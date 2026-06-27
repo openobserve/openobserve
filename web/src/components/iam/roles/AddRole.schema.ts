@@ -26,4 +26,6 @@ export const makeAddRoleSchema = (
 
 export type AddRoleForm = z.infer<ReturnType<typeof makeAddRoleSchema>>;
 
-export const addRoleDefaults = (): AddRoleForm => ({ name: "" });
+// Defaults live in a typed component computed in AddRole.vue (edit-prefill: the
+// optional `role` prop seeds the name on open, blank otherwise) — not a static
+// factory here.

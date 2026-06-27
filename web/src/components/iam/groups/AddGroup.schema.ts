@@ -26,7 +26,6 @@ export const makeAddGroupSchema = (
 
 export type AddGroupForm = z.infer<ReturnType<typeof makeAddGroupSchema>>;
 
-// Static (create-only) defaults. AppGroups always opens this dialog in create
-// mode; the optional `group` prop only seeds the name when present (handled by a
-// typed component computed in the .vue).
-export const addGroupDefaults = (): AddGroupForm => ({ name: "" });
+// Defaults live in a typed component computed in AddGroup.vue (edit-prefill: the
+// optional `group` prop seeds the name on open, blank otherwise) — not a static
+// factory here.

@@ -16,24 +16,33 @@ import { z } from "zod";
 
 export const serviceAccountEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// The form always carries both editable fields (`email` is "" in update mode);
+// the type derives straight from this base shape via z.infer.
+const addServiceAccountBaseSchema = z.object({
+  email: z.string(),
+  first_name: z.string(),
+});
+
+export type AddServiceAccountForm = z.infer<typeof addServiceAccountBaseSchema>;
+
+// `email` is CREATE-ONLY: required + a valid-email regex in create mode (mirrors
+// the pre-migration `rules.email(v) || 'Please enter a valid email address'`), and
+// skipped entirely in update mode (the field is neither rendered nor submitted).
+// Modelled as a conditional superRefine — like AddUser — so the base shape (and
+// its z.infer type) stay stable across modes. The mode (`beingUpdated`) is
+// supplied by the component; the dialog body remounts per open, so OForm always
+// reads the right variant.
 export const makeAddServiceAccountSchema = (
   beingUpdated: boolean,
   t: (_key: string) => string,
 ) =>
-  z.object({
-    email: beingUpdated
-      ? z.string().optional()
-      : z
-          .string()
-          .min(1, t("serviceAccounts.emailInvalid"))
-          .regex(serviceAccountEmailRegex, t("serviceAccounts.emailInvalid")),
-    first_name: z.string().optional(),
+  addServiceAccountBaseSchema.superRefine((val, ctx) => {
+    if (beingUpdated) return;
+    if (val.email.length < 1 || !serviceAccountEmailRegex.test(val.email)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["email"],
+        message: t("serviceAccounts.emailInvalid"),
+      });
+    }
   });
-
-// Explicit form type (the factory's two branches differ only in whether `email`
-// is required, so a hand-written type is clearer than a z.infer union). The form
-// always carries both fields; `email` is "" in update mode.
-export interface AddServiceAccountForm {
-  email: string;
-  first_name: string;
-}
