@@ -58,11 +58,27 @@ fi
 
 WORKFLOW_TAG="test"; [ "$STREAM" = "ci_regression" ] && WORKFLOW_TAG="regression"
 
+# Build-job duration + shard tallies from this attempt's jobs, added to the run doc:
+#   build_duration_sec  — wall-clock of the "build_binary" job (null if absent)
+#   shards_total/passed/failed/skipped — counts of the "e2e / *" shard jobs by conclusion
+# Shard jobs are matched by the "e2e /" name prefix; the build job by exact name "build_binary".
+# Suites without these jobs (e.g. API) get null/0 — harmless, those panels just stay empty.
+JOBDUR='if (.completed_at and .started_at) then ((.completed_at|fromdateiso8601)-(.started_at|fromdateiso8601)) else null end'
+BUILD_DUR=$(printf '%s' "$THIS_JOBS" | jq "[.jobs[]|select(.name==\"build_binary\")]|.[0]|if . then ($JOBDUR) else null end" 2>/dev/null)
+[ -n "$BUILD_DUR" ] || BUILD_DUR=null
+SHARDS=$(printf '%s' "$THIS_JOBS" | jq -c '[.jobs[]|select(.name|startswith("e2e /"))] as $s
+  | {shards_total:($s|length),
+     shards_passed:([$s[]|select(.conclusion=="success")]|length),
+     shards_failed:([$s[]|select(.conclusion=="failure")]|length),
+     shards_skipped:([$s[]|select(.conclusion=="skipped" or .conclusion=="cancelled")]|length)}' 2>/dev/null)
+[ -n "$SHARDS" ] || SHARDS='{}'
+
 printf '%s' "$RUN_JSON" | jq \
   --arg suite "$SUITE" --arg conclusion "$CONCLUSION" --arg wf "$WORKFLOW_TAG" \
   --arg repo "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" --arg attempt "$ATT" \
   --arg run_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${ATT}" \
   --argjson final "${FINAL_DUR:-0}" --argjson total "${TOTAL_DUR:-0}" \
+  --argjson build "$BUILD_DUR" --argjson shards "$SHARDS" \
   '($attempt|tonumber) as $a |
    {
      _timestamp: ((.run_started_at // .created_at | fromdateiso8601) * 1000000 | floor),
@@ -74,7 +90,10 @@ printf '%s' "$RUN_JSON" | jq \
      pr_number: (.pull_requests[0].number // null),
      run_url: $run_url,
      final_duration_sec: ($final|round), total_duration_sec: ($total|round),
-     retry_wasted_sec: (($total-$final)|round)
+     retry_wasted_sec: (($total-$final)|round),
+     build_duration_sec: ($build | if .==null then null else round end),
+     shards_total: ($shards.shards_total // null), shards_passed: ($shards.shards_passed // null),
+     shards_failed: ($shards.shards_failed // null), shards_skipped: ($shards.shards_skipped // null)
    }' > "$PAYLOAD_FILE" 2>/dev/null || { echo "::warning::payload build failed"; exit 0; }
 
 # Optional EXTRA_JSON: shallow-merge caller-supplied fields into the doc (e.g. test counts).

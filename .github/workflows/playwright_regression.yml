@@ -878,3 +878,24 @@ jobs:
             " > payload.json || { echo "::warning::payload build failed"; echo '{}' > payload.json; }
 
           bash .github/scripts/o2-report.sh ci_regression payload.json
+
+          # Also emit one row per shard to the ci_regression_shards stream, flattened from
+          # payload.shards (each = {name, conclusion, duration_sec}). Powers per-shard duration /
+          # slowest-shard / per-module panels. Row schema:
+          #   run_id, repo, workflow="regression", ingest_source="live",
+          #   shard_name (raw job name), module (shard_name minus "e2e / " prefix and "-Regression"
+          #   suffix; "unknown" if empty), conclusion, duration_sec.
+          # _timestamp is intentionally NOT set, so OpenObserve stamps ingest time — same as the run
+          # doc above (which also leaves it unset), keeping the two streams time-aligned.
+          shards_json=$(jq -c --arg repo "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" \
+            '[.shards[]? | {
+              run_id: $run_id, repo: $repo, workflow: "regression", ingest_source: "live",
+              shard_name: .name,
+              module: (.name | sub("^e2e / ";"") | sub("-Regression$";"") | if . == "" then "unknown" else . end),
+              conclusion: .conclusion, duration_sec: .duration_sec
+            }]' payload.json 2>/dev/null) && printf '%s' "$shards_json" > shards.json || echo '[]' > shards.json
+          if [ "$(jq 'length' shards.json 2>/dev/null || echo 0)" -gt 0 ]; then
+            bash .github/scripts/o2-report.sh ci_regression_shards shards.json
+          else
+            echo "::notice::no shard rows to emit"
+          fi
