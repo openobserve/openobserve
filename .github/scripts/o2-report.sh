@@ -33,14 +33,19 @@ if [ ! -s "$PAYLOAD" ]; then
   exit 0
 fi
 
-# OpenObserve's _json endpoint accepts a single object or an array; wrap to an array.
 # Stream the body from a temp file (mktemp → unique per invocation, no shared-/tmp races,
 # no whole-payload-in-a-shell-var).
 URL="${O2_REPORTING_INGEST_BASE%/}/${STREAM}/_json"
 BODY_FILE=$(mktemp "${TMPDIR:-/tmp}/o2_report_body.XXXXXX")
 RESP_FILE=$(mktemp "${TMPDIR:-/tmp}/o2_report_resp.XXXXXX")
 trap 'rm -f "$BODY_FILE" "$RESP_FILE"' EXIT
-{ printf '['; cat "$PAYLOAD"; printf ']'; } > "$BODY_FILE"
+# _json accepts a single object OR an array. Wrap a bare object in [ ]; pass an existing array
+# through unchanged so multi-row callers (e.g. per-shard rows) aren't double-wrapped into [[...]].
+if [ "$(tr -d '[:space:]' < "$PAYLOAD" | cut -c1)" = "[" ]; then
+  cat "$PAYLOAD" > "$BODY_FILE"
+else
+  { printf '['; cat "$PAYLOAD"; printf ']'; } > "$BODY_FILE"
+fi
 
 INSECURE=""
 [ "${O2_REPORTING_INSECURE:-}" = "true" ] && INSECURE="-k"
