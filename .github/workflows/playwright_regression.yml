@@ -236,7 +236,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-chromium-24-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
 
       - name: Install npm dependencies
         run: cd tests/ui-testing && npm ci

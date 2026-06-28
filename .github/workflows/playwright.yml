@@ -483,7 +483,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-chromium-24-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
 
       - name: Check if this is a rerun
         id: check_rerun
