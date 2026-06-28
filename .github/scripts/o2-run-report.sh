@@ -58,8 +58,11 @@ fi
 
 WORKFLOW_TAG="test"; [ "$STREAM" = "ci_regression" ] && WORKFLOW_TAG="regression"
 
-# Build-job duration + shard tallies from this attempt's jobs (shard jobs are named "e2e / ...";
-# the app build job is "build_binary"). Null/0 for suites without them (e.g. API) — harmless.
+# Build-job duration + shard tallies from this attempt's jobs, added to the run doc:
+#   build_duration_sec  — wall-clock of the "build_binary" job (null if absent)
+#   shards_total/passed/failed/skipped — counts of the "e2e / *" shard jobs by conclusion
+# Shard jobs are matched by the "e2e /" name prefix; the build job by exact name "build_binary".
+# Suites without these jobs (e.g. API) get null/0 — harmless, those panels just stay empty.
 JOBDUR='if (.completed_at and .started_at) then ((.completed_at|fromdateiso8601)-(.started_at|fromdateiso8601)) else null end'
 BUILD_DUR=$(printf '%s' "$THIS_JOBS" | jq "[.jobs[]|select(.name==\"build_binary\")]|.[0]|if . then ($JOBDUR) else null end" 2>/dev/null)
 [ -n "$BUILD_DUR" ] || BUILD_DUR=null
