@@ -78,7 +78,7 @@ printf '%s' "$RUN_JSON" | jq \
   --arg repo "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" --arg attempt "$ATT" \
   --arg run_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${ATT}" \
   --argjson final "${FINAL_DUR:-0}" --argjson total "${TOTAL_DUR:-0}" \
-  --argjson build "${BUILD_DUR:-null}" --argjson shards "${SHARDS:-{}}" \
+  --argjson build "$BUILD_DUR" --argjson shards "$SHARDS" \
   '($attempt|tonumber) as $a |
    {
      _timestamp: ((.run_started_at // .created_at | fromdateiso8601) * 1000000 | floor),
