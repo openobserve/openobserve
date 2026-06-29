@@ -67,8 +67,12 @@ export const removeFieldCondition = (
   fieldName: string,
 ): string => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const fieldPattern = new RegExp(`^"?${esc}"?\\s*[=!<>]`, "i");
-  const multiPattern = new RegExp(`^\\(\\s*"?${esc}"?\\s*[=!<>]`, "i");
+  // Operators: comparison (= != > < >= <=) or `IS` (covers IS NULL / IS NOT
+  // NULL produced for null-value filters). Without `is`, null conditions were
+  // never matched and stayed in the query after the value was unchecked.
+  const op = `(?:[=!<>]|is\\b)`;
+  const fieldPattern = new RegExp(`^"?${esc}"?\\s*${op}`, "i");
+  const multiPattern = new RegExp(`^\\(\\s*"?${esc}"?\\s*${op}`, "i");
 
   const removeFromClause = (clause: string): string => {
     const remaining = clause
@@ -84,7 +88,7 @@ export const removeFieldCondition = (
   const parts = queryStr.split("|");
   if (parts.length > 1) {
     parts[1] = removeFromClause(parts[1] as string);
-    return parts.join("|");
+    return parts.join("| ");
   }
   return removeFromClause(parts[0] as string);
 };
