@@ -3,8 +3,9 @@
 
 The API suite is grouped into test CATEGORIES (set by the upload-artifact name
 `api-junit__<category>__<leg>` in api-testing.yml):
-  OSS = api_integration_tests, query_agent_tests
-  ENT = api_integration_tests, query_agent_tests, cli, vortex
+  OSS = api_integration_tests, query_agent_memtable, query_agent_parquet
+  ENT = api_integration_tests, query_agent_memtable, query_agent_parquet, cli, vortex
+(query_agent is split by phase — see PHASE_RE below.)
 Several jobs/shards fold into one category (their test sets are DISJOINT, so the
 dedup below makes "within-category dedup" == sum):
   api_integration_tests = the integration default-set + regression (+ ENT's
@@ -35,10 +36,21 @@ Best-effort: unreadable files are skipped; on no input it still prints zeroes.
 import glob
 import json
 import os
+import re
 import sys
 import xml.etree.ElementTree as ET
 
 RANK = {"skipped": 0, "passed": 1, "failed": 2}
+
+# The query_agent SQL suite runs every query in two phases — memtable and parquet
+# (pytest classes test_1_memtable / test_2_parquet) — and a vortex phase
+# (test_3_vortex). They're genuinely separate tests (different code paths), so
+# rather than one big query_agent bucket we split it BY PHASE from the classname:
+# query_agent_memtable / query_agent_parquet, and route the vortex phase into the
+# `vortex` category (so ENT's main query_agent run, which also executes
+# test_3_vortex, merges with the dedicated vortex job). Tests whose classname
+# doesn't match keep their artifact-derived category untouched.
+PHASE_RE = re.compile(r"test_\d+_(memtable|parquet|vortex)")
 
 
 def category_of(path: str, root: str) -> str:
@@ -46,6 +58,14 @@ def category_of(path: str, root: str) -> str:
     top = rel.split(os.sep)[0]  # per-artifact subdir name
     parts = top.split("__")
     return parts[1] if len(parts) >= 2 else top
+
+
+def refine_category(base: str, classname: str) -> str:
+    m = PHASE_RE.search(classname or "")
+    if not m:
+        return base
+    phase = m.group(1)
+    return "vortex" if phase == "vortex" else f"query_agent_{phase}"
 
 
 def summarize(status_map: dict) -> dict:
@@ -63,15 +83,17 @@ def main() -> int:
     root = sys.argv[1] if len(sys.argv) > 1 else "junit-xml"
     cats: dict[str, dict] = {}
     for path in glob.glob(f"{root}/**/*.xml", recursive=True):
-        cat = category_of(path, root)
-        seen = cats.setdefault(cat, {})
+        base = category_of(path, root)
         try:
             tree = ET.parse(path)
         except Exception as e:  # noqa: BLE001 - skip unreadable/partial files
             print(f"parse-api-junit: skipping {path}: {e}", file=sys.stderr)
             continue
         for tc in tree.getroot().iter("testcase"):
-            key = (tc.get("classname", ""), tc.get("name", ""))
+            classname = tc.get("classname", "")
+            cat = refine_category(base, classname)  # phase-split query_agent
+            seen = cats.setdefault(cat, {})
+            key = (classname, tc.get("name", ""))
             status = "passed"
             for child in tc:
                 tag = child.tag.lower()
