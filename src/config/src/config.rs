@@ -1692,6 +1692,36 @@ pub struct Limit {
     pub alert_considerable_delay: i32,
     #[env_config(name = "ZO_SCHEDULER_WATCH_INTERVAL", default = 30)] // seconds
     pub scheduler_watch_interval: i64,
+    // Per-module scheduler pullers (Part A / A3+A4). When enabled, each TriggerModule gets its
+    // own pull loop, cadence, LIMIT budget, channel and worker pool, so a backlog or slow handler
+    // in one module cannot starve another. Default off → single shared puller (legacy behavior).
+    #[env_config(
+        name = "ZO_SCHEDULER_PER_MODULE_PULLERS",
+        default = false,
+        help = "Run a dedicated pull loop + worker pool per scheduler module. When false, a single shared puller handles all modules (legacy)."
+    )]
+    pub scheduler_per_module_pullers: bool,
+    // Per-module concurrency (LIMIT + channel cap + worker count). 0 = inherit
+    // ZO_ALERT_SCHEDULE_CONCURRENCY. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true.
+    // Backfill defaults to the smallest budget so bulk/background jobs never crowd out others.
+    #[env_config(name = "ZO_SCHEDULER_ALERT_CONCURRENCY", default = 0)]
+    pub scheduler_alert_concurrency: i64,
+    #[env_config(name = "ZO_SCHEDULER_REPORT_CONCURRENCY", default = 0)]
+    pub scheduler_report_concurrency: i64,
+    #[env_config(name = "ZO_SCHEDULER_DERIVED_STREAM_CONCURRENCY", default = 0)]
+    pub scheduler_derived_stream_concurrency: i64,
+    #[env_config(name = "ZO_SCHEDULER_BACKFILL_CONCURRENCY", default = 1)]
+    pub scheduler_backfill_concurrency: i64,
+    #[env_config(name = "ZO_SCHEDULER_ANOMALY_CONCURRENCY", default = 0)]
+    pub scheduler_anomaly_concurrency: i64,
+    #[env_config(name = "ZO_SCHEDULER_QUERY_RECO_CONCURRENCY", default = 0)]
+    pub scheduler_query_reco_concurrency: i64,
+    // Per-module cadence in seconds. 0 = inherit ZO_ALERT_SCHEDULE_INTERVAL, except
+    // derived_stream which falls back to ZO_DERIVED_STREAM_SCHEDULE_INTERVAL.
+    #[env_config(name = "ZO_SCHEDULER_BACKFILL_INTERVAL", default = 0)] // seconds
+    pub scheduler_backfill_interval: i64,
+    #[env_config(name = "ZO_SCHEDULER_DERIVED_STREAM_INTERVAL", default = 0)] // seconds
+    pub scheduler_derived_stream_interval: i64,
     #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
     pub search_job_workers: i64,
     #[env_config(name = "ZO_SEARCH_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds
