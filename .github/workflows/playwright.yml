@@ -206,6 +206,7 @@ jobs:
                 "dashboard-nested-functions.spec.js",
                 "dashboard-legends-copy.spec.js",
                 "dashboard-raw-query.spec.js",
+                "customVariableDefaultValue.spec.js",
               ]
           - testfolder: "Dashboards-Charts"
             browser: "chrome"
