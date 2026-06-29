@@ -531,10 +531,12 @@ export default defineComponent({
     );
 
     // Bridge programmatic licenseKey changes (URL auto-fill, cancel/clear) into
-    // whichever card's form is mounted so the textarea + schema see them.
+    // whichever card's form is mounted. Use form.reset (NOT setFieldValue) so the
+    // field re-seeds AND submit state resets (submissionAttempts → 0) — no
+    // post-save "required" flash on the v-show'd update card when clearing to "".
     watch(licenseKey, (v) => {
-      noLicenseForm.value?.form?.setFieldValue("licenseKey", v ?? "");
-      updateLicenseForm.value?.form?.setFieldValue("licenseKey", v ?? "");
+      noLicenseForm.value?.form?.reset({ licenseKey: v ?? "" });
+      updateLicenseForm.value?.form?.reset({ licenseKey: v ?? "" });
     });
 
     const loadLicenseData = async () => {
