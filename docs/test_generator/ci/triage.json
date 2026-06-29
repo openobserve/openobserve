@@ -1,0 +1,27 @@
+{
+  "feature_slug": "license-limit-refresh",
+  "feature_title": "License Limit Refresh",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "licenseLimitRefresh.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/licenseLimitRefresh.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/License.vue",
+    "web/src/services/license_server.ts",
+    "web/src/enterprise/components/billings/UsageReportBanner.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The diff spans both OSS and enterprise paths: the bulk of the change is in OSS locations (src/common/utils/, src/handler/http/, web/src/components/settings/, web/src/services/), while web/src/enterprise/components/billings/UsageReportBanner.vue sits in the enterprise layer. The license feature itself is enterprise-gated (keyword 'license' present in paths and symbols), but the implementation layers span both trees — classified as 'both'.",
+    "skip": "Not skipped. The trigger comment is empty (no explicit opt-out like 'tests-added' or a skip request). The change is user-facing: it adds a new 'Refresh License Limits' button in the License settings UI and alters the Usage Report Banner display timeout. These are exercisable UI flows that warrant E2E testing.",
+    "e2e": "E2E is warranted. The diff adds a new interactive button ('Refresh License Limits') to the License settings page (web/src/components/settings/License.vue) with success/error notification states, and modifies the Usage Report Banner refresh interval. Both are user-facing UI behaviors that need verification across different license states and error scenarios.",
+    "area": "The License settings page is a system-level administration feature. The GeneralTests group already hosts similar ENT-gated settings specs (cipherKeys.spec.js, logoManagement.spec.js, ingestion-config.spec.js) and organization-level tests, making it the closest fit for a license management spec.",
+    "group": "The GeneralTests matrix shard in playwright.yml runs administrative/configuration specs including ENT-gated features like cipher keys and logo management. The license refresh spec fits naturally alongside these — same kind of settings-page, admin-only UI interaction, same ENT feature tier.",
+    "existing_tests": "No Playwright E2E specs (tests/ui-testing/playwright-tests/**/*.spec.js) are added or modified in this diff. The diff only touches backend Rust code, Vue components, locale JSON files, and a TypeScript service — none of which are E2E test specs."
+  }
+}

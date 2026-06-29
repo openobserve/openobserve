@@ -1,0 +1,325 @@
+diff --git a/src/common/utils/auth.rs b/src/common/utils/auth.rs
+index cfda1dfebbf..8f74b6cee0b 100644
+--- a/src/common/utils/auth.rs
++++ b/src/common/utils/auth.rs
+@@ -1059,6 +1059,7 @@ where
+             || path_is_bulk_operation
+             // for license the function itself with do a perm check
+             || (url_len == 1 && path.contains("license"))
++            || (url_len == 2 && path.contains("/license/refresh"))
+             // service_streams APIs are org-level, not stream-specific
+             || path.contains("/service_streams/_analytics")
+             || path.contains("/service_streams/_correlate")
+diff --git a/src/handler/http/auth/validator.rs b/src/handler/http/auth/validator.rs
+index 642085e2d3f..2308a546070 100644
+--- a/src/handler/http/auth/validator.rs
++++ b/src/handler/http/auth/validator.rs
+@@ -588,7 +588,7 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
+         path_columns.remove(0);
+     }
+     let url_len = path_columns.len();
+-    if path_columns.len() < 2 {
++    if path_columns.len() < 2 || path_columns.first().eq(&Some(&"license")) {
+         return Ok(());
+     }
+     // node and profile are special prefixes, they do not need to create org
+diff --git a/src/handler/http/request/license/mod.rs b/src/handler/http/request/license/mod.rs
+index 49c062ad106..b1dbab696f0 100644
+--- a/src/handler/http/request/license/mod.rs
++++ b/src/handler/http/request/license/mod.rs
+@@ -161,3 +161,22 @@ pub async fn store_license(
+         Err(e) => MetaHttpResponse::internal_error(e),
+     }
+ }
++
++pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> Response {
++    let email = user_email.user_id;
++    if check_license_permission(&email, "PUT").await.is_err() {
++        return MetaHttpResponse::forbidden("Unauthorized Access to license");
++    }
++
++    // check  if license is present. If not present, no point in refreshing
++    match get_license().await {
++        Some(_) => {}
++        None => return (StatusCode::OK, Json("")).into_response(),
++    };
++
++    // the nats handling flow will trigger limit refresh in all nodes
++    match license::update().await {
++        Ok(_) => (StatusCode::OK, Json("")).into_response(),
++        Err(e) => MetaHttpResponse::internal_error(e),
++    }
++}
+diff --git a/src/handler/http/router/mod.rs b/src/handler/http/router/mod.rs
+index ceb2fd19299..53140ee5685 100644
+--- a/src/handler/http/router/mod.rs
++++ b/src/handler/http/router/mod.rs
+@@ -886,6 +886,7 @@ pub fn service_routes() -> Router {
+ 
+             // License
+             .route("/license", get(license::get_license_info).post(license::store_license))
++            .route("/license/refresh", post(license::refresh_license_limits))
+ 
+             // Topology
+             .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))
+diff --git a/web/src/components/settings/License.vue b/web/src/components/settings/License.vue
+index 3894096e3ed..0daeedd3bed 100644
+--- a/web/src/components/settings/License.vue
++++ b/web/src/components/settings/License.vue
+@@ -142,6 +142,13 @@
+                 :label="t('about.add_new_license_key')"
+                 @click="showUpdateFormAndFocus"
+               />
++              <q-btn
++                data-test="refresh-license-limits-btn"
++                no-caps
++                class="o2-primary-button"
++                :label="t('about.refresh_license_limits')"
++                @click="triggerLimitRefresh"
++              />
+             </div>
+           </q-card-section>
+         </q-card>
+@@ -418,6 +425,24 @@ export default defineComponent({
+         }
+       }, 100);
+     };
++    
++    const triggerLimitRefresh = async ()=>{
++       try {
++        await licenseServer.refresh_license_limits();
++        $q.notify({
++          type: "positive",
++          message: t("about.license_refresh_success"),
++        });
++      } catch (error) {
++        console.error("Error refreshing license:", error);
++        $q.notify({
++          type: "negative",
++          message: t("about.failed_to_refresh_license") +
++            " : " +
++            (error?.response?.data?.message || "unexpected error"),
++        });
++      }
++    }
+ 
+     const maskKey = (key: string) => {
+       if (!key) return '';
+@@ -800,6 +825,7 @@ export default defineComponent({
+       showLicenseExpiryWarning,
+       getLicenseExpiryMessage,
+       showUpdateFormAndFocus,
++      triggerLimitRefresh,
+       maskKey,
+       getMaskedLicenseKey,
+       copyLicenseKey,
+diff --git a/web/src/enterprise/components/billings/UsageReportBanner.vue b/web/src/enterprise/components/billings/UsageReportBanner.vue
+index d899fd955b7..fe229769b82 100644
+--- a/web/src/enterprise/components/billings/UsageReportBanner.vue
++++ b/web/src/enterprise/components/billings/UsageReportBanner.vue
+@@ -33,7 +33,7 @@ export default defineComponent({
+     const SEVEN_DAYS = 7 * 24 * ONE_HOUR;
+ 
+     const showBanner = computed(() => {
+-      return elapsedMs.value > ONE_HOUR;
++      return elapsedMs.value > 6 * ONE_HOUR;
+     });
+ 
+     const isSevere = computed(() => {
+diff --git a/web/src/locales/languages/de.json b/web/src/locales/languages/de.json
+index 293233e706d..c848c1d2001 100644
+--- a/web/src/locales/languages/de.json
++++ b/web/src/locales/languages/de.json
+@@ -779,7 +779,10 @@
+     "feature_correlation_management": "Korrelationsmanagement",
+     "feature_log_patterns": "Muster protokollieren",
+     "environment_type": "Art der Umgebung",
+-    "license_allows_unlimited_ingestion": "Die aktuelle Lizenz ermöglicht eine unbegrenzte Datenaufnahme."
++    "license_allows_unlimited_ingestion": "Die aktuelle Lizenz ermöglicht eine unbegrenzte Datenaufnahme.",
++    "refresh_license_limits": "Lizenzlimits aktualisieren",
++    "license_refresh_success": "Die Aktualisierung des Lizenzlimits wurde erfolgreich ausgelöst",
++    "failed_to_refresh_license": "Lizenzlimits konnten nicht aktualisiert werden"
+   },
+   "login": {
+     "userid": "Benutzer-ID",
+diff --git a/web/src/locales/languages/en.json b/web/src/locales/languages/en.json
+index df19de622f9..d7f60977611 100644
+--- a/web/src/locales/languages/en.json
++++ b/web/src/locales/languages/en.json
+@@ -582,6 +582,7 @@
+     "environment_type": "Environment Type",
+     "request_new_license": "Request new License",
+     "add_new_license_key": "Add New License Key",
++    "refresh_license_limits": "Refresh License Limits",
+     "update_license_key": "Update License Key",
+     "paste_new_license_placeholder": "Paste new license key here...",
+     "your_complete_license_key": "Your complete license key:",
+@@ -596,6 +597,8 @@
+     "usage_shows_zero_unlimited": "* Usage shows 0% for unlimited plans",
+     "license_updated_success": "License updated successfully",
+     "failed_to_update_license": "Failed to update license",
++    "license_refresh_success": "License limit refresh triggered successfully",
++    "failed_to_refresh_license": "Failed to refresh license limits",
+     "license_key_copied": "License key copied to clipboard",
+     "failed_to_copy_license": "Failed to copy license key",
+     "license_already_active_title": "License Already Active",
+diff --git a/web/src/locales/languages/es.json b/web/src/locales/languages/es.json
+index f88e0876fb2..7c1beaf9b35 100644
+--- a/web/src/locales/languages/es.json
++++ b/web/src/locales/languages/es.json
+@@ -779,7 +779,10 @@
+     "feature_correlation_management": "Gestión de correlaciones",
+     "feature_log_patterns": "Patrones de registro",
+     "environment_type": "Tipo de entorno",
+-    "license_allows_unlimited_ingestion": "La licencia actual permite la ingesta ilimitada de datos."
++    "license_allows_unlimited_ingestion": "La licencia actual permite la ingesta ilimitada de datos.",
++    "refresh_license_limits": "Actualizar los límites de la licencia",
++    "license_refresh_success": "La actualización del límite de licencia se activó correctamente",
++    "failed_to_refresh_license": "No se pudieron actualizar los límites de licencia"
+   },
+   "login": {
+     "userid": "ID de usuario",
+diff --git a/web/src/locales/languages/fr.json b/web/src/locales/languages/fr.json
+index d49e702d98f..d451fdee3ce 100644
+--- a/web/src/locales/languages/fr.json
++++ b/web/src/locales/languages/fr.json
+@@ -779,7 +779,10 @@
+     "feature_correlation_management": "Gestion des corrélations",
+     "feature_log_patterns": "Modèles de journaux",
+     "environment_type": "Type d'environnement",
+-    "license_allows_unlimited_ingestion": "La licence actuelle permet une ingestion de données illimitée."
++    "license_allows_unlimited_ingestion": "La licence actuelle permet une ingestion de données illimitée.",
++    "refresh_license_limits": "Actualiser les limites de licence",
++    "license_refresh_success": "Actualisation de la limite de licence déclenchée avec succès",
++    "failed_to_refresh_license": "Impossible d'actualiser les limites de licence"
+   },
+   "login": {
+     "userid": "ID utilisateur",
+diff --git a/web/src/locales/languages/it.json b/web/src/locales/languages/it.json
+index 8e143eae6d7..0646348c86f 100644
+--- a/web/src/locales/languages/it.json
++++ b/web/src/locales/languages/it.json
+@@ -779,7 +779,10 @@
+     "feature_correlation_management": "Gestione delle correlazioni",
+     "feature_log_patterns": "Schemi di registro",
+     "environment_type": "Tipo di ambiente",
+-    "license_allows_unlimited_ingestion": "La licenza attuale consente l'inserimento illimitato dei dati."
++    "license_allows_unlimited_ingestion": "La licenza attuale consente l'inserimento illimitato dei dati.",
++    "refresh_license_limits": "Aggiorna i limiti delle licenze",
++    "license_refresh_success": "L'aggiornamento del limite di licenza è stato attivato correttamente",
++    "failed_to_refresh_license": "Aggiornamento dei limiti di licenza non riuscito"
+   },
+   "login": {
+     "userid": "ID utente",
+diff --git a/web/src/locales/languages/ja.json b/web/src/locales/languages/ja.json
+index c37a7e13fc9..2c4d5ecb018 100644
+--- a/web/src/locales/languages/ja.json
++++ b/web/src/locales/languages/ja.json
+@@ -779,7 +779,10 @@
+     "feature_correlation_management": "相関管理",
+     "feature_log_patterns": "ログパターン",
+     "environment_type": "環境タイプ",
+-    "license_allows_unlimited_ingestion": "現在のライセンスでは、無制限のデータ取り込みが可能です。"
++    "license_allows_unlimited_ingestion": "現在のライセンスでは、無制限のデータ取り込みが可能です。",
++    "refresh_license_limits": "ライセンス制限を更新",
++    "license_refresh_success": "ライセンス制限の更新が正常にトリガーされました",
++    "failed_to_refresh_license": "ライセンス制限を更新できませんでした"
+   },
+   "login": {
+     "userid": "ユーザーID",
+diff --git a/web/src/locales/languages/ko.json b/web/src/locales/languages/ko.json
+index c613a974b64..ba5eb204df7 100644
+--- a/web/src/locales/languages/ko.json
++++ b/web/src/locales/languages/ko.json
+@@ -779,7 +779,10 @@
+     "feature_correlation_management": "상관관계 관리",
+     "feature_log_patterns": "로그 패턴",
+     "environment_type": "환경 유형",
+-    "license_allows_unlimited_ingestion": "현재 라이선스는 무제한 데이터 수집을 허용합니다."
++    "license_allows_unlimited_ingestion": "현재 라이선스는 무제한 데이터 수집을 허용합니다.",
++    "refresh_license_limits": "라이선스 제한 새로고침",
++    "license_refresh_success": "라이선스 한도 새로 고침이 성공적으로 트리거됨",
++    "failed_to_refresh_license": "라이선스 제한을 새로 고치지 못했습니다."
+   },
+   "login": {
+     "userid": "사용자 ID",
+diff --git a/web/src/locales/languages/nl.json b/web/src/locales/languages/nl.json
+index d385f731c5b..8d3d62a8a1b 100644
+--- a/web/src/locales/languages/nl.json
++++ b/web/src/locales/languages/nl.json
+@@ -779,7 +779,10 @@
+     "feature_correlation_management": "Correlatiebeheer",
+     "feature_log_patterns": "Logpatronen",
+     "environment_type": "Omgevingstype",
+-    "license_allows_unlimited_ingestion": "De huidige licentie staat onbeperkte gegevensinvoer toe."
++    "license_allows_unlimited_ingestion": "De huidige licentie staat onbeperkte gegevensinvoer toe.",
++    "refresh_license_limits": "Licentielimieten vernieuwen",
++    "license_refresh_success": "De vernieuwing van de licentielimiet is met succes geactiveerd",
++    "failed_to_refresh_license": "Het vernieuwen van de licentielimieten is mislukt"
+   },
+   "login": {
+     "userid": "Gebruikers-ID",
+diff --git a/web/src/locales/languages/pt.json b/web/src/locales/languages/pt.json
+index 7b128b1e121..7a8d0b92194 100644
+--- a/web/src/locales/languages/pt.json
++++ b/web/src/locales/languages/pt.json
+@@ -779,7 +779,10 @@
+     "feature_correlation_management": "Gerenciamento de correlações",
+     "feature_log_patterns": "Padrões de registro",
+     "environment_type": "Tipo de ambiente",
+-    "license_allows_unlimited_ingestion": "A licença atual permite a ingestão ilimitada de dados."
++    "license_allows_unlimited_ingestion": "A licença atual permite a ingestão ilimitada de dados.",
++    "refresh_license_limits": "Atualizar limites de licença",
++    "license_refresh_success": "A atualização do limite de licença foi acionada com sucesso",
++    "failed_to_refresh_license": "Falha ao atualizar os limites da licença"
+   },
+   "login": {
+     "userid": "ID do usuário",
+diff --git a/web/src/locales/languages/tr.json b/web/src/locales/languages/tr.json
+index c0e3dcfc755..8da974580d1 100644
+--- a/web/src/locales/languages/tr.json
++++ b/web/src/locales/languages/tr.json
+@@ -779,7 +779,10 @@
+     "feature_correlation_management": "Korelasyon yönetimi",
+     "feature_log_patterns": "Günlük kalıpları",
+     "environment_type": "Ortam Türü",
+-    "license_allows_unlimited_ingestion": "Mevcut lisans sınırsız veri alımına izin verir."
++    "license_allows_unlimited_ingestion": "Mevcut lisans sınırsız veri alımına izin verir.",
++    "refresh_license_limits": "Lisans Sınırlarını Yenile",
++    "license_refresh_success": "Lisans sınırı yenileme başarıyla tetiklendi",
++    "failed_to_refresh_license": "Lisans sınırları yenilenemedi"
+   },
+   "login": {
+     "userid": "Kullanıcı Kimliği",
+diff --git a/web/src/locales/languages/zh.json b/web/src/locales/languages/zh.json
+index 607e04d1682..353c47e3f82 100644
+--- a/web/src/locales/languages/zh.json
++++ b/web/src/locales/languages/zh.json
+@@ -779,7 +779,10 @@
+     "feature_correlation_management": "关联管理",
+     "feature_log_patterns": "日志模式",
+     "environment_type": "环境类型",
+-    "license_allows_unlimited_ingestion": "当前的许可证允许无限制地摄取数据。"
++    "license_allows_unlimited_ingestion": "当前的许可证允许无限制地摄取数据。",
++    "refresh_license_limits": "刷新许可证限制",
++    "license_refresh_success": "成功触发许可证限制刷新",
++    "failed_to_refresh_license": "未能刷新许可限制"
+   },
+   "login": {
+     "userid": "账号",
+diff --git a/web/src/services/license_server.ts b/web/src/services/license_server.ts
+index c8e41043314..487d84c0bb9 100644
+--- a/web/src/services/license_server.ts
++++ b/web/src/services/license_server.ts
+@@ -11,6 +11,10 @@ const licenseServer = {
+         const url = `/api/license`;
+         return http().post(url, { key: licenseKey });
+     },
++    refresh_license_limits: () => {
++        const url = `/api/license/refresh`;
++        return http().post(url, { });
++    },
+ };
+ 
+ export default licenseServer;
+\ No newline at end of file

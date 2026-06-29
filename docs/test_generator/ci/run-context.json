@@ -1,0 +1,19 @@
+{
+  "feature_slug": "license-limit-refresh",
+  "feature_title": "License Limit Refresh",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "licenseLimitRefresh.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/licenseLimitRefresh.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/License.vue",
+    "web/src/services/license_server.ts",
+    "web/src/enterprise/components/billings/UsageReportBanner.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

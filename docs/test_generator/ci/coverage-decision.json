@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/licenseLimitRefresh.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/sanity.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/theme-management.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/changeOrg.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing E2E test covers the License settings page at all. The feature adds a new 'Refresh License Limits' button to the License page and a new POST /api/license/refresh endpoint. This is a genuinely new feature area in the GeneralTests suite — a new spec is appropriate."
+}

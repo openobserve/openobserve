@@ -61,6 +61,7 @@ import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.
 import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
+const { LicensePage } = require("./generalPages/licensePage.js");
 const APICleanup = require("./apiCleanup.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
@@ -146,8 +147,9 @@ class PageManager {
     this.languagePage = new LanguagePage(page);
     this.correlationSettingsPage = new CorrelationSettingsPage(page);
     this.crossLinkPage = new CrossLinkPage(page);
-    this.schemaPage = new SchemaPage(page);
-    this.schemaLoadPage = new SchemaLoadPage(page);
+        this.schemaPage = new SchemaPage(page);
+        this.schemaLoadPage = new SchemaLoadPage(page);
+        this.licensePage = new LicensePage(page);
 
     // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
     this.logsQueryPage = new LogsQueryPage(page);

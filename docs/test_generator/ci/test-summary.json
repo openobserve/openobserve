@@ -1,0 +1,27 @@
+[
+  {
+    "title": "should show success notification when Refresh License Limits is clicked",
+    "action": "new",
+    "verifies": "clicking Refresh License Limits triggers a successful API call and displays a positive Quasar notification"
+  },
+  {
+    "title": "should not show Refresh License Limits button when no license is installed",
+    "action": "new",
+    "verifies": "the Refresh License Limits button is not rendered in the no-license state"
+  },
+  {
+    "title": "should show error notification when Refresh License Limits API fails",
+    "action": "new",
+    "verifies": "a 403 API response from POST /api/license/refresh surfaces as a negative Quasar notification"
+  },
+  {
+    "title": "should render Refresh License Limits as the third button in the active-license row",
+    "action": "new",
+    "verifies": "the three license-action buttons are in the correct DOM order"
+  },
+  {
+    "title": "should show usage report banner only when elapsed time exceeds 6 hours",
+    "action": "new",
+    "verifies": "the UsageReportBanner threshold is 6 hours (hidden at 5h, visible at 7h)"
+  }
+]

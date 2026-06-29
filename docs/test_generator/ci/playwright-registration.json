@@ -1,0 +1,6 @@
+{
+  "group": "GeneralTests",
+  "spec_filename": "licenseLimitRefresh.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}
