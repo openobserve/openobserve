@@ -88,7 +88,7 @@ export const removeFieldCondition = (
   const parts = queryStr.split("|");
   if (parts.length > 1) {
     parts[1] = removeFromClause(parts[1] as string);
-    return parts.join("|");
+    return parts.join("| ");
   }
   return removeFromClause(parts[0] as string);
 };
