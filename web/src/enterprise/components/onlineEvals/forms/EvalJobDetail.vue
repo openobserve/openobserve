@@ -26,20 +26,20 @@
     </template>
 
     <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
-    <div class="jd__body-inner">
+    <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
       <!-- ── Global window control ── -->
       <!-- A single date picker drives the WHOLE detail view — the KPI strip
            and both the Runs and Failures tables share this one window. Placed
            above the cards (right-aligned) so it reads as a page-level control,
            not a per-tab filter. Refresh re-queries everything. -->
       <div
-        class="jd__toolbar tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:px-5 tw:pt-3"
+        class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:px-5 tw:pt-3"
       >
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
           v-model="selectedDate"
           :auto-apply-dashboard="true"
-          class="jd__date-picker"
+          class="tw:flex-none"
           data-test="eval-job-detail-window"
         />
         <OButton
@@ -56,10 +56,10 @@
       <!-- ── KPI strip ── -->
       <!-- KPI strip — identical card layout + text styles to the LLM
            Sessions detail page (SessionDetails.vue) so the AI module stays
-           consistent. Card chrome (border/bg/hover) comes from the scoped
-           `.kpi-card` rule below; no sub-caption beneath the value. -->
+           consistent. Pinned band (shrink-0) with a bottom divider; the cards
+           below carry their own chrome via Tailwind. -->
       <section
-        class="jd__kpis tw:grid tw:grid-cols-4 tw:gap-[0.625rem]"
+        class="tw:flex-shrink-0 tw:grid tw:grid-cols-4 tw:gap-[0.625rem] tw:px-5 tw:py-4 tw:border-b tw:border-b-[var(--color-dialog-header-border,var(--o2-border))]"
       >
         <!-- While the KPI query is in flight, show skeleton tiles in place of
              the cards (matches the LLM Insights dashboard pattern). -->
@@ -68,10 +68,10 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="kpi-card tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem]"
+          class="tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem] tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
         >
           <div
-            class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]"
+            class="kpi-label tw:text-[0.7rem] tw:leading-normal tw:font-semibold tw:mb-[0.25rem]"
           >
             {{ card.label }}
           </div>
@@ -95,7 +95,7 @@
       <OTabs
         :model-value="activeTab"
         bordered
-        class="jd__tabs"
+        class="tw:flex-shrink-0 tw:px-5"
         data-test="eval-job-detail-tabs"
         @update:model-value="activeTab = $event as TabId"
       >
@@ -109,15 +109,22 @@
       </OTabs>
 
       <!-- ── Body ── -->
+      <!-- Horizontal padding lives on the children (sections + toolbar), not
+           the body, so the Runs/Failures table sits full-bleed with
+           edge-to-edge column headers. Bottom padding is opt-in for the
+           Configuration (form) tab; the table tabs stay flush to the bottom. -->
       <div
-        class="jd__body"
-        :class="{ 'jd__body--form': activeTab === 'configuration' }"
+        class="tw:flex-1 tw:overflow-auto tw:flex tw:flex-col tw:gap-[18px] tw:min-h-0 tw:pt-[18px]"
+        :class="{ 'tw:pb-[18px]': activeTab === 'configuration' }"
       >
         <!-- Shared Runs/Failures filter row — agent filter (both tabs),
              right-aligned. The date picker + refresh live in the global
              toolbar above the cards, so they're not duplicated here. Rendered
              once with v-show (not v-if) so it never remounts on tab switch. -->
-        <div v-show="tableEnabled" class="jd__runs-toolbar">
+        <div
+          v-show="tableEnabled"
+          class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:flex-wrap tw:px-5"
+        >
           <div class="tw:w-[14rem] tw:flex-shrink-0">
             <OSelect
               v-model="agentKey"
@@ -133,16 +140,18 @@
         <!-- Configuration -->
         <template v-if="activeTab === 'configuration'">
           <!-- Target -->
-          <section class="jd-section">
-            <h4 class="jd-section__title">
+          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+            <h4
+              class="tw:m-0 tw:pb-[6px] tw:inline-flex tw:items-center tw:gap-[6px] tw:text-[13px] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+            >
               {{ t("onlineEvals.job.detail.targetSection") }}
             </h4>
             <dl class="jd-kv">
               <dt>{{ t("onlineEvals.job.detail.streamLabel") }}</dt>
-              <dd class="jd-mono">{{ row.stream }}</dd>
+              <dd>{{ row.stream }}</dd>
 
               <dt>{{ t("onlineEvals.job.detail.streamTypeLabel") }}</dt>
-              <dd class="jd-mono">{{ streamType }}</dd>
+              <dd>{{ streamType }}</dd>
             </dl>
 
             <!-- Filter rendered as a code block with a header bar + copy action,
@@ -174,10 +183,15 @@
           </section>
 
           <!-- Scorers -->
-          <section class="jd-section">
-            <h4 class="jd-section__title">
+          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+            <h4
+              class="tw:m-0 tw:pb-[6px] tw:inline-flex tw:items-center tw:gap-[6px] tw:text-[13px] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+            >
               {{ t("onlineEvals.job.detail.scorersSection") }}
-              <span class="jd-section__chip">{{ resolvedScorers.length }}</span>
+              <span
+                class="tw:inline-flex tw:items-center tw:px-[5px] tw:rounded-[3px] tw:text-[10px] tw:font-semibold tw:text-[var(--color-text-secondary)] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+                >{{ resolvedScorers.length }}</span
+              >
             </h4>
             <OEmptyState
               v-if="resolvedScorers.length === 0"
@@ -207,12 +221,12 @@
                   </span>
                   <div class="jd-scorers__main">
                     <div class="jd-scorers__row">
-                      <span class="jd-mono jd-scorers__name">{{
+                      <span class="jd-scorers__name">{{
                         item.name
                       }}</span>
                       <span
                         v-if="item.scorerTypeLabel"
-                        class="jd-scorers__type"
+                        class="jd-scorers__type tw:text-[10px] tw:font-semibold tw:leading-[1.5]"
                         :class="`jd-scorers__type--${item.scorerType}`"
                       >
                         {{ item.scorerTypeLabel }}
@@ -233,24 +247,26 @@
                       <span class="jd-scorers__produces-prefix">
                         {{ t("onlineEvals.job.detail.producesPrefix") }}
                       </span>
-                      <span class="jd-mono jd-scorers__produces-name">{{
+                      <span class="jd-scorers__produces-name">{{
                         item.scoreConfigName
                       }}</span>
                       <template v-if="item.scoreConfigDataType">
                         <span class="jd-scorers__sep">·</span>
-                        <span class="jd-mono jd-scorers__produces-type">
+                        <span class="jd-scorers__produces-type">
                           {{ item.scoreConfigDataType }}
                         </span>
                       </template>
                       <template v-if="item.scoreConfigRangeText">
                         <span class="jd-scorers__sep">·</span>
-                        <span class="jd-mono jd-scorers__produces-range">
+                        <span class="jd-scorers__produces-range">
                           {{ item.scoreConfigRangeText }}
                         </span>
                       </template>
                     </div>
                   </div>
-                  <span class="jd-scorers__cta">
+                  <span
+                    class="jd-scorers__cta tw:text-[11px] tw:font-semibold"
+                  >
                     <span class="jd-scorers__cta-label">
                       {{ t("onlineEvals.job.detail.viewScorerHint") }}
                     </span>
@@ -266,8 +282,10 @@
           </section>
 
           <!-- Sampling -->
-          <section class="jd-section">
-            <h4 class="jd-section__title">
+          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+            <h4
+              class="tw:m-0 tw:pb-[6px] tw:inline-flex tw:items-center tw:gap-[6px] tw:text-[13px] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+            >
               {{ t("onlineEvals.job.detail.samplingSection") }}
             </h4>
             <dl class="jd-kv">
@@ -277,34 +295,36 @@
               <dt v-if="samplingValue != null">
                 {{ t("onlineEvals.job.detail.samplingValueLabel") }}
               </dt>
-              <dd v-if="samplingValue != null" class="jd-mono">
+              <dd v-if="samplingValue != null">
                 {{ samplingValue }}
               </dd>
             </dl>
           </section>
 
           <!-- Metadata -->
-          <section class="jd-section">
-            <h4 class="jd-section__title">
+          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+            <h4
+              class="tw:m-0 tw:pb-[6px] tw:inline-flex tw:items-center tw:gap-[6px] tw:text-[13px] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+            >
               {{ t("onlineEvals.job.detail.metadataSection") }}
             </h4>
             <dl class="jd-kv">
               <dt>{{ t("onlineEvals.job.detail.versionLabel") }}</dt>
-              <dd class="jd-mono">v{{ row.version }}</dd>
+              <dd>v{{ row.version }}</dd>
               <dt v-if="pipelineId">
                 {{ t("onlineEvals.job.detail.pipelineLabel") }}
               </dt>
-              <dd v-if="pipelineId" class="jd-mono">{{ pipelineId }}</dd>
+              <dd v-if="pipelineId">{{ pipelineId }}</dd>
               <dt v-if="createdAt">
                 {{ t("onlineEvals.job.detail.createdLabel") }}
               </dt>
-              <dd v-if="createdAt" class="jd-mono">
+              <dd v-if="createdAt">
                 {{ formatTimestamp(createdAt) }}
               </dd>
               <dt v-if="updatedAt">
                 {{ t("onlineEvals.job.detail.updatedLabel") }}
               </dt>
-              <dd v-if="updatedAt" class="jd-mono">
+              <dd v-if="updatedAt">
                 {{ formatTimestamp(updatedAt) }}
               </dd>
             </dl>
@@ -333,36 +353,36 @@
             class="tw:w-full"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="jd-mono jd-muted-text">{{
+              <span class="tw:text-[var(--color-text-secondary)]">{{
                 relativeTime(row.timestampMs)
               }}</span>
             </template>
             <template #cell-scorerId="{ row }">
-              <span class="jd-mono">{{ scorerNameFor(row.scorerId) }}</span>
+              <span>{{ scorerNameFor(row.scorerId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
               <span
                 v-if="row.targetSpanId"
-                class="jd-mono jd-target-id"
+                class="tw:block tw:truncate"
                 :title="row.targetSpanId"
                 >{{ row.targetSpanId }}</span
               >
-              <span v-else class="jd-muted-text">—</span>
+              <span v-else class="tw:text-[var(--color-text-secondary)]">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
               <span
                 v-if="row.targetTraceId"
-                class="jd-mono jd-target-id"
+                class="tw:block tw:truncate"
                 :title="row.targetTraceId"
                 >{{ row.targetTraceId }}</span
               >
-              <span v-else class="jd-muted-text">—</span>
+              <span v-else class="tw:text-[var(--color-text-secondary)]">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
-              <span class="jd-mono">{{ row.scoreDisplay }}</span>
+              <span>{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
-              <span class="jd-mono">{{
+              <span>{{
                 row.latencyMs != null ? formatLatency(row.latencyMs) : "—"
               }}</span>
             </template>
@@ -401,36 +421,36 @@
             class="tw:w-full"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="jd-mono jd-muted-text">{{
+              <span class="tw:text-[var(--color-text-secondary)]">{{
                 relativeTime(row.timestampMs)
               }}</span>
             </template>
             <template #cell-scorerId="{ row }">
-              <span class="jd-mono">{{ scorerNameFor(row.scorerId) }}</span>
+              <span>{{ scorerNameFor(row.scorerId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
               <span
                 v-if="row.targetSpanId"
-                class="jd-mono jd-target-id"
+                class="tw:block tw:truncate"
                 :title="row.targetSpanId"
                 >{{ row.targetSpanId }}</span
               >
-              <span v-else class="jd-muted-text">—</span>
+              <span v-else class="tw:text-[var(--color-text-secondary)]">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
               <span
                 v-if="row.targetTraceId"
-                class="jd-mono jd-target-id"
+                class="tw:block tw:truncate"
                 :title="row.targetTraceId"
                 >{{ row.targetTraceId }}</span
               >
-              <span v-else class="jd-muted-text">—</span>
+              <span v-else class="tw:text-[var(--color-text-secondary)]">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
-              <span class="jd-mono">{{ row.scoreDisplay }}</span>
+              <span>{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
-              <span class="jd-mono">{{
+              <span>{{
                 row.latencyMs != null ? formatLatency(row.latencyMs) : "—"
               }}</span>
             </template>
@@ -965,102 +985,12 @@ function relativeTime(timestampMs: number): string {
 </script>
 
 <style lang="scss" scoped>
-// Drawer body wrapper: fills ODrawer's scrollable body and lays the KPI strip
-// and tab bar as fixed (shrink-0) rows, with the tab content scrolling on its
-// own below them — preserves the previous fixed-header / scrolling-content feel
-// that the hand-rolled panel had.
-.jd__body-inner {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
+// Page layout, spacing, colors, and text styling are Tailwind utilities in the
+// template (matching SessionDetails.vue). Only cohesive blocks that rely on
+// descendant/element selectors or hover state remain here. Font-family is never
+// set per component — it inherits the global --font-sans.
 
-/* — KPI strip — */
-// No background of its own — the drawer's native dialog surface shows through,
-// so the panel keeps its standard color. Padding + bottom divider frame the
-// pinned KPI band; the grid + card layout live in the template's Tailwind
-// classes, matching SessionDetails.vue exactly.
-.jd__kpis {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  flex-shrink: 0;
-}
-
-// Card chrome copied verbatim from SessionDetails.vue's `.kpi-card` so the two
-// detail pages render identical cards (border/bg/hover + neutral typography).
-.kpi-card {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-  transition: box-shadow 0.2s ease;
-
-  &:hover {
-    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
-  }
-}
-
-/* — Tab strip — OTabs owns the tab chrome; we only pin it and inset it to
-   match the KPI strip / section padding. */
-.jd__tabs {
-  flex-shrink: 0;
-  padding: 0 20px;
-}
-
-/* — Body — */
-.jd__body {
-  flex: 1;
-  overflow: auto;
-  // Horizontal padding lives on the children (sections + toolbar) instead of
-  // the body, so the Runs table — a bare child of the body — sits full-bleed
-  // with edge-to-edge column headers. No bottom padding: the table reaches the
-  // bottom edge with no dead space under its pagination bar.
-  padding: 18px 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  min-height: 0;
-}
-
-// Form-style tabs (Configuration) need breathing room at the bottom. The
-// table tabs (Runs / Failures) intentionally keep the table flush to the
-// bottom edge, so the padding is opt-in per tab.
-.jd__body--form {
-  padding-bottom: 18px;
-}
-
-/* — Configuration sections — */
-.jd-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  // Re-apply the inset the body no longer provides (Configuration + Failures
-  // sections stay aligned with the page content).
-  padding-left: 20px;
-  padding-right: 20px;
-}
-
-.jd-section__title {
-  margin: 0;
-  font: 600 13px/1.5 var(--o2-font);
-  color: var(--color-text-primary, currentColor);
-  padding-bottom: 6px;
-  border-bottom: 1px solid
-    color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.jd-section__chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 5px;
-  border-radius: 3px;
-  font: 600 10px var(--o2-font);
-  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
+/* — Key/value description lists — */
 .jd-kv {
   display: grid;
   grid-template-columns: 130px 1fr;
@@ -1068,8 +998,12 @@ function relativeTime(timestampMs: number): string {
   margin: 0;
 }
 
+// Field labels follow the alert form convention (AddAlert.vue's
+// `.alert-v3-inline-label`): 12px / 600, in the muted-secondary color so the
+// label reads as a strong caption while the value below stays primary.
 .jd-kv dt {
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
@@ -1078,15 +1012,6 @@ function relativeTime(timestampMs: number): string {
   font-size: 13px;
   color: var(--color-text-primary, currentColor);
   word-break: break-word;
-}
-
-.jd-mono {
-  font-variant-numeric: tabular-nums;
-}
-
-.jd-muted {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-style: italic;
 }
 
 // Filter code block — mirrors the Alert History condition view (rounded,
@@ -1125,7 +1050,7 @@ function relativeTime(timestampMs: number): string {
 .jd-codeblock__content {
   margin: 0;
   padding: 10px 14px;
-  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.6;
   color: var(--color-text-primary, currentColor);
@@ -1231,7 +1156,6 @@ function relativeTime(timestampMs: number): string {
   display: inline-flex;
   padding: 1px 7px;
   border-radius: 3px;
-  font: 600 10px/1.5 var(--o2-font);
   background: color-mix(in srgb, #6b76e3 14%, transparent);
   color: #4f5bcf;
 }
@@ -1244,7 +1168,6 @@ function relativeTime(timestampMs: number): string {
 .jd-scorers__version {
   font-size: 11px;
   color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-variant-numeric: tabular-nums;
 }
 
 .jd-scorers__produces {
@@ -1287,7 +1210,6 @@ function relativeTime(timestampMs: number): string {
   align-items: center;
   gap: 4px;
   color: var(--color-text-secondary, var(--o2-text-secondary));
-  font: 600 11px var(--o2-font);
 }
 
 .jd-scorers__cta-label {
@@ -1316,46 +1238,7 @@ function relativeTime(timestampMs: number): string {
   transform: translateX(2px);
 }
 
-/* — Runs / Failures tabs — */
-.jd__runs-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-  // Re-apply the body's former inset so the toolbar controls stay aligned.
-  padding-left: 20px;
-  padding-right: 20px;
-}
-
-.jd__date-picker {
-  flex: 0 0 auto;
-}
-
-.jd__runs-meta {
-  margin-left: auto;
-  font-size: 11.5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd__runs-meta strong {
-  color: var(--color-text-primary, currentColor);
-  font-variant-numeric: tabular-nums;
-}
-
-.jd-muted-text {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-// Span / Trace id cell — truncate to the column width with a native tooltip
-// for the full value. No font overrides: inherits the default table-cell font.
-.jd-target-id {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+/* — Runs / Failures status cell — */
 .jd-status-cell {
   display: inline-flex;
   align-items: center;
@@ -1388,12 +1271,5 @@ function relativeTime(timestampMs: number): string {
 
 .jd-status-cell--skipped .jd-status-cell__dot {
   background: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
-}
-
-.jd-status-cell--warn {
-  color: #b45309;
-}
-.jd-status-cell--bad {
-  color: var(--o2-status-error-text, #c62828);
 }
 </style>
