@@ -258,24 +258,24 @@ describe("IncidentAlertTriggersTable", () => {
       wrapper = mountComp({ triggers: makeAlerts(1) });
     });
 
-    it("returns primary-outline variant for service_discovery", () => {
-      expect((wrapper.vm as any).getReasonVariant("service_discovery")).toBe("primary-outline");
+    it("returns primary-soft variant for service_discovery", () => {
+      expect((wrapper.vm as any).getReasonVariant("service_discovery")).toBe("primary-soft");
     });
 
-    it("returns primary-outline variant for primary_match", () => {
-      expect((wrapper.vm as any).getReasonVariant("primary_match")).toBe("primary-outline");
+    it("returns primary-soft variant for primary_match", () => {
+      expect((wrapper.vm as any).getReasonVariant("primary_match")).toBe("primary-soft");
     });
 
-    it("returns warning-outline variant for secondary_match", () => {
-      expect((wrapper.vm as any).getReasonVariant("secondary_match")).toBe("warning-outline");
+    it("returns warning-soft variant for secondary_match", () => {
+      expect((wrapper.vm as any).getReasonVariant("secondary_match")).toBe("warning-soft");
     });
 
-    it("returns default-outline variant for alert_id", () => {
-      expect((wrapper.vm as any).getReasonVariant("alert_id")).toBe("default-outline");
+    it("returns default-soft variant for alert_id", () => {
+      expect((wrapper.vm as any).getReasonVariant("alert_id")).toBe("default-soft");
     });
 
-    it("returns default-outline variant for unknown reason", () => {
-      expect((wrapper.vm as any).getReasonVariant("foo")).toBe("default-outline");
+    it("returns default-soft variant for unknown reason", () => {
+      expect((wrapper.vm as any).getReasonVariant("foo")).toBe("default-soft");
     });
   });
 
