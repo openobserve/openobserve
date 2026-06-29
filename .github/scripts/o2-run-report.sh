@@ -107,3 +107,22 @@ if [ -n "${EXTRA_JSON:-}" ] && printf '%s' "$EXTRA_JSON" | jq -e . >/dev/null 2>
 fi
 
 bash "$(dirname "$0")/o2-report.sh" "$STREAM" "$PAYLOAD_FILE"
+
+# For runs with e2e shard jobs (UI), also emit one row per shard to <STREAM>_shards so dashboards
+# can break down per-shard duration / slowest shard / per-module health (mirrors ci_regression_shards).
+# API runs have no "e2e /" jobs, so this is a no-op there. Row schema:
+#   run_id, repo, suite, workflow, ingest_source, shard_name, module (shard minus "e2e / "),
+#   conclusion, duration_sec. _timestamp left unset -> ingest time (aligned with the run doc).
+# Notes: THIS_JOBS is the jobs API object {jobs:[...]}, piped in (so .jobs[]); workflow:"test" is
+# fixed to match the run doc's tag; duration clamped to >=0 to guard against runner clock skew.
+SHARD_FILE=$(mktemp "${TMPDIR:-/tmp}/o2_shards.XXXXXX")
+shard_rows=$(printf '%s' "$THIS_JOBS" | jq -c --arg repo "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" --arg suite "$SUITE" \
+  '[.jobs[]? | select(.name|startswith("e2e /")) | {
+     run_id:$run_id, repo:$repo, suite:$suite, workflow:"test", ingest_source:"live",
+     shard_name:.name, module:(.name|sub("^e2e / ";"")), conclusion:.conclusion,
+     duration_sec: (if (.completed_at and .started_at) then ([((.completed_at|fromdateiso8601)-(.started_at|fromdateiso8601)|floor), 0] | max) else null end)
+   }]' 2>/dev/null) && printf '%s' "$shard_rows" > "$SHARD_FILE" || { echo '[]' > "$SHARD_FILE"; echo "::warning::shard-row extraction failed — skipping ${STREAM}_shards"; }
+if [ "$(jq 'length' "$SHARD_FILE" 2>/dev/null || echo 0)" -gt 0 ]; then
+  bash "$(dirname "$0")/o2-report.sh" "${STREAM}_shards" "$SHARD_FILE"
+fi
+rm -f "$SHARD_FILE"
