@@ -547,6 +547,7 @@ jobs:
       labels: ubicloud-standard-4
     permissions:
       contents: read
+      actions: read  # report step reads run/job timings from the Actions API
     outputs:
       # Compact Playwright stats (expected/unexpected/flaky/skipped/duration) from the merged
       # report.json — consumed by report_to_openobserve to record reliability metrics.
@@ -714,62 +715,14 @@ jobs:
             --verbose \
             --token="${{ secrets.TESTDINO_API_TOKEN }}"
 
-  playwright_summary:
-    timeout-minutes: 5
-    runs-on:
-      labels: ubicloud-standard-4
-    permissions: {}
-    needs: [build_binary, ui_integration_tests, merge_and_upload_reports]
-    if: always()
-    steps:
-      - name: Check test results
-        run: |
-          BUILD_OK=false
-          UI_OK=false
-          MERGE_OK=false
-
-          if [ "${{ needs.build_binary.result }}" == "success" ] || [ "${{ needs.build_binary.result }}" == "skipped" ]; then
-            BUILD_OK=true
-          fi
-
-          if [ "${{ needs.ui_integration_tests.result }}" == "success" ] || [ "${{ needs.ui_integration_tests.result }}" == "skipped" ]; then
-            UI_OK=true
-          fi
-
-          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "failure" ]; then
-            MERGE_OK=true
-          fi
-
-          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ] && [ "$MERGE_OK" == "true" ]; then
-            echo "All regression tests completed successfully"
-            exit 0
-          else
-            echo "Regression tests failed:"
-            echo "  build_binary: ${{ needs.build_binary.result }}"
-            echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
-            echo "  merge_and_upload_reports: ${{ needs.merge_and_upload_reports.result }}"
-            exit 1
-          fi
-
-  # ---------------------------------------------------------------------------
-  # Report one run-summary document to OpenObserve (stream: ci_regression).
-  # Pure metrics sidecar: derives per-job timings + per-shard pass/fail from the
-  # GitHub jobs API and the merged Playwright stats. continue-on-error + a
-  # never-fail poster script mean this can NEVER break the regression run.
-  # ---------------------------------------------------------------------------
-  report_to_openobserve:
-    name: Report metrics to OpenObserve
-    needs: [build_binary, ui_integration_tests, merge_and_upload_reports]
-    if: always()
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - name: Clone the current repo
-        uses: actions/checkout@v5
-
-      - name: Build payload and ingest
+      # ---------------------------------------------------------------------------
+      # Non-fatal metrics sidecar — runs HERE inside the report flow (like the TestDino
+      # step above) so it never trails / gates playwright_summary. One run-summary
+      # document to OpenObserve (stream: ci_regression) + per-shard rows
+      # (ci_regression_shards). continue-on-error + a never-fail poster script mean
+      # this can NEVER break the regression run.
+      # ---------------------------------------------------------------------------
+      - name: Report run metrics to OpenObserve
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -777,10 +730,13 @@ jobs:
           O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
           O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
-          BUILD_RESULT: ${{ needs.build_binary.result }}
+          # We are now inside merge_and_upload_reports (needs: [ui_integration_tests]), which
+          # runs only when tests actually ran. build_binary precedes ui_integration_tests, so
+          # build is effectively success here; merge is in-progress (treated success).
+          BUILD_RESULT: success
           UI_RESULT: ${{ needs.ui_integration_tests.result }}
-          MERGE_RESULT: ${{ needs.merge_and_upload_reports.result }}
-          MERGE_STATS: ${{ needs.merge_and_upload_reports.outputs.stats }}
+          MERGE_RESULT: success
+          MERGE_STATS: ${{ steps.report_stats.outputs.stats }}
         run: |
           set -uo pipefail
           # Forks / unconfigured repos: skip entirely (no API call, no rate-limit spend).
@@ -898,4 +854,41 @@ jobs:
             bash .github/scripts/o2-report.sh ci_regression_shards shards.json
           else
             echo "::notice::no shard rows to emit"
+          fi
+
+  playwright_summary:
+    timeout-minutes: 5
+    runs-on:
+      labels: ubicloud-standard-4
+    permissions: {}
+    needs: [build_binary, ui_integration_tests, merge_and_upload_reports]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          BUILD_OK=false
+          UI_OK=false
+          MERGE_OK=false
+
+          if [ "${{ needs.build_binary.result }}" == "success" ] || [ "${{ needs.build_binary.result }}" == "skipped" ]; then
+            BUILD_OK=true
+          fi
+
+          if [ "${{ needs.ui_integration_tests.result }}" == "success" ] || [ "${{ needs.ui_integration_tests.result }}" == "skipped" ]; then
+            UI_OK=true
+          fi
+
+          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "failure" ]; then
+            MERGE_OK=true
+          fi
+
+          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ] && [ "$MERGE_OK" == "true" ]; then
+            echo "All regression tests completed successfully"
+            exit 0
+          else
+            echo "Regression tests failed:"
+            echo "  build_binary: ${{ needs.build_binary.result }}"
+            echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
+            echo "  merge_and_upload_reports: ${{ needs.merge_and_upload_reports.result }}"
+            exit 1
           fi
