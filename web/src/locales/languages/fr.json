@@ -5761,6 +5761,14 @@
         "title": "Erreurs récentes",
         "subtitle": "les 10 dernières spans échouées"
       }
+    },
+    "subtitle": {
+      "llmInsights": "Suivez la latence, les erreurs, les jetons et les coûts sur l'ensemble de votre trafic LLM",
+      "sessions": "Parcourez et inspectez les sessions des agents étape par étape",
+      "quality": "Notez et suivez la qualité de vos réponses au LLM",
+      "evalJobs": "Exécutez et contrôlez les tâches d'évaluation tout au long de vos sessions",
+      "scorers": "Créez et gérez les évaluateurs qui évaluent les résultats du LLM",
+      "scoreConfigs": "Configurez les grilles de notation utilisées pour vos évaluations"
     }
   },
   "logs": {

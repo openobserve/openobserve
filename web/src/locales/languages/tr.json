@@ -5775,6 +5775,14 @@
         "title": "Son hatalar",
         "subtitle": "son 10 başarısız yayılım"
       }
+    },
+    "subtitle": {
+      "llmInsights": "LLM trafiğiniz genelinde gecikmeyi, hataları, belirteçleri ve maliyeti izleyin",
+      "sessions": "Aracı oturumlarına sırayla göz atın ve denetleyin",
+      "quality": "LLM yanıtlarınızın kalitesini puanlayın ve izleyin",
+      "evalJobs": "Oturumlarınız boyunca değerlendirme işlerini çalıştırın ve izleyin",
+      "scorers": "LLM çıktılarını derecelendiren puanları oluşturun ve yönetin",
+      "scoreConfigs": "Değerlendirmeleriniz tarafından kullanılan puanlama derecelerini yapılandırın"
     }
   },
   "logs": {

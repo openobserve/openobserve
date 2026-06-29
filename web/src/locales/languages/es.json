@@ -5759,6 +5759,14 @@
         "title": "Errores recientes",
         "subtitle": "últimos 10 intervalos fallidos"
       }
+    },
+    "subtitle": {
+      "llmInsights": "Realice un seguimiento de la latencia, los errores, los tokens y los costos en todo su tráfico de LLM",
+      "sessions": "Explore e inspeccione las sesiones de los agentes paso a paso",
+      "quality": "Califica y controla la calidad de tus respuestas de LLM",
+      "evalJobs": "Ejecute y supervise los trabajos de evaluación en todas sus sesiones",
+      "scorers": "Cree y administre los puntajes que califican los resultados del LLM",
+      "scoreConfigs": "Configure las rúbricas de puntuación utilizadas en sus evaluaciones"
     }
   },
   "logs": {

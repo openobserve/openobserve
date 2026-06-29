@@ -5773,6 +5773,14 @@
         "title": "Errori recenti",
         "subtitle": "ultimi 10 intervalli non riusciti"
       }
+    },
+    "subtitle": {
+      "llmInsights": "Tieni traccia della latenza, degli errori, dei token e dei costi nel tuo traffico LLM",
+      "sessions": "Sfoglia e ispeziona le sessioni degli agenti una dopo l'altra",
+      "quality": "Valuta e monitora la qualità delle tue risposte LLM",
+      "evalJobs": "Esegui e monitora i lavori di valutazione durante le tue sessioni",
+      "scorers": "Crea e gestisci i punteggi che valutano gli output LLM",
+      "scoreConfigs": "Configura le rubriche di punteggio utilizzate nelle tue valutazioni"
     }
   },
   "logs": {

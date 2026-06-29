@@ -5761,6 +5761,14 @@
         "title": "Aktuelle Fehler",
         "subtitle": "Die letzten 10 fehlgeschlagenen Spans"
       }
+    },
+    "subtitle": {
+      "llmInsights": "Verfolgen Sie Latenz, Fehler, Tokens und Kosten in Ihrem gesamten LLM-Traffic",
+      "sessions": "Agentensitzungen nacheinander durchsuchen und überprüfen",
+      "quality": "Bewerte und verfolge die Qualität deiner LLM-Antworten",
+      "evalJobs": "Führen Sie Evaluierungsaufträge in Ihren Sitzungen aus und überwachen Sie sie",
+      "scorers": "Erstellen und verwalten Sie die Scorer, die LLM-Ergebnisse bewerten",
+      "scoreConfigs": "Konfigurieren Sie die Bewertungsrubriken, die für Ihre Bewertungen verwendet werden"
     }
   },
   "logs": {

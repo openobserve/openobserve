@@ -5775,6 +5775,14 @@
         "title": "Recente fouten",
         "subtitle": "laatste 10 mislukte overspanningen"
       }
+    },
+    "subtitle": {
+      "llmInsights": "Volg latentie, fouten, tokens en kosten in al je LLM-verkeer",
+      "sessions": "Bekijk en inspecteer de sessies van agenten beurtelings",
+      "quality": "Scoor en volg de kwaliteit van je LLM-reacties",
+      "evalJobs": "Voer evaluatietaken uit en controleer ze tijdens al je sessies",
+      "scorers": "Creëer en beheer de scorers die LLM-resultaten beoordelen",
+      "scoreConfigs": "Configureer de scorerubrieken die voor uw evaluaties worden gebruikt"
     }
   },
   "logs": {

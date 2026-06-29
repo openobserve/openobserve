@@ -4959,6 +4959,14 @@
         "title": "最近的错误",
         "subtitle": "最近 10 次失败的跨度"
       }
+    },
+    "subtitle": {
+      "llmInsights": "跟踪 LLM 流量的延迟、错误、代币和成本",
+      "sessions": "依次浏览和检查代理会话",
+      "quality": "对您的 LLM 回复进行评分和跟踪",
+      "evalJobs": "在会话中运行和监控评估作业",
+      "scorers": "创建和管理对 LLM 输出进行评分的记分员",
+      "scoreConfigs": "配置评估时使用的评分标准"
     }
   },
   "onlineEvals": {
