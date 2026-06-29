@@ -89,6 +89,10 @@ test.describe("Report Folders", () => {
 
     testLogger.info(`Moving report "${REPORT_A}" to folder "${FOLDER_B}"`);
 
+    // Search to ensure REPORT_A is visible (table may be paginated with many reports)
+    await pm.reportFoldersPage.searchReports(REPORT_A);
+    await pm.reportFoldersPage.expectReportVisibleInTable(REPORT_A);
+
     // Open move dialog and move to destination folder
     await pm.reportFoldersPage.openMoveDialog(REPORT_A);
     await pm.reportFoldersPage.selectMoveDestination(FOLDER_B);
@@ -100,6 +104,8 @@ test.describe("Report Folders", () => {
     await pm.reportFoldersPage.expectReportVisibleInTable(REPORT_A);
 
     // Move it back to default
+    await pm.reportFoldersPage.searchReports(REPORT_A);
+    await pm.reportFoldersPage.expectReportVisibleInTable(REPORT_A);
     await pm.reportFoldersPage.openMoveDialog(REPORT_A);
     await pm.reportFoldersPage.selectMoveDestination('default');
     await pm.reportFoldersPage.clickMove();
@@ -148,6 +154,8 @@ test.describe("Report Folders", () => {
 
     await pm.reportFoldersPage.clickFolderTab('default');
 
+    await pm.reportFoldersPage.searchReports(REPORT_A);
+    await pm.reportFoldersPage.expectReportVisibleInTable(REPORT_A);
     await pm.reportFoldersPage.openMoveDialog(REPORT_A);
     await pm.reportFoldersPage.expectMoveButtonDisabled();
     await pm.reportFoldersPage.cancelMove();
@@ -223,8 +231,11 @@ test.describe("Report Folders", () => {
     const testReports = reports.filter(r => r.name && r.name.startsWith('test_report_'));
     for (const report of testReports) {
       const result = await pm.apiCleanup.deleteReport(report.name);
-      expect(result.code).toBe(200);
-      testLogger.info(`Deleted test report: ${report.name}`);
+      // Accept 200 (deleted) or 404 (already gone from a prior partial cleanup)
+      if (result.code !== 200 && result.code !== 404) {
+        throw new Error(`Unexpected status deleting report ${report.name}: ${result.code}`);
+      }
+      testLogger.info(`Deleted/already gone test report: ${report.name} (${result.code})`);
     }
 
     // Delete all test folders

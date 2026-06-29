@@ -91,7 +91,7 @@ jobs:
         # the dispatch 403'd on a missing PAT permission, etc.)
         if: github.event_name == 'issue_comment' && success()
         env:
-          GH_TOKEN: ${{ github.token }}   # OSS context → bot can comment on the OSS PR
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}   # PAT only — post as the human, NEVER github-actions[bot]
           PR: ${{ steps.ctx.outputs.pr }}
         run: |
           gh pr comment "$PR" --repo openobserve/openobserve --body \

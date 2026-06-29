@@ -423,6 +423,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         });
     }
 
+    // All nodes need org settings watch for consistent cache
+    tokio::task::spawn(db::organization::org_settings_watch());
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
@@ -460,7 +463,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::alerts::destinations::watch());
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
     tokio::task::spawn(db::alerts::alert::watch());
-    tokio::task::spawn(db::organization::org_settings_watch());
+    // org_settings_watch already started above for all nodes including routers
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
     // Watch needed on queriers (UI APIs) and on whichever node role is the configured

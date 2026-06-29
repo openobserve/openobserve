@@ -564,7 +564,7 @@ describe("formatTimestamp", () => {
   it("should return a formatted string with relative time", () => {
     const nowNs = Date.now() * 1_000_000; // current time in nanoseconds
     const result = formatTimestamp(nowNs);
-    expect(result).toMatch(/\d+ \w+ \d{2}:\d{2}:\d{2}:\d{3}/);
+    expect(result).toMatch(/\d+ \w+ \d{2}:\d{2}:\d{2}\.\d{3}/);
     expect(result).toContain("(");
     expect(result).toContain("ago)");
   });

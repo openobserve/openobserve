@@ -127,10 +127,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:cursor-pointer session-play-icon tw:text-[var(--o2-icon-color)] hover:tw:text-[var(--o2-primary-btn-bg)]"
                     />
                   </template>
+                  <template #cell-error_count="{ row }">
+                    <span
+                      class="tw:tabular-nums"
+                      :class="(row.error_count || 0) > 0
+                        ? 'tw:text-badge-error-soft-text tw:font-medium'
+                        : 'tw:text-text-primary'"
+                    >{{ row.error_count || 0 }}</span>
+                  </template>
                   <template #cell-frustration_count="{ row }">
                     <FrustrationBadge
                       :count="row.frustration_count || 0"
                     />
+                  </template>
+                  <template #cell-user_email="{ row }">
+                    <OUserCell :value="row.user_email" />
                   </template>
                   <template #cell-location="{ row }">
                     <SessionLocationColumn :column="row" />
@@ -183,6 +194,7 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
@@ -361,7 +373,7 @@ const tableColumns = [
     accessorKey: "action_play",
     sortable: false,
     size: 56,
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "timestamp",
@@ -391,15 +403,15 @@ const tableColumns = [
     header: t("rum.errorCount"),
     accessorKey: "error_count",
     sortable: true,
-    size: COL.count,
-    meta: { align: "left" },
+    size: 120,
+    meta: { align: "right" },
   },
   {
     id: "frustration_count",
     header: t("rum.frustrationCount"),
     accessorFn: (row: any) => row["frustration_count"] || 0,
     sortable: true,
-    size: COL.count,
+    size: 160,
     meta: { align: "left" },
   },
   {
