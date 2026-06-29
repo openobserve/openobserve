@@ -219,6 +219,7 @@ const columns = computed(() => [
     accessorKey: "name",
     sortable: true,
     size: COL.name,
+    minSize: 160,
     // `flex` (not `autoWidth`): fills leftover width on load AND stays
     // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
     meta: { align: "left", flex: true },
