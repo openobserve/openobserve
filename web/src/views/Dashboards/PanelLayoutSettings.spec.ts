@@ -114,12 +114,12 @@ describe("PanelLayoutSettings.vue", () => {
   // Drive the real form's submit so the schema runs + the handler is awaited
   // deterministically (a fire-and-forget native submit would not be).
   const submitForm = async (w: any) => {
-    await w.vm.panelFormRef.form.handleSubmit();
+    await w.vm.form.handleSubmit();
     await flushPromises();
   };
 
   const setHeight = async (w: any, v: unknown) => {
-    w.vm.panelFormRef.form.setFieldValue("h", v);
+    w.vm.form.setFieldValue("h", v);
     await nextTick();
   };
 
@@ -182,7 +182,7 @@ describe("PanelLayoutSettings.vue", () => {
     it("shows no error on open and keeps the form valid by default", () => {
       wrapper = mountComponent();
       expect(wrapper.text()).not.toContain("A value is required");
-      expect(wrapper.vm.panelFormRef.form.state.isValid).toBe(true);
+      expect(wrapper.vm.form.state.isValid).toBe(true);
     });
 
     it("blocks submit and does NOT emit save:layout when height is zero (required)", async () => {
@@ -191,7 +191,7 @@ describe("PanelLayoutSettings.vue", () => {
 
       await submitForm(wrapper);
 
-      expect(wrapper.vm.panelFormRef.form.state.isValid).toBe(false);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
       expect(wrapper.emitted("save:layout")).toBeFalsy();
       expect(wrapper.text()).toContain("A value is required");
     });
@@ -202,7 +202,7 @@ describe("PanelLayoutSettings.vue", () => {
 
       await submitForm(wrapper);
 
-      expect(wrapper.vm.panelFormRef.form.state.isValid).toBe(false);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
       expect(wrapper.emitted("save:layout")).toBeFalsy();
       expect(wrapper.text()).toContain("A value is required");
     });
@@ -213,7 +213,7 @@ describe("PanelLayoutSettings.vue", () => {
 
       await submitForm(wrapper);
 
-      expect(wrapper.vm.panelFormRef.form.state.isValid).toBe(false);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
       expect(wrapper.emitted("save:layout")).toBeFalsy();
       expect(wrapper.text()).toContain("Value must be greater than zero");
       expect(wrapper.text()).not.toContain("A value is required");
@@ -225,7 +225,7 @@ describe("PanelLayoutSettings.vue", () => {
 
       await submitForm(wrapper);
 
-      expect(wrapper.vm.panelFormRef.form.state.isValid).toBe(true);
+      expect(wrapper.vm.form.state.isValid).toBe(true);
       const events = wrapper.emitted("save:layout");
       expect(events).toBeTruthy();
       expect(events!.length).toBe(1);

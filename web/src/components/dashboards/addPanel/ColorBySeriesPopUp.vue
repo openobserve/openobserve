@@ -14,6 +14,17 @@
 -->
 
 <!-- eslint-disable vue/no-unused-components -->
+<!--
+  OForm migration: the whole form is the dynamic `series[]` array, a FORM-OWNED
+  field-array. This component OWNS <OForm>, so it creates the form with useOForm
+  and reads `series` reactively via form.useStore (rule ③: one source, no mirror)
+  to render the draggable v-for. Each row's `value` is an OFormCombobox and
+  `color` an OFormColor, both with indexed names (`series[i].value/color`); rows
+  are added/removed/reordered through form.pushFieldValue / removeFieldValue /
+  setFieldValue. The per-row Zod rules (non-empty value + non-null color) gate
+  submit — replacing the old `isFormValid` Save-disabled gate (R3). Save submits
+  via `form-id` (R4); the save handler is baked into useOForm({ onSubmit }).
+-->
 <template>
   <ODialog data-test="color-by-series-popup-dialog"
     :open="open"
@@ -23,13 +34,14 @@
     neutral-button-label="+ Add a new color"
     neutral-button-variant="outline"
     primary-button-label="Save"
-    :primary-button-disabled="!isFormValid"
+    form-id="color-by-series-form"
     @click:neutral="addcolorBySeries"
-    @click:primary="applycolorBySeries"
   >
+    <OForm id="color-by-series-form" :form="form">
     <div data-test="dashboard-color-by-series-popup">
       <draggable
-        v-model="editColorBySeries"
+        :model-value="editColorBySeries"
+        @update:model-value="onReorder"
         :options="dragOptions"
         @mousedown.stop="() => {}"
         data-test="dashboard-addpanel-config-color-by-series-drag"
@@ -48,8 +60,8 @@
           </div>
           <div class="draggable-content tw:flex tw:items-center tw:gap-x-3">
             <div class="input-container tw:flex-1">
-              <OCombobox
-                v-model="series.value"
+              <OFormCombobox
+                :name="`series[${index}].value`"
                 :items="seriesDataItems"
                 search-regex="(?:{([^}])(?:{.})*$|([a-zA-Z-_]+)$)"
                 label="Select Series"
@@ -68,8 +80,8 @@
                 v-if="series.color !== null"
                 class="tw:items-center tw:flex tw:gap-1"
               >
-                <OColor
-                  v-model="series.color"
+                <OFormColor
+                  :name="`series[${index}].color`"
                   class="tw:flex-1"
                   clearable
                   @clear="removeColorByIndex(index)"
@@ -100,29 +112,37 @@
           </div>
         </draggable>
     </div>
+    </OForm>
   </ODialog>
 </template>
 <script lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, nextTick } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
-import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OColor from "@/lib/forms/Color/OColor.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormColor from "@/lib/forms/Color/OFormColor.vue";
+import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import {
+  colorBySeriesPopUpSchema,
+  type ColorBySeriesPopUpForm,
+} from "./ColorBySeriesPopUp.schema";
 
 export default defineComponent({
   name: "colorBySeriesPopUp",
   components: {
     draggable: VueDraggableNext as any,
-    OCombobox,
     OButton,
     ODialog,
-    OColor,
+    OForm,
+    OFormColor,
+    OFormCombobox,
     OIcon,
 },
   props: {
@@ -143,55 +163,47 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const { t } = useI18n();
 
-    // editColorBySeries is populated by the watch below (on every open)
-    const editColorBySeries = ref<any[]>([]);
+    // The whole form is the `series[]` field-array — the FORM is the SOLE source
+    // (rule ②). This component OWNS <OForm> and needs to read `series` to render
+    // the draggable v-for, so it creates the form here with useOForm and reads it
+    // reactively via form.useStore — ONE source of truth, no mirror (rule ③).
+    const makeDefaultRows = () =>
+      props.colorBySeries?.length
+        ? JSON.parse(JSON.stringify(props.colorBySeries))
+        : [{ type: "value", value: "", color: null }];
 
-    // Deep-clone prop on every open so edits never leak back to the chart
-    watch(
-      () => props.open,
-      (isOpen) => {
-        if (isOpen) {
-          editColorBySeries.value = props.colorBySeries?.length
-            ? JSON.parse(JSON.stringify(props.colorBySeries))
-            : [{ type: "value", value: "", color: null }];
-        }
+    // onSubmit (baked into useOForm) fires only when the schema passes (every row
+    // has a non-empty value + a non-null color). The validated value carries the
+    // row order from the drag. Save submits via form-id (R4) → handleSubmit.
+    const form = useOForm<ColorBySeriesPopUpForm>({
+      defaultValues: { series: makeDefaultRows() },
+      schema: colorBySeriesPopUpSchema,
+      onSubmit: (value) => {
+        emit("save", value.series);
       },
-      { immediate: true },
-    );
-
-    // Validate for save button click
-    // Each series must have both value (series name) and color selected for save it
-    const isFormValid = computed(() => {
-      return editColorBySeries.value.every((series: any) => {
-        return (
-          series.value && series.value.trim() !== "" && series.color !== null
-        );
-      });
     });
 
-    // Watch for changes in series.value to ensure proper reactivity
+    // Reactive READ of the form's `series` array (rule ③: form.useStore, NOT a
+    // local copy) — drives the draggable + v-for.
+    const editColorBySeries = form.useStore((s: any) => s.values?.series ?? []);
+
+    // Re-seed the form on open (the overlay may keep the body mounted).
     watch(
-      editColorBySeries,
-      (newVal) => {
-        newVal.forEach((series: any) => {
-          if (
-            typeof series.value !== "string" ||
-            series.value === undefined ||
-            series.value === null
-          ) {
-            series.value = "";
-          }
-        });
+      () => props.open,
+      async (isOpen) => {
+        if (!isOpen) return;
+        await nextTick();
+        form.reset({ series: makeDefaultRows() });
       },
-      { deep: true },
     );
 
     const dragOptions = ref({
       animation: 200,
     });
 
+    // Structural mutations go through the form (the single source).
     const addcolorBySeries = () => {
-      editColorBySeries.value.push({
+      form.pushFieldValue("series", {
         type: "value",
         value: "",
         color: null,
@@ -214,48 +226,31 @@ export default defineComponent({
     };
 
     const removecolorBySeriesByIndex = (index: number) => {
-      editColorBySeries.value.splice(index, 1);
+      form.removeFieldValue("series", index);
+    };
+
+    // Draggable reorder → write the new order back to the form.
+    const onReorder = (newOrder: any[]) => {
+      form.setFieldValue("series", newOrder);
     };
 
     onMounted(() => {
-      // if editColorBySeries is empty, add default color
-      if (editColorBySeries.value.length === 0) {
+      if ((form.getFieldValue("series") ?? []).length === 0) {
         addcolorBySeries();
       }
     });
 
     const setColorByIndex = (index: number) => {
-      editColorBySeries.value[index].color = "#5960b2";
+      form.setFieldValue(`series[${index}].color`, "#5960b2");
     };
 
     const removeColorByIndex = (index: number) => {
-      editColorBySeries.value[index].color = null;
-    };
-
-    const applycolorBySeries = () => {
-      // Only save if fields are not empty
-      if (isFormValid.value) {
-        emit("save", editColorBySeries.value);
-      }
-    };
-
-    const resetColorBySeries = () => {
-      if (props.colorBySeries?.length) {
-        editColorBySeries.value = props.colorBySeries.map((m: any) => ({
-          ...m,
-          value: typeof m.value === "string" ? m.value : "",
-          color: m.color || null,
-        }));
-      } else {
-        editColorBySeries.value = [{ type: "value", value: "", color: null }];
-      }
+      form.setFieldValue(`series[${index}].color`, null);
     };
 
     const cancelEdit = () => {
       // Reset to last saved state so unsaved edits are discarded
-      editColorBySeries.value = props.colorBySeries?.length
-        ? JSON.parse(JSON.stringify(props.colorBySeries))
-        : [{ type: "value", value: "", color: null }];
+      form.reset({ series: makeDefaultRows() });
       emit("close");
     };
 
@@ -267,19 +262,19 @@ export default defineComponent({
 
     return {
       t,
+      form,
       addcolorBySeries,
       removecolorBySeriesByIndex,
+      onReorder,
       dragOptions,
       setColorByIndex,
       removeColorByIndex,
-      applycolorBySeries,
       cancelEdit,
       editColorBySeries,
       "cancel": "cancel",
       seriesDataItems,
       openColorPicker,
       selectColorBySeriesOption,
-      isFormValid,
     };
   },
 });

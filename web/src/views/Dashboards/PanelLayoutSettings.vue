@@ -36,13 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="panel-layout-settings-height"
         class="o2-input"
       >
-        <OForm
-          id="panel-layout-settings-form"
-          ref="panelFormRef"
-          :schema="panelLayoutSettingsSchema"
-          :default-values="panelLayoutSettingsDefaults"
-          @submit="onSubmit"
-        >
+        <OForm id="panel-layout-settings-form" :form="form">
           <OFormInput
             name="h"
             :label="t('dashboard.panelHeight')"
@@ -71,13 +65,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch } from "vue";
+import { computed, defineComponent, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../../utils/zincutils";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -106,53 +101,35 @@ export default defineComponent({
     const { t } = useI18n();
     const router = useRouter();
 
-    const panelFormRef: any = ref(null);
     const panelLayoutSettingsSchema = makePanelLayoutSettingsSchema(t);
 
-    // DYNAMIC (edit-prefill) defaults — the height is seeded from the existing
-    // panel layout. The ODialog remounts the body on open, so this typed
-    // computed re-seeds `h` each open. Only `h` is editable here; w/x/y/i are
-    // carried over from props.layout at submit (they are not form fields).
-    const panelLayoutSettingsDefaults = computed(
-      (): PanelLayoutSettingsForm => ({
-        h: props.layout?.h,
-      }),
-    );
-
-    // The "Approximately N table rows" preview must track the height the user is
-    // typing. `h` is now form-owned, so read it reactively from the form via
-    // form.useStore (a snapshot would not re-render). The OForm body remounts on
-    // each open, so re-subscribe whenever the form ref changes and dispose the
-    // previous subscription.
-    const liveHeight = ref<number>(Number(props.layout?.h ?? 0));
-    let stopHeightWatch: (() => void) | null = null;
-    watch(
-      () => panelFormRef.value,
-      (formRef: any) => {
-        stopHeightWatch?.();
-        stopHeightWatch = null;
-        if (formRef?.form) {
-          const heightStore = formRef.form.useStore((s: any) => s.values?.h);
-          stopHeightWatch = watch(
-            heightStore,
-            (v: any) => {
-              liveHeight.value = Number(v ?? 0);
-            },
-            { immediate: true },
-          );
-        } else {
-          liveHeight.value = Number(props.layout?.h ?? 0);
-        }
+    // OWNER pattern (rule ③): this component renders <OForm> and needs the live
+    // height to compute the row-count preview, so it creates the form with
+    // useOForm and reads it via form.useStore — ONE source of truth, no mirror.
+    // Only `h` is editable; w/x/y/i are carried over from props.layout at submit.
+    // @submit (baked in) fires only after the schema passes (required + > 0).
+    const form = useOForm<PanelLayoutSettingsForm>({
+      defaultValues: { h: props.layout?.h },
+      schema: panelLayoutSettingsSchema,
+      onSubmit: (value) => {
+        emit("save:layout", { ...props.layout, h: Number(value.h) });
       },
-      { immediate: true },
+    });
+
+    // The form is owned here and the component persists across opens (the parent
+    // toggles `:open`; its `v-if` is on the panel data, not cleared on close), so
+    // reset on BOTH transitions: re-seed `h` on open, and clear submit-state +
+    // errors on close so a failed submit's error doesn't linger on reopen.
+    watch(
+      () => props.open,
+      () => {
+        form.reset({ h: props.layout?.h });
+      },
     );
 
-    // @submit fires only after the schema passes (required + > 0). The validated
-    // height merges back into the existing layout; the other layout members are
-    // preserved unchanged.
-    const onSubmit = (value: PanelLayoutSettingsForm) => {
-      emit("save:layout", { ...props.layout, h: Number(value.h) });
-    };
+    // "Approximately N table rows" preview tracks the typed height — read it
+    // reactively from the form (rule ③: form.useStore, NOT a local copy).
+    const liveHeight = form.useStore((s: any) => Number(s.values?.h ?? 0));
 
     const getRowCount = computed(() => {
       // 24 is the height of toolbar
@@ -169,10 +146,7 @@ export default defineComponent({
       store,
       router,
       getImageURL,
-      panelFormRef,
-      panelLayoutSettingsSchema,
-      panelLayoutSettingsDefaults,
-      onSubmit,
+      form,
       getRowCount,
     };
   },
