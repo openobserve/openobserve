@@ -69,10 +69,14 @@ export const addUserBaseSchema = z.object({
 export type AddUserForm = z.infer<typeof addUserBaseSchema>;
 
 export const makeAddUserSchema = (
-  ctx: AddUserSchemaContext,
+  getCtx: () => AddUserSchemaContext,
   t: (_key: string) => string,
 ) =>
   addUserBaseSchema.superRefine((val, zctx) => {
+    // Read the live context on every run so a single stable schema instance
+    // follows mode flips (e.g. the 422 add-existing → create-new switch) WITHOUT
+    // a remount — the OWNER (AddUser.vue) holds one form via useOForm. (Rule ③)
+    const ctx = getCtx();
     // ── Add an existing user (enter an email to invite) ──────────────────────
     if (ctx.existingUser && !ctx.beingUpdated) {
       if (!val.email || !userEmailRegex.test(val.email)) {

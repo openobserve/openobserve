@@ -158,9 +158,12 @@ describe("AddUser", () => {
       ).toBe("add-user-form");
     });
 
-    it("returns a schema from setup() (Options-API wiring, not undefined)", () => {
+    it("passes the owner-created form to OForm (Rule ③ OWNER wiring)", () => {
+      // OWNER pattern: the schema is baked into the useOForm form and handed to
+      // <OForm :form>, so there is no :schema prop — the form must be defined,
+      // and the schema-gating tests below prove the validators actually run.
       wrapper = mountComp();
-      expect(getForm(wrapper).props("schema")).toBeDefined();
+      expect(getForm(wrapper).props("form")).toBeDefined();
     });
 
     it("shows the email field in add-existing mode", () => {
@@ -409,9 +412,8 @@ describe("AddUser", () => {
       setField(wrapper, "change_password", true);
       setField(wrapper, "old_password", "longenough8");
       setField(wrapper, "new_password", "Str0ng!Pass");
-      // onSubmit branches on this.formData.change_password; the v-model bridge
-      // only syncs formData on real input events, not setFieldValue, so mirror it.
-      wrapper.vm.formData.change_password = true;
+      // The single form is the source of truth — onSubmit reads the validated
+      // `value`, so setFieldValue alone drives change_password (no formData mirror).
       await submitForm(wrapper);
 
       expect(userServiece.update).toHaveBeenCalledTimes(1);

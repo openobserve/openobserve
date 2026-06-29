@@ -28,31 +28,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:w-full">
         <OForm
           id="add-user-form"
-          ref="updateUserForm"
-          :key="formMode"
-          :schema="addUserSchema"
-          :default-values="addUserDefaults"
-          @submit="onSubmit"
+          :form="form"
         >
-          <!-- <p class="tw:pt-2 tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
           <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
-            {{ t("user.email") }} : <strong>{{ formData.email }}</strong>
+            {{ t("user.email") }} : <strong>{{ formEmail }}</strong>
           </p>
           <p class="tw:mt-2 tw:truncate" v-if="!existingUser && !beingUpdated">
-            {{ t("user.roles") }} : <strong>{{ formData.role }}</strong>
+            {{ t("user.roles") }} : <strong>{{ formRole }}</strong>
           </p>
           <p
             class="tw:mt-2 tw:truncate"
-            v-if="
-              !existingUser && !beingUpdated && formData?.custom_role?.length
-            "
+            v-if="!existingUser && !beingUpdated && formCustomRole?.length"
           >
             {{ t("user.customRole") }} :
-            <strong>{{ formData.custom_role.join(", ") }}</strong>
+            <strong>{{ formCustomRole.join(", ") }}</strong>
           </p>
           <OFormInput
             v-if="existingUser && !beingUpdated"
-            v-model="formData.email"
             name="email"
             :label="t('user.email')"
             required
@@ -64,7 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="!beingUpdated && !existingUser" class="tw:mt-2">
             <OFormInput
               :type="isPwd ? 'password' : 'text'"
-              v-model="formData.password"
               name="password"
               :label="t('user.password')"
               required
@@ -83,7 +74,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OFormInput
             v-if="!existingUser && !isCloud"
-            v-model="formData.first_name"
             name="first_name"
             :label="t('user.firstName')"
             class="showLabelOnTop tw:mt-2"
@@ -92,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OFormInput
             v-if="!existingUser && !isCloud"
-            v-model="formData.last_name"
             name="last_name"
             :label="t('user.lastName')"
             class="showLabelOnTop tw:mt-2"
@@ -102,9 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="
               (existingUser || beingUpdated) &&
               userRole !== 'member' &&
-              store.state.userInfo.email !== formData.email
+              store.state.userInfo.email !== formEmail
             "
-            v-model="formData.role"
             name="role"
             :label="t('user.role')"
             required
@@ -116,21 +104,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="
               (existingUser || beingUpdated) &&
               userRole !== 'member' &&
-              store.state.userInfo.email !== formData.email &&
+              store.state.userInfo.email !== formEmail &&
               (config.isEnterprise == 'true' || config.isCloud == 'true')
             "
-            v-model="formData.custom_role"
             name="custom_role"
             :label="t('user.customRole')"
             :options="filterdOption"
             class="showLabelOnTop tw:mt-2"
             multiple
             data-test="user-custom-role-field"
-            :disable="isCloud ? filterdOption.length === 0 : (filterdOption.length === 0 || !!formData.is_external)"
+            :disable="isCloud ? filterdOption.length === 0 : (filterdOption.length === 0 || !!isExternalUser)"
             :hint="
               isCloud
                 ? (filterdOption.length === 0 ? t('user.noCustomRolesHint') : '')
-                : formData.is_external
+                : isExternalUser
                   ? t('user.externalUserCustomRoleHint')
                   : filterdOption.length === 0
                     ? t('user.noCustomRolesHint')
@@ -139,7 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div v-if="beingUpdated && !isCloud" class="tw:mt-2">
             <OFormSwitch
-              v-model="formData.change_password"
               name="change_password"
               :label="t('user.changePassword')"
               size="lg"
@@ -148,12 +134,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OFormInput
               v-if="
-                formData.change_password &&
+                changePassword &&
                 (userRole == 'member' ||
-                  store.state.userInfo.email == formData.email)
+                  store.state.userInfo.email == formEmail)
               "
               :type="isOldPwd ? 'password' : 'text'"
-              v-model="formData.old_password"
               name="old_password"
               :label="t('user.oldPassword')"
               required
@@ -170,9 +155,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OFormInput>
 
             <OFormInput
-              v-if="formData.change_password"
+              v-if="changePassword"
               :type="isNewPwd ? 'password' : 'text'"
-              v-model="formData.new_password"
               name="new_password"
               :label="t('user.newPassword')"
               required
@@ -192,9 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="
               !beingUpdated &&
               userRole != 'member' &&
-              formData.organization == 'other'
+              organization == 'other'
             "
-            v-model="formData.other_organization"
             name="other_organization"
             :label="t('user.otherOrganization')"
             class="showLabelOnTop tw:mt-2"
@@ -240,6 +223,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
@@ -305,15 +289,13 @@ export default defineComponent({
     },
   },
   emits: ["update:modelValue", "updated", "update:open"],
-  setup(props) {
+  setup(props, { emit }) {
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
     const { track } = useReo();
-    const formData: any = ref(defaultValue());
     const existingUser = ref(true);
     const beingUpdated: any = ref(false);
-    const updateUserForm: any = ref(null);
     const isPwd: any = ref(true);
     const isNewPwd: any = ref(true);
     const isOldPwd: any = ref(true);
@@ -323,49 +305,166 @@ export default defineComponent({
     const loggedInUserEmail = ref(store.state.userInfo.email);
     const filterdOption = ref([...props.customRoles]);
 
-    // Mode key: the form validates a different subset per mode, and the 422
-    // "this email is actually new" flow flips existingUser → false mid-flight.
-    // Re-keying <OForm> on this remounts it so the new schema applies (values are
-    // preserved because :default-values re-seeds from the persistent formData).
-    const formMode = computed(() => {
-      if (beingUpdated.value) return "edit";
-      if (existingUser.value) return "add-existing";
-      return "add-new";
+    // Non-form context (Rule ③): the org the user is assigned to, the original
+    // record we round-trip on edit, and whether the edited user is external.
+    // These are NOT form fields — they live OUTSIDE <OForm>, read by the owner's
+    // v-if / schema-context / submit handler. The 10 editable fields are owned by
+    // the single TanStack form below (no `formData` mirror, no v-model-to-a-ref).
+    const organization = ref(store.state.selectedOrganization.identifier);
+    const editRecord: any = ref(null);
+    const isExternalUser = ref(false);
+
+    const blankForm = (): AddUserForm => ({
+      email: "",
+      password: "",
+      first_name: "",
+      last_name: "",
+      role: "",
+      custom_role: [],
+      change_password: false,
+      old_password: "",
+      new_password: "",
+      other_organization: "",
     });
 
-    // Conditional schema (returned from setup → in template scope). The factory
-    // reads the non-form context; superRefine reads form values (incl.
-    // change_password) at validation time.
-    const addUserSchema = computed(() =>
-      makeAddUserSchema(
-        {
-          existingUser: existingUser.value,
-          beingUpdated: beingUpdated.value,
-          userRole: props.userRole,
-          loggedInUserEmail: loggedInUserEmail.value,
-          modelEmail: props.modelValue?.email ?? "",
-          organization: formData.value.organization,
-        },
-        t,
-      ),
+    // The save handler reads the VALIDATED `value` ONLY (Rule ②) — no formData
+    // mirror. Non-form context (org, the original edit record) comes from the refs
+    // above. OForm awaits it, so the footer Save spinner spans the request.
+    const onSubmit = async (value: AddUserForm) => {
+      let selectedOrg = organization.value;
+      if (selectedOrg == "other") {
+        selectedOrg = encodeURIComponent(value.other_organization);
+      }
+      if (beingUpdated.value) {
+        const userEmail = editRecord.value?.email ?? value.email;
+        // Round-trip the original record with the edited fields, minus email.
+        const payload: any = {
+          ...editRecord.value,
+          first_name: value.first_name,
+          last_name: value.last_name,
+          role: value.role,
+          custom_role: value.custom_role,
+          change_password: value.change_password,
+          organization: selectedOrg,
+        };
+        delete payload.email;
+        if (value.change_password) {
+          payload.old_password = value.old_password;
+          payload.new_password = value.new_password;
+        } else {
+          delete payload.old_password;
+          delete payload.new_password;
+        }
+        try {
+          const res: any = await userServiece.update(
+            payload,
+            selectedOrg,
+            userEmail,
+          );
+          if (
+            value.change_password == true &&
+            loggedInUserEmail.value === props.modelValue?.email
+          ) {
+            logout_confirm.value = true;
+          } else {
+            emit(
+              "updated",
+              res.data,
+              { ...payload, email: userEmail },
+              "updated",
+            );
+            emit("update:open", false);
+          }
+        } catch (err: any) {
+          toast({
+            variant: "error",
+            message: err.response.data.message,
+          });
+        }
+        track("Button Click", { button: "Update User", page: "Add User" });
+      } else if (existingUser.value) {
+        const userEmail = value.email;
+        try {
+          const res: any = await userServiece.updateexistinguser(
+            {
+              role: value.role,
+              custom_role: value.custom_role,
+            },
+            selectedOrg,
+            userEmail,
+          );
+          emit(
+            "updated",
+            res.data,
+            { ...value, email: userEmail, organization: selectedOrg },
+            "created",
+          );
+          emit("update:open", false);
+        } catch (err: any) {
+          if (err.response.data.code === 422) {
+            // The email is actually new → switch to "create new user" mode. The
+            // stable schema reads existingUser live, so it now enforces the
+            // password policy WITHOUT a remount.
+            existingUser.value = false;
+          } else {
+            if (err.response?.status != 403 || err?.status != 403) {
+              toast({
+                variant: "error",
+                message: err.response.data.message,
+              });
+            }
+          }
+        }
+        track("Button Click", { button: "Update User", page: "Add User" });
+      } else {
+        try {
+          const payload: any = {
+            ...value,
+            org_member_id: "",
+            organization: selectedOrg,
+          };
+          const res: any = await userServiece.create(payload, selectedOrg);
+          emit("updated", res.data, payload, "created");
+          emit("update:open", false);
+        } catch (err: any) {
+          toast({
+            variant: "error",
+            message: err.response.data.message,
+          });
+        }
+        track("Button Click", { button: "Create User", page: "Add User" });
+      }
+    };
+
+    // OWNER pattern (Rule ③): this component renders <OForm>, so it creates the
+    // form here (useOForm) to read it reactively (form.useStore) for parent-side
+    // v-if, then hands it down via <OForm :form="form"> — ONE source of truth.
+    // The schema takes a context GETTER so a single stable instance follows mode
+    // flips (e.g. the 422 add-existing → create-new switch) with no remount.
+    const addUserSchema = makeAddUserSchema(
+      () => ({
+        existingUser: existingUser.value,
+        beingUpdated: beingUpdated.value,
+        userRole: props.userRole,
+        loggedInUserEmail: loggedInUserEmail.value,
+        modelEmail: props.modelValue?.email ?? "",
+        organization: organization.value,
+      }),
+      t,
     );
 
-    // The OForm owns every editable field; formData stays the single working
-    // source for the conditionals/handler (the sanctioned entangled-form
-    // exception), kept in sync by the fields' v-model. :default-values re-seeds
-    // from it on (re)mount.
-    const addUserDefaults = computed((): AddUserForm => ({
-      email: formData.value.email ?? "",
-      password: formData.value.password ?? "",
-      first_name: formData.value.first_name ?? "",
-      last_name: formData.value.last_name ?? "",
-      role: formData.value.role ?? "",
-      custom_role: formData.value.custom_role ?? [],
-      change_password: formData.value.change_password ?? false,
-      old_password: formData.value.old_password ?? "",
-      new_password: formData.value.new_password ?? "",
-      other_organization: formData.value.other_organization ?? "",
-    }));
+    const form = useOForm<AddUserForm>({
+      defaultValues: blankForm(),
+      schema: addUserSchema,
+      onSubmit,
+    });
+
+    // Reactive reads of the SAME form for the owner's conditional rendering (v-if)
+    // and the read-only display lines — not a copy.
+    const changePassword = form.useStore((s: any) => s.values.change_password);
+    const formEmail = form.useStore((s: any) => s.values.email);
+    const formRole = form.useStore((s: any) => s.values.role);
+    const formCustomRole = form.useStore((s: any) => s.values.custom_role);
 
     watch(
       () => props.customRoles,
@@ -375,7 +474,7 @@ export default defineComponent({
     );
 
     onActivated(() => {
-      formData.value.organization = store.state.selectedOrganization.identifier;
+      organization.value = store.state.selectedOrganization.identifier;
     });
 
     onBeforeMount(() => setOrganizationOptions());
@@ -397,26 +496,36 @@ export default defineComponent({
         existingUser.value = false;
         // Row data from the users list doesn't include `organization`; fall back
         // to the active org so the subsequent PUT lands on the right endpoint.
-        formData.value = {
+        organization.value =
+          newVal.organization || store.state.selectedOrganization.identifier;
+        // Keep the full original record (org_member_id, is_external, …) to
+        // round-trip on save — it is non-form context, NOT a form mirror.
+        editRecord.value = {
           ...newVal,
-          organization:
-            newVal.organization || store.state.selectedOrganization.identifier,
-          change_password: false,
+          organization: organization.value,
           password: "",
         };
+        isExternalUser.value = !!newVal.is_external;
+        // Seed the ONE form via reset(values) — never a formData mirror nor a
+        // per-field setFieldValue loop (Rule ③ / playbook "data arrives after
+        // mount" → reset, flash-free).
+        form.reset({
+          ...blankForm(),
+          email: newVal.email ?? "",
+          role: newVal.role ?? "",
+          first_name: newVal.first_name ?? "",
+          last_name: newVal.last_name ?? "",
+          custom_role: newVal.custom_role ?? [],
+        });
         if (config.isEnterprise == "true" || config.isCloud == true) {
           const orgId = store.state.selectedOrganization.identifier;
           userServiece
             .getUserRoles(orgId, newVal.email)
             .then((response: any) => {
-              formData.value.custom_role = response.data;
               // custom_role arrives AFTER mount (async) — bridge it into the form
-              // so the OFormSelect displays it (the form's value, not formData,
-              // is what's rendered). Per the playbook "data arrives after mount".
-              updateUserForm.value?.form?.setFieldValue(
-                "custom_role",
-                response.data,
-              );
+              // so the OFormSelect displays it (the sanctioned setFieldValue
+              // bridge for data that arrives post-mount).
+              form.setFieldValue("custom_role", response.data);
             })
             .catch((error: any) => {
               console.error("Error fetching user roles:", error);
@@ -425,9 +534,10 @@ export default defineComponent({
       } else {
         beingUpdated.value = props.isUpdated;
         existingUser.value = true;
-        formData.value = defaultValue();
-        formData.value.organization =
-          store.state.selectedOrganization.identifier;
+        organization.value = store.state.selectedOrganization.identifier;
+        editRecord.value = null;
+        isExternalUser.value = false;
+        form.reset(blankForm());
       }
     };
 
@@ -457,27 +567,29 @@ export default defineComponent({
           value: "other",
         });
       }
-      formData.value.organization = store.state.selectedOrganization.identifier;
+      organization.value = store.state.selectedOrganization.identifier;
     };
 
-    // Options-API: the schema (and the defaults computed) MUST be returned from
-    // setup() — a bare module import is out of the template's scope, so :schema
-    // would resolve to undefined and validation would silently no-op.
+    // Options-API: everything the template binds MUST be returned from setup() —
+    // a bare module import is out of the template's scope. The OWNER form, the
+    // reactive form-state reads, and the non-form context all flow through here.
     return {
       t,
       store,
       router,
-      formData,
+      form,
       beingUpdated,
-      updateUserForm,
-      formMode,
-      addUserSchema,
-      addUserDefaults,
+      existingUser,
+      organization,
+      isExternalUser,
+      changePassword,
+      formEmail,
+      formRole,
+      formCustomRole,
       isPwd,
       isNewPwd,
       isOldPwd,
       organizationOptions,
-      existingUser,
       getImageURL,
       loadingOrganizations,
       logout_confirm,
@@ -511,119 +623,6 @@ export default defineComponent({
       useLocalUserInfo("", true);
 
       this.$router.push("/logout");
-    },
-    // Plain async @submit handler — fires only after the Zod schema passes
-    // (AddUser.schema.ts now owns the email / role / password / org rules that
-    // used to be manual emailError/roleError/passwordError refs + toast checks).
-    // OForm awaits it, so the footer Save spinner spans the request automatically
-    // (no manual loading toast). `formData` is the working source of truth.
-    async onSubmit() {
-      let selectedOrg = this.formData.organization;
-      if (selectedOrg == "other") {
-        selectedOrg = encodeURIComponent(this.formData.other_organization);
-      }
-      if (this.beingUpdated) {
-        const userEmail = this.formData.email;
-        delete this.formData.email;
-
-        if (this.formData.change_password == false) {
-          delete this.formData.old_password;
-          delete this.formData.new_password;
-        }
-        try {
-          const res: any = await userServiece.update(
-            this.formData,
-            selectedOrg,
-            userEmail,
-          );
-          if (
-            this.formData.change_password == true &&
-            this.loggedInUserEmail === this.modelValue?.email
-          ) {
-            this.logout_confirm = true;
-          } else {
-            this.formData.email = userEmail;
-            this.$emit("updated", res.data, this.formData, "updated");
-            this.$emit("update:open", false);
-          }
-        } catch (err: any) {
-          toast({
-            variant: "error",
-            message: err.response.data.message,
-          });
-          this.formData.email = userEmail;
-        }
-        this.track("Button Click", {
-          button: "Update User",
-          page: "Add User",
-        });
-      } else {
-        if (this.existingUser) {
-          const userEmail = this.formData.email;
-
-          try {
-            const res: any = await userServiece.updateexistinguser(
-              {
-                role: this.formData.role,
-                custom_role: this.formData.custom_role,
-              },
-              selectedOrg,
-              userEmail,
-            );
-            this.formData.email = userEmail;
-            this.existingUser = true;
-            this.$emit("updated", res.data, this.formData, "created");
-            this.$emit("update:open", false);
-          } catch (err: any) {
-            if (err.response.data.code === 422) {
-              // The email is actually new → switch to "create new user" mode.
-              // formMode flips to "add-new", which re-keys <OForm> so the schema
-              // now enforces the password policy.
-              this.existingUser = false;
-            } else {
-              if (err.response?.status != 403 || err?.status != 403) {
-                toast({
-                  variant: "error",
-                  message: err.response.data.message,
-                });
-              }
-              this.formData.email = userEmail;
-            }
-          }
-          this.track("Button Click", {
-            button: "Update User",
-            page: "Add User",
-          });
-        } else {
-          try {
-            const res: any = await userServiece.create(
-              this.formData,
-              selectedOrg,
-            );
-            this.$emit("updated", res.data, this.formData, "created");
-            this.$emit("update:open", false);
-          } catch (err: any) {
-            toast({
-              variant: "error",
-              message: err.response.data.message,
-            });
-          }
-          this.track("Button Click", {
-            button: "Create User",
-            page: "Add User",
-          });
-        }
-      }
-    },
-    async fetchUserRoles(userEmail: any) {
-      const orgId = this.store.state.selectedOrganization.identifier;
-      try {
-        const response = await userServiece.getUserRoles(orgId, userEmail);
-        const existingUserRoles = response.data;
-        this.formData.custom_role = existingUserRoles;
-      } catch (error) {
-        console.error("Error fetching user roles:", error);
-      }
     },
   },
   computed: {
