@@ -1,0 +1,254 @@
+diff --git a/web/src/components/dashboards/VariablesValueSelector.spec.ts b/web/src/components/dashboards/VariablesValueSelector.spec.ts
+index 9ef318cd29b..c8c741e5420 100644
+--- a/web/src/components/dashboards/VariablesValueSelector.spec.ts
++++ b/web/src/components/dashboards/VariablesValueSelector.spec.ts
+@@ -442,6 +442,98 @@ describe("VariablesValueSelector", () => {
+       expect(testVariable.value).toEqual(["value1", "value2"]);
+     });
+ 
++    it("should select the option marked as default (selected) for single-select custom variables", async () => {
++      // Regression: previously the first option was always used on initial load,
++      // ignoring the per-option "Default" checkbox (option.selected).
++      const customConfig = {
++        list: [
++          {
++            name: "custom_stream",
++            type: "custom",
++            multiSelect: false,
++            options: [
++              { label: "e2e_automate", value: "e2e_automate", selected: false },
++              { label: "default", value: "default", selected: true },
++            ],
++          },
++        ],
++      };
++
++      wrapper = createWrapper({
++        variablesConfig: customConfig,
++        initialVariableValues: { value: {} },
++      });
++      await nextTick();
++
++      const vm = wrapper.vm as any;
++      const testVariable = vm.variablesData.values.find(
++        (v: any) => v.name === "custom_stream",
++      );
++
++      // Should pick the default-marked option ("default"), not the first option
++      expect(testVariable.value).toBe("default");
++    });
++
++    it("should select the options marked as default (selected) for multiSelect custom variables", async () => {
++      const customConfig = {
++        list: [
++          {
++            name: "custom_multi",
++            type: "custom",
++            multiSelect: true,
++            options: [
++              { label: "one", value: "one", selected: false },
++              { label: "two", value: "two", selected: true },
++              { label: "three", value: "three", selected: true },
++            ],
++          },
++        ],
++      };
++
++      wrapper = createWrapper({
++        variablesConfig: customConfig,
++        initialVariableValues: { value: {} },
++      });
++      await nextTick();
++
++      const vm = wrapper.vm as any;
++      const testVariable = vm.variablesData.values.find(
++        (v: any) => v.name === "custom_multi",
++      );
++
++      // Should pick all default-marked options, not just the first
++      expect(testVariable.value).toEqual(["two", "three"]);
++    });
++
++    it("should fall back to first option for custom variables when none are marked default", async () => {
++      const customConfig = {
++        list: [
++          {
++            name: "custom_no_default",
++            type: "custom",
++            multiSelect: false,
++            options: [
++              { label: "alpha", value: "alpha", selected: false },
++              { label: "beta", value: "beta", selected: false },
++            ],
++          },
++        ],
++      };
++
++      wrapper = createWrapper({
++        variablesConfig: customConfig,
++        initialVariableValues: { value: {} },
++      });
++      await nextTick();
++
++      const vm = wrapper.vm as any;
++      const testVariable = vm.variablesData.values.find(
++        (v: any) => v.name === "custom_no_default",
++      );
++
++      expect(testVariable.value).toBe("alpha");
++    });
++
+     it("should handle SELECT_ALL value for multiSelect variables", async () => {
+       const customConfig = {
+         list: [
+diff --git a/web/src/components/dashboards/VariablesValueSelector.vue b/web/src/components/dashboards/VariablesValueSelector.vue
+index 62062b73f09..7ff3d85e327 100644
+--- a/web/src/components/dashboards/VariablesValueSelector.vue
++++ b/web/src/components/dashboards/VariablesValueSelector.vue
+@@ -865,16 +865,31 @@ export default defineComponent({
+             ? [SELECT_ALL_VALUE]
+             : SELECT_ALL_VALUE;
+         } else if (item.type === "custom") {
+-          // For custom type variables, set first option as default if no initial value
++          // For custom type variables, honor the per-option default (the "Default"
++          // checkbox in variable settings, stored as `option.selected`) if no initial value
+           if (initialValue !== null && initialValue !== undefined &&
+               (Array.isArray(initialValue) ? initialValue.length > 0 : true)) {
+             // Use initial value if it exists
+             variableData.value = initialValue;
+           } else if (variableData.options && variableData.options.length > 0) {
+-            // Set first option as default value
+-            variableData.value = item.multiSelect
+-              ? [variableData.options[0].value]
+-              : variableData.options[0].value;
++            // Collect options explicitly marked as default
++            const defaultOptionValues = variableData.options
++              .filter((option: any) => option.selected)
++              .map((option: any) => option.value);
++
++            if (item.multiSelect) {
++              // Use all default-marked options, fall back to first option
++              variableData.value =
++                defaultOptionValues.length > 0
++                  ? defaultOptionValues
++                  : [variableData.options[0].value];
++            } else {
++              // Use the default-marked option, fall back to first option
++              variableData.value =
++                defaultOptionValues.length > 0
++                  ? defaultOptionValues[0]
++                  : variableData.options[0].value;
++            }
+           } else {
+             // No options available, set to null/empty array
+             variableData.value = item.multiSelect ? [] : null;
+diff --git a/web/src/composables/dashboard/useVariablesManager.spec.ts b/web/src/composables/dashboard/useVariablesManager.spec.ts
+index c0099404824..0719fc321bb 100644
+--- a/web/src/composables/dashboard/useVariablesManager.spec.ts
++++ b/web/src/composables/dashboard/useVariablesManager.spec.ts
+@@ -97,6 +97,74 @@ describe("useVariablesManager", () => {
+       expect(manager.variablesData.panels["panel-2"][0].panelId).toBe("panel-2");
+     });
+ 
++    it("should use the option marked as default (selected) for single-select custom variables", () => {
++      // Regression: previously the first option was always used as the default,
++      // ignoring the per-option "Default" checkbox (option.selected).
++      const manager = useVariablesManager();
++      const config: VariableConfig[] = [
++        {
++          name: "custom_stream",
++          type: "custom",
++          scope: "panels",
++          panels: ["panel-1"],
++          multiSelect: false,
++          value: "",
++          options: [
++            { label: "e2e_automate", value: "e2e_automate", selected: false },
++            { label: "default", value: "default", selected: true },
++          ],
++        },
++      ];
++
++      manager.initialize(config, {});
++
++      // Should resolve to the default-marked option ("default"), not the first option
++      expect(manager.variablesData.panels["panel-1"][0].value).toBe("default");
++    });
++
++    it("should use options marked as default (selected) for multiSelect custom variables", () => {
++      const manager = useVariablesManager();
++      const config: VariableConfig[] = [
++        {
++          name: "custom_multi",
++          type: "custom",
++          scope: "global",
++          multiSelect: true,
++          value: "",
++          options: [
++            { label: "one", value: "one", selected: false },
++            { label: "two", value: "two", selected: true },
++            { label: "three", value: "three", selected: true },
++          ],
++        },
++      ];
++
++      manager.initialize(config, {});
++
++      expect(manager.variablesData.global[0].value).toEqual(["two", "three"]);
++    });
++
++    it("should fall back to the first option when no custom option is marked default", () => {
++      const manager = useVariablesManager();
++      const config: VariableConfig[] = [
++        {
++          name: "custom_no_default",
++          type: "custom",
++          scope: "global",
++          multiSelect: false,
++          value: "",
++          options: [
++            { label: "alpha", value: "alpha", selected: false },
++            { label: "beta", value: "beta", selected: false },
++          ],
++        },
++      ];
++
++      manager.initialize(config, {});
++
++      expect(manager.variablesData.global[0].value).toBe("alpha");
++    });
++
+     it("should migrate legacy variables to global scope", () => {
+       const manager = useVariablesManager();
+       const config: any[] = [
+diff --git a/web/src/composables/dashboard/useVariablesManager.ts b/web/src/composables/dashboard/useVariablesManager.ts
+index e34aa4c512a..c20f8f06cbf 100644
+--- a/web/src/composables/dashboard/useVariablesManager.ts
++++ b/web/src/composables/dashboard/useVariablesManager.ts
+@@ -106,12 +106,23 @@ const expandVariablesForScopes = (
+       }
+     }
+ 
+-    // For custom type variables, select first option as default
++    // For custom type variables, honor the per-option default (the "Default"
++    // checkbox in variable settings, stored as `option.selected`); fall back to
++    // the first option only when none is marked as default.
+     if (variable.type === "custom") {
+       const options = (variable as any).options;
+       if (options && options.length > 0) {
+-        return variable.multiSelect
+-          ? [options[0].value]
++        const defaultOptionValues = options
++          .filter((option: any) => option.selected)
++          .map((option: any) => option.value);
++
++        if (variable.multiSelect) {
++          return defaultOptionValues.length > 0
++            ? defaultOptionValues
++            : [options[0].value];
++        }
++        return defaultOptionValues.length > 0
++          ? defaultOptionValues[0]
+           : options[0].value;
+       }
+     }

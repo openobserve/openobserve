@@ -1,0 +1,6 @@
+{
+  "group": "Dashboards-Settings",
+  "spec_filename": "customVariableDefaultValue.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

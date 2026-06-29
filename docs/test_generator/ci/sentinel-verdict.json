@@ -1,0 +1,21 @@
+{
+  "verdict": "PASS",
+  "feature_slug": "custom-variable-default-value",
+  "feature_title": "Dashboard Custom Variable Default Value Resolution",
+  "critical_count": 0,
+  "warning_count": 4,
+  "auto_fixed": 0,
+  "warnings": [
+    "W1: Weak assertion at customVariableDefaultValue.spec.js:340 — toBeGreaterThan(0) on displayed length",
+    "W2: Mixed import styles (require + import) at customVariableDefaultValue.spec.js:10-16",
+    "W3: force:true in unused hideVariable() at dashboard-settings.js:433",
+    "W4: No cleanup.spec.js entry for dashboard name patterns used in tests"
+  ],
+  "files_audited": [
+    "tests/ui-testing/playwright-tests/Dashboards/customVariableDefaultValue.spec.js",
+    "tests/ui-testing/pages/dashboardPages/dashboard-variables-scoped.js",
+    "tests/ui-testing/pages/dashboardPages/dashboard-settings.js",
+    "tests/ui-testing/pages/dashboardPages/dashboard-selectors.js",
+    "tests/ui-testing/pages/page-manager.js"
+  ]
+}

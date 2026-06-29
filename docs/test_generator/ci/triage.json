@@ -1,0 +1,26 @@
+{
+  "feature_slug": "custom-variable-default-value",
+  "feature_title": "Dashboard Custom Variable Default Value Resolution",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "customVariableDefaultValue.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/customVariableDefaultValue.spec.js",
+  "playwright_group": "Dashboards-Settings",
+  "source_files": [
+    "web/src/components/dashboards/VariablesValueSelector.vue",
+    "web/src/composables/dashboard/useVariablesManager.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All changed files are under web/src/ (open-source UI paths) — specifically web/src/components/dashboards/ and web/src/composables/dashboard/. No paths under enterprise/, o2_enterprise/, or src/enterprise/. No enterprise keywords (cipher, SSO, SAML, RBAC, SDR, sensitive-data, logo-management) appear in the file paths.",
+    "skip": "Not skipped. The change modifies dashboard custom variable default value resolution — a user-facing UI behavior (what value appears pre-selected when a dashboard loads). No explicit opt-out label or skip instruction was found in the trigger comment (empty) or feature hint (descriptive only).",
+    "e2e": "E2E is warranted. The change alters which option is selected by default for custom dashboard variables — honoring the per-option 'Default' checkbox (option.selected) instead of always picking the first option. This is directly visible to users when dashboards load and should be verified in a real browser across single-select, multi-select, and fallback-to-first-option scenarios.",
+    "area": "Dashboards — the changed source files live in web/src/components/dashboards/ and web/src/composables/dashboard/. The sibling E2E specs live under tests/ui-testing/playwright-tests/Dashboards/.",
+    "group": "Dashboards-Settings — the existing dashboard-variables-setting.spec.js lives in this matrix shard, and this feature is about dashboard variable behavior (default value resolution for custom variables with per-option defaults).",
+    "existing_tests": "No E2E specs in the diff. The changed test files are Vitest unit tests (web/src/components/dashboards/VariablesValueSelector.spec.ts and web/src/composables/dashboard/useVariablesManager.spec.ts), not Playwright E2E specs under tests/ui-testing/playwright-tests/."
+  }
+}
