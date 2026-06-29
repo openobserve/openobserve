@@ -49,17 +49,23 @@ test.describe("Regex Patterns form validation", () => {
         await pm.regexPatternsFormValidation.openAddPatternDrawer();
         await expect(pm.regexPatternsFormValidation.getDrawerLocator()).toBeVisible();
 
-        // Save button should be disabled because both fields are empty
-        // (isFormEmpty is true when name or pattern is empty)
-        await expect(pm.regexPatternsFormValidation.getSaveButtonLocator()).toBeDisabled();
+        // The Create button is NOT gated on form contents — AddRegexPattern.vue's
+        // ODrawer has no :primary-button-disabled binding, so the primary button
+        // stays enabled and validation is enforced on submit via the OForm schema.
+        // (Verified against the enterprise build; OSS skips this suite entirely.)
+        await expect(pm.regexPatternsFormValidation.getSaveButtonLocator()).toBeEnabled();
 
-        testLogger.info('Save button correctly disabled for empty form');
+        testLogger.info('Save button enabled for empty form — validation enforced on submit');
 
-        // OFormInput shows errors only when isTouched=true AND value is invalid.
-        // isTouched is set via field.handleBlur(), which OFormInput calls on every
-        // update:model-value event (fill → clear sequence triggers it reliably).
-        await pm.regexPatternsFormValidation.touchNameField();
-        await pm.regexPatternsFormValidation.touchPatternField();
+        // Submitting the empty form runs the OForm schema validators, which mark
+        // every field touched and surface the required errors without submitting
+        // (vee-validate blocks the @submit handler while the form is invalid).
+        await pm.regexPatternsFormValidation.clickSave();
+
+        // vee-validate blocks the @submit handler while the form is invalid, so
+        // no save fires and the drawer must stay open — guards against an
+        // accidental side-effect submit on the empty form.
+        await expect(pm.regexPatternsFormValidation.getDrawerLocator()).toBeVisible();
 
         // OFormInput validator: '* Name is required'
         await expect(pm.regexPatternsFormValidation.getNameErrorLocator()).toBeVisible();

@@ -60,6 +60,7 @@
       + {{ t('common.add') }}
     </OButton>
     <DrilldownPopUp
+      :key="drilldownPopUpKey"
       :open="showDrilldownPopUp"
       :drilldown-data-index="selectedDrilldownIndexToEdit"
       :is-edit-mode="isDrilldownEditMode"
@@ -91,6 +92,9 @@ export default defineComponent({
     const showDrilldownPopUp = ref(false);
     const isDrilldownEditMode = ref(false);
     const selectedDrilldownIndexToEdit: any = ref(null);
+    // Bumped on every open so the popup remounts fresh each time, ensuring the
+    // saved folder/dashboard/tab are loaded into the form on the first edit.
+    const drilldownPopUpKey = ref(0);
 
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -110,12 +114,14 @@ export default defineComponent({
     const onDrilldownClick = (index: any) => {
       selectedDrilldownIndexToEdit.value = index;
       isDrilldownEditMode.value = true;
+      drilldownPopUpKey.value++;
       showDrilldownPopUp.value = true;
     };
 
     const addNewDrilldown = () => {
       isDrilldownEditMode.value = false;
       selectedDrilldownIndexToEdit.value = null;
+      drilldownPopUpKey.value++;
       showDrilldownPopUp.value = true;
     };
 
@@ -140,6 +146,7 @@ export default defineComponent({
       saveDrilldownData,
       addNewDrilldown,
       isDrilldownEditMode,
+      drilldownPopUpKey,
     };
   },
 });

@@ -732,10 +732,10 @@ export default defineComponent({
         await nextTick();
         form.reset(getRecordData());
 
-        // Refresh dependent lists so they reflect the (possibly new) data
-        await getDashboardListLoading.execute();
-        await getTabListLoading.execute();
-        await getvariableNames();
+        // NOTE: dependent lists are loaded in onMounted + refreshed by the
+        // folder / dashboard / drilldownData watches — do NOT re-fetch them here.
+        // Refreshing on every open reset the selected org when navigating away
+        // (#12932), so that on-open refresh was removed.
       },
     );
 
