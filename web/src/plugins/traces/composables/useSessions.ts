@@ -17,6 +17,7 @@ import { ref } from "vue";
 import { useStore } from "vuex";
 import sessionsService from "@/services/sessions";
 import { useLLMStreamQuery } from "./useLLMStreamQuery";
+import { compactSql } from "../config/llmInsightsPanels";
 
 export interface SessionDetail {
   sessionId: string;
@@ -48,6 +49,13 @@ export interface SessionTraceRow {
   model: string | null;
   /** All models used across spans in this trace. */
   models: string[];
+  /**
+   * Current turn's user question — the last user-role entry in this trace's
+   * `gen_ai_input_messages` (the full prompt carries history; the last user
+   * message is this turn's ask). Drives the turn-preview hover card. Empty
+   * string when no user message is present.
+   */
+  turnUserMessage: string;
 }
 
 /** Single message inside a turn (USER block / ASSISTANT block). */
@@ -260,6 +268,18 @@ export function useSessions() {
     // 1_000_000 / 1_000 respectively, i.e. they expect nanoseconds.
     // We keep the unit convention (nanos) so the existing template
     // keeps formatting correctly without touching the UI layer.
+    //
+    // Parse the per-trace user question from `gen_ai_input_messages` (already
+    // in the response) so the turn-preview hover card has a message preview
+    // without a second fetch. Lazy-import keeps the list-only path light.
+    const { messagesFromInput } = await import("../threadView.utils");
+    const userMessageOf = (raw: any): string => {
+      const msgs = messagesFromInput(raw);
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === "user" && msgs[i].content) return msgs[i].content;
+      }
+      return "";
+    };
     const traces: SessionTraceRow[] = accumulated.map((r: any) => {
       const spansArr = Array.isArray(r.spans) ? r.spans : [];
       const spanCount = Number(spansArr[0]) || 0;
@@ -286,6 +306,7 @@ export function useSessions() {
         status: errorCount > 0 ? "error" : "ok",
         model: modelsArr[0] ?? null,
         models: modelsArr,
+        turnUserMessage: userMessageOf(r.gen_ai_input_messages),
         serviceName: svcArr[0]?.service_name
           ? String(svcArr[0].service_name)
           : null,
@@ -361,7 +382,7 @@ export function useSessions() {
     // but that meant a second parallel COUNT query was needed for LLM/tool
     // call badge counts. Removing the filter lets us compute the counts
     // client-side from the same result set, halving the number of API calls.
-    const sql = `
+    const sql = compactSql(`
       SELECT
         gen_ai_input_messages,
         gen_ai_output_messages,
@@ -374,7 +395,7 @@ export function useSessions() {
         AND gen_ai_operation_name IS NOT NULL
       ORDER BY start_time ASC
       LIMIT 50
-    `;
+    `);
 
     const LLM_OPS = new Set(["chat", "text_completion", "generate_content", "embeddings"]);
 
@@ -452,6 +473,42 @@ export function useSessions() {
   }
 
   /**
+   * Fetch all gen_ai spans across a session's traces — the raw span rows the
+   * `ThreadView` component renders from (it groups by `trace_id` and classifies
+   * by `gen_ai_operation_name`). Used by the session-detail "Pretty" transcript
+   * view. Filters by the session's trace ids (rather than conversation_id) so
+   * tool-execution spans are included, and selects exactly the columns
+   * `ThreadView` reads.
+   */
+  async function fetchSessionSpans(
+    streamName: string,
+    traceIds: string[],
+    startTime: number,
+    endTime: number,
+  ): Promise<any[]> {
+    if (!streamName || !traceIds.length || !startTime || !endTime) return [];
+    const inList = traceIds
+      .map((id) => `'${String(id).replace(/'/g, "''")}'`)
+      .join(",");
+    const sql = compactSql(`
+      SELECT
+        span_id, trace_id, operation_name, gen_ai_operation_name,
+        tool_name, gen_ai_tool_name, tool_args,
+        duration, start_time, end_time,
+        span_status, status_message,
+        gen_ai_request_model, gen_ai_response_model,
+        gen_ai_usage_cost, gen_ai_usage_total_tokens,
+        gen_ai_input_messages, gen_ai_output_messages
+      FROM "${streamName}"
+      WHERE trace_id IN (${inList})
+        AND gen_ai_operation_name IS NOT NULL
+      ORDER BY start_time ASC
+      LIMIT 2000
+    `);
+    return (await executeQuery(sql, startTime, endTime)) || [];
+  }
+
+  /**
    * Cancel in-flight SQL streams from `useLLMStreamQuery`. Called from the
    * parent on unmount so server-side turn-detail work isn't kept around after
    * the tab goes away.
@@ -469,6 +526,7 @@ export function useSessions() {
     fetchPage,
     fetchSession,
     fetchTurnDetail,
+    fetchSessionSpans,
     cancelAll: cancelAllSessionStreams,
   };
 }

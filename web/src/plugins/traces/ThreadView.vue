@@ -187,26 +187,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ u.content }}
           </div>
 
-          <!-- Assistant text. -->
-          <div
-            v-for="(msg, mIdx) in turn.assistant"
-            :key="`a-${mIdx}`"
-            class="thread-bubble thread-bubble--assistant"
-          >
-            {{ msg.content }}
-          </div>
+          <!-- Tool calls — between the user input and the assistant output
+               (the model calls tools, then answers). Hidden behind a one-way
+               "Show calls" pill; once revealed the pill is gone. -->
+          <div v-if="turn.toolCalls.length > 0" class="thread-tools-thread">
+            <button
+              v-if="!expandedToolGroups.has(turn.span.span_id)"
+              class="tt-toggle"
+              @click="toggleToolGroup(turn.span.span_id)"
+            >
+              <span class="tt-zz"></span>
+              <span class="tt-pill">
+                <span class="tt-count">
+                  {{ turn.toolCalls.length }}
+                  {{ turn.toolCalls.length === 1 ? "tool call" : "tool calls" }}
+                  · {{ formatDuration(totalToolDuration(turn.toolCalls)) }}
+                </span>
+                <span class="tt-link">Show calls</span>
+              </span>
+              <span class="tt-zz"></span>
+            </button>
 
-          <!-- Tool calls — one grouped card. -->
-          <div v-if="turn.toolCalls.length > 0" class="thread-tools-card">
-            <div class="thread-tools-card__header">
-              <span class="thread-tools-card__count">
-                {{ turn.toolCalls.length }}
-                {{ turn.toolCalls.length === 1 ? "Tool call" : "Tool calls" }}
-              </span>
-              <span class="thread-tools-card__total">
-                Σ {{ formatDuration(totalToolDuration(turn.toolCalls)) }}
-              </span>
-            </div>
+            <div v-if="expandedToolGroups.has(turn.span.span_id)" class="tt-body">
             <div
               v-for="t in turn.toolCalls"
               :key="t.span_id"
@@ -271,6 +273,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
+            </div>
+          </div>
+
+          <!-- Assistant text (the final answer, after any tool calls). -->
+          <div
+            v-for="(msg, mIdx) in turn.assistant"
+            :key="`a-${mIdx}`"
+            class="thread-bubble thread-bubble--assistant"
+          >
+            {{ msg.content }}
           </div>
 
           <!-- Footer. -->
@@ -398,6 +410,11 @@ const showSystemFull = ref(false);
 /* ─── tool row expansion ──────────────────────────────────────────────── */
 const expandedTools = ref<Set<string>>(new Set());
 
+// The whole tool thread for a turn is collapsed behind a "Show calls" pill by
+// default (keyed by the turn's span id), matching the redesign mockup; the
+// individual tool rows still expand via `expandedTools`.
+const expandedToolGroups = ref<Set<string>>(new Set());
+
 function totalToolDuration(tools: any[]): number {
   let sum = 0;
   for (const t of tools) sum += Number(t.duration) || 0;
@@ -409,6 +426,13 @@ function toggleTool(spanId: string) {
   if (next.has(spanId)) next.delete(spanId);
   else next.add(spanId);
   expandedTools.value = next;
+}
+
+function toggleToolGroup(key: string) {
+  const next = new Set(expandedToolGroups.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  expandedToolGroups.value = next;
 }
 
 /* ─── visual helpers ──────────────────────────────────────────────────── */
@@ -875,32 +899,66 @@ function formatTime(ns: number): string {
 }
 
 /* ─── grouped tool card (secondary weight) ───────────────────────────── */
-.thread-tools-card {
-  border: 1px solid rgba(76, 175, 80, 0.18);
-  border-radius: 0.4rem;
-  background: rgba(76, 175, 80, 0.06);
-  overflow: hidden;
+/* Tool thread — collapsed "Show calls" pill (redesign mockup .tools-thread). */
+.thread-tools-thread {
+  margin: 0.5rem 0;
 
-  &__header {
+  .tt-toggle {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.3rem 0.625rem;
-    border-bottom: 1px solid rgba(76, 175, 80, 0.15);
-    font-size: 0.68rem;
-    color: #4a5568;
+    width: 100%;
+    background: none;
+    border: 0;
+    padding: 0.125rem 0;
+    cursor: pointer;
   }
 
-  &__count {
-    font-weight: 600;
-    color: #4a5568;
-    letter-spacing: 0;
+  .tt-zz {
+    flex: 1;
+    min-width: 1rem;
+    height: 0.75rem;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='12'%3E%3Cpath d='M0 9L4 3L8 9' fill='none' stroke='%23d6dde7' stroke-width='1.4'/%3E%3C/svg%3E")
+      repeat-x center;
+    opacity: 0.7;
+  }
+
+  .tt-pill {
+    flex: none;
+    margin: 0 0.75rem;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 0.5rem 1.125rem;
+    border: 1px solid var(--o2-border-color);
+    border-radius: 0.625rem;
+    background: var(--o2-card-bg);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+
+  .tt-toggle:hover .tt-pill {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .tt-count {
     font-size: 0.72rem;
+    color: var(--o2-text-secondary);
+    font-weight: 600;
+    white-space: nowrap;
   }
 
-  &__total {
-    margin-left: auto;
-    font-family: monospace;
+  .tt-link {
+    font-size: 0.78rem;
+    color: var(--o2-interactive-primary, #3b82f6);
+    font-weight: 650;
+  }
+
+  .tt-body {
+    padding-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
   }
 }
 
@@ -1030,19 +1088,6 @@ function formatTime(ns: number): string {
     box-shadow: 0 0 0 4px var(--o2-card-bg);
   }
 
-  .thread-tools-card {
-    background: rgba(76, 175, 80, 0.08);
-    border-color: rgba(76, 175, 80, 0.22);
-
-    &__header {
-      border-bottom-color: rgba(76, 175, 80, 0.2);
-      color: #a0aec0;
-    }
-
-    &__count {
-      color: #a0aec0;
-    }
-  }
 
   .thread-tool {
     background: rgba(76, 175, 80, 0.06);

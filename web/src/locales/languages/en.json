@@ -4121,17 +4121,60 @@
       "unknownUser": "Unknown user",
       "filters": {
         "status": "Status",
-        "model": "Model"
+        "model": "Model",
+        "sort": "Sort",
+        "all": "All"
+      },
+      "sort": {
+        "turn": "By Turn",
+        "cost": "By Cost",
+        "latency": "By Latency",
+        "severity": "By Severity"
+      },
+      "jumpMostExpensive": "Most Expensive",
+      "jumpCostliestError": "Costliest Error",
+      "expandToView": "Expand To View Response",
+      "noTurnsMatch": "No Turns Match Your Filters",
+      "viewCollapsed": "Collapsed",
+      "viewPretty": "Pretty",
+      "rail": {
+        "slowestTurns": "Slowest Turns",
+        "costHotspots": "Cost Hotspots",
+        "toolHotspots": "Tool Hotspots",
+        "calls": "{n} calls",
+        "call": "{n} call",
+        "ofTotal": "{pct}% of total",
+        "noTools": "No Tool Calls In This Session"
       },
       "kpi": {
         "turns": "Turns",
         "duration": "Duration",
         "inputTokens": "Input Tokens",
         "outputTokens": "Output Tokens",
-        "cost": "Cost"
+        "cost": "Cost",
+        "errors": "Errors",
+        "latency": "Latency",
+        "tokens": "Tokens",
+        "cacheSaved": "Cache Saved"
+      },
+      "kpiSub": {
+        "turns": "Complete Session · {duration}",
+        "errorsLead": "{errors} of {total} · Turns",
+        "errorsNone": "No Errors · {total} Turns",
+        "latencyLead": "Slowest {slowest} ·",
+        "costLead": "Peak {peak} ·",
+        "tokens": "{ratio}% Cached",
+        "cacheSaved": "{ratio}% of Input Reused · {tokens} Tok",
+        "cacheEstimate": "Estimated — per-request cache metrics aren't available yet."
+      },
+      "ribbon": {
+        "title": "Session Ribbon",
+        "subtitle": "Cost, Latency & Tokens Per Turn"
       },
       "conversation": "Conversation",
       "turnLabel": "Turn",
+      "statusOk": "Ok",
+      "statusError": "Error",
       "openTrace": "Open trace",
       "noUserMessage": "No user message captured for this turn.",
       "noAssistantMessage": "No assistant response captured for this turn.",
@@ -4147,6 +4190,7 @@
         "output": "Output",
         "total": "Total",
         "cost": "Cost",
+        "cache": "Cache",
         "spans": "Spans",
         "llmCalls": "LLM calls",
         "toolCalls": "Tool calls",
@@ -4825,6 +4869,14 @@
       "evalJobs": "Eval Jobs",
       "scorers": "Scorers",
       "scoreConfigs": "Score Configs"
+    },
+    "subtitle": {
+      "llmInsights": "Track latency, errors, tokens, and cost across your LLM traffic",
+      "sessions": "Browse and inspect agent sessions turn by turn",
+      "quality": "Score and track the quality of your LLM responses",
+      "evalJobs": "Run and monitor evaluation jobs across your sessions",
+      "scorers": "Create and manage the scorers that grade LLM outputs",
+      "scoreConfigs": "Configure the scoring rubrics used by your evaluations"
     },
     "kpi": {
       "totalCost": "Total Cost",
@@ -5570,6 +5622,10 @@
       "preview": {
         "title": "Matched Spans",
         "hint": "Once you've picked a stream and filter, this panel will show how many spans your job will match.",
+        "matchedSuffix": "spans matched · last 24h",
+        "matchedError": "Couldn't load the match count",
+        "matchedLoading": "Counting matched spans…",
+        "matchedIncomplete": "Finish the filter condition to update the count.",
         "summaryTitle": "Summary",
         "summaryName": "Name",
         "summaryType": "Type",
