@@ -243,11 +243,13 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
       <!-- Recording banner with current URL + controls -->
       <div class="tw:flex tw:items-center tw:gap-3 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--o2-status-error-subtle)] tw:border tw:border-[var(--o2-border-color)]">
         <span class="tw:flex tw:items-center tw:gap-1.5">
-          <span class="tw:w-2 tw:h-2 tw:rounded-full tw:bg-[var(--o2-status-error)] tw:animate-pulse tw:inline-block" aria-hidden="true" />
-          <span class="tw:text-sm tw:font-semibold tw:text-[var(--o2-status-error)]">Recording</span>
+          <span class="tw:relative tw:inline-flex tw:items-center tw:justify-center tw:w-[0.7rem] tw:h-[0.7rem]" aria-hidden="true">
+            <span class="tw:absolute tw:w-[0.7rem] tw:h-[0.7rem] tw:rounded-full tw:bg-[var(--o2-status-error-text)] tw:z-1" />
+            <span class="tw:absolute tw:w-[0.7rem] tw:h-[0.7rem] tw:rounded-full tw:bg-[var(--o2-status-error-text)] tw:opacity-0 tw:animate-[recording-pulse-expand_1.5s_ease-out_infinite]" />
+          </span>
+          <span class="tw:text-sm tw:font-semibold tw:text-[var(--o2-status-error)] tw:pl-1.5">Recording</span>
         </span>
         <span class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:text-[var(--o2-text-secondary)] tw:truncate tw:flex-1 tw:min-w-0">
-          <OIcon name="shield" size="sm" class="tw:shrink-0" aria-hidden="true" />
           <span class="tw:truncate">{{ currentUrl }}</span>
         </span>
         <span class="tw:text-xs tw:text-[var(--o2-text-muted)]">{{ capturedSteps.length }} steps</span>
@@ -305,3 +307,16 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
     </div>
   </div>
 </template>
+
+<style>
+@keyframes recording-pulse-expand {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+</style>
