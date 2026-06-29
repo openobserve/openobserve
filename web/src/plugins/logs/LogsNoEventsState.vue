@@ -19,14 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   Three distinct states based on stream stats vs. current window:
 
-    1. Window misses the stream's data entirely (doc_time_max outside window)
+    1. The selected range has no data but the stream does — either the window
+       misses the data entirely, or (with no filter) it overlaps the stream's
+       min/max envelope yet lands in a gap with no records
        → "Jump to latest data" card (last 15 min around doc_time_max)
 
-    2. Window overlaps stream data but query returned nothing (filters too tight)
-       → "Adjust your filters" message + fallback expand-range card
+    2. Window overlaps stream data but a filter excluded everything
+       → "relax your filters" message (no action card; Ask AI / history below)
 
     3. No stream stats available (fallback)
-       → generic "Expand time range" card
+       → generic message (no action card; Ask AI / history below)
 
   Emits action IDs to the parent rather than mutating state directly.
   The "Ask AI" ghost button is only shown when aiEnabled is true.
@@ -36,18 +38,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #title>{{ t("logs.noEvents.title") }}</template>
 
     <template #description>
-      <!-- Stream has data in window but filters matched nothing -->
+      <!-- Filter applied within an overlapping window: relax the query. -->
       <span v-if="windowHasStreamData && hasFilters" v-html="t('logs.noEvents.descWithFilters')" />
-      <!-- Stream has data in window, no filters — data is at the boundary or sparse -->
-      <span v-else-if="windowHasStreamData && !hasFilters" v-html="t('logs.noEvents.descDataAtBoundary')" />
-      <!-- Window is entirely outside stream's data range -->
+      <!-- We know where the stream's last data is: offer to jump to it. -->
       <span v-else-if="jumpTarget">{{ t("logs.noEvents.descOutOfRange") }}</span>
-      <!-- No stream stats — generic fallback -->
+      <!-- No stream stats: generic fallback. -->
       <span v-else>{{ t("logs.noEvents.descNoFilters", { range: currentPeriodLabel }) }}</span>
     </template>
 
     <template #actions>
-      <!-- Window is outside the stream's data range: offer a precise jump -->
+      <!-- The selected range has no data but the stream does (out of range, or a
+           no-filter window in a gap): offer a precise jump to the latest data. -->
       <EmptyStateActionCard
         v-if="jumpTarget"
         icon="schedule"
@@ -56,16 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-no-events-jump-to-data-card"
         @click="emit('jump-to-stream-data', jumpTarget!.from, jumpTarget!.to)"
       />
-      <!-- No stream stats: generic expand is the only reasonable suggestion -->
-      <EmptyStateActionCard
-        v-else-if="!streamDocTimeRange"
-        icon="schedule"
-        :label="t('logs.noEvents.expandRange')"
-        :sublabel="expandRangeSublabel"
-        data-test="logs-no-events-expand-range-card"
-        @click="emit('widen-range', suggestedPeriod)"
-      />
-      <!-- windowHasStreamData (with or without filters): no action card — Ask AI / history in #extra -->
+      <!-- Filter excluded everything within an overlapping window: no action
+           card — the user relaxes the query themselves (Ask AI / history below). -->
     </template>
 
     <template #extra>
@@ -105,7 +98,7 @@ import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useAiIcon } from "@/composables/useAiIcon";
 import { DateTime } from "luxon";
-import { periodToLabel, nextWiderPeriod } from "@/composables/useWidenRange";
+import { periodToLabel } from "@/composables/useWidenRange";
 
 const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
 // Backend uses exclusive end boundary, so nudge end by 1s to include the record at doc_time_max.
@@ -127,7 +120,6 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  "widen-range": [period: string];
   "jump-to-stream-data": [fromUs: number, toUs: number];
   "open-history": [];
   "ask-ai": [];
@@ -160,13 +152,21 @@ const windowHasStreamData = computed<boolean>(() => {
 });
 
 /**
- * When the window has no overlap with stream data, compute a 15-minute window
- * ending at doc_time_max so the user lands on the most recent data.
+ * A 15-minute window ending at doc_time_max so the user lands on the most
+ * recent data. Offered whenever we know where the stream's last data is and the
+ * failure isn't caused by a filter.
  */
 const jumpTarget = computed<{ from: number; to: number } | null>(() => {
-  if (windowHasStreamData.value) return null;
   const r = props.streamDocTimeRange;
   if (!r) return null;
+  // A filter — not the range — is excluding records within an overlapping
+  // window, so jumping won't help; the user should relax the query instead.
+  if (windowHasStreamData.value && hasFilters.value) return null;
+  // Otherwise point at the stream's most recent data. This covers both a window
+  // entirely outside the data range AND a no-filter window that overlaps the
+  // [min,max] envelope but lands in a gap with no records — since there are no
+  // filters and zero results, doc_time_max is guaranteed to sit outside the
+  // window, so a 15-minute jump there always surfaces data.
   return { from: r.max - FIFTEEN_MINS_US, to: r.max + END_NUDGE_US };
 });
 
@@ -185,20 +185,13 @@ const jumpTargetSublabel = computed(() => {
   return `Last data: ${formatted} (${zone})`;
 });
 
-// --- time-range helpers (fallback expand) -----------------------------------
+// --- time-range helpers ------------------------------------------------------
 
+// `currentPeriodLabel` feeds the "descNoFilters" message. The widen-range
+// action card was removed because widening never surfaces more data here.
 const isRelative = computed(() => props.dateType === "relative" && !!props.relativeTimePeriod);
 const currentPeriodLabel = computed(() =>
   isRelative.value ? periodToLabel(props.relativeTimePeriod) : t("logs.noEvents.selectedRange"),
 );
-const suggestedPeriod = computed(() =>
-  isRelative.value ? nextWiderPeriod(props.relativeTimePeriod) : "7d",
-);
-const suggestedPeriodLabel = computed(() => periodToLabel(suggestedPeriod.value));
-
-const expandRangeSublabel = computed(() => {
-  if (!isRelative.value) return t("logs.noEvents.expandRangeDescAbsolute");
-  return `${currentPeriodLabel.value} → ${suggestedPeriodLabel.value}`;
-});
 
 </script>

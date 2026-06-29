@@ -311,6 +311,17 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
 
   // ── EOF errors (found === null) ─────────────────────────────────────────────
   if (found === null) {
+    // ORDER/GROUP incomplete, lastWord-gated: when the query ends right after the
+    // ORDER/GROUP keyword and BY is expected, classify regardless of expSize. The
+    // candidate set balloons inside subqueries/CTEs/WITHIN GROUP (expSize 12-24),
+    // so the expSize<=10 cap below misses those; the lastWord gate is the strong
+    // signal here, not the size.
+    if (has(exp, "BY")) {
+      const lwBy = lastWord();
+      if (lwBy === "ORDER") return MSG.incompleteOrder;
+      if (lwBy === "GROUP") return MSG.incompleteGroup;
+    }
+
     // ORDER/GROUP incomplete: only [BY] (+ comment/whitespace tokens) expected
     // Also catches expSize === 0 or 1 (nothing expected → query ended mid-keyword)
     if ((has(exp, "BY") && expSize <= 10) || expSize <= 1) {

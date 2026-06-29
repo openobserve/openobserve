@@ -418,6 +418,8 @@ export const searchState = () => {
     searchObj.data.stream.selectedStream = [];
     searchObj.data.stream.selectedStreamFields = [];
     searchObj.data.stream.selectedFields = [];
+    // The FTS system-pick marker belongs to the cleared selection.
+    searchObj.meta.isFtsDefaultColumn = false;
 
     // Reset filter configurations
     searchObj.data.stream.filterField = "";

@@ -92,7 +92,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OBadge data-test="service-accounts-system-badge" variant="primary-outline" size="sm" class="tw:ml-2">system</OBadge>
               </template>
               <template v-else>
-                <span :data-test="`service-accounts-email-${row.email}`">{{ row.email }}</span>
+                <span :data-test="`service-accounts-email-${row.email}`">
+                  <OUserCell :value="row.email" />
+                </span>
               </template>
             </template>
 
@@ -102,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-token="{ row }">
-              <span class="tw:font-mono">{{ row.token || '************' }}</span>
+              <OCodeCell :value="row.token || '************'" :copy="false" />
             </template>
 
             <template #cell-actions="{ row }">
@@ -253,6 +255,8 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -283,7 +287,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { OEmptyState, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge, OSearchInput },
+  components: { OEmptyState, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge, OCodeCell, OUserCell, OSearchInput },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();

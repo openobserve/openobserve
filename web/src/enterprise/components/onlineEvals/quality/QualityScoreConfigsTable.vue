@@ -207,7 +207,7 @@ const columns = computed(() => [
     accessorKey: "totalScores",
     sortable: true,
     size: COL.count,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "coverage",
@@ -215,7 +215,7 @@ const columns = computed(() => [
     accessorKey: "coveragePct",
     sortable: true,
     size: 110,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "trend",

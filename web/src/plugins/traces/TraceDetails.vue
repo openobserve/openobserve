@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:whitespace-nowrap"
               >
-                <span>{{ formatTimestamp(traceStartTime) }}</span>
+                <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
                 <div
                   class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
                 />

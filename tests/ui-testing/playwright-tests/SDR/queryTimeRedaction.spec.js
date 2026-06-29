@@ -103,14 +103,16 @@ test.describe("Query Time Redaction - Combined Test", { tag: '@enterprise' }, ()
       fieldValue: p.value
     }));
 
-    await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
+    // Query-time SDR transforms data at search time, so STEP 1 (visible) and STEP 4
+    // (redacted) inspect the SAME ingested batch — reuse one marker for both.
+    const ingestMarker = await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
     // Verify all fields are visible without redaction
     const fieldsBeforeRedaction = patternsToTest.map(p => ({
       fieldName: p.field,
       shouldBeRedacted: false
     }));
-    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsBeforeRedaction);
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsBeforeRedaction, ingestMarker);
     testLogger.info('✓ STEP 1 PASSED: All fields visible without SDR');
 
     // STEP 2: Create all 4 SDR patterns
@@ -153,7 +155,7 @@ test.describe("Query Time Redaction - Combined Test", { tag: '@enterprise' }, ()
       fieldName: p.field,
       shouldBeRedacted: true
     }));
-    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsAfterRedaction);
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsAfterRedaction, ingestMarker);
     testLogger.info('✓ STEP 4 PASSED: All fields are REDACTED at query time');
 
     testLogger.info('=== ✓ COMBINED QUERY TIME REDACTION TEST COMPLETED SUCCESSFULLY ===');
