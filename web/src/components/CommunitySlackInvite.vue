@@ -30,8 +30,9 @@ const store = useStore();
 
 // ── One-time first-login invite (self-contained) ───────────────────────────
 // Shown once on a Cloud user's first login, then never again for that user.
+// Cloud-only — never shown on self-hosted Enterprise or open source.
 // All trigger/persistence state lives here so the host layout stays clean.
-const isOpen = ref(true);
+const isOpen = ref(false);
 
 // Per-user "seen" record + a pending flag that survives reloads until the user
 // actually dismisses the invite (so it still appears if they leave mid-onboarding).
@@ -62,11 +63,13 @@ const maybeShow = () => {
 const onOnboardingComplete = () => maybeShow();
 
 onMounted(() => {
-  // `isFirstTimeLogin` is set (Cloud only) on the new_user_login callback.
+  // Cloud-only: bail out entirely on Enterprise / open source so nothing is
+  // captured, listened for, or shown there.
+  if (config.isCloud !== "true") return;
+
+  // `isFirstTimeLogin` is set on the new_user_login callback (Cloud only).
   // Capture it into a pending flag before GetStarted clears it.
-  const isFirstLogin =
-    config.isCloud == "true" &&
-    localStorage.getItem("isFirstTimeLogin") === "true";
+  const isFirstLogin = localStorage.getItem("isFirstTimeLogin") === "true";
 
   if (isFirstLogin && localStorage.getItem(seenKey) !== "true") {
     localStorage.setItem(PENDING_KEY, "true");
