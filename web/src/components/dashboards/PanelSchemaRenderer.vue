@@ -199,70 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loadingProgressPercentage="loadingProgressPercentage"
         />
       </div>
-      <div
-        v-if="isCursorOverPanel"
-        class="tw:flex tw:items-center q-gutter-x-xs"
-        style="
-          position: absolute;
-          top: 0px;
-          right: 0px;
-          z-index: 9;
-          padding-right: 2px;
-          padding-top: 2px;
-        "
-        @click.stop
-      >
-        <OButton
-          v-if="
-            showLegendsButton &&
-            noData !== 'No Data' &&
-            ![
-              'table',
-              'html',
-              'markdown',
-              'custom_chart',
-              'geomap',
-              'maps',
-              'heatmap',
-              'metric',
-              'gauge',
-            ].includes(panelSchema.type)
-          "
-          variant="outline"
-          size="icon-circle"
-          @click="$emit('show-legends')"
-          icon-left="format-list-bulleted"
-          data-test="dashboard-show-legends-btn"
-        >
-          <OTooltip content="Show Legends" side="top" align="end" />
-        </OButton>
-        <OButton
-          v-if="
-            [
-              'area',
-              'area-stacked',
-              'bar',
-              'h-bar',
-              'line',
-              'scatter',
-              'stacked',
-              'h-stacked',
-            ].includes(panelSchema.type) &&
-            checkIfPanelIsTimeSeries === true &&
-            allowAnnotationsAdd &&
-            !viewOnly
-          "
-          data-test="panel-schema-renderer-annotation-button"
-          variant="outline"
-          size="icon-circle"
-          @click="toggleAddAnnotationMode"
-        >
-          <template #icon-left
-            ><OIcon :name="isAddAnnotationMode ? 'cancel' : 'edit'" size="sm"
-          /></template>
-          <OTooltip :content="isAddAnnotationMode ? 'Exit Annotations Mode' : 'Add Annotations'" side="top" align="end" />
-        </OButton>
-      </div>
+
       <div
         class="tw:absolute tw:z-9999999 tw:min-w-50 tw:py-1 tw:px-0 tw:hidden tw:whitespace-nowrap tw:top-0 tw:left-0 tw:rounded tw:border tw:border-(--o2-border) tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
         :class="{
