@@ -360,7 +360,6 @@ import BillingService from "@/services/billings";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -405,7 +404,7 @@ interface BillingGroupInvite {
 
 export default defineComponent({
   name: "BillingGroup",
-  components: { OBadge, OButton, OIcon, OInput, OForm, OFormInput, OSpinner, OTable, OUserCell, ODrawer, OTooltip, AppTabs },
+  components: { OBadge, OButton, OIcon, OForm, OFormInput, OSpinner, OTable, OUserCell, ODrawer, OTooltip, AppTabs },
   setup() {
     const { t } = useI18n();
     const store = useStore();
