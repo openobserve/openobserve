@@ -271,6 +271,12 @@ test.describe("Dashboard Custom Variable Default Value Resolution", { tag: ['@cu
     await pm.dashboardSetting.saveVariable();
     await pm.dashboardSetting.closeSettingWindow();
 
+    // The dashboard does not automatically refresh variable values after an edit;
+    // navigate away and back to force the dashboard to re-initialise with the
+    // updated default option.
+    await pm.dashboardCreate.backToDashboardList();
+    await reopenDashboardFromList(page, dashboardName);
+
     // Verify Beta is now the pre-selected value on the dashboard
     await pm.dashboardSetting.waitForCustomVariableOnDashboard(varName);
     displayedValue = await pm.dashboardSetting.getCustomVariableDashboardValue(varName);

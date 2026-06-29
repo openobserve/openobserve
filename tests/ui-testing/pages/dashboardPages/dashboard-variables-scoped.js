@@ -1325,12 +1325,12 @@ export default class DashboardVariablesScoped {
     await this.page.locator('[data-test="dashboard-variable-label"]').fill(label);
 
     // Add custom options - the first option already exists by default
+    // Phase 1: add and fill all option fields (labels + values) without touching checkboxes
     if (values.length > 0) {
       for (let i = 0; i < values.length; i++) {
         const value = values[i];
         const valueLabel = typeof value === 'string' ? value : value.label;
         const valueValue = typeof value === 'string' ? value : value.value;
-        const isDefault = typeof value === 'object' && value.selected === true;
 
         // If this is not the first item, add a new option
         if (i > 0) {
@@ -1341,21 +1341,39 @@ export default class DashboardVariablesScoped {
         // Fill label and value for this option
         await this.page.locator(`[data-test="dashboard-custom-variable-${i}-label"]`).fill(valueLabel);
         await this.page.locator(`[data-test="dashboard-custom-variable-${i}-value"]`).fill(valueValue);
+      }
 
-        // Set as default if specified
-        if (isDefault) {
+      // Phase 2: enable multi-select BEFORE setting checkboxes
+      // (in single-select mode clicking one checkbox unchecks others — radio-button behavior;
+      //  we must be in multi-select mode for independent checkbox control)
+      if (multiSelect) {
+        await this.page.locator('[data-test="dashboard-query_values-show_multiple_values"]').click();
+        await this.page.waitForTimeout(300);
+      }
+
+      // Phase 3: set each option's default-checkbox to match the desired state
+      // Only enforce the spec's selected flags when at least one option is explicitly
+      // marked as default; otherwise leave the form's auto-default (option 0 checked)
+      // intact so the save validation passes.
+      const anyExplicitDefault = values.some(
+        (v) => typeof v === 'object' && v.selected === true,
+      );
+
+      if (anyExplicitDefault) {
+        for (let i = 0; i < values.length; i++) {
+          const value = values[i];
+          const isDefault = typeof value === 'object' && value.selected === true;
           const checkbox = this.page.locator(`[data-test="dashboard-custom-variable-${i}-checkbox"]`);
+          await checkbox.waitFor({ state: "visible", timeout: 5000 });
           const isChecked = await checkbox.isChecked();
-          if (!isChecked) {
+
+          if (isDefault && !isChecked) {
+            await checkbox.click();
+          } else if (!isDefault && isChecked) {
             await checkbox.click();
           }
         }
       }
-    }
-
-    // Enable multi-select if requested
-    if (multiSelect) {
-      await this.page.locator('[data-test="dashboard-query_values-show_multiple_values"]').click();
     }
 
     // Save variable
