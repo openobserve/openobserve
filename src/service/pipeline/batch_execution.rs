@@ -488,7 +488,7 @@ impl ExecutablePipeline {
 
         // error_channel
         let (error_sender, mut error_receiver) =
-            channel::<(String, String, String, Option<String>)>(batch_size);
+            channel::<(String, String, String, Option<String>, Option<Value>)>(batch_size);
 
         let mut node_senders = HashMap::new();
         let mut node_receivers = HashMap::new();
@@ -549,6 +549,7 @@ impl ExecutablePipeline {
                 inv_id: inv_id_cp,
                 print_event,
                 leaf_dest_stream: _leaf_dest_stream,
+                return_value_for_error: false, // pipelines do not support this
             };
             let channels = ProcessChannels {
                 receiver: node_receiver,
@@ -595,8 +596,9 @@ impl ExecutablePipeline {
         let error_task = tokio::spawn(async move {
             log::debug!("[Pipeline] [inv={inv_id_for_errors}]: starts error collecting job");
             let mut count = 0;
-            while let Some((node_id, node_type, error, fn_name)) = error_receiver.recv().await {
-                pipeline_error.add_node_error(node_id, node_type, error, fn_name);
+            while let Some((node_id, node_type, error, fn_name, _)) = error_receiver.recv().await {
+                // for pipelines, we do not store the values
+                pipeline_error.add_node_error(node_id, node_type, error, fn_name, None);
                 count += 1;
             }
             log::debug!("[Pipeline] [inv={inv_id_for_errors}]: collected {count} errors");
@@ -763,7 +765,7 @@ impl ExecutablePipeline {
 
         // error_channel
         let (error_sender, mut error_receiver) =
-            channel::<(String, String, String, Option<String>)>(batch_size);
+            channel::<(String, String, String, Option<String>, Option<Value>)>(batch_size);
 
         let mut node_senders = HashMap::new();
         let mut node_receivers = HashMap::new();
@@ -818,6 +820,7 @@ impl ExecutablePipeline {
                 inv_id: inv_id_cp,
                 print_event: false, // do not print events for workflows
                 leaf_dest_stream: _leaf_dest_stream,
+                return_value_for_error: true,
             };
             let channels = ProcessChannels {
                 receiver: node_receiver,
@@ -858,8 +861,9 @@ impl ExecutablePipeline {
         let error_task = tokio::spawn(async move {
             log::debug!("[Workflow] [inv={inv_id_for_errors}]: starts error collecting job");
             let mut count = 0;
-            while let Some((node_id, node_type, error, fn_name)) = error_receiver.recv().await {
-                pipeline_error.add_node_error(node_id, node_type, error, fn_name);
+            while let Some((node_id, node_type, error, fn_name, val)) = error_receiver.recv().await
+            {
+                pipeline_error.add_node_error(node_id, node_type, error, fn_name, val);
                 count += 1;
             }
             log::debug!("[Workflow] [inv={inv_id_for_errors}]: collected {count} errors");
@@ -1125,13 +1129,14 @@ struct ProcessMetadata {
     inv_id: String,
     print_event: bool,
     leaf_dest_stream: Option<StreamParams>,
+    return_value_for_error: bool,
 }
 
 struct ProcessChannels {
     receiver: Receiver<PipelineItem>,
     child_senders: Vec<Sender<PipelineItem>>,
     result_sender: Option<Sender<(usize, StreamParams, Value)>>,
-    error_sender: Sender<(String, String, String, Option<String>)>,
+    error_sender: Sender<(String, String, String, Option<String>, Option<Value>)>,
 }
 
 async fn process_node(
@@ -1467,6 +1472,13 @@ async fn process_remote_stream_node(
             flattened,
             ..
         } = pipeline_item;
+
+        let value_copy = if metadata.return_value_for_error {
+            Some(record.clone())
+        } else {
+            None
+        };
+
         // handle timestamp before sending to remote_write service
         if !flattened && !record.is_null() && record.is_object() {
             record = match flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level) {
@@ -1475,7 +1487,13 @@ async fn process_remote_stream_node(
                     let err_msg = format!("DestinationNode error with flattening: {e}");
                     if let Err(send_err) = channels
                         .error_sender
-                        .send((node.id.to_string(), node.node_type(), err_msg, None))
+                        .send((
+                            node.id.to_string(),
+                            node.node_type(),
+                            err_msg,
+                            None,
+                            value_copy,
+                        ))
                         .await
                     {
                         log::error!(
@@ -1495,7 +1513,13 @@ async fn process_remote_stream_node(
                 let err_msg = format!("DestinationNode error handling timestamp: {e}");
                 if let Err(send_err) = channels
                     .error_sender
-                    .send((node.id.to_string(), node.node_type(), err_msg, None))
+                    .send((
+                        node.id.to_string(),
+                        node.node_type(),
+                        err_msg,
+                        None,
+                        value_copy,
+                    ))
                     .await
                 {
                     log::error!(
@@ -1596,7 +1620,7 @@ async fn process_remote_stream_node(
                         );
                         if let Err(send_err) = channels
                             .error_sender
-                            .send((node.id.to_string(), node.node_type(), err_msg, None))
+                            .send((node.id.to_string(), node.node_type(), err_msg, None, None))
                             .await
                         {
                             log::error!(
@@ -1670,6 +1694,13 @@ async fn process_function_node(
             mut record,
             mut flattened,
         } = pipeline_item;
+
+        let value_copy = if metadata.return_value_for_error {
+            Some(record.clone())
+        } else {
+            None
+        };
+
         if let Some(runtime) = &function_runtime {
             // Handle flattening if required
             if func_params.after_flatten && !flattened && !record.is_null() && record.is_object() {
@@ -1689,6 +1720,7 @@ async fn process_function_node(
                                 node.node_type(),
                                 err_msg.to_owned(),
                                 Some(func_params.name.to_owned()),
+                                value_copy,
                             ))
                             .await
                         {
@@ -1732,6 +1764,7 @@ async fn process_function_node(
                                         node.node_type(),
                                         err_msg.to_owned(),
                                         Some(func_params.name.to_owned()),
+                                        value_copy,
                                     ))
                                     .await
                                 {
@@ -1785,6 +1818,7 @@ async fn process_function_node(
                                         node.node_type(),
                                         err_msg.to_owned(),
                                         Some(func_params.name.to_owned()),
+                                        value_copy,
                                     ))
                                     .await
                                 {
@@ -1820,6 +1854,11 @@ async fn process_function_node(
     if !result_array_records.is_empty()
         && let Some(runtime) = &function_runtime
     {
+        let value_copy = if metadata.return_value_for_error {
+            Some(Value::Array(result_array_records.clone()))
+        } else {
+            None
+        };
         match runtime {
             CompiledFunctionRuntime::VRL(vrl_resolver, true) => {
                 // VRL result array processing
@@ -1846,6 +1885,7 @@ async fn process_function_node(
                                 node.node_type(),
                                 err_msg.to_owned(),
                                 Some(func_params.name.to_owned()),
+                                value_copy,
                             ))
                             .await
                         {
@@ -1897,6 +1937,7 @@ async fn process_function_node(
                                 node.node_type(),
                                 err_msg.to_owned(),
                                 Some(func_params.name.to_owned()),
+                                value_copy,
                             ))
                             .await
                         {
@@ -1967,6 +2008,12 @@ async fn process_condition_node(
             mut record,
             mut flattened,
         } = pipeline_item;
+
+        let value_copy = if metadata.return_value_for_error {
+            Some(record.clone())
+        } else {
+            None
+        };
         // value must be flattened before condition params can take effect
         if !flattened && !record.is_null() && record.is_object() {
             let flatten_timer = Instant::now();
@@ -1978,7 +2025,13 @@ async fn process_condition_node(
                     let err_msg = format!("ConditionNode error with flattening: {e}");
                     if let Err(send_err) = channels
                         .error_sender
-                        .send((node.id.to_string(), node.node_type(), err_msg, None))
+                        .send((
+                            node.id.to_string(),
+                            node.node_type(),
+                            err_msg,
+                            None,
+                            value_copy,
+                        ))
                         .await
                     {
                         log::error!(
@@ -2067,6 +2120,13 @@ async fn process_stream_node(
                 mut record,
                 flattened,
             } = pipeline_item;
+
+            let value_copy = if metadata.return_value_for_error {
+                Some(record.clone())
+            } else {
+                None
+            };
+
             if !flattened && !record.is_null() && record.is_object() {
                 let flatten_timer = Instant::now();
                 let flatten_res =
@@ -2078,7 +2138,13 @@ async fn process_stream_node(
                         let err_msg = format!("LeafNode error with flattening: {e}");
                         if let Err(send_err) = channels
                             .error_sender
-                            .send((node.id.to_string(), node.node_type(), err_msg, None))
+                            .send((
+                                node.id.to_string(),
+                                node.node_type(),
+                                err_msg,
+                                None,
+                                value_copy,
+                            ))
                             .await
                         {
                             log::error!(
@@ -2124,7 +2190,13 @@ async fn process_stream_node(
                         );
                         if let Err(send_err) = channels
                             .error_sender
-                            .send((node.id.to_string(), node.node_type(), err_msg, None))
+                            .send((
+                                node.id.to_string(),
+                                node.node_type(),
+                                err_msg,
+                                None,
+                                value_copy,
+                            ))
                             .await
                         {
                             log::error!(
