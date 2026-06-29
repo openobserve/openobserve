@@ -136,7 +136,7 @@ interface Props {
   query: string;
   readOnly?: boolean;
   showAutoComplete?: boolean;
-  releaseWheelToPage?: boolean; // let the page scroll when editor has nothing left to scroll
+  releaseWheelToPage?: boolean; // default true: let the page scroll when editor has nothing left to scroll
 
   // Editor autocomplete (forwarded to CodeQueryEditor)
   keywords?: any[];              // Autocomplete keywords for Monaco
@@ -164,7 +164,7 @@ const props = withDefaults(defineProps<Props>(), {
   defaultLanguage: 'sql',
   readOnly: false,
   showAutoComplete: true,
-  releaseWheelToPage: false,
+  releaseWheelToPage: true,
   keywords: () => [],
   suggestions: () => [],
   debounceTime: 500,

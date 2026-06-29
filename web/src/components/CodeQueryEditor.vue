@@ -125,13 +125,14 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
-    // When true, the editor releases the mouse wheel to the page once its own
-    // content has nothing left to scroll (Monaco otherwise always consumes the
-    // wheel). Off by default to preserve behavior for full-page editors; opt in
-    // for small inline editors embedded in a scrollable form.
+    // When true (the app-wide default), the editor releases the mouse wheel to
+    // the page once its own content has nothing left to scroll — Monaco
+    // otherwise always consumes the wheel, trapping page scroll on hover. It
+    // still scrolls internally when its content overflows. Set to false for a
+    // full-page editor that should own the wheel even when not overflowing.
     releaseWheelToPage: {
       type: Boolean,
-      default: false,
+      default: true,
     },
     language: {
       type: String,

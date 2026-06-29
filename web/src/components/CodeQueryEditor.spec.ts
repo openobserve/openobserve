@@ -269,14 +269,14 @@ describe("CodeQueryEditor", () => {
       expect(wrapper.props("readOnly")).toBe(false);
     });
 
-    it("should default releaseWheelToPage to false (editor keeps the wheel)", () => {
+    it("should default releaseWheelToPage to true (page scrolls once editor has nothing left)", () => {
       const wrapper = createWrapper({ releaseWheelToPage: undefined });
-      expect(wrapper.props("releaseWheelToPage")).toBe(false);
+      expect(wrapper.props("releaseWheelToPage")).toBe(true);
     });
 
-    it("should accept releaseWheelToPage prop (opt in to release wheel to page)", () => {
-      const wrapper = createWrapper({ releaseWheelToPage: true });
-      expect(wrapper.props("releaseWheelToPage")).toBe(true);
+    it("should allow opting out via releaseWheelToPage=false (editor keeps the wheel)", () => {
+      const wrapper = createWrapper({ releaseWheelToPage: false });
+      expect(wrapper.props("releaseWheelToPage")).toBe(false);
     });
 
     it("should accept language prop", () => {
