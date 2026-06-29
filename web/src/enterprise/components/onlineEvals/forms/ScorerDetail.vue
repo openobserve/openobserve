@@ -92,24 +92,34 @@
       </section>
 
       <!-- ── Tab strip ── -->
-      <nav class="sd__tabs" role="tablist">
-        <button
+      <OTabs
+        :model-value="activeTab"
+        bordered
+        class="tw:flex-shrink-0 tw:px-5"
+        data-test="scorer-detail-tabs"
+        @update:model-value="activeTab = $event as TabId"
+      >
+        <!-- Slot mode (no `label` prop) so each tab can carry a count badge
+             alongside its label. -->
+        <OTab
           v-for="tab in tabs"
           :key="tab.id"
-          type="button"
-          class="sd__tab"
-          :class="{ 'sd__tab--active': activeTab === tab.id }"
-          role="tab"
-          :aria-selected="activeTab === tab.id"
+          :name="tab.id"
           :data-test="`scorer-detail-tab-${tab.id}`"
-          @click="activeTab = tab.id"
         >
           <span>{{ tab.label }}</span>
-          <span v-if="tab.count != null" class="sd__tab-count">{{
-            tab.count
-          }}</span>
-        </button>
-      </nav>
+          <span
+            v-if="tab.count != null"
+            class="tw:inline-flex tw:items-center tw:justify-center tw:px-[0.375rem] tw:min-w-[1.125rem] tw:h-[1rem] tw:rounded-full tw:text-[0.625rem] tw:font-semibold"
+            :class="
+              activeTab === tab.id
+                ? 'tw:bg-[color-mix(in_srgb,var(--color-primary-600,#3f7994)_18%,transparent)] tw:text-[var(--color-primary-600,#3f7994)]'
+                : 'tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] tw:text-[var(--color-text-secondary)]'
+            "
+            >{{ tab.count }}</span
+          >
+        </OTab>
+      </OTabs>
 
       <!-- ── Body ── -->
       <div
@@ -403,6 +413,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
@@ -817,63 +829,6 @@ function relativeTime(timestampMs: number): string {
 // template (matching SessionDetails.vue). Only cohesive blocks that rely on
 // descendant/element selectors or hover state remain here. Font-family is never
 // set per component — it inherits the global --font-sans.
-
-/* — Tab strip — */
-.sd__tabs {
-  display: flex;
-  gap: 1.125rem;
-  padding: 0 1.25rem;
-  border-bottom: 0.0625rem solid var(--color-dialog-header-border, var(--o2-border));
-  flex-shrink: 0;
-}
-
-.sd__tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.625rem 0;
-  background: transparent;
-  border: 0;
-  border-bottom: 0.125rem solid transparent;
-  cursor: pointer;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 0.8125rem;
-  font-weight: 600;
-  margin-bottom: -0.0625rem;
-}
-
-.sd__tab:hover {
-  color: var(--color-text-primary, currentColor);
-}
-
-.sd__tab--active {
-  color: var(--color-primary-600, #3f7994);
-  border-bottom-color: var(--color-primary-600, #3f7994);
-}
-
-.sd__tab-count {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 0.375rem;
-  min-width: 1.125rem;
-  height: 1rem;
-  border-radius: 62.4375rem;
-  font-size: 0.625rem;
-  font-weight: 600;
-  line-height: 1;
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  justify-content: center;
-}
-
-.sd__tab--active .sd__tab-count {
-  background: color-mix(
-    in srgb,
-    var(--color-primary-600, #3f7994) 18%,
-    transparent
-  );
-  color: var(--color-primary-600, #3f7994);
-}
 
 .sd__tab-intro {
   margin: 0;
