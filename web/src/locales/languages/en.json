@@ -6475,7 +6475,8 @@
         "15min": "15 min",
         "30min": "30 min",
         "1hour": "1 hour",
-        "cron": "Cron"
+        "cron": "Cron",
+        "custom": "Custom"
       },
       "scheduleNow": "Schedule now",
       "scheduleLater": "Schedule later",
@@ -6499,6 +6500,15 @@
       "refreshDestinations": "Refresh destinations",
       "addNewDestination": "Add New Destination",
       "destinationRequired": "At least one destination is required",
+      "customIntervalValue": "Repeat every",
+      "customIntervalUnit": {
+        "label": "Frequency",
+        "minutes": "Minutes",
+        "hours": "Hours",
+        "days": "Days",
+        "weeks": "Weeks",
+        "months": "Months"
+      },
       "cooldownPeriod": "Cooldown Period",
       "minutes": "minutes",
       "seconds":"Seconds"

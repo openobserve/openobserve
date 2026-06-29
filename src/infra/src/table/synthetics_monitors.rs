@@ -77,6 +77,7 @@ impl TryFrom<synthetics_monitors::Model> for Synthetic {
             session_replay: settings.session_replay,
             auth: settings.auth,
             variables: settings.variables,
+            start: settings.start,
             next_run_at: m.next_run_at,
             last_triggered_at: m.last_triggered_at,
             last_check_status,
@@ -140,7 +141,7 @@ pub async fn create<C: TransactionTrait>(
     am.monitor_type = Set(monitor_type_to_str(&monitor.monitor_type).to_owned());
     am.created_at = Set(now);
     am.updated_at = Set(now);
-    // next_run_at = 0 (DB DEFAULT) → fires on first scheduler tick
+    am.next_run_at = Set(monitor.start.unwrap_or(0));
 
     let model = am.insert(&txn).await?.try_into_model()?;
     let result = Synthetic::try_from(model)?;
@@ -409,6 +410,7 @@ fn pack_settings(monitor: &Synthetic) -> Result<serde_json::Value, errors::Error
         session_replay: monitor.session_replay,
         auth: monitor.auth.clone(),
         variables: monitor.variables.clone(),
+        start: monitor.start,
     })?)
 }
 

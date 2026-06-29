@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 import { DateTime } from 'luxon'
 import type { BrowserCheck, BrowserCheckFrequency, BrowserCheckSchedule } from '@/types/synthetics'
+import { convertDateToTimestamp, getTimezoneOffset } from '@/utils/timezone'
 import { journeyToWireSteps, mapWireSteps } from './mapRecordedStep'
 
 // ── Outbound: BrowserCheck → API payload ─────────────────────────────────────
@@ -14,25 +15,16 @@ function buildFrequency(s: BrowserCheckSchedule): BrowserCheckFrequency {
     }
   }
 
-  const isHours = s.intervalUnit === 'hours'
-  const intervalValue = isHours ? (s.intervalValue ?? 1) : (s.intervalValue ?? 5)
+  const unit = s.intervalUnit ?? 'minutes'
+  const intervalValue = s.intervalValue ?? (unit === 'hours' ? 1 : 5)
 
   const freq: BrowserCheckFrequency = {
-    type: isHours ? 'hours' : 'minutes',
+    type: unit as BrowserCheckFrequency['type'],
     interval: intervalValue,
     cron: '',
   }
 
-  if (s.startType === 'later' && s.startDate && s.startTime) {
-    const [year, month, day] = s.startDate.split('-')
-    const [hour, minute] = s.startTime.split(':')
-    const dt = DateTime.fromObject(
-      { year: +year, month: +month, day: +day, hour: +hour, minute: +minute },
-      { zone: s.timezone ?? 'UTC' }
-    )
-    freq.start_time = dt.toMillis()
-    freq.timezone = s.timezone
-  }
+  if (s.timezone) freq.timezone = s.timezone
 
   return freq
 }
@@ -45,12 +37,31 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
     ...rest
   } = check
 
+  // Compute start (microseconds, top-level — matches reports pattern)
+  let start: number | undefined
+  let resolvedTzOffset = tz_offset ?? 0
+
+  if (schedule.timezone) {
+    if (schedule.startType === 'later' && schedule.startDate && schedule.startTime) {
+      const [y, m, d] = schedule.startDate.split('-')
+      const dateForConversion = `${d}-${m}-${y}` // ISO → DD-MM-YYYY
+      const converted = convertDateToTimestamp(dateForConversion, schedule.startTime, schedule.timezone)
+      start = converted.timestamp // microseconds
+      resolvedTzOffset = converted.offset
+    } else {
+      resolvedTzOffset = getTimezoneOffset(schedule.timezone) ?? 0
+    }
+  } else {
+    resolvedTzOffset = DateTime.now().offset
+  }
+
   return {
     ...rest,                          // name, description, enabled, tags, locations
     type: 'browser',
     target: url,                      // url → target
     folder_id: folder,                // folder → folder_id
-    tz_offset: tz_offset ?? 0,
+    tz_offset: resolvedTzOffset,
+    ...(start !== undefined && { start }),
 
     collect_rum_data: rum.collect,
     session_replay: rum.sessionReplay,
@@ -89,7 +100,7 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
 
 // ── Inbound: API response → BrowserCheck ─────────────────────────────────────
 
-function mapFrequencyToSchedule(freq: any): BrowserCheck['schedule'] {
+function mapFrequencyToSchedule(freq: any, start?: number): BrowserCheck['schedule'] {
   if (!freq) return { type: 'interval', intervalValue: 5, intervalUnit: 'minutes' }
 
   if (freq.type === 'cron') {
@@ -100,18 +111,19 @@ function mapFrequencyToSchedule(freq: any): BrowserCheck['schedule'] {
     }
   }
 
-  const isHours = freq.type === 'hours'
   const intervalValue = freq.interval ?? 5
+  // Map API frequency type back to schedule unit (seconds → minutes for display)
+  const unit = freq.type === 'seconds' ? 'minutes' : (freq.type ?? 'minutes')
 
   return {
     type: 'interval',
     intervalValue,
-    intervalUnit: isHours ? 'hours' : 'minutes',
-    ...(freq.start_time && {
+    intervalUnit: unit as BrowserCheckSchedule['intervalUnit'],
+    ...(start && {
       startType: 'later' as const,
       timezone: freq.timezone,
-      startDate: DateTime.fromMillis(freq.start_time, { zone: freq.timezone ?? 'UTC' }).toFormat('yyyy-MM-dd'),
-      startTime: DateTime.fromMillis(freq.start_time, { zone: freq.timezone ?? 'UTC' }).toFormat('HH:mm'),
+      startDate: DateTime.fromMillis(start / 1000, { zone: freq.timezone ?? 'UTC' }).toFormat('yyyy-MM-dd'),
+      startTime: DateTime.fromMillis(start / 1000, { zone: freq.timezone ?? 'UTC' }).toFormat('HH:mm'),
     }),
   }
 }
@@ -123,12 +135,13 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     destinations,
     retries, wait_before_retry_secs, alert_if_fails, cooldown_mins,
     target, folder_id,
-    variables,
+    variables, start,
     ...rest
   } = data as any
 
   return {
     ...rest,
+    start: start ?? undefined,
     url: target,
     folder: folder_id,
 
@@ -137,7 +150,7 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
       sessionReplay: session_replay ?? false,
     },
 
-    schedule: mapFrequencyToSchedule(frequency),
+    schedule: mapFrequencyToSchedule(frequency, start),
 
     notifications: {
       destinations: destinations ?? [],

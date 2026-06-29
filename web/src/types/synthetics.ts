@@ -137,7 +137,7 @@ export type RecorderPortInbound =
   | { type: 'synthetics-response'; response: unknown }
 
 export interface BrowserCheckFrequency {
-  type: 'minutes' | 'hours' | 'seconds' | 'cron'
+  type: 'minutes' | 'hours' | 'seconds' | 'days' | 'weeks' | 'months' | 'cron'
   interval?: number      // value in the unit specified by type
   cron?: string          // always present; empty string for interval types
   timezone?: string
@@ -147,12 +147,13 @@ export interface BrowserCheckFrequency {
 export interface BrowserCheckSchedule {
   type: 'interval' | 'cron'
   intervalValue?: number
-  intervalUnit?: 'minutes' | 'hours'
+  intervalUnit?: 'minutes' | 'hours' | 'days' | 'weeks' | 'months'
   cron?: string
   timezone?: string
   startType?: 'now' | 'later'
   startDate?: string
   startTime?: string
+  isCustomFrequency?: boolean // true when user explicitly chose "Custom" frequency
 }
 
 // Synthetics folder (from GET /api/v2/{org}/folders/synthetics)
@@ -182,6 +183,7 @@ export interface BrowserCheck {
   schedule: BrowserCheckSchedule
   locations: string[]
   tz_offset?: number
+  start?: number // microseconds, top-level — matches reports pattern
   browserDevices?: { browser: string; device: string }[]
   // Alert / retry settings (top-level in API payload)
   retries?: number

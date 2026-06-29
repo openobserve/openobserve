@@ -40,6 +40,9 @@ pub struct SyntheticFrequency {
     pub interval: i64,
     #[serde(default)]
     pub cron: String,
+    /// IANA timezone name (e.g. "America/New_York"). Used for cron scheduling and display.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
 }
 
 impl Default for SyntheticFrequency {
@@ -48,6 +51,7 @@ impl Default for SyntheticFrequency {
             frequency_type: SyntheticFrequencyType::Minutes,
             interval: 5,
             cron: String::new(),
+            timezone: None,
         }
     }
 }
@@ -153,6 +157,10 @@ pub struct Synthetic {
     /// Key-value variables injected into the probe environment.
     #[serde(default)]
     pub variables: Vec<MonitorVariable>,
+    /// Unix epoch microseconds — when to first run the check ("schedule later").
+    /// When set, the scheduler uses this as the initial next_run_at instead of firing immediately.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<i64>,
 
     // ── Scheduler fields (managed by server, not sent by client on create) ──
     /// Pre-computed next fire time (microseconds). 0 = fire on first tick.
@@ -247,6 +255,8 @@ pub struct MonitorSettings {
     pub auth: Option<MonitorAuth>,
     #[serde(default)]
     pub variables: Vec<MonitorVariable>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<i64>,
 }
 
 fn default_wait_before_retry_secs_i32() -> i32 {

@@ -41,7 +41,7 @@ function updateSchedule(patch: Partial<BrowserCheckSchedule>) {
 
 // ─── frequency preset ─────────────────────────────────────────────────────────
 
-type FrequencyPreset = '1min' | '5min' | '15min' | '30min' | '1hour' | 'cron'
+type FrequencyPreset = '1min' | '5min' | '15min' | '30min' | '1hour' | 'cron' | 'custom'
 
 const frequencyOptions: { label: string; value: FrequencyPreset }[] = [
   { label: t('synthetics.scheduleAlert.frequencyOptions.1min'), value: '1min' },
@@ -50,26 +50,30 @@ const frequencyOptions: { label: string; value: FrequencyPreset }[] = [
   { label: t('synthetics.scheduleAlert.frequencyOptions.30min'), value: '30min' },
   { label: t('synthetics.scheduleAlert.frequencyOptions.1hour'), value: '1hour' },
   { label: t('synthetics.scheduleAlert.frequencyOptions.cron'), value: 'cron' },
+  { label: t('synthetics.scheduleAlert.frequencyOptions.custom'), value: 'custom' },
 ]
 
 function scheduleToPreset(s: BrowserCheckSchedule): FrequencyPreset {
   if (s.type === 'cron') return 'cron'
+  // Explicit "Custom" selection persists regardless of interval values
+  if (s.isCustomFrequency) return 'custom'
   const mins =
     s.intervalUnit === 'hours'
       ? (s.intervalValue ?? 1) * 60
       : (s.intervalValue ?? 5)
-  if (mins <= 1) return '1min'
-  if (mins <= 5) return '5min'
-  if (mins <= 15) return '15min'
-  if (mins <= 30) return '30min'
-  return '1hour'
+  if (mins === 1) return '1min'
+  if (mins === 5) return '5min'
+  if (mins === 15) return '15min'
+  if (mins === 30) return '30min'
+  if (mins === 60) return '1hour'
+  return 'custom'
 }
 
 const frequencyPreset = computed<FrequencyPreset>({
   get: () => scheduleToPreset(props.check.schedule),
   set: (v: FrequencyPreset) => {
     if (v === 'cron') {
-      const patch: Partial<BrowserCheckSchedule> = { type: 'cron' }
+      const patch: Partial<BrowserCheckSchedule> = { type: 'cron', isCustomFrequency: false }
       if (!props.check.schedule.timezone) {
         try {
           patch.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -78,8 +82,17 @@ const frequencyPreset = computed<FrequencyPreset>({
         }
       }
       updateSchedule(patch)
+    } else if (v === 'custom') {
+      const cur = props.check.schedule
+      updateSchedule({
+        type: 'interval',
+        intervalValue: cur.intervalValue ?? 10,
+        intervalUnit: cur.intervalUnit ?? 'minutes',
+        cron: '',
+        isCustomFrequency: true,
+      })
     } else {
-      const map: Record<FrequencyPreset, { intervalValue: number; intervalUnit: 'minutes' | 'hours' }> = {
+      const map: Record<Exclude<FrequencyPreset, 'custom'>, { intervalValue: number; intervalUnit: 'minutes' | 'hours' }> = {
         '1min':  { intervalValue: 1,  intervalUnit: 'minutes' },
         '5min':  { intervalValue: 5,  intervalUnit: 'minutes' },
         '15min': { intervalValue: 15, intervalUnit: 'minutes' },
@@ -87,7 +100,7 @@ const frequencyPreset = computed<FrequencyPreset>({
         '1hour': { intervalValue: 1,  intervalUnit: 'hours' },
         cron:    { intervalValue: 5,  intervalUnit: 'minutes' },
       }
-      updateSchedule({ type: 'interval', ...map[v] })
+      updateSchedule({ type: 'interval', ...map[v], isCustomFrequency: false })
     }
   },
 })
@@ -101,14 +114,19 @@ const cron = computed({
 
 function buildTimezoneOptions(): { label: string; value: string }[] {
   try {
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const options: { label: string; value: string }[] = [
+      { label: `Browser Time (${browserTz})`, value: `Browser Time (${browserTz})` },
+      { label: 'UTC', value: 'UTC' },
+    ]
     // @ts-ignore - supportedValuesOf not in all TS versions
     if (typeof Intl.supportedValuesOf === 'function') {
       // @ts-ignore
-      return (Intl.supportedValuesOf('timeZone') as string[]).map((tz) => ({
-        label: tz,
-        value: tz,
-      }))
+      for (const tz of Intl.supportedValuesOf('timeZone') as string[]) {
+        if (tz !== 'UTC') options.push({ label: tz, value: tz })
+      }
     }
+    return options
   } catch {
     // fall through
   }
@@ -118,10 +136,38 @@ function buildTimezoneOptions(): { label: string; value: string }[] {
 const timezoneOptions = buildTimezoneOptions()
 
 const timezone = computed({
-  get: () => props.check.schedule.timezone ?? 'UTC',
+  get: () => {
+    if (props.check.schedule.timezone) return props.check.schedule.timezone
+    try {
+      const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      return `Browser Time (${browserTz})`
+    } catch {
+      return 'UTC'
+    }
+  },
   set: (v: string | number | boolean | null | undefined) =>
     updateSchedule({ timezone: v != null ? String(v) : 'UTC' }),
 })
+
+// ─── custom interval inputs (shown when "Custom" frequency selected) ────────────
+
+const customIntervalValue = computed({
+  get: () => props.check.schedule.intervalValue ?? 10,
+  set: (v: string | number) => updateSchedule({ intervalValue: Number(v) }),
+})
+
+const customIntervalUnit = computed({
+  get: () => props.check.schedule.intervalUnit ?? 'minutes',
+  set: (v: string) => updateSchedule({ intervalUnit: v as BrowserCheckSchedule['intervalUnit'] }),
+})
+
+const customIntervalUnitOptions = [
+  { label: t('synthetics.scheduleAlert.customIntervalUnit.minutes'), value: 'minutes' },
+  { label: t('synthetics.scheduleAlert.customIntervalUnit.hours'), value: 'hours' },
+  { label: t('synthetics.scheduleAlert.customIntervalUnit.days'), value: 'days' },
+  { label: t('synthetics.scheduleAlert.customIntervalUnit.weeks'), value: 'weeks' },
+  { label: t('synthetics.scheduleAlert.customIntervalUnit.months'), value: 'months' },
+]
 
 // ─── start type ───────────────────────────────────────────────────────────────
 
@@ -235,7 +281,7 @@ const silenceMinutes = computed({
         </div>
 
         <!-- Schedule Now / Later -->
-        <div class="tw:flex tw:items-center tw:gap-2">
+        <div v-if="check.schedule.type !== 'cron'" class="tw:flex tw:items-center tw:gap-2">
           <OToggleGroup
             v-model="startType"
             type="single"
@@ -274,6 +320,25 @@ const silenceMinutes = computed({
           :options="timezoneOptions"
           class="tw:w-64!"
           data-test="synthetics-schedule-alert-timezone-select"
+        />
+      </div>
+
+      <!-- Custom interval inputs (shown when "Custom" frequency selected) -->
+      <div v-if="frequencyPreset === 'custom'" class="tw:flex tw:items-start tw:gap-3 tw:flex-wrap">
+        <OInput
+          v-model="customIntervalValue"
+          :label="t('synthetics.scheduleAlert.customIntervalValue')"
+          type="number"
+          min="1"
+          class="tw:w-40!"
+          data-test="synthetics-schedule-alert-custom-interval-value-input"
+        />
+        <OSelect
+          v-model="customIntervalUnit"
+          :label="t('synthetics.scheduleAlert.customIntervalUnit.label')"
+          :options="customIntervalUnitOptions"
+          class="tw:w-40!"
+          data-test="synthetics-schedule-alert-custom-interval-unit-select"
         />
       </div>
 
