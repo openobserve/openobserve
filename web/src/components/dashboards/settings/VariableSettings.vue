@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-settings-drag-handle"
               />
             </div>
-            <div class="tw:grid tw:items-center" style="grid-template-columns: 80px minmax(200px, 1fr) 150px 100px 100px 120px">
+            <div class="tw:grid tw:items-center tw:py-2" style="grid-template-columns: 80px minmax(200px, 1fr) 150px 100px 100px 120px">
               <div>
                 {{ index < 9 ? `0${index + 1}` : index + 1 }}
               </div>
@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OBadge
                     variant="primary-soft"
                     class="tw:ring-1 tw:ring-inset tw:ring-current"
+                    size="sm"
                     data-test="dashboard-variable-scope-badge"
                     v-if="getScopeType(variable) === 'global'"
                   >
@@ -116,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OBadge>
                   <OBadge
                     variant="primary-outline"
+                    size="sm"
                     data-test="dashboard-variable-scope-badge"
                     v-else-if="getScopeType(variable) === 'tabs'"
                   >
@@ -123,6 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OBadge>
                   <OBadge
                     variant="primary-outline"
+                    size="sm"
                     data-test="dashboard-variable-scope-badge"
                     v-else-if="getScopeType(variable) === 'panels'"
                   >
