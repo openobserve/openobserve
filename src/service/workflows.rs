@@ -175,3 +175,11 @@ pub async fn execute_workflow(
 
     Ok(())
 }
+
+pub async fn get_workflow_errors(
+    org_id: &str,
+    wid: &str,
+) -> Result<Vec<WorkflowRunErrors>, anyhow::Error> {
+    let res = workflows::list_errors_for_workflow(org_id, wid).await?;
+    Ok(res)
+}

@@ -7,7 +7,7 @@ use axum::{
     response::Response,
 };
 use config::{ider, meta::self_reporting::error::NodeErrors};
-use infra::table::workflows::Workflow;
+use infra::table::workflows::{Workflow, WorkflowRunErrors};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -29,6 +29,11 @@ pub struct WorkflowTestInput {
 #[derive(Serialize)]
 pub struct WorkflowTestResult {
     errors: HashMap<String, NodeErrors>,
+}
+
+#[derive(Serialize)]
+pub struct WorkflowErrorList {
+    errors: Vec<WorkflowRunErrors>,
 }
 
 /// CreateWorkflow
@@ -263,6 +268,38 @@ pub async fn test_workflow(
 ) -> Response {
     match workflows::test_workflow(&org_id, &workflow_id, inputs.inputs, inputs.from_node).await {
         Ok(v) => MetaHttpResponse::json(WorkflowTestResult { errors: v.errors }),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+/// ListWorkflowErrors
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/workflows/{id}/errors",
+    context_path = "/api",
+    tag = "Workflows",
+    operation_id = "listWorkflowErrors",
+    summary = "List Errored workflow with errors and inputs",
+    description = "",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+        ("id" = String, Path, description = "Workflow id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+    )
+)]
+pub async fn get_workflow_errors(Path((org_id, workflow_id)): Path<(String, String)>) -> Response {
+    match workflows::get_workflow_errors(&org_id, &workflow_id).await {
+        Ok(v) => MetaHttpResponse::json(WorkflowErrorList { errors: v }),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }

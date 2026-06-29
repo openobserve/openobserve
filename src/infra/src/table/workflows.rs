@@ -42,7 +42,7 @@ pub struct WorkflowError {
     pub error: Vec<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize,Serialize)]
 pub struct WorkflowRunErrors {
     pub id: i32,
     pub org_id: String,
@@ -123,9 +123,13 @@ pub async fn get_by_org_wid(
     Ok(ret)
 }
 
-pub async fn list_errors_for_workflow(wid: &str) -> Result<Vec<WorkflowRunErrors>, anyhow::Error> {
+pub async fn list_errors_for_workflow(
+    org_id: &str,
+    wid: &str,
+) -> Result<Vec<WorkflowRunErrors>, anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let entities = workflow_errors::Entity::find()
+        .filter(workflow_errors::Column::OrgId.eq(org_id))
         .filter(workflow_errors::Column::WorkflowId.eq(wid))
         .all(client)
         .await?;
