@@ -248,4 +248,43 @@ describe("ConfirmDialog", () => {
     const dialog = wrapper.findComponent(ODialogStub);
     expect(dialog.props("open")).toBe(false);
   });
+
+  describe("okLabel prop", () => {
+    it("renders custom okLabel on the primary button when provided", () => {
+      wrapper.unmount();
+      wrapper = buildWrapper({ okLabel: "Delete Account" });
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("primaryButtonLabel")).toBe("Delete Account");
+    });
+
+    it("falls back to i18n OK label when okLabel is not provided (default)", () => {
+      wrapper.unmount();
+      wrapper = buildWrapper();
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("primaryButtonLabel")).toBe("OK");
+    });
+
+    it("renders custom okLabel text in button content", () => {
+      wrapper.unmount();
+      wrapper = buildWrapper({ okLabel: "Remove" });
+      const primaryBtn = wrapper.find('[data-test="o-dialog-stub-primary"]');
+      expect(primaryBtn.text()).toBe("Remove");
+    });
+  });
+
+  describe("okColor prop", () => {
+    it("forwards okColor='negative' to primaryButtonVariant", () => {
+      wrapper.unmount();
+      wrapper = buildWrapper({ okColor: "negative" });
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("primaryButtonVariant")).toBe("negative");
+    });
+
+    it("defaults okColor to 'primary' when not provided", () => {
+      wrapper.unmount();
+      wrapper = buildWrapper();
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("primaryButtonVariant")).toBe("primary");
+    });
+  });
 });

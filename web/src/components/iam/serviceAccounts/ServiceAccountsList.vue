@@ -20,12 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
-    <!-- Standard page header: title + actions only. Search moved into the
-         table's own toolbar (built-in global filter). -->
     <AppPageHeader
       :title="t('serviceAccounts.header')"
       icon="manage-accounts"
-      :subtitle="'Programmatic access tokens for APIs'"
+      :subtitle="t('serviceAccounts.headerSubtitle')"
       class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
       <template #actions>
@@ -88,12 +86,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-email="{ row }">
               <template v-if="row.is_system">
-                <span data-test="service-accounts-system-account-label" class="text-weight-medium">AI SRE Agent</span>
-                <OBadge data-test="service-accounts-system-badge" variant="primary-outline" size="sm" class="tw:ml-2">system</OBadge>
+                <span data-test="service-accounts-system-account-label" class="text-weight-medium">{{ t('serviceAccounts.row.managedBy.aiSre') }}</span>
+                <OBadge data-test="service-accounts-system-badge" variant="primary-outline" size="sm" class="tw:ml-2">{{ t('serviceAccounts.row.managedBy.system') }}</OBadge>
               </template>
               <template v-else>
-                <span :data-test="`service-accounts-email-${row.email}`">
-                  <OUserCell :value="row.email" />
+                <span :data-test="`service-accounts-email-${row.email}`" :title="row.email">
+                  {{ row.email }}
                 </span>
               </template>
             </template>
@@ -103,21 +101,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else>{{ row.first_name }}</template>
             </template>
 
-            <template #cell-token="{ row }">
-              <OCodeCell :value="row.token || '************'" :copy="false" />
+            <template #cell-created_at="{ row }">
+              <span v-if="row.created_at" :title="row.created_at_iso">
+                {{ formatCreatedAt(row.created_at) }}
+              </span>
+            </template>
+
+            <template #cell-created_by="{ row }">
+              <OUserCell v-if="row.created_by" :value="row.created_by" />
             </template>
 
             <template #cell-actions="{ row }">
               <template v-if="row.is_system">
-                <OBadge data-test="service-accounts-system-managed-badge" variant="default-outline">
-                    {{ t('serviceAccounts.systemManaged', 'System Managed') }}
-                  <OTooltip v-if="row.description" :content="row.description" />
+                <router-link
+                  v-if="isEnterprise && aiSreEnabled"
+                  :to="{ name: 'aiSreSettings' }"
+                  data-test="service-accounts-system-managed-badge"
+                >
+                  <OBadge variant="default-outline">
+                    {{ t('serviceAccounts.row.managedBy.system') }}
+                    <OTooltip v-if="row.description" :content="managedByTooltip(row)" />
+                  </OBadge>
+                </router-link>
+                <OBadge
+                  v-else
+                  data-test="service-accounts-system-managed-badge"
+                  variant="default-outline"
+                >
+                  {{ t('serviceAccounts.row.managedBy.system') }}
+                  <OTooltip v-if="row.description" :content="managedByTooltip(row)" />
                 </OBadge>
               </template>
               <template v-else>
                 <OButton
                   data-test="service-accounts-refresh"
-                  :title="t('serviceAccounts.refresh')"
+                  :title="t('serviceAccounts.actions.rotate')"
                   variant="ghost"
                   size="icon-sm"
                   icon-left="refresh"
@@ -125,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   data-test="service-accounts-edit"
-                  :title="t('serviceAccounts.update')"
+                  :title="t('serviceAccounts.actions.edit')"
                   variant="ghost"
                   size="icon-sm"
                   icon-left="edit"
@@ -133,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   data-test="service-accounts-delete"
-                  :title="t('serviceAccounts.delete')"
+                  :title="t('serviceAccounts.actions.delete')"
                   variant="ghost"
                   size="icon-sm"
                   icon-left="delete"
@@ -152,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="openBulkDeleteDialog"
                 icon-left="delete"
               >
-                Delete
+                {{ t('serviceAccounts.actions.delete') }}
               </OButton>
             </template>
           </OTable>
@@ -165,83 +183,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @updated="addMember"
     />
 
-    <ODialog data-test="service-accounts-list-refresh-dialog"
-      v-model:open="confirmRefresh"
+    <ConfirmDialog
+      data-test="service-accounts-list-rotate-dialog"
+      v-model="confirmRefresh"
       :title="t('serviceAccounts.confirmRefreshHead')"
-      :secondary-button-label="t('user.cancel')"
-      :primary-button-label="t('user.ok')"
-      @click:secondary="confirmRefresh = false"
-      @click:primary="refreshServiceToken(toBeRefreshed)"
-    >
-      <p>{{ t('serviceAccounts.confirmRefreshMsg') }}</p>
-    </ODialog>
+      :message="t('serviceAccounts.confirm.rotateMsg', { identifier: toBeRefreshed.email || '' })"
+      :ok-label="t('serviceAccounts.confirm.rotate')"
+      ok-color="primary"
+      @update:ok="refreshServiceToken(toBeRefreshed)"
+    />
 
-    <ODialog data-test="service-accounts-list-delete-dialog"
-      v-model:open="confirmDelete"
+    <ConfirmDialog
+      data-test="service-accounts-list-delete-dialog"
+      v-model="confirmDelete"
       :title="t('serviceAccounts.confirmDeleteHead')"
-      :secondary-button-label="t('user.cancel')"
-      :primary-button-label="t('user.ok')"
-      @click:secondary="confirmDelete = false"
-      @click:primary="deleteUser"
-      size="sm"
-    >
-      <p>{{ t('serviceAccounts.confirmDeleteMsg') }}</p>
-    </ODialog>
+      :message="t('serviceAccounts.confirm.deleteMsg', { identifier: deleteUserEmail || '' })"
+      :ok-label="t('serviceAccounts.confirm.delete')"
+      ok-color="negative"
+      @update:ok="deleteUser"
+    />
 
-    <ODialog data-test="service-accounts-list-bulk-delete-dialog"
-      v-model:open="confirmBulkDelete"
-      size="sm"
-      title="Delete Service Accounts"
-      secondary-button-label="Cancel"
-      primary-button-label="OK"
-      @click:secondary="confirmBulkDelete = false"
-      @click:primary="bulkDeleteServiceAccounts"
-    >
-      <p>Are you sure you want to delete {{ selectedAccounts.length }} service account(s)?</p>
-    </ODialog>
+    <ConfirmDialog
+      data-test="service-accounts-list-bulk-delete-dialog"
+      v-model="confirmBulkDelete"
+      :title="t('serviceAccounts.confirm.bulkDeleteTitle')"
+      :message="t('serviceAccounts.confirm.bulkDeleteMsg', { n: selectedAccounts.length })"
+      :ok-label="t('serviceAccounts.confirm.bulkDelete')"
+      ok-color="negative"
+      @update:ok="bulkDeleteServiceAccounts"
+    />
 
     <ODialog data-test="service-accounts-list-token-dialog"
       v-model:open="isShowToken"
       persistent
       size="md"
-      title="Service Account Token"
+      :title="t('serviceAccounts.tokenReveal.title')"
     >
-
-      <div class="tw:flex tw:items-center tw:gap-2 tw:rounded-lg" style="padding: 0rem 0.5rem;">
-        <!-- Token section taking 75% of the width -->
-        <div
-          class="tw:text-xl tw:font-semibold tw:text-center tw:truncate el-border"
-          style="flex: 3; padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
-        >
-          {{ serviceToken }}
-        </div>
-        <!-- Buttons section taking 25% of the width -->
-        <div class="tw:flex tw:justify-end tw:gap-1" style="flex: 1; max-width: 25%;">
-          <OButton
-            data-test="service-accounts-list-token-copy-btn"
-            variant="outline"
-            size="icon-md"
-            :title="t('serviceAccounts.copyToken')"
-            class="tw:mr-1"
-            @click.stop="copyToClipboard(serviceToken, { successMessage: 'Token Copied Successfully!', timeout: 5000 })"
+      <div class="tw:flex tw:flex-col tw:gap-3">
+        <div class="tw:flex tw:items-center tw:gap-2 tw:rounded-lg" style="padding: 0rem 0.5rem;">
+          <div
+            class="tw:text-xl tw:font-semibold tw:text-center tw:truncate el-border"
+            style="flex: 3; padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
           >
-            <OIcon name="content-copy" size="sm" />
-          </OButton>
-          <OButton
-            data-test="service-accounts-list-token-download-btn"
-            variant="outline"
-            size="icon-md"
-            :title="t('serviceAccounts.downloadToken')"
-            @click.stop="downloadTokenAsFile(serviceToken)"
-          >
-            <OIcon name="file-download" size="sm" />
-          </OButton>
+            {{ serviceToken }}
+          </div>
+          <div class="tw:flex tw:justify-end tw:gap-1" style="flex: 1; max-width: 25%;">
+            <OButton
+              data-test="service-accounts-list-token-copy-btn"
+              variant="outline"
+              size="icon-md"
+              :title="copyBtnLabel"
+              class="tw:mr-1"
+              @click.stop="handleCopyToken(serviceToken)"
+            >
+              <OIcon name="content-copy" size="sm" />
+            </OButton>
+          </div>
         </div>
-      </div>
 
-      <div class="tw:pt-3 tw:flex tw:items-center warning-text">
-        <OIcon name="info" class="tw:mr-1" size="sm" />
-        <span class="text-p">Make sure to copy / download the token. You will not be able to see it again.</span>
+        <div class="tw:pt-3 tw:flex tw:items-center warning-text">
+          <OIcon name="info" class="tw:mr-1" size="sm" />
+          <span class="text-p">{{ t('serviceAccounts.tokenReveal.warning') }}</span>
+        </div>
+
+        <div class="tw:pt-2">
+          <div class="text-weight-medium tw:mb-2">{{ t('serviceAccounts.tokenReveal.nextStepOss') }}</div>
+          <div v-if="isEnterprise" class="tw:pt-1">
+            {{ t('serviceAccounts.tokenReveal.nextStepEnterprise') }}
+          </div>
+        </div>
       </div>
     </ODialog>
   </div>
@@ -252,10 +262,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onBeforeMount, onMounted, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -271,7 +281,6 @@ import segment from "@/services/segment_analytics";
 import {
   getImageURL,
   verifyOrganizationStatus,
-  maskText,
 } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -287,7 +296,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { OEmptyState, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge, OCodeCell, OUserCell, OSearchInput },
+  components: { OEmptyState, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge, OUserCell, OSearchInput, ConfirmDialog },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
@@ -302,7 +311,6 @@ export default defineComponent({
     const isUpdated = ref(false);
     const showAddUserDialog = ref(false);
     const { serviceAccountsState } = usePermissions();
-    const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
     const isShowToken = ref(false);
     const confirmRefresh  = ref(false);
@@ -317,14 +325,52 @@ export default defineComponent({
     const selectedAccounts: any = ref([]);
     const confirmBulkDelete = ref(false);
 
+    const copyClicked = ref(false);
+
+    const isEnterprise = computed(() => config.isEnterprise === "true" || config.isCloud === true);
+    const aiSreEnabled = ref(false);
+
+    const copyBtnLabel = computed(() =>
+      copyClicked.value
+        ? t('serviceAccounts.tokenReveal.copied')
+        : t('serviceAccounts.tokenReveal.copy')
+    );
+
+    const handleCopyToken = async (token: string) => {
+      await copyToClipboard(token, { successMessage: t('serviceAccounts.tokenReveal.copied'), timeout: 3000 });
+      copyClicked.value = true;
+      setTimeout(() => {
+        copyClicked.value = false;
+      }, 2000);
+    };
+
+    const formatCreatedAt = (timestamp: number | string): string => {
+      if (!timestamp) return '';
+      const date = new Date(typeof timestamp === 'number' ? timestamp * 1000 : timestamp);
+      const now = new Date();
+      const diff = now.getTime() - date.getTime();
+      const seconds = Math.floor(diff / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+
+      if (seconds < 60) return t('time.justNow') || 'just now';
+      if (minutes < 60) return t('time.minutesAgo', { n: minutes }) || `${minutes}m ago`;
+      if (hours < 24) return t('time.hoursAgo', { n: hours }) || `${hours}h ago`;
+      if (days < 30) return t('time.daysAgo', { n: days }) || `${days}d ago`;
+
+      return date.toLocaleDateString();
+    };
+
+    const managedByTooltip = (row: any): string => {
+      const creator = row.created_by || 'System';
+      const date = row.created_at_iso || '';
+      return t('serviceAccounts.row.managedBy.tooltip', { creator, date });
+    };
+
     onBeforeMount(async () => {
       await getServiceAccountsUsers();
 
-      // Only `action=update&email=…` auto-opens the edit dialog so a shared
-      // edit link still lands directly on the user's form. `action=add` is
-      // intentionally NOT handled here — the dialog only opens via the
-      // "Add Service Account" button click; refreshing on an `action=add`
-      // URL should leave the user on the list view.
       const query = router.currentRoute.value.query;
       if (query.action === "update" && query.email) {
         const match = serviceAccountsState.service_accounts_users.find(
@@ -346,7 +392,7 @@ export default defineComponent({
       },
       {
         id: "email",
-        header: t("user.email"),
+        header: t("serviceAccounts.list.col.identifier"),
         accessorKey: "email",
         sortable: true,
         resizable: true,
@@ -366,13 +412,23 @@ export default defineComponent({
         meta: { align: "left", flex: true },
       },
       {
-        id: "token",
-        header: t("serviceAccounts.token"),
-        accessorKey: "token",
-        sortable: false,
+        id: "created_at",
+        header: t("serviceAccounts.list.col.created"),
+        accessorKey: "created_at",
+        sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.token,
+        size: 160,
+        meta: { align: "left" },
+      },
+      {
+        id: "created_by",
+        header: t("serviceAccounts.list.col.createdBy"),
+        accessorKey: "created_by",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: 180,
         meta: { align: "left" },
       },
       {
@@ -428,13 +484,16 @@ export default defineComponent({
             serviceAccountsState.service_accounts_users = res.data.data.map((data: any) => {
               return {
                 "#": counter <= 9 ? `0${counter++}` : counter++,
-                email: maskText(data.email),
+                email: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
                 token: data.token || '',
                 role: data.role || 'ServiceAccount',
                 is_system: data.is_system || false,
                 description: data.description || null,
+                created_at: data.created_at || null,
+                created_at_iso: data.created_at_iso || null,
+                created_by: data.created_by || null,
               };
             });
 
@@ -504,10 +563,8 @@ export default defineComponent({
     const redactToken = (token: string): string => {
       if (!token || token.length === 0) return '*'.repeat(12);
       if (token.length < 4) {
-        // For tokens shorter than 4 chars, show available chars and pad to 12
         return token + '*'.repeat(12 - token.length);
       } else {
-        // For tokens 4+ chars, show first 4 chars + asterisks (matches backend)
         return token.slice(0, 4) + '*'.repeat(8);
       }
     };
@@ -523,6 +580,7 @@ export default defineComponent({
 
           serviceToken.value = res.token;
           isShowToken.value = true;
+          copyClicked.value = false;
           if (
             store.state.selectedOrganization.identifier == data.organization
           ) {
@@ -639,6 +697,7 @@ export default defineComponent({
       await service_accounts.refresh_token(store.state.selectedOrganization.identifier,row.email).then((res)=>{
           serviceToken.value = res.data.token;
           isShowToken.value = true;
+          copyClicked.value = false;
 
         toast({
           message: "Service token refreshed successfully.",
@@ -659,14 +718,6 @@ export default defineComponent({
       });
 
     }
-    const downloadTokenAsFile = (token:string) => {
-      const blob = new Blob([token], { type: "text/plain" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "service_account_token.txt";
-      link.click();
-      URL.revokeObjectURL(link.href); // Cleanup
-    };
 
     const isSystemAccount = (email: string) => {
       return email.startsWith('o2-sre-agent.org-') && email.endsWith('@openobserve.internal');
@@ -702,7 +753,6 @@ export default defineComponent({
       selectedUser,
       refreshServiceToken,
       copyToClipboard,
-      downloadTokenAsFile,
       isShowToken,
       serviceToken,
       confirmRefreshAction,
@@ -725,6 +775,13 @@ export default defineComponent({
       bulkDeleteServiceAccounts,
       redactToken,
       isSystemAccount,
+      deleteUserEmail,
+      copyClicked,
+      copyBtnLabel,
+      handleCopyToken,
+      formatCreatedAt,
+      managedByTooltip,
+      aiSreEnabled,
     };
   },
 });

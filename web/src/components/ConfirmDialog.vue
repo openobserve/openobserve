@@ -21,7 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :size="warningMessage?.length ? 'md' : 'sm'"
     :title="title"
     :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-label="t('confirmDialog.ok')"
+    :primary-button-label="okLabel || t('confirmDialog.ok')"
+    :primary-button-variant="okColor || 'primary'"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
@@ -50,6 +51,8 @@ export default defineComponent({
     message: { type: String },
     warningMessage: { type: String },
     modelValue: { type: Boolean, default: false },
+    okLabel: { type: String, default: "" },
+    okColor: { type: String, default: "primary" },
   },
   setup(props, { emit }) {
     const { t } = useI18n();

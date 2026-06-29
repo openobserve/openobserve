@@ -84,7 +84,7 @@ const ODialogStub = {
 // OInput: renders a real <input> so setValue() works and emits update:modelValue.
 const OInputStub = {
   name: "OInput",
-  props: ["modelValue", "label", "error", "errorMessage", "disabled"],
+  props: ["modelValue", "label", "error", "errorMessage", "disabled", "placeholder", "hint"],
   emits: ["update:modelValue"],
   inheritAttrs: false,
   template: `
@@ -92,8 +92,10 @@ const OInputStub = {
       <label v-if="label">{{ label }}</label>
       <input
         :value="modelValue"
+        :placeholder="placeholder"
         @input="$emit('update:modelValue', $event.target.value)"
       />
+      <span v-if="hint" data-test="o-input-hint">{{ hint }}</span>
       <span v-if="error && errorMessage" role="alert">{{ errorMessage }}</span>
     </div>
   `,
@@ -141,7 +143,7 @@ function getCancelButton(wrapper: VueWrapper) {
 }
 
 function getEmailInput(wrapper: VueWrapper) {
-  return wrapper.find('[data-test="iam-add-service-account-email-input"] input');
+  return wrapper.find('[data-test="iam-add-service-account-identifier-input"] input');
 }
 
 function getDescriptionInput(wrapper: VueWrapper) {
@@ -213,7 +215,7 @@ describe("AddServiceAccount", () => {
       // Assert
       expect(
         updateWrapper.find(
-          '[data-test="iam-add-service-account-email-input"]',
+          '[data-test="iam-add-service-account-identifier-input"]',
         ).exists(),
       ).toBe(false);
       expect(getDescriptionInput(updateWrapper).exists()).toBe(true);
@@ -515,7 +517,7 @@ describe("AddServiceAccount", () => {
 
       // Assert — email field hidden in update mode
       expect(
-        wrapper.find('[data-test="iam-add-service-account-email-input"]').exists(),
+        wrapper.find('[data-test="iam-add-service-account-identifier-input"]').exists(),
       ).toBe(false);
     });
 
@@ -532,7 +534,7 @@ describe("AddServiceAccount", () => {
       await nextTick();
       expect(
         updateWrapper.find(
-          '[data-test="iam-add-service-account-email-input"]',
+          '[data-test="iam-add-service-account-identifier-input"]',
         ).exists(),
       ).toBe(false);
 
@@ -554,7 +556,7 @@ describe("AddServiceAccount", () => {
       // Assert — email field re-appears
       expect(
         updateWrapper.find(
-          '[data-test="iam-add-service-account-email-input"]',
+          '[data-test="iam-add-service-account-identifier-input"]',
         ).exists(),
       ).toBe(true);
 
@@ -563,6 +565,24 @@ describe("AddServiceAccount", () => {
   });
 
   // ── Edge cases ─────────────────────────────────────────────────────────────
+
+  describe("identifier field", () => {
+    it("renders label as 'Identifier' not 'Email' on the email field", () => {
+      const emailField = wrapper.find('[data-test="iam-add-service-account-identifier-input"]');
+      expect(emailField.exists()).toBe(true);
+      const label = emailField.find("label");
+      expect(label.exists()).toBe(true);
+      expect(label.text()).toContain("Identifier");
+      expect(label.text()).not.toContain("Email");
+    });
+
+    it("uses i18n placeholder with example on the email field", () => {
+      const emailField = wrapper.find('[data-test="iam-add-service-account-identifier-input"]');
+      expect(emailField.exists()).toBe(true);
+      const input = emailField.find("input");
+      expect(input.attributes("placeholder")).toContain("ci-pipeline@serviceaccount.local");
+    });
+  });
 
   describe("edge cases", () => {
     it("does not emit 'updated' when save is clicked with empty email (add mode)", async () => {
