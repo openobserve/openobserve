@@ -8,7 +8,7 @@
       class="condition-logical-operator tw:w-fit tw:max-w-[8rem]"
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
-    <OButtonGroup class="axis-field" radius="sm">
+    <OButtonGroup class="axis-field tw:shrink-0" radius="sm">
       <ODropdown
         @update:open="(v: boolean) => v && loadFilterItem(condition.column)"
       >
@@ -106,6 +106,7 @@
       <OButton
         variant="outline"
         size="icon-chip"
+        class="tw:shrink-0"
         @click="$emit('remove-condition')"
         data-test="dashboard-add-condition-remove"
         icon-left="close"
