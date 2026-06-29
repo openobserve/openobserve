@@ -37,7 +37,7 @@
         <div
           v-for="(mapping, index) in editedValueMapping"
           :key="index"
-          class="tw:flex tw:items-center tw:justify-between tw:border-b tw:border-b-[#cccccc70] tw:mb-2"
+          class="tw:flex tw:items-center tw:justify-between tw:mb-2"
         >
           <div class="tw:self-center tw:cursor-move tw:p-2">
             <OIcon

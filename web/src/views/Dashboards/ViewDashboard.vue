@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           fullscreen: isFullscreen,
           'print-mode-container': store.state.printMode,
         },
-        store.state.printMode === true ? 'tw:px-6 tw:pb-6' : '',
+        store.state.printMode === true ? 'tw:pb-6' : '',
       ]"
       class="tw:h-full"
     >
@@ -1929,8 +1929,15 @@ export default defineComponent({
 }
 
 .print-mode-container {
-  height: 100vh !important;
-  overflow-y: auto !important;
+  /* Grow to the dashboard's natural content height and let the app's outer
+     scroll wrapper (MainLayout's .o2-content-scroll) do the scrolling — the same
+     model the @media print block below relies on. Pinning a viewport height here
+     (100vh or 100%) capped the subtree, and PageLayout's body (overflow-hidden)
+     then clipped the trailing panels, so tall dashboards could never be scrolled
+     to the bottom. `overflow: visible` keeps the sticky header pinned to the
+     outer scroll wrapper rather than to a dead inner scroll box. */
+  height: auto !important;
+  overflow: visible !important;
 }
 
 @media print {
