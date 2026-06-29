@@ -163,28 +163,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-actions="{ row }">
-          <div class="action-buttons">
-            <OButton
-              v-if="row.status === 'open'"
-              variant="ghost-warning"
-              size="icon-sm"
-              @click.stop="acknowledgeIncident(row)"
-              data-test="incident-ack-btn"
-            ><OIcon name="visibility" size="sm" /><OTooltip :content="t('alerts.incidents.acknowledge')" /></OButton>
-            <OButton
-              v-if="row.status !== 'resolved'"
-              variant="ghost-primary"
-              size="icon-sm"
-              @click.stop="resolveIncident(row)"
-              data-test="incident-resolve-btn"
-            ><OIcon name="task-alt" size="sm" /><OTooltip :content="t('alerts.incidents.resolve')" /></OButton>
-            <OButton
-              v-if="row.status === 'resolved'"
-              variant="ghost-warning"
-              size="icon-sm"
-              @click.stop="reopenIncident(row)"
-              data-test="incident-reopen-btn"
-            ><OIcon name="restart-alt" size="sm" /><OTooltip :content="t('alerts.incidents.reopen')" /></OButton>
+          <div class="tw:flex tw:items-center tw:justify-center tw:gap-1">
+            <!-- Slot 1: acknowledge (only when "open"); an empty spacer holds the
+                 slot otherwise so the resolve/reopen action below always lands in
+                 the 2nd column, keeping every row's primary action aligned. -->
+            <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-8">
+              <OButton
+                v-if="row.status === 'open'"
+                variant="ghost-warning"
+                size="icon-sm"
+                @click.stop="acknowledgeIncident(row)"
+                data-test="incident-ack-btn"
+              ><OIcon name="visibility" size="sm" /><OTooltip :content="t('alerts.incidents.acknowledge')" /></OButton>
+            </span>
+            <!-- Slot 2: resolve (open/acknowledged) or reopen (resolved) — always present. -->
+            <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-8">
+              <OButton
+                v-if="row.status !== 'resolved'"
+                variant="ghost-primary"
+                size="icon-sm"
+                @click.stop="resolveIncident(row)"
+                data-test="incident-resolve-btn"
+              ><OIcon name="task-alt" size="sm" /><OTooltip :content="t('alerts.incidents.resolve')" /></OButton>
+              <OButton
+                v-else
+                variant="ghost-warning"
+                size="icon-sm"
+                @click.stop="reopenIncident(row)"
+                data-test="incident-reopen-btn"
+              ><OIcon name="restart-alt" size="sm" /><OTooltip :content="t('alerts.incidents.reopen')" /></OButton>
+            </span>
           </div>
         </template>
 
@@ -349,9 +357,8 @@ export default defineComponent({
         pinned: "right",
         size: 100,
         meta: {
-          align: "right",
+          align: "center",
           actionCount: 2,
-          headerClass: "tw:!text-center tw:!justify-center",
         },
       },
     ];
@@ -824,10 +831,4 @@ body.body--dark {
   .badge-rose { border: 1px solid #fda4af; }
 }
 
-/* Action buttons styling */
-.action-buttons {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-}
 </style>
