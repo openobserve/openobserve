@@ -88,6 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               endTime: dateTime.endTime,
             }"
             :stream-name="errorTrackingState.data.stream.errorStream"
+            stream-type="logs"
+            :enable-grouping="true"
             :query="errorTrackingState.data.editorValue"
             @event-emitted="handleSidebarEvent"
           />
