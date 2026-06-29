@@ -131,9 +131,21 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest --ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex
+          rye run pytest --ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex --junitxml=junit-integration.xml
           kill $SERVER_PID_DEFAULT || true
         working-directory: tests/api-testing/
+
+      # Test-count metrics sidecar: ship the junit so report_to_openobserve can
+      # tally API active/skipped counts (suite=api). always() so counts emit even
+      # when pytest fails (junit is written before pytest's non-zero exit).
+      - name: Upload API junit (integration)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-junit__integration__main
+          path: tests/api-testing/junit-integration.xml
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload OpenObserve server logs on failure
         if: failure()
@@ -236,9 +248,20 @@ jobs:
             sleep 1
           done
           # SINGLE_NODE_OPT_MODE controls which queries load_all_queries() includes
-          SINGLE_NODE_OPT_MODE=${{ matrix.config.mode }} rye run pytest tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py -v
+          SINGLE_NODE_OPT_MODE=${{ matrix.config.mode }} rye run pytest tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py -v --junitxml=junit-queryagent-${{ matrix.config.label }}.xml
           kill $SERVER_PID || true
         working-directory: tests/api-testing/
+
+      # Test-count metrics sidecar (see integration job). Parser dedups the two
+      # opt-mode legs by test identity so the same suite isn't counted twice.
+      - name: Upload API junit (query_agent)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-junit__query_agent__${{ matrix.config.label }}
+          path: tests/api-testing/junit-queryagent-${{ matrix.config.label }}.xml
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload server log on failure
         if: failure()
@@ -339,9 +362,20 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest ${{ matrix.config.target }} -v
+          rye run pytest ${{ matrix.config.target }} -v --junitxml=junit-regression-${{ matrix.config.label }}.xml
           kill $SERVER_PID || true
         working-directory: tests/api-testing/
+
+      # Test-count metrics sidecar (see integration job). Parser dedups the
+      # flag-combo legs that re-run the same target files.
+      - name: Upload API junit (regression)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-junit__regression__${{ matrix.config.label }}
+          path: tests/api-testing/junit-regression-${{ matrix.config.label }}.xml
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload server log on failure
         if: failure()
@@ -505,6 +539,16 @@ jobs:
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
+      # Pull every per-shard junit. NO merge-multiple: each artifact lands in its
+      # own subdir (api-junit__<category>__<leg>) so the parser can read the test
+      # CATEGORY from the dir name. Missing artifacts are non-fatal.
+      - name: Download API junit reports
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: api-junit__*
+          path: junit-xml
       - name: Report run metrics
         continue-on-error: true
         env:
@@ -523,4 +567,21 @@ jobs:
           elif [ "$INTEG" = "cancelled" ] || [ "$AGENT" = "cancelled" ] || [ "$REG" = "cancelled" ]; then CONCLUSION=cancelled
           else CONCLUSION=success; fi
           export CONCLUSION STREAM=ci_test_runs SUITE=api
+          # Parse junit into per-category + total counts. The TOTAL folds into the
+          # run doc (EXTRA_JSON) so suite=api shows up in the same KPI/pie panels
+          # as UI; the per-category rows go to ci_test_counts for the per-shard
+          # breakdown (the API analog of UI's ci_test_modules). All best-effort.
+          if [ -d junit-xml ]; then
+            COUNTS=$(python3 .github/scripts/parse-api-junit.py junit-xml 2>/dev/null || echo "")
+            if [ -n "$COUNTS" ] && printf '%s' "$COUNTS" | jq -e . >/dev/null 2>&1; then
+              echo "API counts: $COUNTS"
+              EXTRA_JSON=$(printf '%s' "$COUNTS" | jq -c .total); export EXTRA_JSON
+              printf '%s' "$COUNTS" | jq -c --arg run_id "$GITHUB_RUN_ID" --arg repo "$GITHUB_REPOSITORY" \
+                '[.by_category[] | {run_id:$run_id, repo:$repo, suite:"api", workflow:"test", ingest_source:"live",
+                  module:.module, tests_total, tests_passed, tests_failed, tests_flaky, tests_skipped}]' > api_counts_rows.json
+              if [ "$(jq 'length' api_counts_rows.json 2>/dev/null || echo 0)" -gt 0 ]; then
+                bash .github/scripts/o2-report.sh ci_test_counts api_counts_rows.json
+              fi
+            fi
+          fi
           bash .github/scripts/o2-run-report.sh
