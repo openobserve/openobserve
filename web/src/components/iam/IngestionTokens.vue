@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               :data-test="`ingestion-token-${row.name}-toggle`"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-              :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+              :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
               size="icon-sm"
               :title="row.enabled ? t('common.disable') : t('common.enable')"
               :disabled="loading"

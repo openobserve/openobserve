@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center actions-container">
             <OButton
               :data-test="`pipeline-list-${row.name}-pause-start-action`"
-              variant="ghost"
+              :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
               size="icon-sm"
               :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -254,8 +254,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="outline"
                 size="sm"
                 @click="bulkTogglePipelines('pause')"
-                icon-left="pause"
               >
+                <template #icon-left>
+                  <OIcon name="pause" size="sm" class="tw:text-button-ghost-destructive-text" />
+                </template>
                 {{ t("pipeline_list.pause") }}
               </OButton>
               <OButton
@@ -263,8 +265,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="outline"
                 size="sm"
                 @click="bulkTogglePipelines('resume')"
-                icon-left="play-arrow"
               >
+                <template #icon-left>
+                  <OIcon name="play-arrow" size="sm" class="tw:text-button-ghost-success-text" />
+                </template>
                 {{ t("pipeline_list.resume") }}
               </OButton>
               <OButton

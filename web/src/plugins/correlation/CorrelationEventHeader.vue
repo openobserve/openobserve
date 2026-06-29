@@ -60,12 +60,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OBadge
           v-for="chip in displayedChips"
           :key="chip.key"
-          :variant="chipBadgeVariant(chip.key)"
+          :variant="dimensionVariant(chip.key)"
           :size="badgeSize"
-          dot
+          class="tw:min-w-0 tw:!p-0 tw:overflow-hidden"
           :data-test="`correlation-event-header-chip-${chip.key}`"
         >
-          {{ chip.label }} = {{ chip.value }}
+          <span class="tw:inline-flex tw:items-stretch tw:min-w-0">
+            <span class="tw:ps-2.5 tw:pe-1 tw:py-1.5 tw:shrink-0 tw:whitespace-nowrap tw:bg-current/8 tw:opacity-90">{{ chip.label }}</span>
+            <span class="tw:ps-1 tw:pe-2.5 tw:py-1.5 tw:truncate tw:min-w-0 tw:font-semibold">{{ chip.value }}</span>
+          </span>
         </OBadge>
 
         <span v-if="hiddenChipCount > 0" class="tw:contents">
@@ -83,12 +86,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OBadge
                   v-for="chip in hiddenChips"
                   :key="chip.key"
-                  :variant="chipBadgeVariant(chip.key)"
+                  :variant="dimensionVariant(chip.key)"
                   :size="badgeSize"
-                  dot
+                  class="tw:!p-0 tw:overflow-hidden"
                   :data-test="`correlation-event-header-hidden-chip-${chip.key}`"
                 >
-                  {{ chip.label }} = {{ chip.value }}
+                  <span class="tw:inline-flex tw:items-stretch">
+                    <span class="tw:ps-2.5 tw:pe-1 tw:py-1.5 tw:shrink-0 tw:whitespace-nowrap tw:bg-current/8 tw:opacity-90">{{ chip.label }}</span>
+                    <span class="tw:ps-1 tw:pe-2.5 tw:py-1.5 tw:font-semibold">{{ chip.value }}</span>
+                  </span>
                 </OBadge>
               </div>
             </template>
@@ -154,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { dimensionVariant } from "@/lib/core/Badge/badgeGroups";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -202,31 +208,6 @@ const emit = defineEmits<{
   "update:activeSubject": [value: string | null];
 }>();
 
-// ── Chip color ────────────────────────────────────────────────────────────────
-
-const hashKey = (s: string) => {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-};
-
-const CHIP_VARIANTS = [
-  "primary-outline",
-  "success-outline",
-  "warning-outline",
-  "error-outline",
-  "teal-outline",
-  "orange-outline",
-  "lime-outline",
-  "amber-outline",
-  "cyan-outline",
-  "blue-outline",
-  "purple-outline",
-  "indigo-outline",
-] as const;
-
-const chipBadgeVariant = (key: string): BadgeVariant =>
-  CHIP_VARIANTS[hashKey(key) % CHIP_VARIANTS.length];
 
 // ── Responsive overflow (ResizeObserver) ─────────────────────────────────────
 

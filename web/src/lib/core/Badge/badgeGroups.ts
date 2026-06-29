@@ -385,3 +385,31 @@ export function resolveBadge(
 function genericEntry(value: unknown): BadgeValueConfig {
   return { variant: statusVariant(value).variant };
 }
+
+/** Soft fallback palette for dimension keys not present in the registry. */
+const DIMENSION_FALLBACK_VARIANTS: BadgeVariant[] = [
+  "default-soft", "amber-soft", "purple-soft", "blue-soft", "teal-soft", "indigo-soft",
+];
+
+/**
+ * Resolve a correlation/incident DIMENSION key (k8s-cluster, service, env, …)
+ * to a soft colour variant. Exact-normalised match first, then substring (so
+ * "k8s-cluster" resolves via "cluster"), then a stable hash over the palette so
+ * unknown keys still get a consistent colour. Single source of truth for the
+ * key|value dimension chip rendered in the incident list AND the correlation
+ * "Correlated by:" chips, so the same dimension is the same colour in both.
+ */
+export function dimensionVariant(key: string): BadgeVariant {
+  const values = BADGE_GROUPS.dimensionKey.values as Record<string, BadgeValueConfig>;
+  const nk = normalizeKey(key);
+  if (values[nk]) return values[nk].variant;
+  for (const [pattern, cfg] of Object.entries(values)) {
+    if (nk.includes(pattern)) return cfg.variant;
+  }
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = ((hash << 5) - hash) + key.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return DIMENSION_FALLBACK_VARIANTS[Math.abs(hash) % DIMENSION_FALLBACK_VARIANTS.length];
+}

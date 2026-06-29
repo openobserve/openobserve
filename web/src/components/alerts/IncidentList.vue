@@ -237,7 +237,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import { BADGE_GROUPS, normalizeKey } from "@/lib/core/Badge/badgeGroups";
+import { dimensionVariant } from "@/lib/core/Badge/badgeGroups";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
@@ -348,7 +348,11 @@ export default defineComponent({
         isAction: true,
         pinned: "right",
         size: 100,
-        meta: { align: "center", actionCount: 2 },
+        meta: {
+          align: "right",
+          actionCount: 2,
+          headerClass: "tw:!text-center tw:!justify-center",
+        },
       },
     ];
 
@@ -572,23 +576,9 @@ export default defineComponent({
       return classes[Math.abs(hash) % classes.length];
     };
 
-    const DIMENSION_FALLBACK_VARIANTS: BadgeVariant[] = [
-      'default-soft', 'amber-soft', 'purple-soft', 'blue-soft', 'teal-soft', 'indigo-soft',
-    ];
-    const getDimensionVariant = (key: string): BadgeVariant => {
-      const values = BADGE_GROUPS.dimensionKey.values as Record<string, { variant: BadgeVariant }>;
-      const nk = normalizeKey(key);
-      if (values[nk]) return values[nk].variant;
-      for (const [pattern, cfg] of Object.entries(values)) {
-        if (nk.includes(pattern)) return cfg.variant;
-      }
-      let hash = 0;
-      for (let i = 0; i < key.length; i++) {
-        hash = ((hash << 5) - hash) + key.charCodeAt(i);
-        hash = hash & hash;
-      }
-      return DIMENSION_FALLBACK_VARIANTS[Math.abs(hash) % DIMENSION_FALLBACK_VARIANTS.length];
-    };
+    // Shared with the correlation "Correlated by:" chips so the same dimension
+    // key renders in the same colour in both places. See badgeGroups.ts.
+    const getDimensionVariant = dimensionVariant;
 
     const restoreStateFromStore = (): boolean => {
       const savedState = store.state.incidents.incidents;

@@ -56,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OBadge
           data-test="correlation-reason-badge"
           :variant="getReasonVariant(row.correlation_reason)"
+          size="sm"
         >
           {{ getReasonLabel(row.correlation_reason) }}
           <OTooltip :content="getReasonTooltip(row.correlation_reason)" side="top" />
@@ -148,15 +149,15 @@ export default defineComponent({
     const getReasonVariant = (reason: string): BadgeVariant => {
       switch (reason) {
         case "service_discovery":
-          return "primary-outline";
+          return "primary-soft";
         case "primary_match":
-          return "primary-outline";
+          return "primary-soft";
         case "secondary_match":
-          return "warning-outline";
+          return "warning-soft";
         case "alert_id":
-          return "default-outline";
+          return "default-soft";
         default:
-          return "default-outline";
+          return "default-soft";
       }
     };
 

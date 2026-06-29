@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     v-else
                     :data-test="`report-list-${row.name}-pause-start-report`"
-                    :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+                    :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                     size="icon-sm"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                     :title="row.enabled ? t('alerts.pause') : t('alerts.start')"

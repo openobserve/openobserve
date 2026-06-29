@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else
                       :data-test="`alert-list-${row.name}-pause-start-alert`"
                       class="tw:ml-1"
-                      :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+                      :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                       size="icon-sm"
                       :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                       :title="
@@ -499,7 +499,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:mr-2"
                       @click="bulkToggleAlerts('pause')"
                     >
-                      <OIcon name="pause" size="sm" />
+                      <OIcon name="pause" size="sm" class="tw:text-button-ghost-destructive-text" />
                       <span class="tw:ml-2">Pause</span>
                     </OButton>
                     <OButton
@@ -510,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:mr-2"
                       @click="bulkToggleAlerts('resume')"
                     >
-                      <OIcon name="play-arrow" size="sm" />
+                      <OIcon name="play-arrow" size="sm" class="tw:text-button-ghost-success-text" />
                       <span class="tw:ml-2">Resume</span>
                     </OButton>
                     <OButton

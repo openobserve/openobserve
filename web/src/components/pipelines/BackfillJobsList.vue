@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
                 <OButton
                   v-if="canResumeJob(row)"
-                  variant="ghost"
+                  variant="ghost-success"
                   size="icon-sm"
                   @click="confirmResumeJob(row)"
                   data-test="resume-job-btn"

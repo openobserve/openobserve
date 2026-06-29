@@ -91,6 +91,7 @@
   --color-success-200: #bbf7d0;
   --color-success-400: #4ade80;   /* referenced by EmptyState check illustration */
   --color-success-500: #22c55e;
+  --color-success-600: #16a34a;   /* parity with error-600 — ghost-success play/resume text */
   --color-success-700: #15803d;
   --color-success-900: #14532d;
 

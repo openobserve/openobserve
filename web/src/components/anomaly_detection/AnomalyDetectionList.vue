@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="row.status !== 'training' && row.status !== 'failed'"
           :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-          variant="ghost"
+          :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
           size="icon-sm"
           :title="row.enabled ? 'Pause' : 'Resume'"
           @click="toggleEnabled(row)"

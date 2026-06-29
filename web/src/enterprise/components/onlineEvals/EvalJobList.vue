@@ -84,7 +84,7 @@
             <OButton
               v-if="canActivate(row.status)"
               :data-test="`eval-job-list-${row.name}-activate-btn`"
-              variant="ghost"
+              variant="ghost-success"
               size="icon-sm"
               :title="t('onlineEvals.actions.activate')"
               icon-left="play-arrow"
@@ -95,7 +95,7 @@
             <OButton
               v-if="canPause(row.status)"
               :data-test="`eval-job-list-${row.name}-pause-btn`"
-              variant="ghost"
+              variant="ghost-destructive"
               size="icon-sm"
               :title="t('onlineEvals.actions.pause')"
               icon-left="pause"
