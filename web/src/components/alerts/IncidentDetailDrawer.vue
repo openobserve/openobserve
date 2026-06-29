@@ -862,7 +862,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="tw:space-y-2">
                       <!-- Alert Name -->
                       <div class="tw:flex tw:flex-col tw:gap-0.5">
-                        <span :class="'tw:text-text-muted'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                        <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                           Alert Name
                         </span>
                         <span :class="'tw:text-text-primary'" class="tw:text-sm tw:font-medium">
@@ -873,7 +873,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Stream Type & Name -->
                       <div class="tw:grid tw:grid-cols-2 tw:gap-2">
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-muted'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Stream Type
                           </span>
                           <OTag
@@ -884,7 +884,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-muted'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Stream Name
                           </span>
                           <span :class="'tw:text-text-primary'" class="tw:text-sm tw:font-medium tw:truncate">
@@ -896,7 +896,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Threshold & Period -->
                       <div class="tw:grid tw:grid-cols-2 tw:gap-2">
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-muted'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Threshold
                           </span>
                           <span :class="'tw:text-text-primary'" class="tw:text-sm tw:font-medium">
@@ -904,7 +904,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </span>
                         </div>
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-muted'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Period
                           </span>
                           <span :class="'tw:text-text-primary'" class="tw:text-sm tw:font-medium">
@@ -916,7 +916,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Frequency & Silence -->
                       <div class="tw:grid tw:grid-cols-2 tw:gap-2">
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-muted'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Frequency
                           </span>
                           <span :class="'tw:text-text-primary'" class="tw:text-sm tw:font-medium">
@@ -924,7 +924,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </span>
                         </div>
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-muted'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Silence
                           </span>
                           <span :class="'tw:text-text-primary'" class="tw:text-sm tw:font-medium">
