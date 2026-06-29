@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <AppPageHeader
       :title="t('aiObservability.nav.llmInsights')"
+      :subtitle="t('aiObservability.subtitle.llmInsights')"
       icon="dashboard"
       class="tw:px-4 tw:border-b tw:border-border-default"
     >

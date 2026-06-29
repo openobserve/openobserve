@@ -331,8 +331,10 @@ const pendingAgentName = ref<string | null>(
 // in `pagination="server"` mode and emits `pagination-change`; these refs are
 // the source of truth it reads back via `:current-page` / `:page-size`.
 const currentPage = ref(1);
-const rowsPerPage = ref(25);
-const rowsPerPageOptions = [10, 25, 50, 100];
+// Page-size options match the dashboards' table pagination
+// (TablePaginationControls) so the AI module stays consistent.
+const rowsPerPage = ref(20);
+const rowsPerPageOptions = [20, 50, 100, 250, 500]; 
 
 const agentSelectOptions = computed(() =>
   agents.value.map((agent) => ({

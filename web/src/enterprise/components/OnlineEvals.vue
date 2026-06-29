@@ -63,6 +63,7 @@ the Free Software Foundation, either version 3 of the License, or
       <AppPageHeader
         v-if="hideTabBar && embeddedHeader"
         :title="embeddedHeader.title"
+        :subtitle="embeddedHeader.subtitle"
         :icon="embeddedHeader.icon"
         class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       >
@@ -538,19 +539,19 @@ const tabs = computed<
 // shares the same title strip. Title + icon track the active rail item.
 const EMBEDDED_HEADER_META: Record<
   ActiveTab,
-  { i18nKey: string; icon: IconName }
+  { i18nKey: string; subtitleKey: string; icon: IconName }
 > = {
-  quality: { i18nKey: "aiObservability.nav.quality", icon: "star-rate" },
-  jobs: { i18nKey: "aiObservability.nav.evalJobs", icon: "event" },
-  scorers: { i18nKey: "aiObservability.nav.scorers", icon: "rule" },
-  scoreConfigs: { i18nKey: "aiObservability.nav.scoreConfigs", icon: "tune" },
+  quality: { i18nKey: "aiObservability.nav.quality", subtitleKey: "aiObservability.subtitle.quality", icon: "star-rate" },
+  jobs: { i18nKey: "aiObservability.nav.evalJobs", subtitleKey: "aiObservability.subtitle.evalJobs", icon: "event" },
+  scorers: { i18nKey: "aiObservability.nav.scorers", subtitleKey: "aiObservability.subtitle.scorers", icon: "rule" },
+  scoreConfigs: { i18nKey: "aiObservability.nav.scoreConfigs", subtitleKey: "aiObservability.subtitle.scoreConfigs", icon: "tune" },
 };
 
-const embeddedHeader = computed<{ title: string; icon: IconName } | null>(
+const embeddedHeader = computed<{ title: string; subtitle: string; icon: IconName } | null>(
   () => {
     const meta = EMBEDDED_HEADER_META[activeTab.value];
     if (!meta) return null;
-    return { title: t(meta.i18nKey), icon: meta.icon };
+    return { title: t(meta.i18nKey), subtitle: t(meta.subtitleKey), icon: meta.icon };
   },
 );
 

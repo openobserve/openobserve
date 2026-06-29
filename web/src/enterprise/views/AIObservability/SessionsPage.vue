@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <AppPageHeader
       :title="t('aiObservability.nav.sessions')"
+      :subtitle="t('aiObservability.subtitle.sessions')"
       icon="forum"
       class="tw:px-4 tw:border-b tw:border-border-default"
     >

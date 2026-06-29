@@ -311,7 +311,7 @@
             :show-global-filter="false"
             :show-footer="false"
             :page-size="20"
-            :page-size-options="[20, 50, 100, 200]"
+            :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.scorer.detail.runs.empty')"
             :footer-title="t('onlineEvals.scorer.detail.tabs.runs')"
             show-index
