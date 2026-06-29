@@ -582,6 +582,7 @@ export default defineComponent({
       });
 
       const options = {
+        backgroundColor: "transparent",
         tooltip: {
           trigger: "item",
           backgroundColor: isDarkMode.value ? "#1f2937" : "#ffffff",
@@ -746,37 +747,7 @@ body.body--dark .graph-legend__divider {
   margin: 8px 0;
 }
 
-/* Light mode */
 .incident-service-graph {
-  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
-  border: 1px solid #e5e7eb;
-  box-shadow:
-    0 1px 3px 0 rgba(0, 0, 0, 0.08),
-    0 1px 2px 0 rgba(0, 0, 0, 0.04),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-}
-
-.incident-service-graph:hover {
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-}
-
-/* Dark mode */
-.body--dark .incident-service-graph {
-  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-  border: 1px solid #374151;
-  box-shadow:
-    0 1px 3px 0 rgba(0, 0, 0, 0.3),
-    0 1px 2px 0 rgba(0, 0, 0, 0.2),
-    inset 0 0 0 1px rgba(75, 85, 99, 0.3);
-}
-
-.body--dark .incident-service-graph:hover {
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.4),
-    0 2px 4px -1px rgba(0, 0, 0, 0.3),
-    inset 0 0 0 1px rgba(75, 85, 99, 0.3);
+  background: transparent;
 }
 </style>
