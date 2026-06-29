@@ -753,8 +753,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
 // import alertList from "./alerts";
 
@@ -2668,12 +2668,9 @@ export default defineComponent({
     };
 
     // ── Keyboard shortcuts ──────────────────────────────────────────────
-    useShortcutScope("alerts");
-    useShortcutsWithMac([
+    useShortcuts([
       {
-        key: "n",
-        scope: "alerts",
-        description: "shortcuts.actions.alertsCreate",
+        id: "alertsCreate",
         handler: () => {
           if (isInputFocused()) return;
           // Mirror the Add button so the URL updates (action=add / route push),
@@ -2694,27 +2691,21 @@ export default defineComponent({
         },
       },
       {
-        key: "i",
-        scope: "alerts",
-        description: "shortcuts.actions.alertsImport",
+        id: "alertsImport",
         handler: () => {
           if (isInputFocused()) return;
           importAlert();
         },
       },
       {
-        key: "r",
-        scope: "alerts",
-        description: "shortcuts.actions.alertsRefresh",
+        id: "alertsRefresh",
         handler: () => {
           if (isInputFocused()) return;
           refreshAlerts();
         },
       },
       {
-        key: "/",
-        scope: "alerts",
-        description: "shortcuts.actions.focusSearch",
+        id: "alertsFocusSearch",
         handler: () => {
           focusSearchInput("alert-list-search-input");
         },

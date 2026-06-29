@@ -288,8 +288,8 @@ import { getRoles } from "@/services/iam";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "ServiceAccountsList",
   components: { OEmptyState, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge, OCodeCell, OUserCell, OSearchInput },
@@ -685,24 +685,17 @@ export default defineComponent({
 
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    useShortcutScope("iam-service-accounts");
-    useShortcutsWithMac([
+    useShortcuts([
       {
-        key: "n",
-        scope: "iam-service-accounts",
-        description: "shortcuts.actions.iamServiceAccountsAdd",
+        id: "iamServiceAccountsAdd",
         handler: () => { if (!isInputFocused()) addRoutePush({}); },
       },
       {
-        key: "r",
-        scope: "iam-service-accounts",
-        description: "shortcuts.actions.iamServiceAccountsRefresh",
+        id: "iamServiceAccountsRefresh",
         handler: () => { if (!isInputFocused()) getServiceAccountsUsers(); },
       },
       {
-        key: "/",
-        scope: "iam-service-accounts",
-        description: "shortcuts.actions.focusSearch",
+        id: "iamServiceAccountsFocusSearch",
         handler: () => {
           focusSearchInput("iam-service-accounts-search-input");
         },

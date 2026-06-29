@@ -351,8 +351,8 @@ import {
 import { hasPanelTime } from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -1843,45 +1843,34 @@ export default defineComponent({
     });
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    useShortcutScope("dashboard");
-    useShortcutsWithMac([
+    useShortcuts([
       {
-        key: "r",
-        scope: "dashboard",
-        description: "shortcuts.actions.dashboardRefresh",
+        id: "dashboardRefresh",
         handler: () => {
           if (isInputFocused()) return;
           refreshData();
         },
       },
       {
-        key: "n",
-        scope: "dashboard",
-        description: "shortcuts.actions.dashboardAddPanel",
+        id: "dashboardAddPanel",
         handler: () => {
           if (isInputFocused()) return;
           addPanelData();
         },
       },
       {
-        key: "ctrl+s",
-        scope: "dashboard",
-        description: "shortcuts.actions.dashboardSave",
+        id: "dashboardSave",
         handler: () => savePanelLayout(null),
       },
       {
-        key: "f",
-        scope: "dashboard",
-        description: "shortcuts.actions.dashboardFullscreen",
+        id: "dashboardFullscreen",
         handler: () => {
           if (isInputFocused()) return;
           toggleFullscreen();
         },
       },
       {
-        key: "x",
-        scope: "dashboard",
-        description: "shortcuts.actions.dashboardExport",
+        id: "dashboardExport",
         handler: () => {
           if (isInputFocused()) return;
           // Trigger the whole-dashboard export (ExportDashboard button).

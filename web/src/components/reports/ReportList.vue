@@ -344,8 +344,8 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
@@ -797,18 +797,13 @@ const onMoveUpdated = async (fromFolder: string, toFolder: string) => {
 };
 
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
-useShortcutScope("reports");
-useShortcutsWithMac([
+useShortcuts([
   {
-    key: "n",
-    scope: "reports",
-    description: "shortcuts.actions.reportsAdd",
+    id: "reportsAdd",
     handler: () => { if (!isInputFocused()) createNewReport(); },
   },
   {
-    key: "r",
-    scope: "reports",
-    description: "shortcuts.actions.reportsRefresh",
+    id: "reportsRefresh",
     handler: () => {
       if (!isInputFocused()) {
         // Match the refresh button: drop the cache first so it actually reloads.
@@ -818,9 +813,7 @@ useShortcutsWithMac([
     },
   },
   {
-    key: "/",
-    scope: "reports",
-    description: "shortcuts.actions.focusSearch",
+    id: "reportsFocusSearch",
     handler: () => {
       focusSearchInput("report-list-search-input");
     },

@@ -270,8 +270,8 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
 import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
@@ -1226,24 +1226,17 @@ export default defineComponent({
 
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    useShortcutScope("iam-users");
-    useShortcutsWithMac([
+    useShortcuts([
       {
-        key: "n",
-        scope: "iam-users",
-        description: "shortcuts.actions.iamUsersAdd",
+        id: "iamUsersAdd",
         handler: () => { if (!isInputFocused()) addRoutePush({}); },
       },
       {
-        key: "r",
-        scope: "iam-users",
-        description: "shortcuts.actions.iamUsersRefresh",
+        id: "iamUsersRefresh",
         handler: () => { if (!isInputFocused()) getOrgMembers(); },
       },
       {
-        key: "/",
-        scope: "iam-users",
-        description: "shortcuts.actions.focusSearch",
+        id: "iamUsersFocusSearch",
         handler: () => {
           focusSearchInput("user-list-search-input");
         },

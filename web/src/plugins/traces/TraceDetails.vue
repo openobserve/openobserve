@@ -859,8 +859,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
 import {
   TRACE_SERVICE_DETECTION_KEY,
@@ -2603,7 +2603,6 @@ export default defineComponent({
     };
 
     // ── Keyboard shortcuts — span navigation ─────────────────────────────
-    useShortcutScope("trace-detail");
     const nextSpanHandler = () => {
       if (isInputFocused()) return;
       const list = spanList.value;
@@ -2619,31 +2618,11 @@ export default defineComponent({
       if (idx > 0) updateSelectedSpan(list[idx - 1].span_id);
     };
 
-    useShortcutsWithMac([
-      {
-        key: "j",
-        scope: "trace-detail",
-        description: "shortcuts.actions.traceNextSpan",
-        handler: nextSpanHandler,
-      },
-      {
-        key: "down",
-        scope: "trace-detail",
-        description: "shortcuts.actions.traceNextSpan",
-        handler: nextSpanHandler,
-      },
-      {
-        key: "k",
-        scope: "trace-detail",
-        description: "shortcuts.actions.tracePrevSpan",
-        handler: prevSpanHandler,
-      },
-      {
-        key: "up",
-        scope: "trace-detail",
-        description: "shortcuts.actions.tracePrevSpan",
-        handler: prevSpanHandler,
-      },
+    useShortcuts([
+      // `traceNextSpan` registers j + ↓, `tracePrevSpan` registers k + ↑
+      // (both bindings live in the registry under `keys`).
+      { id: "traceNextSpan", handler: nextSpanHandler },
+      { id: "tracePrevSpan", handler: prevSpanHandler },
     ]);
     return {
       router,

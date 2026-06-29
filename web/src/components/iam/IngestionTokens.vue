@@ -190,8 +190,8 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import organizationsService from "@/services/organizations";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 interface Token {
@@ -355,24 +355,17 @@ export default defineComponent({
     });
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    useShortcutScope("ingestion-tokens");
-    useShortcutsWithMac([
+    useShortcuts([
       {
-        key: "n",
-        scope: "ingestion-tokens",
-        description: "shortcuts.actions.ingestionTokensAdd",
+        id: "ingestionTokensAdd",
         handler: () => { if (!isInputFocused()) showCreateForm.value = true; },
       },
       {
-        key: "r",
-        scope: "ingestion-tokens",
-        description: "shortcuts.actions.ingestionTokensRefresh",
+        id: "ingestionTokensRefresh",
         handler: () => { if (!isInputFocused()) fetchTokens(); },
       },
       {
-        key: "/",
-        scope: "ingestion-tokens",
-        description: "shortcuts.actions.focusSearch",
+        id: "ingestionTokensFocusSearch",
         handler: () => {
           focusSearchInput("ingestion-tokens-search-input");
         },

@@ -280,8 +280,8 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
@@ -771,24 +771,17 @@ export default defineComponent({
 
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    useShortcutScope("alert-destinations");
-    useShortcutsWithMac([
+    useShortcuts([
       {
-        key: "n",
-        scope: "alert-destinations",
-        description: "shortcuts.actions.alertDestinationsAdd",
+        id: "alertDestinationsAdd",
         handler: () => { if (!isInputFocused()) editDestination(null); },
       },
       {
-        key: "r",
-        scope: "alert-destinations",
-        description: "shortcuts.actions.alertDestinationsRefresh",
+        id: "alertDestinationsRefresh",
         handler: () => { if (!isInputFocused()) getDestinations(); },
       },
       {
-        key: "/",
-        scope: "alert-destinations",
-        description: "shortcuts.actions.focusSearch",
+        id: "alertDestinationsFocusSearch",
         handler: () => {
           focusSearchInput("destination-list-search-input");
         },

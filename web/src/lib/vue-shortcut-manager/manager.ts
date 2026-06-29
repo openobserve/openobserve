@@ -3,6 +3,7 @@ import type {
   Shortcut,
   ShortcutManagerOptions,
 } from "./types";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 // ---------------------------------------------------------------------------
 // Lazy singleton — no plugin or main.ts setup needed.
@@ -92,10 +93,12 @@ export class ShortcutManager {
   // ---------- Register / Unregister ----------
 
   register(shortcut: Shortcut): string {
-    const id = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
-    });
+    const id =
+      shortcut.id ??
+      "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+      });
     const key = shortcut.key.toLowerCase();
     const existing = this.shortcuts.get(key) ?? [];
 
@@ -149,6 +152,15 @@ export class ShortcutManager {
 
   getByScope(scope: string): RegisteredShortcut[] {
     return this.getAll().filter((s) => (s.scope ?? "global") === scope);
+  }
+
+  /** Find a registered shortcut by its id (for tests / programmatic triggers). */
+  getById(id: string): RegisteredShortcut | undefined {
+    for (const list of this.shortcuts.values()) {
+      const found = list.find((s) => s.id === id);
+      if (found) return found;
+    }
+    return undefined;
   }
 
   // ---------- Key Parsing ----------
@@ -240,26 +252,6 @@ export class ShortcutManager {
   }
 
   /**
-   * Returns true when a text-input element has keyboard focus.
-   * Single-letter shortcuts (no modifier keys) must not fire while the user
-   * is typing — the check lives here so preventDefault() is never called
-   * before we decide to skip the shortcut.
-   */
-  private static isInputFocused(): boolean {
-    const el = document.activeElement;
-    if (!el || el === document.body) return false;
-    const tag = el.tagName.toLowerCase();
-    // Only treat contentEditable as an input when it has role="textbox"
-    // (CodeMirror, ProseMirror, etc.). Generic contentEditable containers
-    // (e.g. panel drag handles) should not block shortcuts.
-    const isContentEditableInput =
-      (el as HTMLElement).isContentEditable &&
-      (el.getAttribute("role") === "textbox" ||
-        el.closest('[role="textbox"]') !== null);
-    return ["input", "textarea", "select"].includes(tag) || isContentEditableInput;
-  }
-
-  /**
    * Returns true when the shortcut key string contains at least one modifier
    * (ctrl, meta, alt, shift). Pure single-letter keys have no modifier.
    */
@@ -279,7 +271,7 @@ export class ShortcutManager {
     // Guard: never intercept single-letter shortcuts while the user is typing
     // in an input/textarea/contenteditable. Modifier-key shortcuts (Ctrl+S,
     // ⌘+Enter, etc.) are always allowed through regardless of focus.
-    if (!ShortcutManager.hasModifier(shortcut.key) && ShortcutManager.isInputFocused()) {
+    if (!ShortcutManager.hasModifier(shortcut.key) && isInputFocused()) {
       return;
     }
 

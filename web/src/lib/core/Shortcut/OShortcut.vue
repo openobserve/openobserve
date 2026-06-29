@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import type { ShortcutProps } from "./OShortcut.types";
 import { computed } from "vue";
+import { isMacOS } from "@/utils/keyboardShortcuts";
 
 const props = withDefaults(defineProps<ShortcutProps>(), {
   size: "sm",
 });
 
-const isMac =
-  typeof navigator !== "undefined" &&
-  /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+const isMac = isMacOS();
 
 /** Token → display symbol. Modifier glyphs are platform-aware. */
 const SYMBOLS: Record<string, string> = {

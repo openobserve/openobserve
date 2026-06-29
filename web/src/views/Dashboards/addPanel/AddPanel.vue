@@ -242,8 +242,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 
@@ -1722,30 +1722,21 @@ export default defineComponent({
     };
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    useShortcutScope("panel-editor");
-    useShortcutsWithMac([
+    useShortcuts([
       {
-        key: "ctrl+enter",
-        scope: "panel-editor",
-        description: "shortcuts.actions.panelEditorRun",
+        id: "panelEditorRun",
         handler: () => runQuery(false),
       },
       {
-        key: "ctrl+s",
-        scope: "panel-editor",
-        description: "shortcuts.actions.panelEditorSave",
+        id: "panelEditorSave",
         handler: () => savePanelData.execute(),
       },
       {
-        key: "alt+left",
-        scope: "panel-editor",
-        description: "shortcuts.actions.panelEditorBack",
+        id: "panelEditorBack",
         handler: () => goBack(),
       },
       {
-        key: "i",
-        scope: "panel-editor",
-        description: "shortcuts.actions.panelEditorQueryInspector",
+        id: "panelEditorQueryInspector",
         handler: () => {
           if (isInputFocused()) return;
           showViewPanel.value = true;

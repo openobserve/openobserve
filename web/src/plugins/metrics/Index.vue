@@ -163,8 +163,8 @@ const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
 import OButton from "@/lib/core/Button/OButton.vue";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "Metrics",
@@ -601,18 +601,13 @@ export default defineComponent({
     // [END] cancel running queries
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    useShortcutScope("metrics");
-    useShortcutsWithMac([
+    useShortcuts([
       {
-        key: "ctrl+enter",
-        scope: "metrics",
-        description: "shortcuts.actions.metricsRunQuery",
+        id: "metricsRunQuery",
         handler: () => runQuery(),
       },
       {
-        key: "r",
-        scope: "metrics",
-        description: "shortcuts.actions.metricsRefresh",
+        id: "metricsRefresh",
         handler: () => {
           if (isInputFocused()) return;
           runQuery();

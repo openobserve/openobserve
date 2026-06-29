@@ -302,8 +302,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -840,24 +840,17 @@ export default defineComponent({
 
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    useShortcutScope("streams");
-    useShortcutsWithMac([
+    useShortcuts([
       {
-        key: "n",
-        scope: "streams",
-        description: "shortcuts.actions.streamsAdd",
+        id: "streamsAdd",
         handler: () => { if (!isInputFocused()) addStream(); },
       },
       {
-        key: "r",
-        scope: "streams",
-        description: "shortcuts.actions.streamsRefresh",
+        id: "streamsRefresh",
         handler: () => { if (!isInputFocused()) getLogStream(true); },
       },
       {
-        key: "/",
-        scope: "streams",
-        description: "shortcuts.actions.focusSearch",
+        id: "streamsFocusSearch",
         handler: () => {
           focusSearchInput("streams-search-stream-input");
         },

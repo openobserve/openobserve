@@ -368,8 +368,8 @@ import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -2347,27 +2347,20 @@ watch(
 );
 
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
-useShortcutScope("traces");
-useShortcutsWithMac([
+useShortcuts([
   {
-    key: "ctrl+enter",
-    scope: "traces",
-    description: "shortcuts.actions.tracesSearch",
+    id: "tracesSearch",
     handler: () => runQueryFn(),
   },
   {
-    key: "r",
-    scope: "traces",
-    description: "shortcuts.actions.tracesRefresh",
+    id: "tracesRefresh",
     handler: () => {
       if (isInputFocused()) return;
       runQueryFn();
     },
   },
   {
-    key: "/",
-    scope: "traces",
-    description: "shortcuts.actions.focusQuery",
+    id: "tracesFocusQuery",
     handler: () => {
       // The traces query editor is Monaco — focus its inner textarea.
       const el = document.querySelector<HTMLElement>(
@@ -2377,9 +2370,7 @@ useShortcutsWithMac([
     },
   },
   {
-    key: "ctrl+shift+c",
-    scope: "traces",
-    description: "shortcuts.actions.tracesCopyUrl",
+    id: "tracesCopyUrl",
     handler: () => copyTracesUrl(),
   },
 ]);

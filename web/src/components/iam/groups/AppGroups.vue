@@ -157,8 +157,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const showAddGroup = ref(false);
@@ -362,24 +362,17 @@ const bulkDeleteUserGroups = async () => {
 };
 
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
-useShortcutScope("iam-groups");
-useShortcutsWithMac([
+useShortcuts([
   {
-    key: "n",
-    scope: "iam-groups",
-    description: "shortcuts.actions.iamGroupsAdd",
+    id: "iamGroupsAdd",
     handler: () => { if (!isInputFocused()) addGroup(); },
   },
   {
-    key: "r",
-    scope: "iam-groups",
-    description: "shortcuts.actions.iamGroupsRefresh",
+    id: "iamGroupsRefresh",
     handler: () => { if (!isInputFocused()) setupGroups(); },
   },
   {
-    key: "/",
-    scope: "iam-groups",
-    description: "shortcuts.actions.focusSearch",
+    id: "iamGroupsFocusSearch",
     handler: () => {
       focusSearchInput("iam-groups-search-input");
     },

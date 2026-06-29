@@ -3542,6 +3542,7 @@ export default defineComponent({
 
     useShortcuts([
       {
+        id: 'aiChatClose',
         key: 'escape',
         description: 'Close AI chat',
         handler: () => {
@@ -3553,12 +3554,9 @@ export default defineComponent({
         },
       },
       {
+        id: 'aiChatExpand',
         key: 'ctrl+b',
-        description: 'Expand/collapse AI chat',
-        handler: toggleExpand,
-      },
-      {
-        key: 'meta+b',
+        keyForMac: 'meta+b',
         description: 'Expand/collapse AI chat',
         handler: toggleExpand,
       },

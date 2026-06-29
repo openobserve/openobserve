@@ -451,8 +451,8 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
@@ -1157,30 +1157,21 @@ const onBackfillSuccess = (jobId: string) => {
 };
 
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
-useShortcutScope("pipelines");
-useShortcutsWithMac([
+useShortcuts([
   {
-    key: "n",
-    scope: "pipelines",
-    description: "shortcuts.actions.pipelinesAdd",
+    id: "pipelinesAdd",
     handler: () => { if (!isInputFocused()) goToCreatePipeline(); },
   },
   {
-    key: "i",
-    scope: "pipelines",
-    description: "shortcuts.actions.pipelinesImport",
+    id: "pipelinesImport",
     handler: () => { if (!isInputFocused()) goToImportPipeline(); },
   },
   {
-    key: "r",
-    scope: "pipelines",
-    description: "shortcuts.actions.pipelinesRefresh",
+    id: "pipelinesRefresh",
     handler: () => { if (!isInputFocused()) getPipelines(); },
   },
   {
-    key: "/",
-    scope: "pipelines",
-    description: "shortcuts.actions.focusSearch",
+    id: "pipelinesFocusSearch",
     handler: () => {
       focusSearchInput("pipeline-list-search-input");
     },

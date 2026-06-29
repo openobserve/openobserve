@@ -224,8 +224,8 @@ import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "functionList",
@@ -674,24 +674,17 @@ export default defineComponent({
 
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    useShortcutScope("functions");
-    useShortcutsWithMac([
+    useShortcuts([
       {
-        key: "n",
-        scope: "functions",
-        description: "shortcuts.actions.functionsAdd",
+        id: "functionsAdd",
         handler: () => { if (!isInputFocused()) showAddUpdateFn({}); },
       },
       {
-        key: "r",
-        scope: "functions",
-        description: "shortcuts.actions.functionsRefresh",
+        id: "functionsRefresh",
         handler: () => { if (!isInputFocused()) getJSTransforms(); },
       },
       {
-        key: "/",
-        scope: "functions",
-        description: "shortcuts.actions.focusSearch",
+        id: "functionsFocusSearch",
         handler: () => {
           focusSearchInput("functions-list-search-input");
         },

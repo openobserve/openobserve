@@ -239,8 +239,8 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const AddTemplate = defineAsyncComponent(
@@ -598,24 +598,17 @@ const bulkDeleteTemplates = () => {
     });
 };
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
-useShortcutScope("alert-templates");
-useShortcutsWithMac([
+useShortcuts([
   {
-    key: "n",
-    scope: "alert-templates",
-    description: "shortcuts.actions.alertTemplatesAdd",
+    id: "alertTemplatesAdd",
     handler: () => { if (!isInputFocused()) editTemplate(null); },
   },
   {
-    key: "r",
-    scope: "alert-templates",
-    description: "shortcuts.actions.alertTemplatesRefresh",
+    id: "alertTemplatesRefresh",
     handler: () => { if (!isInputFocused()) getTemplates(); },
   },
   {
-    key: "/",
-    scope: "alert-templates",
-    description: "shortcuts.actions.focusSearch",
+    id: "alertTemplatesFocusSearch",
     handler: () => {
       focusSearchInput("template-list-search-input");
     },

@@ -410,8 +410,8 @@ import {
   saveLogsStreamType,
   restoreLogsStreamType,
 } from "@/utils/streamPersist";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageSearch",
@@ -3219,12 +3219,9 @@ export default defineComponent({
     };
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    useShortcutScope("logs");
-    useShortcutsWithMac([
+    useShortcuts([
       {
-        key: "ctrl+enter",
-        scope: "logs",
-        description: "shortcuts.actions.logsRunQuery",
+        id: "logsRunQuery",
         handler: () => {
           // In normal logs mode `handleRunQueryFn` only handles
           // visualize/patterns/build — trigger the logs search the same way the
@@ -3240,15 +3237,11 @@ export default defineComponent({
         },
       },
       {
-        key: "ctrl+h",
-        scope: "logs",
-        description: "shortcuts.actions.logsSearchHistory",
+        id: "logsSearchHistory",
         handler: () => showSearchHistoryfn(),
       },
       {
-        key: "/",
-        scope: "logs",
-        description: "shortcuts.actions.focusQuery",
+        id: "logsFocusQuery",
         handler: () => {
           // The logs query editor is Monaco — focus its inner textarea
           // (`.monaco-editor textarea`), not a CodeMirror `.cm-editor`.
@@ -3259,9 +3252,7 @@ export default defineComponent({
         },
       },
       {
-        key: "r",
-        scope: "logs",
-        description: "shortcuts.actions.logsRefresh",
+        id: "logsRefresh",
         handler: () => {
           if (isInputFocused()) return;
           if (searchObj.loading) return;
@@ -3270,35 +3261,27 @@ export default defineComponent({
         },
       },
       {
-        key: "h",
-        scope: "logs",
-        description: "shortcuts.actions.logsToggleHistogram",
+        id: "logsToggleHistogram",
         handler: () => {
           if (isInputFocused()) return;
           searchObj.meta.showHistogram = !searchObj.meta.showHistogram;
         },
       },
       {
-        key: "ctrl+/",
-        scope: "logs",
-        description: "shortcuts.actions.logsToggleSidebar",
+        id: "logsToggleSidebar",
         handler: () => {
           searchObj.meta.showFields = !searchObj.meta.showFields;
         },
       },
       {
-        key: "s",
-        scope: "logs",
-        description: "shortcuts.actions.logsSaveView",
+        id: "logsSaveView",
         handler: () => {
           if (isInputFocused()) return;
           (searchBarRef.value as any)?.fnSavedView?.();
         },
       },
       {
-        key: "ctrl+shift+d",
-        scope: "logs",
-        description: "shortcuts.actions.logsExport",
+        id: "logsExport",
         handler: () => {
           (searchBarRef.value as any)?.downloadLogs?.(searchObj.data?.queryResults?.hits ?? [], "csv");
         },

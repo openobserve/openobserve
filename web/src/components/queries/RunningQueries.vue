@@ -199,8 +199,8 @@ import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
 import { getDuration } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
@@ -796,18 +796,13 @@ export default defineComponent({
     };
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    useShortcutScope("running-queries");
-    useShortcutsWithMac([
+    useShortcuts([
       {
-        key: "r",
-        scope: "running-queries",
-        description: "shortcuts.actions.runningQueriesRefresh",
+        id: "runningQueriesRefresh",
         handler: () => { if (!isInputFocused()) refreshData(); },
       },
       {
-        key: "/",
-        scope: "running-queries",
-        description: "shortcuts.actions.focusSearch",
+        id: "runningQueriesFocusSearch",
         handler: () => {
           focusSearchInput("running-queries-search-input");
         },

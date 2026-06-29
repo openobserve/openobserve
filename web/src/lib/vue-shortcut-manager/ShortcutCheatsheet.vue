@@ -68,16 +68,17 @@
           class="tw:flex tw:items-center tw:gap-1.5 tw:flex-wrap"
           data-test="shortcut-cheatsheet-chips"
         >
-          <button
+          <OButton
             v-for="m in filteredModules"
             :key="m.title"
-            type="button"
-            class="tw:inline-flex tw:items-center tw:shrink-0 tw:h-6 tw:px-2.5 tw:rounded-full tw:border tw:bg-transparent tw:border-[var(--o2-border)] tw:text-[var(--o2-text-secondary)] tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:select-none tw:cursor-pointer tw:outline-none tw:transition-colors tw:duration-200 hover:tw:text-[var(--o2-text-primary)] hover:tw:border-[var(--o2-primary-color)]"
+            variant="outline"
+            size="chip"
+            class="tw:shrink-0"
             :data-test="`shortcut-cheatsheet-chip-${m.title.toLowerCase().replace(/[\s()—/]+/g, '-')}`"
             @click="onModuleClick(m.title)"
           >
             {{ m.title }}
-          </button>
+          </OButton>
         </div>
       </div>
     </template>
@@ -131,9 +132,9 @@
               <ul class="tw:list-none tw:p-0 tw:m-0">
                 <li
                   v-for="entry in sec.entries"
-                  :key="entry.key + entry.label"
+                  :key="entry.id"
                   class="tw:flex tw:justify-between tw:items-center tw:py-1.5 tw:px-2 tw:rounded-md tw:cursor-pointer tw:transition-colors tw:duration-100 hover:tw:bg-[var(--o2-primary-background)]"
-                  :data-test="`shortcut-cheatsheet-row-${entry.label.toLowerCase().replace(/\s+/g, '-')}`"
+                  :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                   @click="triggerEntry(entry)"
                 >
                   <span
@@ -144,7 +145,7 @@
                     class="tw:flex tw:items-center tw:gap-1 tw:shrink-0 tw:ml-4"
                   >
                     <template
-                      v-for="(part, idx) in formatKey(entry.key)"
+                      v-for="(part, idx) in formatKey(entry.display)"
                       :key="idx"
                     >
                       <span
@@ -205,9 +206,9 @@
               <ul class="tw:list-none tw:p-0 tw:m-0">
                 <li
                   v-for="entry in sec.entries"
-                  :key="entry.key + entry.label"
+                  :key="entry.id"
                   class="tw:flex tw:justify-between tw:items-center tw:py-1.5 tw:px-2 tw:rounded-md tw:cursor-pointer tw:transition-colors tw:duration-100 hover:tw:bg-[var(--o2-primary-background)]"
-                  :data-test="`shortcut-cheatsheet-row-${entry.label.toLowerCase().replace(/\s+/g, '-')}`"
+                  :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                   @click="triggerEntry(entry)"
                 >
                   <span
@@ -218,7 +219,7 @@
                     class="tw:flex tw:items-center tw:gap-1 tw:shrink-0 tw:ml-4"
                   >
                     <template
-                      v-for="(part, idx) in formatKey(entry.key)"
+                      v-for="(part, idx) in formatKey(entry.display)"
                       :key="idx"
                     >
                       <span
@@ -280,6 +281,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useShortcut } from "./composables";
 import { SHORTCUT_REGISTRY, SHORTCUT_MODULES } from "./shortcutRegistry";
+import type { ShortcutEntry } from "./shortcutRegistry";
+import { isMacOS } from "@/utils/keyboardShortcuts";
 
 const props = withDefaults(
   defineProps<{
@@ -307,7 +310,11 @@ const search = ref("");
 
 // ── Module-grouped display data ─────────────────────────────────────────────
 interface DisplayEntry {
-  key: string;
+  id: string;
+  /** Combo string rendered as keycaps (e.g. "ctrl+enter", "del / ⌫"). */
+  display: string;
+  /** Real platform key dispatched when the row is clicked. */
+  dispatchKey: string;
   label: string;
 }
 interface DisplaySection {
@@ -321,8 +328,23 @@ interface DisplayModule {
 
 const groupByPage = new Map(SHORTCUT_REGISTRY.map((g) => [g.pageKey, g]));
 
-const allModules = computed<DisplayModule[]>(() =>
-  SHORTCUT_MODULES.map((m) => ({
+/**
+ * Cheatsheet display combo. Always the Windows/common form — `sym()` renders
+ * `ctrl`→`⌘` on Mac, so we never need the explicit `keyForMac` here.
+ */
+function entryDisplay(e: ShortcutEntry): string {
+  return e.display ?? e.keyForWindows ?? e.key ?? "";
+}
+
+/** Real key to dispatch on click — platform-resolved, first of multi-bindings. */
+function entryDispatchKey(e: ShortcutEntry, mac: boolean): string {
+  if (e.keys?.length) return e.keys[0];
+  return (mac ? e.keyForMac : e.keyForWindows) ?? e.key ?? "";
+}
+
+const allModules = computed<DisplayModule[]>(() => {
+  const mac = isMacOS();
+  return SHORTCUT_MODULES.map((m) => ({
     title: t(m.titleKey),
     sections: m.pages.flatMap((pageKey) => {
       const group = groupByPage.get(pageKey);
@@ -331,14 +353,16 @@ const allModules = computed<DisplayModule[]>(() =>
         {
           title: t(group.pageKey),
           entries: group.shortcuts.map((s) => ({
-            key: s.key,
+            id: s.id,
+            display: entryDisplay(s),
+            dispatchKey: entryDispatchKey(s, mac),
             label: t(s.descriptionKey),
           })),
         },
       ];
     }),
-  })),
-);
+  }));
+});
 
 const filteredModules = computed<DisplayModule[]>(() => {
   const q = search.value.trim().toLowerCase();
@@ -347,7 +371,8 @@ const filteredModules = computed<DisplayModule[]>(() => {
     const sections = m.sections.flatMap((sec) => {
       const entries = sec.entries.filter(
         (e) =>
-          e.label.toLowerCase().includes(q) || e.key.toLowerCase().includes(q),
+          e.label.toLowerCase().includes(q) ||
+          e.display.toLowerCase().includes(q),
       );
       return entries.length ? [{ ...sec, entries }] : [];
     });
@@ -452,7 +477,7 @@ onUnmounted(teardown);
 
 // ── Shortcut trigger ──────────────────────────────────────────────────────────
 function triggerEntry(entry: DisplayEntry) {
-  const parts = entry.key.split("+");
+  const parts = entry.dispatchKey.split("+");
   const mainKey = parts[parts.length - 1];
   window.dispatchEvent(
     new KeyboardEvent("keydown", {
@@ -482,12 +507,6 @@ useShortcut(
 );
 
 // ── Key formatting ────────────────────────────────────────────────────────────
-const isMac = computed(
-  () =>
-    typeof navigator !== "undefined" &&
-    /Mac|iPhone|iPad|iPod/.test(navigator.platform),
-);
-
 const KEY_SYMBOLS: Record<string, string> = {
   ctrl: "Ctrl",
   shift: "⇧",
@@ -524,12 +543,13 @@ function formatKey(key: string): string[] {
 }
 
 function sym(k: string): string {
-  if (k === "ctrl" && isMac.value) return "⌘";
-  if (k === "alt" && isMac.value) return "⌥";
-  if ((k === "delete" || k === "del") && isMac.value) return "⌫";
+  const mac = isMacOS();
+  if (k === "ctrl" && mac) return "⌘";
+  if (k === "alt" && mac) return "⌥";
+  if ((k === "delete" || k === "del") && mac) return "⌫";
   // ⇧ is a Mac glyph; spell it out on Windows/Linux.
-  if (k === "shift") return isMac.value ? "⇧" : "Shift";
-  if (k === "meta") return isMac.value ? "⌘" : "Win";
+  if (k === "shift") return mac ? "⇧" : "Shift";
+  if (k === "meta") return mac ? "⌘" : "Win";
   return KEY_SYMBOLS[k] ?? k.toUpperCase();
 }
 </script>

@@ -1,7 +1,24 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import type { Shortcut } from "@/lib/vue-shortcut-manager";
+/**
+ * True when running on a macOS / iOS device. Used to pick platform-specific
+ * key combos (⌘ vs Ctrl) and modifier glyphs (⇧ ⌥ ⌫ vs the spelled-out words).
+ *
+ * `navigator.platform` is deprecated and can be empty on some browsers, so we
+ * prefer the modern `userAgentData.platform`, then fall back to `platform`, then
+ * the UA string. Evaluated lazily so it reflects `navigator` at call time
+ * (stable in the app; stubbable in tests).
+ */
+export function isMacOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const source =
+    (navigator as { userAgentData?: { platform?: string } }).userAgentData
+      ?.platform ||
+    navigator.platform ||
+    navigator.userAgent ||
+    "";
+  return /mac|iphone|ipad|ipod/i.test(source);
+}
 
 /**
  * Returns true when no text-input element has focus.
@@ -42,24 +59,4 @@ export function focusSearchInput(dataTest: string): void {
         : null;
     })();
   target?.focus();
-}
-
-/**
- * Registers shortcuts on both Windows (ctrl) and Mac (meta/⌘).
- * For every shortcut whose key starts with "ctrl+", a hidden "meta+" twin is
- * also registered so the action fires on Mac without duplicating the cheatsheet entry.
- */
-export function useShortcutsWithMac(shortcuts: Shortcut[]): void {
-  const expanded: Shortcut[] = [];
-  for (const s of shortcuts) {
-    expanded.push(s);
-    if (s.key.startsWith("ctrl+")) {
-      expanded.push({
-        ...s,
-        key: "meta+" + s.key.slice(5),
-        hidden: true,
-      });
-    }
-  }
-  useShortcuts(expanded);
 }

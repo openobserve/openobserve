@@ -201,7 +201,7 @@ import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useShortcut } from "@/lib/vue-shortcut-manager";
-import { useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 
 let mainLayoutMixin: any = null;
@@ -1162,14 +1162,7 @@ export default defineComponent({
     const openShortcutsList = () => { showShortcuts.value = true; };
 
     // ── Global shortcuts: AI Chat ─────────────────────────────────────────
-    useShortcutsWithMac([
-      {
-        key: "ctrl+b",
-        scope: "global",
-        description: "shortcuts.actions.aiChatToggle",
-        handler: () => toggleAIChat(),
-      },
-    ]);
+    useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
 
     return {
       t,
