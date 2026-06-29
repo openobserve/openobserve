@@ -25,7 +25,7 @@ on:
 # Cancel an in-progress run if a newer push to the same ref arrives, so we don't
 # pay for superseded translation runs.
 concurrency:
-  group: update-translations-${{ github.ref }}
+  group: update-translations-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -47,10 +47,19 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Verify AWS role secret is configured
+        env:
+          AWS_TRANSLATE_ROLE_ARN: ${{ secrets.AWS_TRANSLATE_ROLE_ARN }}
+        run: |
+          if [ -z "$AWS_TRANSLATE_ROLE_ARN" ]; then
+            echo "::error::Secret AWS_TRANSLATE_ROLE_ARN is not set. Add the IAM role ARN as a repository secret."
+            exit 1
+          fi
+
       - name: Configure AWS Credentials with IAM Role
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
+          role-to-assume: ${{ secrets.AWS_TRANSLATE_ROLE_ARN }}
           role-session-name: GitHubActions-TranslationWorkflow
           aws-region: us-east-1
 
@@ -62,28 +71,44 @@ jobs:
           cache-dependency-path: scripts/translations/requirements.txt
 
       - name: Install Python dependencies
-        run: pip install -q -r scripts/translations/requirements.txt
+        run: pip install -r scripts/translations/requirements.txt
 
       - name: Run translation script
+        id: run_translation
+        # Inputs are passed as environment variables (not interpolated into the
+        # script body) so user-controlled text can never be injected into the
+        # shell. The script itself validates language codes against the supported
+        # list before any AWS call (see main.py).
+        env:
+          INPUT_LANGUAGES: ${{ github.event.inputs.languages }}
+          INPUT_FORCE: ${{ github.event.inputs.force }}
         run: |
           cd scripts/translations
-          ARGS="${{ github.event.inputs.languages }}"
-          if [ "${{ github.event.inputs.force }}" = "true" ]; then
-            ARGS="$ARGS --force"
+          ARGS=()
+          if [ -n "$INPUT_LANGUAGES" ]; then
+            read -ra REQUESTED <<< "$INPUT_LANGUAGES"
+            ARGS+=("${REQUESTED[@]}")
           fi
-          echo "Running translation with args: $ARGS"
-          python3 main.py $ARGS
+          if [ "$INPUT_FORCE" = "true" ]; then
+            ARGS+=("--force")
+          fi
+          echo "Running translation with args: ${ARGS[*]}"
+          python3 main.py "${ARGS[@]}"
 
       - name: Check for translation changes
         id: check_changes
+        # Use `git status --porcelain` (not `git diff`) so brand-new untracked
+        # files — e.g. a freshly created .translation_state.json or a new locale
+        # file — are detected, not just modifications to already-tracked files.
         run: |
-          if git diff --quiet web/src/locales/languages/ scripts/translations/.translation_state.json; then
-            echo "changes=false" >> $GITHUB_OUTPUT
-            echo "No translation changes detected"
-          else
+          PATHS="web/src/locales/languages/ scripts/translations/.translation_state.json"
+          if [ -n "$(git status --porcelain -- $PATHS)" ]; then
             echo "changes=true" >> $GITHUB_OUTPUT
             echo "Translation changes detected:"
-            git diff --stat web/src/locales/languages/ scripts/translations/.translation_state.json
+            git status --porcelain -- $PATHS
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "No translation changes detected"
           fi
 
       - name: Commit and push translation updates
@@ -105,6 +130,10 @@ jobs:
       - name: Summary
         if: always()
         run: |
+          if [ "${{ steps.run_translation.outcome }}" != "success" ]; then
+            echo "❌ Translation script did not complete successfully (outcome: ${{ steps.run_translation.outcome }}). See the 'Run translation script' step logs."
+            exit 0
+          fi
           if [ "${{ steps.check_changes.outputs.changes }}" == "true" ]; then
             echo "✅ Translations updated and committed."
           else

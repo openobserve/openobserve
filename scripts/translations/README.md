@@ -129,11 +129,14 @@ The workflow uses **IAM Role with OIDC** for secure, credential-less authenticat
 
 #### IAM Role Configuration
 
-The workflow is already configured to use:
-- **IAM Role**: `arn:aws:iam::058694856476:role/GitHubActionsRole`
+The workflow assumes an IAM role via OIDC. The role ARN is **not hardcoded** — it
+is read from the `AWS_TRANSLATE_ROLE_ARN` repository secret so the AWS account ID
+is not exposed in source control:
+- **IAM Role**: stored in the `AWS_TRANSLATE_ROLE_ARN` secret
 - **Region**: `us-east-1`
 
-This is the same role used by other OpenObserve workflows (e.g., `build-pr-image.yml`).
+You can point this secret at the same role used by other OpenObserve workflows
+(e.g., `build-pr-image.yml`).
 
 #### Required IAM Permissions
 
@@ -158,9 +161,17 @@ Ensure the `GitHubActionsRole` has the following permission for AWS Translate:
 
 #### GitHub Repository Setup
 
-**No additional secrets required!** The workflow uses the existing OIDC configuration.
+Add one repository secret so the workflow can authenticate via OIDC without
+exposing the AWS account ID:
 
-The role is already configured in the workflow file and will automatically authenticate via GitHub's OIDC provider.
+| Secret | Value |
+|--------|-------|
+| `AWS_TRANSLATE_ROLE_ARN` | `arn:aws:iam::<ACCOUNT_ID>:role/<RoleName>` |
+
+Set it under **Settings → Secrets and variables → Actions → New repository secret**
+(or via `gh secret set AWS_TRANSLATE_ROLE_ARN`). The workflow fails fast with a
+clear error if this secret is missing. No long-lived AWS keys are stored — only
+the role ARN, which is assumed via GitHub's OIDC provider.
 
 ### Workflow Behavior
 
@@ -271,7 +282,7 @@ ERROR: No credentials for the translation service.
 ```
 **Solution**: IAM role should be automatically assumed via OIDC. Check:
 1. Workflow has `permissions: id-token: write`
-2. Role ARN is correct: `arn:aws:iam::058694856476:role/GitHubActionsRole`
+2. The `AWS_TRANSLATE_ROLE_ARN` secret is set and points to a valid role
 3. Role has `translate:TranslateText` permission
 
 ### Import Error
