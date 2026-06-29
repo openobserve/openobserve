@@ -459,7 +459,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
       <AppPageHeader
         :title="check.name || 'Untitled check'"
         :back="{ label: 'Checks', to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
-        class="tw:border-b tw:border-border-default"
+        class="tw:shrin-0 tw:px-4 tw:border-b tw:border-border-default"
       />
 
     <OStepper
