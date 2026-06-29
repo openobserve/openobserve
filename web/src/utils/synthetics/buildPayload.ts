@@ -1,8 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 import { DateTime } from 'luxon'
 import type { BrowserCheck, BrowserCheckFrequency, BrowserCheckSchedule } from '@/types/synthetics'
-import { convertDateToTimestamp, getTimezoneOffset } from '@/utils/timezone'
+import { convertDateToTimestamp } from '@/utils/timezone'
 import { journeyToWireSteps, mapWireSteps } from './mapRecordedStep'
+import { useLocalTimezone } from '../storage'
 
 // ── Outbound: BrowserCheck → API payload ─────────────────────────────────────
 
@@ -37,22 +38,30 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
     ...rest
   } = check
 
-  // Compute start (microseconds, top-level — matches reports pattern)
-  let start: number | undefined
+  // Compute start (microseconds, top-level — always set, matches reports pattern)
+  let start: number
   let resolvedTzOffset = tz_offset ?? 0
 
-  if (schedule.timezone) {
-    if (schedule.startType === 'later' && schedule.startDate && schedule.startTime) {
-      const [y, m, d] = schedule.startDate.split('-')
-      const dateForConversion = `${d}-${m}-${y}` // ISO → DD-MM-YYYY
-      const converted = convertDateToTimestamp(dateForConversion, schedule.startTime, schedule.timezone)
-      start = converted.timestamp // microseconds
-      resolvedTzOffset = converted.offset
-    } else {
-      resolvedTzOffset = getTimezoneOffset(schedule.timezone) ?? 0
-    }
+  if (schedule.startType === 'later' && schedule.startDate && schedule.startTime) {
+    // Schedule Later: use the user-chosen date/time/timezone
+    const [y, m, d] = schedule.startDate.split('-')
+    const dateForConversion = `${d}-${m}-${y}` // ISO → DD-MM-YYYY
+    const converted = convertDateToTimestamp(dateForConversion, schedule.startTime, schedule.timezone ?? 'UTC')
+    start = converted.timestamp
+    resolvedTzOffset = converted.offset
   } else {
-    resolvedTzOffset = DateTime.now().offset
+    // Schedule Now: always use browser timezone (matches CreateReport.vue)
+    const now = new Date()
+    const dd = String(now.getDate()).padStart(2, '0')
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    const yyyy = now.getFullYear()
+    const hh = String(now.getHours()).padStart(2, '0')
+    const min = String(now.getMinutes()).padStart(2, '0')
+    const browserTz = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone
+    const converted = convertDateToTimestamp(`${dd}-${mm}-${yyyy}`, `${hh}:${min}`, browserTz)
+    start = converted.timestamp;
+    resolvedTzOffset = converted.offset;
+    check.schedule.timezone = browserTz;
   }
 
   return {
@@ -61,7 +70,7 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
     target: url,                      // url → target
     folder_id: folder,                // folder → folder_id
     tz_offset: resolvedTzOffset,
-    ...(start !== undefined && { start }),
+    start,
 
     collect_rum_data: rum.collect,
     session_replay: rum.sessionReplay,
@@ -115,6 +124,13 @@ function mapFrequencyToSchedule(freq: any, start?: number): BrowserCheck['schedu
   // Map API frequency type back to schedule unit (seconds → minutes for display)
   const unit = freq.type === 'seconds' ? 'minutes' : (freq.type ?? 'minutes')
 
+  const timezone = freq.timezone
+      .toLowerCase()
+      .startsWith("browser time")
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : freq.timezone;
+
+  // On edit, always show as "Schedule Later" with date/time from `start`
   return {
     type: 'interval',
     intervalValue,
@@ -122,8 +138,8 @@ function mapFrequencyToSchedule(freq: any, start?: number): BrowserCheck['schedu
     ...(start && {
       startType: 'later' as const,
       timezone: freq.timezone,
-      startDate: DateTime.fromMillis(start / 1000, { zone: freq.timezone ?? 'UTC' }).toFormat('yyyy-MM-dd'),
-      startTime: DateTime.fromMillis(start / 1000, { zone: freq.timezone ?? 'UTC' }).toFormat('HH:mm'),
+      startDate: DateTime.fromMillis(start / 1000, { zone: timezone ?? 'UTC' }).toFormat('yyyy-MM-dd'),
+      startTime: DateTime.fromMillis(start / 1000, { zone: timezone ?? 'UTC' }).toFormat('HH:mm'),
     }),
   }
 }

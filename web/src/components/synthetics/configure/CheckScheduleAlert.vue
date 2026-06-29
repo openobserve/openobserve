@@ -343,7 +343,7 @@ const silenceMinutes = computed({
       </div>
 
       <!-- Schedule Later date/time pickers (shown below the row when later selected) -->
-      <div v-if="startType === 'later'" class="tw:flex tw:items-start tw:gap-3 tw:flex-wrap">
+      <div v-if="startType === 'later' && check.schedule.type !== 'cron'" class="tw:flex tw:items-start tw:gap-3 tw:flex-wrap">
         <ODate
           v-model="startDate"
           :label="t('synthetics.scheduleAlert.startDate')"
