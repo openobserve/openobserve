@@ -890,6 +890,8 @@ jobs:
       # Compact Playwright stats (expected/unexpected/flaky/skipped) from the merged report.json,
       # consumed by report_to_openobserve to record per-test counts in ci_test_runs.
       stats: ${{ steps.report_stats.outputs.stats }}
+      # Flaky test names + their module (top-level test folder), JSON array, for ci_test_flaky.
+      flaky: ${{ steps.report_flaky.outputs.flaky }}
 
     steps:
       - name: Clone the current repo
@@ -991,6 +993,25 @@ jobs:
           fi
           echo "stats=$STATS" >> "$GITHUB_OUTPUT"
           echo "report stats: $STATS"
+
+      - name: Extract flaky tests for OpenObserve
+        id: report_flaky
+        if: always()
+        run: |
+          cd tests/ui-testing
+          if [ -f playwright-results/report.json ]; then
+            # Pull each flaky test (status==="flaky": failed then passed on retry) + its module
+            # (top-level test folder from the spec file path). Single-line JSON for GITHUB_OUTPUT.
+            FLAKY=$(node -e '
+              const fs=require("fs"); let r; try{r=JSON.parse(fs.readFileSync("playwright-results/report.json","utf8"))}catch(e){process.stdout.write("[]");process.exit(0)}
+              const out=[]; (function w(s){(s.specs||[]).forEach(sp=>(sp.tests||[]).forEach(t=>{if(t.status==="flaky"){const f=(sp.file||s.file||"");out.push({module:(f.split("/")[0]||"unknown"),title:sp.title,file:f})}}));(s.suites||[]).forEach(w)})({suites:r.suites||[]});
+              process.stdout.write(JSON.stringify(out));
+            ' 2>/dev/null || echo "[]")
+          else
+            FLAKY="[]"
+          fi
+          echo "flaky=$FLAKY" >> "$GITHUB_OUTPUT"
+          echo "flaky tests: $FLAKY"
 
       - name: Cache test failures to TestDino
         if: ${{ needs.ui_integration_tests.result == 'failure' }}
@@ -1177,6 +1198,7 @@ jobs:
           BUILD: ${{ needs.build_binary.result }}
           TESTS: ${{ needs.ui_integration_tests.result }}
           MERGE_STATS: ${{ needs.merge_and_upload_reports.outputs.stats }}
+          MERGE_FLAKY: ${{ needs.merge_and_upload_reports.outputs.flaky }}
         run: |
           # No relevant changes → tests were skipped → no run to record.
           if [ "$TESTS" = "skipped" ] && [ "$BUILD" = "skipped" ]; then
@@ -1193,3 +1215,15 @@ jobs:
           fi
           export CONCLUSION STREAM=ci_test_runs SUITE=ui
           bash .github/scripts/o2-run-report.sh
+
+          # Emit one row per flaky test (with its module) to ci_test_flaky, for the per-module
+          # flaky dashboard. Non-fatal: empty/parse issues just skip. _timestamp left unset -> ingest time.
+          FLAKY="${MERGE_FLAKY:-[]}"
+          if printf '%s' "$FLAKY" | jq -e 'type=="array" and length>0' >/dev/null 2>&1; then
+            printf '%s' "$FLAKY" | jq -c --arg run_id "$GITHUB_RUN_ID" --arg repo "$GITHUB_REPOSITORY" \
+              '[.[] | {run_id:$run_id, repo:$repo, suite:"ui", workflow:"test", ingest_source:"live", module:.module, test_title:.title, test_file:.file}]' \
+              > flaky.json 2>/dev/null || echo '[]' > flaky.json
+            if [ "$(jq 'length' flaky.json 2>/dev/null || echo 0)" -gt 0 ]; then
+              bash .github/scripts/o2-report.sh ci_test_flaky flaky.json
+            fi
+          fi
