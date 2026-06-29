@@ -60,6 +60,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="(id) => id === 'clear-filters' && (filterQuery = '')"
             />
           </template>
+          <template #cell-role="{ row }">
+            <OTag v-if="row.role" type="userRole" :value="row.role" />
+            <span v-else class="tw:text-text-primary">—</span>
+          </template>
+          <template #cell-inviter_id="{ row }">
+            <OUserCell :value="row.inviter_id" />
+          </template>
+          <template #cell-expiry="{ row }">
+            <OTimeCell
+              :value="row.expires_at"
+              unit="us"
+              :timezone="store.state.timezone"
+              empty-label="—"
+            />
+          </template>
           <template #cell-actions="{ row }">
             <div class="tw:flex tw:items-center tw:gap-2">
               <OButton
@@ -119,6 +134,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { defineComponent, ref, onMounted } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -138,6 +156,9 @@ export default defineComponent({
     AppPageHeader,
     OEmptyState,
     OButton,
+    OTag,
+    OTimeCell,
+    OUserCell,
     ODialog,
     OTable,
     OSearchInput,

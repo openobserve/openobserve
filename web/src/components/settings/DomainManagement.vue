@@ -42,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchable
             clearable
             :loading="loadingFunctions"
-            @update:model-value="userTouched = true"
           >
             <template #empty>
               <span>{{ t('settings.noVrlFunctionsFound') }}</span>
@@ -391,7 +390,6 @@ const saving = ref(false);
 // Claim parser function state
 const claimParserFunction = ref("");
 const originalClaimParserFunction = ref(""); // Track original value to detect changes
-const userTouched = ref(false); // Only true after user explicitly interacts with the select
 const functionOptions = ref<string[]>([]);
 const allFunctions = ref<string[]>([]);
 const loadingFunctions = ref(false);
@@ -403,10 +401,9 @@ const loadingErrors = ref(false);
 const emit = defineEmits(["cancel", "saved"]);
 
 // Computed property to check if claim parser function value has changed.
-// Requires explicit user interaction (userTouched) so the pre-loaded stored value
-// does not enable the Save button on first render — matching main branch q-select hide-selected behaviour.
+// The field is pre-populated with the saved value, so Save stays disabled until
+// the user picks a genuinely different function.
 const hasClaimParserChanged = computed(() => {
-  if (!userTouched.value) return false;
   return (claimParserFunction.value || "") !== originalClaimParserFunction.value;
 });
 
@@ -453,12 +450,11 @@ const loadDomainSettings = async () => {
       domains.splice(0, domains.length, ...loadedDomains);
     }
 
-    // Track the saved value for change detection without pre-populating the OSelect model.
-    // This matches main branch's q-select hide-selected visual behaviour: the field appears
-    // empty on first load; the user must explicitly select a value before saving.
+    // Pre-populate the OSelect with the saved value so the configured parser is
+    // visible on load. Save stays disabled (hasClaimParserChanged) until the user
+    // selects a different function.
     const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function || "";
-    claimParserFunction.value = ""; // Always start visually empty
-    userTouched.value = false;      // Reset so save button is disabled until user acts
+    claimParserFunction.value = storedFunction;
     originalClaimParserFunction.value = storedFunction;
   } catch (error: any) {
     // If the API doesn't exist yet or returns an error, use example data
@@ -639,8 +635,8 @@ const loadFunctions = async () => {
     loadingFunctions.value = true;
     const response = await jstransform.list(1, 10000, "name", false, "", store.state.zoConfig.meta_org);
 
-    // Populate options. The model value (claimParserFunction) is intentionally NOT set here
-    // so the trigger remains visually empty until the user makes an explicit selection.
+    // Populate options. The model value (claimParserFunction) is set in loadDomainSettings;
+    // here we only keep the change-detection baseline in sync.
     const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function || "";
     originalClaimParserFunction.value = storedFunction;
 
@@ -688,9 +684,8 @@ const saveClaimParserFunction = async () => {
     };
     store.dispatch("setOrganizationSettings", updatedSettings);
 
-    // Update original value after successful save and reset interaction flag
+    // Update original value after successful save so Save disables again
     originalClaimParserFunction.value = claimParserFunction.value || "";
-    userTouched.value = false;
 
     toast({
       variant: "success",

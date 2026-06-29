@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="row.chunks_total"
-                  class="tw:text-xs tw:text-gray-400 tw:whitespace-nowrap tw:pr-8"
+                  class="tw:text-xs tw:text-text-primary tw:whitespace-nowrap tw:pr-8"
                 >
                   {{ row.chunks_completed || 0 }}/{{
                     row.chunks_total
@@ -150,16 +150,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Created At Column -->
             <template #cell-created_at="{ row }">
-              <div class="tw:text-xs">
-                {{ formatTimestamp(row.created_at) }}
-              </div>
+              <OTimeCell
+                :value="row.created_at"
+                unit="us"
+                :timezone="store.state.timezone"
+                empty-label="N/A"
+              />
             </template>
 
             <!-- Last Triggered At Column -->
             <template #cell-last_triggered_at="{ row }">
-              <div class="tw:text-xs">
-                {{ formatTimestamp(row.last_triggered_at) }}
-              </div>
+              <OTimeCell
+                :value="row.last_triggered_at"
+                unit="us"
+                mode="absolute"
+                :timezone="store.state.timezone"
+                empty-label="Never"
+              />
             </template>
 
             <!-- Actions Column -->
@@ -305,6 +312,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import BackfillJobDetails from "./BackfillJobDetails.vue";
@@ -350,9 +358,9 @@ const perPageOptionsList = [10, 20, 50, 100];
 const columns: OTableColumnDef[] = [
   { id: "pipeline_name", header: "Pipeline", accessorKey: "pipeline_name", sortable: true, size: COL.streamName, meta: { align: "left", autoWidth: true } },
   { id: "time_range", header: "Time Range", accessorKey: "start_time", sortable: true, size: COL.date, meta: { align: "left" } },
-  { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, size: COL.description, meta: { align: "left" } },
+  { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, size: 400, meta: { align: "left" } },
   { id: "created_at", header: "Created", accessorKey: "created_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
-  { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
+  { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, size: COL.dateAbsolute, meta: { align: "left" } },
   { id: "actions", header: "Actions", accessorKey: "actions", meta: { align: "center", actionCount: 4 }, isAction: true, size: 128 },
 ];
 

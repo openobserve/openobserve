@@ -82,11 +82,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-last_triggered_at="{ row }">
-        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.last_triggered_at }}</span>
+        <span class="tw:cursor-pointer" @click="openReport(row)">
+          <OTimeCell
+            :value="row.last_triggered_at_raw"
+            unit="us"
+            mode="absolute"
+            :timezone="store.state.timezone"
+            empty-label="Never"
+          />
+        </span>
       </template>
 
       <template #cell-created_at="{ row }">
-        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.created_at }}</span>
+        <span class="tw:cursor-pointer" @click="openReport(row)">
+          <OTimeCell
+            :value="row.created_at_raw"
+            unit="us"
+            :timezone="store.state.timezone"
+          />
+        </span>
       </template>
 
       <template #empty>
@@ -115,6 +129,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
@@ -215,9 +230,11 @@ const formatReports = () => {
         tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
         time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
         frequency: getFrequencyValue(report.frequency),
+        last_triggered_at_raw: report.last_triggered_at || null,
         last_triggered_at: report.last_triggered_at
           ? convertUnixToQuasarFormat(report.last_triggered_at)
           : "-",
+        created_at_raw: report.created_at || null,
         created_at: convertUnixToQuasarFormat(report.created_at),
         orgId: report.org_id,
         isCached: !report?.destinations?.length,
@@ -300,7 +317,7 @@ const columns: OTableColumnDef[] = [
     header: t("reports.lastTriggeredAt"),
     accessorKey: "last_triggered_at",
     sortable: false,
-    size: COL.date,
+    size: COL.dateAbsolute,
     meta: { align: "left" },
   },
   {

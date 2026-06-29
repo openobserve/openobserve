@@ -104,13 +104,13 @@
           </template>
 
           <template #cell-isDefault="{ row }">
-            <span
+            <OTag
               v-if="booleanOf(row, 'isDefault', 'is_default')"
-              class="tw:inline-flex tw:items-center tw:py-[1px] tw:px-[7px] tw:rounded-[3px] tw:font-semibold tw:text-[10px] tw:leading-[1.5] tw:bg-[color-mix(in_srgb,var(--o2-status-success-text)_14%,transparent)] tw:text-(--o2-status-success-text) tw:uppercase"
-            >
-              {{ t("llmProviders.defaultBadge") }}
-            </span>
-            <span v-else class="tw:text-(--color-text-secondary,var(--o2-text-secondary))">—</span>
+              type="booleanState"
+              value="yes"
+              :label="t('llmProviders.defaultBadge')"
+            />
+            <span v-else class="tw:text-text-primary">—</span>
           </template>
 
           <template #cell-actions="{ row }">
@@ -155,6 +155,7 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

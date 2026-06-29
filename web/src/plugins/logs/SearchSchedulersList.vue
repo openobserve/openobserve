@@ -38,16 +38,25 @@
             :show-global-filter="false"
             :default-columns="false"
           >
+            <template #cell-user_id="{ row }">
+              <OUserCell :value="row.user_id" />
+            </template>
+            <template #cell-created_at="{ row }">
+              <OTimeCell
+                :value="row.toBeCreatedAt"
+                unit="us"
+                :timezone="store.state.timezone"
+              />
+            </template>
+            <template #cell-start_time="{ row }">
+              <OTimeCell
+                :value="row.toBeStoredStartTime"
+                unit="us"
+                :timezone="store.state.timezone"
+              />
+            </template>
             <template #cell-status="{ row }">
-              <div class="status-cell">
-                <OIcon
-                  :name="getStatusIcon(row.status)"
-                  size="xs"
-                  class="tw:mr-1"
-                  :class="getStatusColorClass(row.status)"
-                />
-                {{ getStatusText(row.status) }}
-              </div>
+              <OTag type="queryStatus" :value="getStatusText(row.status)" />
             </template>
             <template #cell-actions="{ row }">
               <OButton
@@ -248,6 +257,9 @@ import { useI18n } from "vue-i18n";
 import { formatDate } from "@/utils/date";
 import type { Ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -268,6 +280,9 @@ export default defineComponent({
     DateTime,
     OEmptyState,
     OTable,
+    OTimeCell,
+    OUserCell,
+    OTag,
     TenstackTable,
     ConfirmDialog,
     AppTabs,

@@ -102,6 +102,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ statusLabel(row.status) }}
               </OBadge>
             </template>
+            <template #cell-invited_by="{ row }">
+              <OUserCell :value="row.invited_by" />
+            </template>
+            <template #cell-accepted_by="{ row }">
+              <OUserCell :value="row.accepted_by" />
+            </template>
           </OTable>
         </div>
       </div>
@@ -220,6 +226,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:h-full"
             data-test="org-group-invites-table"
           >
+            <template #cell-inviter_id="{ row }">
+              <OUserCell :value="row.inviter_id" />
+            </template>
             <template #cell-actions="{ row }">
               <div class="tw:flex tw:justify-end tw:pr-3 tw:gap-2">
                 <OButton
@@ -348,6 +357,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -382,7 +392,7 @@ interface BillingGroupInvite {
 
 export default defineComponent({
   name: "BillingGroup",
-  components: { OBadge, OButton, OIcon, OInput, OSpinner, OTable, ODrawer, OTooltip, AppTabs },
+  components: { OBadge, OButton, OIcon, OInput, OSpinner, OTable, OUserCell, ODrawer, OTooltip, AppTabs },
   setup() {
     const { t } = useI18n();
     const store = useStore();

@@ -136,7 +136,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 150,
-        meta: { align: "right" },
+        meta: { align: "left" },
       },
     ]);
 

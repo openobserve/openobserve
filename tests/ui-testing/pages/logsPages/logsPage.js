@@ -3226,11 +3226,20 @@ export class LogsPage {
 
     // ===== LOG DETAIL SIDEBAR METHODS (Bug #9724) =====
     /**
-     * Opens the log detail sidebar by clicking on a log row
+     * Opens the log detail sidebar by clicking the first result row.
+     * Clicks whichever first-row cell is rendered (matched by the
+     * `log-table-column-0-` prefix) — the default column may be the generic
+     * "source" column OR the FTS "body"/message column — then waits for the
+     * detail dialog. Includes a force-click fallback for transient instability.
      * @returns {Promise<void>}
      */
     async openLogDetailSidebar() {
-        const sourceCell = this.page.locator(this.logTableColumnSource).first();
+        // The first result cell can render as the generic "source" column OR the FTS
+        // "body"/message column (e.g. streams whose default column is a body field, like
+        // the highlighting test stream). Waiting on the exact "...-source" cell timed out
+        // whenever the body column was rendered instead, so target any first-row cell by
+        // prefix — mirroring clickLogTableColumnSource / waitForSearchResults.
+        const sourceCell = this.page.locator('[data-test^="log-table-column-0-"]').first();
         // Under CI load the row can resolve in the DOM while the results table is still
         // streaming/re-rendering, so a plain click waits out its timeout on "element is not
         // stable". Wait for the cell to be visible, bring it into view, then click with a

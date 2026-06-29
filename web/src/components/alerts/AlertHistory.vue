@@ -140,15 +140,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-timestamp="{ value }">
-            {{ formatDate(value) }}
+            <OTimeCell :value="value" unit="us" mode="absolute" :timezone="store.state.timezone" empty-label="—" />
           </template>
 
           <template #cell-start_time="{ value }">
-            {{ formatDate(value) }}
+            <OTimeCell :value="value" unit="us" mode="absolute" :timezone="store.state.timezone" empty-label="—" />
           </template>
 
           <template #cell-end_time="{ value }">
-            {{ formatDate(value) }}
+            <OTimeCell :value="value" unit="us" mode="absolute" :timezone="store.state.timezone" empty-label="—" />
           </template>
 
           <template #cell-status="{ value }">
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-is_realtime="{ value }">
             <OIcon
               :name="value ? 'check-circle' : 'schedule'"
-              :class="value ? 'tw:text-(--o2-positive)' : 'tw:text-gray-500'"
+              :class="value ? 'tw:text-(--o2-positive)' : 'tw:text-text-primary'"
               size="xs"
             >
               <OTooltip :content="value ? 'Real-time' : 'Scheduled'" />
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-is_silenced="{ value }">
             <OIcon
               :name="value ? 'volume-off' : 'volume-up'"
-              :class="value ? 'tw:text-gray-500' : 'tw:text-(--o2-positive)'"
+              :class="value ? 'tw:text-text-primary' : 'tw:text-(--o2-positive)'"
               size="md"
             >
               <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-dedup="{ row }">
-            <span v-if="!row.dedup_enabled" class="tw:text-gray-400">-</span>
+            <span v-if="!row.dedup_enabled" class="tw:text-text-primary">-</span>
             <div v-else-if="row.dedup_suppressed" class="tw:text-red-500">
               <OIcon name="block" size="sm">
                 <OTooltip>
@@ -485,6 +485,7 @@ import { useI18n } from "vue-i18n";
 import { formatDate } from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -562,7 +563,7 @@ const columns = ref<OTableColumnDef[]>([
     minSize: 37,
     maxSize: 37,
     cell: " ",
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "is_silenced",
@@ -573,15 +574,15 @@ const columns = ref<OTableColumnDef[]>([
     minSize: 37,
     maxSize: 37,
     cell: " ",
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "timestamp",
     header: t("alerts.timestamp") || "Timestamp",
     accessorKey: "timestamp",
     sortable: true,
-    size: 160,
-    maxSize: 160,
+    size: COL.dateAbsolute,
+    maxSize: COL.dateAbsolute,
     cell: " ",
     meta: { align: "left" },
   },
@@ -590,8 +591,8 @@ const columns = ref<OTableColumnDef[]>([
     header: t("alerts.startTime") || "Start Time",
     accessorKey: "start_time",
     sortable: true,
-    size: 160,
-    maxSize: 160,
+    size: COL.dateAbsolute,
+    maxSize: COL.dateAbsolute,
     cell: " ",
     meta: { align: "left" },
   },
@@ -600,8 +601,8 @@ const columns = ref<OTableColumnDef[]>([
     header: t("alerts.endTime") || "End Time",
     accessorKey: "end_time",
     sortable: true,
-    size: 160,
-    maxSize: 160,
+    size: COL.dateAbsolute,
+    maxSize: COL.dateAbsolute,
     cell: " ",
     meta: { align: "left" },
   },
@@ -632,7 +633,7 @@ const columns = ref<OTableColumnDef[]>([
     sortable: true,
     size: 64,
     maxSize: 64,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "dedup",
@@ -641,7 +642,7 @@ const columns = ref<OTableColumnDef[]>([
     size: 80,
     maxSize: 80,
     cell: " ",
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "actions",

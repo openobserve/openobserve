@@ -56,16 +56,11 @@
         </template>
 
         <template #cell-status="{ row }">
-          <span class="ej-status-chip tw:inline-flex tw:items-center tw:gap-1.25 tw:py-px tw:px-2 tw:rounded-full tw:font-semibold tw:text-[11px] tw:leading-normal tw:font-[inherit] tw:capitalize" :class="{
-              'tw:[background:color-mix(in_srgb,var(--o2-status-success-text)_14%,transparent)] tw:text-[var(--o2-status-success-text)]': statusOf(row) === 'active',
-              'tw:[background:color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]': statusOf(row) === 'draft',
-              'tw:[background:color-mix(in_srgb,var(--o2-status-warning-text)_14%,transparent)] tw:text-[var(--o2-status-warning-text)]': statusOf(row) === 'paused',
-              'tw:[background:color-mix(in_srgb,var(--o2-status-warning-text)_14%,transparent)] tw:text-[var(--o2-status-warning-text)]': statusOf(row) === 'degraded',
-              'tw:[background:color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:opacity-70': statusOf(row) === 'archived',
-            }">
-            <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-current" />
-            {{ statusLabel(statusOf(row)) }}
-          </span>
+          <OTag
+            type="evalStatus"
+            :value="statusOf(row)"
+            :label="statusLabel(statusOf(row))"
+          />
         </template>
 
         <template #cell-stream="{ row }">
@@ -136,6 +131,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -228,7 +224,7 @@ const columns = computed(() => [
     accessorFn: (row: EvalJob) => (row.scorers || []).length,
     sortable: true,
     size: COL.count,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "lastRun",

@@ -546,7 +546,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 200,
-          meta: { align: "center" },
+          meta: { align: "right" },
         },
         {
           id: "get",
@@ -556,7 +556,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 200,
-          meta: { align: "center" },
+          meta: { align: "right" },
         },
         {
           id: "create",
@@ -566,7 +566,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 200,
-          meta: { align: "center" },
+          meta: { align: "right" },
         },
         {
           id: "update",
@@ -576,7 +576,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 200,
-          meta: { align: "center" },
+          meta: { align: "right" },
         },
         {
           id: "delete",
@@ -586,7 +586,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 200,
-          meta: { align: "center" },
+          meta: { align: "right" },
         },
       ];
     });
@@ -613,7 +613,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 200,
-          meta: { align: "center" },
+          meta: { align: "right" },
         },
         {
           id: "get",
@@ -623,7 +623,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 200,
-          meta: { align: "center" },
+          meta: { align: "right" },
         },
         {
           id: "create",
@@ -633,7 +633,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 200,
-          meta: { align: "center" },
+          meta: { align: "right" },
         },
         {
           id: "update",
@@ -643,7 +643,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 200,
-          meta: { align: "center" },
+          meta: { align: "right" },
         },
         {
           id: "delete",
@@ -653,7 +653,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 200,
-          meta: { align: "center" },
+          meta: { align: "right" },
         },
       ];
     });

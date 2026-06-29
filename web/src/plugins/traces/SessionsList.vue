@@ -115,15 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- User -->
         <template #cell-userId="{ row }">
-          <span
-            v-if="row.userId"
-            class="tw:text-[0.75rem] tw:text-[var(--o2-text-primary)] tw:truncate tw:max-w-[160px] tw:block"
-          >
-            {{ row.userId }}
-          </span>
-          <span v-else class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">
-            {{ t('traces.sessionsList.unknownUser') }}
-          </span>
+          <OUserCell :value="row.userId" />
         </template>
 
         <!-- First user message -->
@@ -189,6 +181,7 @@ import { useStore } from "vuex";
 import { formatDate } from "@/utils/date";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import useStreams from "@/composables/useStreams";
 import { useSessions, type SessionRow } from "./composables/useSessions";
 import EvalEmptyState from "@/components/EvalEmptyState.vue";
@@ -310,7 +303,7 @@ const tableColumns = computed(() => [
     size: 90,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "durationNanos",
@@ -319,7 +312,7 @@ const tableColumns = computed(() => [
     size: 120,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "tokens",
@@ -328,7 +321,7 @@ const tableColumns = computed(() => [
     size: 250,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "cost",
@@ -337,7 +330,7 @@ const tableColumns = computed(() => [
     size: 100,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "status",
@@ -346,7 +339,7 @@ const tableColumns = computed(() => [
     size: 100,
     sortable: false,
     hideable: true,
-    meta: { align: "center", disableCellAction: true },
+    meta: { align: "left", disableCellAction: true },
   },
 ].map((c: any) => ({
   ...c,

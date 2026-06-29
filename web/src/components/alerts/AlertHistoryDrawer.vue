@@ -266,10 +266,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <template #cell-timestamp="{ row }">
-                    <span class="tw:text-[13px]" :class="row._child ? 'tw:pl-5 tw:opacity-70' : ''">
-                      {{ formatTimestamp(row.timestamp) }}
+                    <span class="tw:text-[13px] tw:tabular-nums tw:whitespace-nowrap" :class="row._child ? 'tw:pl-5 tw:opacity-70' : ''">
+                      {{ formatTimestampFull(row.timestamp) }}
                     </span>
-                    <OTooltip :content="formatTimestampFull(row.timestamp)" />
                   </template>
 
                   <template #cell-evaluation_time="{ row }">

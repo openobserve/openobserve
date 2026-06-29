@@ -306,7 +306,7 @@ const traceColumns = computed(() => [
     size: 100,
     minSize: 50,
     maxSize: 200,
-    meta: { align: "right", slot: true },
+    meta: { align: "left", slot: true },
   },
   {
     id: "status",

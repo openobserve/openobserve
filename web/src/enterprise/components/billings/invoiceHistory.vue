@@ -15,10 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="invoice-history-container" class="tw:rounded-md tw:py-3 tw:flex tw:flex-col tw:h-full">
-    <div data-test="invoice-history-title" class="tw:flex-none tw:flex tw:px-2 tw:text-xl tw:tracking-[0.005em] tw:font-[600]">
-      {{ t("billing.invoiceHistory") }}
-    </div>
+  <div data-test="invoice-history-container" class="tw:rounded-md tw:flex tw:flex-col tw:h-full">
     <div class="tw:flex-1 tw:min-h-0">
       <div class="tw:w-full tw:h-full">
         <invoice-table></invoice-table>

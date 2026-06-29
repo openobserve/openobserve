@@ -92,20 +92,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-status="{ row }">
-          <span
-            class="tw:inline-flex tw:items-center tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-semibold"
-            :class="getStatusColorClass(row.status)"
-          >
-            {{ getStatusLabel(row.status) }}
-          </span>
+          <OTag
+            type="incidentStatus"
+            :value="row.status"
+            :label="getStatusLabel(row.status)"
+            size="sm"
+            data-test="incident-status-badge"
+          />
         </template>
         <template #cell-severity="{ row }">
-          <span
-            class="tw:inline-flex tw:items-center tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-semibold"
-            :class="getSeverityColorClass(row.severity)"
-          >
-            {{ row.severity }}
-          </span>
+          <OBadge
+            :variant="getSeverityVariant(row.severity)"
+            dot
+            size="sm"
+            data-test="incident-severity-badge"
+          >{{ row.severity }}</OBadge>
         </template>
         <template #cell-title="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1">
@@ -115,19 +116,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-dimensions="{ row }">
-          <div class="tw:flex tw:flex-wrap tw:gap-1">
+          <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-1 tw:min-w-0 tw:overflow-hidden">
             <span
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
-              class="dimension-badge tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-semibold tw:m-0.5 tw:max-w-45 tw:overflow-hidden"
-              :class="getDimensionColorClass(key)"
+              class="tw:inline-flex tw:min-w-0"
             >
-              <span class="tw:inline-block tw:overflow-hidden tw:truncate">{{ key }}</span>=<span class="tw:inline-block tw:overflow-hidden tw:truncate">{{ value }}</span>
+              <OBadge :variant="getDimensionVariant(key)" size="sm" class="tw:min-w-0 tw:!p-0 tw:overflow-hidden">
+                <span class="tw:inline-flex tw:items-stretch tw:min-w-0">
+                  <span class="tw:ps-2.5 tw:pe-1 tw:py-1.5 tw:shrink-0 tw:whitespace-nowrap tw:bg-current/8 tw:opacity-90">{{ key }}</span>
+                  <span class="tw:ps-1 tw:pe-2.5 tw:py-1.5 tw:truncate tw:min-w-0 tw:font-semibold">{{ value }}</span>
+                </span>
+              </OBadge>
               <OTooltip :delay="300" :content="key + '=' + value" />
             </span>
-            <span
+            <OBadge
               v-if="getSortedDimensions(row.group_values).length > 2"
-              class="dimension-badge tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-medium tw:m-0.5 tw:max-w-45 tw:overflow-hidden tw:bg-surface-panel tw:text-(--o2-text-secondary)"
+              variant="default-soft"
+              size="sm"
+              class="tw:shrink-0"
             >
               +{{ getSortedDimensions(row.group_values).length - 2 }} more
               <OTooltip :delay="300" :max-width="'28rem'">
@@ -142,8 +149,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </OTooltip>
-            </span>
+            </OBadge>
           </div>
+        </template>
+        <template #cell-last_alert_at="{ row }">
+          <OTimeCell
+            :value="row.last_alert_at"
+            unit="us"
+            mode="absolute"
+            :timezone="store.state.timezone"
+            empty-label="—"
+          />
         </template>
         <template #cell-actions="{ row }">
           <div class="tw:flex tw:justify-end tw:items-center">
@@ -213,9 +229,14 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { BADGE_GROUPS, normalizeKey } from "@/lib/core/Badge/badgeGroups";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
@@ -231,6 +252,9 @@ export default defineComponent({
     OTooltip,
     OIcon,
     OTable,
+    OTag,
+    OBadge,
+    OTimeCell,
     OToggleGroup,
     OToggleGroupItem,
 },
@@ -295,7 +319,7 @@ export default defineComponent({
         accessorKey: "group_values",
         resizable: true,
         hideable: true,
-        size: 400,
+        size: 500,
         meta: { align: "left" },
       },
       {
@@ -305,7 +329,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 80,
-        meta: { align: "center" },
+        meta: { align: "right" },
       },
       {
         id: "last_alert_at",
@@ -314,7 +338,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: 180,
+        size: COL.dateAbsolute,
         meta: { align: "left" },
       },
       {
@@ -473,6 +497,16 @@ export default defineComponent({
       }
     };
 
+    const getSeverityVariant = (severity: string): BadgeVariant => {
+      switch (severity) {
+        case "P1": return "error-soft";
+        case "P2": return "orange-soft";
+        case "P3": return "amber-soft";
+        case "P4": return "blue-soft";
+        default: return "default-soft";
+      }
+    };
+
     const getSeverityColorClass = (severity: string) => {
       switch (severity) {
         case "P1": return "severity-p1";
@@ -535,6 +569,24 @@ export default defineComponent({
         hash = hash & hash;
       }
       return classes[Math.abs(hash) % classes.length];
+    };
+
+    const DIMENSION_FALLBACK_VARIANTS: BadgeVariant[] = [
+      'default-soft', 'amber-soft', 'purple-soft', 'blue-soft', 'teal-soft', 'indigo-soft',
+    ];
+    const getDimensionVariant = (key: string): BadgeVariant => {
+      const values = BADGE_GROUPS.dimensionKey.values as Record<string, { variant: BadgeVariant }>;
+      const nk = normalizeKey(key);
+      if (values[nk]) return values[nk].variant;
+      for (const [pattern, cfg] of Object.entries(values)) {
+        if (nk.includes(pattern)) return cfg.variant;
+      }
+      let hash = 0;
+      for (let i = 0; i < key.length; i++) {
+        hash = ((hash << 5) - hash) + key.charCodeAt(i);
+        hash = hash & hash;
+      }
+      return DIMENSION_FALLBACK_VARIANTS[Math.abs(hash) % DIMENSION_FALLBACK_VARIANTS.length];
     };
 
     const restoreStateFromStore = (): boolean => {
@@ -625,11 +677,13 @@ export default defineComponent({
       reopenIncident,
       getStatusColorClass,
       getStatusLabel,
+      getSeverityVariant,
       getSeverityColorClass,
       formatTimestamp,
       formatDimensions,
       getSortedDimensions,
       getDimensionColorClass,
+      getDimensionVariant,
       qTableRef,
       store,
     };
