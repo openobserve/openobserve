@@ -251,7 +251,7 @@ const columns = computed(() => [
     accessorKey: "version",
     sortable: true,
     size: COL.version,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "usedBy",
@@ -259,7 +259,7 @@ const columns = computed(() => [
     accessorFn: (row: Scorer) => usedByCount(row),
     sortable: true,
     size: COL.count,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "lastRun",

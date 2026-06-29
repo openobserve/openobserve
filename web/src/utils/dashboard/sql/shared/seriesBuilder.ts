@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { getDataValue } from "../../aliasUtils";
-import { getSeriesColor } from "../../colorPalette";
+import {
+  getSeriesColor,
+  getAreaStyleOverride,
+} from "../../colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
 
@@ -189,10 +192,32 @@ export function createSeriesBuilders(deps: SeriesDeps) {
     seriesConfig: Record<string, any>,
     seriesName: string,
   ): SeriesObject => {
+    const seriesColor =
+      getSeriesColor(
+        panelSchema.config.color,
+        yAxisName,
+        seriesData,
+        chartMin,
+        chartMax,
+        store.state.theme,
+        panelSchema?.config?.color?.colorBySeries,
+      ) ?? null;
+
+    // For area charts, fade the fill into a bottom-to-top transparent
+    // gradient instead of a flat solid color (shared with the PromQL builder).
+    const areaStyle = getAreaStyleOverride(
+      panelSchema.type,
+      defaultSeriesProps?.areaStyle,
+      seriesColor,
+      yAxisName,
+      store.state.theme,
+    );
+
     return {
       //only append if yaxiskeys length is more than 1
       name: yAxisName?.toString(),
       ...defaultSeriesProps,
+      ...areaStyle,
       label: getSeriesLabel(),
       originalSeriesName: seriesName,
       // markLine if exist
@@ -201,16 +226,7 @@ export function createSeriesBuilders(deps: SeriesDeps) {
       // config to connect null values
       connectNulls: panelSchema.config?.connect_nulls ?? false,
       large: true,
-      color:
-        getSeriesColor(
-          panelSchema.config.color,
-          yAxisName,
-          seriesData,
-          chartMin,
-          chartMax,
-          store.state.theme,
-          panelSchema?.config?.color?.colorBySeries,
-        ) ?? null,
+      color: seriesColor,
       data: seriesData,
       ...seriesConfig,
     };

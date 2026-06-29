@@ -216,8 +216,8 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await expect(templateOverrideSelect, 'Template override select should be visible').toBeVisible({ timeout: 3000 });
     testLogger.info('✓ Template override field found');
 
-    // Open the select dropdown and pick a template
-    await templateOverrideSelect.click();
+    // Open the select dropdown and pick a template (page object clicks the OSelect trigger).
+    await pm.alertsPage.openAdvancedTemplateOverrideSelect();
     await page.waitForTimeout(500);
 
     const templateOption = pm.alertsPage.getFirstMenuItem();

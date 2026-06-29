@@ -834,7 +834,7 @@ describe("SearchBar", () => {
       await flushPromises();
 
       // OButton: the download button uses title="Export Traces" (no .download-logs-btn class)
-      expect(wrapper.find('[title="Export Traces"]').exists()).toBe(true);
+      expect(wrapper.find('[title="traces.exportTraces"]').exists()).toBe(true);
     });
 
     it("should be disabled when queryResults.hits is empty", async () => {
@@ -843,7 +843,7 @@ describe("SearchBar", () => {
       await flushPromises();
 
       // OButton uses native HTML disabled attribute (not a CSS "disabled" class)
-      const btn = wrapper.find('[title="Export Traces"]');
+      const btn = wrapper.find('[title="traces.exportTraces"]');
       expect(btn.exists()).toBe(true);
       expect(btn.attributes("disabled")).toBeDefined();
     });
@@ -861,7 +861,7 @@ describe("SearchBar", () => {
       await flushPromises();
 
       // OButton: when enabled, native disabled attribute should be absent
-      const btn = wrapper.find('[title="Export Traces"]');
+      const btn = wrapper.find('[title="traces.exportTraces"]');
       expect(btn.exists()).toBe(true);
       expect(btn.attributes("disabled")).toBeUndefined();
     });

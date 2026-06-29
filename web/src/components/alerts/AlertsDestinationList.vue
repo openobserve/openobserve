@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:text-xs tw:flex-shrink-0"
               >{{ t('alert_destinations.templateDefaultBadge') }}</OBadge>
             </div>
-            <span v-else class="tw:text-gray-400">—</span>
+            <span v-else class="tw:text-text-primary">—</span>
           </template>
 
           <template #cell-type="{ row }">

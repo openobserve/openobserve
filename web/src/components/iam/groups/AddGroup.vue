@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-group-groupname-input-btn"
         :error="showNameError"
         :error-message="nameErrorMessage"
-        :help-text="!showNameError ? `Use alphanumeric and '_' characters only, without spaces.` : undefined"
+        :help-text="!showNameError ? t('iam.nameHelpText') : undefined"
         @update:model-value="showNameError = !!name && !isValidGroupName"
       />
     </div>
@@ -93,7 +93,7 @@ watch(
   }
 );
 const nameErrorMessage = computed(() =>
-  !name.value ? t('common.nameRequired') : `Use alphanumeric and '_' characters only, without spaces.`
+  !name.value ? t('common.nameRequired') : t('iam.nameHelpText')
 );
 
 const saveGroup = () => {

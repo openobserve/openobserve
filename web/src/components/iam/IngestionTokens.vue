@@ -94,24 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-token="{ row }">
-            <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-full">
-              <code
-                class="tw:font-mono tw:px-2 tw:py-1 tw:rounded tw:text-sm tw:truncate tw:max-w-[280px] tw:inline-block"
-                style="background: rgba(0,0,0,0.06);"
-              >{{ row.token }}</code>
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                icon-left="content-copy"
-                class="tw:shrink-0"
-                :title="t('ingestion.copyTokenBtn')"
-                @click="copyToken(row.token)"
-              />
-            </div>
+            <OCodeCell :value="row.token" />
           </template>
 
           <template #cell-created_by="{ row }">
-            <span class="tw:text-gray-500">{{ row.created_by }}</span>
+            <OUserCell :value="row.created_by" />
           </template>
 
           <template #cell-actions="{ row }">
@@ -197,6 +184,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -217,7 +206,7 @@ interface Token {
 
 export default defineComponent({
   name: "IngestionTokens",
-  components: { AppPageHeader, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OInput, OTable },
+  components: { AppPageHeader, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OInput, OTable, OCodeCell, OUserCell },
   setup() {
     const store = useStore();
     const { t } = useI18n();
@@ -241,7 +230,7 @@ export default defineComponent({
         hideable: true,
         size: COL.name,
         minSize: 160,
-        meta: { cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!', flex: true },
+        meta: { align: "left", cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!', flex: true },
       },
       {
         id: "token",
@@ -252,6 +241,7 @@ export default defineComponent({
         hideable: true,
         // Wide enough for the truncated token (code max-w 280) + gap + copy btn.
         size: 340,
+        meta: { align: "left" },
       },
       {
         id: "created_by",
@@ -261,6 +251,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.owner,
+        meta: { align: "left" },
       },
       {
         id: "actions",
@@ -269,6 +260,7 @@ export default defineComponent({
         sortable: false,
         isAction: true,
         size: 80,
+        meta: { align: "center", actionCount: 1 },
       },
     ];
 

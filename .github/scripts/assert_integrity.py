@@ -4,10 +4,13 @@ Assertion-integrity analyzer for the E2E Council pipeline (deterministic — no 
 
 Two modes:
   fingerprint <spec.js>                         -> print a JSON fingerprint of the spec's assertions
-  check <spec.js> [--baseline <fingerprint.json>] [--allow-weakening]
+  check <spec.js> [--baseline <fingerprint.json>] [--allow-weakening] [--strengthen]
                                                 -> static anti-pattern scan + (optional) diff-aware
                                                    heal-weakening check; writes nothing, prints a JSON
                                                    verdict, exits 2 if any CRITICAL finding.
+                                                   --strengthen (Refiner mode): permit ADDED negative
+                                                   matchers (assert-absence is valid strengthening);
+                                                   still blocks any DROP of assertions.
 
 Conservative by design: only HIGH-CONFIDENCE patterns are flagged as critical, because a gate with
 false positives gets disabled by humans (the same trap that made mutation-testing a poor fit).
@@ -166,11 +169,20 @@ def swallowed_assertion_tests(lines):
     return flagged
 
 
-def check(spec_path, baseline=None, allow_weakening=False):
+def check(spec_path, baseline=None, allow_weakening=False, strengthen=False):
     """Run the static anti-pattern scan (tautologies, conditional-only assertions) and, when a
     baseline is given, the diff-aware heal-weakening guard. Returns a verdict dict; never raises on
     a malformed/partial baseline — missing baseline keys fall back to the current value (skip that
-    comparison) rather than crashing the gate."""
+    comparison) rather than crashing the gate.
+
+    `strengthen` (Refiner mode): the Refiner STRENGTHENS weak/mismatched tests, which can legitimately
+    (a) ADD negative matchers (assert a column is *absent* before a re-search) and (b) park a genuinely
+    unwired test as fixme. So in strengthen mode we permit a negatives rise ONLY when expect() ALSO rose
+    (an addition, not an in-place flip — a flip with flat expect() is still flagged), and permit a
+    skip/fixme rise (honest feature-incomplete). `heal-removed-assertions` (expect() may never drop) and
+    EVERY static anti-pattern check (tautology, conditional-only, swallowed, no-runnable) STILL apply —
+    so strengthen mode cannot be used to drop assertions or green-wash. (NOTE: do not also pass
+    --allow-weakening in strengthen mode; that disables the removed guard and defeats the point.)"""
     src = open(spec_path, encoding='utf-8').read()
     lines = src.split('\n')
     findings = []
@@ -207,10 +219,18 @@ def check(spec_path, baseline=None, allow_weakening=False):
         if fp['expects'] < base_expects:
             findings.append({'severity': 'critical', 'rule': 'heal-removed-assertions',
                              'detail': f"expect() count dropped {base_expects} -> {fp['expects']} during heal"})
-        if fp['negatives'] > base_negatives:
+        # Inverted = a positive flipped to a negative IN PLACE. In --strengthen mode (Refiner) ADDING a
+        # negative is legitimate, but ONLY if expect() ALSO rose — that proves the negative is a new
+        # assertion, not a flip. A negative rise with no new expect() is an in-place flip → still flag,
+        # even in strengthen mode. (Outside strengthen mode any negative rise is flagged, as before.)
+        if fp['negatives'] > base_negatives and (not strengthen or fp['expects'] <= base_expects):
             findings.append({'severity': 'critical', 'rule': 'heal-inverted-assertions',
-                             'detail': f"negative matchers rose {base_negatives} -> {fp['negatives']} during heal (positive flipped to negative?)"})
-        if fp['skips'] > base_skips:
+                             'detail': f"negative matchers rose {base_negatives} -> {fp['negatives']} (positive flipped to negative in place — expect() did not rise)"})
+        # Rising skip/fixme is silent-skipping during heal — blocked. The Refiner's HONEST
+        # feature-incomplete path (park a test as fixme, assertion body kept intact) is permitted ONLY in
+        # --strengthen mode; expect() still cannot drop (guarded above) and an all-fixme spec is still
+        # caught by no-runnable-tests, so this can't be used to green-wash.
+        if fp['skips'] > base_skips and not strengthen:
             findings.append({'severity': 'critical', 'rule': 'heal-skipped-tests',
                              'detail': f"skip/fixme rose {base_skips} -> {fp['skips']} during heal (use the feature-incomplete path, not silent skipping)"})
 
@@ -226,13 +246,15 @@ def main():
     if mode == 'fingerprint':
         print(json.dumps(fingerprint(open(spec, encoding='utf-8').read())))
         return
-    baseline, allow = None, False
+    baseline, allow, strengthen = None, False, False
     args = sys.argv[3:]
     if '--baseline' in args:
         baseline = json.load(open(args[args.index('--baseline') + 1]))
     if '--allow-weakening' in args:
         allow = True
-    result = check(spec, baseline, allow)
+    if '--strengthen' in args:
+        strengthen = True
+    result = check(spec, baseline, allow, strengthen)
     print(json.dumps(result, indent=2))
     sys.exit(2 if result['verdict'] == 'FAIL' else 0)
 

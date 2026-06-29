@@ -31,6 +31,11 @@ import {
 } from "./composables/contextProviders";
 import { buildVersionChecker } from "./utils/buildVersionChecker";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { bootstrapTheme } from "@/utils/themeManager";
+
+// Apply the resolved theme synchronously before the app mounts so the first
+// paint already uses the correct colors (no flash of the base stylesheet theme).
+bootstrapTheme();
 
 const app = createApp(App);
 const router = createRouter(store);

@@ -29,6 +29,7 @@ export const COL = {
   // Full "YYYY-MM-DD HH:mm:ss" timestamps — predictable, so fix their width.
   createdAt:    200,
   updatedAt:    200,
+  dateAbsolute: 160,
   duration:     120,
   frequency:    130,
   type:         180,
