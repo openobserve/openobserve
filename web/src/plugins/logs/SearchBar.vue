@@ -153,6 +153,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- SET ONCE — view controls that persist across sessions -->
           <ODropdownGroup :label="t('search.menuGroupSetOnce')">
+            <!-- SQL Mode — toggles the same flag used for SQL auto-detection -->
+            <ODropdownItem
+              data-test="logs-search-bar-menu-sql-mode-toggle-btn"
+              @select.prevent="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge">
+                  <OIcon name="code" size="sm" />
+                </span>
+              </template>
+              {{ t("search.sqlModeLabel") }}
+              <template #icon-right>
+                <OSwitch
+                  :model-value="searchObj.meta.sqlMode"
+                  :disabled="isSqlModeDisabled"
+                  size="md"
+                  data-test="logs-search-bar-sql-mode-toggle"
+                  class="tw:ml-auto"
+                  @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
+                />
+              </template>
+            </ODropdownItem>
+
             <!-- Reset filters (shown here only when toolbar is too narrow for inline button) -->
             <ODropdownItem
               v-if="toolbarMoveResetToMenu"
