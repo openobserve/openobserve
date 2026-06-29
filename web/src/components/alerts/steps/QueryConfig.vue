@@ -587,6 +587,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :default-language="localTab"
                       :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
                       editor-height="100%"
+                      release-wheel-to-page
                       :disable-ai="!streamName"
                       :keywords="autoCompleteKeywords"
                       :suggestions="autoCompleteSuggestions"
@@ -642,6 +643,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       default-language="vrl"
                       :query="vrlFunctionContent"
                       editor-height="100%"
+                      release-wheel-to-page
                       :disable-ai="false"
                       :hide-nl-toggle="false"
                       @focus="vrlEditorPlaceholderFlag = false"

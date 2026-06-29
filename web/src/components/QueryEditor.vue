@@ -77,6 +77,7 @@
         :query="query"
         :nlp-mode="nlpMode"
         :read-only="readOnly"
+        :release-wheel-to-page="releaseWheelToPage"
         :show-auto-complete="showAutoComplete"
         :keywords="keywords"
         :suggestions="suggestions"
@@ -135,6 +136,7 @@ interface Props {
   query: string;
   readOnly?: boolean;
   showAutoComplete?: boolean;
+  releaseWheelToPage?: boolean; // let the page scroll when editor has nothing left to scroll
 
   // Editor autocomplete (forwarded to CodeQueryEditor)
   keywords?: any[];              // Autocomplete keywords for Monaco
@@ -162,6 +164,7 @@ const props = withDefaults(defineProps<Props>(), {
   defaultLanguage: 'sql',
   readOnly: false,
   showAutoComplete: true,
+  releaseWheelToPage: false,
   keywords: () => [],
   suggestions: () => [],
   debounceTime: 500,

@@ -125,6 +125,14 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    // When true, the editor releases the mouse wheel to the page once its own
+    // content has nothing left to scroll (Monaco otherwise always consumes the
+    // wheel). Off by default to preserve behavior for full-page editors; opt in
+    // for small inline editors embedded in a scrollable form.
+    releaseWheelToPage: {
+      type: Boolean,
+      default: false,
+    },
     language: {
       type: String,
       default: "sql",
@@ -706,7 +714,12 @@ export default defineComponent({
         smoothScrolling: true,
         mouseWheelScrollSensitivity: 1,
         fastScrollSensitivity: 1,
-        scrollbar: { horizontal: "auto", vertical: "visible" },
+        scrollbar: {
+          horizontal: "auto",
+          vertical: "visible",
+          // Let the page scroll when this editor has nothing left to scroll.
+          alwaysConsumeMouseWheel: !props.releaseWheelToPage,
+        },
         find: {
           addExtraSpaceOnTop: false,
           autoFindInSelection: "never",
