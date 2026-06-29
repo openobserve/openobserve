@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Light / Dark segmented mode toggle -->
-    <OCardSection class="tw:pt-0 tw:px-2">
+    <OCardSection class="tw:pt-2 tw:px-2">
       <OToggleGroup
         :model-value="activeTab"
         type="single"
