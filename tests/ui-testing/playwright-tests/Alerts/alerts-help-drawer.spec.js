@@ -3,14 +3,17 @@
 /**
  * Alerts Additional Settings Help Drawer — E2E Smoke Tests
  *
- * Verifies three behaviors introduced by the new AlertSettingsHelpDrawer component:
- *   1. Clicking the info button opens the help drawer with current-section content.
+ * Verifies three behaviors of the AlertSettingsHelpDrawer component:
+ *   1. Clicking the "Learn more" help trigger opens the help drawer with its
+ *      "What this alert sends now" (current) section.
  *   2. Selecting a template in the panel's preview dropdown does NOT mutate the
  *      form's Template Override select (Apply is required to commit).
  *   3. The drawer closes when clicking the overlay.
  *
  * Modelled after: tests/ui-testing/playwright-tests/Alerts/alerts-advanced.spec.js
- * Uses the same harness: enhanced-baseFixtures.js + PageManager + oselectHelpers pattern.
+ * Navigation reuses the shared PageManager / AlertsPage page-object methods
+ * (fillAlertName / selectStreamType / selectStreamByName / openAdvancedTab) so
+ * selectors stay in one place and match the real wizard.
  */
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
@@ -20,11 +23,11 @@ const logData = require('../../fixtures/log.json');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 const NETWORK_IDLE_TIMEOUT_MS = 30000;
-const ALERT_LIST_ADD_BTN = '[data-test="alert-list-add-alert-btn"]';
+const TEST_STREAM = 'e2e_automate';
 
 /**
- * Open an OSelect dropdown by clicking its trigger button until aria-expanded is true.
- * Mirrors the pattern in oselectHelpers.js (which is ES module; we inline for CJS compat).
+ * Open an OSelect dropdown by clicking its trigger until aria-expanded is true.
+ * Used only for the in-drawer preview select (no page-object method covers it).
  */
 async function openOSelectDropdown(page, rootLocator, { retries = 5, settleMs = 400 } = {}) {
     const trigger = rootLocator.locator('[data-test$="-trigger"]').first();
@@ -37,53 +40,21 @@ async function openOSelectDropdown(page, rootLocator, { retries = 5, settleMs = 
 }
 
 /**
- * Navigate to the alert creation wizard and land on the Advanced tab.
- * Reuses the same navigation pattern used by alertCreationWizard.js:
- *   Click add → fill name → select stream type → select stream → reach Advanced tab.
- *
- * We do the minimal steps needed to reach the Advanced tab without creating an alert.
+ * Navigate to the alert creation wizard and land on the Advanced tab, using the
+ * shared AlertsPage page-object methods (single source of truth for selectors).
+ * Minimal steps only — we do not create the alert.
  */
 async function navigateToAdvancedTab(page, pm) {
     const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
 
-    // Open alert creation wizard
-    await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
-    await page.locator(ALERT_LIST_ADD_BTN).click();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    // Fill alert name
-    await page.locator('[data-test="alert-name-input"]').waitFor({ state: 'visible', timeout: 10000 });
-    await page.locator('[data-test="alert-name-input"]').click();
     const uniqueSuffix = Math.random().toString(36).substring(2, 8);
-    await page.locator('[data-test="alert-name-input"] input').fill('auto_helpdrawer_smoke_' + uniqueSuffix);
-
-    // Select stream type (logs) via OSelect popover
-    const streamTypeSelect = page.locator('[data-test="alert-stream-type-select"]');
-    await openOSelectDropdown(page, streamTypeSelect);
-    const streamTypePopover = page.locator('[data-test="alert-stream-type-select-popover"]');
-    await streamTypePopover.waitFor({ state: 'visible', timeout: 5000 });
-    await page.locator('[data-test="alert-stream-type-select-option"][data-test-value="logs"]').click();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    // Select stream — use e2e_automate which always exists in CI
-    const streamNameSelect = page.locator('[data-test="alert-stream-name-select"]');
-    await streamNameSelect.waitFor({ state: 'visible', timeout: 10000 });
-    await openOSelectDropdown(page, streamNameSelect);
-    // Type to filter, then pick first available
-    await page.keyboard.type('e2e_automate', { delay: 30 });
-    await page.waitForTimeout(1000);
-    const firstStreamOption = page.locator('[data-test$="-option"]').first();
-    await firstStreamOption.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    await firstStreamOption.click();
-    await page.waitForTimeout(500);
-
-    // Switch to Advanced tab (mirrors _switchToAdvancedTab in alertCreationWizard.js)
-    const advancedTab = page.locator('.alert-v3-tabs > div:first-child > div').filter({ hasText: 'Advanced' }).first();
-    await advancedTab.waitFor({ state: 'visible', timeout: 10000 });
-    await advancedTab.click({ force: true });
-    await page.waitForTimeout(500);
+    await pm.alertsPage.clickAddAlertButton();
+    await pm.alertsPage.fillAlertName('auto_helpdrawer_smoke_' + uniqueSuffix);
+    await pm.alertsPage.selectStreamType('logs');
+    await pm.alertsPage.selectStreamByName(TEST_STREAM);
+    await pm.alertsPage.openAdvancedTab();
     testLogger.info('Navigated to Advanced tab');
 }
 
@@ -99,17 +70,18 @@ test.describe('Alerts — Additional Settings Help Drawer', {
     });
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Behavior 1: Info button opens the help drawer
+    // Behavior 1: "Learn more" trigger opens the help drawer
     // ─────────────────────────────────────────────────────────────────────────
-    test('clicking the info button opens the help drawer and shows current-section content', {
+    test('clicking the "Learn more" link opens the help drawer and shows current-section content', {
         tag: ['@alerts-help-drawer', '@smoke', '@alerts'],
     }, async ({ page }) => {
         await navigateToAdvancedTab(page, pm);
 
-        // The help-info button lives next to the Template Override field in Advanced tab
-        const infoBtn = page.locator('[data-test="advanced-template-info-btn"]');
-        await infoBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await infoBtn.click();
+        // The "Learn more" help trigger lives next to the Template Override field.
+        // (data-test kept as advanced-template-info-btn for selector stability.)
+        const learnMore = page.locator('[data-test="advanced-template-info-btn"]');
+        await learnMore.waitFor({ state: 'visible', timeout: 10000 });
+        await learnMore.click();
 
         // Drawer must be visible and the current-section content area must render
         const drawer = page.locator('[data-test="alert-settings-help-drawer"]');
@@ -129,10 +101,10 @@ test.describe('Alerts — Additional Settings Help Drawer', {
     }, async ({ page }) => {
         await navigateToAdvancedTab(page, pm);
 
-        // Open drawer
-        const infoBtn = page.locator('[data-test="advanced-template-info-btn"]');
-        await infoBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await infoBtn.click();
+        // Open drawer via the Template Override "Learn more" trigger
+        const learnMore = page.locator('[data-test="advanced-template-info-btn"]');
+        await learnMore.waitFor({ state: 'visible', timeout: 10000 });
+        await learnMore.click();
         await page.locator('[data-test="alert-settings-help-drawer"]').waitFor({ state: 'visible', timeout: 5000 });
 
         // Capture form's Template Override select value BEFORE panel interaction
@@ -172,10 +144,10 @@ test.describe('Alerts — Additional Settings Help Drawer', {
     }, async ({ page }) => {
         await navigateToAdvancedTab(page, pm);
 
-        // Open drawer
-        const infoBtn = page.locator('[data-test="advanced-template-info-btn"]');
-        await infoBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await infoBtn.click();
+        // Open drawer via the Template Override "Learn more" trigger
+        const learnMore = page.locator('[data-test="advanced-template-info-btn"]');
+        await learnMore.waitFor({ state: 'visible', timeout: 10000 });
+        await learnMore.click();
         const drawer = page.locator('[data-test="alert-settings-help-drawer"]');
         await expect(drawer).toBeVisible({ timeout: 5000 });
 
@@ -187,5 +159,31 @@ test.describe('Alerts — Additional Settings Help Drawer', {
         // Drawer must no longer be visible
         await expect(drawer).toBeHidden({ timeout: 5000 });
         testLogger.info('Drawer closed on overlay click');
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Behavior 4: Additional Variables panel — built-in list is collapsed by
+    // default (no upfront wall of chips) and expands on demand.
+    // ─────────────────────────────────────────────────────────────────────────
+    test('Additional Variables help collapses the built-in variables list until expanded', {
+        tag: ['@alerts-help-drawer', '@smoke', '@alerts'],
+    }, async ({ page }) => {
+        await navigateToAdvancedTab(page, pm);
+
+        // Open the Additional Variables "Learn more" trigger
+        const learnMore = page.locator('[data-test="advanced-variables-info-btn"]');
+        await learnMore.waitFor({ state: 'visible', timeout: 10000 });
+        await learnMore.click();
+        await expect(page.locator('[data-test="alert-settings-help-drawer"]')).toBeVisible({ timeout: 5000 });
+
+        // Built-in variable chips are hidden until the disclosure is expanded
+        await expect(page.locator('[data-test="help-builtin-var"]').first()).toBeHidden();
+        const toggle = page.locator('[data-test="help-builtin-toggle"]');
+        await expect(toggle).toBeVisible({ timeout: 5000 });
+
+        // Expanding reveals the chips
+        await toggle.click();
+        await expect(page.locator('[data-test="help-builtin-var"]').first()).toBeVisible({ timeout: 5000 });
+        testLogger.info('Built-in variables list expands on demand');
     });
 });
