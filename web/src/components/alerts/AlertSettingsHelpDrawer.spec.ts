@@ -103,6 +103,26 @@ describe("AlertSettingsHelpDrawer", () => {
     expect(w.find('[data-test="help-builtin-toggle"]').exists()).toBe(true);
   });
 
+  it("resolves every component it renders (no unregistered-component import bug)", () => {
+    // Regression guard: the built-in disclosure renders <OIcon>; if its import
+    // is dropped, Vue emits a 'Failed to resolve component' warning at runtime.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // Don't auto-stub OIcon — let it resolve from the real import.
+    const wrapper = mount(AlertSettingsHelpDrawer, {
+      props: { open: true, topic: "variables" },
+      global: {
+        plugins: [i18n],
+        stubs: { ODrawer: { template: "<div><slot /></div>" } },
+      },
+    });
+    const unresolved = warn.mock.calls
+      .map((c) => String(c[0]))
+      .filter((m) => /Failed to resolve component/.test(m));
+    expect(unresolved).toEqual([]);
+    warn.mockRestore();
+    wrapper.unmount();
+  });
+
   it("renders the built-in variable chips once expanded, including {alert_name}", async () => {
     w = mountDrawer({ topic: "variables" });
     await w.find('[data-test="help-builtin-toggle"]').trigger("click");
