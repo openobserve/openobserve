@@ -13,7 +13,7 @@
       <span
         v-if="row.name"
         :class="[
-          'tw:font-semibold tw:text-[18px] tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:min-w-0 tw:truncate',
+          'tw:font-semibold tw:text-[1.125rem] tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:min-w-0 tw:truncate',
           store.state.theme === 'dark'
             ? 'tw:text-blue-400 tw:bg-blue-900/50'
             : 'tw:text-blue-600 tw:bg-blue-50',
@@ -68,7 +68,7 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem] tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+          class="tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem] tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
         >
           <div
             class="kpi-label tw:text-[0.7rem] tw:leading-normal tw:font-semibold tw:mb-[0.25rem]"
@@ -114,8 +114,8 @@
            edge-to-edge column headers. Bottom padding is opt-in for the
            Configuration (form) tab; the table tabs stay flush to the bottom. -->
       <div
-        class="tw:flex-1 tw:overflow-auto tw:flex tw:flex-col tw:gap-[18px] tw:min-h-0 tw:pt-[18px]"
-        :class="{ 'tw:pb-[18px]': activeTab === 'configuration' }"
+        class="tw:flex-1 tw:overflow-auto tw:flex tw:flex-col tw:gap-[1.125rem] tw:min-h-0 tw:pt-[1.125rem]"
+        :class="{ 'tw:pb-[1.125rem]': activeTab === 'configuration' }"
       >
         <!-- Shared Runs/Failures filter row — agent filter (both tabs),
              right-aligned. The date picker + refresh live in the global
@@ -142,7 +142,7 @@
           <!-- Target -->
           <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
             <h4
-              class="tw:m-0 tw:pb-[6px] tw:inline-flex tw:items-center tw:gap-[6px] tw:text-[13px] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.targetSection") }}
             </h4>
@@ -185,11 +185,11 @@
           <!-- Scorers -->
           <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
             <h4
-              class="tw:m-0 tw:pb-[6px] tw:inline-flex tw:items-center tw:gap-[6px] tw:text-[13px] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.scorersSection") }}
               <span
-                class="tw:inline-flex tw:items-center tw:px-[5px] tw:rounded-[3px] tw:text-[10px] tw:font-semibold tw:text-[var(--color-text-secondary)] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+                class="tw:inline-flex tw:items-center tw:px-[0.3125rem] tw:rounded-[0.1875rem] tw:text-[0.625rem] tw:font-semibold tw:text-[var(--color-text-secondary)] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
                 >{{ resolvedScorers.length }}</span
               >
             </h4>
@@ -226,7 +226,7 @@
                       }}</span>
                       <span
                         v-if="item.scorerTypeLabel"
-                        class="jd-scorers__type tw:text-[10px] tw:font-semibold tw:leading-[1.5]"
+                        class="jd-scorers__type tw:text-[0.625rem] tw:font-semibold tw:leading-[1.5]"
                         :class="`jd-scorers__type--${item.scorerType}`"
                       >
                         {{ item.scorerTypeLabel }}
@@ -265,7 +265,7 @@
                     </div>
                   </div>
                   <span
-                    class="jd-scorers__cta tw:text-[11px] tw:font-semibold"
+                    class="jd-scorers__cta tw:text-[0.6875rem] tw:font-semibold"
                   >
                     <span class="jd-scorers__cta-label">
                       {{ t("onlineEvals.job.detail.viewScorerHint") }}
@@ -284,7 +284,7 @@
           <!-- Sampling -->
           <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
             <h4
-              class="tw:m-0 tw:pb-[6px] tw:inline-flex tw:items-center tw:gap-[6px] tw:text-[13px] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.samplingSection") }}
             </h4>
@@ -304,7 +304,7 @@
           <!-- Metadata -->
           <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
             <h4
-              class="tw:m-0 tw:pb-[6px] tw:inline-flex tw:items-center tw:gap-[6px] tw:text-[13px] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.metadataSection") }}
             </h4>
@@ -993,8 +993,8 @@ function relativeTime(timestampMs: number): string {
 /* — Key/value description lists — */
 .jd-kv {
   display: grid;
-  grid-template-columns: 130px 1fr;
-  gap: 6px 14px;
+  grid-template-columns: 8.125rem 1fr;
+  gap: 0.375rem 0.875rem;
   margin: 0;
 }
 
@@ -1002,14 +1002,14 @@ function relativeTime(timestampMs: number): string {
 // `.alert-v3-inline-label`): 12px / 600, in the muted-secondary color so the
 // label reads as a strong caption while the value below stays primary.
 .jd-kv dt {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .jd-kv dd {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--color-text-primary, currentColor);
   word-break: break-word;
 }
@@ -1018,8 +1018,8 @@ function relativeTime(timestampMs: number): string {
 // bordered, neutral surface + header bar) so condition rendering is consistent
 // across drawers.
 .jd-codeblock {
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 8px;
+  border: 0.0625rem solid var(--color-dialog-header-border, var(--o2-border));
+  border-radius: 0.5rem;
   overflow: hidden;
   background: color-mix(
     in srgb,
@@ -1032,8 +1032,8 @@ function relativeTime(timestampMs: number): string {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  padding: 0.375rem 0.625rem;
+  border-bottom: 0.0625rem solid var(--color-dialog-header-border, var(--o2-border));
   background: color-mix(
     in srgb,
     var(--color-text-secondary) 6%,
@@ -1042,21 +1042,22 @@ function relativeTime(timestampMs: number): string {
 }
 
 .jd-codeblock__label {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .jd-codeblock__content {
   margin: 0;
-  padding: 10px 14px;
+  padding: 0.625rem 0.875rem;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
   color: var(--color-text-primary, currentColor);
   white-space: pre-wrap;
   overflow-x: auto;
-  max-height: 240px;
+  // Hard cap the filter condition height; longer conditions scroll.
+  max-height: 12.5rem;
   overflow-y: auto;
 }
 
@@ -1066,19 +1067,26 @@ function relativeTime(timestampMs: number): string {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0.625rem;
+  // Show ~3 scorer cards (~65px each + 10px gap); the rest scroll. The small
+  // extra lets the 4th card peek as a scroll affordance. padding-right keeps
+  // the scrollbar off the card edges.
+  max-height: 25rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  padding-top:0.625rem
 }
 
 .jd-scorers__card {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
   background: var(--color-card-bg);
-  border: 1px solid
+  border: 0.0625rem solid
     color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
-  border-radius: 8px;
+  border-radius: 0.5rem;
   text-align: left;
   cursor: pointer;
   transition:
@@ -1099,9 +1107,9 @@ function relativeTime(timestampMs: number): string {
     var(--color-primary-600, #3f7994) 4%,
     var(--color-card-bg)
   );
-  box-shadow: 0 1px 3px
+  box-shadow: 0 0.0625rem 0.1875rem
     color-mix(in srgb, var(--color-primary-600, #3f7994) 12%, transparent);
-  transform: translateY(-1px);
+  transform: translateY(-0.0625rem);
 }
 
 .jd-scorers__card:disabled {
@@ -1114,9 +1122,9 @@ function relativeTime(timestampMs: number): string {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  width: 2.125rem;
+  height: 2.125rem;
+  border-radius: 0.5rem;
   background: color-mix(in srgb, #6b76e3 14%, transparent);
   color: #4f5bcf;
 }
@@ -1136,26 +1144,26 @@ function relativeTime(timestampMs: number): string {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 0.3125rem;
 }
 
 .jd-scorers__row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
 .jd-scorers__name {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--color-text-primary, currentColor);
 }
 
 .jd-scorers__type {
   display: inline-flex;
-  padding: 1px 7px;
-  border-radius: 3px;
+  padding: 0.0625rem 0.4375rem;
+  border-radius: 0.1875rem;
   background: color-mix(in srgb, #6b76e3 14%, transparent);
   color: #4f5bcf;
 }
@@ -1166,15 +1174,15 @@ function relativeTime(timestampMs: number): string {
 }
 
 .jd-scorers__version {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .jd-scorers__produces {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: 0.375rem;
+  font-size: 0.75rem;
   color: var(--color-text-secondary, var(--o2-text-secondary));
   flex-wrap: wrap;
 }
@@ -1208,7 +1216,7 @@ function relativeTime(timestampMs: number): string {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 0.25rem;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
@@ -1235,20 +1243,20 @@ function relativeTime(timestampMs: number): string {
 
 .jd-scorers__card:hover:not(:disabled) .jd-scorers__chevron {
   opacity: 1;
-  transform: translateX(2px);
+  transform: translateX(0.125rem);
 }
 
 /* — Runs / Failures status cell — */
 .jd-status-cell {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 0.3125rem;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .jd-status-cell__dot {
-  width: 6px;
-  height: 6px;
+  width: 0.375rem;
+  height: 0.375rem;
   border-radius: 50%;
   background: var(--color-text-secondary, var(--o2-text-secondary));
 }
