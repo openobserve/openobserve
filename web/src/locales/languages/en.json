@@ -4114,6 +4114,7 @@
       "turn": "turn",
       "turns": "turns",
       "turnsShown": "{filtered} of {total} {unit} shown",
+      "turnCount": "{count} {unit}",
       "userBadge": "User",
       "sessionPrefix": "session",
       "copySessionId": "Copy session id",
@@ -4122,17 +4123,8 @@
       "filters": {
         "status": "Status",
         "model": "Model",
-        "sort": "Sort",
         "all": "All"
       },
-      "sort": {
-        "turn": "By Turn",
-        "cost": "By Cost",
-        "latency": "By Latency",
-        "severity": "By Severity"
-      },
-      "jumpMostExpensive": "Most Expensive",
-      "jumpCostliestError": "Costliest Error",
       "expandToView": "Expand To View Response",
       "noTurnsMatch": "No Turns Match Your Filters",
       "viewCollapsed": "Collapsed",

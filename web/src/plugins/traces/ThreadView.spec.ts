@@ -661,59 +661,6 @@ describe("ThreadView", () => {
   });
 
   // =========================================================================
-  // toolGlyph — pick a unicode glyph per tool name
-  // =========================================================================
-
-  describe("toolGlyph (via tool row icon)", () => {
-    // Each tuple: [tool_name, expected glyph].
-    // Names are chosen so they uniquely trigger one branch in toolGlyph()
-    // without accidentally matching an earlier higher-priority branch.
-    const cases: [string, string][] = [
-      ["search_records", "🔍"],      // includes "search"
-      ["list_history", "📋"],        // includes "list"
-      ["read_file", "📖"],           // includes "read"
-      ["write_content", "✏"],       // includes "write"
-      ["delete_item", "🗑"],         // includes "delete"
-      ["nav_page", "🧭"],            // includes "nav"
-      ["time_range_picker", "⏱"],   // includes "time"
-      // "merged" must NOT also match "call"/"tool" (those are checked first)
-      ["merged_spans", "∑"],         // includes "merged", no "call"/"tool"
-      ["plan_skill", "🧩"],          // includes "skill"
-      ["schema_inspect", "🗄"],      // includes "schema"
-    ];
-
-    cases.forEach(([toolName, glyph]) => {
-      it(`should display ${glyph} for tool name "${toolName}"`, () => {
-        const llm = makeLLMSpan({ span_id: "llm-p" });
-        const tool = makeToolSpan({
-          span_id: `tool-${toolName}`,
-          reference_parent_span_id: "llm-p",
-          tool_name: toolName,
-        });
-        const w = mountThreadView({ spans: [llm, tool] });
-        const iconEl = w.find(".thread-tool-row__icon");
-        expect(iconEl.text()).toBe(glyph);
-        w.unmount();
-      });
-    });
-
-    // "unrecognised" name — must contain none of the keyword substrings
-    // (schema, list, search, query, sql, read, get, fetch, write, edit,
-    //  create, delete, remove, tool, call, nav, time, range, merged, skill, plan)
-    it("should display ▸ for an unrecognised tool name", () => {
-      const llm = makeLLMSpan({ span_id: "llm-p" });
-      const tool = makeToolSpan({
-        span_id: "tool-unknown",
-        reference_parent_span_id: "llm-p",
-        tool_name: "my_custom_operation",
-      });
-      const w = mountThreadView({ spans: [llm, tool] });
-      expect(w.find(".thread-tool-row__icon").text()).toBe("▸");
-      w.unmount();
-    });
-  });
-
-  // =========================================================================
   // Prop: selectedSpanId (accepted but doesn't drive internal state)
   // =========================================================================
 

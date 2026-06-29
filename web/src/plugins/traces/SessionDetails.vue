@@ -247,8 +247,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Conversation column: toolbar + panel -->
       <div class="tw:flex tw:flex-col tw:min-w-0 tw:min-h-0">
 
-      <!-- Conversation toolbar: search (fills width) + status + model + sort.
-           Kept visible in both views; filters/sort drive the Collapsed list. -->
+      <!-- Conversation toolbar: search (fills width) + status + model filters.
+           Sorting lives on the Collapsed view's metric column headers. -->
       <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:mb-[0.625rem] tw:flex-shrink-0">
         <OSearchInput
           v-model="searchText"
@@ -274,14 +274,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="modelOptions"
           />
         </div>
-        <div class="tw:w-[11rem] tw:flex-shrink-0">
-          <OSelect
-            v-model="sortMode"
-            :label="t('traces.sessionDetail.filters.sort')"
-            label-position="inside"
-            :options="sortOptions"
-          />
-        </div>
       </div>
 
       <!-- Conversation panel -->
@@ -297,10 +289,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t('traces.sessionDetail.conversation') }}
           </span>
           <OBadge size="sm" variant="default-soft">
-            {{ t('traces.sessionDetail.turnsShown', {
-              filtered: filteredTraces.length,
-              total: traces.length,
-              unit: traces.length === 1 ? t('traces.sessionDetail.turn') : t('traces.sessionDetail.turns'),
+            {{ t('traces.sessionDetail.turnCount', {
+              count: filteredTraces.length,
+              unit: filteredTraces.length === 1 ? t('traces.sessionDetail.turn') : t('traces.sessionDetail.turns'),
             }) }}
           </OBadge>
           <OToggleGroup :model-value="viewMode" @update:model-value="setViewMode">
@@ -311,27 +302,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t('traces.sessionDetail.viewPretty') }}
             </OToggleGroupItem>
           </OToggleGroup>
-          <div class="tw:flex-1"></div>
-          <template v-if="viewMode === 'collapsed'">
-            <OButton
-              v-if="sessionStats"
-              variant="outline"
-              size="sm"
-              @click="jumpToTurn(sessionStats.peakTurn)"
-            >
-              <OIcon name="trending-up" size="xs" class="tw:mr-[0.25rem]" />
-              {{ t('traces.sessionDetail.jumpMostExpensive') }}
-            </OButton>
-            <OButton
-              v-if="costliestErrorTurn"
-              variant="outline"
-              size="sm"
-              @click="jumpToTurn(costliestErrorTurn)"
-            >
-              <OIcon name="error-outline" size="xs" class="tw:mr-[0.25rem]" />
-              {{ t('traces.sessionDetail.jumpCostliestError') }}
-            </OButton>
-          </template>
         </div>
 
         <!-- Conversation body — ONE scroll container holding both views -->
@@ -342,6 +312,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="viewMode === 'collapsed'"
           class="tw:flex tw:flex-col tw:gap-[0.5rem] tw:p-[0.5rem]"
         >
+          <!-- column headers — clickable sort controls for the three metric bars
+               (OTable-style arrows). Aligned to the same grid template as each
+               turn row, sticky so they persist on scroll. -->
+          <div
+            v-if="filteredTraces.length"
+            class="tw:sticky tw:top-0 tw:z-[5] tw:grid tw:grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] tw:items-center tw:gap-[0.75rem] tw:px-[0.75rem] tw:py-[0.4rem] tw:bg-[var(--o2-card-bg-solid)] tw:border-b tw:border-[var(--o2-border-color)] tw:text-[0.72rem] tw:font-medium tw:text-[var(--o2-text-primary)]"
+            data-test="session-turn-columns"
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+            <button
+              v-for="col in sortableColumns"
+              :key="col.key"
+              type="button"
+              class="tw:flex tw:items-center tw:justify-end tw:gap-[0.15rem] tw:cursor-pointer tw:select-none hover:tw:text-[var(--o2-text-primary)]"
+              :data-test="`session-turn-sort-${col.key}`"
+              @click="toggleSort(col.key)"
+            >
+              {{ t(col.label) }}
+              <OIcon
+                :name="sortIconName(col.key)"
+                size="xs"
+                :class="sortIcon(col.key) === 'none' ? 'tw:opacity-40' : 'tw:text-[var(--color-table-sort-icon-active)]'"
+              />
+            </button>
+          </div>
           <div
             v-for="trace in filteredTraces"
             :key="trace.traceId"
@@ -351,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- collapsed header (click to expand) -->
             <div
-              class="tw:grid tw:grid-cols-[auto_auto_minmax(0,1fr)_auto_5rem_5rem] tw:items-center tw:gap-[0.75rem] tw:px-[0.75rem] tw:py-[0.6rem] tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_3%,var(--o2-card-bg))]"
+              class="tw:grid tw:grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] tw:items-center tw:gap-[0.75rem] tw:px-[0.75rem] tw:py-[0.6rem] tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_3%,var(--o2-card-bg))]"
               @click="toggleTurn(trace.traceId)"
             >
               <OIcon
@@ -378,12 +375,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ secondaryLine(trace) }}
                 </div>
               </div>
-              <OBadge
-                size="sm"
-                :variant="trace.status === 'error' ? 'error-soft' : 'success-soft'"
-              >
-                {{ trace.status === 'error' ? t('traces.sessionDetail.statusError') : t('traces.sessionDetail.statusOk') }}
-              </OBadge>
               <div class="tw:flex tw:flex-col tw:gap-[0.2rem] tw:min-w-0">
                 <span class="tw:text-[0.72rem] tw:font-semibold tw:tabular-nums tw:text-right tw:text-[var(--o2-text-secondary)]">
                   {{ formatDuration(trace.durationNanos) }}
@@ -400,6 +391,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <OProgressBar :value="ratio(trace.cost, maxTurnCost)" size="xs" />
               </div>
+              <div class="tw:flex tw:flex-col tw:gap-[0.2rem] tw:min-w-0">
+                <span class="tw:text-[0.72rem] tw:font-semibold tw:tabular-nums tw:text-right tw:text-[var(--o2-text-secondary)]">
+                  {{ formatTokens(trace.tokens) }}
+                </span>
+                <OProgressBar :value="ratio(trace.tokens, maxTurnTokens)" size="xs" />
+              </div>
             </div>
 
             <!-- expanded body (basic messages + stats; full Ledger is S6) -->
@@ -408,7 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:border-t tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg-solid)] tw:p-[0.75rem]"
             >
               <!-- loading skeleton -->
-              <div v-if="turnDetailLoading[trace.traceId]" class="tw:flex tw:flex-col tw:gap-[0.4rem]">
+              <div v-if="sessionSpansLoading" class="tw:flex tw:flex-col tw:gap-[0.4rem]">
                 <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[40%] tw:h-[0.7rem]" />
                 <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[90%] tw:h-[0.65rem]" />
                 <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[80%] tw:h-[0.65rem]" />
@@ -434,6 +431,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ turnDetail(trace.traceId)?.userMessage?.content || t('traces.sessionDetail.noUserMessage') }}
                   </div>
                 </div>
+
+                <!-- tool calls — between user input and assistant output, same
+                     "Show calls" thread used by the Pretty view (ThreadView) -->
+                <ThreadToolCalls
+                  :tool-calls="toolCallsForTurn(trace.traceId)"
+                  @span-selected="onSpanSelected"
+                />
 
                 <!-- assistant block -->
                 <div class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:overflow-hidden">
@@ -502,6 +506,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ThreadView
             v-else
             :spans="sessionSpans"
+            :show-summary="false"
+            condense-turns
             @span-selected="onSpanSelected"
           />
         </div>
@@ -514,87 +520,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:flex-col tw:gap-[0.625rem] tw:min-h-0 tw:overflow-y-auto tw:pb-[0.625rem]"
         data-test="session-rail"
       >
-        <!-- Slowest Turns -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-shrink-0">
-          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)]">
-            <OIcon name="schedule" size="xs" class="tw:text-[var(--o2-text-muted)]" />
-            <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
-              {{ t('traces.sessionDetail.rail.slowestTurns') }}
-            </span>
-          </div>
-          <div class="tw:max-h-[13rem] tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
-            <TurnPreviewCard
-              v-for="(row, i) in slowestTurns"
-              :key="row.n"
-              :turn="traces[row.n - 1]"
-              :index="row.n - 1"
-              :cache-pct="cacheRatio"
-            >
-              <button
-                class="tw:flex tw:items-center tw:gap-[0.5rem] tw:w-full tw:px-[0.4rem] tw:py-[0.35rem] tw:rounded-md tw:text-left tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
-                @click="jumpToTurn(row.n)"
-              >
-                <span class="tw:w-[1.25rem] tw:h-[1.25rem] tw:rounded-md tw:grid tw:place-items-center tw:text-[0.62rem] tw:font-bold tw:tabular-nums tw:flex-shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)] tw:text-[var(--o2-text-secondary)]">
-                  {{ i + 1 }}
-                </span>
-                <span class="tw:text-[0.72rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:w-[2.75rem] tw:flex-shrink-0">
-                  {{ t('traces.sessionDetail.turnLabel') }} {{ row.n }}
-                </span>
-                <span class="tw:flex-1 tw:min-w-0">
-                  <OProgressBar :value="ratio(row.lat, maxTurnLat)" :variant="row.status === 'error' ? 'danger' : 'warning'" size="xs" />
-                </span>
-                <span class="tw:text-[0.7rem] tw:font-semibold tw:tabular-nums tw:text-[var(--o2-text-secondary)] tw:min-w-[2.75rem] tw:text-right">
-                  {{ formatDuration(row.lat) }}
-                </span>
-                <OIcon name="chevron-right" size="xs" class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0" />
-              </button>
-            </TurnPreviewCard>
-          </div>
-        </div>
-
-        <!-- Cost Hotspots -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-shrink-0">
-          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)]">
-            <OIcon name="trending-up" size="xs" class="tw:text-[var(--o2-text-muted)]" />
-            <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
-              {{ t('traces.sessionDetail.rail.costHotspots') }}
-            </span>
-          </div>
-          <div class="tw:max-h-[13rem] tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
-            <TurnPreviewCard
-              v-for="(row, i) in costHotspots"
-              :key="row.n"
-              :turn="traces[row.n - 1]"
-              :index="row.n - 1"
-              :cache-pct="cacheRatio"
-            >
-              <button
-                class="tw:flex tw:items-center tw:gap-[0.5rem] tw:w-full tw:px-[0.4rem] tw:py-[0.35rem] tw:rounded-md tw:text-left tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
-                @click="jumpToTurn(row.n)"
-              >
-                <span class="tw:w-[1.25rem] tw:h-[1.25rem] tw:rounded-md tw:grid tw:place-items-center tw:text-[0.62rem] tw:font-bold tw:tabular-nums tw:flex-shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)] tw:text-[var(--o2-text-secondary)]">
-                  {{ i + 1 }}
-                </span>
-                <span class="tw:text-[0.72rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:w-[2.75rem] tw:flex-shrink-0">
-                  {{ t('traces.sessionDetail.turnLabel') }} {{ row.n }}
-                </span>
-                <span class="tw:flex-1 tw:min-w-0">
-                  <OProgressBar :value="ratio(row.cost, maxTurnCost)" size="xs" />
-                </span>
-                <span class="tw:flex tw:flex-col tw:items-end tw:min-w-[3.25rem]">
-                  <span class="tw:text-[0.7rem] tw:font-semibold tw:tabular-nums tw:text-[var(--o2-text-secondary)]">
-                    ${{ row.cost.toFixed(4) }}
-                  </span>
-                  <span v-if="detail && detail.cost > 0" class="tw:text-[0.6rem] tw:tabular-nums tw:text-[var(--o2-text-muted)]">
-                    {{ ((row.cost / detail.cost) * 100).toFixed(1) }}%
-                  </span>
-                </span>
-                <OIcon name="chevron-right" size="xs" class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0" />
-              </button>
-            </TurnPreviewCard>
-          </div>
-        </div>
-
         <!-- Tool Hotspots (by time + calls; cost pending backend attribution) -->
         <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-shrink-0">
           <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)]">
@@ -646,6 +571,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t('traces.sessionDetail.rail.noTools') }}
           </div>
         </div>
+
+        <!-- Cost Hotspots -->
+        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-shrink-0">
+          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)]">
+            <OIcon name="trending-up" size="xs" class="tw:text-[var(--o2-text-muted)]" />
+            <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
+              {{ t('traces.sessionDetail.rail.costHotspots') }}
+            </span>
+          </div>
+          <div class="tw:max-h-[13rem] tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
+            <TurnPreviewCard
+              v-for="(row, i) in costHotspots"
+              :key="row.n"
+              :turn="traces[row.n - 1]"
+              :index="row.n - 1"
+              :cache-pct="cacheRatio"
+            >
+              <button
+                class="tw:flex tw:items-center tw:gap-[0.5rem] tw:w-full tw:px-[0.4rem] tw:py-[0.35rem] tw:rounded-md tw:text-left tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
+                @click="jumpToTurn(row.n)"
+              >
+                <span class="tw:w-[1.25rem] tw:h-[1.25rem] tw:rounded-md tw:grid tw:place-items-center tw:text-[0.62rem] tw:font-bold tw:tabular-nums tw:flex-shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)] tw:text-[var(--o2-text-secondary)]">
+                  {{ i + 1 }}
+                </span>
+                <span class="tw:text-[0.72rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:w-[2.75rem] tw:flex-shrink-0">
+                  {{ t('traces.sessionDetail.turnLabel') }} {{ row.n }}
+                </span>
+                <span class="tw:flex-1 tw:min-w-0">
+                  <OProgressBar :value="ratio(row.cost, maxTurnCost)" size="xs" />
+                </span>
+                <span class="tw:flex tw:flex-col tw:items-end tw:min-w-[3.25rem]">
+                  <span class="tw:text-[0.7rem] tw:font-semibold tw:tabular-nums tw:text-[var(--o2-text-secondary)]">
+                    ${{ row.cost.toFixed(4) }}
+                  </span>
+                  <span v-if="detail && detail.cost > 0" class="tw:text-[0.6rem] tw:tabular-nums tw:text-[var(--o2-text-muted)]">
+                    {{ ((row.cost / detail.cost) * 100).toFixed(1) }}%
+                  </span>
+                </span>
+                <OIcon name="chevron-right" size="xs" class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0" />
+              </button>
+            </TurnPreviewCard>
+          </div>
+        </div>
+
+        <!-- Slowest Turns -->
+        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-shrink-0">
+          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)]">
+            <OIcon name="schedule" size="xs" class="tw:text-[var(--o2-text-muted)]" />
+            <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
+              {{ t('traces.sessionDetail.rail.slowestTurns') }}
+            </span>
+          </div>
+          <div class="tw:max-h-[13rem] tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
+            <TurnPreviewCard
+              v-for="(row, i) in slowestTurns"
+              :key="row.n"
+              :turn="traces[row.n - 1]"
+              :index="row.n - 1"
+              :cache-pct="cacheRatio"
+            >
+              <button
+                class="tw:flex tw:items-center tw:gap-[0.5rem] tw:w-full tw:px-[0.4rem] tw:py-[0.35rem] tw:rounded-md tw:text-left tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
+                @click="jumpToTurn(row.n)"
+              >
+                <span class="tw:w-[1.25rem] tw:h-[1.25rem] tw:rounded-md tw:grid tw:place-items-center tw:text-[0.62rem] tw:font-bold tw:tabular-nums tw:flex-shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)] tw:text-[var(--o2-text-secondary)]">
+                  {{ i + 1 }}
+                </span>
+                <span class="tw:text-[0.72rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:w-[2.75rem] tw:flex-shrink-0">
+                  {{ t('traces.sessionDetail.turnLabel') }} {{ row.n }}
+                </span>
+                <span class="tw:flex-1 tw:min-w-0">
+                  <OProgressBar :value="ratio(row.lat, maxTurnLat)" :variant="row.status === 'error' ? 'danger' : 'warning'" size="xs" />
+                </span>
+                <span class="tw:text-[0.7rem] tw:font-semibold tw:tabular-nums tw:text-[var(--o2-text-secondary)] tw:min-w-[2.75rem] tw:text-right">
+                  {{ formatDuration(row.lat) }}
+                </span>
+                <OIcon name="chevron-right" size="xs" class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0" />
+              </button>
+            </TurnPreviewCard>
+          </div>
+        </div>
       </aside>
       </div>
     </template>
@@ -666,7 +672,13 @@ import {
   type SessionDetail,
   type SessionTraceRow,
   type TurnDetail,
+  type TurnMessage,
 } from "./composables/useSessions";
+import {
+  messagesFromInput,
+  messagesFromOutput,
+  getModel,
+} from "./threadView.utils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -680,6 +692,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import TurnPreviewCard from "./TurnPreviewCard.vue";
 import SessionRibbon from "./SessionRibbon.vue";
 import ThreadView from "./ThreadView.vue";
+import ThreadToolCalls from "./ThreadToolCalls.vue";
 
 import {
   splitNumberWithUnit,
@@ -692,7 +705,7 @@ const route = useRoute();
 const router = useRouter();
 const store = useStore();
 
-const { fetchSession, fetchTurnDetail, fetchSessionSpans } = useSessions();
+const { fetchSession, fetchSessionSpans } = useSessions();
 const detail = ref<SessionDetail | null>(null);
 const traces = ref<SessionTraceRow[]>([]);
 const loading = ref(false);
@@ -906,18 +919,49 @@ const kpiCards = computed<
 const searchText = ref("");
 const statusFilter = ref<"all" | "ok" | "error">("all");
 const modelFilter = ref<string>("all");
-const sortMode = ref<"turn" | "cost" | "latency" | "severity">("turn");
+
+// Sort state is shared between the toolbar Sort dropdown and the clickable
+// column headers (OTable-style). `sortKey` = which metric; `sortDir` = order.
+type SortKey = "turn" | "latency" | "cost" | "tokens";
+const sortKey = ref<SortKey>("turn");
+const sortDir = ref<"asc" | "desc">("asc");
+
+// The metric columns that have a sortable header (latency / cost / tokens).
+const sortableColumns: { key: Extract<SortKey, "latency" | "cost" | "tokens">; label: string }[] = [
+  { key: "latency", label: "traces.sessionDetail.kpi.latency" },
+  { key: "cost", label: "traces.sessionDetail.kpi.cost" },
+  { key: "tokens", label: "traces.sessionDetail.kpi.tokens" },
+];
+
+// Header click: cycle this column none → desc → asc → none (back to turn order).
+function toggleSort(key: SortKey) {
+  if (sortKey.value !== key) {
+    sortKey.value = key;
+    sortDir.value = "desc";
+  } else if (sortDir.value === "desc") {
+    sortDir.value = "asc";
+  } else {
+    sortKey.value = "turn";
+    sortDir.value = "asc";
+  }
+}
+// Which arrow a given column shows.
+function sortIcon(key: SortKey): "asc" | "desc" | "none" {
+  return sortKey.value === key ? sortDir.value : "none";
+}
+function sortIconName(key: SortKey): string {
+  const s = sortIcon(key);
+  return s === "asc"
+    ? "arrow-upward"
+    : s === "desc"
+      ? "arrow-downward"
+      : "unfold-more";
+}
 
 const statusOptions = computed(() => [
   { label: t("traces.sessionDetail.filters.all"), value: "all" },
   { label: t("traces.sessionDetail.statusOk"), value: "ok" },
   { label: t("traces.sessionDetail.statusError"), value: "error" },
-]);
-const sortOptions = computed(() => [
-  { label: t("traces.sessionDetail.sort.turn"), value: "turn" },
-  { label: t("traces.sessionDetail.sort.cost"), value: "cost" },
-  { label: t("traces.sessionDetail.sort.latency"), value: "latency" },
-  { label: t("traces.sessionDetail.sort.severity"), value: "severity" },
 ]);
 const modelOptions = computed(() => {
   const models = new Set<string>();
@@ -928,10 +972,103 @@ const modelOptions = computed(() => {
   ];
 });
 
-// Lazy per-turn detail — populated on first expand of a given turn.
-const turnDetails = reactive<Record<string, TurnDetail>>({});
-const turnDetailLoading = reactive<Record<string, boolean>>({});
 const expandedTurns = reactive<Record<string, boolean>>({});
+
+// Per-turn detail is DERIVED from the session spans we already fetch eagerly
+// (`sessionSpans`) — the SAME single source that powers the Pretty view and the
+// Tool Hotspots. This guarantees the collapsed turn body, the tool hotspots, and
+// the transcript can never disagree. (Previously a separate per-turn query could
+// come back empty while the spans clearly contained tools — so clicking a tool
+// hotspot jumped to a turn that reported "0 tool calls".) Spans are grouped by
+// `trace_id` and classified exactly like ThreadView / the old fetchTurnDetail.
+const LLM_OPS = new Set([
+  "chat",
+  "text_completion",
+  "generate_content",
+  "embeddings",
+]);
+
+const turnDetailsByTrace = computed<Record<string, TurnDetail>>(() => {
+  const byTrace: Record<string, any[]> = {};
+  for (const s of sessionSpans.value) {
+    const tid = String(s.trace_id || "");
+    if (!tid) continue;
+    (byTrace[tid] ||= []).push(s);
+  }
+
+  const out: Record<string, TurnDetail> = {};
+  for (const tid of Object.keys(byTrace)) {
+    const spans = byTrace[tid]
+      .slice()
+      .sort(
+        (a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0),
+      );
+
+    let llmCalls = 0;
+    let toolCalls = 0;
+    let otherCalls = 0;
+    const otherOps = new Set<string>();
+    for (const sp of spans) {
+      const op = String(sp.gen_ai_operation_name || "").toLowerCase();
+      if (LLM_OPS.has(op)) llmCalls += 1;
+      else if (op === "execute_tool") toolCalls += 1;
+      else {
+        otherCalls += 1;
+        if (op) otherOps.add(op);
+      }
+    }
+
+    // user question = last user-role entry of a span's full prompt; model = the
+    // first span that carries one.
+    let userMessage: TurnMessage | null = null;
+    let model: string | null = null;
+    for (const sp of spans) {
+      if (!model) {
+        const m = getModel(sp);
+        if (m) model = m;
+      }
+      if (!userMessage) {
+        const inputMsgs = messagesFromInput(sp.gen_ai_input_messages);
+        for (let i = inputMsgs.length - 1; i >= 0; i--) {
+          if (inputMsgs[i].role === "user" && inputMsgs[i].content) {
+            userMessage = { role: "user", content: inputMsgs[i].content };
+            break;
+          }
+        }
+      }
+      if (userMessage && model) break;
+    }
+
+    // assistant reply = final non-empty assistant message (walk newest → oldest).
+    let assistantMessage: TurnMessage | null = null;
+    for (let s = spans.length - 1; s >= 0; s--) {
+      const outputMsgs = messagesFromOutput(spans[s].gen_ai_output_messages);
+      let a: any = null;
+      for (let i = outputMsgs.length - 1; i >= 0; i--) {
+        if (outputMsgs[i].role === "assistant" && outputMsgs[i].content) {
+          a = outputMsgs[i];
+          break;
+        }
+      }
+      if (a) {
+        assistantMessage = { role: "assistant", content: a.content };
+        break;
+      }
+    }
+
+    out[tid] = {
+      traceId: tid,
+      userMessage,
+      assistantMessage,
+      model,
+      llmCalls,
+      toolCalls,
+      otherCalls,
+      otherOps: [...otherOps].sort(),
+    };
+  }
+  return out;
+});
 
 const filteredTraces = computed(() => {
   const q = searchText.value.trim().toLowerCase();
@@ -945,7 +1082,7 @@ const filteredTraces = computed(() => {
         .join(" ")
         .toLowerCase();
       if (!hay.includes(q)) {
-        const td = turnDetails[tr.traceId];
+        const td = turnDetailsByTrace.value[tr.traceId];
         const msgHay = [
           td?.userMessage?.content || "",
           td?.assistantMessage?.content || "",
@@ -957,16 +1094,16 @@ const filteredTraces = computed(() => {
     }
     return true;
   });
-  if (sortMode.value === "cost")
-    rows = [...rows].sort((a, b) => b.cost - a.cost);
-  else if (sortMode.value === "latency")
-    rows = [...rows].sort((a, b) => b.durationNanos - a.durationNanos);
-  else if (sortMode.value === "severity")
-    rows = [...rows].sort(
-      (a, b) =>
-        Number(b.status === "error") - Number(a.status === "error") ||
-        b.durationNanos - a.durationNanos,
-    );
+  const dir = sortDir.value === "asc" ? 1 : -1;
+  if (sortKey.value === "latency")
+    rows = [...rows].sort((a, b) => (a.durationNanos - b.durationNanos) * dir);
+  else if (sortKey.value === "cost")
+    rows = [...rows].sort((a, b) => (a.cost - b.cost) * dir);
+  else if (sortKey.value === "tokens")
+    rows = [...rows].sort((a, b) => (a.tokens - b.tokens) * dir);
+  else if (sortKey.value === "turn" && dir === -1)
+    // "turn" asc is the natural (chronological) order; desc reverses it.
+    rows = [...rows].reverse();
   return rows;
 });
 
@@ -977,45 +1114,35 @@ function isExpanded(traceId: string): boolean {
   return !!expandedTurns[traceId];
 }
 function turnDetail(traceId: string): TurnDetail | undefined {
-  return turnDetails[traceId];
+  return turnDetailsByTrace.value[traceId];
 }
 
-async function loadTurnDetail(traceId: string) {
-  if (turnDetails[traceId] || turnDetailLoading[traceId]) return;
-  turnDetailLoading[traceId] = true;
-  try {
-    turnDetails[traceId] = await fetchTurnDetail(
-      streamName.value,
-      traceId,
-      startTime.value,
-      endTime.value,
-    );
-  } catch (e: any) {
-    console.error("Turn detail fetch error:", e?.raw ?? e);
-    // Surface an empty turn so the user sees the block instead of a
-    // forever-spinning loader — they can still inspect the trace.
-    turnDetails[traceId] = {
-      traceId,
-      userMessage: null,
-      assistantMessage: null,
-      model: null,
-      llmCalls: 0,
-      toolCalls: 0,
-      otherCalls: 0,
-      otherOps: [],
-    };
-  } finally {
-    turnDetailLoading[traceId] = false;
+// Per-turn execute_tool spans (for the collapsed body's "Show calls" thread),
+// grouped from the same sessionSpans + ordered chronologically.
+const toolSpansByTrace = computed<Record<string, any[]>>(() => {
+  const out: Record<string, any[]> = {};
+  for (const s of sessionSpans.value) {
+    if (String(s.gen_ai_operation_name || "").toLowerCase() !== "execute_tool")
+      continue;
+    const tid = String(s.trace_id || "");
+    if (!tid) continue;
+    (out[tid] ||= []).push(s);
   }
+  for (const tid of Object.keys(out)) {
+    out[tid].sort(
+      (a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0),
+    );
+  }
+  return out;
+});
+function toolCallsForTurn(traceId: string): any[] {
+  return toolSpansByTrace.value[traceId] || [];
 }
 
 function toggleTurn(traceId: string) {
-  if (expandedTurns[traceId]) {
-    expandedTurns[traceId] = false;
-    return;
-  }
-  expandedTurns[traceId] = true;
-  loadTurnDetail(traceId);
+  expandedTurns[traceId] = !expandedTurns[traceId];
+  // Detail is derived from sessionSpans; make sure those are (being) fetched.
+  if (expandedTurns[traceId]) loadSessionSpans();
 }
 
 // ── View mode: Collapsed (turn list) vs Pretty (ThreadView transcript) ──
@@ -1056,17 +1183,6 @@ function onSpanSelected(spanId: string) {
   const span = sessionSpans.value.find((s) => s.span_id === spanId);
   if (span?.trace_id) openTrace(span.trace_id);
 }
-
-// Peak-cost turn (1-based) and costliest *error* turn — drive the panel's jump
-// buttons. peakTurn already lives on sessionStats; this is the error variant.
-const costliestErrorTurn = computed<number | null>(() => {
-  const errs = traces.value
-    .map((tr, i) => ({ tr, i }))
-    .filter((x) => x.tr.status === "error");
-  if (!errs.length) return null;
-  errs.sort((a, b) => b.tr.cost - a.tr.cost);
-  return errs[0].i + 1;
-});
 
 // ── Right-rail hotspots ────────────────────────────────────────────────────
 // Slowest turns + cost hotspots come from `traces`. Tool hotspots come from the
@@ -1120,9 +1236,6 @@ const toolHotspots = computed<ToolHotspot[]>(() => {
   }
   return Object.values(agg).sort((x, y) => y.duration - x.duration);
 });
-const maxToolDuration = computed(() =>
-  toolHotspots.value.reduce((m, t) => Math.max(m, t.duration), 0),
-);
 
 // Jump to a turn (1-based): clear filters so it's visible, expand it, then
 // scroll it into view and briefly flash it. Wired from the KPI chips, the
@@ -1132,11 +1245,12 @@ function jumpToTurn(n: number) {
   searchText.value = "";
   statusFilter.value = "all";
   modelFilter.value = "all";
-  sortMode.value = "turn";
+  sortKey.value = "turn";
+  sortDir.value = "asc";
   const trace = traces.value[n - 1];
   if (!trace) return;
   expandedTurns[trace.traceId] = true;
-  loadTurnDetail(trace.traceId);
+  loadSessionSpans();
   nextTick(() => {
     const el = document.getElementById(`turn-${n}`);
     if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -1173,6 +1287,9 @@ function trunc(s: string | null | undefined, n: number): string {
 // Per-turn bar denominators (max across turns) for the latency/cost mini-bars.
 const maxTurnCost = computed(() => sessionStats.value?.maxCost ?? 0);
 const maxTurnLat = computed(() => sessionStats.value?.slowestLat ?? 0);
+const maxTurnTokens = computed(() =>
+  traces.value.reduce((m, tr) => Math.max(m, tr.tokens), 0),
+);
 function ratio(v: number, max: number): number {
   return max > 0 ? Math.min(1, v / max) : 0;
 }
@@ -1180,7 +1297,7 @@ function ratio(v: number, max: number): number {
 // Collapsed-row secondary line: the assistant reply once the turn is loaded,
 // otherwise the error label / model / a hint to expand.
 function secondaryLine(trace: SessionTraceRow): string {
-  const td = turnDetails[trace.traceId];
+  const td = turnDetailsByTrace.value[trace.traceId];
   if (td?.assistantMessage?.content) return trunc(td.assistantMessage.content, 90);
   if (trace.status === "error") return t("traces.sessionDetail.statusError");
   return trace.model || t("traces.sessionDetail.expandToView");
