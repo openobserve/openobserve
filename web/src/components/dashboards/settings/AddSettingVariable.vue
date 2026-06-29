@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <div class="tw:flex tw:flex-col tw:h-full">
-      <DashboardHeader :title="title" backButton @back="close">
+  <div class="tw:h-full">
+    <div class="tw:flex tw:flex-col tw:max-h-full">
+      <DashboardHeader class="tw:shrink-0" :title="title" backButton @back="close">
       </DashboardHeader>
 
       <div
-        class="tw:overflow-y-auto tw:px-[3px] tw:max-h-[calc(100vh-170px)] tw:[scrollbar-width:thin] tw:[&::-webkit-scrollbar]:w-[6px] tw:[&::-webkit-scrollbar]:bg-transparent tw:[&::-webkit-scrollbar-thumb]:rounded"
+        class="tw:min-h-0 tw:overflow-y-auto tw:px-[3px] tw:[scrollbar-width:thin] tw:[&::-webkit-scrollbar]:w-[6px] tw:[&::-webkit-scrollbar]:bg-transparent tw:[&::-webkit-scrollbar-thumb]:rounded"
         :class="store.state.theme === 'dark' ? 'tw:[scrollbar-color:#4b5563_transparent] tw:[&::-webkit-scrollbar-thumb]:bg-[#4b5563]' : 'tw:[scrollbar-color:#d1d5db_transparent] tw:[&::-webkit-scrollbar-thumb]:bg-[#d1d5db]'"
       >
         <OForm
@@ -544,7 +544,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="tw:sticky tw:bottom-0 tw:left-0 tw:w-full tw:pt-3 tw:pb-2 tw:px-0 tw:flex tw:justify-center tw:gap-4 tw:z-10 tw:border-t"
+        class="tw:shrink-0 tw:w-full tw:pt-3 tw:pb-2 tw:px-0 tw:flex tw:justify-center tw:gap-4 tw:border-t"
         :class="store.state.theme === 'dark' ? 'tw:border-t-[#333] tw:[box-shadow:rgb(20,20,20)_0px_-4px_7px_0px]' : 'tw:border-t-[#eee] tw:[box-shadow:rgb(240,240,240)_0px_-4px_7px_0px]'"
       >
         <OButton
