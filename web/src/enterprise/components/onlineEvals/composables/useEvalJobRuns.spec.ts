@@ -2,7 +2,7 @@
 // Tests for useEvalJobRuns — the Runs / Failures data backbone of the Eval
 // Job detail drawer. The composable splits into two refresh paths:
 //   • KPIs: eager — fires whenever the drawer is open (jobId set)
-//   • runs hits + failures-by-scorer rollup: lazy — only when the Runs or
+//   • runs hits + status-filtered failures hits: lazy — only when the Runs or
 //     Failures tab is the active one
 // We mock `executeQuery` so the tests drive the SQL boundary directly.
 
@@ -168,11 +168,11 @@ describe("useEvalJobRuns — table refresh (lazy)", () => {
     useEvalJobRuns(ref<string | null>("job-1"), ref(DEFAULT_WINDOW), enabled);
     await flushAsync();
 
-    // Only the KPI query, not the runs + failures-by-scorer queries.
+    // Only the KPI query, not the runs + failures queries.
     expect(mockExecuteQuery).toHaveBeenCalledTimes(1);
   });
 
-  it("fires the runs + failures-by-scorer queries when tableEnabled flips to true", async () => {
+  it("fires the runs + failures queries when tableEnabled flips to true", async () => {
     mockExecuteQuery.mockResolvedValue([]);
     const enabled = ref(false);
 
@@ -183,12 +183,20 @@ describe("useEvalJobRuns — table refresh (lazy)", () => {
     enabled.value = true;
     await flushAsync();
 
-    // Two queries fire in parallel — runs hits and the failures rollup.
+    // Two queries fire in parallel — runs hits and the status-filtered failures
+    // hits. Both LIMIT 200; only the failures query filters on status.
     expect(mockExecuteQuery).toHaveBeenCalledTimes(2);
     const sqls = mockExecuteQuery.mock.calls.map((c) => c[0]);
-    expect(sqls.some((s) => s.includes("LIMIT 200"))).toBe(true);
-    expect(sqls.some((s) => s.includes("GROUP BY scorer_id"))).toBe(true);
-    const runsSql = sqls.find((s) => s.includes("LIMIT 200")) ?? "";
+    const failuresSql = sqls.find((s) =>
+      s.includes("attributes_status IN ('error', 'timeout')"),
+    );
+    const runsSql = sqls.find(
+      (s) =>
+        s.includes("LIMIT 200") &&
+        !s.includes("attributes_status IN ('error', 'timeout')"),
+    );
+    expect(failuresSql).toContain("LIMIT 200");
+    expect(runsSql).toBeTruthy();
     expect(runsSql).not.toContain("attributes_target_agent_name");
     expect(runsSql).not.toContain("attributes_target_agent_id");
   });
@@ -206,23 +214,23 @@ describe("useEvalJobRuns — table refresh (lazy)", () => {
       },
     ]);
     mockExecuteQuery.mockResolvedValueOnce([
-      { scorer_id: "s1", total_runs: 10, failures: 1 },
+      { span_id: "f1", _timestamp: 124, attributes_status: "error" },
     ]);
 
     const enabled = ref(true);
-    const { runs, failuresByScorer } = useEvalJobRuns(
+    const { runs, failures } = useEvalJobRuns(
       ref<string | null>("job-1"),
       ref(DEFAULT_WINDOW),
       enabled,
     );
     await flushAsync();
     expect(runs.value.length).toBe(1);
-    expect(failuresByScorer.value.length).toBe(1);
+    expect(failures.value.length).toBe(1);
 
     enabled.value = false;
     await flushAsync();
     expect(runs.value).toEqual([]);
-    expect(failuresByScorer.value).toEqual([]);
+    expect(failures.value).toEqual([]);
   });
 });
 
@@ -367,49 +375,47 @@ describe("useEvalJobRuns — score extraction from attributes_response", () => {
   });
 });
 
-describe("useEvalJobRuns — failures-by-scorer rollup", () => {
-  it("computes failureRate = failures/total*100 per scorer", async () => {
+describe("useEvalJobRuns — failures query", () => {
+  it("restricts the failures query to failed statuses and maps the hits", async () => {
     mockExecuteQuery.mockResolvedValueOnce([
-      { total_runs: 1, success_runs: 1 },
-    ]);
-    mockExecuteQuery.mockResolvedValueOnce([]);
+      { total_runs: 1, success_runs: 0 },
+    ]); // KPI
+    mockExecuteQuery.mockResolvedValueOnce([]); // runs
     mockExecuteQuery.mockResolvedValueOnce([
-      { scorer_id: "s1", total_runs: 100, failures: 5 },
-      { scorer_id: "s2", total_runs: 50, failures: 25 },
-    ]);
+      {
+        span_id: "f1",
+        _timestamp: 123,
+        attributes_status: "error",
+        attributes_scorer_id: "s1",
+        attributes_response: '{"value_numeric": 0.1}',
+      },
+    ]); // failures
 
-    const { failuresByScorer } = useEvalJobRuns(
+    const { failures } = useEvalJobRuns(
       ref<string | null>("job-1"),
       ref(DEFAULT_WINDOW),
       ref(true),
     );
     await flushAsync();
 
-    expect(failuresByScorer.value).toEqual([
-      { scorerId: "s1", totalRuns: 100, failures: 5, failureRate: 5 },
-      { scorerId: "s2", totalRuns: 50, failures: 25, failureRate: 50 },
-    ]);
-  });
+    // The failures query filters status server-side (so it isn't capped by the
+    // latest-200 runs window) and selects the same row columns as the runs query.
+    // The KPI query also mentions the failed statuses (in a COUNT CASE), so
+    // disambiguate the row query by its LIMIT 200.
+    const failuresSql = mockExecuteQuery.mock.calls
+      .map((c) => c[0])
+      .find(
+        (s) =>
+          s.includes("attributes_status IN ('error', 'timeout')") &&
+          s.includes("LIMIT 200"),
+      );
+    expect(failuresSql).toBeTruthy();
 
-  it("drops rows with no scorer_id (defensive)", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([
-      { total_runs: 1, success_runs: 1 },
-    ]);
-    mockExecuteQuery.mockResolvedValueOnce([]);
-    mockExecuteQuery.mockResolvedValueOnce([
-      { scorer_id: "", total_runs: 10, failures: 1 },
-      { scorer_id: "s1", total_runs: 10, failures: 1 },
-    ]);
-
-    const { failuresByScorer } = useEvalJobRuns(
-      ref<string | null>("job-1"),
-      ref(DEFAULT_WINDOW),
-      ref(true),
-    );
-    await flushAsync();
-
-    expect(failuresByScorer.value).toHaveLength(1);
-    expect(failuresByScorer.value[0].scorerId).toBe("s1");
+    expect(failures.value).toHaveLength(1);
+    expect(failures.value[0].id).toBe("f1");
+    expect(failures.value[0].status).toBe("error");
+    expect(failures.value[0].scorerId).toBe("s1");
+    expect(failures.value[0].scoreNumeric).toBe(0.1);
   });
 });
 
@@ -481,7 +487,7 @@ describe("useEvalJobRuns — error handling", () => {
     mockExecuteQuery.mockRejectedValueOnce(new Error("network"));
     mockExecuteQuery.mockRejectedValueOnce(new Error("network"));
 
-    const { runs, failuresByScorer } = useEvalJobRuns(
+    const { runs, failures } = useEvalJobRuns(
       ref<string | null>("job-1"),
       ref(DEFAULT_WINDOW),
       ref(true),
@@ -489,6 +495,6 @@ describe("useEvalJobRuns — error handling", () => {
     await flushAsync();
 
     expect(runs.value).toEqual([]);
-    expect(failuresByScorer.value).toEqual([]);
+    expect(failures.value).toEqual([]);
   });
 });

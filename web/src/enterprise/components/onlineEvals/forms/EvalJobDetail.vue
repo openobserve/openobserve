@@ -406,7 +406,7 @@
             :enable-column-resize="true"
             :persist-columns="true"
             table-id="eval-job-failures"
-            :data="failedRuns"
+            :data="failures"
             :columns="runColumns"
             row-key="id"
             :loading="isLoadingRuns"
@@ -826,6 +826,7 @@ const jobIdRef = computed(() => String(props.row.id ?? ""));
 const {
   kpis,
   runs,
+  failures,
   isLoadingKpis,
   isLoading: isLoadingRuns,
   refresh: refreshRunsData,
@@ -837,10 +838,6 @@ async function refreshAll() {
   syncDateWindow();
   await refreshRunsData();
 }
-
-const failedRuns = computed(() =>
-  runs.value.filter((r) => r.status === "error" || r.status === "timeout"),
-);
 
 // — KPI strip cards —
 // value/unit split mirrors the SessionDetails KPI cards (big value + small
