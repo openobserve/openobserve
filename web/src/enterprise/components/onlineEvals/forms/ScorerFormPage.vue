@@ -52,11 +52,12 @@
     <div class="scorer-form__body">
       <div class="scorer-form__main">
         <!-- Section 01: Identity -->
-        <section class="scorer-section">
-          <div class="scorer-section__head">
-            <span class="scorer-section__num">01</span>
-            <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.identitySection") }}</h3>
+        <section class="scorer-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.scorer.identitySection") }}</span>
           </div>
+          <div class="scorer-section__body">
 
           <div class="scorer-field">
             <label class="scorer-field__label">
@@ -129,14 +130,16 @@
               </span>
             </div>
           </div>
+          </div>
         </section>
 
         <!-- Section 02: LLM Judge configuration -->
-        <section v-if="form.scorerType === 'llm_judge'" class="scorer-section">
-          <div class="scorer-section__head">
-            <span class="scorer-section__num">02</span>
-            <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.judgeSection") }}</h3>
+        <section v-if="form.scorerType === 'llm_judge'" class="scorer-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.scorer.judgeSection") }}</span>
           </div>
+          <div class="scorer-section__body">
 
           <div class="scorer-field">
             <label class="scorer-field__label">
@@ -333,14 +336,16 @@
             </div>
 
           </div>
+          </div>
         </section>
 
         <!-- Section 02: Endpoint -->
-        <section v-else class="scorer-section">
-          <div class="scorer-section__head">
-            <span class="scorer-section__num">02</span>
-            <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.endpointSection") }}</h3>
+        <section v-else class="scorer-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.scorer.endpointSection") }}</span>
           </div>
+          <div class="scorer-section__body">
 
           <div class="scorer-field">
             <label class="scorer-field__label">
@@ -402,14 +407,16 @@
               />
             </div>
           </div>
+          </div>
         </section>
 
         <!-- Section 03: Authentication -->
-        <section v-if="form.scorerType === 'remote'" class="scorer-section">
-          <div class="scorer-section__head">
-            <span class="scorer-section__num">03</span>
-            <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.authSection") }}</h3>
+        <section v-if="form.scorerType === 'remote'" class="scorer-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.scorer.authSection") }}</span>
           </div>
+          <div class="scorer-section__body">
 
           <div class="scorer-field">
             <label class="scorer-field__label">
@@ -503,17 +510,19 @@
               </div>
             </div>
           </div>
+          </div>
         </section>
 
         <!-- Section 04: Custom headers -->
-        <section v-if="form.scorerType === 'remote'" class="scorer-section">
-          <div class="scorer-section__head">
-            <span class="scorer-section__num">04</span>
-            <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.headersSection") }}</h3>
+        <section v-if="form.scorerType === 'remote'" class="scorer-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.scorer.headersSection") }}</span>
             <span class="scorer-section__head-aside">
               {{ t("onlineEvals.scorer.remoteHeaders.subtitle") }}
             </span>
           </div>
+          <div class="scorer-section__body">
 
           <div class="scorer-field">
             <div
@@ -566,14 +575,16 @@
               </button>
             </div>
           </div>
+          </div>
         </section>
 
         <!-- Section 05: Request body template -->
-        <section v-if="form.scorerType === 'remote'" class="scorer-section">
-          <div class="scorer-section__head">
-            <span class="scorer-section__num">05</span>
-            <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.requestBodySection") }}</h3>
+        <section v-if="form.scorerType === 'remote'" class="scorer-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.scorer.requestBodySection") }}</span>
           </div>
+          <div class="scorer-section__body">
 
           <div class="scorer-field scorer-field--request-body">
             <label class="scorer-field__label">
@@ -597,6 +608,7 @@
                 class="scorer-prompt-vars__chip scorer-mono"
               >{{ formatTemplateVariable(v) }}</span>
             </div>
+          </div>
           </div>
         </section>
       </div>
@@ -1364,18 +1376,19 @@ async function save() {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
-  gap: 10px;
+  display: flex;
+  gap: 8px;
 }
 
 .scorer-form__main {
+  flex: 6.5;
   min-width: 0;
+  min-height: 0;
   overflow: auto;
-  padding: 18px 24px 24px;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
 }
 
 .scorer-form__foot {
@@ -1406,40 +1419,44 @@ async function save() {
 .scorer-form__main .scorer-field--request-body :deep(textarea) { max-height: 280px; }
 
 .scorer-section {
-  margin-bottom: 24px;
+  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
-.scorer-section__head {
+.section-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-default, var(--o2-border));
 }
 
-.scorer-section__num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-weight: 700;
-  font-size: 11px;
+.section-header-accent {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  margin-right: 8px;
+  flex-shrink: 0;
+  background: var(--q-primary);
 }
 
-.scorer-section__title {
-  margin: 0;
-  font-size: 14px;
+.section-header-title {
+  font-size: 13px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--color-text-primary, currentColor);
 }
 
+.scorer-section__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
 .scorer-field {
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .scorer-field__label {
@@ -1794,7 +1811,10 @@ async function save() {
 
 @media (max-width: 1100px) {
   .scorer-form__body {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+  .scorer-form__main {
+    flex: 1 1 auto;
   }
 }
 </style>
