@@ -39,7 +39,7 @@ pub struct Workflow {
 #[derive(Deserialize, Serialize)]
 pub struct WorkflowError {
     pub node_id: String,
-    pub error: String,
+    pub error: Vec<String>,
 }
 
 #[derive(Deserialize)]

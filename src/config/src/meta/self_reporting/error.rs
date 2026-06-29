@@ -138,8 +138,8 @@ impl PipelineError {
 pub struct NodeErrors {
     node_id: String,
     node_type: String,
-    errors: HashSet<(String, Option<serde_json::Value>)>,
-    error_count: i32,
+    pub errors: HashSet<(String, Option<serde_json::Value>)>,
+    pub error_count: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function_name: Option<String>,
 }
