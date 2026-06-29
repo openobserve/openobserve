@@ -216,7 +216,7 @@ async function refresh() {
 }
 
 function editMonitor() {
-  router.push({ name: "synthetic", query: { edit: monitorId.value } });
+  router.push({ name: "synthetic-new", query: { edit: monitorId.value } });
 }
 
 onMounted(() => {

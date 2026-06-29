@@ -6500,7 +6500,8 @@
       "addNewDestination": "Add New Destination",
       "destinationRequired": "At least one destination is required",
       "cooldownPeriod": "Cooldown Period",
-      "minutes": "minutes"
+      "minutes": "minutes",
+      "seconds":"Seconds"
     },
     "locations": {
       "title": "Locations",

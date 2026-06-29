@@ -279,7 +279,7 @@ function buildChartOption(): echarts.EChartsOption {
   const seriesData = buckets.value.map((b) => [b.tsMs, b.avgMs]);
 
   return {
-    grid: { left: 48, right: 16, top: 16, bottom: 28 },
+    grid: { left: 52, right: 52, top: 16, bottom: 28 },
     tooltip: {
       trigger: "axis",
       valueFormatter: (val) => formatDuration(Number(val)),
