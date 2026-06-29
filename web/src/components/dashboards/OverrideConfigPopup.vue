@@ -343,7 +343,14 @@ export default defineComponent({
       for (const c of props.columns as any[]) {
         if (!c?.alias || seen.has(c.alias)) continue;
         seen.add(c.alias);
-        out.push({ label: c.label, value: c.alias, isNumeric: !!c.isNumeric });
+        // Mirror the table renderer (convertTableData uses `label || alias`):
+        // fall back to the alias so columns with an empty label (e.g. custom-SQL
+        // columns) still show a name instead of a blank row.
+        out.push({
+          label: c.label || c.alias,
+          value: c.alias,
+          isNumeric: !!c.isNumeric,
+        });
       }
       return out;
     });
