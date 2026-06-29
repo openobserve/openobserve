@@ -208,13 +208,13 @@ async function saveCheck() {
       await syntheticsService.update(org, editId.value, apiPayload.value, check.value.folder)
       dismiss()
       toast({ variant: 'success', message: 'Check updated successfully.' })
-      router.push({ name: 'synthetic' })
+      router.push({ name: 'synthetic', query: { folder: check.value.folder } })
     } else {
       const res = await syntheticsService.create(org, apiPayload.value, check.value.folder)
       const savedId = res.data?.id ?? crypto.randomUUID()
       dismiss()
       toast({ variant: 'success', message: 'Check saved successfully.' })
-      router.push({ name: 'synthetic' })
+      router.push({ name: 'synthetic', query: { folder: check.value.folder } })
     }
   } catch (err: any) {
     dismiss()
