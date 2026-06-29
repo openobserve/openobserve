@@ -70,7 +70,7 @@ impl TryFrom<synthetics_monitors::Model> for Synthetic {
             enabled: m.enabled,
             destinations,
             retries: settings.retries,
-            cooldown_secs: settings.cooldown_secs,
+            cooldown_mins: settings.cooldown_mins,
             wait_before_retry_secs: settings.wait_before_retry_secs,
             alert_if_fails: settings.alert_if_fails,
             collect_rum_data: settings.collect_rum_data,
@@ -402,7 +402,7 @@ async fn list_models<C: ConnectionTrait>(
 fn pack_settings(monitor: &Synthetic) -> Result<serde_json::Value, errors::Error> {
     Ok(serde_json::to_value(MonitorSettings {
         retries: monitor.retries,
-        cooldown_secs: monitor.cooldown_secs,
+        cooldown_mins: monitor.cooldown_mins,
         wait_before_retry_secs: monitor.wait_before_retry_secs,
         alert_if_fails: monitor.alert_if_fails,
         collect_rum_data: monitor.collect_rum_data,
@@ -510,7 +510,7 @@ mod tests {
             locations: serde_json::json!(["aws-us-east-1"]),
             enabled: true,
             destinations: serde_json::json!([]),
-            settings: serde_json::json!({"retries": 1, "cooldown_secs": 0, "wait_before_retry_secs": 5, "alert_if_fails": 1, "collect_rum_data": false, "session_replay": false, "variables": []}),
+            settings: serde_json::json!({"retries": 1, "cooldown_mins": 0, "wait_before_retry_secs": 5, "alert_if_fails": 1, "collect_rum_data": false, "session_replay": false, "variables": []}),
             next_run_at: 0,
             last_triggered_at: 0,
             last_check_status: "unknown".to_string(),

@@ -197,8 +197,8 @@ function routeToCreateDestination() {
 // ─── cooldown ─────────────────────────────────────────────────────────────────
 
 const silenceMinutes = computed({
-  get: () => props.check.cooldownSecs ?? 60,
-  set: (v: string | number) => emit('update:check', { ...props.check, cooldownSecs: Number(v) }),
+  get: () => props.check.cooldownMins ?? 5,
+  set: (v: string | number) => emit('update:check', { ...props.check, cooldownMins: Number(v) }),
 })
 </script>
 

@@ -59,7 +59,7 @@ mod tests {
             locations: serde_json::json!(["aws-us-east-1"]),
             enabled: true,
             destinations: serde_json::json!([]),
-            settings: serde_json::json!({"retries": 1, "cooldown_secs": 0}),
+            settings: serde_json::json!({"retries": 1, "cooldown_mins": 0}),
             next_run_at: 0,
             last_triggered_at: 0,
             last_check_status: "unknown".to_string(),

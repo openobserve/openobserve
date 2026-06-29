@@ -138,9 +138,9 @@ pub struct Synthetic {
     /// Alert only after this many consecutive failures (like alerts trigger_tolerance).
     #[serde(default = "default_one")]
     pub alert_if_fails: i32,
-    /// Silence period (seconds) between repeated alert notifications.
-    #[serde(default)]
-    pub cooldown_secs: i32,
+    /// Silence period (minutes) between repeated alert notifications.
+    #[serde(default, alias = "cooldown_secs")]
+    pub cooldown_mins: i32,
     /// Collect RUM data for browser monitors (session replay / performance).
     #[serde(default)]
     pub collect_rum_data: bool,
@@ -233,8 +233,8 @@ pub struct MonitorVariable {
 pub struct MonitorSettings {
     #[serde(default)]
     pub retries: i32,
-    #[serde(default)]
-    pub cooldown_secs: i32,
+    #[serde(default, alias = "cooldown_secs")]
+    pub cooldown_mins: i32,
     #[serde(default = "default_wait_before_retry_secs_i32")]
     pub wait_before_retry_secs: i32,
     #[serde(default = "default_one_i32")]

@@ -187,7 +187,7 @@ export interface BrowserCheck {
   retries?: number
   waitBeforeRetrySecs?: number
   alertIfFails?: number
-  cooldownSecs?: number
+  cooldownMins?: number
   notifications: {
     destinations: string[]
   }

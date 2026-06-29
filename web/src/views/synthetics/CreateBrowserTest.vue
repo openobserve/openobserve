@@ -152,7 +152,7 @@ const check = ref<BrowserCheck>({
   retries: 0,
   waitBeforeRetrySecs: 5,
   alertIfFails: 1,
-  cooldownSecs: 60,
+  cooldownMins: 5,
   notifications: { destinations: [] },
   rum: { collect: true, sessionReplay: false },
 })

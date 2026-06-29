@@ -40,7 +40,7 @@ function buildFrequency(s: BrowserCheckSchedule): BrowserCheckFrequency {
 export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<string, unknown> {
   const {
     journey, schedule, rum, auth, variables, secrets, headers, cookies, notifications,
-    url, folder, browserDevices, retries, waitBeforeRetrySecs, cooldownSecs, alertIfFails,
+    url, folder, browserDevices, retries, waitBeforeRetrySecs, cooldownMins, alertIfFails,
     tz_offset,
     ...rest
   } = check
@@ -58,7 +58,7 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
     retries: retries ?? 0,
     wait_before_retry_secs: waitBeforeRetrySecs ?? 5,
     alert_if_fails: alertIfFails ?? 1,
-    cooldown_secs: cooldownSecs ?? 0,
+    cooldown_mins: cooldownMins ?? 0,
 
     destinations: notifications.destinations,
 
@@ -121,7 +121,7 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     config, frequency,
     collect_rum_data, session_replay,
     destinations,
-    retries, wait_before_retry_secs, alert_if_fails, cooldown_secs,
+    retries, wait_before_retry_secs, alert_if_fails, cooldown_mins,
     target, folder_id,
     variables,
     ...rest
@@ -146,7 +146,7 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     retries: retries ?? 0,
     waitBeforeRetrySecs: wait_before_retry_secs ?? 5,
     alertIfFails: alert_if_fails ?? 1,
-    cooldownSecs: cooldown_secs ?? 0,
+    cooldownMins: cooldown_mins ?? 0,
 
     browserDevices: config?.browser_devices,
 
