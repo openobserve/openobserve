@@ -27,6 +27,32 @@
 
     <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
     <div class="jd__body-inner">
+      <!-- ── Global window control ── -->
+      <!-- A single date picker drives the WHOLE detail view — the KPI strip
+           and both the Runs and Failures tables share this one window. Placed
+           above the cards (right-aligned) so it reads as a page-level control,
+           not a per-tab filter. Refresh re-queries everything. -->
+      <div
+        class="jd__toolbar tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:px-5 tw:pt-3"
+      >
+        <DateTimePickerDashboard
+          ref="dateTimePickerRef"
+          v-model="selectedDate"
+          :auto-apply-dashboard="true"
+          class="jd__date-picker"
+          data-test="eval-job-detail-window"
+        />
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          icon-left="refresh"
+          :loading="isLoadingKpis || isLoadingRuns"
+          :title="t('onlineEvals.job.detail.refresh')"
+          data-test="eval-job-detail-refresh"
+          @click="refreshAll"
+        />
+      </div>
+
       <!-- ── KPI strip ── -->
       <!-- KPI strip — identical card layout + text styles to the LLM
            Sessions detail page (SessionDetails.vue) so the AI module stays
@@ -87,6 +113,23 @@
         class="jd__body"
         :class="{ 'jd__body--form': activeTab === 'configuration' }"
       >
+        <!-- Shared Runs/Failures filter row — agent filter (both tabs),
+             right-aligned. The date picker + refresh live in the global
+             toolbar above the cards, so they're not duplicated here. Rendered
+             once with v-show (not v-if) so it never remounts on tab switch. -->
+        <div v-show="tableEnabled" class="jd__runs-toolbar">
+          <div class="tw:w-[14rem] tw:flex-shrink-0">
+            <OSelect
+              v-model="agentKey"
+              :options="agentOptions"
+              labelKey="label"
+              valueKey="value"
+              class="tw:w-full tw:rounded"
+              data-test="eval-job-detail-runs-agent-filter"
+            />
+          </div>
+        </div>
+
         <!-- Configuration -->
         <template v-if="activeTab === 'configuration'">
           <!-- Target -->
@@ -270,35 +313,6 @@
 
         <!-- Runs -->
         <template v-else-if="activeTab === 'runs'">
-          <div class="jd__runs-toolbar">
-            <div class="tw:w-[14rem] tw:flex-shrink-0">
-              <OSelect
-                v-model="agentKey"
-                :options="agentOptions"
-                labelKey="label"
-                valueKey="value"
-                class="tw:w-full tw:rounded"
-                data-test="eval-job-detail-runs-agent-filter"
-              />
-            </div>
-            <DateTimePickerDashboard
-              ref="dateTimePickerRef"
-              v-model="selectedDate"
-              :auto-apply-dashboard="true"
-              class="jd__date-picker"
-              data-test="eval-job-detail-runs-window"
-            />
-            <OButton
-              variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="isLoadingRuns"
-              :title="t('onlineEvals.job.detail.refresh')"
-              data-test="eval-job-detail-runs-refresh"
-              @click="refreshRuns"
-            />
-          </div>
-
           <OTable
             data-test="eval-job-detail-runs-table"
             :enable-column-resize="true"
@@ -366,52 +380,13 @@
 
         <!-- Failures -->
         <template v-else-if="activeTab === 'failures'">
-          <div class="jd__runs-toolbar">
-            <div class="tw:w-[14rem] tw:flex-shrink-0">
-              <OSelect
-                v-model="agentKey"
-                :options="agentOptions"
-                labelKey="label"
-                valueKey="value"
-                class="tw:w-full tw:rounded"
-                data-test="eval-job-detail-failures-agent-filter"
-              />
-            </div>
-            <div class="tw:w-[14rem] tw:flex-shrink-0">
-              <OSelect
-                v-model="scorerFilterKey"
-                :options="scorerOptions"
-                labelKey="label"
-                valueKey="value"
-                class="tw:w-full tw:rounded"
-                data-test="eval-job-detail-failures-scorer-filter"
-              />
-            </div>
-            <DateTimePickerDashboard
-              ref="dateTimePickerRef"
-              v-model="selectedDate"
-              :auto-apply-dashboard="true"
-              class="jd__date-picker"
-              data-test="eval-job-detail-failures-window"
-            />
-            <OButton
-              variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="isLoadingRuns"
-              :title="t('onlineEvals.job.detail.refresh')"
-              data-test="eval-job-detail-failures-refresh"
-              @click="refreshRuns"
-            />
-          </div>
-
-          <!-- Single failures table — filterable by agent + scorer. -->
+          <!-- Single failures table — filterable by agent. -->
           <OTable
             data-test="eval-job-detail-failures-table"
             :enable-column-resize="true"
             :persist-columns="true"
             table-id="eval-job-failures"
-            :data="filteredFailedRuns"
+            :data="failedRuns"
             :columns="runColumns"
             row-key="id"
             :loading="isLoadingRuns"
@@ -836,7 +811,9 @@ const {
   refresh: refreshRunsData,
 } = useEvalJobRuns(jobIdRef, dateWindow, tableEnabled, selectedAgent);
 
-async function refreshRuns() {
+// Global refresh — re-syncs the shared window then re-queries everything
+// (KPI strip + Runs + Failures), since one picker drives the whole view.
+async function refreshAll() {
   syncDateWindow();
   await refreshRunsData();
 }
@@ -844,35 +821,6 @@ async function refreshRuns() {
 const failedRuns = computed(() =>
   runs.value.filter((r) => r.status === "error" || r.status === "timeout"),
 );
-
-// — Scorer filter (Failures tab) — client-side, since runs are already loaded.
-// Options are the job's attached scorers; the value is each scorer's row `id`,
-// which is what a run row carries in `scorerId` (== attributes_scorer_id).
-const ALL_SCORERS_VALUE = "__all_scorers__";
-const scorerFilterKey = ref(ALL_SCORERS_VALUE);
-
-const scorerOptions = computed(() => {
-  const opts = [
-    {
-      label: t("onlineEvals.job.detail.failures.allScorers"),
-      value: ALL_SCORERS_VALUE,
-    },
-  ];
-  if (!Array.isArray(props.row.scorers)) return opts;
-  for (const ref of props.row.scorers) {
-    const refId = typeof ref === "string" ? ref : (ref?.id ?? "");
-    const found = props.scorers.find((s) => entityId(s) === refId);
-    if (found) opts.push({ label: found.name, value: String(found.id) });
-  }
-  return opts;
-});
-
-const filteredFailedRuns = computed(() => {
-  if (scorerFilterKey.value === ALL_SCORERS_VALUE) return failedRuns.value;
-  return failedRuns.value.filter(
-    (r) => String(r.scorerId) === scorerFilterKey.value,
-  );
-});
 
 // — KPI strip cards —
 // value/unit split mirrors the SessionDetails KPI cards (big value + small
