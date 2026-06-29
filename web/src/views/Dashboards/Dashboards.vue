@@ -199,20 +199,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </template>
             <template #cell-owner="{ value }">
-              <span
-                v-if="value"
-                class="tw:flex tw:items-center tw:gap-2 tw:min-w-0"
-              >
-                <span
-                  class="tw:text-text-primary tw:truncate tw:flex-1 tw:min-w-0"
-                  :title="value"
-                  >{{ value }}</span
-                >
-              </span>
-              <span v-else class="tw:text-text-primary">—</span>
+              <OUserCell :value="value" />
             </template>
-            <template #cell-created="{ value }">
-              <span class="tw:text-text-primary">{{ value }}</span>
+            <template #cell-created="{ row, value }">
+              <OTimeCell
+                :value="row.created_raw || value"
+                unit="iso"
+                :timezone="store.state.timezone"
+              />
             </template>
             <template #cell-folder="{ row }">
               <button
@@ -451,6 +445,8 @@ import { formatDate } from "@/utils/date";
 
 import dashboardService from "../../services/dashboards";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -493,6 +489,8 @@ const AddDashboardFromGitHub = defineAsyncComponent(() => {
 export default defineComponent({
   name: "Dashboards",
   components: {
+    OUserCell,
+    OTimeCell,
     PageLayout,
     AppPageHeader,
     OEmptyState,
@@ -935,6 +933,7 @@ export default defineComponent({
       identifier: folderInfo ? board.dashboard.dashboardId : board.dashboardId,
       description: folderInfo ? board.dashboard.description : board.description,
       owner: folderInfo ? board.dashboard.owner : board.owner,
+      created_raw: folderInfo ? board.dashboard.created : board.created,
       created: formatDate(
         folderInfo ? board.dashboard.created : board.created,
         "YYYY-MM-DDTHH:mm:ss",

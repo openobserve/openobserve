@@ -18,6 +18,7 @@ import { expect } from '@playwright/test';
 import fs from 'fs';
 import { CommonActions } from '../commonActions';
 import { AlertCreationWizard } from './alertCreationWizard.js';
+import { openOSelectDropdown } from './oselectHelpers.js';
 import { AlertManagement } from './alertManagement.js';
 import { AlertBulkOperations } from './alertBulkOperations.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -836,6 +837,13 @@ export class AlertsPage {
         return this.page.locator(this.locators.advancedTemplateOverrideSelect).first();
     }
 
+    /**
+     * Open the Advanced-tab template override OSelect dropdown.
+     */
+    async openAdvancedTemplateOverrideSelect() {
+        await openOSelectDropdown(this.page, this.getAdvancedTemplateOverrideSelect());
+    }
+
     // ==================== FOLDER OPERATIONS ====================
 
     generateRandomString() {
@@ -1385,6 +1393,10 @@ export class AlertsPage {
     /**
      * Verify alert list table is visible
      */
+    async expectAlertListPageVisible() {
+        await expect(this.page.locator(this.locators.alertListPage)).toBeVisible({ timeout: 15000 });
+    }
+
     async expectAlertListTableVisible() {
         await expect(this.page.locator(this.locators.alertListTable)).toBeVisible({ timeout: 10000 });
     }

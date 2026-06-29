@@ -3967,14 +3967,15 @@
     },
     "noEvents": {
       "title": "No traces found",
-      "descNoFilters": "No traces were found in {range}. Try widening the time range to load results.",
-      "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. Try widening the time range or removing a filter.",
+      "descNoFilters": "No traces were found in {range}.",
+      "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. The stream has data here — try relaxing a filter in the query bar.",
       "descOutOfRange": "Your time window doesn't contain any data from this stream. Jump to when data was last seen.",
-      "descDataAtBoundary": "The stream has data in this window but no traces matched. Try widening the time range.",
+      "descDataAtBoundary": "The stream has data here, but nothing matched the selected window.",
       "jumpToData": "Jump to latest data",
       "expandRange": "Expand the time range",
       "expandRangeDescAbsolute": "Switch to a wider relative time range",
       "removeFilter": "Remove a filter",
+      "askAi": "Ask AI to fix my query",
       "selectedRange": "the selected range"
     },
     "tracesTitle": "TRACES",
@@ -5645,7 +5646,7 @@
     },
     "noEvents": {
       "title": "No events found",
-      "descNoFilters": "No events were found in {range}. Try widening the time range to load results.",
+      "descNoFilters": "No events were found in {range}.",
       "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. The stream has data here — try relaxing a filter in the query bar.",
       "descOutOfRange": "Your time window doesn't contain any data from this stream. Jump to when data was last seen.",
       "descDataAtBoundary": "The stream has data in this window but no events matched. Try checking your search history or asking AI for help.",
