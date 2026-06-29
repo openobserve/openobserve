@@ -33,7 +33,7 @@ export default defineComponent({
     const SEVEN_DAYS = 7 * 24 * ONE_HOUR;
 
     const showBanner = computed(() => {
-      return elapsedMs.value > ONE_HOUR;
+      return elapsedMs.value > 6 * ONE_HOUR;
     });
 
     const isSevere = computed(() => {
