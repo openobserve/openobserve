@@ -376,7 +376,7 @@ const selectedAgent = computed<GenAiAgentListItem | null>(() => {
 // The effective stream + agent the whole dashboard queries on:
 //  - Stream tab → the picked stream, no agent.
 //  - Agent tab  → the selected agent's source stream + the agent itself
-//    (→ trace-id filter). Deriving the stream from the agent is the whole
+//    (→ direct canonical-agent filter). Deriving the stream from the agent is the whole
 //    point: we don't ask the user to pick a stream AND an agent separately.
 const effectiveStream = computed(() =>
   filterMode.value === "agent"

@@ -57,6 +57,8 @@ pub const ATTR_TARGET_SPAN_ID: &str = "target_span_id";
 pub const ATTR_TARGET_TRACE_ID: &str = "target_trace_id";
 pub const ATTR_TARGET_STREAM: &str = "target_stream";
 pub const ATTR_TARGET_STREAM_TYPE: &str = "target_stream_type";
+pub const ATTR_TARGET_AGENT_NAME: &str = "target_agent_name";
+pub const ATTR_TARGET_AGENT_ID: &str = "target_agent_id";
 
 // Identity of the evaluator
 pub const ATTR_SCORER_ID: &str = "scorer_id";
@@ -150,6 +152,8 @@ mod tests {
             ATTR_TARGET_TRACE_ID,
             ATTR_TARGET_STREAM,
             ATTR_TARGET_STREAM_TYPE,
+            ATTR_TARGET_AGENT_NAME,
+            ATTR_TARGET_AGENT_ID,
             ATTR_SCORER_ID,
             ATTR_SCORER_VERSION,
             ATTR_SCORER_TYPE,

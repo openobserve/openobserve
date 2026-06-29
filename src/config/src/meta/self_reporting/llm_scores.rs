@@ -79,6 +79,10 @@ pub struct LlmScoreRecord {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_stream_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub job_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<String>,
@@ -110,6 +114,8 @@ impl LlmScoreRecord {
             source_type: LlmScoreDataSourceType::LlmJudge,
             source_stream: Some(String::new()),
             source_stream_type: Some(String::new()),
+            agent_name: None,
+            agent_id: None,
             job_id: Some(String::new()),
             reasoning: Some(String::new()),
             metadata: Some(serde_json::json!({})),
@@ -144,6 +150,8 @@ mod tests {
             source_type: LlmScoreDataSourceType::LlmJudge,
             source_stream: Some("traces".to_string()),
             source_stream_type: Some("traces".to_string()),
+            agent_name: Some("agent-a".to_string()),
+            agent_id: Some("agent-1".to_string()),
             job_id: Some("job-1".to_string()),
             reasoning: None,
             metadata: None,
@@ -158,6 +166,8 @@ mod tests {
         assert_eq!(back.level, LlmScoreDataLevel::Span);
         assert_eq!(back.score_config_id, Some("cfg-entity-1".to_string()));
         assert_eq!(back.source_stream_type, Some("traces".to_string()));
+        assert_eq!(back.agent_name, Some("agent-a".to_string()));
+        assert_eq!(back.agent_id, Some("agent-1".to_string()));
     }
 
     #[test]
@@ -216,6 +226,8 @@ mod tests {
             source_type: LlmScoreDataSourceType::LlmJudge,
             source_stream: None,
             source_stream_type: None,
+            agent_name: None,
+            agent_id: None,
             job_id: None,
             reasoning: None,
             metadata: None,
@@ -233,6 +245,8 @@ mod tests {
         assert!(!obj.contains_key("value_boolean"));
         assert!(!obj.contains_key("scorer_id"));
         assert!(!obj.contains_key("score_config_id"));
+        assert!(!obj.contains_key("agent_name"));
+        assert!(!obj.contains_key("agent_id"));
         assert!(!obj.contains_key("reasoning"));
         assert!(!obj.contains_key("author"));
     }

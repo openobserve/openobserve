@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashMap;
 
 use axum::{
     Json,
@@ -23,12 +23,11 @@ use axum::{
 };
 use config::meta::gen_ai::GenAiAgentMappingConfig;
 #[cfg(feature = "enterprise")]
-use config::meta::stream::StreamType;
-#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::llm_evaluations::agents;
 #[cfg(feature = "enterprise")]
 pub use o2_enterprise::enterprise::llm_evaluations::agents::{
-    AgentListQuery, GenAiAgentListItem, GenAiAgentListResponse,
+    AgentListQuery, ClearAgentRegistryQuery, ClearAgentRegistryResponse, GenAiAgentListItem,
+    GenAiAgentListResponse,
 };
 #[cfg(not(feature = "enterprise"))]
 use serde::{Deserialize, Serialize};
@@ -45,10 +44,18 @@ use crate::{
 #[cfg(not(feature = "enterprise"))]
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct AgentListQuery {
-    pub start_time: i64,
-    pub end_time: i64,
     #[serde(default)]
-    pub source_lookback_micros: Option<i64>,
+    pub start_time: Option<i64>,
+    #[serde(default)]
+    pub end_time: Option<i64>,
+    #[serde(default)]
+    pub from: usize,
+    #[serde(default = "default_agent_list_size")]
+    pub size: usize,
+    #[serde(default)]
+    pub source_stream: Option<String>,
+    #[serde(default)]
+    pub source_stream_type: Option<String>,
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -64,6 +71,30 @@ pub struct GenAiAgentListItem {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct GenAiAgentListResponse {
     pub agents: Vec<GenAiAgentListItem>,
+    pub total: usize,
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn default_agent_list_size() -> usize {
+    10_000
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct ClearAgentRegistryQuery {
+    #[serde(default)]
+    pub source_stream: Option<String>,
+    #[serde(default)]
+    pub source_stream_type: Option<String>,
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ClearAgentRegistryResponse {
+    pub source_stream: Option<String>,
+    pub source_stream_type: Option<String>,
+    pub deleted_count: u64,
+    pub cleared_buffer_count: usize,
 }
 
 #[utoipa::path(
@@ -179,13 +210,13 @@ pub async fn save_agent_mapping(
     get,
     path = "/{org_id}/gen_ai/agents",
     tag = "GenAI Settings",
-    operation_id = "ListScoredGenAiAgents",
+    operation_id = "ListGenAiAgents",
     params(
         ("org_id" = String, Path, description = "Organization ID"),
         AgentListQuery,
     ),
     responses(
-        (status = 200, description = "Agents referenced by LLM score records", body = GenAiAgentListResponse),
+        (status = 200, description = "Discovered Gen-AI agents", body = GenAiAgentListResponse),
         (status = 400, description = "Invalid time range"),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
@@ -199,29 +230,29 @@ pub async fn list_scored_agents(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !check_permissions(
-            &org_id,
-            &org_id,
-            &user_email.user_id,
-            "traces",
-            "GET",
-            None,
-            true,
-            false,
-            false,
-        )
-        .await
-        {
-            return MetaHttpResponse::forbidden("Unauthorized Access");
-        }
-
         if let Err(e) = agents::validate_agent_list_query(&query) {
             return MetaHttpResponse::bad_request(e);
         }
 
-        match load_scored_agent_list(&org_id, &query).await {
+        if let (Some(source_stream), Some(source_stream_type)) =
+            (&query.source_stream, &query.source_stream_type)
+            && !can_read_stream(
+                &org_id,
+                &user_email.user_id,
+                source_stream,
+                source_stream_type,
+            )
+            .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+
+        match load_agent_list(&org_id, &user_email.user_id, &query).await {
             Ok(response) => MetaHttpResponse::json(response),
-            Err(e) => MetaHttpResponse::internal_error(format!("Failed to load agents: {e}")),
+            Err(e) => {
+                log::error!("Failed to load Gen-AI agents for org {org_id}: {e}");
+                MetaHttpResponse::internal_error("Failed to load agents")
+            }
         }
     }
 
@@ -232,148 +263,165 @@ pub async fn list_scored_agents(
     }
 }
 
-#[cfg(feature = "enterprise")]
-async fn load_scored_agent_list(
-    org_id: &str,
-    query: &AgentListQuery,
-) -> anyhow::Result<GenAiAgentListResponse> {
-    let scored_span_keys = load_scored_span_keys(org_id, query).await?;
-
-    if scored_span_keys.is_empty() {
-        return Ok(GenAiAgentListResponse { agents: vec![] });
-    }
-
-    let mapping =
-        crate::service::db::system_settings::get_gen_ai_agent_mapping_config(org_id).await;
-    let name_fields =
-        agents::mapped_storage_fields("gen_ai_agent_name", &mapping.agent_name_fields);
-    let id_fields = agents::mapped_storage_fields("gen_ai_agent_id", &mapping.agent_id_fields);
-    let source_start = agents::source_start_time(query);
-    let mut agent_items: BTreeMap<agents::AgentIdentityKey, GenAiAgentListItem> = BTreeMap::new();
-
-    for (source, source_ids) in scored_span_keys {
-        let source_stream_type = StreamType::from(source.stream_type.as_str());
-        let Ok(schema) = infra::schema::get(org_id, &source.stream, source_stream_type).await
-        else {
-            continue;
-        };
-        let schema_fields: HashSet<String> = schema
-            .fields()
-            .iter()
-            .map(|field| field.name().to_string())
-            .collect();
-        let available_name_fields = agents::available_fields(&name_fields, &schema_fields);
-        let available_id_fields = agents::available_fields(&id_fields, &schema_fields);
-        if available_name_fields.is_empty() && available_id_fields.is_empty() {
-            continue;
-        }
-
-        let Some(agent_sql) = agents::build_agent_source_sql(
-            &source.stream,
-            &source_ids.trace_ids,
-            &available_name_fields,
-            &available_id_fields,
-        ) else {
-            continue;
-        };
-        let result = run_search(
-            org_id,
-            source_stream_type,
-            agent_sql,
-            source_start,
-            query.end_time,
-            agents::MAX_AGENT_ROWS_PER_STREAM,
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/settings/gen_ai/agent_registry",
+    tag = "GenAI Settings",
+    operation_id = "ClearGenAiAgentRegistry",
+    params(
+        ("org_id" = String, Path, description = "Organization ID"),
+        ClearAgentRegistryQuery,
+    ),
+    responses(
+        (status = 200, description = "Cleared Gen-AI agent registry rows", body = ClearAgentRegistryResponse),
+        (status = 400, description = "Invalid query"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("Authorization" = []))
+)]
+pub async fn clear_agent_registry(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Query(query): Query<ClearAgentRegistryQuery>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !check_permissions(
+            &org_id,
+            &org_id,
+            &user_email.user_id,
+            "settings",
+            "DELETE",
+            None,
+            true,
+            false,
+            false,
         )
-        .await?;
-
-        for row in result.hits {
-            let item = agents::agent_list_item_from_row(&source, &row);
-            let key = agents::agent_identity_key(
-                &item.name,
-                item.id.as_deref(),
-                &item.source_stream,
-                &item.source_stream_type,
-            );
-            agent_items.entry(key).or_insert(item);
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
         }
+
+        if let Err(e) = agents::validate_clear_agent_registry_query(&query) {
+            return MetaHttpResponse::bad_request(e);
+        }
+
+        let (deleted_count, cleared_buffer_count) =
+            match o2_enterprise::enterprise::llm_evaluations::agent_registry::clear_registry(
+                &org_id,
+                query.source_stream.as_deref(),
+                query.source_stream_type.as_deref(),
+            )
+            .await
+            {
+                Ok(count) => count,
+                Err(e) => {
+                    log::error!("Failed to clear Gen-AI agent registry for org {org_id}: {e}");
+                    return MetaHttpResponse::internal_error("Failed to clear agent registry");
+                }
+            };
+
+        return MetaHttpResponse::json(ClearAgentRegistryResponse {
+            source_stream: query.source_stream,
+            source_stream_type: query.source_stream_type,
+            deleted_count,
+            cleared_buffer_count,
+        });
     }
 
-    Ok(GenAiAgentListResponse {
-        agents: agent_items.into_values().collect(),
-    })
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (&org_id, &user_email, &query);
+        MetaHttpResponse::not_found("Gen-AI agent registry is an enterprise feature")
+    }
 }
 
 #[cfg(feature = "enterprise")]
-async fn load_scored_span_keys(
+async fn load_agent_list(
     org_id: &str,
+    user_id: &str,
     query: &AgentListQuery,
-) -> anyhow::Result<BTreeMap<agents::SourceKey, agents::ScoredSourceIds>> {
-    let result = run_search(
+) -> anyhow::Result<GenAiAgentListResponse> {
+    let rows = infra::table::gen_ai_agents::list(
         org_id,
-        StreamType::Logs,
-        agents::scored_span_keys_sql(),
-        query.start_time,
-        query.end_time,
-        agents::MAX_SCORED_SPAN_KEYS as i64,
+        &infra::table::gen_ai_agents::AgentListFilter {
+            start_time: query.start_time,
+            end_time: query.end_time,
+            source_stream: query.source_stream.clone(),
+            source_stream_type: query.source_stream_type.clone(),
+        },
     )
     .await?;
 
-    Ok(agents::collect_scored_span_keys(result.hits))
+    let mut permission_cache: HashMap<(String, String), bool> = HashMap::new();
+    let mut items = Vec::with_capacity(rows.len());
+
+    for row in rows {
+        let permission_key = (row.stream_type.clone(), row.stream_name.clone());
+        let allowed = match permission_cache.get(&permission_key) {
+            Some(allowed) => *allowed,
+            None => {
+                let allowed =
+                    can_read_stream(org_id, user_id, &row.stream_name, &row.stream_type).await;
+                permission_cache.insert(permission_key, allowed);
+                allowed
+            }
+        };
+        if !allowed {
+            continue;
+        }
+        if let Some(item) = agent_item_from_registry_row(row) {
+            items.push(item);
+        }
+    }
+
+    let total = items.len();
+    let size = query.size.min(
+        o2_enterprise::enterprise::common::config::get_config()
+            .gen_ai_agent_registry
+            .api_max_page_size,
+    );
+    let agents = items
+        .into_iter()
+        .skip(query.from)
+        .take(size)
+        .collect::<Vec<_>>();
+
+    Ok(GenAiAgentListResponse { agents, total })
 }
 
 #[cfg(feature = "enterprise")]
-async fn run_search(
+async fn can_read_stream(
     org_id: &str,
-    stream_type: StreamType,
-    sql: String,
-    start_time: i64,
-    end_time: i64,
-    size: i64,
-) -> anyhow::Result<config::meta::search::Response> {
-    let trace_id = config::ider::generate_trace_id();
-    let req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql,
-            from: 0,
-            size,
-            start_time,
-            end_time,
-            quick_mode: false,
-            query_type: "".to_string(),
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            action_id: None,
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
-        },
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: Some(config::meta::search::SearchEventType::UI),
-        search_event_context: None,
-        use_cache: true,
-        clear_cache: false,
-        local_mode: None,
-    };
-
-    crate::service::search::cache::search(
-        &trace_id,
+    user_id: &str,
+    source_stream: &str,
+    source_stream_type: &str,
+) -> bool {
+    check_permissions(
+        source_stream,
         org_id,
-        stream_type,
-        None,
-        &req,
-        "".to_string(),
-        false,
+        user_id,
+        source_stream_type,
+        "GET",
         None,
         false,
+        false,
+        true,
     )
     .await
-    .map_err(|e| anyhow::anyhow!(e.to_string()))
+}
+
+#[cfg(feature = "enterprise")]
+fn agent_item_from_registry_row(
+    row: infra::table::entity::gen_ai_agents::Model,
+) -> Option<GenAiAgentListItem> {
+    let name = row.agent_name.clone().or_else(|| row.agent_id.clone())?;
+
+    Some(GenAiAgentListItem {
+        name,
+        id: row.agent_id,
+        source_stream: row.stream_name,
+        source_stream_type: row.stream_type,
+    })
 }

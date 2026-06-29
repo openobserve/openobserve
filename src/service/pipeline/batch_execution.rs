@@ -959,6 +959,8 @@ async fn process_llm_evaluation_node(
                             target_trace_id: ctx.trace_id.clone(),
                             target_stream: ctx.source_stream.clone(),
                             target_stream_type: ctx.source_stream_type.clone(),
+                            target_agent_name: ctx.agent_name.clone(),
+                            target_agent_id: ctx.agent_id.clone(),
                             scorer_id: None,
                             scorer_version: None,
                             scorer_type: None,

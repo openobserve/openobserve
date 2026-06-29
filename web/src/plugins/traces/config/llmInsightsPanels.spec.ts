@@ -167,15 +167,12 @@ describe("renderPanelSql", () => {
         startTime: 1,
         endTime: 2,
         interval: "1 hour",
-        agentFilter:
-          `trace_id IN (SELECT trace_id FROM "default" ` +
-          `WHERE gen_ai_agent_id = 'a1' GROUP BY trace_id)`,
+        agentFilter: `gen_ai_agent_id = 'a1'`,
       },
     );
     expect(sql).toBe(
       `SELECT COUNT(*) as c FROM "default" WHERE gen_ai_operation_name IS NOT NULL ` +
-        `AND trace_id IN (SELECT trace_id FROM "default" WHERE gen_ai_agent_id = 'a1' ` +
-        `GROUP BY trace_id) GROUP BY ts`,
+        `AND gen_ai_agent_id = 'a1' GROUP BY ts`,
     );
     expect(sql).not.toContain("\n");
   });

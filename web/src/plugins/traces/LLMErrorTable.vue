@@ -112,7 +112,7 @@ interface Props {
   // epoch microseconds (same units the trend panels receive)
   startTime: number;
   endTime: number;
-  // Bare agent trace-id predicate (no leading AND); "" = All Agents. Used to
+  // Bare agent predicate (no leading AND); "" = All Agents. Used to
   // build the SQL — NOT the cache key (that's `cacheKey`).
   agentFilter?: string;
   // The page's canonical selection id (`stream::agent::window`, built once in
@@ -194,7 +194,7 @@ async function loadErrors() {
   }
   loading.value = true;
   // No histogram here, so the interval is unused; renderPanelSql still
-  // substitutes the stream and splices the agent trace-id predicate.
+  // substitutes the stream and splices the agent predicate.
   const sql = renderPanelSql(props.panel.query.sql, {
     stream: props.streamName,
     startTime: props.startTime,

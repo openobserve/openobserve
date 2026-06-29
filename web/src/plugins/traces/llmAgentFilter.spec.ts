@@ -33,15 +33,15 @@ describe("llmAgentFilter", () => {
     expect(buildAgentTraceFilter(agentWithId, "")).toBe("");
   });
 
-  it("filters by trace membership using gen_ai_agent_id when present (§6.6)", () => {
+  it("filters directly by gen_ai_agent_id when present", () => {
     expect(buildAgentTraceFilter(agentWithId, "default")).toBe(
-      `trace_id IN (SELECT trace_id FROM "default" WHERE gen_ai_agent_id = 'agent-123' GROUP BY trace_id)`,
+      `gen_ai_agent_id = 'agent-123'`,
     );
   });
 
   it("falls back to gen_ai_agent_name when the agent has no id (§6.3)", () => {
     expect(buildAgentTraceFilter({ ...agentWithId, id: null }, "default")).toBe(
-      `trace_id IN (SELECT trace_id FROM "default" WHERE gen_ai_agent_name = 'support-agent' GROUP BY trace_id)`,
+      `gen_ai_agent_name = 'support-agent'`,
     );
   });
 
@@ -56,13 +56,13 @@ describe("llmAgentFilter", () => {
 
   it("builds a session-membership filter that keeps full matching sessions", () => {
     expect(buildAgentSessionFilter(agentWithId, "default")).toBe(
-      `gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM "default" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND trace_id IN (SELECT trace_id FROM "default" WHERE gen_ai_agent_id = 'agent-123' GROUP BY trace_id) GROUP BY gen_ai_conversation_id)`,
+      `gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM "default" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND gen_ai_agent_id = 'agent-123' GROUP BY gen_ai_conversation_id)`,
     );
   });
 
   it("supports a custom session field for session-membership filters", () => {
     expect(buildAgentSessionFilter(agentWithId, "default", "llm_session_id")).toBe(
-      `llm_session_id IN (SELECT llm_session_id FROM "default" WHERE llm_session_id IS NOT NULL AND llm_session_id != '' AND trace_id IN (SELECT trace_id FROM "default" WHERE gen_ai_agent_id = 'agent-123' GROUP BY trace_id) GROUP BY llm_session_id)`,
+      `llm_session_id IN (SELECT llm_session_id FROM "default" WHERE llm_session_id IS NOT NULL AND llm_session_id != '' AND gen_ai_agent_id = 'agent-123' GROUP BY llm_session_id)`,
     );
   });
 

@@ -419,8 +419,23 @@ pub async fn get_gen_ai_agent_mapping_config(
 
     match get(&SettingScope::Org, Some(org_id), None, GEN_AI_AGENT_MAPPING).await {
         Ok(Some(setting)) => {
-            serde_json::from_value::<GenAiAgentMappingConfig>(setting.setting_value)
-                .unwrap_or_default()
+            match serde_json::from_value::<GenAiAgentMappingConfig>(setting.setting_value) {
+                Ok(config) => match config.normalize_and_validate() {
+                    Ok(config) => config,
+                    Err(e) => {
+                        log::warn!(
+                            "Ignoring invalid Gen-AI agent mapping config for org {org_id}: {e}"
+                        );
+                        GenAiAgentMappingConfig::default()
+                    }
+                },
+                Err(e) => {
+                    log::warn!(
+                        "Ignoring malformed Gen-AI agent mapping config for org {org_id}: {e}"
+                    );
+                    GenAiAgentMappingConfig::default()
+                }
+            }
         }
         _ => GenAiAgentMappingConfig::default(),
     }

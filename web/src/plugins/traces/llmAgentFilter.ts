@@ -3,11 +3,9 @@
 // LLM Observability Phase 2 — Agent Filtering (Stream Contract v1.0, §6.4/§6.6).
 //
 // When an agent is selected on the LLM Insights dashboard, every query against
-// the active trace stream must be scoped to that agent. We filter by *trace
-// membership* rather than a flat `gen_ai_agent_id = '...'` predicate, because
-// error spans and tool/child spans don't carry the canonical agent fields —
-// only the LLM call span does. Resolving the matching trace ids first keeps the
-// whole trace (and its child spans) in scope for cost/token/error aggregates.
+// the agent's source trace stream can be scoped directly to that agent. Ingest
+// writes the canonical gen_ai_agent_id / gen_ai_agent_name fields onto spans, so
+// the dashboard does not need to resolve matching trace ids with a subquery.
 
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 
@@ -30,15 +28,11 @@ function sqlQuote(value: string): string {
 }
 
 /**
- * Build the source-stream trace-id agent predicate for LLM Insights queries.
+ * Build the source-stream agent predicate for LLM Insights queries.
  * Returns the bare predicate (no leading `AND`/`WHERE`) so call sites can splice
  * it where appropriate, or an empty string when no agent is selected.
  *
- *   trace_id IN (
- *     SELECT trace_id FROM "<stream>"
- *     WHERE gen_ai_agent_id = '<id>'   -- or gen_ai_agent_name = '<name>'
- *     GROUP BY trace_id
- *   )
+ *   gen_ai_agent_id = '<id>'   -- or gen_ai_agent_name = '<name>'
  */
 export function buildAgentTraceFilter(
   agent: GenAiAgentListItem | null | undefined,
@@ -48,9 +42,7 @@ export function buildAgentTraceFilter(
   const field = agent.id ? "gen_ai_agent_id" : "gen_ai_agent_name";
   const value = agent.id ?? agent.name;
   if (!value) return "";
-  return `trace_id IN (SELECT trace_id FROM "${streamName}" WHERE ${field} = '${sqlQuote(
-    String(value),
-  )}' GROUP BY trace_id)`;
+  return `${field} = '${sqlQuote(String(value))}'`;
 }
 
 /**

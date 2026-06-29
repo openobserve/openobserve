@@ -77,7 +77,7 @@ interface Props {
   // epoch microseconds (same units LLMTrendPanel receives)
   startTime: number;
   endTime: number;
-  // Bare agent trace-id predicate (no leading AND); "" = All Agents.
+  // Bare agent predicate (no leading AND); "" = All Agents.
   agentFilter?: string;
   // Panel-cache identity, forwarded to PanelSchemaRenderer. The dashboards
   // engine restores a panel's result from its IndexedDB cache on mount (keyed

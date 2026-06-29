@@ -181,7 +181,7 @@ describe("useSessions — fetchPage: field mapping", () => {
 
   it("passes the supplied filter to the list API", async () => {
     mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
-    const filter = `trace_id IN (SELECT trace_id FROM "stream" WHERE gen_ai_agent_id = 'agent-1' GROUP BY trace_id)`;
+    const filter = `gen_ai_agent_id = 'agent-1'`;
 
     const { fetchPage } = useSessions();
     await fetchPage("stream", 1000, 2000, 0, 25, filter);

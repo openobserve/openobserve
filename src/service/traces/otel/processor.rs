@@ -213,9 +213,11 @@ impl OtelIngestionProcessor {
         let tool_call_result = self
             .tool_extractor
             .extract_tool_call_result(span_attributes);
-        let agent = self
-            .agent_extractor
-            .extract(span_attributes, agent_mapping_config);
+        let agent = self.agent_extractor.extract(
+            span_attributes,
+            resource_attributes,
+            agent_mapping_config,
+        );
         let evaluation = self.evaluation_extractor.extract(span_attributes);
 
         SpanExtractions {

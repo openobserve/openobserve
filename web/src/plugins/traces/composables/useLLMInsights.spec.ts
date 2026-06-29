@@ -687,4 +687,23 @@ describe("useLLMInsights — SQL surface", () => {
       expect(sql).toContain(`FROM "my-stream.test"`);
     }
   });
+
+  it("agent-scoped KPI and sparkline queries use direct canonical agent predicates", () => {
+    const { fetchAll } = useLLMInsights();
+    fetchAll("agent-stream", 100, 200, {
+      name: "support-agent",
+      id: "agent-123",
+      source_stream: "agent-stream",
+      source_stream_type: "traces",
+    });
+
+    const sqls = mockFetchQueryDataWithHttpStream.mock.calls.map(
+      ([p]: any) => p.queryReq.query.sql,
+    );
+    expect(sqls).toHaveLength(3);
+    for (const sql of sqls) {
+      expect(sql).toContain(`gen_ai_agent_id = 'agent-123'`);
+      expect(sql).not.toContain("trace_id IN (SELECT trace_id");
+    }
+  });
 });

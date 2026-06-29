@@ -241,6 +241,7 @@ use crate::{common::meta, handler::http::request};
         request::service_streams::correlate_streams,
         request::service_streams::get_identity_config,
         request::service_streams::save_identity_config,
+        request::gen_ai::clear_agent_registry,
         request::gen_ai::get_agent_mapping,
         request::gen_ai::list_scored_agents,
         request::gen_ai::save_agent_mapping,

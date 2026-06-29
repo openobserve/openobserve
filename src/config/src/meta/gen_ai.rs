@@ -22,6 +22,14 @@ use utoipa::ToSchema;
 
 const MAX_AGENT_MAPPING_FIELDS: usize = 10;
 const MAX_AGENT_MAPPING_FIELD_LEN: usize = 256;
+const TARGET_AGENT_FIELDS: &[&str] = &[
+    "target_agent_name",
+    "target_agent_id",
+    "attributes.target_agent_name",
+    "attributes.target_agent_id",
+    "attributes_target_agent_name",
+    "attributes_target_agent_id",
+];
 
 /// Org-level fallback mapping for normalizing Gen-AI agent identity.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -68,14 +76,27 @@ fn validate_fields(label: &str, fields: &[String], redundant_target: &str) -> Re
 
     let mut seen = HashSet::new();
     for field in fields {
+        if field.is_empty() {
+            return Err(format!("{label} field names cannot be empty"));
+        }
         if field.len() > MAX_AGENT_MAPPING_FIELD_LEN {
             return Err(format!(
                 "{label} field '{field}' cannot exceed {MAX_AGENT_MAPPING_FIELD_LEN} characters"
             ));
         }
+        if !is_safe_mapping_field(field) {
+            return Err(format!(
+                "{label} field '{field}' contains invalid characters"
+            ));
+        }
         if field == redundant_target {
             return Err(format!(
                 "{label} must not include redundant target field '{field}'"
+            ));
+        }
+        if TARGET_AGENT_FIELDS.contains(&field.as_str()) {
+            return Err(format!(
+                "{label} must not include target-agent field '{field}'"
             ));
         }
         if !seen.insert(field.as_str()) {
@@ -84,6 +105,18 @@ fn validate_fields(label: &str, fields: &[String], redundant_target: &str) -> Re
     }
 
     Ok(())
+}
+
+fn is_safe_mapping_field(field: &str) -> bool {
+    let Some(first) = field.chars().next() else {
+        return false;
+    };
+
+    (first.is_ascii_alphabetic() || first == '_')
+        && field
+            .chars()
+            .skip(1)
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '.')
 }
 
 #[cfg(test)]
@@ -116,6 +149,30 @@ mod tests {
     }
 
     #[test]
+    fn test_agent_mapping_rejects_empty_field_names() {
+        let err = GenAiAgentMappingConfig {
+            agent_name_fields: vec!["   ".to_string()],
+            agent_id_fields: vec![],
+        }
+        .normalize_and_validate()
+        .unwrap_err();
+
+        assert!(err.contains("empty"));
+    }
+
+    #[test]
+    fn test_agent_mapping_rejects_unsafe_field_names() {
+        let err = GenAiAgentMappingConfig {
+            agent_name_fields: vec!["agent.name;DROP".to_string()],
+            agent_id_fields: vec![],
+        }
+        .normalize_and_validate()
+        .unwrap_err();
+
+        assert!(err.contains("invalid characters"));
+    }
+
+    #[test]
     fn test_agent_mapping_allows_same_field_in_both_lists() {
         let config = GenAiAgentMappingConfig {
             agent_name_fields: vec!["agent".to_string()],
@@ -135,5 +192,19 @@ mod tests {
         .unwrap_err();
 
         assert!(err.contains("redundant target"));
+    }
+
+    #[test]
+    fn test_agent_mapping_rejects_target_agent_fields() {
+        for field in TARGET_AGENT_FIELDS {
+            let err = GenAiAgentMappingConfig {
+                agent_name_fields: vec![field.to_string()],
+                agent_id_fields: vec![],
+            }
+            .normalize_and_validate()
+            .unwrap_err();
+
+            assert!(err.contains("target-agent"));
+        }
     }
 }

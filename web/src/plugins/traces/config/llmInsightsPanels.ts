@@ -379,7 +379,7 @@ export function renderPanelSql(
     startTime: number;
     endTime: number;
     interval: string;
-    // Bare agent trace-id predicate (no leading AND). Empty = "All Agents".
+    // Bare agent predicate (no leading AND). Empty = "All Agents".
     // Auto-spliced into each panel's WHERE (see below).
     agentFilter?: string;
   },

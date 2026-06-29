@@ -190,6 +190,8 @@ static GEN_AI_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLo
         Field::new("gen_ai_operation_name", DataType::Utf8, true),
         Field::new("gen_ai_response_model", DataType::Utf8, true),
         Field::new("gen_ai_provider_name", DataType::Utf8, true),
+        Field::new("gen_ai_agent_name", DataType::Utf8, true),
+        Field::new("gen_ai_agent_id", DataType::Utf8, true),
         Field::new("gen_ai_input_messages", DataType::Utf8, true),
         Field::new("gen_ai_output_messages", DataType::Utf8, true),
         Field::new("gen_ai_system_instructions", DataType::Utf8, true),
@@ -243,6 +245,17 @@ pub async fn delete(
 ) -> Result<(), anyhow::Error> {
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
     infra::schema::delete(org_id, stream_type, stream_name, None).await?;
+    #[cfg(feature = "enterprise")]
+    if stream_type == StreamType::Traces
+        && let Err(e) = o2_enterprise::enterprise::llm_evaluations::agent_registry::clear_registry(
+            org_id,
+            Some(stream_name),
+            Some(stream_type.as_str()),
+        )
+        .await
+    {
+        log::error!("Failed to delete Gen-AI agent registry rows for {org_id}/{stream_name}: {e}");
+    }
     if stream_type == StreamType::EnrichmentTables {
         // Enrichment table size is not deleted by schema delete
         // Since we are storing the current size of the table in bytes in the meta table,
