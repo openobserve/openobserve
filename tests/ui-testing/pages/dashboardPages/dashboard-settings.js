@@ -2,7 +2,7 @@
 // This class contains methods to interact with the dashboard settings page in OpenObserve.
 // This includes changing the dashboard name, adding tabs, managing variables, and more.
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
-const { getTabSelector } = require('./dashboard-selectors.js');
+const { getTabSelector, getVariableSelector } = require('./dashboard-selectors.js');
 const { selectStreamFromDropdown, selectFieldFromDropdown } = require('./dashboard-stream-field-utils.js');
 
 export default class DashboardSetting {
@@ -546,5 +546,191 @@ export default class DashboardSetting {
       .locator('[data-test="confirm-button"]')
       .waitFor({ state: "visible" });
     await page.locator('[data-test="confirm-button"]').click();
+  }
+
+  // ──────────────────────────────────────────────
+  // Custom Variable Fine-Grained Operations
+  // These provide low-level access for tests that need to manually
+  // control checkboxes, options, and validation assertions beyond
+  // what the high-level addCustomVariable() helper supports.
+  // ──────────────────────────────────────────────
+
+  /**
+   * Click the edit button for a variable in the settings variable list
+   * @param {string} variableName
+   */
+  async clickEditVariableBtn(variableName) {
+    const btn = this.page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`);
+    await btn.waitFor({ state: "visible", timeout: 10000 });
+    await btn.click();
+    // Wait for the form to appear
+    await this.page.locator('[data-test="dashboard-variable-name"]').waitFor({ state: "visible", timeout: 10000 });
+  }
+
+  /**
+   * Click the "Add Variable" button in the settings variables tab
+   */
+  async clickAddVariableBtn() {
+    const btn = this.page.locator('[data-test="dashboard-add-variable-btn"]');
+    await btn.waitFor({ state: "visible", timeout: 10000 });
+    await btn.click();
+    await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Select "Custom" type in the open variable form
+   */
+  async selectCustomTypeInForm() {
+    await this.page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await this.page.getByRole("option", { name: "Custom", exact: true }).click();
+    await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Fill the variable name input in the open form
+   * @param {string} name
+   */
+  async typeVariableName(name) {
+    const input = this.page.locator('[data-test="dashboard-variable-name"]');
+    await input.waitFor({ state: "visible", timeout: 10000 });
+    await input.fill(name);
+  }
+
+  /**
+   * Click the "Add Option" button to append a new empty option row
+   */
+  async clickAddOptionBtn() {
+    await this.page.locator('button:has-text("Add Option")').click();
+    await this.page.waitForTimeout(300);
+  }
+
+  /**
+   * Fill the label input for a custom option at the given index
+   * @param {number} index
+   * @param {string} text
+   */
+  async fillOptionLabel(index, text) {
+    const input = this.page.locator(`[data-test="dashboard-custom-variable-${index}-label"]`);
+    await input.waitFor({ state: "visible", timeout: 10000 });
+    await input.fill(text);
+  }
+
+  /**
+   * Fill the value input for a custom option at the given index
+   * @param {number} index
+   * @param {string} text
+   */
+  async fillOptionValue(index, text) {
+    const input = this.page.locator(`[data-test="dashboard-custom-variable-${index}-value"]`);
+    await input.waitFor({ state: "visible", timeout: 10000 });
+    await input.fill(text);
+  }
+
+  /**
+   * Click the Default checkbox for a custom option at the given index
+   * @param {number} index
+   */
+  async clickDefaultCheckbox(index) {
+    const cb = this.page.locator(`[data-test="dashboard-custom-variable-${index}-checkbox"]`);
+    await cb.waitFor({ state: "visible", timeout: 10000 });
+    await cb.scrollIntoViewIfNeeded();
+    await cb.click();
+  }
+
+  /**
+   * Check whether the Default checkbox at the given index is checked
+   * @param {number} index
+   * @returns {Promise<boolean>}
+   */
+  async isCheckboxChecked(index) {
+    const cb = this.page.locator(`[data-test="dashboard-custom-variable-${index}-checkbox"]`);
+    await cb.waitFor({ state: "visible", timeout: 10000 });
+    return await cb.isChecked();
+  }
+
+  /**
+   * Click the Select All checkbox (visible only in multi-select mode)
+   */
+  async clickSelectAllCheckbox() {
+    const cb = this.page.locator('[data-test="dashboard-custom-variable-select-all-checkbox"]');
+    await cb.waitFor({ state: "visible", timeout: 10000 });
+    await cb.click();
+  }
+
+  /**
+   * Assert that the Select All checkbox is visible on the form
+   * @returns {Promise<void>}
+   */
+  async expectSelectAllCheckboxVisible() {
+    await this.page.locator('[data-test="dashboard-custom-variable-select-all-checkbox"]').waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  /**
+   * Assert that the Select All checkbox is NOT visible on the form
+   * @returns {Promise<void>}
+   */
+  async expectSelectAllCheckboxNotVisible() {
+    await this.page.locator('[data-test="dashboard-custom-variable-select-all-checkbox"]').waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  /**
+   * Click the remove button for a custom option at the given index
+   * @param {number} index
+   */
+  async clickRemoveOption(index) {
+    const btn = this.page.locator(`[data-test="dashboard-custom-variable-${index}-remove"]`);
+    await btn.waitFor({ state: "visible", timeout: 10000 });
+    await btn.scrollIntoViewIfNeeded();
+    await btn.click();
+    await this.page.waitForTimeout(300);
+  }
+
+  /**
+   * Toggle the multi-select switch ON or OFF
+   * @param {boolean} enable - true to enable multi-select, false to disable
+   */
+  async toggleMultiSelect(enable) {
+    const toggle = this.page.locator('[data-test="dashboard-query_values-show_multiple_values"]');
+    await toggle.waitFor({ state: "visible", timeout: 10000 });
+
+    // Read the current ARIA state to decide whether to click
+    const isCurrentlyOn = await toggle.getAttribute('aria-checked').then(v => v === 'true');
+
+    if (enable && !isCurrentlyOn) {
+      await toggle.click();
+      await this.page.waitForTimeout(300);
+    } else if (!enable && isCurrentlyOn) {
+      await toggle.click();
+      await this.page.waitForTimeout(300);
+    }
+  }
+
+  /**
+   * Assert that the Quasar notification with validation error is visible
+   * "Select at least one default option"
+   */
+  async expectValidationErrorVisible() {
+    const notification = this.page.locator('.q-notification').filter({ hasText: "Select at least one default option" });
+    await notification.waitFor({ state: "visible", timeout: 10000 });
+  }
+
+  /**
+   * Read the currently displayed value of a custom variable on the dashboard
+   * @param {string} variableName
+   * @returns {Promise<string>}
+   */
+  async getCustomVariableDashboardValue(variableName) {
+    const varEl = this.page.locator(getVariableSelector(variableName));
+    await varEl.waitFor({ state: "visible", timeout: 10000 });
+    const displayedText = await varEl.locator('.q-field__native').textContent();
+    return displayedText.trim();
+  }
+
+  /**
+   * Wait for a custom variable to appear on the dashboard
+   * @param {string} variableName
+   */
+  async waitForCustomVariableOnDashboard(variableName) {
+    await this.page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 15000 });
   }
 }
