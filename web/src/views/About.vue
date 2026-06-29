@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] tw:text-(--o2-primary-color)">
                 <OIcon name="code" size="md" />
               </div>
-                <OText variant="panel-title" as="h2">{{ t("about.os_libraries") }}</OText>
+                <OText variant="page-title" as="h2" class="tw:text-xl tw:font-medium">{{ t("about.os_libraries") }}</OText>
             </div>
             <div class="tw:text-sm" style="color: var(--o2-text-secondary)">{{ t("about.os_libraries_msg") }}</div>
             <div class="tw:grid tw:grid-cols-4 tw:gap-2.5">
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-info)_12%,var(--o2-card-bg))] tw:text-(--o2-info)">
                 <OIcon name="shield" size="md" />
               </div>
-              <OText variant="page-title" as="h2" class="tw:m-0">{{ t("about.license_info") }}</OText>
+              <OText variant="page-title" as="h2" class="tw:m-0 tw:text-xl tw:font-medium">{{ t("about.license_info") }}</OText>
             </div>
             <OText v-if="store.state.zoConfig.build_type == 'opensource'" variant="body" as="div" class="tw:leading-relaxed tw:m-0 tw:mb-4">
               {{ t("about.license_info_os_msg") }}
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] tw:text-(--o2-primary-color)">
                 <OIcon name="groups" size="md" />
               </div>
-              <OText variant="page-title" as="h3" class="tw:m-0">{{ t("about.community_lbl") }}</OText>
+              <OText variant="page-title" as="h3" class="tw:m-0 tw:text-lg tw:font-medium tw:leading-6">{{ t("about.community_lbl") }}</OText>
             </div>
             <OText variant="body" class="tw:leading-relaxed tw:m-0 tw:mb-4">{{ t("about.community_msg") }}</OText>
             <div class="tw:flex tw:flex-wrap tw:gap-2">

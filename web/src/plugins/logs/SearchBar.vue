@@ -1033,6 +1033,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="searchObj.config.fnSplitterModel"
           :limits="searchObj.config.fnSplitterLimit"
           :horizontal="false"
+          :separator="!!searchObj.data.transformType"
           separator-class="tw:w-px! tw:bg-[var(--o2-border-color)]"
         >
           <template #before>
