@@ -309,30 +309,50 @@ ModuleNotFoundError: No module named 'boto3'
    }
    ```
 
-2. **Push to branch:**
+2. **Merge the `en.json` change to `main`:**
    ```bash
    git add web/src/locales/languages/en.json
    git commit -m "feat: add new dashboard feature text"
-   git push origin feat/new-dashboard-feature
+   # open a PR and merge to main
    ```
 
-3. **Workflow automatically:**
-   - Detects `en.json` change
+3. **Workflow automatically (on `main` only):**
+   - Triggers because `web/src/locales/languages/en.json` changed
    - Runs translation script
-   - Translates `newFeature` to all 10 languages
-   - Commits updated `fr.json`, `es.json`, etc. to the same branch
+   - Translates only the **new or modified** keys to all 10 languages
+   - Commits updated `fr.json`, `es.json`, etc. plus `.translation_state.json`
 
 4. **Build workflows:**
    - Use the newly updated translation files
    - No additional steps needed
 
+> **Why `main` only?** Running on every feature branch made AWS Translate bill for
+> the same strings repeatedly (per branch, per rebase, again on merge). Gating to
+> `main` translates each string once, when it actually lands.
+
+## Change detection (`.translation_state.json`)
+
+`scripts/translations/.translation_state.json` records, per locale, a hash of the
+English source each translated value was derived from. On every run the script:
+
+- **Translates** a key only when it is new, missing in a target file, or its English
+  source text changed since the last run (so editing an existing label re-translates it).
+- **Keeps** already-translated text whose source is unchanged — it is never re-sent to
+  AWS, and English is never "translated" to English.
+- **Prunes** keys that were removed from `en.json`.
+- **Bootstraps** safely: the first run after this file is introduced adopts existing
+  translations as-is (no costly full re-translation, no overwriting manual fixes).
+
+Commit `.translation_state.json` together with the translation files — it is the
+source of truth that keeps subsequent runs incremental.
+
 ## Best Practices
 
 1. **Review Commits**: Check auto-generated translation commits for accuracy
 2. **Test in UI**: Verify translations display correctly in the application
-3. **Manual Fixes**: Edit translations manually if needed - they won't be overwritten
+3. **Manual Fixes**: Manual edits to a key are preserved until its English source changes
 4. **Context Matters**: Some terms may need manual translation for proper context
-5. **Feature Branches**: Translations happen on your branch before merging
+5. **Land on `main`**: Translations are generated when `en.json` is merged to `main`
 
 ## Cost Considerations
 
@@ -363,9 +383,11 @@ AWS Translate pricing (as of 2024):
 **First-time full translation:** ~$9 (one-time)
 
 ### Cost Optimization:
-- ✅ Only new keys are translated (existing translations preserved)
-- ✅ Only runs when `en.json` actually changes
-- ✅ Works on feature branches (consolidates before merge)
+- ✅ Only **new or modified** keys are translated (unchanged text is never re-sent)
+- ✅ Runs on **`main` only**, and only when `en.json` changes (no per-branch re-billing)
+- ✅ Superseded runs are cancelled (`concurrency` with `cancel-in-progress`)
+- ✅ Safety cap (`TRANSLATION_MAX_KEYS`, default 5000) blocks accidental mass re-translation
+- ✅ Failed AWS calls are retried next run, not silently billed as English
 - ✅ Typical monthly cost: **Under $2**
 
 ## Alternative Translation Services
