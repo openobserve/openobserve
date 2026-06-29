@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t('about.manage_license') }}
             </OButton>
           </div>
-          <OText variant="body" class="tw:leading-relaxed tw:m-0 tw:mb-5 tw:ml-15">{{ t("about.license_info_msg") }}</OText>
+          <OText variant="body" class="tw:leading-relaxed tw:m-0 tw:mb-5">{{ t("about.license_info_msg") }}</OText>
 
           <div v-if="loadingLicense" class="tw:text-center tw:py-8">
             <OSpinner size="md" />
