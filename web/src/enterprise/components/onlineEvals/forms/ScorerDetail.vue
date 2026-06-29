@@ -13,7 +13,7 @@
       <span
         v-if="row.name"
         :class="[
-          'tw:font-semibold tw:text-[18px] tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:min-w-0 tw:truncate',
+          'tw:font-semibold tw:text-[1.125rem] tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:min-w-0 tw:truncate',
           store.state.theme === 'dark'
             ? 'tw:text-blue-400 tw:bg-blue-900/50'
             : 'tw:text-blue-600 tw:bg-blue-50',
@@ -26,14 +26,40 @@
     </template>
 
     <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
-    <div class="sd__body-inner">
+    <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+      <!-- ── Global window control ── -->
+      <!-- A single date picker drives the WHOLE detail view — the KPI strip
+           and the Runs table share this one window. Placed above the cards
+           (right-aligned) so it reads as a page-level control, not a per-tab
+           filter. Refresh re-queries everything. -->
+      <div
+        class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:px-5 tw:pt-3"
+      >
+        <DateTimePickerDashboard
+          ref="dateTimePickerRef"
+          v-model="selectedDate"
+          :auto-apply-dashboard="true"
+          class="tw:flex-none"
+          data-test="scorer-detail-runs-window"
+        />
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          icon-left="refresh"
+          :loading="isLoadingRuns"
+          :title="t('onlineEvals.scorer.detail.refresh')"
+          data-test="scorer-detail-runs-refresh"
+          @click="refreshRuns"
+        />
+      </div>
+
       <!-- ── KPI strip ── -->
       <!-- KPI strip — identical card layout + text styles to the LLM
            Sessions detail page (SessionDetails.vue) so the AI module stays
-           consistent. Card chrome (border/bg/hover) comes from the scoped
-           `.kpi-card` rule below; no sub-caption beneath the value. -->
+           consistent. Pinned band (shrink-0) with a bottom divider; the cards
+           below carry their own chrome via Tailwind. -->
       <section
-        class="sd__kpis tw:grid tw:grid-cols-4 tw:gap-[0.625rem]"
+        class="tw:flex-shrink-0 tw:grid tw:grid-cols-4 tw:gap-[0.625rem] tw:px-5 tw:py-4 tw:border-b tw:border-b-[var(--color-dialog-header-border,var(--o2-border))]"
       >
         <!-- While the KPI query is in flight, show skeleton tiles in place of
              the cards (matches the LLM Insights dashboard pattern). -->
@@ -42,10 +68,10 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="kpi-card tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem]"
+          class="tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem] tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
         >
           <div
-            class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]"
+            class="kpi-label tw:text-[0.7rem] tw:leading-normal tw:font-semibold tw:mb-[0.25rem]"
           >
             {{ card.label }}
           </div>
@@ -87,15 +113,35 @@
 
       <!-- ── Body ── -->
       <div
-        class="sd__body"
-        :class="{ 'sd__body--form': activeTab !== 'runs' }"
+        class="tw:flex-1 tw:overflow-auto tw:flex tw:flex-col tw:gap-[1.125rem] tw:min-h-0 tw:pt-[1.125rem]"
+        :class="{ 'tw:pb-[1.125rem]': activeTab !== 'runs' }"
       >
+        <!-- Runs filter row — agent filter, right-aligned. The date picker +
+             refresh live in the global toolbar above the cards, so they're not
+             duplicated here. Rendered once with v-show (not v-if) so it never
+             remounts on tab switch. -->
+        <div
+          v-show="runsEnabled"
+          class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:flex-wrap tw:px-5"
+        >
+          <div class="tw:w-[14rem] tw:flex-shrink-0">
+            <OSelect
+              v-model="agentKey"
+              :options="agentOptions"
+              labelKey="label"
+              valueKey="value"
+              class="tw:w-full tw:rounded"
+              data-test="scorer-detail-runs-agent-filter"
+            />
+          </div>
+        </div>
+
         <!-- Configuration -->
         <template v-if="activeTab === 'configuration'">
           <!-- No section heading here: the "Configuration" tab label already
                names this block, so an in-panel "Configuration" title (and its
                separator) would just duplicate it. -->
-          <section class="sd-section">
+          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
             <dl class="sd-kv">
               <dt>{{ t("onlineEvals.scorer.detail.scorerTypeLabel") }}</dt>
               <dd>
@@ -110,7 +156,7 @@
               <template v-if="scorerType === 'llm_judge'">
                 <dt>{{ t("onlineEvals.scorer.detail.providerLabel") }}</dt>
                 <dd>
-                  <span v-if="provider" class="sd-mono">{{
+                  <span v-if="provider">{{
                     provider.name
                   }}</span>
                   <span v-else class="sd-muted">{{
@@ -120,19 +166,21 @@
 
                 <template v-if="judgeModel">
                   <dt>{{ t("onlineEvals.scorer.detail.modelLabel") }}</dt>
-                  <dd class="sd-mono">{{ judgeModel }}</dd>
+                  <dd>{{ judgeModel }}</dd>
                 </template>
               </template>
 
               <template v-if="scorerType === 'remote' && remoteEndpoint">
                 <dt>{{ t("onlineEvals.scorer.detail.endpointLabel") }}</dt>
-                <dd class="sd-mono">{{ remoteEndpoint }}</dd>
+                <dd>{{ remoteEndpoint }}</dd>
               </template>
             </dl>
           </section>
 
-          <section class="sd-section">
-            <h4 class="sd-section__title">
+          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+            <h4
+              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+            >
               {{ t("onlineEvals.scorer.detail.producesSection") }}
             </h4>
             <div
@@ -141,7 +189,7 @@
               data-test="scorer-detail-produces"
             >
               <OIcon name="rule" size="xs" />
-              <span class="sd-mono sd-produces__name">{{
+              <span class="sd-produces__name">{{
                 producesConfig.name
               }}</span>
               <span class="sd-produces__version"
@@ -160,14 +208,19 @@
             />
           </section>
 
-          <section v-if="row.template" class="sd-section">
-            <h4 class="sd-section__title">
+          <section v-if="row.template" class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+            <h4
+              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+            >
               {{
                 scorerType === "llm_judge"
                   ? t("onlineEvals.scorer.detail.promptSection")
                   : t("onlineEvals.scorer.detail.requestTemplateSection")
               }}
-              <span v-if="variables.length" class="sd-section__chip">
+              <span
+                v-if="variables.length"
+                class="tw:inline-flex tw:items-center tw:px-[0.3125rem] tw:rounded-[0.1875rem] tw:text-[0.625rem] tw:font-semibold tw:text-[var(--color-text-secondary)] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              >
                 {{ variables.length }}
                 {{ t("onlineEvals.scorer.detail.variablesSuffix") }}
               </span>
@@ -177,28 +230,32 @@
             }}</pre>
           </section>
 
-          <section v-if="outputSchemaPretty" class="sd-section">
-            <h4 class="sd-section__title">
+          <section v-if="outputSchemaPretty" class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+            <h4
+              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+            >
               {{ t("onlineEvals.scorer.detail.outputSchemaSection") }}
             </h4>
             <pre class="sd-code sd-code--mono">{{ outputSchemaPretty }}</pre>
           </section>
 
-          <section class="sd-section">
-            <h4 class="sd-section__title">
+          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+            <h4
+              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+            >
               {{ t("onlineEvals.scorer.detail.metadataSection") }}
             </h4>
             <dl class="sd-kv">
               <dt v-if="createdAt">
                 {{ t("onlineEvals.scorer.detail.createdLabel") }}
               </dt>
-              <dd v-if="createdAt" class="sd-mono">
+              <dd v-if="createdAt">
                 {{ formatTimestamp(createdAt) }}
               </dd>
               <dt v-if="updatedAt">
                 {{ t("onlineEvals.scorer.detail.updatedLabel") }}
               </dt>
-              <dd v-if="updatedAt" class="sd-mono">
+              <dd v-if="updatedAt">
                 {{ formatTimestamp(updatedAt) }}
               </dd>
             </dl>
@@ -214,7 +271,7 @@
             <ul class="sd-versions">
               <li class="sd-versions__item sd-versions__item--active">
                 <div class="sd-versions__head">
-                  <span class="sd-mono sd-versions__label"
+                  <span class="sd-versions__label"
                     >v{{ row.version }}</span
                   >
                   <span class="sd-versions__chip">{{
@@ -223,7 +280,7 @@
                 </div>
                 <div v-if="updatedAt" class="sd-versions__meta">
                   {{ t("onlineEvals.scorer.detail.lastUpdated") }}
-                  <span class="sd-mono">{{ formatTimestamp(updatedAt) }}</span>
+                  <span>{{ formatTimestamp(updatedAt) }}</span>
                 </div>
               </li>
             </ul>
@@ -232,35 +289,6 @@
 
         <!-- Runs -->
         <template v-else-if="activeTab === 'runs'">
-          <div class="sd__runs-toolbar">
-            <div class="tw:w-[14rem] tw:flex-shrink-0">
-              <OSelect
-                v-model="agentKey"
-                :options="agentOptions"
-                labelKey="label"
-                valueKey="value"
-                class="tw:w-full tw:rounded"
-                data-test="scorer-detail-runs-agent-filter"
-              />
-            </div>
-            <DateTimePickerDashboard
-              ref="dateTimePickerRef"
-              v-model="selectedDate"
-              :auto-apply-dashboard="true"
-              class="sd__date-picker"
-              data-test="scorer-detail-runs-window"
-            />
-            <OButton
-              variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="isLoadingRuns"
-              :title="t('onlineEvals.scorer.detail.refresh')"
-              data-test="scorer-detail-runs-refresh"
-              @click="refreshRuns"
-            />
-          </div>
-
           <OTable
             data-test="scorer-detail-runs-table"
             :enable-column-resize="true"
@@ -281,36 +309,36 @@
             class="tw:w-full"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="sd-mono sd-muted-text">{{
+              <span class="tw:text-[var(--color-text-secondary)]">{{
                 relativeTime(row.timestampMs)
               }}</span>
             </template>
             <template #cell-jobId="{ row }">
-              <span class="sd-mono">{{ jobNameFor(row.jobId) }}</span>
+              <span>{{ jobNameFor(row.jobId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
               <span
                 v-if="row.targetSpanId"
-                class="sd-mono sd-target-id"
+                class="tw:block tw:truncate"
                 :title="row.targetSpanId"
                 >{{ row.targetSpanId }}</span
               >
-              <span v-else class="sd-muted-text">—</span>
+              <span v-else class="tw:text-[var(--color-text-secondary)]">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
               <span
                 v-if="row.targetTraceId"
-                class="sd-mono sd-target-id"
+                class="tw:block tw:truncate"
                 :title="row.targetTraceId"
                 >{{ row.targetTraceId }}</span
               >
-              <span v-else class="sd-muted-text">—</span>
+              <span v-else class="tw:text-[var(--color-text-secondary)]">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
-              <span class="sd-mono">{{ row.scoreDisplay }}</span>
+              <span>{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
-              <span class="sd-mono">{{
+              <span>{{
                 row.latencyMs != null ? formatLatency(row.latencyMs) : "—"
               }}</span>
             </template>
@@ -347,7 +375,7 @@
                   @click="emit('view-job', job)"
                 >
                   <OIcon name="play-arrow" size="xs" />
-                  <span class="sd-mono">{{ job.name }}</span>
+                  <span>{{ job.name }}</span>
                   <span class="sd-used-list__meta">{{ job.status }}</span>
                   <OIcon
                     name="chevron-right"
@@ -785,62 +813,33 @@ function relativeTime(timestampMs: number): string {
 </script>
 
 <style lang="scss" scoped>
-// Drawer body wrapper: fills ODrawer's scrollable body and lays the KPI strip
-// and tab bar as fixed (shrink-0) rows, with the tab content scrolling on its
-// own below them — preserves the previous fixed-header / scrolling-content feel
-// that the hand-rolled panel had.
-.sd__body-inner {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-
-/* — KPI strip — */
-// No background of its own — the drawer's native dialog surface shows through,
-// so the panel keeps its standard color. Padding + bottom divider frame the
-// pinned KPI band; the grid + card layout live in the template's Tailwind
-// classes, matching SessionDetails.vue exactly.
-.sd__kpis {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  flex-shrink: 0;
-}
-
-// Card chrome copied verbatim from SessionDetails.vue's `.kpi-card` so the AI
-// module's detail pages render identical cards (border/bg/hover + neutral
-// typography).
-.kpi-card {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-  transition: box-shadow 0.2s ease;
-
-  &:hover {
-    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
-  }
-}
+// Page layout, spacing, colors, and text styling are Tailwind utilities in the
+// template (matching SessionDetails.vue). Only cohesive blocks that rely on
+// descendant/element selectors or hover state remain here. Font-family is never
+// set per component — it inherits the global --font-sans.
 
 /* — Tab strip — */
 .sd__tabs {
   display: flex;
-  gap: 18px;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  gap: 1.125rem;
+  padding: 0 1.25rem;
+  border-bottom: 0.0625rem solid var(--color-dialog-header-border, var(--o2-border));
   flex-shrink: 0;
 }
 
 .sd__tab {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 0;
+  gap: 0.375rem;
+  padding: 0.625rem 0;
   background: transparent;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-bottom: 0.125rem solid transparent;
   cursor: pointer;
   color: var(--color-text-secondary, var(--o2-text-secondary));
-  font: 600 13px var(--o2-font);
-  margin-bottom: -1px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin-bottom: -0.0625rem;
 }
 
 .sd__tab:hover {
@@ -855,11 +854,13 @@ function relativeTime(timestampMs: number): string {
 .sd__tab-count {
   display: inline-flex;
   align-items: center;
-  padding: 0 6px;
-  min-width: 18px;
-  height: 16px;
-  border-radius: 999px;
-  font: 600 10px/1 var(--o2-font);
+  padding: 0 0.375rem;
+  min-width: 1.125rem;
+  height: 1rem;
+  border-radius: 62.4375rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1;
   background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
   color: var(--color-text-secondary, var(--o2-text-secondary));
   justify-content: center;
@@ -874,44 +875,11 @@ function relativeTime(timestampMs: number): string {
   color: var(--color-primary-600, #3f7994);
 }
 
-/* — Body — */
-.sd__body {
-  flex: 1;
-  overflow: auto;
-  // Horizontal padding lives on the children (sections + toolbar) instead of
-  // the body, so the Runs table — a bare child of the body — sits full-bleed
-  // with edge-to-edge column headers. No bottom padding: the table reaches the
-  // bottom edge with no dead space under its pagination bar.
-  padding: 18px 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  min-height: 0;
-}
-
-// Form-style tabs (Configuration / Versions / Used By) need breathing room at
-// the bottom. The Runs tab keeps its table flush to the bottom edge, so the
-// padding is opt-in per tab.
-.sd__body--form {
-  padding-bottom: 18px;
-}
-
 .sd__tab-intro {
   margin: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-/* — Sections (Configuration tab) — */
-.sd-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  // Re-apply the inset the body no longer provides (config sections stay
-  // aligned with the page content).
-  padding-left: 20px;
-  padding-right: 20px;
 }
 
 // Versions / Used By tab content sits directly in the body (not in a
@@ -920,53 +888,28 @@ function relativeTime(timestampMs: number): string {
 .sd__tab-pad {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding-left: 20px;
-  padding-right: 20px;
-}
-
-.sd-section__title {
-  margin: 0;
-  font: 600 13px/1.5 var(--o2-font);
-  color: var(--color-text-primary, currentColor);
-  padding-bottom: 6px;
-  border-bottom: 1px solid
-    color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.sd-section__chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 5px;
-  border-radius: 3px;
-  font: 600 10px var(--o2-font);
-  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  gap: 1.125rem;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
 }
 
 .sd-kv {
   display: grid;
-  grid-template-columns: 120px 1fr;
-  gap: 6px 14px;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 0.375rem 0.875rem;
   margin: 0;
 }
 
 .sd-kv dt {
-  font-size: 11px;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .sd-kv dd {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--color-text-primary, currentColor);
-}
-
-.sd-mono {
-  font-variant-numeric: tabular-nums;
 }
 
 .sd-muted {
@@ -976,9 +919,9 @@ function relativeTime(timestampMs: number): string {
 
 .sd-type-chip {
   display: inline-flex;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 11px;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 0.1875rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   background: color-mix(in srgb, #6b76e3 14%, transparent);
   color: #4f5bcf;
@@ -991,10 +934,10 @@ function relativeTime(timestampMs: number): string {
 
 .sd-version-chip {
   display: inline-flex;
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 11px;
+  margin-left: 0.375rem;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 0.1875rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
   color: var(--color-text-secondary, var(--o2-text-secondary));
@@ -1003,17 +946,17 @@ function relativeTime(timestampMs: number): string {
 .sd-produces {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 12px;
+  gap: 0.375rem;
+  padding: 0.625rem 0.75rem;
   background: color-mix(
     in srgb,
     var(--color-primary-600, #3f7994) 8%,
     transparent
   );
-  border: 1px solid
+  border: 0.0625rem solid
     color-mix(in srgb, var(--color-primary-600, #3f7994) 30%, transparent);
-  border-radius: 5px;
-  font-size: 12px;
+  border-radius: 0.3125rem;
+  font-size: 0.75rem;
   color: var(--color-text-primary, currentColor);
 }
 
@@ -1025,23 +968,24 @@ function relativeTime(timestampMs: number): string {
 .sd-produces__sep,
 .sd-produces__type {
   color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 
 .sd-code {
   margin: 0;
-  padding: 12px;
+  padding: 0.75rem;
   background: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
-  border: 1px solid
+  border: 0.0625rem solid
     color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: 0.375rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
   line-height: 1.55;
   color: var(--color-text-primary, currentColor);
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 280px;
+  max-height: 12.5rem;
   overflow: auto;
 }
 
@@ -1056,15 +1000,15 @@ function relativeTime(timestampMs: number): string {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .sd-versions__item {
-  padding: 12px 14px;
+  padding: 0.75rem 0.875rem;
   background: var(--color-card-bg);
-  border: 1px solid
+  border: 0.0625rem solid
     color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
-  border-radius: 6px;
+  border-radius: 0.375rem;
 }
 
 .sd-versions__item--active {
@@ -1083,20 +1027,21 @@ function relativeTime(timestampMs: number): string {
 .sd-versions__head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .sd-versions__label {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--color-text-primary, currentColor);
 }
 
 .sd-versions__chip {
   display: inline-flex;
-  padding: 1px 7px;
-  border-radius: 3px;
-  font: 600 10px var(--o2-font);
+  padding: 0.0625rem 0.4375rem;
+  border-radius: 0.1875rem;
+  font-size: 0.625rem;
+  font-weight: 600;
   background: color-mix(
     in srgb,
     var(--o2-status-success-text, #2e7d32) 14%,
@@ -1106,61 +1051,22 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-versions__meta {
-  margin-top: 6px;
-  font-size: 11.5px;
+  margin-top: 0.375rem;
+  font-size: 0.71875rem;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 /* — Runs tab — */
-.sd__runs-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-  // Re-apply the body's former inset so the toolbar controls stay aligned.
-  padding-left: 20px;
-  padding-right: 20px;
-}
-
-.sd__date-picker {
-  flex: 0 0 auto;
-}
-
-.sd__runs-meta {
-  margin-left: auto;
-  font-size: 11.5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sd__runs-meta strong {
-  color: var(--color-text-primary, currentColor);
-  font-variant-numeric: tabular-nums;
-}
-
-.sd-muted-text {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-// Span / Trace id cell — truncate to the column width with a native tooltip
-// for the full value. No font overrides: inherits the default table-cell font.
-.sd-target-id {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .sd-status-cell {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 0.3125rem;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .sd-status-cell__dot {
-  width: 6px;
-  height: 6px;
+  width: 0.375rem;
+  height: 0.375rem;
   border-radius: 50%;
   background: var(--color-text-secondary, var(--o2-text-secondary));
 }
@@ -1192,7 +1098,7 @@ function relativeTime(timestampMs: number): string {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.25rem;
 }
 
 .sd-used-list__item {
@@ -1202,8 +1108,8 @@ function relativeTime(timestampMs: number): string {
     var(--color-text-secondary) 5%,
     transparent
   ) !important;
-  border: 1px solid transparent !important;
-  border-radius: 5px !important;
+  border: 0.0625rem solid transparent !important;
+  border-radius: 0.3125rem !important;
   transition:
     border-color 0.15s,
     background 0.15s;
@@ -1224,16 +1130,16 @@ function relativeTime(timestampMs: number): string {
 
 .sd-used-list__item:deep(button) {
   height: auto !important;
-  padding: 8px 10px !important;
-  gap: 8px;
-  font-size: 12px;
+  padding: 0.5rem 0.625rem !important;
+  gap: 0.5rem;
+  font-size: 0.75rem;
   justify-content: flex-start;
   text-align: left;
 }
 
 .sd-used-list__meta {
   margin-left: auto;
-  font-size: 10px;
+  font-size: 0.625rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--color-text-secondary, var(--o2-text-secondary));
