@@ -69,9 +69,10 @@ function mapValue(wire: WireStep, action: StepAction): string | undefined {
 
 /** Convert a single extension {@link WireStep} into the UI-facing {@link BrowserStep}. */
 export function mapWireStep(wire: WireStep): BrowserStep {
-  const action = mapAction(wire.action)
+  const action = mapAction(wire.action);
+  const id = getUUIDv7(true);
   return {
-    id: getUUIDv7(),
+    id: id,
     action,
     name: wire.name,
     selector: wire.selector,
@@ -80,7 +81,10 @@ export function mapWireStep(wire: WireStep): BrowserStep {
     timeout: wire.timeout_ms ?? DEFAULT_TIMEOUT,
     code: wire.code || "",
     // Keep the original extension step untouched for replay (full fidelity).
-    wire,
+    wire: {
+      ...wire,
+      id,
+    },
   }
 }
 

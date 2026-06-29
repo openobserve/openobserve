@@ -3,6 +3,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { BrowserStep } from '@/types/synthetics'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
+import { getUUIDv7 } from '@/utils/zincutils'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
@@ -123,19 +124,19 @@ function deleteStep(index: number) {
 }
 function duplicateStep(index: number) {
   const next = [...props.modelValue]
-  next.splice(index + 1, 0, { ...next[index], id: crypto.randomUUID() })
+  next.splice(index + 1, 0, { ...next[index], id: getUUIDv7(true) })
   emit('update:modelValue', next)
 }
 function insertStepBelow(index: number) {
   const next = [...props.modelValue]
-  next.splice(index + 1, 0, { id: crypto.randomUUID(), action: 'click', name: '', timeout: 30000 })
+  next.splice(index + 1, 0, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000 })
   emit('update:modelValue', next)
 }
 function addStep() {
-  emit('update:modelValue', [...props.modelValue, { id: crypto.randomUUID(), action: 'click', name: '', timeout: 30000 }])
+  emit('update:modelValue', [...props.modelValue, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000 }])
 }
 function duplicateCapturedStep(index: number, step: BrowserStep) {
-  capturedSteps.value.splice(index + 1, 0, { ...step, id: crypto.randomUUID() })
+  capturedSteps.value.splice(index + 1, 0, { ...step, id: getUUIDv7(true) })
 }
 </script>
 
