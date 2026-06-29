@@ -142,7 +142,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: api-junit__integration__main
+          name: api-junit__api_integration_tests__main
           path: tests/api-testing/junit-integration.xml
           if-no-files-found: warn
           retention-days: 7
@@ -258,7 +258,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: api-junit__query_agent__${{ matrix.config.label }}
+          name: api-junit__query_agent_tests__${{ matrix.config.label }}
           path: tests/api-testing/junit-queryagent-${{ matrix.config.label }}.xml
           if-no-files-found: warn
           retention-days: 7
@@ -372,7 +372,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: api-junit__regression__${{ matrix.config.label }}
+          name: api-junit__api_integration_tests__regression_${{ matrix.config.label }}
           path: tests/api-testing/junit-regression-${{ matrix.config.label }}.xml
           if-no-files-found: warn
           retention-days: 7

@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """Aggregate API pytest junit XML into PER-CATEGORY + total test-count summaries.
 
-The API suite is sharded into test CATEGORIES (the api-testing.yml matrix
-"shards"): e.g. OSS = integration / query_agent / regression; ENT additionally
-splits integration into oss_in_ent / ent_top / ent_rbac and adds cli / vortex_*.
-Some categories run the SAME tests under several env-flag matrix legs
-(query_agent opt true|false; regression utf8/join combos) — those legs must
-collapse, not multiply, the count. So within each category we DEDUP by test
-identity (classname::name) and pick the worst status across legs:
+The API suite is grouped into test CATEGORIES (set by the upload-artifact name
+`api-junit__<category>__<leg>` in api-testing.yml):
+  OSS = api_integration_tests, query_agent_tests
+  ENT = api_integration_tests, query_agent_tests, cli, vortex
+Several jobs/shards fold into one category (their test sets are DISJOINT, so the
+dedup below makes "within-category dedup" == sum):
+  api_integration_tests = the integration default-set + regression (+ ENT's
+                          oss_in_ent / ent_top / ent_rbac shards)
+  vortex                = tests/vortex/* + test_3_vortex.py
+Other jobs re-run the SAME tests under several env-flag matrix legs (query_agent
+opt true|false; regression utf8/join combos) — those legs must collapse, not
+multiply, the count. So within each category we DEDUP by test identity
+(classname::name) and pick the worst status across legs:
 
     failed  if it failed/errored in ANY leg   (precedence 2)
     passed  if it passed in any leg (never failed)  (precedence 1)
