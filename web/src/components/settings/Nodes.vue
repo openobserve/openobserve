@@ -626,7 +626,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 100,
-          meta: { align: "center" },
+          meta: { align: "left" },
         },
         {
           id: "cpu",
@@ -636,7 +636,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 200,
-          meta: { align: "left" },
+          meta: { align: "right" },
         },
         {
           id: "memory",
@@ -646,7 +646,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 200,
-          meta: { align: "left" },
+          meta: { align: "right" },
         },
         {
           id: "tcp",
@@ -655,7 +655,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 150,
-          meta: { align: "left" },
+          meta: { align: "right" },
         },
       ];
       if (!store.state.zoConfig.super_cluster_enabled) {

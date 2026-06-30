@@ -271,6 +271,37 @@ class APICleanup {
     }
 
     /**
+     * Create a minimal dashboard for use as a report dependency.
+     * Returns { dashboardId, folderId } or throws on failure.
+     */
+    async createMinimalDashboard(title = 'E2E Setup Dashboard', folderId = 'default') {
+        const payload = {
+            title,
+            description: '',
+            role: '',
+            owner: this.email,
+            tabs: [{ tabId: 'default', name: 'Default', panels: [] }],
+            variables: {}
+        };
+        const response = await this._fetch(
+            `${this.baseUrl}/api/${this.org}/dashboards?folder=${encodeURIComponent(folderId)}`,
+            {
+                method: 'POST',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }
+        );
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createMinimalDashboard: HTTP ${response.status} — ${body}`);
+        }
+        const result = await response.json();
+        const dashboardId = result.dashboard_id || result.dashboardId || result.id;
+        testLogger.info('Created minimal dashboard', { dashboardId, folderId });
+        return { dashboardId, folderId };
+    }
+
+    /**
      * Delete a single dashboard
      * @param {string} dashboardId - The dashboard ID
      * @param {string} folderId - The folder ID

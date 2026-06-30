@@ -118,6 +118,9 @@ const doSubmit = async (value) => {
   if(res.status == 200) {
     localStorage.removeItem("isFirstTimeLogin");
     emit("removeFirstTimeLogin",false);
+    // Notify first-login follow-ups (e.g. the community Slack invite) that the
+    // onboarding form is done, so they don't stack on top of this full-screen dialog.
+    window.dispatchEvent(new CustomEvent("o2:onboarding-complete"));
     toast({
       message: 'Thank you for your feedback',
       variant: 'success',

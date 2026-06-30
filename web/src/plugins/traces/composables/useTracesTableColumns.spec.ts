@@ -184,9 +184,9 @@ describe("useTracesTableColumns", () => {
       expect(getSpanKindCol()?.size).toBe(120);
     });
 
-    it("should have meta.align=center, slot=false, closable=true", () => {
+    it("should have meta.align=left, slot=false, closable=true", () => {
       const meta = getSpanKindCol()?.meta as Record<string, unknown>;
-      expect(meta?.align).toBe("center");
+      expect(meta?.align).toBe("left");
       expect(meta?.slot).toBe(false);
       expect(meta?.closable).toBe(true);
     });
