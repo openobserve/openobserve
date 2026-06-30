@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scrollable body — owns its own scroll so the header above stays fixed.
          Pads itself horizontally (the card has no px) so focus rings on edge
          controls aren't clipped by the scroll container's overflow. -->
-    <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-hidden tw:px-[1rem] tw:pt-[0.625rem]">
+    <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-y-auto tw:px-[0.625rem] tw:pt-[0.625rem]">
     <!-- Loading — full-page skeleton mirroring the real layout (standard O2 wave
          shimmer) so nothing jumps when data lands. -->
     <div
@@ -240,9 +240,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <SessionRibbon :traces="traces" :cache-pct="cacheRatio" @jump="jumpToTurn" />
       </div>
 
-      <!-- Lower area: conversation column (left) + hotspot rail (right) -->
+      <!-- Lower area: conversation column (left) + hotspot rail (right). Full-page
+           scroll — the column grows with content; the rail sticks (items-start so
+           it doesn't stretch to the tall conversation's height). -->
       <div
-        class="tw:grid tw:grid-cols-[minmax(0,1fr)_340px] tw:gap-[0.625rem] tw:flex-1 tw:min-h-0"
+        class="tw:grid tw:grid-cols-[minmax(0,1fr)_340px] tw:gap-[0.625rem] tw:items-start"
       >
       <!-- Conversation column: toolbar + panel -->
       <div class="tw:flex tw:flex-col tw:min-w-0 tw:min-h-0">
@@ -278,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Conversation panel -->
       <div
-        class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:mb-[0.625rem] tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:overflow-hidden"
+        class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:mb-[0.625rem] tw:flex tw:flex-col tw:overflow-hidden"
         data-test="session-conversation-panel"
       >
         <!-- panel header: title + count chip + jump buttons -->
@@ -304,8 +306,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroup>
         </div>
 
-        <!-- Conversation body — ONE scroll container holding both views -->
-        <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto">
+        <!-- Conversation body — natural height; the page scrolls, not this. -->
+        <div>
 
         <!-- turn list (Collapsed view) -->
         <div
@@ -492,8 +494,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Pretty (transcript) view — reuses ThreadView, rendered from the
-             session's raw spans (fetched once on first switch). -->
-        <div v-if="viewMode === 'pretty'" class="tw:h-full">
+             session's raw spans (fetched once on first switch). Natural height so
+             it flows into the page scroll. -->
+        <div v-if="viewMode === 'pretty'">
           <div
             v-if="sessionSpansLoading"
             class="tw:flex tw:flex-col tw:gap-[0.5rem] tw:p-[0.75rem]"
@@ -515,15 +518,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       </div>
 
-      <!-- Right rail: hotspot cards. Fills the rail height and splits it across
-           the three cards (each scrolls internally) so the rail itself never
-           scrolls — no second scrollbar. -->
+      <!-- Right rail: hotspot cards. Sticks to the top of the page-scroll so the
+           hotspots stay visible while the conversation scrolls. Each card sizes to
+           its rows (capped at ~5, see the lists' max-h); the rail shrinks to its
+           content and only caps/scrolls at the viewport so there's no wasted gap. -->
       <aside
-        class="tw:flex tw:flex-col tw:gap-[0.625rem] tw:min-h-0 tw:overflow-hidden tw:pb-[0.625rem]"
+        class="tw:sticky tw:top-0 tw:self-start tw:flex tw:flex-col tw:gap-[0.625rem] tw:max-h-[calc(100vh-2.6rem-68px-1.25rem)] tw:overflow-y-auto tw:pb-[0.625rem]"
         data-test="session-rail"
       >
         <!-- Tool Hotspots (by time + calls; cost pending backend attribution) -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-shrink-0 tw:overflow-hidden">
           <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
             <OIcon name="build" size="xs" class="tw:text-[var(--o2-text-muted)]" />
             <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
@@ -538,7 +542,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-else-if="toolHotspots.length"
-            class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]"
+            class="tw:max-h-[11rem] tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]"
           >
             <TurnPreviewCard
               v-for="(row, i) in toolHotspots"
@@ -575,14 +579,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Cost Hotspots -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-shrink-0 tw:overflow-hidden">
           <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
             <OIcon name="trending-up" size="xs" class="tw:text-[var(--o2-text-muted)]" />
             <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
               {{ t('traces.sessionDetail.rail.costHotspots') }}
             </span>
           </div>
-          <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
+          <div class="tw:max-h-[11rem] tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
             <TurnPreviewCard
               v-for="(row, i) in costHotspots"
               :key="row.n"
@@ -618,14 +622,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Slowest Turns -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-shrink-0 tw:overflow-hidden">
           <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
             <OIcon name="schedule" size="xs" class="tw:text-[var(--o2-text-muted)]" />
             <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
               {{ t('traces.sessionDetail.rail.slowestTurns') }}
             </span>
           </div>
-          <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
+          <div class="tw:max-h-[11rem] tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
             <TurnPreviewCard
               v-for="(row, i) in slowestTurns"
               :key="row.n"
