@@ -22,11 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <!-- Toolbar: Stream/Agent toggle + picker. Only in the full-page skeleton
-         (the kpiOnly variant renders beneath the real toolbar). Mirrors the
-         toolbar's justify-end layout + py so the streamsLoaded flip doesn't
-         shift the KPI row down when the real toggle/picker appear. -->
+         when the real toolbar is hidden (initial !streamsLoaded). On a mid-session
+         switch the real toolbar is already shown, so `hideToolbar` drops this to
+         avoid a duplicate toggle/picker row. The kpiOnly variant never shows it. -->
     <div
-      v-if="!kpiOnly"
+      v-if="!kpiOnly && !hideToolbar"
       class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:py-[0.5rem]"
     >
       <SkeletonBox width="116px" height="32px" rounded />
@@ -122,7 +122,7 @@ import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 // kpiOnly: render just the KPI tiles row. Used when the trend/table panels
 // render live underneath (firing their own queries) while only the KPI strip
 // is still loading — so the panels aren't blocked behind the KPI fetch.
-defineProps<{ kpiOnly?: boolean }>();
+defineProps<{ kpiOnly?: boolean; hideToolbar?: boolean }>();
 
 const store = useStore();
 </script>

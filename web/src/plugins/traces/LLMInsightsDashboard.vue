@@ -94,7 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          stream, we fall through to the content so the trend/table panels mount
          and fire their queries immediately — in parallel with the KPI fetch,
          rather than waiting for it (the KPI strip keeps its own skeleton). -->
-    <LLMInsightsSkeleton v-if="!streamsLoaded" class="tw:flex-1 tw:px-4" />
+    <LLMInsightsSkeleton
+      v-if="!streamsLoaded || switching"
+      :hide-toolbar="streamsLoaded"
+      class="tw:flex-1 tw:px-4"
+    />
 
     <!-- Generic error state — kept separate because a failed request is a
          different signal from "no data yet". Once we have a result we fall
@@ -335,6 +339,12 @@ const agents = ref<GenAiAgentListItem[]>([]);
 // True once the agents API has resolved at least once — lets us tell "agents
 // not loaded yet" apart from "this window genuinely has no agents".
 const agentsLoaded = ref(false);
+
+// True while a user-driven switch (clicking the Agent tab or changing the agent)
+// is resolving — the agents list fetch happens BEFORE the KPI fetch flips
+// `loading`, so without this the page would show stale stream data during that
+// gap. We show the full skeleton instead so the switch feels immediate.
+const switching = ref(false);
 
 // Filter mode: "stream" = view a whole stream; "agent" = view a single agent,
 // whose source stream + trace filter both come from the agents API.
@@ -719,74 +729,82 @@ async function loadInsights(
   endTime?: number,
   opts?: { force?: boolean },
 ) {
-  const force = opts?.force ?? false;
-  const start = startTime ?? props.startTime;
-  const end = endTime ?? props.endTime;
-  if (!start || !end) return;
-  localStorage.setItem(MODE_LS_KEY, filterMode.value);
+  try {
+    const force = opts?.force ?? false;
+    const start = startTime ?? props.startTime;
+    const end = endTime ?? props.endTime;
+    if (!start || !end) return;
+    localStorage.setItem(MODE_LS_KEY, filterMode.value);
 
-  // Stream-mode reads `effectiveStream` from `activeStream`, which is only set
-  // once the stream list loads — so make sure that's done before we fetch,
-  // regardless of whether this call raced ahead of the mount's stream load.
-  await ensureStreamsLoaded();
+    // Stream-mode reads `effectiveStream` from `activeStream`, which is only set
+    // once the stream list loads — so make sure that's done before we fetch,
+    // regardless of whether this call raced ahead of the mount's stream load.
+    await ensureStreamsLoaded();
 
-  if (filterMode.value === "agent") {
-    // Agent tab can't fetch until it knows the agent's source stream, so the
-    // agents list must be loaded first — await it here. (Agents API is only
-    // ever hit on the Agent tab.)
-    await loadAgents(start, end);
-    // Resolve an agent name carried in the URL to its concrete (stream-scoped)
-    // selection now that the list exists.
-    if (pendingAgentName.value) {
-      const match = agents.value.find((a) => a.name === pendingAgentName.value);
-      if (match) activeAgent.value = agentOptionKey(match);
-      pendingAgentName.value = null;
+    if (filterMode.value === "agent") {
+      // Agent tab can't fetch until it knows the agent's source stream, so the
+      // agents list must be loaded first — await it here. (Agents API is only
+      // ever hit on the Agent tab.)
+      await loadAgents(start, end);
+      // Resolve an agent name carried in the URL to its concrete (stream-scoped)
+      // selection now that the list exists.
+      if (pendingAgentName.value) {
+        const match = agents.value.find(
+          (a) => a.name === pendingAgentName.value,
+        );
+        if (match) activeAgent.value = agentOptionKey(match);
+        pendingAgentName.value = null;
+      }
+      // Default to the first agent when nothing valid is selected (fresh entry
+      // to the tab, or the previously-picked agent is gone for this window).
+      if (!selectedAgent.value && agents.value.length > 0) {
+        activeAgent.value = agentOptionKey(agents.value[0]);
+      }
+      localStorage.setItem(AGENT_LS_KEY, activeAgent.value);
+    } else {
+      // Agents API is only relevant on the Agent tab — don't touch it in Stream
+      // mode. The list loads lazily when the user switches to the Agent tab.
+      localStorage.setItem(STREAM_LS_KEY, activeStream.value);
     }
-    // Default to the first agent when nothing valid is selected (fresh entry
-    // to the tab, or the previously-picked agent is gone for this window).
-    if (!selectedAgent.value && agents.value.length > 0) {
-      activeAgent.value = agentOptionKey(agents.value[0]);
+
+    // Keep the URL in step with the resolved selection (runs even when there's
+    // nothing to query, e.g. the Agent tab with no agents).
+    syncFilterUrl();
+
+    // Stream comes from the agent (Agent tab) or the picker (Stream tab).
+    const stream = effectiveStream.value;
+    if (!stream) return;
+
+    // Per-selection KPI retention: restore the summary numbers for this exact
+    // stream+agent+window instead of refetching on a tab toggle. `force`
+    // (manual refresh) skips the cache.
+    const ck = kpiCacheKey(start, end);
+    if (!force && kpiCache.has(ck)) {
+      const snap = kpiCache.get(ck)!;
+      kpi.value = snap.kpi;
+      kpiPrev.value = snap.kpiPrev;
+      sparklines.value = snap.sparklines;
+      lastRunAt.value = snap.lastRunAt;
+      error.value = null; // restoring a prior success — drop any stale error
+      hasLoadedOnce.value = true; // we have data → no first-load skeleton
+      return;
     }
-    localStorage.setItem(AGENT_LS_KEY, activeAgent.value);
-  } else {
-    // Agents API is only relevant on the Agent tab — don't touch it in Stream
-    // mode. The list loads lazily when the user switches to the Agent tab.
-    localStorage.setItem(STREAM_LS_KEY, activeStream.value);
-  }
 
-  // Keep the URL in step with the resolved selection (runs even when there's
-  // nothing to query, e.g. the Agent tab with no agents).
-  syncFilterUrl();
-
-  // Stream comes from the agent (Agent tab) or the picker (Stream tab).
-  const stream = effectiveStream.value;
-  if (!stream) return;
-
-  // Per-selection KPI retention: restore the summary numbers for this exact
-  // stream+agent+window instead of refetching on a tab toggle. `force` (manual
-  // refresh) skips the cache.
-  const ck = kpiCacheKey(start, end);
-  if (!force && kpiCache.has(ck)) {
-    const snap = kpiCache.get(ck)!;
-    kpi.value = snap.kpi;
-    kpiPrev.value = snap.kpiPrev;
-    sparklines.value = snap.sparklines;
-    lastRunAt.value = snap.lastRunAt;
-    error.value = null; // restoring a prior success — drop any stale error
-    hasLoadedOnce.value = true; // we have data → no first-load skeleton
-    return;
-  }
-
-  await fetchAll(stream, start, end, effectiveAgent.value);
-  // `loading` true→false already stamped lastRunAt via the watcher; snapshot the
-  // fresh result so returning to this selection skips the network.
-  if (!error.value) {
-    kpiCache.set(ck, {
-      kpi: kpi.value,
-      kpiPrev: kpiPrev.value,
-      sparklines: sparklines.value,
-      lastRunAt: lastRunAt.value,
-    });
+    await fetchAll(stream, start, end, effectiveAgent.value);
+    // `loading` true→false already stamped lastRunAt via the watcher; snapshot
+    // the fresh result so returning to this selection skips the network.
+    if (!error.value) {
+      kpiCache.set(ck, {
+        kpi: kpi.value,
+        kpiPrev: kpiPrev.value,
+        sparklines: sparklines.value,
+        lastRunAt: lastRunAt.value,
+      });
+    }
+  } finally {
+    // The switch is resolved (data ready, or we bailed early) — drop the switch
+    // skeleton. Any in-flight KPI/panel fetch keeps its own skeleton from here.
+    switching.value = false;
   }
 }
 
@@ -794,6 +812,9 @@ function onFilterModeChange(mode?: string | number | null) {
   const next = mode === "agent" ? "agent" : "stream";
   if (next === filterMode.value) return;
   filterMode.value = next;
+  // Entering the Agent tab fetches the agents list before any KPI fetch — show
+  // the skeleton for that whole stretch so the switch is immediate, not stale.
+  if (next === "agent") switching.value = true;
   loadInsights();
 }
 
@@ -802,6 +823,7 @@ function onStreamChange() {
 }
 
 function onAgentChange() {
+  switching.value = true;
   loadInsights();
 }
 
