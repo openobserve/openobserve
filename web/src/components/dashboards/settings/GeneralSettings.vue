@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
     <div>
     <OForm ref="formRef" :schema="generalSettingsSchema" :default-values="generalSettingsDefaults()" @submit="onSubmit" v-slot="{ isSubmitting }">
-    <div class="tw:flex tw:flex-col tw:gap-3 tw:px-3">
+    <div class="tw:flex tw:flex-col tw:gap-3 tw:px-3 tw:py-3">
         <OFormInput
           name="name"
           :label="t('dashboard.name')"

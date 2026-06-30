@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-        <div class="tw:mx-2 tw:my-2 scroll">
+        <div class="scroll">
           <OTabPanels
             v-model="activeTab"
             animated

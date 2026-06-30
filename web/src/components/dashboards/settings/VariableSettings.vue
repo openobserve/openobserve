@@ -47,137 +47,128 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </DashboardHeader>
-      <div>
-        <div class="tw:grid tw:py-2 tw:font-bold tw:border-b tw:border-b-(--o2-border-color) tw:bg-(--o2-table-header-bg)" style="grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 100px 100px 120px" data-test="dashboard-variables-list-header">
-          <div class="tw:pl-4"></div>
-          <div>#</div>
-          <div>{{ t("dashboard.name") }}</div>
-          <div>{{ t("dashboard.type") }}</div>
-          <div>{{ t("dashboard.selectType") }}</div>
-          <div>Scope</div>
-          <div class="tw:ml-4 tw:pl-4">
-            {{ t("dashboard.actions") }}
-          </div>
-        </div>
-
-        <draggable
-          v-model="dashboardVariablesList"
-          :options="dragOptions"
-          @end="handleDragEnd"
-          @mousedown.stop="() => {}"
-          data-test="dashboard-variable-settings-drag"
+      <div ref="tableWrapper" data-test="dashboard-variable-settings-drag">
+        <OTable
+          data-test="dashboard-variables-table"
+          :data="dashboardVariablesList"
+          :columns="columns"
+          row-key="name"
+          :frame="false"
+          pagination="none"
+          sorting="none"
+          selection="none"
+          :default-columns="false"
+          :show-global-filter="false"
         >
-          <div
-            v-for="(variable, index) in dashboardVariablesList"
-            :key="variable.name"
-            class="draggable-row tw:grid tw:items-center tw:rounded tw:border-b tw:border-b-(--o2-border-color) tw:hover:bg-[var(--color-interactive-hover-bg)]"
-            style="grid-template-columns: 48px minmax(0, 1fr)"
-            data-test="dashboard-variable-settings-draggable-row"
-          >
-            <div class="tw:flex tw:items-center tw:justify-center tw:h-full tw:cursor-move tw:box-border">
-              <OIcon
-                name="drag-indicator" size="sm"
-                class="'tw:mr-1"
-                data-test="dashboard-variable-settings-drag-handle"
-              />
-            </div>
-            <div class="tw:grid tw:items-center tw:py-2" style="grid-template-columns: 80px minmax(200px, 1fr) 150px 100px 100px 120px">
-              <div>
-                {{ index < 9 ? `0${index + 1}` : index + 1 }}
-              </div>
-              <div class="item-name">
-                <span class="tw:block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">
-                  {{ variable.name }}
-                </span>
-                <OTooltip
-                  v-if="variable.name.length > 30"
-                  :content="variable.name"
-                />
-              </div>
-              <div>
-                {{ getVariableTypeLabel(variable.type) }}
-              </div>
-              <div>
-                {{
-                  variable.multiSelect
-                    ? t("dashboard.isMultiSelect")
-                    : t("dashboard.isSingleSelect")
-                }}
-              </div>
-              <div>
-                <div class="tw:flex tw:items-center">
-                  <OBadge
-                    variant="primary-soft"
-                    class="tw:ring-1 tw:ring-inset tw:ring-current"
-                    size="sm"
-                    data-test="dashboard-variable-scope-badge"
-                    v-if="getScopeType(variable) === 'global'"
-                  >
-                    Global
-                  </OBadge>
-                  <OBadge
-                    variant="primary-outline"
-                    size="sm"
-                    data-test="dashboard-variable-scope-badge"
-                    v-else-if="getScopeType(variable) === 'tabs'"
-                  >
-                    {{ variable.tabs?.length || 0 }} Tabs
-                  </OBadge>
-                  <OBadge
-                    variant="primary-outline"
-                    size="sm"
-                    data-test="dashboard-variable-scope-badge"
-                    v-else-if="getScopeType(variable) === 'panels'"
-                  >
-                    {{ variable.panels?.length || 0 }} Panels
-                  </OBadge>
+          <template #empty>
+            <NoData />
+          </template>
 
-                  <OTooltip
-                    v-if="getScopeType(variable) === 'tabs' && variable.tabs?.length"
-                  >
-                    <template #content>
-                      <div>{{ t('dashboard.appliedToTabs') }}</div>
-                      <div v-for="tabId in variable.tabs" :key="tabId">{{ getTabName(tabId) }}</div>
-                    </template>
-                  </OTooltip>
-
-                  <OTooltip
-                    v-if="getScopeType(variable) === 'panels' && variable.panels?.length"
-                  >
-                    <template #content>
-                      <div>{{ t('dashboard.appliedToPanels') }}</div>
-                      <div v-for="panelId in variable.panels" :key="panelId">{{ getPanelName(panelId) }}</div>
-                    </template>
-                  </OTooltip>
-                </div>
-              </div>
-              <div class="tw:flex tw:justify-end tw:gap-2">
-                <OButton
-                  variant="ghost"
-                  size="icon"
-                  :title="t('dashboard.edit')"
-                  @click="editVariableFn(variable.name)"
-                  :data-test="`dashboard-edit-variable-${variable.name}`"
-                  icon-left="edit"
-                >
-                </OButton>
-                <OButton
-                  variant="ghost"
-                  size="icon"
-                  :title="t('dashboard.delete')"
-                  @click.stop="
-                    showDeleteDialogFn({ row: { name: variable.name } })
-                  "
-                  data-test="dashboard-delete-variable"
-                >
-                  <template #icon-left
-                    ><OIcon name="delete" size="sm"
-                  /></template>
-                </OButton>
-              </div>
+          <template #cell-drag>
+            <div
+              class="variable-drag-handle tw:flex tw:items-center tw:justify-center tw:cursor-move"
+              data-test="dashboard-variable-settings-drag-handle"
+            >
+              <OIcon name="drag-indicator" size="sm" />
             </div>
-          </div>
-        </draggable>
+          </template>
+
+          <template #cell-index="{ row }">
+            {{ formatIndex(row) }}
+          </template>
+
+          <template #cell-name="{ row }">
+            <div class="item-name">
+              <span class="tw:block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">
+                {{ row.name }}
+              </span>
+              <OTooltip v-if="row.name.length > 30" :content="row.name" />
+            </div>
+          </template>
+
+          <template #cell-type="{ row }">
+            {{ getVariableTypeLabel(row.type) }}
+          </template>
+
+          <template #cell-selection="{ row }">
+            {{
+              row.multiSelect
+                ? t("dashboard.isMultiSelect")
+                : t("dashboard.isSingleSelect")
+            }}
+          </template>
+
+          <template #cell-scope="{ row }">
+            <div class="tw:flex tw:items-center">
+              <OBadge
+                variant="primary-soft"
+                class="tw:ring-1 tw:ring-inset tw:ring-current"
+                size="sm"
+                data-test="dashboard-variable-scope-badge"
+                v-if="getScopeType(row) === 'global'"
+              >
+                Global
+              </OBadge>
+              <OBadge
+                variant="primary-outline"
+                size="sm"
+                data-test="dashboard-variable-scope-badge"
+                v-else-if="getScopeType(row) === 'tabs'"
+              >
+                {{ row.tabs?.length || 0 }} Tabs
+              </OBadge>
+              <OBadge
+                variant="primary-outline"
+                size="sm"
+                data-test="dashboard-variable-scope-badge"
+                v-else-if="getScopeType(row) === 'panels'"
+              >
+                {{ row.panels?.length || 0 }} Panels
+              </OBadge>
+
+              <OTooltip
+                v-if="getScopeType(row) === 'tabs' && row.tabs?.length"
+              >
+                <template #content>
+                  <div>{{ t('dashboard.appliedToTabs') }}</div>
+                  <div v-for="tabId in row.tabs" :key="tabId">{{ getTabName(tabId) }}</div>
+                </template>
+              </OTooltip>
+
+              <OTooltip
+                v-if="getScopeType(row) === 'panels' && row.panels?.length"
+              >
+                <template #content>
+                  <div>{{ t('dashboard.appliedToPanels') }}</div>
+                  <div v-for="panelId in row.panels" :key="panelId">{{ getPanelName(panelId) }}</div>
+                </template>
+              </OTooltip>
+            </div>
+          </template>
+
+          <template #cell-actions="{ row }">
+            <div class="tw:flex tw:justify-center tw:gap-2">
+              <OButton
+                variant="ghost"
+                size="icon"
+                :title="t('dashboard.edit')"
+                @click="editVariableFn(row.name)"
+                :data-test="`dashboard-edit-variable-${row.name}`"
+                icon-left="edit"
+              >
+              </OButton>
+              <OButton
+                variant="ghost"
+                size="icon"
+                :title="t('dashboard.delete')"
+                @click.stop="showDeleteDialogFn({ row: { name: row.name } })"
+                data-test="dashboard-delete-variable"
+              >
+                <template #icon-left><OIcon name="delete" size="sm" /></template>
+              </OButton>
+            </div>
+          </template>
+        </OTable>
 
         <ConfirmDialog
           :title="t('dashboard.deleteVariable')"
@@ -208,6 +199,7 @@ import {
   ref,
   onMounted,
   onActivated,
+  onBeforeUnmount,
   reactive,
   nextTick,
 } from "vue";
@@ -228,15 +220,20 @@ import NoData from "../../shared/grid/NoData.vue";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 import useNotifications from "@/composables/useNotifications";
-import { VueDraggableNext } from "vue-draggable-next";
+import Sortable from "sortablejs";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import {
+  COL,
+  TABLE_INDEX_COL_SIZE,
+} from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "VariableSettings",
   components: {
-    draggable: VueDraggableNext as any,
     AddSettingVariable,
     NoData,
     ConfirmDialog,
@@ -247,6 +244,7 @@ export default defineComponent({
     ODialog,
     OBadge,
     OTooltip,
+    OTable,
   },
   emits: ["save"],
   setup(props, { emit }) {
@@ -259,9 +257,66 @@ export default defineComponent({
       data: {},
     });
 
-    const dragOptions = ref({
-      animation: 200,
-    });
+    // Wrapper around the global OTable; used to reach its rendered <tbody>
+    // so SortableJS can provide row drag-and-drop (OTable has no native
+    // row reorder — we layer it on without modifying OTable).
+    const tableWrapper = ref<HTMLElement | null>(null);
+    let sortableInstance: Sortable | null = null;
+
+    const columns: OTableColumnDef[] = [
+      {
+        id: "drag",
+        header: "",
+        size: 32,
+        minSize: 32,
+        maxSize: 32,
+        meta: { align: "center" },
+      },
+      {
+        id: "index",
+        header: "#",
+        size: TABLE_INDEX_COL_SIZE,
+        meta: { align: "left" },
+      },
+      {
+        id: "name",
+        header: t("dashboard.name"),
+        accessorKey: "name",
+        size: COL.name,
+        meta: { align: "left", isName: true },
+      },
+      {
+        id: "type",
+        header: t("dashboard.type"),
+        size: COL.type,
+        meta: { align: "left" },
+      },
+      {
+        id: "selection",
+        header: t("dashboard.selectType"),
+        size: COL.status,
+        meta: { align: "left" },
+      },
+      {
+        id: "scope",
+        header: "Scope",
+        size: COL.status,
+        meta: { align: "left" },
+      },
+      {
+        id: "actions",
+        header: t("dashboard.actions"),
+        isAction: true,
+        size: 120,
+        meta: { align: "center", actionCount: 2 },
+      },
+    ];
+
+    // Zero-padded position label ("01", "02", …) matching the previous design.
+    const formatIndex = (variable: any) => {
+      const index = dashboardVariablesList.value.indexOf(variable);
+      return index < 9 ? `0${index + 1}` : `${index + 1}`;
+    };
 
     const {
       showPositiveNotification,
@@ -363,12 +418,64 @@ export default defineComponent({
       }
     };
 
+    // Attach SortableJS to OTable's rendered <tbody> so rows can be dragged
+    // to reorder. Re-runnable: tears down any prior instance first.
+    const initSortable = async () => {
+      await nextTick();
+      const tbody = tableWrapper.value?.querySelector(
+        'tbody[data-test="o2-table-body"]',
+      ) as HTMLElement | null;
+      if (!tbody) return;
+
+      sortableInstance?.destroy();
+      sortableInstance = Sortable.create(tbody, {
+        animation: 200,
+        handle: ".variable-drag-handle",
+        onEnd: (evt: Sortable.SortableEvent) => {
+          const { oldIndex, newIndex } = evt;
+          if (
+            oldIndex == null ||
+            newIndex == null ||
+            oldIndex === newIndex
+          ) {
+            return;
+          }
+
+          // Revert Sortable's DOM mutation so Vue stays the single source of
+          // truth, then reorder the reactive data and let Vue re-render.
+          const parent = evt.from;
+          if (newIndex > oldIndex) {
+            parent.insertBefore(evt.item, parent.children[oldIndex]);
+          } else {
+            parent.insertBefore(
+              evt.item,
+              parent.children[oldIndex + 1] ?? null,
+            );
+          }
+
+          const list = [...dashboardVariablesList.value];
+          const [moved] = list.splice(oldIndex, 1);
+          list.splice(newIndex, 0, moved);
+          dashboardVariablesList.value = list;
+
+          handleDragEnd();
+        },
+      });
+    };
+
     onMounted(async () => {
       await getDashboardData();
+      await initSortable();
     });
 
     onActivated(async () => {
       await getDashboardData();
+      await initSortable();
+    });
+
+    onBeforeUnmount(() => {
+      sortableInstance?.destroy();
+      sortableInstance = null;
     });
 
     const getDashboardData = async () => {
@@ -437,9 +544,12 @@ export default defineComponent({
       isAddVariable.value = false;
       // Wait for the listing view to render
       await nextTick();
+      // OTable remounted with a fresh <tbody>; re-attach row dragging.
+      await initSortable();
     };
-    const goBackToDashboardList = () => {
+    const goBackToDashboardList = async () => {
       isAddVariable.value = false;
+      await initSortable();
     };
     const editVariableFn = async (name: any) => {
       selectedVariable.value = name;
@@ -462,12 +572,13 @@ export default defineComponent({
       selectedVariable,
       handleSaveVariable,
       showVariablesDependenciesGraphPopUp,
-      dragOptions,
-      handleDragEnd,
       getVariableTypeLabel,
       getScopeType,
       getTabName,
       getPanelName,
+      tableWrapper,
+      columns,
+      formatIndex,
     };
   },
 });

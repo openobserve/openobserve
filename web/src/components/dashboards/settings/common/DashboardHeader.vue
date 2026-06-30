@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="dashboard-header-root">
     <div
       data-test="dashboard-header-row"
-      class="tw:flex tw:items-center tw:flex-nowrap tw:mb-2"
+      class="tw:flex tw:items-center tw:flex-nowrap tw:my-2 tw:mx-2"
     >
       <div
         v-if="backButton"
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <slot name="right"></slot>
       </div>
     </div>
-    <OSeparator data-test="dashboard-header-separator" class="tw:mb-2" />
+    <OSeparator data-test="dashboard-header-separator"/>
   </div>
 </template>
 
