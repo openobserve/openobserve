@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="t('serviceAccounts.header')"
       icon="manage-accounts"
-      :subtitle="'Programmatic access tokens for APIs'"
+      :subtitle="t('serviceAccounts.headerSubtitle')"
       class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
       <template #actions>
@@ -88,13 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-email="{ row }">
               <template v-if="row.is_system">
-                <span data-test="service-accounts-system-account-label" class="text-weight-medium">AI SRE Agent</span>
+                <span data-test="service-accounts-system-account-label" class="text-weight-medium">{{ row.first_name }}</span>
                 <OBadge data-test="service-accounts-system-badge" variant="primary-outline" size="sm" class="tw:ml-2">system</OBadge>
               </template>
               <template v-else>
-                <span :data-test="`service-accounts-email-${row.email}`">
-                  <OUserCell :value="row.email" />
-                </span>
+                <span :data-test="`service-accounts-email-${row.email}`">{{ row.email }}</span>
               </template>
             </template>
 
@@ -103,21 +101,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else>{{ row.first_name }}</template>
             </template>
 
-            <template #cell-token="{ row }">
-              <OCodeCell :value="row.token || '************'" :copy="false" />
-            </template>
-
             <template #cell-actions="{ row }">
               <template v-if="row.is_system">
-                <OBadge data-test="service-accounts-system-managed-badge" variant="default-outline">
-                    {{ t('serviceAccounts.systemManaged', 'System Managed') }}
-                  <OTooltip v-if="row.description" :content="row.description" />
-                </OBadge>
+                <span
+                  data-test="service-accounts-system-managed-badge"
+                  class="tw:inline-flex tw:items-center tw:gap-1 tw:text-xs tw:text-text-muted"
+                >
+                  {{ t('serviceAccounts.row.managedBy') }}
+                  <OTooltip :content="t('serviceAccounts.row.managedByTooltip')" />
+                </span>
               </template>
               <template v-else>
                 <OButton
                   data-test="service-accounts-refresh"
-                  :title="t('serviceAccounts.refresh')"
+                  :title="t('serviceAccounts.rotate')"
                   variant="ghost"
                   size="icon-sm"
                   icon-left="refresh"
@@ -133,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   data-test="service-accounts-delete"
-                  :title="t('serviceAccounts.delete')"
+                  :title="t('serviceAccounts.deleteServiceAccount')"
                   variant="ghost"
                   size="icon-sm"
                   icon-left="delete"
@@ -152,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="openBulkDeleteDialog"
                 icon-left="delete"
               >
-                Delete
+                {{ t('serviceAccounts.bulkDelete') }}
               </OButton>
             </template>
           </OTable>
@@ -165,83 +162,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @updated="addMember"
     />
 
-    <ODialog data-test="service-accounts-list-refresh-dialog"
-      v-model:open="confirmRefresh"
+    <ConfirmDialog
+      data-test="service-accounts-list-refresh-dialog"
+      v-model="confirmRefresh"
       :title="t('serviceAccounts.confirmRefreshHead')"
-      :secondary-button-label="t('user.cancel')"
-      :primary-button-label="t('user.ok')"
-      @click:secondary="confirmRefresh = false"
-      @click:primary="refreshServiceToken(toBeRefreshed)"
-    >
-      <p>{{ t('serviceAccounts.confirmRefreshMsg') }}</p>
-    </ODialog>
+      :message="t('serviceAccounts.confirmRefreshMsg', { identifier: toBeRefreshed.email })"
+      @update:ok="refreshServiceToken(toBeRefreshed)"
+      @update:cancel="confirmRefresh = false"
+    />
 
-    <ODialog data-test="service-accounts-list-delete-dialog"
-      v-model:open="confirmDelete"
+    <ConfirmDialog
+      data-test="service-accounts-list-delete-dialog"
+      v-model="confirmDelete"
       :title="t('serviceAccounts.confirmDeleteHead')"
-      :secondary-button-label="t('user.cancel')"
-      :primary-button-label="t('user.ok')"
-      @click:secondary="confirmDelete = false"
-      @click:primary="deleteUser"
-      size="sm"
-    >
-      <p>{{ t('serviceAccounts.confirmDeleteMsg') }}</p>
-    </ODialog>
+      :message="t('serviceAccounts.confirmDeleteMsg', { identifier: deleteUserEmailIdentifier })"
+      ok-label="Delete"
+      ok-color="destructive"
+      @update:ok="deleteUser"
+      @update:cancel="confirmDelete = false"
+    />
 
-    <ODialog data-test="service-accounts-list-bulk-delete-dialog"
-      v-model:open="confirmBulkDelete"
-      size="sm"
-      title="Delete Service Accounts"
-      secondary-button-label="Cancel"
-      primary-button-label="OK"
-      @click:secondary="confirmBulkDelete = false"
-      @click:primary="bulkDeleteServiceAccounts"
-    >
-      <p>Are you sure you want to delete {{ selectedAccounts.length }} service account(s)?</p>
-    </ODialog>
+    <ConfirmDialog
+      data-test="service-accounts-list-bulk-delete-dialog"
+      v-model="confirmBulkDelete"
+      :title="t('serviceAccounts.confirmBulkDeleteHead')"
+      :message="t('serviceAccounts.confirmBulkDeleteMsg', { count: selectedAccounts.length })"
+      ok-label="Delete"
+      ok-color="destructive"
+      @update:ok="bulkDeleteServiceAccounts"
+      @update:cancel="confirmBulkDelete = false"
+    />
 
     <ODialog data-test="service-accounts-list-token-dialog"
       v-model:open="isShowToken"
       persistent
       size="md"
-      title="Service Account Token"
+      :title="t('serviceAccounts.tokenDialogTitle')"
     >
+      <div>
+        <OTabs v-model="tokenTab" dense align="left">
+          <OTab name="curl" :label="t('serviceAccounts.tokenReveal.curl')" />
+          <OTab name="header" :label="t('serviceAccounts.tokenReveal.header')" />
+          <OTab name="env" :label="t('serviceAccounts.tokenReveal.env')" />
+        </OTabs>
 
-      <div class="tw:flex tw:items-center tw:gap-2 tw:rounded-lg" style="padding: 0rem 0.5rem;">
-        <!-- Token section taking 75% of the width -->
-        <div
-          class="tw:text-xl tw:font-semibold tw:text-center tw:truncate el-border"
-          style="flex: 3; padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
-        >
-          {{ serviceToken }}
-        </div>
-        <!-- Buttons section taking 25% of the width -->
-        <div class="tw:flex tw:justify-end tw:gap-1" style="flex: 1; max-width: 25%;">
+        <OTabPanels v-model="tokenTab" animated>
+          <OTabPanel name="curl">
+            <pre class="tw:bg-surface tw:p-3 tw:rounded tw:text-xs tw:overflow-auto tw:whitespace-pre-wrap">{{
+              tokenCurlSnippet
+            }}</pre>
+          </OTabPanel>
+          <OTabPanel name="header">
+            <pre class="tw:bg-surface tw:p-3 tw:rounded tw:text-xs tw:overflow-auto tw:whitespace-pre-wrap">{{
+              tokenHeaderSnippet
+            }}</pre>
+          </OTabPanel>
+          <OTabPanel name="env">
+            <pre class="tw:bg-surface tw:p-3 tw:rounded tw:text-xs tw:overflow-auto tw:whitespace-pre-wrap">{{
+              tokenEnvSnippet
+            }}</pre>
+          </OTabPanel>
+        </OTabPanels>
+
+        <div class="tw:flex tw:items-center tw:gap-2 tw:mt-3">
           <OButton
             data-test="service-accounts-list-token-copy-btn"
             variant="outline"
             size="icon-md"
             :title="t('serviceAccounts.copyToken')"
-            class="tw:mr-1"
             @click.stop="copyToClipboard(serviceToken, { successMessage: 'Token Copied Successfully!', timeout: 5000 })"
           >
             <OIcon name="content-copy" size="sm" />
           </OButton>
-          <OButton
-            data-test="service-accounts-list-token-download-btn"
-            variant="outline"
-            size="icon-md"
-            :title="t('serviceAccounts.downloadToken')"
-            @click.stop="downloadTokenAsFile(serviceToken)"
-          >
-            <OIcon name="file-download" size="sm" />
-          </OButton>
+          <span class="tw:text-xs tw:text-text-muted">{{ tokenNextStepHint }}</span>
         </div>
-      </div>
-
-      <div class="tw:pt-3 tw:flex tw:items-center warning-text">
-        <OIcon name="info" class="tw:mr-1" size="sm" />
-        <span class="text-p">Make sure to copy / download the token. You will not be able to see it again.</span>
       </div>
     </ODialog>
   </div>
@@ -249,14 +243,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 
-import { defineComponent, ref, onBeforeMount, onMounted, watch } from "vue";
+import { defineComponent, ref, onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -264,30 +257,29 @@ import config from "@/aws-exports";
 import AddServiceAccount from "./AddServiceAccount.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import usersService from "@/services/users";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import organizationsService from "@/services/organizations";
-import segment from "@/services/segment_analytics";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import { copyToClipboard } from "@/utils/clipboard";
 import {
   getImageURL,
   verifyOrganizationStatus,
-  maskText,
 } from "@/utils/zincutils";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import { copyToClipboard } from "@/utils/clipboard";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
-import { computed, nextTick } from "vue";
-import { getRoles } from "@/services/iam";
+import { computed } from "vue";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { OEmptyState, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge, OCodeCell, OUserCell, OSearchInput },
+  components: { OEmptyState, AddServiceAccount, ConfirmDialog, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge, OSearchInput, OTabs, OTab, OTabPanels, OTabPanel },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
@@ -312,6 +304,32 @@ export default defineComponent({
     });
 
     const serviceToken  = ref("");
+
+    const tokenTab = ref("curl");
+
+    const tokenCurlSnippet = computed(() => {
+      const orgId = store.state.selectedOrganization.identifier;
+      const endpoint = config.isCloud
+        ? "https://api.openobserve.ai"
+        : window.location.origin;
+      return `curl -X GET "${endpoint}/api/${orgId}/_search" \\\n  -H "Authorization: Bearer ${serviceToken.value || 'YOUR_TOKEN'}"`;
+    });
+
+    const tokenHeaderSnippet = computed(() => {
+      return `Authorization: Bearer ${serviceToken.value || 'YOUR_TOKEN'}`;
+    });
+
+    const tokenEnvSnippet = computed(() => {
+      const orgId = store.state.selectedOrganization.identifier;
+      return `ZO_TOKEN=${serviceToken.value || 'YOUR_TOKEN'}\nZO_ORG_ID=${orgId}`;
+    });
+
+    const tokenNextStepHint = computed(() => {
+      const isEnt = config.isEnterprise === "true";
+      const isCloud = config.isCloud;
+      if (isCloud) return t("serviceAccounts.tokenReveal.nextStepCloud");
+      return t("serviceAccounts.tokenReveal.nextStep");
+    });
 
     const serviceAccounts = ref([]);
     const selectedAccounts: any = ref([]);
@@ -346,7 +364,7 @@ export default defineComponent({
       },
       {
         id: "email",
-        header: t("user.email"),
+        header: t("serviceAccounts.list.col.identifier"),
         accessorKey: "email",
         sortable: true,
         resizable: true,
@@ -366,13 +384,23 @@ export default defineComponent({
         meta: { align: "left", flex: true },
       },
       {
-        id: "token",
-        header: t("serviceAccounts.token"),
-        accessorKey: "token",
-        sortable: false,
+        id: "created_at",
+        header: t("serviceAccounts.list.col.created"),
+        accessorKey: "created_at",
+        sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.token,
+        size: 140,
+        meta: { align: "left" },
+      },
+      {
+        id: "created_by",
+        header: t("serviceAccounts.list.col.createdBy"),
+        accessorKey: "created_by",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: 160,
         meta: { align: "left" },
       },
       {
@@ -389,6 +417,7 @@ export default defineComponent({
     const selectedRole = ref(options.value[0].value);
     const currentUserRole = ref("");
     let deleteUserEmail = "";
+    const deleteUserEmailIdentifier = ref("");
 
     const currentUser = computed(() => store.state.userInfo.email);
 
@@ -406,6 +435,7 @@ export default defineComponent({
     const confirmDeleteAction = (row: any) => {
       confirmDelete.value = true;
       deleteUserEmail = row.email;
+      deleteUserEmailIdentifier.value = row.email;
     };
     const loading = ref(false);
     const getServiceAccountsUsers = async () =>{
@@ -428,13 +458,15 @@ export default defineComponent({
             serviceAccountsState.service_accounts_users = res.data.data.map((data: any) => {
               return {
                 "#": counter <= 9 ? `0${counter++}` : counter++,
-                email: maskText(data.email),
+                email: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
                 token: data.token || '',
                 role: data.role || 'ServiceAccount',
                 is_system: data.is_system || false,
                 description: data.description || null,
+                created_at: data.created_at || '',
+                created_by: data.created_by || '',
               };
             });
 
@@ -535,6 +567,8 @@ export default defineComponent({
               first_name: data.first_name,
               last_name: data.last_name,
               token: res.token ? redactToken(res.token) : '',
+              created_at: data.created_at || new Date().toISOString(),
+              created_by: data.created_by || '',
             };
 
             serviceAccountsState.service_accounts_users = [...serviceAccountsState.service_accounts_users, user];
@@ -659,15 +693,6 @@ export default defineComponent({
       });
 
     }
-    const downloadTokenAsFile = (token:string) => {
-      const blob = new Blob([token], { type: "text/plain" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "service_account_token.txt";
-      link.click();
-      URL.revokeObjectURL(link.href); // Cleanup
-    };
-
     const isSystemAccount = (email: string) => {
       return email.startsWith('o2-sre-agent.org-') && email.endsWith('@openobserve.internal');
     };
@@ -702,9 +727,13 @@ export default defineComponent({
       selectedUser,
       refreshServiceToken,
       copyToClipboard,
-      downloadTokenAsFile,
       isShowToken,
       serviceToken,
+      tokenTab,
+      tokenCurlSnippet,
+      tokenHeaderSnippet,
+      tokenEnvSnippet,
+      tokenNextStepHint,
       confirmRefreshAction,
       filterQuery,
       userEmail,
@@ -725,6 +754,7 @@ export default defineComponent({
       bulkDeleteServiceAccounts,
       redactToken,
       isSystemAccount,
+      deleteUserEmailIdentifier,
     };
   },
 });
