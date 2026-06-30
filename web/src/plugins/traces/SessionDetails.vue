@@ -929,7 +929,7 @@ const kpiCards = computed<
     },
     {
       key: "latency",
-      label: t("traces.sessionDetail.kpi.latency"),
+      label: t("traces.sessionDetail.kpi.duration"),
       value: lat.value,
       unit: lat.unit,
       // Latency is never colour-flagged — "good" latency is too workload-
@@ -990,7 +990,7 @@ const sortDir = ref<"asc" | "desc">("asc");
 
 // The metric columns that have a sortable header (latency / cost / tokens).
 const sortableColumns: { key: Extract<SortKey, "latency" | "cost" | "tokens">; label: string }[] = [
-  { key: "latency", label: "traces.sessionDetail.kpi.latency" },
+  { key: "latency", label: "traces.sessionDetail.kpi.duration" },
   { key: "cost", label: "traces.sessionDetail.kpi.cost" },
   { key: "tokens", label: "traces.sessionDetail.kpi.tokens" },
 ];

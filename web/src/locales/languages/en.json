@@ -4146,7 +4146,6 @@
         "outputTokens": "Output Tokens",
         "cost": "Cost",
         "errors": "Errors",
-        "latency": "Latency",
         "tokens": "Tokens",
         "cacheSaved": "Cache Saved"
       },
@@ -4164,7 +4163,7 @@
       },
       "ribbon": {
         "title": "Session Ribbon",
-        "subtitle": "Cost, Latency & Tokens Per Turn"
+        "subtitle": "Cost, Duration & Tokens Per Turn"
       },
       "conversation": "Conversation",
       "turnLabel": "Turn",

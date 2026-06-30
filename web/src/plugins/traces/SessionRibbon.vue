@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('traces.sessionDetail.kpi.cost') }}
         </OToggleGroupItem>
         <OToggleGroupItem value="latency" size="sm">
-          {{ t('traces.sessionDetail.kpi.latency') }}
+          {{ t('traces.sessionDetail.kpi.duration') }}
         </OToggleGroupItem>
         <OToggleGroupItem value="tokens" size="sm">
           {{ t('traces.sessionDetail.kpi.tokens') }}

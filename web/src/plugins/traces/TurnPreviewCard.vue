@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="tw:font-[650]">{{ costLabel }}</span>
             </div>
             <div class="tw:flex tw:items-center tw:justify-between tw:text-[11px]">
-              <span class="tw:text-[var(--o2-text-muted)]">{{ t('traces.sessionDetail.kpi.latency') }}</span>
+              <span class="tw:text-[var(--o2-text-muted)]">{{ t('traces.sessionDetail.kpi.duration') }}</span>
               <span class="tw:font-[650]">{{ latencyLabel }}</span>
             </div>
             <div class="tw:flex tw:items-center tw:justify-between tw:text-[11px]">
