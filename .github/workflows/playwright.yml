@@ -881,9 +881,9 @@ jobs:
     name: Merge Reports
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
-    runs-on:
-      # Bumped to standard-8: merge-reports was bailing mid-merge on standard-4 under memory pressure.
-      labels: ubicloud-standard-8
+    # GitHub-hosted runner: `playwright merge-reports` crashes mid-merge (extracts a few blobs then
+    # exits non-zero) deterministically on the ubicloud runners — works on github-hosted / eks.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       actions: read  # the no-blobs investigation reads run/job state from the Actions API
