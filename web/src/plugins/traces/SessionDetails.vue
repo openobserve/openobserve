@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="session-details-page tw:h-[calc(100vh-2.6rem)] tw:px-[0.625rem] tw:py-[0.375rem]"
+    class="session-details-page tw:h-[calc(100vh-2.6rem)]"
   >
   <div
     class="session-details card-container tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:bg-[var(--o2-card-bg-solid)]"
@@ -170,8 +170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="tw:grid tw:grid-cols-2 tw:gap-[0.625rem] tw:mb-[0.625rem] tw:flex-shrink-0"
       >
-      <!-- KPI strip — six session-level metric tiles. Card chrome + danger/warn
-           variants are Tailwind utilities (see kpiCardClass / kpiAccentClass),
+      <!-- KPI strip — six session-level metric tiles. Card chrome + danger
+           variant are Tailwind utilities (see kpiCardClass / kpiAccentClass),
            matching the LLM Insights dashboard so the AI module stays consistent. -->
       <div
         class="tw:grid tw:grid-cols-3 tw:gap-[0.625rem]"
@@ -784,22 +784,20 @@ const cacheRatio = computed(() => sessionStats.value?.cacheRatio ?? 0);
 
 // KPI tile classes. Mirrors the `statusBadgeClass()` pattern this module already
 // uses — a function returns the Tailwind class string for a given variant, so the
-// (shared) card chrome + danger/warn surface tint live in one place and the
-// skeleton and real tiles stay in sync. Styling is Tailwind-only (no scoped CSS).
-function kpiCardClass(variant?: "danger" | "warn"): string {
+// (shared) card chrome + danger surface tint live in one place and the skeleton
+// and real tiles stay in sync. Styling is Tailwind-only (no scoped CSS). Only
+// Errors uses a variant (red when > 50% error rate); every other tile is neutral.
+function kpiCardClass(variant?: "danger"): string {
   const base =
     "tw:flex tw:flex-col tw:justify-between tw:gap-1 tw:px-3.5 tw:py-2.5 tw:rounded-lg tw:border tw:transition-shadow hover:tw:shadow-[0_1px_6px_rgba(0,0,0,0.08)]";
   if (variant === "danger")
     return `${base} tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_5%,var(--o2-card-bg))] tw:border-[color-mix(in_srgb,var(--o2-service-health-critical)_35%,var(--o2-border-color))]`;
-  if (variant === "warn")
-    return `${base} tw:bg-[color-mix(in_srgb,var(--o2-status-warning-text)_6%,var(--o2-card-bg))] tw:border-[color-mix(in_srgb,var(--o2-status-warning-text)_35%,var(--o2-border-color))]`;
   return `${base} tw:bg-[var(--o2-card-bg)] tw:border-[var(--o2-border-color)]`;
 }
 
-// Accent text colour for a variant's label/value; "" → use the neutral default.
-function kpiAccentClass(variant?: "danger" | "warn"): string {
+// Accent text colour for a variant's value; "" → use the neutral default.
+function kpiAccentClass(variant?: "danger"): string {
   if (variant === "danger") return "tw:text-[var(--o2-service-health-critical)]";
-  if (variant === "warn") return "tw:text-[var(--o2-status-warning-text)]";
   return "";
 }
 
@@ -822,7 +820,7 @@ const kpiCards = computed<
     subLead: string;
     subTurns: TurnChip[];
     subTail: string;
-    variant?: "danger" | "warn";
+    variant?: "danger";
     estimate?: boolean;
   }[]
 >(() => {
@@ -854,8 +852,9 @@ const kpiCards = computed<
       label: t("traces.sessionDetail.kpi.errors"),
       value: String(s.errRate),
       unit: "%",
-      // Only flag red when there are actual errors; a clean session stays neutral.
-      variant: s.errors > 0 ? "danger" : undefined,
+      // Red only when the majority of turns failed (> 50% error rate); below
+      // that the tile stays neutral so the colour means "this session broke".
+      variant: s.errRate > 50 ? "danger" : undefined,
       subLead: s.errors
         ? t("traces.sessionDetail.kpiSub.errorsLead", {
             errors: s.errors,
@@ -870,8 +869,8 @@ const kpiCards = computed<
       label: t("traces.sessionDetail.kpi.latency"),
       value: lat.value,
       unit: lat.unit,
-      // Colour only when there's actual latency; otherwise stay neutral.
-      variant: s.avgLat > 0 ? "warn" : undefined,
+      // Latency is never colour-flagged — "good" latency is too workload-
+      // specific to threshold reliably, so the tile stays neutral.
       subLead: t("traces.sessionDetail.kpiSub.latencyLead", {
         slowest: formatDuration(s.slowestLat),
       }),
