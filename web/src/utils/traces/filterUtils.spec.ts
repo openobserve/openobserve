@@ -7,6 +7,7 @@ import {
   replaceExistingFieldCondition,
   applyFilterTerm,
   buildFilterTerm,
+  removeFieldCondition,
 } from "./filterUtils";
 
 // ---------------------------------------------------------------------------
@@ -439,6 +440,79 @@ describe("buildFilterTerm", () => {
 
     it("should wrap boolean string in single quotes", () => {
       expect(buildFilterTerm("is_error", "true")).toBe("is_error = 'true'");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// removeFieldCondition
+// ---------------------------------------------------------------------------
+
+describe("removeFieldCondition", () => {
+  describe("comparison operators", () => {
+    it("should remove an equality condition", () => {
+      expect(removeFieldCondition("brand='Apple'", "brand")).toBe("");
+    });
+
+    it("should remove a not-equal condition", () => {
+      expect(removeFieldCondition("brand!='Apple'", "brand")).toBe("");
+    });
+
+    it("should remove only the targeted field and keep the rest", () => {
+      expect(
+        removeFieldCondition("brand='Apple' AND env='prod'", "brand"),
+      ).toBe("env='prod'");
+    });
+
+    it("should leave the query unchanged when the field is absent", () => {
+      expect(removeFieldCondition("env='prod'", "brand")).toBe("env='prod'");
+    });
+  });
+
+  describe("IS NULL / IS NOT NULL conditions", () => {
+    // Regression: unchecking a null value emits remove-field, which must strip
+    // the `IS NULL` / `IS NOT NULL` condition it produced. The old regex only
+    // matched [=!<>] so these conditions lingered in the editor.
+    it("should remove an IS NULL condition", () => {
+      expect(
+        removeFieldCondition("user_agent_device_brand IS NULL", "user_agent_device_brand"),
+      ).toBe("");
+    });
+
+    it("should remove an IS NOT NULL condition", () => {
+      expect(
+        removeFieldCondition("user_agent_device_brand IS NOT NULL", "user_agent_device_brand"),
+      ).toBe("");
+    });
+
+    it("should remove an IS NULL condition while keeping other conditions", () => {
+      expect(
+        removeFieldCondition("brand IS NULL AND env='prod'", "brand"),
+      ).toBe("env='prod'");
+    });
+
+    it("should remove a lowercase 'is null' condition", () => {
+      expect(removeFieldCondition("brand is null", "brand")).toBe("");
+    });
+
+    it("should remove a parenthesized group that starts with IS NULL", () => {
+      expect(
+        removeFieldCondition("(brand IS NULL or brand='Apple')", "brand"),
+      ).toBe("");
+    });
+
+    it("should not remove a different field whose name is a prefix", () => {
+      expect(removeFieldCondition("brand_name IS NULL", "brand")).toBe(
+        "brand_name IS NULL",
+      );
+    });
+  });
+
+  describe("pipe-separated queries", () => {
+    it("should remove an IS NULL condition only from the WHERE part", () => {
+      expect(
+        removeFieldCondition("SELECT * FROM rum | brand IS NULL", "brand"),
+      ).toBe("SELECT * FROM rum | ");
     });
   });
 });

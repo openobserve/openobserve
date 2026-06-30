@@ -34,23 +34,34 @@ gh_get(){ curl -s -H "Authorization: token ${GH_TOKEN}" -H "Accept: application/
 
 # wall-clock of one attempt = max(completed) - min(started) across its jobs (clamped non-negative
 # to guard against clock-skew where a completed_at precedes a started_at).
-attempt_wall(){ jq '[.jobs[]|select(.completed_at!=null and .started_at!=null)] as $j
-  | (if ($j|length)>0 then (($j|map(.completed_at|fromdateiso8601)|max)-($j|map(.started_at|fromdateiso8601)|min)) else 0 end)
+# $1 = floor epoch (the attempt's run_started_at). On a RE-RUN, GitHub's per-attempt jobs API
+# carries over jobs that did NOT re-run with their ORIGINAL (earlier-attempt) timestamps, so a
+# naive min(started) spans the idle gap between a failed run and a much-later manual re-run —
+# inflating the duration by hours. Flooring the start at run_started_at counts only this
+# attempt's actual work (no effect on normal runs, where min(started) >= run_started_at).
+attempt_wall(){ jq --argjson floor "${1:-0}" '[.jobs[]|select(.completed_at!=null and .started_at!=null)] as $j
+  | (if ($j|length)>0 then (($j|map(.completed_at|fromdateiso8601)|max)-([($j|map(.started_at|fromdateiso8601)|min), $floor]|max)) else 0 end)
   | if . < 0 then 0 else . end'; }
+# Epoch seconds of a run/attempt object's run_started_at (0 if absent).
+run_started_epoch(){ jq 'if .run_started_at then (.run_started_at|fromdateiso8601) else 0 end'; }
 
 RUN_JSON=$(gh_get "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" 2>/dev/null)
 [ -n "$RUN_JSON" ] || { echo "::warning::could not fetch run object — skipping"; exit 0; }
 ATT="${GITHUB_RUN_ATTEMPT:-1}"
+# This attempt's start — the floor for its wall-clock (see attempt_wall).
+RUN_STARTED=$(printf '%s' "$RUN_JSON" | run_started_epoch 2>/dev/null || echo 0)
+[ -n "$RUN_STARTED" ] || RUN_STARTED=0
 
 THIS_JOBS=$(gh_get "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${ATT}/jobs?per_page=100" 2>/dev/null)
-FINAL_DUR=$(printf '%s' "$THIS_JOBS" | attempt_wall 2>/dev/null || echo 0)
+FINAL_DUR=$(printf '%s' "$THIS_JOBS" | attempt_wall "$RUN_STARTED" 2>/dev/null || echo 0)
 
 # total across attempts: add each prior attempt's wall-clock.
 TOTAL_DUR="$FINAL_DUR"
 if [ "$ATT" -gt 1 ] 2>/dev/null; then
   SUM="$FINAL_DUR"
   for n in $(seq 1 $((ATT-1))); do
-    W=$(gh_get "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${n}/jobs?per_page=100" 2>/dev/null | attempt_wall 2>/dev/null || echo 0)
+    NFLOOR=$(gh_get "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${n}" 2>/dev/null | run_started_epoch 2>/dev/null || echo 0)
+    W=$(gh_get "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${n}/jobs?per_page=100" 2>/dev/null | attempt_wall "${NFLOOR:-0}" 2>/dev/null || echo 0)
     SUM=$(awk -v a="$SUM" -v b="$W" 'BEGIN{print a+b}')
   done
   TOTAL_DUR="$SUM"
@@ -107,3 +118,22 @@ if [ -n "${EXTRA_JSON:-}" ] && printf '%s' "$EXTRA_JSON" | jq -e . >/dev/null 2>
 fi
 
 bash "$(dirname "$0")/o2-report.sh" "$STREAM" "$PAYLOAD_FILE"
+
+# For runs with e2e shard jobs (UI), also emit one row per shard to <STREAM>_shards so dashboards
+# can break down per-shard duration / slowest shard / per-module health (mirrors ci_regression_shards).
+# API runs have no "e2e /" jobs, so this is a no-op there. Row schema:
+#   run_id, repo, suite, workflow, ingest_source, shard_name, module (shard minus "e2e / "),
+#   conclusion, duration_sec. _timestamp left unset -> ingest time (aligned with the run doc).
+# Notes: THIS_JOBS is the jobs API object {jobs:[...]}, piped in (so .jobs[]); workflow:"test" is
+# fixed to match the run doc's tag; duration clamped to >=0 to guard against runner clock skew.
+SHARD_FILE=$(mktemp "${TMPDIR:-/tmp}/o2_shards.XXXXXX")
+shard_rows=$(printf '%s' "$THIS_JOBS" | jq -c --arg repo "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" --arg suite "$SUITE" \
+  '[.jobs[]? | select(.name|startswith("e2e /")) | {
+     run_id:$run_id, repo:$repo, suite:$suite, workflow:"test", ingest_source:"live",
+     shard_name:.name, module:(.name|sub("^e2e / ";"")), conclusion:.conclusion,
+     duration_sec: (if (.completed_at and .started_at) then ([((.completed_at|fromdateiso8601)-(.started_at|fromdateiso8601)|floor), 0] | max) else null end)
+   }]' 2>/dev/null) && printf '%s' "$shard_rows" > "$SHARD_FILE" || { echo '[]' > "$SHARD_FILE"; echo "::warning::shard-row extraction failed — skipping ${STREAM}_shards"; }
+if [ "$(jq 'length' "$SHARD_FILE" 2>/dev/null || echo 0)" -gt 0 ]; then
+  bash "$(dirname "$0")/o2-report.sh" "${STREAM}_shards" "$SHARD_FILE"
+fi
+rm -f "$SHARD_FILE"

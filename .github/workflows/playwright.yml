@@ -480,7 +480,7 @@ jobs:
 
       - name: Cache Playwright browser
         id: playwright-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
@@ -876,20 +876,26 @@ jobs:
         if: always()
         run: cat o2.log
 
-  merge_and_upload_reports:
+  merge_reports:
     timeout-minutes: 15
-    name: Merge Reports and Upload to TestDino
+    name: Merge Reports
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
+    # eks runner: `playwright merge-reports` silently stops mid-merge (exits 0, ~3 of N blobs, no
+    # output) on the ubicloud and github-hosted runners — but works on the eks runners (same as ENT).
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
-      actions: read
+      actions: read  # the no-blobs investigation reads run/job state from the Actions API
     outputs:
       # Compact Playwright stats (expected/unexpected/flaky/skipped) from the merged report.json,
       # consumed by report_to_openobserve to record per-test counts in ci_test_runs.
       stats: ${{ steps.report_stats.outputs.stats }}
+      # Flaky + failed tests for the ci_test_results stream, consumed by
+      # report_to_openobserve. JSON array: [{module,title,file,status}] where
+      # status is "flaky"|"failed" (see .github/scripts/extract-flaky.js). "[]" if none.
+      flaky: ${{ steps.report_flaky.outputs.flaky }}
 
     steps:
       - name: Clone the current repo
@@ -968,16 +974,36 @@ jobs:
             fi
           fi
 
-          # Unset CI to use non-CI reporter config (html + json instead of blob)
-          unset CI
-          npx playwright merge-reports --config playwright.config.js ./all-blob-reports
+          # Force the html + json reporters explicitly with their output paths instead of
+          # relying on `unset CI` to flip playwright.config.js's `process.env.CI ? blob : html/json`
+          # ternary. The runner exports CI=true and `unset CI` does not reliably reach the
+          # merge subprocess, so the config would intermittently re-select the `blob` reporter —
+          # which writes a merged blob-report/ and NOTHING to playwright-results/, making the
+          # downstream `ls playwright-results/html-report/` fail with a cryptic exit 2.
+          mkdir -p playwright-results
+          # These env vars override playwright.config.js's reporter settings:
+          #   PLAYWRIGHT_HTML_OUTPUT_DIR  - html reporter output directory
+          #   PLAYWRIGHT_HTML_OPEN=never  - never auto-open the report (required for CI)
+          #   PLAYWRIGHT_JSON_OUTPUT_NAME - json reporter output file path
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-results/html-report \
+          PLAYWRIGHT_HTML_OPEN=never \
+          PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results/report.json \
+            npx playwright merge-reports --reporter html,json ./all-blob-reports
 
           echo "Contents of playwright-results:"
-          ls -la playwright-results/
+          ls -la playwright-results/ || true
+          if [ ! -f playwright-results/html-report/index.html ] || [ ! -f playwright-results/report.json ]; then
+            echo "::error::merge-reports did not produce the expected html-report/index.html and report.json"
+            echo "::error::all-blob-reports contents:"
+            ls -la all-blob-reports/ || true
+            exit 1
+          fi
+          # Diagnostics only — never fail the step on these (the guard above already
+          # confirmed the outputs exist).
           echo "Contents of html-report:"
-          ls -la playwright-results/html-report/
+          ls -la playwright-results/html-report/ || true
           echo "Checking report.json:"
-          ls -lh playwright-results/report.json
+          ls -lh playwright-results/report.json || true
 
       - name: Extract report stats for OpenObserve
         id: report_stats
@@ -992,8 +1018,111 @@ jobs:
           echo "stats=$STATS" >> "$GITHUB_OUTPUT"
           echo "report stats: $STATS"
 
+      - name: Extract flaky tests for OpenObserve
+        id: report_flaky
+        if: always()
+        run: |
+          # Flaky + failed tests from the merged report, as one JSON array, for the
+          # ci_test_results stream. Logic + schema live in extract-flaky.js (it
+          # handles a missing/malformed report by printing [] non-fatally, and is
+          # commented to explain status="flaky" vs "failed" and the sp.title choice).
+          FLAKY=$(node .github/scripts/extract-flaky.js tests/ui-testing/playwright-results/report.json)
+          echo "flaky=$FLAKY" >> "$GITHUB_OUTPUT"
+          # Log a count only — avoid dumping test file paths/titles into public CI logs.
+          echo "flaky/failed test count: $(printf '%s' "$FLAKY" | jq 'length' 2>/dev/null || echo '?')"
+
+      - name: Upload merged report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merged-report-${{ github.run_attempt }}
+          path: tests/ui-testing/playwright-results
+          retention-days: 1
+          if-no-files-found: warn
+
+  # OpenObserve metrics — its own job so playwright_summary never depends on it. Emits one
+  # retry-aware run-summary doc (ci_test_runs, suite=ui) + per-test flaky/failed rows
+  # (ci_test_results). The step is continue-on-error and the poster scripts never fail.
+  report_openobserve:
+    timeout-minutes: 10
+    name: Report to OpenObserve
+    needs: [ui_integration_tests, merge_reports]
+    if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
+    runs-on:
+      labels: ubicloud-standard-4
+    permissions:
+      contents: read
+      actions: read  # reads run/job timings from the Actions API
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Report run metrics to OpenObserve
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          O2_REPORTING_INGEST_BASE: ${{ secrets.O2_REPORTING_INGEST_BASE }}
+          O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
+          O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
+          TESTS: ${{ needs.ui_integration_tests.result }}
+          MERGE_STATS: ${{ needs.merge_reports.outputs.stats }}
+          MERGE_FLAKY: ${{ needs.merge_reports.outputs.flaky }}
+        run: |
+          # This job runs only when tests actually ran (merge `if:` gates on !cancelled &&
+          # ui != skipped), so TESTS is success|failure here.
+          if [ "$TESTS" = "failure" ]; then CONCLUSION=failure; else CONCLUSION=success; fi
+          # Per-test counts from the merged report.json (tests_total includes skipped).
+          if [ -n "${MERGE_STATS:-}" ] && [ "$MERGE_STATS" != "null" ] && [ "$MERGE_STATS" != "{}" ]; then
+            EXTRA_JSON=$(printf '%s' "$MERGE_STATS" | jq -c '{tests_total:((.expected//0)+(.unexpected//0)+(.flaky//0)+(.skipped//0)), tests_passed:(.expected//0), tests_failed:(.unexpected//0), tests_flaky:(.flaky//0), tests_skipped:(.skipped//0)}' 2>/dev/null || echo "")
+            [ -n "$EXTRA_JSON" ] && export EXTRA_JSON
+          fi
+          export CONCLUSION STREAM=ci_test_runs SUITE=ui
+          bash .github/scripts/o2-run-report.sh
+          # One row per flaky-or-failed test -> ci_test_results (status flaky|failed; suite/
+          # workflow hardcoded UI-only). o2-report.sh takes the stream as arg 1. Non-fatal.
+          FLAKY="${MERGE_FLAKY:-[]}"
+          if printf '%s' "$FLAKY" | jq -e 'type=="array" and length>0' >/dev/null 2>&1; then
+            FLAKY_FILE=$(mktemp "${TMPDIR:-/tmp}/flaky.XXXXXX")
+            trap 'rm -f "$FLAKY_FILE"' EXIT
+            printf '%s' "$FLAKY" | jq -c --arg run_id "$GITHUB_RUN_ID" --arg repo "$GITHUB_REPOSITORY" \
+              '[.[] | {run_id:$run_id, repo:$repo, suite:"ui", workflow:"test", ingest_source:"live", status:.status, module:.module, test_title:.title, test_file:.file}]' \
+              > "$FLAKY_FILE" 2>/dev/null || echo '[]' > "$FLAKY_FILE"
+            if [ "$(jq 'length' "$FLAKY_FILE" 2>/dev/null || echo 0)" -gt 0 ]; then
+              bash .github/scripts/o2-report.sh ci_test_results "$FLAKY_FILE"
+            fi
+          fi
+
+  # TestDino upload — its own job so it never gates playwright_summary. Only runs when tests
+  # failed (and uploads enabled); consumes the merged report via artifact.
+  upload_testdino:
+    timeout-minutes: 15
+    name: Upload to TestDino
+    needs: [ui_integration_tests, merge_reports]
+    if: ${{ !cancelled() && needs.ui_integration_tests.result == 'failure' && needs.merge_reports.result == 'success' }}
+    runs-on:
+      labels: ubicloud-standard-4
+    permissions:
+      contents: read
+      actions: read  # download-artifact fetches the merged-report artifact
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install project dependencies
+        run: cd tests/ui-testing && npm ci
+
+      - name: Download merged report
+        uses: actions/download-artifact@v4
+        with:
+          name: merged-report-${{ github.run_attempt }}
+          path: tests/ui-testing/playwright-results
+
       - name: Cache test failures to TestDino
-        if: ${{ needs.ui_integration_tests.result == 'failure' }}
         env:
           TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
         run: |
@@ -1037,7 +1166,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload to TestDino
-        if: ${{ needs.ui_integration_tests.result == 'failure' && env.UPLOAD_TO_TESTDINO == 'true' }}
+        if: ${{ env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
           cd tests/ui-testing
 
@@ -1153,43 +1282,3 @@ jobs:
             echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
             exit 1
           fi
-
-  # Non-fatal metrics sidecar: one retry-aware run-summary doc to OpenObserve (stream ci_test_runs,
-  # suite=ui). Re-runs append one doc per attempt; the dashboard keeps the latest attempt per run_id.
-  report_to_openobserve:
-    name: Report run metrics to OpenObserve
-    needs: [check_changes, build_binary, ui_integration_tests, merge_and_upload_reports]
-    if: always()
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - name: Clone the current repo
-        uses: actions/checkout@v5
-      - name: Report run metrics
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          O2_REPORTING_INGEST_BASE: ${{ secrets.O2_REPORTING_INGEST_BASE }}
-          O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
-          O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
-          BUILD: ${{ needs.build_binary.result }}
-          TESTS: ${{ needs.ui_integration_tests.result }}
-          MERGE_STATS: ${{ needs.merge_and_upload_reports.outputs.stats }}
-        run: |
-          # No relevant changes → tests were skipped → no run to record.
-          if [ "$TESTS" = "skipped" ] && [ "$BUILD" = "skipped" ]; then
-            echo "::notice::no tests ran (no relevant changes) — skipping metrics"; exit 0
-          fi
-          if [ "$TESTS" = "failure" ] || [ "$BUILD" = "failure" ]; then CONCLUSION=failure
-          elif [ "$TESTS" = "cancelled" ] || [ "$BUILD" = "cancelled" ]; then CONCLUSION=cancelled
-          else CONCLUSION=success; fi
-          # Per-test counts from the merged report.json. tests_total is the FULL total (includes
-          # skipped, matching regression); the dashboard derives executed = passed+failed+flaky.
-          if [ -n "${MERGE_STATS:-}" ] && [ "$MERGE_STATS" != "null" ] && [ "$MERGE_STATS" != "{}" ]; then
-            EXTRA_JSON=$(printf '%s' "$MERGE_STATS" | jq -c '{tests_total:((.expected//0)+(.unexpected//0)+(.flaky//0)+(.skipped//0)), tests_passed:(.expected//0), tests_failed:(.unexpected//0), tests_flaky:(.flaky//0), tests_skipped:(.skipped//0)}' 2>/dev/null || echo "")
-            [ -n "$EXTRA_JSON" ] && export EXTRA_JSON
-          fi
-          export CONCLUSION STREAM=ci_test_runs SUITE=ui
-          bash .github/scripts/o2-run-report.sh
