@@ -34,6 +34,16 @@
         >
           {{ t("settings.genAiAgentMapping.resetToEmpty") }}
         </OButton>
+        <OButton
+          data-test="gen-ai-agent-registry-clear-btn"
+          variant="outline-destructive"
+          size="sm"
+          :loading="clearingRegistry"
+          :disabled="loading || loadingDefaults || saving"
+          @click="openClearRegistryDialog"
+        >
+          {{ t("settings.genAiAgentMapping.clearRegistry") }}
+        </OButton>
       </template>
     </AppPageHeader>
 
@@ -97,6 +107,25 @@
         </OButton>
       </div>
     </template>
+
+    <ODialog
+      v-model:open="clearRegistryDialogOpen"
+      data-test="gen-ai-agent-registry-clear-dialog"
+      size="sm"
+      :title="t('settings.genAiAgentMapping.clearRegistryTitle')"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="
+        t('settings.genAiAgentMapping.clearRegistryConfirm')
+      "
+      primary-button-variant="destructive"
+      :primary-button-loading="clearingRegistry"
+      @click:secondary="clearRegistryDialogOpen = false"
+      @click:primary="clearAgentRegistry"
+    >
+      <p class="tw:text-sm tw:text-text-primary">
+        {{ t("settings.genAiAgentMapping.clearRegistryDescription") }}
+      </p>
+    </ODialog>
   </div>
 </template>
 
@@ -107,6 +136,7 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -121,6 +151,8 @@ const store = useStore();
 const loading = ref(false);
 const loadingDefaults = ref(false);
 const saving = ref(false);
+const clearingRegistry = ref(false);
+const clearRegistryDialogOpen = ref(false);
 const agentNameText = ref("");
 const agentIdText = ref("");
 
@@ -178,6 +210,41 @@ const resetToEmpty = () => {
   setDraft(genAiAgentMappingService.emptyConfig());
 };
 
+const openClearRegistryDialog = () => {
+  clearRegistryDialogOpen.value = true;
+};
+
+const clearAgentRegistry = async () => {
+  if (!orgId.value) {
+    clearRegistryDialogOpen.value = false;
+    return;
+  }
+
+  clearingRegistry.value = true;
+  try {
+    const result = await genAiAgentMappingService.clearRegistry(orgId.value);
+    clearRegistryDialogOpen.value = false;
+    toast({
+      variant: "success",
+      message: t("settings.genAiAgentMapping.clearRegistrySuccess", {
+        deletedCount: result.deleted_count,
+        bufferCount: result.cleared_buffer_count,
+      }),
+    });
+  } catch (error: any) {
+    toast({
+      variant: "error",
+      message:
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        t("settings.genAiAgentMapping.clearRegistryFailed"),
+    });
+  } finally {
+    clearingRegistry.value = false;
+  }
+};
+
 const saveConfig = async () => {
   if (!orgId.value) return;
 
@@ -205,4 +272,3 @@ const saveConfig = async () => {
 
 onBeforeMount(loadConfig);
 </script>
-

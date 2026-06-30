@@ -3684,9 +3684,15 @@
       "fieldsPlaceholder": "agent.name\nllm.agent.name",
       "applyDefaults": "Apply defaults",
       "resetToEmpty": "Reset to empty",
+      "clearRegistry": "Clear registry",
+      "clearRegistryTitle": "Clear agent registry?",
+      "clearRegistryDescription": "This deletes all discovered GenAI agent registry rows for this organization. New matching traces will repopulate the registry during ingestion.",
+      "clearRegistryConfirm": "Clear registry",
       "saved": "GenAI agent mapping saved successfully",
+      "clearRegistrySuccess": "GenAI agent registry cleared. Deleted {deletedCount} stored agents and {bufferCount} queued observations.",
       "loadFailed": "Failed to load GenAI agent mapping",
       "saveFailed": "Failed to save GenAI agent mapping",
+      "clearRegistryFailed": "Failed to clear GenAI agent registry",
       "defaultsLoadFailed": "Failed to load GenAI agent mapping defaults"
     },
     "correlation": {

@@ -26,6 +26,13 @@ export interface GenAiAgentListResponse {
   agents: GenAiAgentListItem[];
 }
 
+export interface ClearGenAiAgentRegistryResponse {
+  source_stream?: string | null;
+  source_stream_type?: string | null;
+  deleted_count: number;
+  cleared_buffer_count: number;
+}
+
 const emptyConfig = (): GenAiAgentMappingConfig => ({
   agent_name_fields: [],
   agent_id_fields: [],
@@ -96,6 +103,25 @@ const genAiAgentMappingService = {
       normalizeConfig(config),
     );
     return normalizeConfig(response.data);
+  },
+  clearRegistry: async (
+    orgIdentifier: string,
+  ): Promise<ClearGenAiAgentRegistryResponse> => {
+    const response = await http().delete(
+      `/api/${orgIdentifier}/settings/gen_ai/agent_registry`,
+    );
+    return {
+      source_stream:
+        typeof response.data?.source_stream === "string"
+          ? response.data.source_stream
+          : null,
+      source_stream_type:
+        typeof response.data?.source_stream_type === "string"
+          ? response.data.source_stream_type
+          : null,
+      deleted_count: Number(response.data?.deleted_count) || 0,
+      cleared_buffer_count: Number(response.data?.cleared_buffer_count) || 0,
+    };
   },
 };
 
