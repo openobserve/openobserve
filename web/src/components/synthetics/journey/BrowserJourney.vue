@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { BrowserStep } from '@/types/synthetics'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
 import { getUUIDv7 } from '@/utils/zincutils'
+import { VueDraggableNext } from 'vue-draggable-next'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
@@ -30,6 +31,16 @@ const emit = defineEmits<{
 // ── Filter / expand state ──────────────────────────────────────────────────
 const filterQuery = ref('')
 const expandedSteps = ref<Set<string>>(new Set())
+
+// ── Drag-and-drop ──────────────────────────────────────────────────────────
+const stepsModel = computed<BrowserStep[]>({
+  get: () => props.modelValue,
+  set: (val: BrowserStep[]) => emit('update:modelValue', val),
+})
+
+const dragDisabled = computed(() =>
+  isRecording.value || props.isReplaying || props.readonly || !!filterQuery.value.trim()
+)
 
 // ── Recording state ────────────────────────────────────────────────────────
 // All Chrome-extension messaging lives in the composable; this component only
@@ -278,7 +289,7 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
     </template>
 
     <!-- Normal step list (shown when not recording) -->
-      <!-- Empty state -->
+    <!-- Empty state -->
     <div
       v-else-if="modelValue.length === 0"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-4 tw:py-16 tw:text-center"
@@ -290,7 +301,32 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
         <OButton variant="outline" size="sm" @click="addStep">Add a step manually</OButton>
       </div>
     </div>
-    <!-- Step list — single flat list -->
+
+    <!-- Step list — draggable when not recording, replaying, readonly, or filtered -->
+    <VueDraggableNext
+      v-else-if="!dragDisabled"
+      v-model="stepsModel"
+      handle="[data-test='synthetics-journey-step-drag-handle']"
+      :animation="200"
+      ghost-class="tw:opacity-30 tw:bg-[var(--o2-primary-50)] tw:border tw:border-dashed tw:border-[var(--o2-primary-color)] tw:rounded-md"
+      drag-class="tw:opacity-50 tw:shadow-lg"
+      item-key="id"
+    >
+      <BrowserJourneyStep
+        v-for="(step, index) in stepsModel"
+        :key="step.id"
+        :step="step"
+        :index="index"
+        :expanded="isStepExpanded(step.id)"
+        @update:step="updateStep(index, $event)"
+        @update:expanded="setStepExpanded(step.id, $event)"
+        @delete="deleteStep(index)"
+        @duplicate="duplicateStep(index)"
+        @insert-below="insertStepBelow(index)"
+      />
+    </VueDraggableNext>
+
+    <!-- Plain list when drag is disabled (filter active, etc.) -->
     <div v-else class="tw:flex tw:flex-col tw:gap-1">
       <BrowserJourneyStep
         v-for="{ step, originalIndex } in filteredSteps"
