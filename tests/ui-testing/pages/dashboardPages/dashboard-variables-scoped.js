@@ -1070,12 +1070,13 @@ export default class DashboardVariablesScoped {
     // Normalize scope type
     const normalizedType = scopeType === 'tabs' ? 'tab' : (scopeType === 'panels' ? 'panel' : scopeType);
 
-    // Find the variable row in the variables list
-    const variableRow = this.page.locator(`[data-test="dashboard-variable-settings-draggable-row"]`);
-    await variableRow.waitFor({ state: "visible", timeout: 5000 });
+    // Find the variable's scope chip in the variables list. The list migrated
+    // to OTable, so the old per-row `dashboard-variable-settings-draggable-row`
+    // attribute is gone; the scope badge data-test is preserved, so anchor on it.
+    const scopeChip = this.page.locator('[data-test="dashboard-variable-scope-badge"]').first();
+    await scopeChip.waitFor({ state: "visible", timeout: 5000 });
 
     // Hover over the scope chip to see the tooltip showing "Deleted Tab" or "Deleted Panel"
-    const scopeChip = variableRow.locator('[data-test="dashboard-variable-scope-badge"]').first();
     await scopeChip.hover();
 
     // Wait for tooltip to appear and verify it contains "Deleted Tab" or "Deleted Panel"
