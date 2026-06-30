@@ -135,12 +135,6 @@ function toggleExpanded() {
       class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:h-9 tw:min-h-9 tw:group"
       :class="{ 'tw:border-b tw:border-[var(--o2-border-color)]': expanded }"
     >
-      <!-- Drag handle -->
-      <span
-        class="tw:cursor-grab tw:text-[var(--o2-text-muted)] tw:select-none tw:text-base tw:leading-none"
-        data-test="synthetics-journey-step-drag-handle"
-        aria-hidden="true"
-      >⠿</span>
 
       <!-- Selection checkbox -->
       <OCheckbox
@@ -150,6 +144,13 @@ function toggleExpanded() {
         :data-test="`synthetics-journey-step-checkbox-${index}`"
         @update:model-value="emit('toggle-select')"
       />
+
+      <!-- Drag handle -->
+      <span
+        class="tw:cursor-grab tw:text-[var(--o2-text-muted)] tw:select-none tw:text-base tw:leading-none"
+        data-test="synthetics-journey-step-drag-handle"
+        aria-hidden="true"
+      >⠿</span>
 
       <!-- Step number -->
       <span class="tw:w-6 tw:text-right tw:text-sm tw:tabular-nums tw:text-[var(--o2-text-muted)] tw:shrink-0">
@@ -172,7 +173,7 @@ function toggleExpanded() {
       <!-- Selector/value preview -->
       <span
         v-if="selectorPreview"
-        class="tw:font-mono tw:text-xs tw:text-[var(--o2-text-secondary)] tw:truncate tw:max-w-[11.25rem] tw:shrink-0"
+        class="tw:font-mono tw:text-xs tw:text-[var(--o2-text-secondary)] tw:truncate tw:max-w-[25%] tw:shrink-0"
       >
         {{ selectorPreview }}
       </span>

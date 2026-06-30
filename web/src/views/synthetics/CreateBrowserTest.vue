@@ -16,6 +16,7 @@ import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OSwitch from '@/lib/forms/Switch/OSwitch.vue'
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue'
 import OStepper from '@/lib/navigation/Stepper/OStepper.vue'
 import OStep from '@/lib/navigation/Stepper/OStep.vue'
 import BrowserJourney from '@/components/synthetics/journey/BrowserJourney.vue'
@@ -226,6 +227,16 @@ async function saveCheck() {
   } finally {
     isSaving.value = false
   }
+}
+
+// ── Selection state (synced from BrowserJourney) ───────────────────────────
+const journeyRef = ref<InstanceType<typeof BrowserJourney>>()
+const journeySelectionState = ref({ count: 0, isRecording: false })
+const showBulkDeleteDialog = ref(false)
+
+function onDeleteSelected() {
+  journeyRef.value?.deleteSelectedSteps()
+  showBulkDeleteDialog.value = false
 }
 
 // ── Replay ──────────────────────────────────────────────────────────────────
@@ -475,6 +486,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
         class="tw:h-full!"
       >
         <BrowserJourney
+          ref="journeyRef"
           v-model="check.journey"
           :start-url="check.url"
           :extension-ready="extensionReady"
@@ -485,6 +497,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
           @replay="onReplay"
           @stop-replay="onStopReplay"
           @auto-record-consumed="autoRecord = false"
+          @selection-changed="journeySelectionState = $event"
         />
       </OStep>
       <OStep
@@ -506,15 +519,26 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
     </OStepper>
 
     <!-- Sticky footer — tab-aware, always visible -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:gap-2 tw:border-t tw:border-[var(--o2-border-color)] tw:shrink-0 tw:bg-[var(--o2-body-primary-bg)]">
-      <!-- Journey step: Cancel | Replay status + Continue -->
+    <div class="tw:flex tw:items-center tw:px-3 tw:py-2.5 tw:gap-2 tw:border-t tw:border-[var(--o2-border-color)] tw:shrink-0 tw:bg-[var(--o2-body-primary-bg)]">
+      <!-- Journey step: Cancel | Selection actions (left) | Replay status + Continue (right) -->
       <template v-if="currentStep === 1">
-        <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
-          Cancel
-        </OButton>
+        <!-- Selection actions — moved from BrowserJourney, kept on the left -->
+        <template v-if="journeySelectionState.count > 0 && !journeySelectionState.isRecording">
+          <span class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:whitespace-nowrap">{{ journeySelectionState.count }} selected</span>
+          <OButton
+            variant="outline-destructive"
+            size="sm"
+            data-test="synthetics-journey-delete-selected-btn"
+            @click="showBulkDeleteDialog = true"
+          >
+            <template #icon-left><OIcon name="delete" size="sm" /></template>
+            Delete
+          </OButton>
+        </template>
+        <span class="tw:flex-1" aria-hidden="true" />
         <span
           v-if="replayStatus"
-          class="tw:mr-auto tw:text-xs tw:flex tw:items-center tw:gap-2"
+          class="tw:text-xs tw:flex tw:items-center tw:gap-2"
           role="status"
           data-test="synthetics-create-replay-status"
         >
@@ -530,6 +554,9 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
           </span>
         </span>
 
+        <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
+          Cancel
+        </OButton>
         <OButton variant="primary" size="sm" data-test="synthetics-create-continue-btn" @click="journeyStepDone = true; currentStep = 2">
           Continue
           <template #suffix><OIcon name="chevron-right" size="sm" /></template>
@@ -538,6 +565,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
 
       <!-- Configure step: Cancel | Back + Save -->
       <template v-else-if="currentStep === 2">
+        <span class="tw:flex-1" aria-hidden="true" />
         <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
           Cancel
         </OButton>
@@ -551,5 +579,22 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
         </OButton>
       </template>
     </div>
+
+    <!-- Bulk delete confirmation dialog — moved from BrowserJourney -->
+    <ODialog
+      v-model:open="showBulkDeleteDialog"
+      size="sm"
+      title="Delete steps"
+      primary-button-label="Delete"
+      secondary-button-label="Cancel"
+      primary-button-variant="destructive"
+      data-test="synthetics-journey-bulk-delete-dialog"
+      @click:primary="onDeleteSelected"
+      @click:secondary="showBulkDeleteDialog = false"
+    >
+      <p class="tw:py-2">
+        Delete {{ journeySelectionState.count }} step{{ journeySelectionState.count !== 1 ? 's' : '' }}? This cannot be undone.
+      </p>
+    </ODialog>
   </div>
 </template>

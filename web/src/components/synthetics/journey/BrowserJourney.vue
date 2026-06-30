@@ -10,7 +10,6 @@ import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
-import ODialog from '@/lib/overlay/Dialog/ODialog.vue'
 import BrowserJourneyStep from './BrowserJourneyStep.vue'
 
 const props = defineProps<{
@@ -28,6 +27,7 @@ const emit = defineEmits<{
   'replay': []
   'stop-replay': []
   'auto-record-consumed': []
+  'selection-changed': [{ count: number; isRecording: boolean }]
 }>()
 
 // ── Filter / expand state ──────────────────────────────────────────────────
@@ -61,7 +61,6 @@ function onDragEnd() {
 
 // ── Multi-select ───────────────────────────────────────────────────────────
 const selectedStepIds = ref<Set<string>>(new Set())
-const showBulkDeleteDialog = ref(false)
 
 const selectedCount = computed(() => selectedStepIds.value.size)
 
@@ -100,6 +99,7 @@ function deleteSelectedSteps() {
 watch(() => props.modelValue.length, () => { selectedStepIds.value = new Set() })
 watch(filterQuery, () => { selectedStepIds.value = new Set() })
 
+
 // ── Recording state ────────────────────────────────────────────────────────
 // All Chrome-extension messaging lives in the composable; this component only
 // reflects its reactive state and merges the result into the journey on stop.
@@ -109,6 +109,14 @@ const capturedSteps = recorder.liveSteps
 const externalStopSteps = recorder.externalStopSteps
 const currentUrl = recorder.currentUrl
 const recordingError = recorder.error
+
+// Emit selection state changes for the parent's sticky footer
+watch([selectedCount, isRecording], ([count, recording]) => {
+  emit('selection-changed', { count, isRecording: recording })
+})
+
+// Expose selection state for the parent's sticky footer
+defineExpose({ selectedCount, isRecording, deleteSelectedSteps })
 
 function startRecording() {
   recorder.startRecording(props.startUrl ?? '').catch((err) => {
@@ -213,36 +221,23 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
   <div class="tw:flex tw:flex-col tw:min-h-0 tw:w-full tw:p-2">
 
     <!-- Toolbar — adapts in-place to recording state, no layout shift -->
-    <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
+    <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3 tw:pl-2">
       <!-- Normal: label + filter + step actions -->
-      <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:mr-0">Steps</h3>
-      <OBadge variant="default" size="sm">{{ modelValue.length }}</OBadge>
       <OCheckbox
         v-if="!isRecording && !readonly"
         :model-value="selectAllModel"
-        size="sm"
+        size="xs"
         data-test="synthetics-journey-select-all"
         @update:model-value="toggleSelectAll"
       />
+      <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:mr-0">Steps</h3>
+      <OBadge variant="default" size="sm">{{ modelValue.length }}</OBadge>
       <OInput
         v-model="filterQuery"
         placeholder="Filter steps..."
         class="tw:w-48 tw:ml-2!"
         data-test="synthetics-journey-filter-input"
       />
-      <!-- Selection actions -->
-      <template v-if="selectedCount > 0 && !isRecording">
-        <span class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:whitespace-nowrap">{{ selectedCount }} selected</span>
-        <OButton
-          variant="outline-destructive"
-          size="sm"
-          data-test="synthetics-journey-delete-selected-btn"
-          @click="showBulkDeleteDialog = true"
-        >
-          <template #icon-left><OIcon name="delete" size="sm" /></template>
-          Delete
-        </OButton>
-      </template>
       <span class="tw:flex-1" aria-hidden="true" />
       <OButton
         variant="outline"
@@ -428,22 +423,6 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
       />
     </div>
 
-    <!-- Bulk delete confirmation dialog -->
-    <ODialog
-      v-model:open="showBulkDeleteDialog"
-      size="sm"
-      title="Delete steps"
-      primary-button-label="Delete"
-      secondary-button-label="Cancel"
-      primary-button-variant="destructive"
-      data-test="synthetics-journey-bulk-delete-dialog"
-      @click:primary="deleteSelectedSteps(); showBulkDeleteDialog = false"
-      @click:secondary="showBulkDeleteDialog = false"
-    >
-      <p class="tw:py-2">
-        Delete {{ selectedCount }} step{{ selectedCount !== 1 ? 's' : '' }}? This cannot be undone.
-      </p>
-    </ODialog>
   </div>
 </template>
 
