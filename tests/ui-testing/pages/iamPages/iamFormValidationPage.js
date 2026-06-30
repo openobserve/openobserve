@@ -48,9 +48,9 @@ export class IamFormValidationPage {
         // ── Service Account form ──────────────────────────────────────────────
         this.addServiceAccountBtn  = '[data-test="service-accounts-add-btn"]';
         this.saDialog              = '[data-test="add-service-account-dialog"]';
-        // OInput data-test="iam-add-service-account-email-input" → -field / -error
-        this.saEmailInput          = '[data-test="iam-add-service-account-email-input-field"]';
-        this.saEmailError          = '[data-test="iam-add-service-account-email-input-error"]';
+        // OInput data-test="iam-add-service-account-identifier-input" → -field / -error
+        this.saEmailInput          = '[data-test="iam-add-service-account-identifier-input-field"]';
+        this.saEmailError          = '[data-test="iam-add-service-account-identifier-input-error"]';
         this.saSubmitBtn           = '[data-test="add-service-account-dialog"] [data-test="o-dialog-primary-btn"]';
         this.saCancelBtn           = '[data-test="add-service-account-dialog"] [data-test="o-dialog-secondary-btn"]';
 

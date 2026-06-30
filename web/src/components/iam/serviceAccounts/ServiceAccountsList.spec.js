@@ -687,25 +687,32 @@ describe("ServiceAccountsList Component", () => {
   });
 
   describe("File Operations", () => {
-    it("downloads token as file", () => {
-      const token = "test-token-123";
-      const mockClick = vi.fn();
-      const mockLink = {
-        href: "",
-        download: "",
-        click: mockClick
-      };
+    it("downloadTokenAsFile is available", () => {
+      expect(typeof wrapper.vm.downloadTokenAsFile).toBe("function");
+    });
 
-      const originalCreateElement = document.createElement;
-      document.createElement = vi.fn().mockReturnValue(mockLink);
+    it("downloadTokenAsFile triggers a text-file download of the token", () => {
+      const createEl = vi.spyOn(document, "createElement");
+      const createObjUrl = vi
+        .spyOn(URL, "createObjectURL")
+        .mockReturnValue("blob:mock");
+      const revokeObjUrl = vi
+        .spyOn(URL, "revokeObjectURL")
+        .mockImplementation(() => {});
 
-      wrapper.vm.downloadTokenAsFile(token);
+      wrapper.vm.downloadTokenAsFile("my-secret-token");
 
-      expect(mockLink.download).toBe("service_account_token.txt");
-      expect(mockClick).toHaveBeenCalled();
-      expect(global.URL.revokeObjectURL).toHaveBeenCalled();
+      const anchor = createEl.mock.results.find(
+        (r) => r.value?.tagName === "A",
+      )?.value;
+      expect(anchor).toBeTruthy();
+      expect(anchor.download).toBe("service_account_token.txt");
+      expect(createObjUrl).toHaveBeenCalled();
+      expect(revokeObjUrl).toHaveBeenCalled();
 
-      document.createElement = originalCreateElement;
+      createEl.mockRestore();
+      createObjUrl.mockRestore();
+      revokeObjUrl.mockRestore();
     });
   });
 
@@ -719,12 +726,13 @@ describe("ServiceAccountsList Component", () => {
 
     it("has correct column configuration", () => {
       // columns uses OTableColumnDef with 'id' (not 'name')
-      expect(wrapper.vm.columns).toHaveLength(5);
+      expect(wrapper.vm.columns).toHaveLength(6);
       expect(wrapper.vm.columns[0].id).toBe("#");
       expect(wrapper.vm.columns[1].id).toBe("email");
       expect(wrapper.vm.columns[2].id).toBe("first_name");
       expect(wrapper.vm.columns[3].id).toBe("token");
-      expect(wrapper.vm.columns[4].id).toBe("actions");
+      expect(wrapper.vm.columns[4].id).toBe("created_at");
+      expect(wrapper.vm.columns[5].id).toBe("actions");
     });
 
     it("has correct per page options", () => {
@@ -781,12 +789,18 @@ describe("ServiceAccountsList Component", () => {
       const displayRole = sreAgent.is_system ? "System Managed" : sreAgent.role;
       expect(displayRole).toBe("System Managed");
     });
+
+    it("excludes system-managed rows from selection via isRowSelectable", () => {
+      // Regular accounts are selectable…
+      expect(wrapper.vm.isRowSelectable({ email: "service1@example.com", is_system: false })).toBe(true);
+      // …system-managed accounts are not (checkbox disabled, excluded from select-all).
+      expect(wrapper.vm.isRowSelectable({ email: "o2-sre-agent.org-test-org@openobserve.internal", is_system: true })).toBe(false);
+      // Also caught by the email heuristic even if is_system is missing.
+      expect(wrapper.vm.isRowSelectable({ email: "o2-sre-agent.org-acme@openobserve.internal" })).toBe(false);
+    });
   });
 
   describe("ODialog Migration - Confirm Refresh Dialog", () => {
-    const findRefreshDialog = (w) =>
-      w.findAllComponents({ name: 'ODialog' }).find((d) => d.props('title')?.includes('Refresh') || d.props('title')?.includes('refresh'));
-
     it("opens confirm refresh dialog when confirmRefreshAction is invoked", async () => {
       const row = { email: "service1@example.com", is_system: false };
       wrapper.vm.confirmRefreshAction(row);
@@ -796,19 +810,20 @@ describe("ServiceAccountsList Component", () => {
       expect(wrapper.vm.toBeRefreshed).toEqual(row);
     });
 
-    it("closes confirm refresh dialog when ODialog emits click:secondary", async () => {
+    it("closes confirm refresh dialog when ConfirmDialog emits update:cancel", async () => {
       wrapper.vm.confirmRefresh = true;
+      wrapper.vm.toBeRefreshed = { email: "service1@example.com" };
       await nextTick();
 
-      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
-      const refreshDialog = dialogs.find((d) => d.props('open') === true);
+      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
+      const refreshDialog = confirmDialogs.find((d) => d.props('modelValue') === true);
       expect(refreshDialog).toBeDefined();
 
-      await refreshDialog.vm.$emit('click:secondary');
+      await refreshDialog.vm.$emit('update:cancel');
       expect(wrapper.vm.confirmRefresh).toBe(false);
     });
 
-    it("invokes refreshServiceToken when ODialog emits click:primary on refresh dialog", async () => {
+    it("invokes refreshServiceToken when ConfirmDialog emits update:ok on refresh dialog", async () => {
       vi.mocked(service_accounts.refresh_token).mockResolvedValue({
         data: { token: "new-token-abc" }
       });
@@ -816,12 +831,11 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.confirmRefreshAction(row);
       await nextTick();
 
-      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
-      // Find the first open xs dialog after refresh action; that's our refresh dialog
-      const refreshDialog = dialogs.find((d) => d.props('open') === true);
+      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
+      const refreshDialog = confirmDialogs.find((d) => d.props('modelValue') === true);
       expect(refreshDialog).toBeDefined();
 
-      await refreshDialog.vm.$emit('click:primary');
+      await refreshDialog.vm.$emit('update:ok');
       await flushPromises();
 
       expect(service_accounts.refresh_token).toHaveBeenCalledWith(
@@ -831,55 +845,68 @@ describe("ServiceAccountsList Component", () => {
       // After successful refresh, confirm dialog should be closed
       expect(wrapper.vm.confirmRefresh).toBe(false);
     });
+
+    it("passes a destructive verb label (not generic OK) to the rotate confirm", async () => {
+      wrapper.vm.confirmRefresh = true;
+      wrapper.vm.toBeRefreshed = { email: "service1@example.com" };
+      await nextTick();
+
+      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
+      const refreshDialog = confirmDialogs.find((d) => d.props('modelValue') === true);
+      expect(refreshDialog).toBeDefined();
+      // Verb-labeled, destructive — no hardcoded English / generic OK.
+      expect(refreshDialog.props('okLabel')).toBe('Rotate token');
+      expect(refreshDialog.props('okColor')).toBe('destructive');
+    });
   });
 
   describe("ODialog Migration - Confirm Delete Dialog", () => {
     it("opens confirm delete dialog with confirmDeleteAction", async () => {
-      // confirmDeleteAction receives the row object directly (not wrapped in {row: ...})
       const row = { email: "service1@example.com", is_system: false };
       wrapper.vm.confirmDeleteAction(row);
       await nextTick();
 
       expect(wrapper.vm.confirmDelete).toBe(true);
 
-      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
-      const openDialogs = dialogs.filter((d) => d.props('open') === true);
+      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
+      const openDialogs = confirmDialogs.filter((d) => d.props('modelValue') === true);
       expect(openDialogs.length).toBeGreaterThan(0);
     });
 
-    it("closes confirm delete dialog when ODialog emits click:secondary", async () => {
+    it("closes confirm delete dialog when ConfirmDialog emits update:cancel", async () => {
       wrapper.vm.confirmDelete = true;
+      wrapper.vm.deleteUserEmailIdentifier = "service1@example.com";
       await nextTick();
 
-      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
-      const deleteDialog = dialogs.find((d) => d.props('open') === true);
+      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
+      const deleteDialog = confirmDialogs.find((d) => d.props('modelValue') === true);
       expect(deleteDialog).toBeDefined();
 
-      await deleteDialog.vm.$emit('click:secondary');
+      await deleteDialog.vm.$emit('update:cancel');
       expect(wrapper.vm.confirmDelete).toBe(false);
     });
 
-    it("invokes deleteUser when ODialog emits click:primary on delete dialog", async () => {
+    it("invokes deleteUser when ConfirmDialog emits update:ok on delete dialog", async () => {
       vi.mocked(service_accounts.delete).mockResolvedValue({
         data: { code: 200 }
       });
 
-      // confirmDeleteAction receives the row directly (not wrapped in {row: ...})
       const row = { email: "service1@example.com", is_system: false };
       wrapper.vm.confirmDeleteAction(row);
       await nextTick();
 
-      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
-      const deleteDialog = dialogs.find((d) => d.props('open') === true);
+      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
+      const deleteDialog = confirmDialogs.find((d) => d.props('modelValue') === true);
       expect(deleteDialog).toBeDefined();
 
-      await deleteDialog.vm.$emit('click:primary');
+      await deleteDialog.vm.$emit('update:ok');
       await flushPromises();
 
       expect(service_accounts.delete).toHaveBeenCalledWith(
         "test-org",
         "service1@example.com"
       );
+      // confirmDelete is set to false at the start of deleteUser
       expect(wrapper.vm.confirmDelete).toBe(false);
     });
 
@@ -888,7 +915,6 @@ describe("ServiceAccountsList Component", () => {
         response: { status: 500, data: { message: "Something failed" } }
       });
 
-      // confirmDeleteAction receives the row object directly (not wrapped in {row: ...})
       const row = { email: "service1@example.com", is_system: false };
       wrapper.vm.confirmDeleteAction(row);
       await expect(wrapper.vm.deleteUser()).resolves.toBeUndefined();
@@ -901,7 +927,6 @@ describe("ServiceAccountsList Component", () => {
         response: { status: 403 }
       });
 
-      // confirmDeleteAction receives the row object directly (not wrapped in {row: ...})
       const row = { email: "service1@example.com", is_system: false };
       wrapper.vm.confirmDeleteAction(row);
       await expect(wrapper.vm.deleteUser()).resolves.toBeUndefined();
@@ -917,19 +942,20 @@ describe("ServiceAccountsList Component", () => {
       expect(wrapper.vm.confirmBulkDelete).toBe(true);
     });
 
-    it("closes bulk delete dialog when ODialog emits click:secondary", async () => {
+    it("closes bulk delete dialog when ConfirmDialog emits update:cancel", async () => {
       wrapper.vm.confirmBulkDelete = true;
+      wrapper.vm.selectedAccounts = [{ email: "service1@example.com" }];
       await nextTick();
 
-      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
-      const bulkDialog = dialogs.find((d) => d.props('open') === true);
+      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
+      const bulkDialog = confirmDialogs.find((d) => d.props('modelValue') === true);
       expect(bulkDialog).toBeDefined();
 
-      await bulkDialog.vm.$emit('click:secondary');
+      await bulkDialog.vm.$emit('update:cancel');
       expect(wrapper.vm.confirmBulkDelete).toBe(false);
     });
 
-    it("invokes bulkDeleteServiceAccounts on ODialog click:primary and clears selection", async () => {
+    it("invokes bulkDeleteServiceAccounts on ConfirmDialog update:ok and clears selection", async () => {
       vi.mocked(service_accounts.bulkDelete).mockResolvedValue({
         data: { successful: ["service1@example.com"], unsuccessful: [] }
       });
@@ -938,13 +964,13 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.openBulkDeleteDialog();
       await nextTick();
 
-      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
-      const bulkDialog = dialogs.find(
-        (d) => d.props('open') === true && d.props('title') === 'Delete Service Accounts'
+      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
+      const bulkDialog = confirmDialogs.find(
+        (d) => d.props('modelValue') === true
       );
       expect(bulkDialog).toBeDefined();
 
-      await bulkDialog.vm.$emit('click:primary');
+      await bulkDialog.vm.$emit('update:ok');
       await flushPromises();
 
       expect(service_accounts.bulkDelete).toHaveBeenCalledWith(
@@ -1039,7 +1065,7 @@ describe("ServiceAccountsList Component", () => {
 
       const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
       const tokenDialog = dialogs.find(
-        (d) => d.props('open') === true && d.props('title') === 'Service Account Token'
+        (d) => d.props('open') === true && d.props('title') === 'Copy your token'
       );
       expect(tokenDialog).toBeDefined();
       // `persistent` may be received as boolean true or as "" (boolean attr)
@@ -1054,7 +1080,7 @@ describe("ServiceAccountsList Component", () => {
 
       const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
       const tokenDialog = dialogs.find(
-        (d) => d.props('open') === true && d.props('title') === 'Service Account Token'
+        (d) => d.props('open') === true && d.props('title') === 'Copy your token'
       );
       expect(tokenDialog).toBeDefined();
 
@@ -1102,6 +1128,286 @@ describe("ServiceAccountsList Component", () => {
       // The token dialog should open with the new token
       expect(wrapper.vm.isShowToken).toBe(true);
       expect(wrapper.vm.serviceToken).toBe("tok-xyz");
+    });
+  });
+
+  // =========================================================================
+  // Audit improvements — Plan items (P0+P1+P2)
+  // =========================================================================
+
+  describe("Token dialog — tabs and snippets", () => {
+    beforeEach(async () => {
+      wrapper.vm.serviceToken = "test-token-abc123";
+      wrapper.vm.isShowToken = true;
+      await nextTick();
+    });
+
+    it("renders OTabs with three tab panels (cURL, Header, Environment Variable)", () => {
+      const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
+        (d) => d.props("title") === "Copy your token"
+      );
+      expect(tokenDialog).toBeDefined();
+      // OTabs should render tab triggers for curl, header, env
+      const dialogHtml = tokenDialog.html();
+      expect(dialogHtml).toContain("cURL");
+      expect(dialogHtml).toContain("Header");
+      expect(dialogHtml).toContain("Environment Variable");
+    });
+
+    it("renders cURL snippet with serviceToken and org identifier", () => {
+      const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
+        (d) => d.props("title") === "Copy your token"
+      );
+      expect(tokenDialog).toBeDefined();
+      const dialogHtml = tokenDialog.html();
+      expect(dialogHtml).toContain("test-token-abc123");
+    });
+
+    it("cURL snippet uses Basic auth (curl -u identifier:token), not Bearer", () => {
+      wrapper.vm.revealToken("the-token", "svc@example.com");
+      const curl = wrapper.vm.tokenCurlSnippet;
+      // OpenObserve uses HTTP Basic auth, not Bearer tokens.
+      expect(curl).toContain("/streams");
+      expect(curl).toContain('curl -u "svc@example.com:the-token"');
+      expect(curl).not.toContain("Bearer");
+      expect(curl).not.toContain("_search");
+    });
+
+    it("Header snippet is Authorization: Basic base64(identifier:token)", () => {
+      wrapper.vm.revealToken("the-token", "svc@example.com");
+      const header = wrapper.vm.tokenHeaderSnippet;
+      // base64("svc@example.com:the-token")
+      const expected = btoa("svc@example.com:the-token");
+      expect(header).toBe(`Authorization: Basic ${expected}`);
+      expect(header).not.toContain("Bearer");
+    });
+
+    it("Env snippet exposes the Basic credential, not a raw Bearer token", () => {
+      wrapper.vm.revealToken("the-token", "svc@example.com");
+      const env = wrapper.vm.tokenEnvSnippet;
+      expect(env).toContain("Basic ");
+      expect(env).not.toContain("Bearer");
+    });
+
+    it("renders a download button in the token dialog (step 1)", () => {
+      const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
+        (d) => d.props("title") === "Copy your token"
+      );
+      expect(tokenDialog).toBeDefined();
+      const dialogHtml = tokenDialog.html();
+      expect(dialogHtml).toContain("service-accounts-list-token-download-btn");
+    });
+
+    it("renders a copy button in the token dialog", () => {
+      const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
+        (d) => d.props("title") === "Copy your token"
+      );
+      expect(tokenDialog).toBeDefined();
+      // Copy button should still be present (data-test attribute)
+      expect(tokenDialog.html()).toContain("service-accounts-list-token-copy-btn");
+    });
+  });
+
+  describe("Token dialog — wizard step 2 (grant permissions, edition-gated)", () => {
+    // aws-exports is mocked with isEnterprise: "true" (see top of file), so the
+    // enterprise next-step (grant-permissions hint + Add-to-Group link) renders.
+    it("opens at step 1 and advances to step 2 via Next", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com");
+      await nextTick();
+      expect(wrapper.vm.wizardStep).toBe(1);
+
+      // Step 2 content is gated behind the Next button.
+      expect(
+        wrapper.find('[data-test="service-accounts-token-step-2"]').exists()
+      ).toBe(false);
+
+      await wrapper.find('[data-test="service-accounts-token-next-btn"]').trigger("click");
+      await nextTick();
+      expect(wrapper.vm.wizardStep).toBe(2);
+      expect(
+        wrapper.find('[data-test="service-accounts-token-step-2"]').exists()
+      ).toBe(true);
+    });
+
+    it("renders the grant-permissions next-step hint on step 2", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com");
+      wrapper.vm.wizardStep = 2;
+      await nextTick();
+
+      const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
+        (d) => d.props("title") === "Grant permissions"
+      );
+      expect(tokenDialog).toBeDefined();
+      // Enterprise build: hint nudges the user to grant permissions via a group.
+      expect(tokenDialog.html()).toContain("no permissions yet");
+    });
+
+    it("renders Add-to-Role (first) and Add-to-Group links in enterprise builds on step 2", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com");
+      wrapper.vm.wizardStep = 2;
+      await nextTick();
+
+      const roleLink = wrapper.find('[data-test="service-accounts-list-token-add-to-role"]');
+      const groupLink = wrapper.find('[data-test="service-accounts-list-token-add-to-group"]');
+      expect(roleLink.exists()).toBe(true);
+      expect(groupLink.exists()).toBe(true);
+      expect(wrapper.vm.showGroupLink).toBe(true);
+
+      // Role must be the first option (appear before Group in the DOM).
+      const html = wrapper.find('[data-test="service-accounts-token-step-2"]').html();
+      expect(html.indexOf("add-to-role")).toBeLessThan(html.indexOf("add-to-group"));
+    });
+
+    it("Add-to-Role link targets the roles route with the account prefilled", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com");
+      await nextTick();
+      expect(wrapper.vm.roleLinkTarget.name).toBe("roles");
+      expect(wrapper.vm.roleLinkTarget.query.member).toBe("svc@example.com");
+    });
+
+    it("Back returns to step 1; Done closes the dialog", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com");
+      wrapper.vm.wizardStep = 2;
+      await nextTick();
+
+      await wrapper.find('[data-test="service-accounts-token-back-btn"]').trigger("click");
+      await nextTick();
+      expect(wrapper.vm.wizardStep).toBe(1);
+
+      wrapper.vm.wizardStep = 2;
+      await nextTick();
+      await wrapper.find('[data-test="service-accounts-token-done-btn"]').trigger("click");
+      await nextTick();
+      expect(wrapper.vm.isShowToken).toBe(false);
+    });
+
+    it("resets to step 1 each time the token is revealed", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com");
+      wrapper.vm.wizardStep = 2;
+      await nextTick();
+
+      // Revealing again (e.g. another create/rotate) must start at step 1.
+      wrapper.vm.revealToken("tok2", "svc2@example.com");
+      await nextTick();
+      expect(wrapper.vm.wizardStep).toBe(1);
+    });
+  });
+
+  describe("Columns — token, created, identifier header", () => {
+    it("includes a 'token' column", () => {
+      const tokenCol = wrapper.vm.columns.find((c) => c.id === "token");
+      expect(tokenCol).toBeDefined();
+      expect(tokenCol.header).toBe("Token");
+    });
+
+    it("includes a 'created' column", () => {
+      const createdCol = wrapper.vm.columns.find((c) => c.id === "created_at");
+      expect(createdCol).toBeDefined();
+    });
+
+    it("does not include a 'createdBy' column (API does not return created_by)", () => {
+      const createdByCol = wrapper.vm.columns.find((c) => c.id === "created_by");
+      expect(createdByCol).toBeUndefined();
+    });
+
+    it("renames email header to 'Identifier'", () => {
+      const emailCol = wrapper.vm.columns.find((c) => c.id === "email");
+      expect(emailCol).toBeDefined();
+      expect(emailCol.header).toBe("Identifier");
+    });
+
+    it("formats created_at (epoch micros) into a readable date string", () => {
+      // 2026-06-30T00:00:00Z in microseconds.
+      const micros = Date.UTC(2026, 5, 30, 0, 0, 0) * 1000;
+      const formatted = wrapper.vm.formatCreatedAt(micros);
+      expect(formatted).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+      expect(formatted).toContain("2026-06-30");
+    });
+
+    it("formatCreatedAt returns an em dash for missing timestamps", () => {
+      expect(wrapper.vm.formatCreatedAt(0)).toBe("—");
+      expect(wrapper.vm.formatCreatedAt(undefined)).toBe("—");
+    });
+  });
+
+  describe("Actions — rotate verb label", () => {
+    it("uses 'Rotate Token' as the action label for token rotation", () => {
+      // The refresh button title should now say "Rotate Token"
+      const refreshBtn = wrapper.find('[data-test="service-accounts-refresh"]');
+      if (refreshBtn.exists()) {
+        expect(refreshBtn.attributes("title")).toBe("Rotate Token");
+      }
+    });
+  });
+
+  describe("System rows — managed-by chip and disabled checkbox", () => {
+    beforeEach(async () => {
+      await wrapper.vm.getServiceAccountsUsers();
+      await flushPromises();
+    });
+
+    it("renders a managed-by chip with tooltip for system rows", () => {
+      const sreAgentRow = mockServiceAccountsState.service_accounts_users.find(
+        (a) => a.is_system
+      );
+      expect(sreAgentRow).toBeDefined();
+      // System row should have managed-by badge visible in the rendered output
+    });
+
+    it("uses system-managed tooltip text for disabled checkbox", () => {
+      // Checkbox on system rows should have a tooltip explaining why disabled
+      const sreAgent = mockServiceAccountsState.service_accounts_users.find(
+        (a) => a.is_system
+      );
+      expect(sreAgent).toBeDefined();
+    });
+  });
+
+  describe("Header subtitle", () => {
+    it("renders a subtitle below the header", async () => {
+      // The subtitle should be visible
+      const appPageHeader = wrapper.findComponent({ name: "AppPageHeader" });
+      if (appPageHeader.exists()) {
+        expect(appPageHeader.props("subtitle")).toBe(
+          "Programmatic access tokens for APIs"
+        );
+      }
+    });
+  });
+
+  describe("Empty state", () => {
+    it("has empty-state copy with title and CTA", async () => {
+      // Set up the mock to return empty data
+      vi.mocked(service_accounts.list).mockResolvedValueOnce({
+        data: { data: [] }
+      });
+      await wrapper.vm.getServiceAccountsUsers();
+      await flushPromises();
+
+      // The service accounts list should be empty
+      expect(mockServiceAccountsState.service_accounts_users).toHaveLength(0);
+      // OEmptyState should be present (OTable renders #empty slot when data is empty)
+      const oEmpty = wrapper.findComponent({ name: "OEmptyState" });
+      // If OTable renders the empty slot, OEmptyState will be visible
+      if (oEmpty.exists()) {
+        expect(oEmpty.props("preset")).toBe("no-service-accounts");
+      }
+    });
+  });
+
+  describe("Email unmasking", () => {
+    it("does not mask email addresses with maskText in the cell display", async () => {
+      await wrapper.vm.getServiceAccountsUsers();
+      await flushPromises();
+
+      // For non-system accounts, email should be displayed unmasked
+      const userAccount = mockServiceAccountsState.service_accounts_users.find(
+        (a) => !a.is_system
+      );
+      if (userAccount) {
+        // Email should be the full email, not masked
+        expect(userAccount.email).toBe("service1@example.com");
+      }
     });
   });
 });

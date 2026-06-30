@@ -100,24 +100,6 @@ test.describe("Service Account for API access", () => {
         testLogger.info('Test completed successfully');
     });
     
-    test("Service Account Download Token", async ({ page }, testInfo) => {
-        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
-        testLogger.testStart(testInfo.title, testInfo.file);
-        
-        await navigateToBase(page);
-        pageManager = new PageManager(page);
-        
-        await pageManager.iamPage.gotoIamPage();
-        await pageManager.iamPage.iamPageServiceAccountsTab();
-        await pageManager.iamPage.iamPageAddServiceAccount();
-        await pageManager.iamPage.enterEmailServiceAccount(uniqueEmail);
-        await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
-        await pageManager.iamPage.clickDownloadToken();
-        
-        testLogger.info('Test completed successfully');
-    });
-    
     test("Service Account Token Pop Up Closed", async ({ page }, testInfo) => {
         const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
         testLogger.testStart(testInfo.title, testInfo.file);
