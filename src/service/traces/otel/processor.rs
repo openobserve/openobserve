@@ -253,7 +253,7 @@ impl OtelIngestionProcessor {
         let mut usage = extracted.usage.clone();
         let mut cost = extracted.cost.clone();
 
-        if extracted.input.is_some() || extracted.output.is_some() {
+        if is_generation_or_embedding(extracted.op_name) {
             let span_ts_micros = i64::try_from(span_start_nanos / 1_000).unwrap_or(i64::MAX);
             let matched_pricing = extracted.model_name.as_ref().and_then(|mn| {
                 crate::service::db::model_pricing::find_pricing_sync_at(
@@ -266,7 +266,6 @@ impl OtelIngestionProcessor {
 
             if let Some(v) = &extracted.input
                 && !usage.contains_key("input")
-                && is_generation_or_embedding(extracted.op_name)
             {
                 let prompt = v.to_string();
                 let prompt_tokens = pricing::calculate_token_count(tokenizer_key, &prompt);
@@ -274,14 +273,13 @@ impl OtelIngestionProcessor {
             }
             if let Some(v) = &extracted.output
                 && !usage.contains_key("output")
-                && is_generation_or_embedding(extracted.op_name)
             {
                 let output_text = v.to_string();
                 let output_tokens = pricing::calculate_token_count(tokenizer_key, &output_text);
                 usage.insert("output".to_string(), output_tokens);
             }
 
-            if cost.is_empty() && is_generation_or_embedding(extracted.op_name) {
+            if cost.is_empty() {
                 if let Some(pricing_def) = matched_pricing {
                     let result = crate::service::db::model_pricing::calculate_cost_from_definition(
                         &pricing_def,
@@ -893,6 +891,42 @@ mod tests {
                 .and_then(|v| v.as_f64()),
             Some(0.0075)
         );
+    }
+
+    #[test]
+    fn test_process_span_calculates_deepseek_cost_from_token_only_span() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("deepseek-v4-pro"),
+        );
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(1000));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(500));
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        let input_cost = span_attrs
+            .get(GenAiExtensions::USAGE_COST_INPUT)
+            .and_then(|v| v.as_f64())
+            .unwrap();
+        let output_cost = span_attrs
+            .get(GenAiExtensions::USAGE_COST_OUTPUT)
+            .and_then(|v| v.as_f64())
+            .unwrap();
+        let total_cost = span_attrs
+            .get(GenAiAttributes::USAGE_COST)
+            .and_then(|v| v.as_f64())
+            .unwrap();
+
+        assert!((input_cost - 0.000435).abs() < 1e-12);
+        assert!((output_cost - 0.000435).abs() < 1e-12);
+        assert!((total_cost - 0.00087).abs() < 1e-12);
     }
 
     #[test]
