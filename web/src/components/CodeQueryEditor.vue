@@ -125,6 +125,15 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    // When true (the app-wide default), the editor releases the mouse wheel to
+    // the page once its own content has nothing left to scroll — Monaco
+    // otherwise always consumes the wheel, trapping page scroll on hover. It
+    // still scrolls internally when its content overflows. Set to false for a
+    // full-page editor that should own the wheel even when not overflowing.
+    releaseWheelToPage: {
+      type: Boolean,
+      default: true,
+    },
     language: {
       type: String,
       default: "sql",
@@ -706,7 +715,12 @@ export default defineComponent({
         smoothScrolling: true,
         mouseWheelScrollSensitivity: 1,
         fastScrollSensitivity: 1,
-        scrollbar: { horizontal: "auto", vertical: "visible" },
+        scrollbar: {
+          horizontal: "auto",
+          vertical: "visible",
+          // Let the page scroll when this editor has nothing left to scroll.
+          alwaysConsumeMouseWheel: !props.releaseWheelToPage,
+        },
         find: {
           addExtraSpaceOnTop: false,
           autoFindInSelection: "never",

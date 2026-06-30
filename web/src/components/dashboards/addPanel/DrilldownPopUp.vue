@@ -737,27 +737,6 @@ export default defineComponent({
       }
     }, { deep: true });
 
-    watch(
-      () => props.open,
-      async (isOpen) => {
-        if (!isOpen) return;
-
-        // Re-initialize form data from the current props each time the dialog opens
-        drilldownData.value = props.isEditMode
-          ? JSON.parse(
-              JSON.stringify(
-                dashboardPanelData.data.config.drilldown[props.drilldownDataIndex],
-              ),
-            )
-          : getDefaultDrilldownData();
-
-        // Refresh dependent lists so they reflect the (possibly new) data
-        await getDashboardListLoading.execute();
-        await getTabListLoading.execute();
-        await getvariableNames();
-      },
-    );
-
     const updateQueryValue = (value: string) => {
       drilldownData.value.data.logsQuery = value;
     };
