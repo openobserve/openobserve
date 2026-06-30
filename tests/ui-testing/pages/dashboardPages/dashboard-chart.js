@@ -428,8 +428,40 @@ export default class ChartTypeSelector {
   async openFieldPropertyPopup(alias, axis = "x") {
     const itemLocator = this.page.locator(`[data-test="dashboard-${axis}-item-${alias}"]`);
     await itemLocator.waitFor({ state: "visible", timeout: 10000 });
-    await itemLocator.click();
-    testLogger.debug('Opened field property popup', { alias, axis });
+
+    // The popup is an ODropdown anchored to the axis item. When opened
+    // immediately after the panel's first render, a late re-render of the
+    // field list can re-mount the trigger and auto-dismiss the popup within
+    // a few hundred ms — so a single click + visibility check races against
+    // the popup vanishing. Open it, then confirm it STAYS open; re-open if it
+    // auto-closed. Click only when the popup isn't already open (the trigger
+    // toggles, so clicking an open popup would close it).
+    const popupRoot = this.page.locator('[data-test="dynamic-function-popup-root"]');
+    const maxAttempts = 5;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (!(await popupRoot.isVisible().catch(() => false))) {
+        await itemLocator.click();
+      }
+      const opened = await popupRoot
+        .waitFor({ state: "visible", timeout: 3000 })
+        .then(() => true)
+        .catch(() => false);
+      if (opened) {
+        // Confirm the popup is still open after the window in which the
+        // post-render re-render would have dismissed it.
+        await this.page.waitForTimeout(700);
+        if (await popupRoot.isVisible().catch(() => false)) {
+          testLogger.debug('Opened field property popup', { alias, axis, attempt });
+          return;
+        }
+      }
+      // Auto-closed (or never opened) — wait briefly for the panel to settle,
+      // then retry the open.
+      await this.page.waitForTimeout(500);
+    }
+    throw new Error(
+      `Field property popup for ${axis}-item-${alias} did not stay open after ${maxAttempts} attempts`,
+    );
   }
 
   /**

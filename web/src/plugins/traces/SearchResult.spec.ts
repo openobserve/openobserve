@@ -336,9 +336,11 @@ describe("SearchResult", () => {
         "get:traceDetails",
         "metrics:filters-updated",
         "run-query",
-        "widen-range",
         "remove-filter",
+        "jump-to-stream-data",
         "error-only-toggled",
+        "ask-ai",
+        "send-to-ai-chat",
       ];
 
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);

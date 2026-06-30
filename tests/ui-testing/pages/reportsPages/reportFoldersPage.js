@@ -140,13 +140,9 @@ export class ReportFoldersPage {
       `${process.env["ZO_BASE_URL"]}/web/reports?org_identifier=${process.env["ORGNAME"]}`,
       { waitUntil: 'domcontentloaded' }
     );
-    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
-      console.warn('navigateToReports: networkidle timed out, continuing');
-    });
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     await expect(this.pageTitle).toContainText('Reports');
-    await this.folderTabsContainer.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
-      console.warn('navigateToReports: folderTabsContainer not visible, continuing');
-    });
+    await this.folderTabsContainer.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
   }
 
   async clickAddFolder() {
@@ -223,8 +219,9 @@ export class ReportFoldersPage {
 
   async clickDeleteFolder(folderName) {
     await this.clickMoreIcon(folderName);
-    await this.deleteFolderIcon.click({ force: true });
-    await expect(this.confirmDeleteDialog).toBeVisible({ timeout: 5000 });
+    await this.deleteFolderIcon.waitFor({ state: 'visible', timeout: 5000 });
+    await this.deleteFolderIcon.click();
+    await expect(this.confirmDeleteDialog).toBeVisible({ timeout: 10000 });
   }
 
   async confirmDelete() {
@@ -308,11 +305,14 @@ export class ReportFoldersPage {
   async clickMove() {
     await this.moveSubmitBtn.click();
     await this.moveDialog.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    // Wait for ODialog close animation to finish before next interaction
+    await this.page.locator('[data-test="o-dialog-overlay"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
   }
 
   async cancelMove() {
     await this.moveCancelBtn.first().click();
     await this.moveDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await this.page.locator('[data-test="o-dialog-overlay"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
   }
 
   async expectDefaultFolderExists() {
@@ -351,6 +351,10 @@ export class ReportFoldersPage {
     await expect(this.reportPauseStartBtn(reportName)).toBeVisible({ timeout: 10000 });
   }
 
+  async expectReportNotVisibleInTable(reportName) {
+    await expect(this.reportPauseStartBtn(reportName)).not.toBeVisible({ timeout: 5000 });
+  }
+
   async getFolderCount() {
     // Every OTab in the sidebar carries a `data-test="dashboard-folder-tab-<id>"`.
     return await this.page
@@ -385,5 +389,59 @@ export class ReportFoldersPage {
       return true;
     }
     return false;
+  }
+
+  // ===== BULK OPERATION METHODS =====
+  // Selectors for bulk report operations (move/delete) in main branch.
+  // Note: bulk pause/resume are not available in main's ReportList.vue.
+  // Bulk delete confirmation uses ConfirmDialog (data-test="confirm-dialog")
+  // with ODialog's standard primary/secondary button pattern.
+
+  async selectAllReports() {
+    // OTableHeader passes row-id="all" to OTableSelectCheckbox, making the
+    // header checkbox data-test "o2-table-select-all" (not "header").
+    const headerCheckbox = this.page.locator('[data-test="o2-table-select-all"]');
+    await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
+    await headerCheckbox.click();
+    await this.page.waitForTimeout(300);
+  }
+
+  async expectBulkButtonsVisible() {
+    await expect(this.page.locator('[data-test="report-list-move-reports-btn"]')).toBeVisible({ timeout: 5000 });
+    await expect(this.page.locator('[data-test="report-list-delete-reports-btn"]')).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectBulkButtonsHidden() {
+    await expect(this.page.locator('[data-test="report-list-move-reports-btn"]')).not.toBeVisible({ timeout: 3000 });
+  }
+
+  async clickBulkMove() {
+    await this.page.locator('[data-test="report-list-move-reports-btn"]').click();
+    await expect(this.moveDialog).toBeVisible({ timeout: 5000 });
+  }
+
+  async clickBulkDelete() {
+    await this.page.locator('[data-test="report-list-delete-reports-btn"]').click();
+    await expect(this.page.locator('[data-test="confirm-dialog"]')).toBeVisible({ timeout: 5000 });
+  }
+
+  async confirmBulkDelete() {
+    const confirmBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
+    await confirmBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await confirmBtn.click({ force: true });
+    await this.page.locator('[data-test="confirm-dialog"]').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
+  async cancelBulkDelete() {
+    const cancelBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]');
+    await cancelBtn.click();
+    await this.page.locator('[data-test="confirm-dialog"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+  }
+
+  async expectBulkDeleteSuccessVisible() {
+    await expect(
+      this.page.locator('[data-test="o-toast-message"]').filter({ hasText: /deleted successfully/i })
+    ).toBeVisible({ timeout: 10000 });
   }
 }

@@ -193,7 +193,7 @@ describe("DashboardJsonEditor", () => {
     expect(drawer.exists()).toBe(true);
     expect(drawer.props("open")).toBe(true);
     expect(drawer.props("width")).toBe(70);
-    expect(drawer.props("title")).toBe("Edit Dashboard JSON");
+    expect(drawer.props("title")).toBe("dashboard.editJson");
     expect(drawer.props("primaryButtonLabel")).toBe("common.save");
     expect(drawer.props("secondaryButtonLabel")).toBe("common.cancel");
     expect(drawer.props("primaryButtonLoading")).toBe(false);

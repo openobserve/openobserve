@@ -17,6 +17,13 @@ export default class DashboardLegendsCopy {
     // Chart renderer selector (VERIFIED from ChartRenderer.vue - data-test="chart-renderer")
     this.chartRenderer = page.locator('[data-test="chart-renderer"]');
 
+    // Show Legends button. The button now lives in the panel header toolbar:
+    // "dashboard-show-legends-btn" in dashboard view (PanelContainer) and
+    // "panel-editor-show-legends-btn" in the add/edit panel toolbar (PanelEditor).
+    this.showLegendsBtn = page.locator(
+      '[data-test="dashboard-show-legends-btn"], [data-test="panel-editor-show-legends-btn"]'
+    );
+
     // Table selectors (VERIFIED from TableRenderer.vue)
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
   }
@@ -32,7 +39,7 @@ export default class DashboardLegendsCopy {
    */
   getShowLegendsButton() {
     // The button renders icon "format_list_bulleted" as text content via Quasar's OIcon
-    return this.page.locator('[data-test="dashboard-show-legends-btn"]').first();
+    return this.showLegendsBtn.first();
   }
 
   /**

@@ -538,17 +538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                       </template>
                       <template #cell-type="{ row }">
-                        <span
-                          class="field-type-badge"
-                          :class="{
-                            'badge-int64': row.type === 'Int64',
-                            'badge-float64': row.type === 'Float64',
-                            'badge-utf8': row.type === 'Utf8',
-                            'badge-bool': row.type === 'Boolean',
-                          }"
-                        >
-                          {{ row.type }}
-                        </span>
+                        <OTag type="fieldType" :value="row.type" />
                       </template>
                       <template #cell-index_type="{ row }">
                         <div
@@ -976,6 +966,7 @@ import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
@@ -1031,6 +1022,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OTable,
+    OTag,
     DateTime,
     AssociatedRegexPatterns,
     ODrawer,

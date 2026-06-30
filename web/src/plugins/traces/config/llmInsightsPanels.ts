@@ -122,11 +122,12 @@ const TOKENS_FIELD = `gen_ai_usage_total_tokens`;
 const MODEL_FIELD = `gen_ai_response_model`;
 const OBSERVATION_TYPE_FIELD = `gen_ai_operation_name`;
 
-export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
+export function getLLMInsightsPanels(t: (key: string) => string): LLMPanelDef[] {
+  return [
   {
     id: "cost-trend",
-    title: "Cost trend",
-    subtitle: "USD by model",
+    title: t("aiObservability.panels.costTrend.title"),
+    subtitle: t("aiObservability.panels.costTrend.subtitle"),
     type: "stacked-area",
     layout: { colSpan: 1 },
     query: {
@@ -152,8 +153,8 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
   {
     id: "token-trend",
-    title: "Token trend",
-    subtitle: "tokens by model",
+    title: t("aiObservability.panels.tokenTrend.title"),
+    subtitle: t("aiObservability.panels.tokenTrend.subtitle"),
     type: "stacked-area",
     layout: { colSpan: 1 },
     query: {
@@ -175,8 +176,8 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
   {
     id: "span-trend",
-    title: "Span trend",
-    subtitle: "span count by kind",
+    title: t("aiObservability.panels.spanTrend.title"),
+    subtitle: t("aiObservability.panels.spanTrend.subtitle"),
     type: "stacked-area",
     layout: { colSpan: 1 },
     query: {
@@ -197,8 +198,8 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
   {
     id: "latency-percentiles",
-    title: "Latency p50 / p95 / p99",
-    subtitle: "all LLM calls",
+    title: t("aiObservability.panels.latencyPercentiles.title"),
+    subtitle: t("aiObservability.panels.latencyPercentiles.subtitle"),
     type: "histogram-with-thresholds",
     layout: { colSpan: 1 },
     query: {
@@ -231,8 +232,8 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
   {
     id: "traces-over-time",
-    title: "Traces over time",
-    subtitle: "trace count by service",
+    title: t("aiObservability.panels.tracesOverTime.title"),
+    subtitle: t("aiObservability.panels.tracesOverTime.subtitle"),
     type: "stacked-area",
     layout: { colSpan: 1 },
     query: {
@@ -253,8 +254,8 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
   {
     id: "errors-over-time",
-    title: "Errors over time",
-    subtitle: "error count",
+    title: t("aiObservability.panels.errorsOverTime.title"),
+    subtitle: t("aiObservability.panels.errorsOverTime.subtitle"),
     type: "stacked-area",
     layout: { colSpan: 1 },
     color: "#ef4444",
@@ -280,8 +281,8 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
   {
     id: "spans-by-model",
-    title: "Spans by model",
-    subtitle: "call count per model",
+    title: t("aiObservability.panels.spansByModel.title"),
+    subtitle: t("aiObservability.panels.spansByModel.subtitle"),
     type: "horizontal-bar",
     layout: { colSpan: 1 },
     color: "#3b82f6",
@@ -302,8 +303,8 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
   {
     id: "tokens-by-model",
-    title: "Tokens by model",
-    subtitle: "total tokens per model",
+    title: t("aiObservability.panels.tokensByModel.title"),
+    subtitle: t("aiObservability.panels.tokensByModel.subtitle"),
     type: "horizontal-bar",
     layout: { colSpan: 1 },
     color: "#a855f7",
@@ -324,8 +325,8 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   },
   {
     id: "recent-errors",
-    title: "Recent errors",
-    subtitle: "last 10 failed spans",
+    title: t("aiObservability.panels.recentErrors.title"),
+    subtitle: t("aiObservability.panels.recentErrors.subtitle"),
     type: "table",
     layout: { colSpan: 2 },
     emptyStateText: "No errors in this time range",
@@ -360,7 +361,8 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
       { field: "trace_id", label: "", format: "view-link", align: "right" },
     ],
   },
-];
+  ];
+}
 
 /**
  * Substitute the standard placeholders in a SQL template with concrete values.

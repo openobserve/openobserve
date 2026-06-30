@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="addApiHeader"
         icon-left="add"
       >
-        Add Condition
+        {{ t('alerts.addCondition') }}
       </OButton>
     </template>
     <template v-else>

@@ -219,6 +219,7 @@ jobs:
                 "logsAnalyzeDimensions.spec.js",
                 "monaco-query-prefill.spec.js",
                 "logsqueries.matchall.spec.js",
+                "ftsDefaultColumn.spec.js",
               ]
           - testfolder: "Logs-Features"
             browser: "chrome"
@@ -244,6 +245,8 @@ jobs:
                 "alerts-metrics-notification.spec.js",
                 "alerts-destinations-prebuilt.spec.js",
                 "alerts-vrl-encoding.spec.js",
+                "alerts-history.spec.js",
+                "alerts-template-prebuilt-guard.spec.js",
                 "alerts-form-validation.spec.js",
                 "anomaly-detection-form-validation.spec.js",
               ]
@@ -334,6 +337,7 @@ jobs:
                 "reportsScheduleNow.spec.js",
                 "reportsScheduleLater.spec.js",
                 "reportFolders.spec.js",
+                "reports-bulk-operations.spec.js",
                 "reports-form-validation.spec.js",
               ]
           - testfolder: "Streams"
@@ -476,12 +480,10 @@ jobs:
 
       - name: Cache Playwright browser
         id: playwright-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
-          restore-keys: |
-            playwright-chromium-${{ runner.os }}-
 
       - name: Check if this is a rerun
         id: check_rerun
@@ -884,6 +886,14 @@ jobs:
     permissions:
       contents: read
       actions: read
+    outputs:
+      # Compact Playwright stats (expected/unexpected/flaky/skipped) from the merged report.json,
+      # consumed by report_to_openobserve to record per-test counts in ci_test_runs.
+      stats: ${{ steps.report_stats.outputs.stats }}
+      # Flaky + failed tests for the ci_test_results stream, consumed by
+      # report_to_openobserve. JSON array: [{module,title,file,status}] where
+      # status is "flaky"|"failed" (see .github/scripts/extract-flaky.js). "[]" if none.
+      flaky: ${{ steps.report_flaky.outputs.flaky }}
 
     steps:
       - name: Clone the current repo
@@ -892,7 +902,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: "22"
+          node-version: 22
 
       - name: Install project dependencies
         run: cd tests/ui-testing && npm ci
@@ -962,16 +972,101 @@ jobs:
             fi
           fi
 
-          # Unset CI to use non-CI reporter config (html + json instead of blob)
-          unset CI
-          npx playwright merge-reports --config playwright.config.js ./all-blob-reports
+          # Force the html + json reporters explicitly with their output paths instead of
+          # relying on `unset CI` to flip playwright.config.js's `process.env.CI ? blob : html/json`
+          # ternary. The runner exports CI=true and `unset CI` does not reliably reach the
+          # merge subprocess, so the config would intermittently re-select the `blob` reporter —
+          # which writes a merged blob-report/ and NOTHING to playwright-results/, making the
+          # downstream `ls playwright-results/html-report/` fail with a cryptic exit 2.
+          mkdir -p playwright-results
+          # These env vars override playwright.config.js's reporter settings:
+          #   PLAYWRIGHT_HTML_OUTPUT_DIR  - html reporter output directory
+          #   PLAYWRIGHT_HTML_OPEN=never  - never auto-open the report (required for CI)
+          #   PLAYWRIGHT_JSON_OUTPUT_NAME - json reporter output file path
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-results/html-report \
+          PLAYWRIGHT_HTML_OPEN=never \
+          PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results/report.json \
+            npx playwright merge-reports --reporter html,json ./all-blob-reports
 
           echo "Contents of playwright-results:"
-          ls -la playwright-results/
+          ls -la playwright-results/ || true
+          if [ ! -f playwright-results/html-report/index.html ] || [ ! -f playwright-results/report.json ]; then
+            echo "::error::merge-reports did not produce the expected html-report/index.html and report.json"
+            echo "::error::all-blob-reports contents:"
+            ls -la all-blob-reports/ || true
+            exit 1
+          fi
+          # Diagnostics only — never fail the step on these (the guard above already
+          # confirmed the outputs exist).
           echo "Contents of html-report:"
-          ls -la playwright-results/html-report/
+          ls -la playwright-results/html-report/ || true
           echo "Checking report.json:"
-          ls -lh playwright-results/report.json
+          ls -lh playwright-results/report.json || true
+
+      - name: Extract report stats for OpenObserve
+        id: report_stats
+        if: always()
+        run: |
+          cd tests/ui-testing
+          if [ -f playwright-results/report.json ]; then
+            STATS=$(jq -c '.stats // {}' playwright-results/report.json 2>/dev/null || echo '{}')
+          else
+            STATS='{}'
+          fi
+          echo "stats=$STATS" >> "$GITHUB_OUTPUT"
+          echo "report stats: $STATS"
+
+      - name: Extract flaky tests for OpenObserve
+        id: report_flaky
+        if: always()
+        run: |
+          # Flaky + failed tests from the merged report, as one JSON array, for the
+          # ci_test_results stream. Logic + schema live in extract-flaky.js (it
+          # handles a missing/malformed report by printing [] non-fatally, and is
+          # commented to explain status="flaky" vs "failed" and the sp.title choice).
+          FLAKY=$(node .github/scripts/extract-flaky.js tests/ui-testing/playwright-results/report.json)
+          echo "flaky=$FLAKY" >> "$GITHUB_OUTPUT"
+          # Log a count only — avoid dumping test file paths/titles into public CI logs.
+          echo "flaky/failed test count: $(printf '%s' "$FLAKY" | jq 'length' 2>/dev/null || echo '?')"
+
+      # Non-fatal metrics sidecar — runs HERE inside the report flow (like the TestDino
+      # step below) so it never trails / gates playwright_summary (which doesn't need this
+      # job). One retry-aware run-summary doc to OpenObserve (ci_test_runs, suite=ui) plus
+      # per-test flaky/failed rows to ci_test_results. continue-on-error: never fails the run.
+      - name: Report run metrics to OpenObserve
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          O2_REPORTING_INGEST_BASE: ${{ secrets.O2_REPORTING_INGEST_BASE }}
+          O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
+          O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
+          TESTS: ${{ needs.ui_integration_tests.result }}
+          MERGE_STATS: ${{ steps.report_stats.outputs.stats }}
+          MERGE_FLAKY: ${{ steps.report_flaky.outputs.flaky }}
+        run: |
+          # This job runs only when tests actually ran (merge `if:` gates on !cancelled &&
+          # ui != skipped), so TESTS is success|failure here.
+          if [ "$TESTS" = "failure" ]; then CONCLUSION=failure; else CONCLUSION=success; fi
+          # Per-test counts from the merged report.json (tests_total includes skipped).
+          if [ -n "${MERGE_STATS:-}" ] && [ "$MERGE_STATS" != "null" ] && [ "$MERGE_STATS" != "{}" ]; then
+            EXTRA_JSON=$(printf '%s' "$MERGE_STATS" | jq -c '{tests_total:((.expected//0)+(.unexpected//0)+(.flaky//0)+(.skipped//0)), tests_passed:(.expected//0), tests_failed:(.unexpected//0), tests_flaky:(.flaky//0), tests_skipped:(.skipped//0)}' 2>/dev/null || echo "")
+            [ -n "$EXTRA_JSON" ] && export EXTRA_JSON
+          fi
+          export CONCLUSION STREAM=ci_test_runs SUITE=ui
+          bash .github/scripts/o2-run-report.sh
+          # One row per flaky-or-failed test -> ci_test_results (status flaky|failed; suite/
+          # workflow hardcoded UI-only). o2-report.sh takes the stream as arg 1. Non-fatal.
+          FLAKY="${MERGE_FLAKY:-[]}"
+          if printf '%s' "$FLAKY" | jq -e 'type=="array" and length>0' >/dev/null 2>&1; then
+            FLAKY_FILE=$(mktemp "${TMPDIR:-/tmp}/flaky.XXXXXX")
+            trap 'rm -f "$FLAKY_FILE"' EXIT
+            printf '%s' "$FLAKY" | jq -c --arg run_id "$GITHUB_RUN_ID" --arg repo "$GITHUB_REPOSITORY" \
+              '[.[] | {run_id:$run_id, repo:$repo, suite:"ui", workflow:"test", ingest_source:"live", status:.status, module:.module, test_title:.title, test_file:.file}]' \
+              > "$FLAKY_FILE" 2>/dev/null || echo '[]' > "$FLAKY_FILE"
+            if [ "$(jq 'length' "$FLAKY_FILE" 2>/dev/null || echo 0)" -gt 0 ]; then
+              bash .github/scripts/o2-report.sh ci_test_results "$FLAKY_FILE"
+            fi
+          fi
 
       - name: Cache test failures to TestDino
         if: ${{ needs.ui_integration_tests.result == 'failure' }}

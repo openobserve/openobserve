@@ -70,7 +70,7 @@ jobs:
           version: "21.12"
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Install frontend dependencies
         run: cd web && npm ci

@@ -30,7 +30,11 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             if infra::table::short_urls::contains(&short_id).await? {
                 return Ok(());
             }
-            infra::table::short_urls::add(&short_id, &original_url).await?;
+            // The super-cluster queue only carries the original_url, not the
+            // org_id, so store an empty org_id. This matches the legacy
+            // semantics in `short_urls::get`, where empty-org rows are accepted
+            // from any org.
+            infra::table::short_urls::add(&short_id, &original_url, "").await?;
         }
         MessageType::ShortUrlDelete => {
             let short_id = parse_key(&msg.key)?;

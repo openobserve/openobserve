@@ -26,6 +26,7 @@ import {
 import { mount, flushPromises } from "@vue/test-utils";
 import User from "@/components/iam/users/User.vue";
 import { createI18n } from "vue-i18n";
+import enLocale from "@/locales/languages/en.json";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import usersService from "@/services/users";
@@ -42,46 +43,11 @@ const i18n = createI18n({
   globalInjection: true,
   silentTranslationWarn: true,
   silentFallbackWarn: true,
+  // Use the real en.json so dialog titles/labels resolve exactly as in the app.
+  // Dialog titles (e.g. "Delete Users") are now translated via t("user.deleteUsersTitle");
+  // sourcing the real dictionary keeps the title-based dialog lookups in this spec working.
   messages: {
-    en: {
-      user: {
-        email: "Email",
-        firstName: "First Name",
-        lastName: "Last Name",
-        role: "Role",
-        actions: "Actions",
-        name: "Name",
-        password: "Password",
-        confirmPassword: "Confirm Password",
-        search: "Search",
-        add: "Add User",
-        update: "Update User",
-        editUser: "Edit User",
-        cancel: "Cancel",
-        save: "Save",
-        confirmDeleteHead: "Delete User",
-        confirmDeleteMsg: "Are you sure you want to delete this user?",
-        ok: "OK",
-        header: "User",
-        delete: "Delete",
-        revoke_invite: "Revoke Invitation",
-      },
-      iam: { basicUsers: "Users" },
-      search: {
-        showing: "Showing",
-        of: "of",
-        recordsPerPage: "Records Per Page",
-      },
-      ticket: { noDataErrorMsg: "No data available" },
-      common: {
-        cancel: "Cancel",
-        save: "Save",
-        delete: "Delete",
-        edit: "Edit",
-        add: "Add",
-        update: "Update",
-      },
-    },
+    en: enLocale,
   },
 });
 

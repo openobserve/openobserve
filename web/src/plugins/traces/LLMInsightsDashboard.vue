@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Trend panels (config-driven) -->
       <div class="tw:grid tw:grid-cols-2 tw:gap-[0.625rem]">
         <div
-          v-for="panel in LLM_INSIGHTS_PANELS"
+          v-for="panel in llmInsightsPanels"
           :key="panel.id"
           :class="panel.layout.colSpan === 2 ? 'tw:col-span-2' : ''"
         >
@@ -168,13 +168,15 @@ import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { LLM_INSIGHTS_PANELS } from "./config/llmInsightsPanels";
+import { getLLMInsightsPanels } from "./config/llmInsightsPanels";
 import useStreams from "@/composables/useStreams";
 
 const { getStreams } = useStreams();
 const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
+
+const llmInsightsPanels = computed(() => getLLMInsightsPanels(t));
 
 interface Props {
   streamName: string;
@@ -321,7 +323,7 @@ const kpiCards = computed<KpiCard[]>(() => {
   );
 
   const costCard: KpiCard = {
-    label: "Total Cost",
+    label: t("aiObservability.kpi.totalCost"),
     ...splitCost(kpi.value.totalCost),
     trend: costTrend,
     sparkData: sparklines.value.cost,
@@ -331,7 +333,7 @@ const kpiCards = computed<KpiCard[]>(() => {
   return [
     costCard,
     {
-      label: "Total Tokens",
+      label: t("aiObservability.kpi.totalTokens"),
       value: tokens.value,
       unit: tokens.unit,
       trend: computeTrend(kpi.value.totalTokens, kpiPrev.value.totalTokens, true),
@@ -339,7 +341,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       sparkColor: "#a855f7",
     },
     {
-      label: "Total Traces",
+      label: t("aiObservability.kpi.totalTraces"),
       value: traces.value,
       unit: traces.unit,
       trend: computeTrend(kpi.value.traceCount, kpiPrev.value.traceCount, true),
@@ -347,7 +349,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       sparkColor: "#3b82f6",
     },
     {
-      label: "P95 Latency",
+      label: t("aiObservability.kpi.p95Latency"),
       value: p95.value,
       unit: p95.unit,
       trend: computeTrend(
@@ -359,7 +361,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       sparkColor: "#f97316",
     },
     {
-      label: "Error Rate",
+      label: t("aiObservability.kpi.errorRate"),
       value: errorRate.toFixed(1),
       unit: "%",
       trend: computeTrend(errorRate, errorRatePrev, true),

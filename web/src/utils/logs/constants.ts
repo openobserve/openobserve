@@ -125,6 +125,11 @@ export const DEFAULT_LOGS_CONFIG = {
     sqlModeEditTransition: false,
     nlpMode: false,
     quickMode: false,
+    // True when the current selectedFields were chosen automatically by the FTS
+    // default-column logic (a system pick), not by the user. System picks are a
+    // display convenience and must NOT be persisted to logFilterField — only an
+    // explicit user pin/reorder/remove persists. Cleared by any user action.
+    isFtsDefaultColumn: false,
     queryEditorPlaceholderFlag: true,
     functionEditorPlaceholderFlag: true,
     resultGrid: {

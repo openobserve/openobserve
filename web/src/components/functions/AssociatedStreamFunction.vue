@@ -262,7 +262,7 @@ export default defineComponent({
         header: t("logStream.docNum"),
         sortable: true,
         size: COL.count,
-        meta: { align: "left" },
+        meta: { align: "right" },
       },
       {
         id: "storage_size",
@@ -270,7 +270,7 @@ export default defineComponent({
         header: t("logStream.storageSize"),
         sortable: true,
         size: COL.sizeBytes,
-        meta: { align: "left" },
+        meta: { align: "right" },
       },
       {
         id: "compressed_size",
@@ -278,7 +278,7 @@ export default defineComponent({
         header: t("logStream.compressedSize"),
         sortable: true,
         size: COL.sizeBytes,
-        meta: { align: "left" },
+        meta: { align: "right" },
       },
     ];
     const addFunctionInProgress = ref(false);
@@ -362,7 +362,7 @@ export default defineComponent({
           cell: " ",
           sortable: true,
           size: COL.count,
-          meta: { align: "left" },
+          meta: { align: "right" },
         },
         {
           id: "applyBeforeFlattening",
