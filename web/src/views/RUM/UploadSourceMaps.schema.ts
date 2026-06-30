@@ -21,23 +21,23 @@ export const makeUploadSourceMapsSchema = (t: (_key: string) => string) =>
     service: z
       .string()
       .trim()
-      .min(1, t("rum.uploadSourceMaps.serviceRequired")),
+      .min(1, t("rum.uploadSourceMapsForm.serviceRequired")),
     version: z
       .string()
       .trim()
-      .min(1, t("rum.uploadSourceMaps.versionRequired")),
+      .min(1, t("rum.uploadSourceMapsForm.versionRequired")),
     environment: z.string().optional().default(""),
     file: z
       .instanceof(File)
       .nullable()
       // Required: a missing file (null) fails here with the "select a file" msg.
       .refine((f) => f instanceof File, {
-        message: t("rum.uploadSourceMaps.fileRequired"),
+        message: t("rum.uploadSourceMapsForm.fileRequired"),
       })
       // Type: only .zip is allowed (skipped when null — the required refine
       // above already reports that case).
       .refine((f) => f == null || f.name.toLowerCase().endsWith(".zip"), {
-        message: t("rum.uploadSourceMaps.fileTypeZip"),
+        message: t("rum.uploadSourceMapsForm.fileTypeZip"),
       }),
   });
 

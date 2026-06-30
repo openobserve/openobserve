@@ -809,7 +809,7 @@
     "webVitals": "Web Vitals",
     "errors": "Errors",
     "api": "API",
-    "uploadSourceMaps": {
+    "uploadSourceMapsForm": {
       "serviceRequired": "Service is required",
       "versionRequired": "Version is required",
       "fileRequired": "Please select a ZIP file to upload",
