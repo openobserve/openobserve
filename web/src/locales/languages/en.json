@@ -4136,6 +4136,7 @@
         "calls": "{n} calls",
         "call": "{n} call",
         "ofTotal": "{pct}% of total",
+        "usedIn": "Used In",
         "noTools": "No Tool Calls In This Session"
       },
       "kpi": {

@@ -545,12 +545,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="toolHotspots.length"
             class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]"
           >
-            <TurnPreviewCard
+            <span
               v-for="(row, i) in toolHotspots"
               :key="row.name"
-              :turn="traces[originalTurnIndex(row.topTraceId)]"
-              :index="originalTurnIndex(row.topTraceId)"
-              :cache-pct="cacheRatio"
+              class="tw:contents"
             >
               <button
                 class="tw:flex tw:items-center tw:gap-[0.5rem] tw:w-full tw:px-[0.4rem] tw:py-[0.35rem] tw:rounded-md tw:text-left tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
@@ -572,7 +570,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <OIcon name="chevron-right" size="xs" class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0" />
               </button>
-            </TurnPreviewCard>
+              <!-- Hover: which turns this (deduped) tool actually ran in. side="top"
+                   matches the other rail hovers (TurnPreviewCard) so it pops above
+                   the row instead of floating left over the conversation. -->
+              <OTooltip side="top" :delay="120" max-width="220px" content-class="tw:p-0!">
+                <template #content>
+                  <div class="tw:w-[200px] tw:py-[9px] tw:px-3 tw:text-xs tw:text-[var(--o2-text-primary)]">
+                    <div class="tw:font-bold tw:mb-[2px] tw:break-words">{{ row.name }}</div>
+                    <div class="tw:text-[10px] tw:text-[var(--o2-text-muted)] tw:mb-[7px]">
+                      {{ t(row.calls === 1 ? 'traces.sessionDetail.rail.call' : 'traces.sessionDetail.rail.calls', { n: row.calls }) }}
+                    </div>
+                    <div class="tw:text-[9.5px] tw:font-bold tw:tracking-[0.05em] tw:text-[var(--o2-text-muted)] tw:mb-1">
+                      {{ t('traces.sessionDetail.rail.usedIn') }}
+                    </div>
+                    <div class="tw:flex tw:flex-wrap tw:gap-1">
+                      <span
+                        v-for="tn in row.turns"
+                        :key="tn"
+                        class="tw:inline-flex tw:items-center tw:px-[0.35rem] tw:h-[1.05rem] tw:rounded-[0.3rem] tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:text-[10px] tw:font-semibold tw:tabular-nums"
+                      >{{ t('traces.sessionDetail.turnLabel') }} {{ tn }}</span>
+                    </div>
+                  </div>
+                </template>
+              </OTooltip>
+            </span>
           </div>
           <div v-else class="tw:px-[0.75rem] tw:py-[1.25rem] tw:text-center tw:text-[0.72rem] tw:text-[var(--o2-text-muted)]">
             {{ t('traces.sessionDetail.rail.noTools') }}
@@ -1211,9 +1232,14 @@ interface ToolHotspot {
   tokens: number;
   topTraceId: string;
   topDur: number;
+  /** 1-based turn numbers this tool ran in (unique, sorted) — for the hover. */
+  turns: number[];
 }
 const toolHotspots = computed<ToolHotspot[]>(() => {
-  const agg: Record<string, ToolHotspot> = {};
+  const agg: Record<
+    string,
+    Omit<ToolHotspot, "turns"> & { turnsSet: Set<number> }
+  > = {};
   for (const s of sessionSpans.value) {
     if (String(s.gen_ai_operation_name || "").toLowerCase() !== "execute_tool")
       continue;
@@ -1231,16 +1257,27 @@ const toolHotspots = computed<ToolHotspot[]>(() => {
         tokens: 0,
         topTraceId: s.trace_id,
         topDur: -1,
+        turnsSet: new Set<number>(),
       });
     a.duration += dur;
     a.calls += 1;
     a.tokens += tokens;
+    const turnNum = originalTurnIndex(String(s.trace_id)) + 1;
+    if (turnNum > 0) a.turnsSet.add(turnNum);
     if (dur > a.topDur) {
       a.topDur = dur;
       a.topTraceId = s.trace_id;
     }
   }
-  return Object.values(agg).sort((x, y) => y.duration - x.duration);
+  // Rank by call count — tool span `duration` is unreliable (many report 0ms,
+  // a backend gap), so calls is the meaningful hotspot signal; tie-break by the
+  // summed duration. Attach the sorted list of turns each tool ran in.
+  return Object.values(agg)
+    .map(({ turnsSet, ...rest }) => ({
+      ...rest,
+      turns: [...turnsSet].sort((p, q) => p - q),
+    }))
+    .sort((x, y) => y.calls - x.calls || y.duration - x.duration);
 });
 
 // Jump to a turn (1-based): clear filters so it's visible, expand it, then
