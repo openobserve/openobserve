@@ -655,7 +655,8 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .unwrap();
         // Two query strings. The `None` string is byte-identical to the legacy query (LIMIT $10).
         // The `Some` string appends `AND module = $10` to the inner SELECT and shifts LIMIT to
-        // $11, so the existing $1..$9 binds are untouched and `module`/`concurrency` are bound last.
+        // $11, so the existing $1..$9 binds are untouched and `module`/`concurrency` are bound
+        // last.
         let query = if module.is_some() {
             r#"UPDATE scheduled_jobs
 SET status = $1, start_time = $2,
@@ -735,10 +736,7 @@ RETURNING *;"#
             q = q.bind(m);
         }
         q = q.bind(concurrency);
-        let jobs: Vec<Trigger> = match q
-            .fetch_all(&mut *tx)
-            .await
-        {
+        let jobs: Vec<Trigger> = match q.fetch_all(&mut *tx).await {
             Ok(jobs) => jobs,
             Err(e) => {
                 if let Err(e) = tx.rollback().await {

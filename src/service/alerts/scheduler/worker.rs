@@ -513,10 +513,7 @@ impl Scheduler {
     }
 
     pub async fn run(&self) -> Result<()> {
-        log::debug!(
-            "Starting scheduler with {} lane(s)",
-            self.lanes.len()
-        );
+        log::debug!("Starting scheduler with {} lane(s)", self.lanes.len());
 
         // Spawn all workers across every lane.
         let worker_handles: Vec<_> = self
@@ -580,11 +577,7 @@ fn resolve_module_configs(
     let default_interval = base.poll_interval_secs;
     let pick_concurrency = |v: i64| if v > 0 { v } else { default_concurrency };
     let pick_interval = |v: i64| {
-        if v > 0 {
-            v as u64
-        } else {
-            default_interval
-        }
+        if v > 0 { v as u64 } else { default_interval }
     };
     let derived_stream_interval = if cfg.limit.scheduler_derived_stream_interval > 0 {
         cfg.limit.scheduler_derived_stream_interval as u64
