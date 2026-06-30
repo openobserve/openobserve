@@ -5,6 +5,7 @@ export {
   SHORTCUT_REGISTRY,
   SHORTCUT_MODULES,
   getShortcutDef,
+  getShortcutDisplay,
   resolveShortcutKeys,
 } from "./shortcutRegistry";
 export type {

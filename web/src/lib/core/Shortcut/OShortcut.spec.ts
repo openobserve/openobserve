@@ -45,6 +45,33 @@ describe("OShortcut", () => {
     });
   });
 
+  describe("registry id resolution", () => {
+    it("should resolve keys from the registry when only an id is given", () => {
+      wrapper = mount(OShortcut, { props: { id: "alertsImport" } });
+      expect(wrapper.findAll("kbd").map((c) => c.text())).toEqual(["I"]);
+    });
+
+    it("should render a ctrl-combo id as a ⌘ keycap on Mac", () => {
+      wrapper = mount(OShortcut, { props: { id: "logsRunQuery" } });
+      expect(wrapper.findAll("kbd").map((c) => c.text())).toEqual(["⌘↵"]);
+    });
+
+    it("should resolve a display-only id (e.g. delete)", () => {
+      wrapper = mount(OShortcut, { props: { id: "alertsRowDelete" } });
+      expect(wrapper.find("kbd").text()).toBe("⌫");
+    });
+
+    it("should prefer explicit keys over id", () => {
+      wrapper = mount(OShortcut, { props: { keys: "x", id: "alertsImport" } });
+      expect(wrapper.find("kbd").text()).toBe("X");
+    });
+
+    it("should render nothing for an unknown id", () => {
+      wrapper = mount(OShortcut, { props: { id: "nopeNotAnId" } });
+      expect(wrapper.findAll("kbd")).toHaveLength(0);
+    });
+  });
+
   describe("size", () => {
     it("should apply small keycap sizing by default", () => {
       wrapper = mount(OShortcut, { props: { keys: "?" } });

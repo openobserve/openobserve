@@ -438,6 +438,33 @@ export function getShortcutDef(id: string): ShortcutDef | undefined {
   return DEFS.get(id);
 }
 
+// Every entry (registerable AND display-only), keyed by id — for display lookups.
+const ENTRIES: Map<string, ShortcutEntry> = (() => {
+  const map = new Map<string, ShortcutEntry>();
+  for (const group of SHORTCUT_REGISTRY) {
+    for (const e of group.shortcuts) map.set(e.id, e);
+  }
+  return map;
+})();
+
+/**
+ * Resolve a shortcut's display key(s) by id — for tooltips / `OShortcut`. Works
+ * for any id, including display-only ones. Returns the Windows/common combo
+ * (OShortcut renders `ctrl`→`⌘` on Mac), the bare key, the list of bindings, or
+ * the leading token of a multi-binding label (e.g. "del / ⌫" → "del").
+ */
+export function getShortcutDisplay(
+  id: string,
+): string | string[] | undefined {
+  const e = ENTRIES.get(id);
+  if (!e) return undefined;
+  if (e.keyForWindows) return e.keyForWindows;
+  if (e.key) return e.key;
+  if (e.keys?.length) return e.keys;
+  if (e.display) return e.display.split(" / ")[0].trim();
+  return undefined;
+}
+
 /**
  * Resolve a definition's registration key(s) for the given platform.
  *  - `keys`            → all of them (multiple equivalent bindings)

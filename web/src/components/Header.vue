@@ -223,7 +223,7 @@ size="xs" class="warning" />{{
             side="bottom"
             align="center"
             :content="t('menu.aiAssistant')"
-            shortcut="ctrl+b"
+            shortcut-id="aiChatToggle"
           />
         </OButton>
       </template>
@@ -281,7 +281,7 @@ size="xs" class="warning" />{{
           <!-- Keyboard shortcuts -->
           <ODropdownItem
             data-test="menu-link-shortcuts-item"
-            shortcut="?"
+            shortcut-id="openCheatsheet"
             @select="openShortcuts"
           >
             {{ t("menu.keyboardShortcuts") }}

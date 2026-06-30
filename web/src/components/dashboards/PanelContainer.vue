@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-fullscreen-btn"
           icon-left="fullscreen"
         >
-          <OTooltip side="bottom" :content="t('panel.fullScreen')" shortcut="v" />
+          <OTooltip side="bottom" :content="t('panel.fullScreen')" shortcut-id="panelView" />
         </OButton>
         <OButton
           v-if="dependentAdHocVariable"
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!simplifiedPanelView"
             data-test="dashboard-edit-panel"
             @select="onPanelModifyClick('EditPanel')"
-            shortcut="e"
+            shortcut-id="panelEdit"
           >
             <template #icon-left
               ><OIcon name="edit" size="sm"
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!simplifiedPanelView"
             data-test="dashboard-duplicate-panel"
             @select="onPanelModifyClick('DuplicatePanel')"
-            shortcut="d"
+            shortcut-id="panelDuplicate"
           >
             <template #icon-left
               ><OIcon name="content-copy" size="sm"
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownItem
             data-test="dashboard-delete-panel"
             @select="onPanelModifyClick('DeletePanel')"
-            shortcut="del"
+            shortcut-id="panelDelete"
           >
             <template #icon-left
               ><OIcon name="delete-outline" size="sm" class="tw:text-current!"
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             data-test="dashboard-query-inspector-panel"
             @select="showViewPanel = true"
-            shortcut="i"
+            shortcut-id="panelQueryInspector"
           >
             <template #icon-left
               ><OIcon name="manage-search" size="sm"

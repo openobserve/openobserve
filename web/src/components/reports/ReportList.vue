@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="report-list-refresh-btn"
                     @click="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
                   >
-                    <OTooltip side="bottom" :content="t('reports.reloadReports')" shortcut="r" />
+                    <OTooltip side="bottom" :content="t('reports.reloadReports')" shortcut-id="reportsRefresh" />
                   </OButton>
                 </template>
                 <template #empty>

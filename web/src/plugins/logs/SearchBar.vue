@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop
           />
           <OIcon name="bar-chart" size="sm" class="tw:shrink-0" />
-          <OTooltip :content="searchObj.meta.showHistogram ? t('search.hideHistogram') : t('search.showHistogramLabel')" shortcut="h" />
+          <OTooltip :content="searchObj.meta.showHistogram ? t('search.hideHistogram') : t('search.showHistogramLabel')" shortcut-id="logsToggleHistogram" />
         </OButton>
 
         <!-- this is the button group responsible for showing all the utilities -->
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <ODropdownItem
               data-test="logs-search-bar-menu-create-saved-view-btn"
-              shortcut="s"
+              shortcut-id="logsSaveView"
               @select="fnSavedView"
             >
               <template #icon-left>
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownGroup :label="t('search.menuGroupHistory')">
             <ODropdownItem
               data-test="search-history-item-btn"
-              shortcut="ctrl+h"
+              shortcut-id="logsSearchHistory"
               @select="showSearchHistoryfn"
             >
               <template #icon-left>

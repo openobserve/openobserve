@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="upload-file"
             >
               <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
-              <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" shortcut="i" />
+              <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" shortcut-id="alertsImport" />
             </OButton>
             <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
             <OButton
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="alert-list-refresh-btn"
                     @click="refreshAlerts"
                   >
-                    <OTooltip side="bottom" content="Reload alerts" shortcut="r" />
+                    <OTooltip side="bottom" content="Reload alerts" shortcut-id="alertsRefresh" />
                   </OButton>
                 </template>
 
@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTooltip
                         side="bottom"
                         :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                        :shortcut="row.enabled ? 'p' : undefined"
+                        :shortcut-id="row.enabled ? 'alertsRowPause' : undefined"
                       />
                     </OButton>
                     <OButton
@@ -333,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       icon-left="edit"
                       @click.stop="editAlert(row)"
                     >
-                      <OTooltip side="bottom" :content="t('alerts.edit')" shortcut="e" />
+                      <OTooltip side="bottom" :content="t('alerts.edit')" shortcut-id="alertsRowEdit" />
                     </OButton>
                     <OButton
                       data-row-action="duplicate"
@@ -343,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="duplicateAlert(row)"
                       :data-test="`alert-list-${row.name}-clone-alert`"
                     >
-                      <OTooltip side="bottom" :content="t('alerts.clone')" shortcut="d" />
+                      <OTooltip side="bottom" :content="t('alerts.clone')" shortcut-id="alertsRowDuplicate" />
                     </OButton>
                     <!-- Hidden proxies so the row-hover shortcuts work for
                          actions that live in the more-menu dropdown (which is
@@ -387,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <ODropdownItem
                         :data-test="`alert-list-${row.name}-delete-alert`"
                         variant="destructive"
-                        shortcut="del"
+                        shortcut-id="alertsRowDelete"
                         @select="showDeleteDialogFn({ row })"
                       >
                         <template #icon-left>
@@ -398,7 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <ODropdownSeparator />
                       <ODropdownItem
                         :data-test="`alert-list-${row.name}-export-alert`"
-                        shortcut="x"
+                        shortcut-id="alertsRowExport"
                         @select="exportAlert(row)"
                       >
                         <template #icon-left>

@@ -48,8 +48,9 @@ const variantClasses: Record<
     <slot />
     <slot name="icon-right" />
     <OShortcut
-      v-if="props.shortcut"
+      v-if="props.shortcut || props.shortcutId"
       :keys="props.shortcut"
+      :id="props.shortcutId"
       class="tw:ms-auto tw:ps-4"
     />
   </DropdownMenuItem>

@@ -5,6 +5,7 @@ import { ShortcutManager, getManager, resetManager } from '@/lib/vue-shortcut-ma
 import { useShortcut, useShortcuts } from '@/lib/vue-shortcut-manager/composables';
 import {
   getShortcutDef,
+  getShortcutDisplay,
   resolveShortcutKeys,
 } from '@/lib/vue-shortcut-manager/shortcutRegistry';
 
@@ -320,5 +321,21 @@ describe('shortcutRegistry', () => {
   it('should resolve every binding for a multi-key entry', () => {
     const def = getShortcutDef('traceNextSpan')!;
     expect(resolveShortcutKeys(def, false)).toEqual(['j', 'down']);
+  });
+
+  it('should resolve a tooltip display key by id (registerable)', () => {
+    // Windows/common form — OShortcut renders ctrl→⌘ on Mac.
+    expect(getShortcutDisplay('logsRunQuery')).toBe('ctrl+enter');
+    expect(getShortcutDisplay('alertsImport')).toBe('i');
+  });
+
+  it('should resolve a tooltip display token for display-only ids', () => {
+    expect(getShortcutDisplay('panelView')).toBe('v');
+    // "del / ⌫" cheatsheet label → clean "del" token for the tooltip keycap.
+    expect(getShortcutDisplay('alertsRowDelete')).toBe('del');
+  });
+
+  it('should return undefined display for an unknown id', () => {
+    expect(getShortcutDisplay('nopeNotAnId')).toBeUndefined();
   });
 });

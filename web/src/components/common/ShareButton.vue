@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="tooltip || !showLabel"
       :content="tooltip || t('search.shareLink')"
       :shortcut="shortcut || undefined"
+      :shortcut-id="shortcutId || undefined"
     />
   </OButton>
 </template>
@@ -84,6 +85,12 @@ export default defineComponent({
     },
     // Optional keyboard-shortcut hint shown in the tooltip (raw key, e.g. "ctrl+shift+c")
     shortcut: {
+      type: String,
+      default: "",
+    },
+    // Registry shortcut id — resolves the hint key from shortcutRegistry.ts so a
+    // key change there updates this tooltip too. Prefer this over `shortcut`.
+    shortcutId: {
       type: String,
       default: "",
     },

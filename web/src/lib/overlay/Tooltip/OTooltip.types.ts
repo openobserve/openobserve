@@ -34,6 +34,12 @@ export interface TooltipProps {
    * (`["⌘", "⇧", "A"]`). Omit to show no hint.
    */
   shortcut?: string | string[];
+  /**
+   * Registry shortcut id — resolves the hint keys from `shortcutRegistry.ts`
+   * (the single source of truth) so a key change there updates this tooltip too.
+   * Prefer this over `shortcut`; `shortcut` wins if both are set.
+   */
+  shortcutId?: string;
 }
 
 export interface TooltipSlots {

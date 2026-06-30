@@ -2,12 +2,20 @@
 import type { ShortcutProps } from "./OShortcut.types";
 import { computed } from "vue";
 import { isMacOS } from "@/utils/keyboardShortcuts";
+import { getShortcutDisplay } from "@/lib/vue-shortcut-manager/shortcutRegistry";
 
 const props = withDefaults(defineProps<ShortcutProps>(), {
   size: "sm",
 });
 
 const isMac = isMacOS();
+
+/** Explicit `keys` win; otherwise resolve from the registry by `id`. */
+const resolvedKeys = computed<string | string[]>(() => {
+  if (props.keys != null) return props.keys;
+  if (props.id) return getShortcutDisplay(props.id) ?? "";
+  return "";
+});
 
 /** Token → display symbol. Modifier glyphs are platform-aware. */
 const SYMBOLS: Record<string, string> = {
@@ -57,10 +65,11 @@ function symbolizeCombo(combo: string): string {
  * renders one keycap per element (each element is itself symbolised).
  */
 const caps = computed<string[]>(() => {
-  if (Array.isArray(props.keys)) {
-    return props.keys.map(symbolizeCombo).filter(Boolean);
+  const keys = resolvedKeys.value;
+  if (Array.isArray(keys)) {
+    return keys.map(symbolizeCombo).filter(Boolean);
   }
-  const combo = symbolizeCombo(props.keys);
+  const combo = symbolizeCombo(keys);
   return combo ? [combo] : [];
 });
 

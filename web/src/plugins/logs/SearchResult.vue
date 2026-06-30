@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip
             :content="searchObj.meta.showFields ? 'Collapse Fields' : 'Open Fields'"
             side="bottom"
-            shortcut="ctrl+/"
+            shortcut-id="logsToggleSidebar"
           />
         </OButton>
         <div

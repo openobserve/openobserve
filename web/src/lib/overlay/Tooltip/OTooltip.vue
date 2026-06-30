@@ -121,7 +121,11 @@ const contentClasses = computed(() => [
         >
           <span class="tw:inline-flex tw:items-center tw:gap-1.5">
             <slot name="content">{{ content }}</slot>
-            <OShortcut v-if="shortcut" :keys="shortcut" />
+            <OShortcut
+              v-if="shortcut || shortcutId"
+              :keys="shortcut"
+              :id="shortcutId"
+            />
           </span>
           <TooltipArrow
             :width="10"
@@ -160,7 +164,11 @@ const contentClasses = computed(() => [
           >
             <span class="tw:inline-flex tw:items-center tw:gap-1.5">
               <slot name="content">{{ content }}</slot>
-              <OShortcut v-if="shortcut" :keys="shortcut" />
+              <OShortcut
+              v-if="shortcut || shortcutId"
+              :keys="shortcut"
+              :id="shortcutId"
+            />
             </span>
             <TooltipArrow
               :width="10"

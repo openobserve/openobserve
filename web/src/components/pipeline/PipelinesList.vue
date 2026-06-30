@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip
                 side="bottom"
                 :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                :shortcut="row.enabled ? 'p' : undefined"
+                :shortcut-id="row.enabled ? 'pipelinesRowPause' : undefined"
               />
             </OButton>
             <OButton
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="editPipeline(row)"
               icon-left="edit"
             >
-              <OTooltip side="bottom" :content="t('alerts.edit')" shortcut="e" />
+              <OTooltip side="bottom" :content="t('alerts.edit')" shortcut-id="pipelinesRowEdit" />
             </OButton>
             <!-- Hidden proxies so the row-hover shortcuts reach the more-menu
                  actions (teleported out of the row): x = export, Del = delete. -->
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <ODropdownItem
                 :data-test="`pipeline-list-${row.name}-export-action`"
-                shortcut="x"
+                shortcut-id="pipelinesRowExport"
                 @select="exportPipeline(row)"
               >
                 <template #icon-left>
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownSeparator />
               <ODropdownItem
                 :data-test="`pipeline-list-${row.name}-delete-pipeline`"
-                shortcut="del"
+                shortcut-id="pipelinesRowDelete"
                 @select="openDeleteDialog(row)"
                 variant="destructive"
               >

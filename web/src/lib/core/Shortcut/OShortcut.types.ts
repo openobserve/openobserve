@@ -15,8 +15,16 @@ export interface ShortcutProps {
    *    single keycap (`⌘↵`, `⌘⇧A`, `?`).
    *  - an array — one keycap per element (`["g", "l"]` → `G` `L`); each element
    *    is itself symbolised, so pre-symbolised values pass through unchanged.
+   *
+   * Optional when `id` is given (the keys are then resolved from the registry).
    */
-  keys: string | string[];
+  keys?: string | string[];
+  /**
+   * Registry shortcut id — resolves the keys from `shortcutRegistry.ts` (the
+   * single source of truth) so a key change there updates this keycap too.
+   * Ignored when `keys` is provided.
+   */
+  id?: string;
   /** Keycap size. Default: `"sm"` */
   size?: ShortcutSize;
 }

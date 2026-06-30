@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-list-refresh"
                 @click="getDashboards"
               >
-                <OTooltip side="bottom" :content="t('dashboard.reloadDashboards')" shortcut="r" />
+                <OTooltip side="bottom" :content="t('dashboard.reloadDashboards')" shortcut-id="dashboardsListRefresh" />
               </OButton>
             </template>
             <template #cell-name="{ row, value }">

@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-panel-data-view-query-inspector-btn"
               icon-left="info-outline"
             >
-              <OTooltip side="left" align="center" content="Query Inspector" shortcut="i" />
+              <OTooltip side="left" align="center" content="Query Inspector" shortcut-id="panelEditorQueryInspector" />
             </OButton>
             <DateTimePickerDashboard
               v-if="selectedDate"
