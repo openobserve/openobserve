@@ -515,14 +515,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       </div>
 
-      <!-- Right rail: hotspot cards -->
+      <!-- Right rail: hotspot cards. Fills the rail height and splits it across
+           the three cards (each scrolls internally) so the rail itself never
+           scrolls — no second scrollbar. -->
       <aside
-        class="tw:flex tw:flex-col tw:gap-[0.625rem] tw:min-h-0 tw:overflow-y-auto tw:pb-[0.625rem]"
+        class="tw:flex tw:flex-col tw:gap-[0.625rem] tw:min-h-0 tw:overflow-hidden tw:pb-[0.625rem]"
         data-test="session-rail"
       >
         <!-- Tool Hotspots (by time + calls; cost pending backend attribution) -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-shrink-0">
-          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)]">
+        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
             <OIcon name="build" size="xs" class="tw:text-[var(--o2-text-muted)]" />
             <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
               {{ t('traces.sessionDetail.rail.toolHotspots') }}
@@ -536,7 +538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-else-if="toolHotspots.length"
-            class="tw:max-h-[13rem] tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]"
+            class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]"
           >
             <TurnPreviewCard
               v-for="(row, i) in toolHotspots"
@@ -555,12 +557,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="tw:text-[0.72rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:flex-1 tw:min-w-0 tw:truncate" :title="row.name">
                   {{ row.name }}
                 </span>
-                <span class="tw:flex tw:flex-col tw:items-end tw:min-w-[3.5rem]">
-                  <span class="tw:text-[0.7rem] tw:font-semibold tw:tabular-nums tw:text-[var(--o2-text-secondary)]">
+                <span class="tw:flex tw:items-center tw:gap-[0.3rem] tw:text-[0.7rem] tw:tabular-nums tw:flex-shrink-0">
+                  <span class="tw:font-semibold tw:text-[var(--o2-text-secondary)]">
                     {{ formatDuration(row.duration) }}
                   </span>
-                  <span class="tw:text-[0.6rem] tw:tabular-nums tw:text-[var(--o2-text-muted)]">
-                    {{ t(row.calls === 1 ? 'traces.sessionDetail.rail.call' : 'traces.sessionDetail.rail.calls', { n: row.calls }) }}
+                  <span class="tw:text-[var(--o2-text-muted)]">
+                    · {{ t(row.calls === 1 ? 'traces.sessionDetail.rail.call' : 'traces.sessionDetail.rail.calls', { n: row.calls }) }}
                   </span>
                 </span>
                 <OIcon name="chevron-right" size="xs" class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0" />
@@ -573,14 +575,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Cost Hotspots -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-shrink-0">
-          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)]">
+        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
             <OIcon name="trending-up" size="xs" class="tw:text-[var(--o2-text-muted)]" />
             <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
               {{ t('traces.sessionDetail.rail.costHotspots') }}
             </span>
           </div>
-          <div class="tw:max-h-[13rem] tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
+          <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
             <TurnPreviewCard
               v-for="(row, i) in costHotspots"
               :key="row.n"
@@ -616,14 +618,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Slowest Turns -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-shrink-0">
-          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)]">
+        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
             <OIcon name="schedule" size="xs" class="tw:text-[var(--o2-text-muted)]" />
             <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
               {{ t('traces.sessionDetail.rail.slowestTurns') }}
             </span>
           </div>
-          <div class="tw:max-h-[13rem] tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
+          <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
             <TurnPreviewCard
               v-for="(row, i) in slowestTurns"
               :key="row.n"
