@@ -152,13 +152,19 @@ the Free Software Foundation, either version 3 of the License, or
             :auto-apply-dashboard="true"
             data-test="quality-time-range-picker"
           />
-          <ORefreshButton
-            :last-run-at="qualityLastRunAt"
-            :loading="qualityRefreshing"
-            :disabled="qualityRefreshing"
-            data-test="quality-refresh-btn"
-            @click="onQualityRefresh"
-          />
+          <!-- Bordered wrapper matches the Sessions / LLM Insights headers —
+               ORefreshButton renders no border of its own. -->
+          <div
+            class="tw:inline-flex tw:items-center tw:border tw:border-border-default tw:rounded-md tw:px-1 tw:h-[2rem] tw:overflow-hidden"
+          >
+            <ORefreshButton
+              :last-run-at="qualityLastRunAt"
+              :loading="qualityRefreshing"
+              :disabled="qualityRefreshing"
+              data-test="quality-refresh-btn"
+              @click="onQualityRefresh"
+            />
+          </div>
         </template>
       </AppPageHeader>
 
@@ -180,12 +186,15 @@ the Free Software Foundation, either version 3 of the License, or
           <QualityPage
             v-if="activeTab === 'quality'"
             ref="qualityPageRef"
-            v-model:agent-key="qualityAgentKey"
+            :agent-key="qualityAgentKey"
             :agent-options="qualityAgentOptions"
+            :agents-loading="qualityAgentsLoading"
             :date-window="qualityDateWindow"
             :agent-filter="selectedQualityAgent"
             :score-configs="scoreConfigs"
             :configs-loading="isLoading"
+            @update:agent-key="onQualityAgentChange"
+            @ready="reloadQuality"
           />
           <ScoreConfigList
             v-else-if="activeTab === 'scoreConfigs'"
@@ -348,7 +357,7 @@ the Free Software Foundation, either version 3 of the License, or
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeMount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeMount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -633,9 +642,16 @@ const selectedQualityAgent = computed<AgentFilterSelection | null>(() => {
   );
 });
 
+// True while the agent list is being fetched (the FIRST phase of reloadQuality,
+// before any quality data loader runs). QualityPage uses this to skeleton the
+// agent dropdown + the KPI/table so the page reads as "loading" from the very
+// start of a reload instead of looking idle until the data queries kick in.
+const qualityAgentsLoading = ref(false);
+
 async function loadQualityAgents() {
   const { startUs, endUs } = qualityDateWindow.value;
   if (!orgId.value || !startUs || !endUs) return;
+  qualityAgentsLoading.value = true;
   try {
     const response = await genAiAgentMappingService.listAgents(
       orgId.value,
@@ -655,6 +671,8 @@ async function loadQualityAgents() {
     console.warn("Failed to load GenAI agents", err);
     qualityAgents.value = [];
     qualityAgentKey.value = ALL_AGENTS_VALUE;
+  } finally {
+    qualityAgentsLoading.value = false;
   }
 }
 
@@ -671,65 +689,75 @@ function syncQualityDateWindow() {
   }
 }
 
-// LocalStorage persistence is handled inside the composable now. This watch
-// only forwards the change into the absolute `dateWindow` the QualityPage
-// reads as a prop. No deep flag: DateTimePickerDashboard's
-// `update:modelValue` emits a brand-new object on every commit, so the
-// top-level ref identity changes and this watch fires.
-watch(qualitySelectedDate, () => {
-  syncQualityDateWindow();
-});
+// ── Quality reload orchestration ─────────────────────────────────────────
+// ONE path drives every quality fetch. Exactly three triggers reload
+// everything (agent list + KPIs + table + charts):
+//   1. The Quality page mounts            → @ready
+//   2. The user clicks Refresh            → onQualityRefresh
+//   3. The date-time window changes       → watch(qualitySelectedDate)
+// All three run the SAME sequence: re-anchor the window from the picker, load
+// the agent list FIRST, then load the quality data — so the agent filter is
+// always populated before the data it scopes is fetched.
+//
+// Changing the agent filter is a data-only reload (the agent list itself is
+// unchanged) and is handled separately by onQualityAgentChange below.
+const qualityReloading = ref(false);
 
-watch(
-  qualityDateWindow,
-  () => {
-    void loadQualityAgents();
-  },
-  { immediate: true },
-);
-
-watch(orgId, () => {
-  qualityAgentKey.value = ALL_AGENTS_VALUE;
-  void loadQualityAgents();
-});
-
-// Aggregated "is any quality query in flight" — exposed by QualityPage so the
-// Refresh button can show its spinner regardless of which loader is running.
-const qualityRefreshing = computed(
-  () => qualityPageRef.value?.isAnyLoading ?? false,
-);
-
-// Last-refresh timestamp for the header's ORefreshButton — stamped when the
-// quality loaders settle (true → false), mirroring the Sessions / LLM Insights
-// pages so the button shows "last refreshed …".
-const qualityLastRunAt = ref<number | null>(null);
-watch(qualityRefreshing, (isLoading, wasLoading) => {
-  if (wasLoading && !isLoading) qualityLastRunAt.value = Date.now();
-});
-
-// Manual refresh: re-anchor the window from the picker (so relative ranges
-// like "Past 15 minutes" advance to "now") and let the QualityPage watch on
-// `dateWindow` drive the actual refetch. We deliberately don't call
-// `qualityPageRef.refreshAll()` here — `syncQualityDateWindow` always
-// assigns a fresh `{startUs,endUs}` object, so the prop's ref identity
-// changes and the watch fires. Calling refreshAll() explicitly on top of
-// that would race two concurrent loads on every Refresh click.
-function onQualityRefresh() {
-  if (qualityDatePickerRef.value) {
+async function reloadQuality() {
+  qualityReloading.value = true;
+  try {
+    // On the @ready trigger this runs from QualityPage's onMounted; wait a
+    // tick so the parent's `qualityPageRef` is guaranteed assigned before we
+    // call into it.
+    await nextTick();
     syncQualityDateWindow();
-  } else {
-    // Picker isn't mounted (shouldn't happen — button + picker render
-    // together for the quality tab — but cover the race during initial
-    // teardown). Run the refresh directly so the click isn't lost.
-    void qualityPageRef.value?.refreshAll?.();
+    await loadQualityAgents();
+    await qualityPageRef.value?.refreshAll?.();
+  } finally {
+    qualityReloading.value = false;
   }
 }
 
-// Sync the initial dateWindow once the picker mounts (it only mounts while
-// the Quality tab is active). Without this the first render uses the
-// 7-day default instead of the user's persisted/picked range.
-watch(qualityDatePickerRef, (next) => {
-  if (next) syncQualityDateWindow();
+// Trigger 2 — Refresh button. Re-anchors relative ranges ("Past 15 minutes")
+// to "now" via the shared reload path.
+function onQualityRefresh() {
+  void reloadQuality();
+}
+
+// Trigger 3 — date-time change. DateTimePickerDashboard emits
+// `update:modelValue` (→ qualitySelectedDate) only on an actual commit, so
+// this fires once per user change, never on mount.
+watch(qualitySelectedDate, () => {
+  void reloadQuality();
+});
+
+// Org switch — reset the agent filter and reload from scratch.
+watch(orgId, () => {
+  qualityAgentKey.value = ALL_AGENTS_VALUE;
+  void reloadQuality();
+});
+
+// User picked a different agent — only the data needs refetching; the agent
+// list is unchanged. Driven explicitly from the dropdown's update event (not a
+// watch on the key) so the programmatic reset inside loadQualityAgents()
+// during reloadQuality() never double-fires a data reload.
+function onQualityAgentChange(key: string) {
+  qualityAgentKey.value = key;
+  void qualityPageRef.value?.refreshAll?.();
+}
+
+// Aggregated "is a quality reload in flight" — covers the agent-load phase
+// plus every in-flight QualityPage loader, so the Refresh button spins from
+// click to settle.
+const qualityRefreshing = computed(
+  () => qualityReloading.value || (qualityPageRef.value?.isAnyLoading ?? false),
+);
+
+// Last-refresh timestamp for the header's ORefreshButton — stamped when a
+// reload settles (true → false), mirroring the Sessions / LLM Insights pages.
+const qualityLastRunAt = ref<number | null>(null);
+watch(qualityRefreshing, (isLoading, wasLoading) => {
+  if (wasLoading && !isLoading) qualityLastRunAt.value = Date.now();
 });
 
 const currentSingularLabel = computed(() =>

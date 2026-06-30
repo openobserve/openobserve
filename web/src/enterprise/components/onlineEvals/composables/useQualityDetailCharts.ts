@@ -324,13 +324,14 @@ export function useQualityDetailCharts(
     }
   }
 
-  watch(
-    [selectedConfig, dateWindow, agentFilter ?? ref(null)],
-    () => {
-      void refresh();
-    },
-    { immediate: true },
-  );
+  // Only opening the drawer on a row (selectedConfig change) refreshes from
+  // here. Date-window / agent-filter changes are driven by the page's
+  // refreshAll(), so watching them here would double-fire the chart queries
+  // alongside the KPI/table reload. No `immediate`: the initial load is
+  // covered by refreshAll() too.
+  watch(selectedConfig, () => {
+    void refresh();
+  });
 
   return {
     isLoading,

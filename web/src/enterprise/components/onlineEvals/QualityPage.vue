@@ -4,7 +4,18 @@
          sits with the KPIs + table it scopes (matches LLM Insights). -->
     <div class="tw:flex tw:items-center tw:justify-end tw:px-4">
       <div class="tw:w-[14rem] tw:flex-shrink-0">
+        <!-- While the agent list is loading we swap the select for a skeleton
+             of the same height so the control reads as "loading" (and can't be
+             opened on an empty list) instead of showing an empty dropdown. -->
+        <SkeletonBox
+          v-if="agentsLoading"
+          width="100%"
+          height="2.125rem"
+          rounded
+          data-test="quality-agent-filter-skeleton"
+        />
         <OSelect
+          v-else
           v-model="agentModel"
           label="Agent"
           label-position="inside"
@@ -38,7 +49,7 @@
     <div class="quality-page__tier2">
       <QualityScoreConfigsTable
         :rows="configRows"
-        :is-loading="isConfigsLoading || !!configsLoading"
+        :is-loading="isConfigsLoading || !!configsLoading || !!agentsLoading"
         @select="selectConfig"
         @refresh="refreshAll"
       />
@@ -109,6 +120,7 @@ import QualityScoreConfigsTable from "./quality/QualityScoreConfigsTable.vue";
 import QualityDetailPanel from "./quality/QualityDetailPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import type { AgentFilterSelection } from "./utils/agentFilterSql";
 
 const props = defineProps<{
@@ -128,10 +140,19 @@ const props = defineProps<{
   // Data" before its own skeleton kicks in. OR-ing this into the table's
   // loading flag keeps the skeleton up from the very first paint.
   configsLoading?: boolean;
+  // True during the agent-list fetch (first phase of the parent's reload).
+  // Drives the agent-dropdown skeleton plus the KPI/table skeletons so the
+  // whole page reads as "loading" from the start of a reload, not just once
+  // the data queries begin.
+  agentsLoading?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "update:agentKey", value: string): void;
+  // Fired once after mount so the parent can run the agents-first reload. The
+  // parent owns every reload trigger (mount / refresh / date / agent) — this
+  // page no longer self-loads on mount or on prop changes.
+  (e: "ready"): void;
 }>();
 
 const agentModel = computed<string>({
@@ -239,25 +260,23 @@ defineExpose({ refreshAll, isAnyLoading });
 
 /** Show the KPI skeleton whenever the KPI queries are running — on the initial
  * load AND on every refresh — matching the rest of the app (e.g. LLM Insights),
- * so a refresh gives clear feedback instead of leaving the cards frozen. */
-const showKpiSkeleton = computed(() => isLoading.value);
+ * so a refresh gives clear feedback instead of leaving the cards frozen. Also
+ * shown during the agent-list fetch (the phase before the KPI query starts) so
+ * the page reads as loading from the very start of a reload. */
+const showKpiSkeleton = computed(() => isLoading.value || !!props.agentsLoading);
 
+// The parent (OnlineEvals) owns every reload trigger — mount, refresh button,
+// date-time change, and agent change — and calls `refreshAll()` / `refreshConfigs()`
+// via the exposed handle. This page only signals readiness; it does NOT watch
+// `dateWindow`/`agentFilter` (doing so re-introduced the duplicate fetches that
+// fired once from here and again from the parent's reload).
 onMounted(() => {
-  void refreshAll();
+  emit("ready");
 });
 
-// No deep flag: the parent (OnlineEvals) always assigns a fresh
-// `{startUs,endUs}` object via `qualityDateWindow.value = …`, so the ref's
-// identity changes and the top-level watch already fires. Deep traversal
-// would just walk two numeric leaves on every change for no benefit.
-watch(dateWindowRef, () => {
-  void refreshAll();
-});
-
-watch(agentFilterRef, () => {
-  void refreshAll();
-});
-
+// The score-configs list arrives asynchronously from the parent's `loadAll()`,
+// often AFTER the initial reload has run against an empty list. Re-run just the
+// table aggregate when it lands so the rows populate.
 watch(scoreConfigsRef, () => {
   void refreshConfigs();
 });
