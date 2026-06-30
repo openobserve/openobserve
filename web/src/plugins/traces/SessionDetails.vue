@@ -231,6 +231,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ chip.label }}</span>
               </TurnPreviewCard>
             </template>
+            <OButton
+              v-if="card.filterErrors"
+              variant="outline-destructive"
+              size="xs"
+              icon-left="filter-alt"
+              data-test="session-detail-filter-errors"
+              @click="filterToErrors"
+            >
+              {{ t('traces.sessionDetail.kpiSub.filterErrors') }}
+            </OButton>
             <span v-if="card.subTail">{{ card.subTail }}</span>
           </div>
         </div>
@@ -862,6 +872,9 @@ const kpiCards = computed<
     subTail: string;
     variant?: "danger";
     estimate?: boolean;
+    /** Errors tile: show a "Filter Errors" button instead of per-turn chips
+     *  when there are too many error turns to list as chips. */
+    filterErrors?: boolean;
   }[]
 >(() => {
   const d = detail.value;
@@ -895,13 +908,24 @@ const kpiCards = computed<
       // Red only when the majority of turns failed (> 50% error rate); below
       // that the tile stays neutral so the colour means "this session broke".
       variant: s.errRate > 50 ? "danger" : undefined,
-      subLead: s.errors
-        ? t("traces.sessionDetail.kpiSub.errorsLead", {
-            errors: s.errors,
-            total: d.turns,
-          })
-        : t("traces.sessionDetail.kpiSub.errorsNone", { total: d.turns }),
-      subTurns: s.errorTurnNums.map((n) => ({ n, label: String(n) })),
+      // Up to 3 error turns → jump chips. More than that → a "Filter Errors"
+      // button (chips would be an overwhelming wall of numbers).
+      subLead: !s.errors
+        ? t("traces.sessionDetail.kpiSub.errorsNone", { total: d.turns })
+        : s.errors > 3
+          ? t("traces.sessionDetail.kpiSub.errorsLeadMany", {
+              errors: s.errors,
+              total: d.turns,
+            })
+          : t("traces.sessionDetail.kpiSub.errorsLead", {
+              errors: s.errors,
+              total: d.turns,
+            }),
+      subTurns:
+        s.errors > 3
+          ? []
+          : s.errorTurnNums.map((n) => ({ n, label: String(n) })),
+      filterErrors: s.errors > 3,
       subTail: "",
     },
     {
@@ -1313,6 +1337,21 @@ function jumpToTurn(n: number) {
     setTimeout(() => {
       if (flashTurn.value === n) flashTurn.value = null;
     }, 1400);
+  });
+}
+
+// "Filter Errors" (Errors KPI, > 3 errors): narrow the conversation to error
+// turns and scroll the list into view instead of listing every error number.
+function filterToErrors() {
+  searchText.value = "";
+  modelFilter.value = "all";
+  sortKey.value = "turn";
+  sortDir.value = "asc";
+  statusFilter.value = "error";
+  nextTick(() => {
+    document
+      .querySelector('[data-test="session-conversation-panel"]')
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   });
 }
 

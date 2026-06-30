@@ -4153,6 +4153,8 @@
       "kpiSub": {
         "turns": "Complete Session · {duration}",
         "errorsLead": "{errors} of {total} · Turns",
+        "errorsLeadMany": "{errors} of {total} Turns Failed",
+        "filterErrors": "Filter Errors",
         "errorsNone": "No Errors · {total} Turns",
         "latencyLead": "Slowest {slowest} ·",
         "costLead": "Peak {peak} ·",
