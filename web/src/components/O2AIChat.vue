@@ -2799,7 +2799,7 @@ export default defineComponent({
                     continue;
                   }
 
-                  // Handle message content (type === 'message' or legacy format with just content)
+                  // Handle streamed deltas and full/legacy message content.
                   if (data && typeof data.content === "string") {
                     // Complete any active tool call first (add green checkmark to chat)
                     if (activeToolCall.value) {
@@ -2821,26 +2821,33 @@ export default defineComponent({
                       if (isActive()) activeToolCall.value = null;
                     }
 
-                    // Format code blocks with proper line breaks
-                    let content = data.content;
-                    content = content.replace(
-                      /```(\w*)\s*([^`])/g,
-                      "```$1\n$2",
-                    );
-                    content = content.replace(/([^`])\s*```/g, "$1\n```");
+                    const isMessageDelta = data.type === "message_delta";
 
-                    // Add newline separator if starting a new text segment after tool call
-                    if (streamingMsg && textSegment === "") {
-                      streamingMsg += "\n\n";
+                    // Format code blocks with proper line breaks for full/legacy
+                    // messages. Deltas must be appended exactly as received.
+                    let content = data.content;
+                    if (!isMessageDelta) {
+                      content = content.replace(
+                        /```(\w*)\s*([^`])/g,
+                        "```$1\n$2",
+                      );
+                      content = content.replace(/([^`])\s*```/g, "$1\n```");
                     }
-                    // Add newline between consecutive message events if needed
-                    else if (
-                      streamingMsg &&
-                      !streamingMsg.endsWith("\n") &&
-                      !content.startsWith("\n")
-                    ) {
-                      streamingMsg += "\n\n";
-                      textSegment += "\n\n";
+
+                    if (!isMessageDelta) {
+                      // Add newline separator if starting a new text segment after tool call
+                      if (streamingMsg && textSegment === "") {
+                        streamingMsg += "\n\n";
+                      }
+                      // Add newline between consecutive full/legacy message events if needed
+                      else if (
+                        streamingMsg &&
+                        !streamingMsg.endsWith("\n") &&
+                        !content.startsWith("\n")
+                      ) {
+                        streamingMsg += "\n\n";
+                        textSegment += "\n\n";
+                      }
                     }
 
                     // Accumulate to both total content and current segment
@@ -3207,7 +3214,7 @@ export default defineComponent({
                   continue;
                 }
 
-                // Handle message content
+                // Handle streamed deltas and full/legacy message content.
                 if (data && typeof data.content === "string") {
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
@@ -3228,19 +3235,25 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
-                  let content = data.content;
-                  content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
-                  content = content.replace(/([^`])\s*```/g, "$1\n```");
+                  const isMessageDelta = data.type === "message_delta";
 
-                  if (streamingMsg && textSegment === "") {
-                    streamingMsg += "\n\n";
-                  } else if (
-                    streamingMsg &&
-                    !streamingMsg.endsWith("\n") &&
-                    !content.startsWith("\n")
-                  ) {
-                    streamingMsg += "\n\n";
-                    textSegment += "\n\n";
+                  let content = data.content;
+                  if (!isMessageDelta) {
+                    content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
+                    content = content.replace(/([^`])\s*```/g, "$1\n```");
+                  }
+
+                  if (!isMessageDelta) {
+                    if (streamingMsg && textSegment === "") {
+                      streamingMsg += "\n\n";
+                    } else if (
+                      streamingMsg &&
+                      !streamingMsg.endsWith("\n") &&
+                      !content.startsWith("\n")
+                    ) {
+                      streamingMsg += "\n\n";
+                      textSegment += "\n\n";
+                    }
                   }
 
                   streamingMsg += content;
