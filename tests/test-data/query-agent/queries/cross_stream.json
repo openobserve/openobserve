@@ -777,6 +777,2720 @@
         ],
         "results_mode": "rowsort"
       }
+    },
+    {
+      "id": "Q672",
+      "sql": "SELECT a.pallet_id AS pallet_a, b.pallet_id AS pallet_b, c.pallet_id AS pallet_c, a.throughput_rate AS rate_a, b.throughput_rate AS rate_b, c.load_factor AS load_c FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone JOIN \"{stream}\" c ON a.control_center = c.control_center AND a.pallet_id != c.pallet_id WHERE a.throughput_rate > 300 ORDER BY a.throughput_rate DESC LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 40259000000,
+        "end_offset": 40333000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_a",
+          "pallet_b",
+          "pallet_c",
+          "rate_a",
+          "rate_b",
+          "load_c"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "PL-005",
+            "PL-005",
+            "555.0",
+            "900.0",
+            "67.9"
+          ],
+          [
+            "PL-001",
+            "PL-001",
+            "PL-005",
+            "555.0",
+            "320.0",
+            "67.9"
+          ],
+          [
+            "PL-005",
+            "PL-001",
+            "PL-001",
+            "320.0",
+            "320.0",
+            "72.8"
+          ],
+          [
+            "PL-005",
+            "PL-005",
+            "PL-001",
+            "320.0",
+            "900.0",
+            "72.8"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q673",
+      "sql": "SELECT a.component_name, a.region_code, b.region_code AS region_b, COUNT(*) AS join_cnt, AVG(CAST(a.latency_ms AS FLOAT)) AS avg_lat_a, AVG(CAST(b.latency_ms AS FLOAT)) AS avg_lat_b FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone AND a.operation_mode = b.operation_mode GROUP BY a.component_name, a.region_code, b.region_code ORDER BY join_cnt DESC LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 40319000000,
+        "end_offset": 40393000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "region_code",
+          "region_b",
+          "join_cnt",
+          "avg_lat_a",
+          "avg_lat_b"
+        ],
+        "results": [
+          [
+            "scan-hub",
+            "EU-WEST",
+            "EU-WEST",
+            "1",
+            "45.0",
+            "45.0"
+          ],
+          [
+            "zone-controller",
+            "US-WEST",
+            "AP-EAST",
+            "1",
+            "12.0",
+            "89.0"
+          ],
+          [
+            "conveyor-driver",
+            "US-EAST",
+            "AP-SOUTH",
+            "1",
+            "15.0",
+            "1450.0"
+          ],
+          [
+            "batch-sync",
+            "AP-SOUTH",
+            "EU-WEST",
+            "1",
+            "1450.0",
+            "45.0"
+          ],
+          [
+            "track-router",
+            "EU-NORTH",
+            "US-WEST",
+            "1",
+            "230.0",
+            "12.0"
+          ],
+          [
+            "track-router",
+            "EU-NORTH",
+            "EU-NORTH",
+            "1",
+            "230.0",
+            "230.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q674",
+      "sql": "SELECT a.org_name, a.site_name, b.org_name AS org_b, a.throughput_rate, b.load_factor, a.cell_temp, b.cell_temp AS temp_b FROM \"{stream}\" a LEFT JOIN \"{stream2}\" b ON a.control_center = b.control_center AND a.conveyor_lane = b.conveyor_lane WHERE a.throughput_rate > 200 ORDER BY a.throughput_rate DESC, b.load_factor ASC NULLS LAST LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 40379000000,
+        "end_offset": 40453000000
+      },
+      "expected": {
+        "columns": [
+          "org_name",
+          "site_name",
+          "org_b",
+          "throughput_rate",
+          "load_factor",
+          "cell_temp",
+          "temp_b"
+        ],
+        "results": [
+          [
+            "warehouse-west",
+            "site-dub-07",
+            "warehouse-west",
+            "840.0",
+            "33.0",
+            "40.0",
+            "40.0"
+          ],
+          [
+            "warehouse-west",
+            "site-dub-07",
+            "warehouse-south",
+            "840.0",
+            "72.8",
+            "40.0",
+            "22.0"
+          ],
+          [
+            "warehouse-east",
+            "site-ber-06",
+            "warehouse-east",
+            "725.0",
+            "12.5",
+            "32.5",
+            "32.5"
+          ],
+          [
+            "warehouse-east",
+            "site-ber-06",
+            "warehouse-north",
+            "725.0",
+            "55.2",
+            "32.5",
+            "18.5"
+          ],
+          [
+            "warehouse-east",
+            "site-ber-06",
+            "warehouse-central",
+            "725.0",
+            "88.1",
+            "32.5",
+            "26.3"
+          ],
+          [
+            "warehouse-central",
+            "site-sfo-05",
+            "warehouse-west",
+            "610.0",
+            "33.0",
+            "28.9",
+            "40.0"
+          ],
+          [
+            "warehouse-central",
+            "site-sfo-05",
+            "warehouse-south",
+            "610.0",
+            "72.8",
+            "28.9",
+            "22.0"
+          ],
+          [
+            "warehouse-south",
+            "site-mum-09",
+            "warehouse-west",
+            "555.0",
+            "33.0",
+            "22.0",
+            "40.0"
+          ],
+          [
+            "warehouse-south",
+            "site-mum-09",
+            "warehouse-south",
+            "555.0",
+            "72.8",
+            "22.0",
+            "22.0"
+          ],
+          [
+            "warehouse-north",
+            "site-sin-08",
+            "warehouse-east",
+            "290.0",
+            "12.5",
+            "18.5",
+            "32.5"
+          ],
+          [
+            "warehouse-north",
+            "site-sin-08",
+            "warehouse-north",
+            "290.0",
+            "55.2",
+            "18.5",
+            "18.5"
+          ],
+          [
+            "warehouse-north",
+            "site-sin-08",
+            "warehouse-central",
+            "290.0",
+            "88.1",
+            "18.5",
+            "26.3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q675",
+      "sql": "SELECT a._timestamp, a.pallet_id, a.facility_zone, a.throughput_rate FROM \"{stream}\" a WHERE EXISTS (SELECT 1 FROM \"{stream2}\" b WHERE b.facility_zone = a.facility_zone AND b.throughput_rate > a.throughput_rate) ORDER BY a._timestamp ASC LIMIT 10",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 40439000000,
+        "end_offset": 40513000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "facility_zone",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "ZONE-3",
+            "555.0"
+          ],
+          [
+            "PL-004",
+            "ZONE-2",
+            "150.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q676",
+      "sql": "SELECT a.pallet_id, a.load_factor, a.operation_mode FROM \"{stream}\" a WHERE a.load_factor > (SELECT AVG(b.load_factor) FROM \"{stream2}\" b WHERE b.facility_zone = a.facility_zone) ORDER BY a.load_factor DESC LIMIT 10",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 40499000000,
+        "end_offset": 40573000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "load_factor",
+          "operation_mode"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "99.0",
+            "hybrid"
+          ],
+          [
+            "PL-005",
+            "94.6",
+            "manual"
+          ],
+          [
+            "PL-004",
+            "45.3",
+            "auto"
+          ],
+          [
+            "PL-006",
+            "45.3",
+            "hybrid"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q677",
+      "sql": "SELECT a.component_name, a.latency_ms FROM \"{stream}\" a WHERE NOT EXISTS (SELECT 1 FROM \"{stream2}\" b WHERE b.component_name = a.component_name AND b.latency_ms < a.latency_ms) ORDER BY a.latency_ms DESC LIMIT 10",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 40559000000,
+        "end_offset": 40633000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "batch-sync",
+            "1450"
+          ],
+          [
+            "lane-monitor",
+            "567"
+          ],
+          [
+            "track-router",
+            "230"
+          ],
+          [
+            "track-router",
+            "230"
+          ],
+          [
+            "pallet-mapper",
+            "89"
+          ],
+          [
+            "pallet-mapper",
+            "89"
+          ],
+          [
+            "scan-hub",
+            "45"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q678",
+      "sql": "SELECT facility_zone, pallet_id, throughput_rate FROM \"{stream}\" WHERE facility_zone IN (SELECT facility_zone FROM \"{stream2}\" WHERE load_factor > 50.0) ORDER BY throughput_rate DESC LIMIT 12",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 40619000000,
+        "end_offset": 40693000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "pallet_id",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "PL-003",
+            "900.0"
+          ],
+          [
+            "ZONE-1",
+            "PL-007",
+            "840.0"
+          ],
+          [
+            "ZONE-3",
+            "PL-001",
+            "555.0"
+          ],
+          [
+            "ZONE-2",
+            "PL-008",
+            "290.0"
+          ],
+          [
+            "ZONE-4",
+            "PL-006",
+            "290.0"
+          ],
+          [
+            "ZONE-4",
+            "PL-002",
+            "190.0"
+          ],
+          [
+            "ZONE-2",
+            "PL-004",
+            "190.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q679",
+      "sql": "SELECT control_center, sorter_model FROM \"{stream}\" WHERE control_center NOT IN (SELECT control_center FROM \"{stream2}\" WHERE throughput_rate < 200.0) GROUP BY control_center, sorter_model ORDER BY control_center LIMIT 10",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 40679000000,
+        "end_offset": 40753000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "sorter_model"
+        ],
+        "results": [
+          [
+            "CC-BETA",
+            "SORT-X1"
+          ],
+          [
+            "CC-DELTA",
+            "SORT-M3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q680",
+      "sql": "SELECT a.operation_mode, a.facility_zone, COUNT(*) AS cnt FROM \"{stream}\" a WHERE a.conveyor_lane IN (SELECT b.conveyor_lane FROM \"{stream2}\" b WHERE b.charge_remaining > 40.0) GROUP BY a.operation_mode, a.facility_zone ORDER BY cnt DESC LIMIT 10",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 40739000000,
+        "end_offset": 40813000000
+      },
+      "expected": {
+        "columns": [
+          "operation_mode",
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "manual",
+            "ZONE-2",
+            "1"
+          ],
+          [
+            "hybrid",
+            "ZONE-3",
+            "1"
+          ],
+          [
+            "auto",
+            "ZONE-2",
+            "1"
+          ],
+          [
+            "manual",
+            "ZONE-1",
+            "1"
+          ],
+          [
+            "manual",
+            "ZONE-3",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q681",
+      "sql": "SELECT COALESCE(a.facility_zone, b.facility_zone) AS zone, a.throughput_rate AS rate_a, b.load_factor AS load_b, a.sorter_model, b.sorter_model AS sorter_b FROM \"{stream}\" a FULL OUTER JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone AND a.control_center = b.control_center ORDER BY zone LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 40799000000,
+        "end_offset": 40873000000
+      },
+      "expected": {
+        "columns": [
+          "zone",
+          "rate_a",
+          "load_b",
+          "sorter_model",
+          "sorter_b"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "840.0",
+            "72.8",
+            "SORT-M3",
+            "SORT-M3"
+          ],
+          [
+            "ZONE-1",
+            "555.0",
+            "72.8",
+            "SORT-M3",
+            "SORT-M3"
+          ],
+          [
+            "ZONE-2",
+            "290.0",
+            "88.1",
+            "SORT-Z9",
+            "SORT-Q5"
+          ],
+          [
+            "ZONE-2",
+            "290.0",
+            "55.2",
+            "SORT-Z9",
+            "SORT-Z9"
+          ],
+          [
+            "ZONE-3",
+            "555.0",
+            "33.0",
+            "SORT-X1",
+            "SORT-X1"
+          ],
+          [
+            "ZONE-3",
+            "555.0",
+            "94.6",
+            "SORT-X1",
+            "SORT-X1"
+          ],
+          [
+            "ZONE-3",
+            "840.0",
+            "33.0",
+            "SORT-X1",
+            "SORT-X1"
+          ],
+          [
+            "ZONE-3",
+            "840.0",
+            "94.6",
+            "SORT-X1",
+            "SORT-X1"
+          ],
+          [
+            "ZONE-4",
+            "725.0",
+            "88.1",
+            "SORT-A7",
+            "SORT-A7"
+          ],
+          [
+            "ZONE-4",
+            "725.0",
+            "55.2",
+            "SORT-A7",
+            "SORT-A7"
+          ],
+          [
+            "ZONE-4",
+            "190.0",
+            "55.2",
+            "SORT-A7",
+            "SORT-A7"
+          ],
+          [
+            "ZONE-4",
+            "190.0",
+            "88.1",
+            "SORT-A7",
+            "SORT-A7"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q682",
+      "sql": "SELECT COALESCE(a.component_name, b.component_name) AS comp, COALESCE(a.region_code, b.region_code) AS region, COUNT(a._timestamp) AS cnt_a, COUNT(b._timestamp) AS cnt_b FROM \"{stream}\" a FULL OUTER JOIN \"{stream2}\" b ON a.component_name = b.component_name AND a.scan_category = b.scan_category GROUP BY comp, region ORDER BY cnt_a DESC NULLS LAST LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 40859000000,
+        "end_offset": 40933000000
+      },
+      "expected": {
+        "columns": [
+          "comp",
+          "region",
+          "cnt_a",
+          "cnt_b"
+        ],
+        "results": [
+          [
+            "zone-controller",
+            "US-WEST",
+            "2",
+            "2"
+          ],
+          [
+            "conveyor-driver",
+            "US-EAST",
+            "2",
+            "2"
+          ],
+          [
+            "charge-checker",
+            "EU-CENTRAL",
+            "2",
+            "2"
+          ],
+          [
+            "sorter-engine",
+            "AP-CENTRAL",
+            "2",
+            "2"
+          ],
+          [
+            "temp-regulator",
+            "US-CENTRAL",
+            "1",
+            "0"
+          ],
+          [
+            "scan-hub",
+            "EU-WEST",
+            "0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q683",
+      "sql": "SELECT a.pallet_id AS pallet_a, b.pallet_id AS pallet_b, a.throughput_rate, b.load_factor, a.throughput_rate * b.load_factor AS combined_score FROM (SELECT pallet_id, throughput_rate, facility_zone FROM \"{stream}\" WHERE throughput_rate > 300 ORDER BY throughput_rate DESC LIMIT 5) a CROSS JOIN (SELECT pallet_id, load_factor, facility_zone FROM \"{stream2}\" WHERE load_factor > 40.0 ORDER BY load_factor DESC LIMIT 5) b WHERE a.facility_zone != b.facility_zone ORDER BY combined_score DESC LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 40919000000,
+        "end_offset": 40993000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_a",
+          "pallet_b",
+          "throughput_rate",
+          "load_factor",
+          "combined_score"
+        ],
+        "results": [
+          [
+            "PL-004",
+            "PL-005",
+            "725.0",
+            "99.0",
+            "71775.0"
+          ],
+          [
+            "PL-003",
+            "PL-005",
+            "610.0",
+            "99.0",
+            "60390.0"
+          ],
+          [
+            "PL-004",
+            "PL-003",
+            "725.0",
+            "67.9",
+            "49227.50000000001"
+          ],
+          [
+            "PL-002",
+            "PL-005",
+            "480.0",
+            "99.0",
+            "47520.0"
+          ],
+          [
+            "PL-005",
+            "PL-003",
+            "610.0",
+            "67.9",
+            "41419.0"
+          ],
+          [
+            "PL-002",
+            "PL-003",
+            "480.0",
+            "67.9",
+            "32592.000000000004"
+          ],
+          [
+            "PL-001",
+            "PL-003",
+            "320.0",
+            "67.9",
+            "21728.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q684",
+      "sql": "SELECT a.component_name, b.region_code, COUNT(*) AS pair_cnt FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.component_name != b.component_name WHERE a.latency_ms IS NOT NULL AND b.latency_ms IS NOT NULL GROUP BY a.component_name, b.region_code ORDER BY pair_cnt DESC LIMIT 12",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 40979000000,
+        "end_offset": 41053000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "region_code",
+          "pair_cnt"
+        ],
+        "results": [
+          [
+            "lane-monitor",
+            "US-CENTRAL",
+            "4"
+          ],
+          [
+            "batch-sync",
+            "US-CENTRAL",
+            "4"
+          ],
+          [
+            "batch-sync",
+            "AP-EAST",
+            "4"
+          ],
+          [
+            "lane-monitor",
+            "AP-EAST",
+            "4"
+          ],
+          [
+            "lane-monitor",
+            "AP-SOUTH",
+            "2"
+          ],
+          [
+            "pallet-mapper",
+            "US-CENTRAL",
+            "2"
+          ],
+          [
+            "batch-sync",
+            "EU-CENTRAL",
+            "2"
+          ],
+          [
+            "lane-monitor",
+            "EU-CENTRAL",
+            "2"
+          ],
+          [
+            "track-router",
+            "US-CENTRAL",
+            "2"
+          ],
+          [
+            "temp-regulator",
+            "AP-EAST",
+            "2"
+          ],
+          [
+            "track-router",
+            "AP-EAST",
+            "2"
+          ],
+          [
+            "batch-sync",
+            "SA-EAST",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q685",
+      "sql": "SELECT a.facility_zone, a.pallet_id, a.throughput_rate, b.load_factor, RANK() OVER (PARTITION BY a.facility_zone ORDER BY a.throughput_rate DESC) AS rank_in_zone FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone AND a.control_center = b.control_center ORDER BY a.facility_zone, rank_in_zone LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41039000000,
+        "end_offset": 41113000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "pallet_id",
+          "throughput_rate",
+          "load_factor",
+          "rank_in_zone"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "PL-007",
+            "900.0",
+            "94.6",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "PL-003",
+            "555.0",
+            "94.6",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "PL-004",
+            "190.0",
+            "45.3",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "PL-004",
+            "190.0",
+            "88.1",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "PL-005",
+            "900.0",
+            "67.9",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "PL-005",
+            "900.0",
+            "72.8",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "PL-001",
+            "555.0",
+            "67.9",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "PL-001",
+            "555.0",
+            "72.8",
+            "3"
+          ],
+          [
+            "ZONE-4",
+            "PL-002",
+            "290.0",
+            "45.3",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "PL-002",
+            "290.0",
+            "88.1",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "PL-006",
+            "150.0",
+            "45.3",
+            "3"
+          ],
+          [
+            "ZONE-4",
+            "PL-006",
+            "150.0",
+            "88.1",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q686",
+      "sql": "SELECT a.component_name, AVG(CAST(a.latency_ms AS FLOAT)) AS avg_lat_a, AVG(CAST(b.latency_ms AS FLOAT)) AS avg_lat_b, AVG(CAST(a.latency_ms AS FLOAT)) - AVG(CAST(b.latency_ms AS FLOAT)) AS diff FROM \"{stream}\" a LEFT JOIN \"{stream2}\" b ON a.component_name = b.component_name AND a.region_code = b.region_code WHERE a.latency_ms IS NOT NULL GROUP BY a.component_name ORDER BY ABS(diff) DESC LIMIT 12",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41099000000,
+        "end_offset": 41173000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "avg_lat_a",
+          "avg_lat_b",
+          "diff"
+        ],
+        "results": [
+          [
+            "scan-hub",
+            "45.0",
+            "45.0",
+            "0.0"
+          ],
+          [
+            "zone-controller",
+            "12.0",
+            "12.0",
+            "0.0"
+          ],
+          [
+            "conveyor-driver",
+            "15.0",
+            "15.0",
+            "0.0"
+          ],
+          [
+            "track-router",
+            "230.0",
+            "230.0",
+            "0.0"
+          ],
+          [
+            "sorter-engine",
+            "1900.0",
+            "None",
+            "None"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q687",
+      "sql": "WITH zone_stats AS (SELECT facility_zone, AVG(throughput_rate) AS avg_rate, MAX(throughput_rate) AS max_rate FROM \"{stream}\" GROUP BY facility_zone), zone_stats2 AS (SELECT facility_zone, AVG(load_factor) AS avg_load, MIN(load_factor) AS min_load FROM \"{stream2}\" GROUP BY facility_zone) SELECT z.facility_zone, z.avg_rate, z.max_rate, z2.avg_load, z2.min_load, z.avg_rate / NULLIF(z2.avg_load, 0) AS rate_per_load FROM zone_stats z JOIN zone_stats2 z2 ON z.facility_zone = z2.facility_zone ORDER BY rate_per_load DESC",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41159000000,
+        "end_offset": 41233000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "avg_rate",
+          "max_rate",
+          "avg_load",
+          "min_load",
+          "rate_per_load"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "725.0",
+            "840.0",
+            "33.0",
+            "33.0",
+            "21.96969696969697"
+          ],
+          [
+            "ZONE-4",
+            "725.0",
+            "725.0",
+            "33.85",
+            "12.5",
+            "21.418020679468242"
+          ],
+          [
+            "ZONE-2",
+            "385.0",
+            "480.0",
+            "33.85",
+            "12.5",
+            "11.373707533234859"
+          ],
+          [
+            "ZONE-1",
+            "725.0",
+            "840.0",
+            "85.9",
+            "72.8",
+            "8.440046565774155"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q688",
+      "sql": "SELECT a.facility_zone, a.control_center, a.pallet_id, a.throughput_rate, z2.max_load, a.throughput_rate / NULLIF(z2.max_load, 0) AS efficiency FROM \"{stream}\" a JOIN (SELECT facility_zone, MAX(load_factor) AS max_load FROM \"{stream2}\" GROUP BY facility_zone) z2 ON a.facility_zone = z2.facility_zone WHERE a.throughput_rate > 200 ORDER BY efficiency DESC LIMIT 12",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41219000000,
+        "end_offset": 41293000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "control_center",
+          "pallet_id",
+          "throughput_rate",
+          "max_load",
+          "efficiency"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "CC-BETA",
+            "PL-005",
+            "900.0",
+            "94.6",
+            "9.513742071881607"
+          ],
+          [
+            "ZONE-3",
+            "CC-BETA",
+            "PL-001",
+            "840.0",
+            "94.6",
+            "8.879492600422834"
+          ],
+          [
+            "ZONE-1",
+            "CC-DELTA",
+            "PL-003",
+            "555.0",
+            "94.6",
+            "5.866807610993658"
+          ],
+          [
+            "ZONE-2",
+            "CC-ALPHA",
+            "PL-008",
+            "290.0",
+            "55.2",
+            "5.253623188405797"
+          ],
+          [
+            "ZONE-4",
+            "CC-GAMMA",
+            "PL-002",
+            "290.0",
+            "88.1",
+            "3.2917139614074915"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q689",
+      "sql": "SELECT a.facility_zone, a.throughput_rate AS rate_a, b.throughput_rate AS rate_b, ABS(a.throughput_rate - b.throughput_rate) AS rate_diff FROM \"{stream}\" a JOIN \"{stream}\" b ON a.facility_zone = b.facility_zone AND a._timestamp < b._timestamp WHERE a.throughput_rate > 200 AND b.throughput_rate > 200 ORDER BY rate_diff DESC LIMIT 12",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41279000000,
+        "end_offset": 41353000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "rate_a",
+          "rate_b",
+          "rate_diff"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "900.0",
+            "320.0",
+            "580.0"
+          ],
+          [
+            "ZONE-1",
+            "900.0",
+            "320.0",
+            "580.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q690",
+      "sql": "SELECT a.control_center, a.load_factor AS load_a, b.load_factor AS load_b, a.load_factor + b.load_factor AS total_load FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.control_center = b.control_center JOIN \"{stream}\" c ON a.facility_zone = c.facility_zone AND a.operation_mode = c.operation_mode WHERE a.load_factor > 30 AND b.load_factor > 30 ORDER BY total_load DESC LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41339000000,
+        "end_offset": 41413000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "load_a",
+          "load_b",
+          "total_load"
+        ],
+        "results": [
+          [
+            "CC-BETA",
+            "99.0",
+            "99.0",
+            "198.0"
+          ],
+          [
+            "CC-DELTA",
+            "67.9",
+            "99.0",
+            "166.9"
+          ],
+          [
+            "CC-BETA",
+            "99.0",
+            "33.0",
+            "132.0"
+          ],
+          [
+            "CC-DELTA",
+            "33.0",
+            "99.0",
+            "132.0"
+          ],
+          [
+            "CC-DELTA",
+            "67.9",
+            "33.0",
+            "100.9"
+          ],
+          [
+            "CC-DELTA",
+            "33.0",
+            "33.0",
+            "66.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q691",
+      "sql": "SELECT a.component_name, COUNT(*) AS solo_cnt, AVG(CAST(a.latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" a WHERE a.component_name NOT IN (SELECT DISTINCT b.component_name FROM \"{stream2}\" b WHERE b.latency_ms > 500) GROUP BY a.component_name ORDER BY solo_cnt DESC LIMIT 10",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41399000000,
+        "end_offset": 41473000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "solo_cnt",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "pallet-mapper",
+            "2",
+            "89.0"
+          ],
+          [
+            "batch-sync",
+            "1",
+            "1450.0"
+          ],
+          [
+            "charge-checker",
+            "1",
+            "78.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q692",
+      "sql": "SELECT COALESCE(a.info_tag, 'none') AS tag_a, COALESCE(b.info_tag, 'none') AS tag_b, COUNT(*) AS cnt FROM \"{stream}\" a LEFT JOIN \"{stream2}\" b ON a.variant_tag = b.variant_tag GROUP BY COALESCE(a.info_tag, 'none'), COALESCE(b.info_tag, 'none') ORDER BY cnt DESC LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41459000000,
+        "end_offset": 41533000000
+      },
+      "expected": {
+        "columns": [
+          "tag_a",
+          "tag_b",
+          "cnt"
+        ],
+        "results": [
+          [
+            "none",
+            "none",
+            "9"
+          ],
+          [
+            "Allowlisted",
+            "Allowlisted",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q693",
+      "sql": "SELECT a.org_name, b.org_name AS org_b, a.threat_flag, b.threat_flag AS threat_b, COUNT(*) AS pair_cnt FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone WHERE a.threat_flag IS NOT NULL OR b.threat_flag IS NOT NULL GROUP BY a.org_name, b.org_name, a.threat_flag, b.threat_flag ORDER BY pair_cnt DESC LIMIT 12",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41519000000,
+        "end_offset": 41593000000
+      },
+      "expected": {
+        "columns": [
+          "org_name",
+          "org_b",
+          "threat_flag",
+          "threat_b",
+          "pair_cnt"
+        ],
+        "results": [
+          [
+            "warehouse-central",
+            "warehouse-west",
+            "None",
+            "false",
+            "1"
+          ],
+          [
+            "warehouse-east",
+            "warehouse-east",
+            "false",
+            "None",
+            "1"
+          ],
+          [
+            "warehouse-south",
+            "warehouse-south",
+            "false",
+            "None",
+            "1"
+          ],
+          [
+            "warehouse-north",
+            "warehouse-north",
+            "None",
+            "true",
+            "1"
+          ],
+          [
+            "warehouse-north",
+            "warehouse-central",
+            "true",
+            "true",
+            "1"
+          ],
+          [
+            "warehouse-central",
+            "warehouse-central",
+            "true",
+            "true",
+            "1"
+          ],
+          [
+            "warehouse-north",
+            "warehouse-west",
+            "None",
+            "false",
+            "1"
+          ],
+          [
+            "warehouse-south",
+            "warehouse-east",
+            "false",
+            "None",
+            "1"
+          ],
+          [
+            "warehouse-central",
+            "warehouse-north",
+            "None",
+            "true",
+            "1"
+          ],
+          [
+            "warehouse-east",
+            "warehouse-south",
+            "false",
+            "None",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q694",
+      "sql": "SELECT COALESCE(a.pallet_id, 'no-match') AS pallet_a, b.pallet_id AS pallet_b, a.throughput_rate, b.load_factor FROM \"{stream}\" a RIGHT JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone AND a.sorter_model = b.sorter_model ORDER BY b.load_factor DESC LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41579000000,
+        "end_offset": 41653000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_a",
+          "pallet_b",
+          "throughput_rate",
+          "load_factor"
+        ],
+        "results": [
+          [
+            "PL-002",
+            "PL-006",
+            "290.0",
+            "88.1"
+          ],
+          [
+            "PL-006",
+            "PL-006",
+            "725.0",
+            "88.1"
+          ],
+          [
+            "PL-001",
+            "PL-005",
+            "840.0",
+            "72.8"
+          ],
+          [
+            "PL-003",
+            "PL-007",
+            "555.0",
+            "72.8"
+          ],
+          [
+            "PL-007",
+            "PL-007",
+            "610.0",
+            "72.8"
+          ],
+          [
+            "PL-004",
+            "PL-004",
+            "290.0",
+            "55.2"
+          ],
+          [
+            "PL-007",
+            "PL-003",
+            "610.0",
+            "33.0"
+          ],
+          [
+            "PL-003",
+            "PL-003",
+            "555.0",
+            "33.0"
+          ],
+          [
+            "PL-001",
+            "PL-001",
+            "840.0",
+            "33.0"
+          ],
+          [
+            "PL-002",
+            "PL-002",
+            "290.0",
+            "12.5"
+          ],
+          [
+            "PL-006",
+            "PL-002",
+            "725.0",
+            "12.5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q695",
+      "sql": "SELECT a.pallet_id, a.facility_zone, b.pallet_id AS peer, c.pallet_id AS cross_peer, a.throughput_rate, c.load_factor FROM \"{stream}\" a JOIN \"{stream}\" b ON a.facility_zone = b.facility_zone AND a.pallet_id < b.pallet_id JOIN \"{stream2}\" c ON b.facility_zone = c.facility_zone WHERE a.throughput_rate > 300 ORDER BY a.throughput_rate DESC LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41639000000,
+        "end_offset": 41713000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "facility_zone",
+          "peer",
+          "cross_peer",
+          "throughput_rate",
+          "load_factor"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "ZONE-3",
+            "PL-005",
+            "PL-001",
+            "900.0",
+            "94.6"
+          ],
+          [
+            "PL-003",
+            "ZONE-1",
+            "PL-007",
+            "PL-003",
+            "555.0",
+            "67.9"
+          ],
+          [
+            "PL-003",
+            "ZONE-1",
+            "PL-007",
+            "PL-007",
+            "555.0",
+            "72.8"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q696",
+      "sql": "SELECT a.operation_mode, a.facility_zone, COUNT(*) AS matches, SUM(a.throughput_rate) AS total_rate, SUM(b.load_factor) AS total_load, SUM(a.item_count) AS total_items FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone AND a.operation_mode = b.operation_mode AND a.conveyor_lane = b.conveyor_lane GROUP BY a.operation_mode, a.facility_zone HAVING COUNT(*) > 0 ORDER BY total_rate DESC LIMIT 12",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41699000000,
+        "end_offset": 41773000000
+      },
+      "expected": {
+        "columns": [
+          "operation_mode",
+          "facility_zone",
+          "matches",
+          "total_rate",
+          "total_load",
+          "total_items"
+        ],
+        "results": [
+          [
+            "hybrid",
+            "ZONE-3",
+            "1",
+            "900.0",
+            "99.0",
+            "88"
+          ],
+          [
+            "manual",
+            "ZONE-3",
+            "1",
+            "610.0",
+            "67.9",
+            "60"
+          ],
+          [
+            "auto",
+            "ZONE-2",
+            "1",
+            "480.0",
+            "45.3",
+            "275"
+          ],
+          [
+            "hybrid",
+            "ZONE-4",
+            "1",
+            "480.0",
+            "21.4",
+            "275"
+          ],
+          [
+            "manual",
+            "ZONE-1",
+            "1",
+            "320.0",
+            "67.9",
+            "410"
+          ],
+          [
+            "manual",
+            "ZONE-2",
+            "1",
+            "150.0",
+            "12.5",
+            "155"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q697",
+      "sql": "SELECT DISTINCT a.facility_zone, a.control_center, a.sorter_model, b.conveyor_lane FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone ORDER BY a.facility_zone, a.control_center LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41759000000,
+        "end_offset": 41833000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "control_center",
+          "sorter_model",
+          "conveyor_lane"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "CC-DELTA",
+            "SORT-M3",
+            "LANE-B"
+          ],
+          [
+            "ZONE-2",
+            "CC-ALPHA",
+            "SORT-Z9",
+            "LANE-C"
+          ],
+          [
+            "ZONE-3",
+            "CC-BETA",
+            "SORT-X1",
+            "LANE-D"
+          ],
+          [
+            "ZONE-4",
+            "CC-GAMMA",
+            "SORT-A7",
+            "LANE-A"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q698",
+      "sql": "SELECT a.org_name, a.component_name, a.latency_ms FROM \"{stream}\" a WHERE NOT EXISTS (SELECT 1 FROM \"{stream2}\" b WHERE b.component_name = a.component_name AND b.latency_ms > a.latency_ms ) AND a.latency_ms > 100 ORDER BY a.latency_ms ASC LIMIT 10",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41819000000,
+        "end_offset": 41893000000
+      },
+      "expected": {
+        "columns": [
+          "org_name",
+          "component_name",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "warehouse-north",
+            "lane-monitor",
+            "567"
+          ],
+          [
+            "warehouse-north",
+            "lane-monitor",
+            "567"
+          ],
+          [
+            "warehouse-east",
+            "sorter-engine",
+            "1900"
+          ],
+          [
+            "warehouse-south",
+            "temp-regulator",
+            "3200"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q699",
+      "sql": "WITH stream_a AS (SELECT facility_zone, pallet_id, throughput_rate, operation_mode FROM \"{stream}\" WHERE throughput_rate > 200), stream_b AS (SELECT facility_zone, pallet_id, load_factor, operation_mode FROM \"{stream2}\" WHERE load_factor > 30) SELECT a.facility_zone, a.pallet_id AS pallet_a, b.pallet_id AS pallet_b, a.throughput_rate, b.load_factor FROM stream_a a INNER JOIN stream_b b ON a.facility_zone = b.facility_zone AND a.operation_mode = b.operation_mode ORDER BY a.throughput_rate DESC LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41879000000,
+        "end_offset": 41953000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "pallet_a",
+          "pallet_b",
+          "throughput_rate",
+          "load_factor"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "PL-007",
+            "PL-007",
+            "900.0",
+            "99.0"
+          ],
+          [
+            "ZONE-2",
+            "PL-004",
+            "PL-004",
+            "480.0",
+            "45.3"
+          ],
+          [
+            "ZONE-1",
+            "PL-003",
+            "PL-003",
+            "320.0",
+            "94.6"
+          ],
+          [
+            "ZONE-3",
+            "PL-005",
+            "PL-005",
+            "320.0",
+            "67.9"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q700",
+      "sql": "SELECT a.facility_zone, COUNT(*) AS join_rows, AVG(CAST(a.throughput_rate AS FLOAT)) AS avg_rate, STDDEV(CAST(a.throughput_rate AS FLOAT)) AS std_rate, AVG(CAST(b.load_factor AS FLOAT)) AS avg_load FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone AND a.control_center = b.control_center GROUP BY a.facility_zone HAVING COUNT(*) > 0 ORDER BY avg_rate DESC LIMIT 12",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41939000000,
+        "end_offset": 42013000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "join_rows",
+          "avg_rate",
+          "std_rate",
+          "avg_load"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "2",
+            "610.0",
+            "0.0",
+            "66.0"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "602.5",
+            "173.24116139070415",
+            "12.5"
+          ],
+          [
+            "ZONE-2",
+            "4",
+            "602.5",
+            "141.4508159514583",
+            "38.30000019073486"
+          ],
+          [
+            "ZONE-3",
+            "4",
+            "580.0",
+            "300.2221399786054",
+            "66.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q701",
+      "sql": "SELECT a.region_code, COUNT(*) AS stream_a_cnt, COUNT(DISTINCT CASE WHEN b.latency_ms > 500   THEN b._timestamp END) AS has_high_lat_b FROM \"{stream}\" a LEFT JOIN \"{stream2}\" b ON b.region_code = a.region_code GROUP BY a.region_code ORDER BY stream_a_cnt DESC LIMIT 10",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 41999000000,
+        "end_offset": 42073000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "stream_a_cnt",
+          "has_high_lat_b"
+        ],
+        "results": [
+          [
+            "EU-CENTRAL",
+            "2",
+            "0"
+          ],
+          [
+            "SA-EAST",
+            "2",
+            "2"
+          ],
+          [
+            "AP-EAST",
+            "2",
+            "0"
+          ],
+          [
+            "US-CENTRAL",
+            "2",
+            "1"
+          ],
+          [
+            "AP-SOUTH",
+            "1",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q702",
+      "sql": "SELECT COALESCE(a.facility_zone, b.facility_zone) AS zone, a.pallet_id, b.pallet_id AS pallet_b, c.pallet_id AS pallet_c, a.throughput_rate, b.load_factor, c.cell_temp FROM \"{stream}\" a LEFT JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone LEFT JOIN \"{stream}\" c ON a.control_center = c.control_center AND a.pallet_id < c.pallet_id ORDER BY zone, a.throughput_rate DESC NULLS LAST LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42059000000,
+        "end_offset": 42133000000
+      },
+      "expected": {
+        "columns": [
+          "zone",
+          "pallet_id",
+          "pallet_b",
+          "pallet_c",
+          "throughput_rate",
+          "load_factor",
+          "cell_temp"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "PL-007",
+            "PL-003",
+            "None",
+            "555.0",
+            "94.6",
+            "None"
+          ],
+          [
+            "ZONE-1",
+            "PL-007",
+            "PL-007",
+            "None",
+            "555.0",
+            "67.9",
+            "None"
+          ],
+          [
+            "ZONE-1",
+            "PL-003",
+            "PL-007",
+            "PL-007",
+            "320.0",
+            "67.9",
+            "22.0"
+          ],
+          [
+            "ZONE-1",
+            "PL-003",
+            "PL-003",
+            "PL-007",
+            "320.0",
+            "94.6",
+            "22.0"
+          ],
+          [
+            "ZONE-2",
+            "PL-008",
+            "PL-004",
+            "None",
+            "190.0",
+            "45.3",
+            "None"
+          ],
+          [
+            "ZONE-2",
+            "PL-004",
+            "PL-004",
+            "PL-008",
+            "150.0",
+            "45.3",
+            "26.3"
+          ],
+          [
+            "ZONE-3",
+            "PL-001",
+            "PL-001",
+            "None",
+            "900.0",
+            "94.6",
+            "None"
+          ],
+          [
+            "ZONE-3",
+            "PL-001",
+            "PL-005",
+            "None",
+            "900.0",
+            "67.9",
+            "None"
+          ],
+          [
+            "ZONE-4",
+            "PL-006",
+            "PL-006",
+            "None",
+            "190.0",
+            "21.4",
+            "None"
+          ],
+          [
+            "ZONE-4",
+            "PL-006",
+            "PL-002",
+            "None",
+            "190.0",
+            "88.1",
+            "None"
+          ],
+          [
+            "ZONE-4",
+            "PL-002",
+            "PL-006",
+            "PL-006",
+            "150.0",
+            "21.4",
+            "26.3"
+          ],
+          [
+            "ZONE-4",
+            "PL-002",
+            "PL-002",
+            "PL-006",
+            "150.0",
+            "88.1",
+            "26.3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q703",
+      "sql": "SELECT a.facility_zone, COUNT(DISTINCT a.pallet_id) AS distinct_pallets_a, COUNT(DISTINCT b.pallet_id) AS distinct_pallets_b, MAX(a.throughput_rate) AS peak_rate, MIN(b.load_factor) AS min_load FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone GROUP BY a.facility_zone ORDER BY peak_rate DESC",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42119000000,
+        "end_offset": 42193000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "distinct_pallets_a",
+          "distinct_pallets_b",
+          "peak_rate",
+          "min_load"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "2",
+            "2",
+            "725.0",
+            "12.5"
+          ],
+          [
+            "ZONE-3",
+            "2",
+            "1",
+            "610.0",
+            "99.0"
+          ],
+          [
+            "ZONE-1",
+            "2",
+            "2",
+            "610.0",
+            "33.0"
+          ],
+          [
+            "ZONE-4",
+            "1",
+            "2",
+            "480.0",
+            "12.5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q704",
+      "sql": "SELECT a.sorter_model, a.conveyor_lane, b.sorter_model AS sorter_b, b.conveyor_lane AS lane_b, APPROX_DISTINCT(a.pallet_id) AS approx_pallets, COUNT(*) AS cnt FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone AND a.operation_mode = b.operation_mode GROUP BY a.sorter_model, a.conveyor_lane, b.sorter_model, b.conveyor_lane ORDER BY cnt DESC LIMIT 12",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42179000000,
+        "end_offset": 42253000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "conveyor_lane",
+          "sorter_b",
+          "lane_b",
+          "approx_pallets",
+          "cnt"
+        ],
+        "results": [
+          [
+            "SORT-X1",
+            "LANE-D",
+            "SORT-X1",
+            "LANE-D",
+            "2",
+            "2"
+          ],
+          [
+            "SORT-A7",
+            "LANE-A",
+            "SORT-A7",
+            "LANE-A",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-Z9",
+            "LANE-C",
+            "SORT-Z9",
+            "LANE-C",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-Q5",
+            "LANE-C",
+            "SORT-Q5",
+            "LANE-C",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-M3",
+            "LANE-B",
+            "SORT-M3",
+            "LANE-B",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q705",
+      "sql": "SELECT a.component_name, a.scan_category, b.scan_category AS scan_b, COUNT(*) AS cnt, AVG(CAST(a.latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.component_name = b.component_name WHERE a.latency_ms IS NOT NULL AND b.latency_ms IS NOT NULL GROUP BY a.component_name, a.scan_category, b.scan_category HAVING COUNT(*) > 0 ORDER BY avg_lat DESC LIMIT 12",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42239000000,
+        "end_offset": 42313000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "scan_category",
+          "scan_b",
+          "cnt",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "temp-regulator",
+            "inbound",
+            "inbound",
+            "2",
+            "3200.0"
+          ],
+          [
+            "sorter-engine",
+            "internal",
+            "internal",
+            "2",
+            "1900.0"
+          ],
+          [
+            "charge-checker",
+            "outbound",
+            "outbound",
+            "2",
+            "78.0"
+          ],
+          [
+            "conveyor-driver",
+            "inbound",
+            "inbound",
+            "2",
+            "15.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q706",
+      "sql": "WITH ranked_a AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn FROM \"{stream}\" WHERE throughput_rate > 200), ranked_b AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY load_factor DESC) AS rn FROM \"{stream2}\" WHERE load_factor > 30) SELECT a.facility_zone, a.pallet_id, b.pallet_id AS pallet_b, a.throughput_rate, b.load_factor FROM ranked_a a JOIN ranked_b b ON a.facility_zone = b.facility_zone AND a.rn = b.rn WHERE a.rn <= 3 ORDER BY a.facility_zone, a.rn LIMIT 12",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42299000000,
+        "end_offset": 42373000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "pallet_id",
+          "pallet_b",
+          "throughput_rate",
+          "load_factor"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "PL-003",
+            "PL-003",
+            "900.0",
+            "99.0"
+          ],
+          [
+            "ZONE-1",
+            "PL-007",
+            "PL-007",
+            "610.0",
+            "67.9"
+          ],
+          [
+            "ZONE-3",
+            "PL-005",
+            "PL-001",
+            "320.0",
+            "99.0"
+          ],
+          [
+            "ZONE-4",
+            "PL-006",
+            "PL-006",
+            "480.0",
+            "45.3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q707",
+      "sql": "SELECT a.facility_zone, SUM(a.throughput_rate) AS total_rate_a, SUM(b.throughput_rate) AS total_rate_b, SUM(a.throughput_rate) / NULLIF(SUM(b.throughput_rate), 0) AS rate_ratio FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone GROUP BY a.facility_zone HAVING SUM(b.throughput_rate) > 0 ORDER BY rate_ratio DESC",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42359000000,
+        "end_offset": 42433000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "total_rate_a",
+          "total_rate_b",
+          "rate_ratio"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "1450.0",
+            "1015.0",
+            "1.4285714285714286"
+          ],
+          [
+            "ZONE-1",
+            "2900.0",
+            "2330.0",
+            "1.2446351931330473"
+          ],
+          [
+            "ZONE-3",
+            "1450.0",
+            "1680.0",
+            "0.8630952380952381"
+          ],
+          [
+            "ZONE-2",
+            "1540.0",
+            "2030.0",
+            "0.7586206896551724"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q708",
+      "sql": "SELECT a.pallet_id, a.operation_mode, a.throughput_rate, COUNT(b._timestamp) AS matches_in_b FROM \"{stream}\" a LEFT JOIN \"{stream2}\" b ON a.operation_mode = b.operation_mode AND a.facility_zone = b.facility_zone GROUP BY a.pallet_id, a.operation_mode, a.throughput_rate ORDER BY matches_in_b DESC, a.throughput_rate DESC LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42419000000,
+        "end_offset": 42493000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "operation_mode",
+          "throughput_rate",
+          "matches_in_b"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "hybrid",
+            "900.0",
+            "1"
+          ],
+          [
+            "PL-005",
+            "manual",
+            "840.0",
+            "1"
+          ],
+          [
+            "PL-007",
+            "auto",
+            "555.0",
+            "1"
+          ],
+          [
+            "PL-004",
+            "auto",
+            "290.0",
+            "1"
+          ],
+          [
+            "PL-008",
+            "manual",
+            "190.0",
+            "1"
+          ],
+          [
+            "PL-002",
+            "auto",
+            "190.0",
+            "1"
+          ],
+          [
+            "PL-006",
+            "hybrid",
+            "290.0",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q709",
+      "sql": "SELECT a.tag_b AS severity, b.filter_result, COUNT(*) AS cnt, AVG(CAST(a.latency_ms AS FLOAT)) AS avg_lat_a, AVG(CAST(b.latency_ms AS FLOAT)) AS avg_lat_b FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone AND a.control_center = b.control_center WHERE a.latency_ms IS NOT NULL GROUP BY a.tag_b, b.filter_result ORDER BY cnt DESC LIMIT 12",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42479000000,
+        "end_offset": 42553000000
+      },
+      "expected": {
+        "columns": [
+          "severity",
+          "filter_result",
+          "cnt",
+          "avg_lat_a",
+          "avg_lat_b"
+        ],
+        "results": [
+          [
+            "low",
+            "allow",
+            "2",
+            "12.0",
+            "956.0"
+          ],
+          [
+            "critical",
+            "allow",
+            "2",
+            "61.5",
+            "45.0"
+          ],
+          [
+            "high",
+            "allow",
+            "2",
+            "1900.0",
+            "956.0"
+          ],
+          [
+            "critical",
+            "block",
+            "2",
+            "61.5",
+            "15.0"
+          ],
+          [
+            "low",
+            "block",
+            "1",
+            "12.0",
+            "230.0"
+          ],
+          [
+            "medium",
+            "allow",
+            "1",
+            "15.0",
+            "45.0"
+          ],
+          [
+            "high",
+            "block",
+            "1",
+            "1900.0",
+            "230.0"
+          ],
+          [
+            "medium",
+            "block",
+            "1",
+            "15.0",
+            "15.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q710",
+      "sql": "SELECT a.facility_zone, b.facility_zone AS zone_b, a._timestamp, b._timestamp AS ts_b, a.throughput_rate, b.load_factor FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.control_center = b.control_center AND a.conveyor_lane != b.conveyor_lane ORDER BY a._timestamp ASC LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42539000000,
+        "end_offset": 42613000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "zone_b",
+          "ts_b",
+          "throughput_rate",
+          "load_factor"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q711",
+      "sql": "SELECT a.org_name, AVG(CAST(a.throughput_rate AS FLOAT)) AS avg_rate, AVG(CAST(b.load_factor AS FLOAT)) AS avg_load, PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY a.throughput_rate) AS median_rate FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.org_name = b.org_name WHERE a.throughput_rate > 100 GROUP BY a.org_name ORDER BY avg_rate DESC LIMIT 10",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42599000000,
+        "end_offset": 42673000000
+      },
+      "expected": {
+        "columns": [
+          "org_name",
+          "avg_rate",
+          "avg_load",
+          "median_rate"
+        ],
+        "results": [
+          [
+            "warehouse-west",
+            "840.0",
+            "33.0",
+            "840.0"
+          ],
+          [
+            "warehouse-east",
+            "725.0",
+            "94.5999984741211",
+            "725.0"
+          ],
+          [
+            "warehouse-south",
+            "555.0",
+            "72.80000305175781",
+            "555.0"
+          ],
+          [
+            "warehouse-north",
+            "290.0",
+            "55.20000076293945",
+            "290.0"
+          ],
+          [
+            "warehouse-central",
+            "190.0",
+            "88.0999984741211",
+            "190.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q712",
+      "sql": "WITH zone_agg AS (SELECT facility_zone, AVG(throughput_rate) AS avg_rate, AVG(load_factor) AS avg_load FROM \"{stream}\" GROUP BY facility_zone), zone_agg2 AS (SELECT facility_zone, AVG(throughput_rate) AS avg_rate2, AVG(load_factor) AS avg_load2 FROM \"{stream2}\" GROUP BY facility_zone) SELECT z.facility_zone, z.avg_rate, z2.avg_rate2, CASE WHEN z.avg_rate > z2.avg_rate2 THEN 'stream1_faster' WHEN z.avg_rate < z2.avg_rate2 THEN 'stream2_faster' ELSE 'equal' END AS comparison FROM zone_agg z JOIN zone_agg2 z2 ON z.facility_zone = z2.facility_zone ORDER BY z.facility_zone",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42659000000,
+        "end_offset": 42733000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "avg_rate",
+          "avg_rate2",
+          "comparison"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "900.0",
+            "610.0",
+            "stream1_faster"
+          ],
+          [
+            "ZONE-2",
+            "170.0",
+            "335.0",
+            "stream2_faster"
+          ],
+          [
+            "ZONE-3",
+            "437.5",
+            "610.0",
+            "stream2_faster"
+          ],
+          [
+            "ZONE-4",
+            "170.0",
+            "150.0",
+            "stream1_faster"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q713",
+      "sql": "SELECT a.component_name, a.region_code, a.scan_category, b.scan_category AS scan_b, a.latency_ms, b.latency_ms AS lat_b, CASE WHEN a.latency_ms > b.latency_ms THEN 'a_slower' WHEN a.latency_ms < b.latency_ms THEN 'b_slower' ELSE 'equal' END AS lat_comparison FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.component_name = b.component_name AND a.region_code = b.region_code WHERE a.latency_ms IS NOT NULL AND b.latency_ms IS NOT NULL ORDER BY a.latency_ms DESC LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42719000000,
+        "end_offset": 42793000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "region_code",
+          "scan_category",
+          "scan_b",
+          "latency_ms",
+          "lat_b",
+          "lat_comparison"
+        ],
+        "results": [
+          [
+            "batch-sync",
+            "AP-SOUTH",
+            "inbound",
+            "inbound",
+            "1450",
+            "1450",
+            "equal"
+          ],
+          [
+            "batch-sync",
+            "AP-SOUTH",
+            "inbound",
+            "inbound",
+            "1450",
+            "1450",
+            "equal"
+          ],
+          [
+            "track-router",
+            "EU-NORTH",
+            "internal",
+            "internal",
+            "230",
+            "230",
+            "equal"
+          ],
+          [
+            "track-router",
+            "EU-NORTH",
+            "internal",
+            "internal",
+            "230",
+            "230",
+            "equal"
+          ],
+          [
+            "scan-hub",
+            "EU-WEST",
+            "outbound",
+            "outbound",
+            "45",
+            "45",
+            "equal"
+          ],
+          [
+            "scan-hub",
+            "EU-WEST",
+            "outbound",
+            "outbound",
+            "45",
+            "45",
+            "equal"
+          ],
+          [
+            "zone-controller",
+            "US-WEST",
+            "inbound",
+            "inbound",
+            "12",
+            "12",
+            "equal"
+          ],
+          [
+            "zone-controller",
+            "US-WEST",
+            "inbound",
+            "inbound",
+            "12",
+            "12",
+            "equal"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q714",
+      "sql": "SELECT a.auth_result, b.auth_result AS auth_b, COUNT(*) AS cnt, SUM(CASE WHEN a.response_code >= 400 THEN 1 ELSE 0 END) AS errors_a, SUM(CASE WHEN b.response_code >= 400 THEN 1 ELSE 0 END) AS errors_b FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone GROUP BY a.auth_result, b.auth_result ORDER BY cnt DESC LIMIT 10",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42779000000,
+        "end_offset": 42853000000
+      },
+      "expected": {
+        "columns": [
+          "auth_result",
+          "auth_b",
+          "cnt",
+          "errors_a",
+          "errors_b"
+        ],
+        "results": [
+          [
+            "pass",
+            "pass",
+            "4",
+            "3",
+            "1"
+          ],
+          [
+            "denied",
+            "pass",
+            "2",
+            "2",
+            "1"
+          ],
+          [
+            "pass",
+            "fail",
+            "2",
+            "1",
+            "2"
+          ],
+          [
+            "pass",
+            "denied",
+            "1",
+            "1",
+            "1"
+          ],
+          [
+            "fail",
+            "pass",
+            "1",
+            "1",
+            "0"
+          ],
+          [
+            "denied",
+            "denied",
+            "1",
+            "1",
+            "1"
+          ],
+          [
+            "fail",
+            "fail",
+            "1",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q715",
+      "sql": "SELECT a.pallet_id, ARRAY_AGG(DISTINCT b.pallet_id) AS peers_in_b, COUNT(DISTINCT b.pallet_id) AS peer_count FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone AND a.control_center = b.control_center AND a.pallet_id != b.pallet_id GROUP BY a.pallet_id ORDER BY peer_count DESC LIMIT 10",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42839000000,
+        "end_offset": 42913000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "peers_in_b",
+          "peer_count"
+        ],
+        "results": [
+          [
+            "PL-007",
+            "['PL-003']",
+            "1"
+          ],
+          [
+            "PL-003",
+            "['PL-007']",
+            "1"
+          ],
+          [
+            "PL-001",
+            "['PL-005']",
+            "1"
+          ],
+          [
+            "PL-004",
+            "['PL-008']",
+            "1"
+          ],
+          [
+            "PL-002",
+            "['PL-006']",
+            "1"
+          ],
+          [
+            "PL-008",
+            "['PL-004']",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q716",
+      "sql": "SELECT a.device_type, b.device_type AS device_b, a.page_slug, b.page_slug AS slug_b, COUNT(*) AS cnt, AVG(CAST(a.lcp_micros AS FLOAT)) AS avg_lcp_a, AVG(CAST(b.lcp_micros AS FLOAT)) AS avg_lcp_b FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone WHERE a.device_type IS NOT NULL AND b.device_type IS NOT NULL GROUP BY a.device_type, b.device_type, a.page_slug, b.page_slug ORDER BY cnt DESC LIMIT 15",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 42899000000,
+        "end_offset": 42973000000
+      },
+      "expected": {
+        "columns": [
+          "device_type",
+          "device_b",
+          "page_slug",
+          "slug_b",
+          "cnt",
+          "avg_lcp_a",
+          "avg_lcp_b"
+        ],
+        "results": [
+          [
+            "Mobile",
+            "Computer",
+            "itemPage",
+            "searchPage",
+            "2",
+            "1450000.0",
+            "2200000.0"
+          ],
+          [
+            "Computer",
+            "Computer",
+            "searchPage",
+            "searchPage",
+            "2",
+            "2200000.0",
+            "2200000.0"
+          ],
+          [
+            "Tablet",
+            "Tablet",
+            "itemPage",
+            "itemPage",
+            "1",
+            "2500000.0",
+            "2500000.0"
+          ],
+          [
+            "Mobile",
+            "Mobile",
+            "itemPage",
+            "cartPage",
+            "1",
+            "1800000.0",
+            "900000.0"
+          ],
+          [
+            "Tablet",
+            "Computer",
+            "itemPage",
+            "searchPage",
+            "1",
+            "2500000.0",
+            "3200000.0"
+          ],
+          [
+            "Mobile",
+            "Mobile",
+            "itemPage",
+            "itemPage",
+            "1",
+            "1800000.0",
+            "1800000.0"
+          ],
+          [
+            "Computer",
+            "Mobile",
+            "searchPage",
+            "itemPage",
+            "1",
+            "1200000.0",
+            "1800000.0"
+          ],
+          [
+            "Computer",
+            "Tablet",
+            "searchPage",
+            "itemPage",
+            "1",
+            "3200000.0",
+            "2500000.0"
+          ],
+          [
+            "Computer",
+            "Mobile",
+            "searchPage",
+            "cartPage",
+            "1",
+            "1200000.0",
+            "900000.0"
+          ],
+          [
+            "Mobile",
+            "Tablet",
+            "itemPage",
+            "itemPage",
+            "1",
+            "1100000.0",
+            "2500000.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
     }
   ]
 }

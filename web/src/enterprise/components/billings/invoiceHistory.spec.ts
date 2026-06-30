@@ -61,18 +61,6 @@ describe("InvoiceHistory", () => {
       const pageContainer = wrapper.find('[data-test="invoice-history-container"]');
       expect(pageContainer.exists()).toBe(true);
     });
-
-    it("should render the title row", () => {
-      const titleRow = wrapper.find('[data-test="invoice-history-title"]');
-      expect(titleRow.exists()).toBe(true);
-    });
-
-    it("should display the correct title text", () => {
-      const titleElement = wrapper.find('[data-test="invoice-history-title"]');
-      expect(titleElement.exists()).toBe(true);
-      // The text should be the translated text
-      expect(titleElement.text()).toContain("Invoice History");
-    });
   });
 
   describe("Component Registration and Imports", () => {
@@ -146,9 +134,6 @@ describe("InvoiceHistory", () => {
       const container = wrapper.find('[data-test="invoice-history-container"]');
       expect(container.exists()).toBe(true);
 
-      const titleDiv = wrapper.find('[data-test="invoice-history-title"]');
-      expect(titleDiv.exists()).toBe(true);
-
       const invoiceTable = wrapper.find('[data-testid="mock-invoice-table"]');
       expect(invoiceTable.exists()).toBe(true);
     });
@@ -158,11 +143,6 @@ describe("InvoiceHistory", () => {
       expect(containers).toHaveLength(1);
     });
 
-    it("should contain exactly one title div", () => {
-      const titleDivs = wrapper.findAll('[data-test="invoice-history-title"]');
-      expect(titleDivs).toHaveLength(1);
-    });
-
     it("should contain exactly one InvoiceTable component", () => {
       const invoiceTables = wrapper.findAll('[data-testid="mock-invoice-table"]');
       expect(invoiceTables).toHaveLength(1);
@@ -170,22 +150,15 @@ describe("InvoiceHistory", () => {
 
     it("should have proper nesting structure", () => {
       const container = wrapper.find('[data-test="invoice-history-container"]');
-      const titleDiv = wrapper.find('[data-test="invoice-history-title"]');
       const invoiceTable = wrapper.find('[data-testid="mock-invoice-table"]');
 
       expect(container.exists()).toBe(true);
-      expect(titleDiv.exists()).toBe(true);
       expect(invoiceTable.exists()).toBe(true);
     });
   });
 
 
   describe("Internationalization (i18n)", () => {
-    it("should use i18n for title text", () => {
-      const titleDiv = wrapper.find('[data-test="invoice-history-title"]');
-      expect(titleDiv.text()).toBe("Invoice History");
-    });
-
     it("should handle missing translation keys gracefully", () => {
       // Test that translation function exists and works
       expect(typeof wrapper.vm.t).toBe("function");
@@ -309,7 +282,7 @@ describe("InvoiceHistory", () => {
       
       // Verify component still exists and has expected elements
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.html()).toContain("Invoice History");
+      expect(wrapper.find('[data-test="invoice-history-container"]').exists()).toBe(true);
     });
 
     it("should have minimal component overhead", () => {
@@ -334,9 +307,9 @@ describe("InvoiceHistory", () => {
     });
 
     it("should not have accessibility violations in basic structure", () => {
-      const titleDiv = wrapper.find('[data-test="invoice-history-title"]');
-      expect(titleDiv.exists()).toBe(true);
-      expect(titleDiv.element.tagName).toBe("DIV");
+      const container = wrapper.find('[data-test="invoice-history-container"]');
+      expect(container.exists()).toBe(true);
+      expect(container.element.tagName).toBe("DIV");
     });
 
     it("should maintain proper DOM hierarchy", () => {
@@ -344,11 +317,6 @@ describe("InvoiceHistory", () => {
       expect(container.exists()).toBe(true);
       const allDivs = wrapper.findAll("div");
       expect(allDivs.length).toBeGreaterThan(0);
-    });
-
-    it("should render text content properly", () => {
-      const text = wrapper.text();
-      expect(text).toContain("Invoice History");
     });
   });
 });

@@ -132,7 +132,11 @@
     "error": "Fehler",
     "db": "Datenbank",
     "discardChanges": "Änderungen verwerfen",
-    "unsavedChanges": "Ungespeicherte Änderungen"
+    "unsavedChanges": "Ungespeicherte Änderungen",
+    "remove": "entfernen",
+    "export": "Exportieren",
+    "clearFilter": "Filter löschen",
+    "noMatches": "Keine Treffer"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -425,7 +429,18 @@
     "menuGroupExplain": "Erkläre",
     "fieldValuesEmpty": "Keine Werte gefunden.",
     "fieldValuesEmptyHint": "Probieren Sie einen breiteren Zeitraum aus, um die Werte zu sehen.",
-    "selectLogsStreamFirst": "Wählen Sie zuerst Logs-Stream aus"
+    "selectLogsStreamFirst": "Wählen Sie zuerst Logs-Stream aus",
+    "menuMore": "Mehr",
+    "searchInspect": "Suche Inspect",
+    "vrlOnlyForTableWarning": "Die VRL-Funktion wird nur für Tabellendiagramme unterstützt.",
+    "customDownloadTitle": "Benutzerdefinierter Download",
+    "selectFunctionNamePlaceholder": "Wählen Sie den Funktionsnamen",
+    "confirmFunctionUpdateTitle": "Update bestätigen",
+    "confirmFunctionUpdateMsg": "Möchten Sie die Funktion {name} wirklich aktualisieren?",
+    "traceIdLabel": "Trace-ID:",
+    "enterTraceIdPlaceholder": "Trace-ID eingeben",
+    "changeQueryModeTitle": "Abfragemodus ändern",
+    "changeQueryModeConfirm": "Möchten Sie den Abfragemodus wirklich ändern? Die für X-Achse, Y-Achse und Filter gespeicherten Daten werden gelöscht."
   },
   "menu": {
     "home": "Startseite",
@@ -539,7 +554,14 @@
       "learnMore": "Erfahre mehr:",
       "quickImpl": "Anleitung zur schnellen Implementierung",
       "blogPost": "Grundlagen der Frontend-Überwachung"
-    }
+    },
+    "sourceMaps": "Quellkarten",
+    "service": "Bedienung",
+    "environment": "Umwelt",
+    "applyFilters": "Filter anwenden",
+    "uploadSourceMaps": "Quellkarten hochladen",
+    "files": "Dateien",
+    "uploadedAt": "Hochgeladen am"
   },
   "about": {
     "name": "Observe öffnen",
@@ -791,6 +813,10 @@
         "service_maps": {
           "name": "Servicekarten",
           "note": "Serviceabhängigkeiten visualisieren"
+        },
+        "byob": {
+          "name": "Bring Your Own Bucket",
+          "note": "Leiten Sie Organisationsdaten in Ihren eigenen Cloud-Bucket"
         }
       },
       "buttons": {
@@ -922,7 +948,12 @@
     "authTypeSSO": "SSO",
     "authTypeLocal": "Einheimisch",
     "noCustomRolesHint": "Keine benutzerdefinierten Rollen definiert — erstellen Sie eine in IAM → Rollen",
-    "externalUserCustomRoleHint": "Externe Benutzer können nur über das Quellsystem geändert werden"
+    "externalUserCustomRoleHint": "Externe Benutzer können nur über das Quellsystem geändert werden",
+    "subtitle": "Personen mit Zugang zu dieser Organisation",
+    "revokeInvitationTitle": "Einladung widerrufen",
+    "revokeInvitationMsg": "Bist du sicher, dass du die Einladung für {email} widerrufen möchtest?",
+    "deleteUsersTitle": "Benutzer löschen",
+    "deleteUsersMsg": "Sind Sie sicher, dass Sie {count} Benutzer löschen möchten?"
   },
   "ticket": {
     "header": "Tickets für den Support",
@@ -984,7 +1015,8 @@
     "proceed_subscription": "Weiter zum Abonnement",
     "subscription_plan": "Abonnementplan",
     "makeBilledMember": "Diese Organisation zu einem Rechnungsmitglied von {org} machen",
-    "manage": "Managen"
+    "manage": "Managen",
+    "nameHelpText": "Verwenden Sie nur alphanumerische Zeichen, Leerzeichen und Unterstriche."
   },
   "template": {
     "header": "Vorlagen",
@@ -1054,7 +1086,10 @@
     "fieldRequired": "Feld ist erforderlich!",
     "dataType": "Datentyp",
     "dataTypeRequired": "Datentyp ist erforderlich!",
-    "udsFieldAlreadyInSchema": "Ein oder mehrere ausgewählte Felder sind bereits Teil des definierten Schemas"
+    "udsFieldAlreadyInSchema": "Ein oder mehrere ausgewählte Felder sind bereits Teil des definierten Schemas",
+    "subtitle": "Indexverwaltung und Stream-Konfiguration",
+    "streamNameHelpText": "Verwenden Sie nur alphanumerische Zeichen, Unterstriche und Doppelpunkte.",
+    "deleteAssociatedAlertsPipelines": "Löschen Sie alle mit dem Stream verknüpften Pipelines und Alerts"
   },
   "function": {
     "header": "Funktionen",
@@ -1114,7 +1149,11 @@
     "vrlFunctionHint": "Verwenden Sie das `.`, um das aktuelle Ereignis darzustellen. Beispiel: .new_field = .existing_field + 'verarbeitet'",
     "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
     "enterFunctionPrompt": "Geben Sie eine Aufforderung ein, um eine Funktion zu generieren",
-    "jsErrorDetails": "JavaScript-Fehlerdetails"
+    "jsErrorDetails": "JavaScript-Fehlerdetails",
+    "subtitle": "Wiederverwendbare VRL-Funktionen, die in Pipelines angewendet werden",
+    "clickTestFunctionHint": "Bitte klicken Sie auf Funktion testen, um die Ereignisse zu sehen",
+    "pleaseEnterQuery": "Bitte geben Sie eine Anfrage ein",
+    "enrichmentTablesSubtitle": "Nachschlagetabellen, die aufgenommene Daten anreichern"
   },
   "confirmDialog": {
     "cancel": "Abbrechen",
@@ -1386,6 +1425,7 @@
     "selectDashboardLabel": "Wählen Sie Dashboard",
     "selectTabLabel": "Wählen Sie Tab",
     "numbers": "Zahlen",
+    "localeFormat": "Gebietsschema-Format",
     "nanoseconds": "Nanosekunden (ns)",
     "currency": "Währung",
     "p99": "P99",
@@ -1692,7 +1732,89 @@
     "multiSqlQueryLabelHint": "Benutzerdefinierter Name für diese Abfrage in Legenden (z. B. 'Production')",
     "multiQueryWarning": "Nur Abfrage 1 wird für {chartType} gerendert",
     "trellisNotSupportedWithMultiQuery": "Das Trellis-Layout ist bei mehreren Abfragen deaktiviert. Entfernen Sie zusätzliche Abfragen, um Trellis zu verwenden.",
-    "xAliasInconsistencyWarning": "X-Achsen-Aliase sind bei allen Abfragen inkonsistent: Einige verwenden ein Histogramm, andere nicht. Verwenden Sie für alle Abfragen denselben Aliastyp, um vorhersehbare Ergebnisse zu erzielen."
+    "xAliasInconsistencyWarning": "X-Achsen-Aliase sind bei allen Abfragen inkonsistent: Einige verwenden ein Histogramm, andere nicht. Verwenden Sie für alle Abfragen denselben Aliastyp, um vorhersehbare Ergebnisse zu erzielen.",
+    "subtitle": "Dashboards ordnerübergreifend erstellen, organisieren und teilen",
+    "deleteDashboardConfirmTitle": "Dashboard löschen",
+    "deleteDashboardConfirmMsg": "Möchten Sie das Dashboard wirklich löschen?",
+    "deleteDashboardsConfirmTitle": "Dashboards löschen",
+    "deleteDashboardsConfirmMsg": "Möchten Sie {count} Dashboard (s) wirklich löschen?",
+    "importCustom": "Benutzerdefiniert",
+    "importCustomDesc": "Import aus JSON-Datei oder URL",
+    "importTemplates": "Vorlagen",
+    "importTemplatesDesc": "Durchsuchen und aus der Galerie importieren",
+    "searchThisFolder": "Dieser Ordner",
+    "searchThisFolderTitle": "Nur diesen Ordner durchsuchen",
+    "searchAllFolders": "Alle Ordner",
+    "searchAllFoldersTitle": "In allen Ordnern suchen",
+    "reloadDashboards": "Dashboards neu laden",
+    "editVariable": "Variable bearbeiten",
+    "addOption": "Option hinzufügen",
+    "addFilter": "Filter hinzufügen",
+    "noDataFound": "Keine Daten gefunden",
+    "streamSelectTooltip": "Wählen Sie einen Stream aus oder verwenden Sie eine Variable wie $streamVariable, um den Stream dynamisch auf der Grundlage eines anderen Werts auszuwählen.",
+    "fieldSelectTooltip": "Wählen Sie ein Feld aus oder verwenden Sie eine Variable wie $FieldVariable. Wenn der Stream eine Variable verwendet, ist die Feldliste leer. Geben Sie den Feldnamen manuell ein.",
+    "filterInfoTooltip": "In Filtern können Sie den Wert einer anderen Variablen verwenden, um den Wert der aktuellen Variablen zu filtern. Dies kann mithilfe des Namens der anderen Variablen geschehen. Zum Beispiel:",
+    "defaultSelectAll": "Standard — Alles auswählen",
+    "escapeSingleQuotesTooltip": "Wenn diese Option aktiviert ist, werden einfache Anführungszeichen in der Abfrage maskiert. Zum Beispiel wird ein Wert wie `O'Reilly` durch `O\"Reilly` ersetzt.",
+    "byDefaultSelect": "Standardmäßig wählen Sie:",
+    "firstValue": "Erster Wert",
+    "allValues": "Alle Werte",
+    "customValue": "Benutzerdefiniert",
+    "showDependencies": "Abhängigkeiten anzeigen",
+    "deleteVariable": "Variable löschen",
+    "deleteVariableMsg": "Möchten Sie die Variable wirklich löschen?",
+    "appliedToTabs": "Auf Tabs angewendet:",
+    "appliedToPanels": "Auf Paneele angewendet:",
+    "selectVariableScope": "Variablenbereich auswählen",
+    "variableScopeHelp": "Variablen werden auf alle Tabs und Panels angewendet, wenn Global ausgewählt ist.",
+    "tableFiltering": "Filtern von Spalten",
+    "columnFormattingTitle": "Formatierung von Spalten",
+    "columnFormattingSubtitle": "Fügen Sie die Felder hinzu, die Sie formatieren möchten, und gestalten Sie dann jedes Feld mit einer Live-Vorschau.",
+    "columnFormattingPick": "Wählen Sie eine Spalte",
+    "columnFormattingSampleNote": "Stichprobenzeilen aus dieser Spalte.",
+    "columnFormattingAddField": "Feld hinzufügen",
+    "columnFormattingAllAdded": "Alle Felder hinzugefügt",
+    "columnFormattingNoFields": "Keine Felder hinzugefügt",
+    "columnFormattingNoFieldsHint": "Verwenden Sie oben „Feld hinzufügen“, um mit der Formatierung einer Spalte zu beginnen.",
+    "columnFormattingEmptyTitle": "Eine Spalte formatieren",
+    "columnFormattingEmptyHint": "Wählen Sie ein Feld aus, um Einheiten, Ausrichtungen, Farben und bedingte Regeln anzuwenden.",
+    "columnFormattingNoFieldsToFormat": "Noch keine Felder formatiert",
+    "columnFormattingOneFieldToFormat": "1 Feld formatiert",
+    "columnFormattingFieldsToFormat": "formatierte Felder",
+    "typeNumeric": "Num",
+    "typeText": "Text",
+    "sectionValueFormatting": "Formatierung von Werten",
+    "sectionFieldType": "Typ des Feldes",
+    "configSectionFieldOverridesAliases": [
+      "Field Overrides",
+      "Override Config",
+      "Override",
+      "Column Formatting"
+    ],
+    "sectionAlignment": "Ausrichtung",
+    "alignLeft": "Links",
+    "alignCenter": "Zentrum",
+    "alignRight": "Richtig",
+    "sectionStyling": "Styling",
+    "sectionConditionalStyling": "Bedingtes Styling",
+    "conditionThreshold": "Wert",
+    "conditionAddRule": "+ Regel hinzufügen",
+    "conditionNoRules": "Noch keine Regeln.",
+    "conditionIfValue": "Wenn der Wert",
+    "conditionThenText": "dann die Farbe des Textes",
+    "conditionAndBg": "und Hintergrund",
+    "opLessThan": "weniger als",
+    "opGreaterThan": "größer als",
+    "opLessThanEqual": "kleiner als oder gleich",
+    "opGreaterThanEqual": "größer als oder gleich",
+    "opEqual": "gleich",
+    "opNotEqual": "nicht gleich",
+    "textColor": "Text",
+    "bgColor": "Hintergrund",
+    "colorNone": "keine",
+    "customColor": "Benutzerdefinierte Farbe",
+    "inlinePreview": "Vorschau",
+    "showDynamicFilters": "Dynamische Filter anzeigen"
   },
   "panel": {
     "header": "Panel",
@@ -1981,7 +2103,14 @@
       "viewOrgGroup": "Organisationsgruppe anzeigen",
       "usageMemberLabel": "Mitgliedsorganisation",
       "usageAllMembers": "Aktuelle Org",
-      "currentOrgTitle": "Aktuelle Organisation"
+      "currentOrgTitle": "Aktuelle Organisation",
+      "childOrgIdColumn": "Kennung der untergeordneten Organisation",
+      "childOrgNameColumn": "Name der untergeordneten Organisation",
+      "notEnabledTitle": "Abrechnungsgruppe nicht verfügbar",
+      "notEnabledDesc": "Diese Organisation ist nicht berechtigt, eine Abrechnungsgruppe zu starten. Wenden Sie sich an Ihren Administrator, falls Sie diese Funktion benötigen.",
+      "memberOrgsTitle": "Mitgliedsorganisationen",
+      "searchMemberOrg": "Organisation suchen",
+      "noMemberMatch": "Keine passenden Organisationen"
     }
   },
   "message": {
@@ -2182,7 +2311,43 @@
       "rcaCompleted": "Ursachenanalyse abgeschlossen",
       "noRcaYet": "Keine Ursachenanalyse verfügbar. Klicken Sie auf „Analysieren“, um zu beginnen.",
       "search": "Vorfälle suchen...",
-      "sreChat": "SRE-Assistenten fragen"
+      "sreChat": "SRE-Assistenten fragen",
+      "subtitle": "Vorfallsverwaltung und -verfolgung",
+      "correlationPrimaryMatch": "Primäre Übereinstimmung",
+      "correlationSecondaryMatch": "Sekundäre Übereinstimmung",
+      "correlationServiceDiscoveryTooltip": "Korreliert anhand vorberechneter Dienstidentität aus der Service Discovery",
+      "correlationPrimaryMatchTooltip": "Korreliert anhand primärer Übereinstimmungskriterien",
+      "correlationSecondaryMatchTooltip": "Korreliert anhand sekundärer Übereinstimmungskriterien",
+      "correlationAlertId": "Alarm-ID",
+      "correlationAlertIdTooltip": "Keine passenden Dimensionen gefunden – isoliert anhand der Alarm-ID",
+      "correlatedByServiceDiscovery": "Dimensionen",
+      "correlatedBySemanticGroups": "Dimensionen",
+      "correlatedByAlertId": "Alarm-ID",
+      "goBack": "Zurück",
+      "incident": "Vorfall",
+      "uniqueAlerts": "Eindeutige Alarme",
+      "relatedAlerts": "Zugehörige Alarme",
+      "alertTriggers": "Alarmauslöser",
+      "incidentTimeline": "Vorfall-Zeitleiste",
+      "incidentDetails": "Vorfalldetails",
+      "incidentId": "Vorfall-ID",
+      "incidentName": "Vorfallname",
+      "initialTrigger": "Erster Auslöser",
+      "noDimensionsAvailable": "Keine Dimensionen verfügbar",
+      "noAlertDetailsAvailable": "Keine Alarmdetails verfügbar",
+      "clickOnTriggerToViewDetails": "Klicken Sie in der Tabelle auf einen Auslöser, um Details anzuzeigen",
+      "refreshCorrelatedData": "Korrelierte Daten aktualisieren",
+      "showingCorrelatedLogs": "Korrelierte Logs aus dem Vorfallszeitraum werden angezeigt",
+      "showingCorrelatedMetrics": "Korrelierte Metriken aus dem Vorfallszeitraum werden angezeigt",
+      "showingCorrelatedTraces": "Korrelierte Traces aus dem Vorfallszeitraum werden angezeigt",
+      "incidentTitleUpdatedSuccess": "Vorfalltitel erfolgreich aktualisiert",
+      "markAsAcknowledgedTooltip": "Vorfall als bestätigt und in Bearbeitung markieren",
+      "markAsResolvedTooltip": "Vorfall als behoben markieren und schließen",
+      "reopenIncidentTooltip": "Diesen behobenen Vorfall erneut öffnen",
+      "editIncidentTitleTooltip": "Vorfalltitel bearbeiten",
+      "firedTimes": "{count}-mal ausgelöst",
+      "incidentAnalysis": "Vorfallanalyse",
+      "noAlertActivityData": "Keine Alarmaktivitätsdaten"
     },
     "events": "Ereignisse",
     "multiWindow": "Mit der Vergangenheit vergleichen",
@@ -2230,7 +2395,9 @@
       "alertName": "Alarmname",
       "streamInfo": "Datenquelle",
       "alertType": "Alarmtyp",
-      "queryCondition": "Abfragebedingung"
+      "queryCondition": "Abfragebedingung",
+      "configuringRealTime": "Echtzeit-Alarm konfigurieren für",
+      "configuringScheduled": "Geplanten Alarm konfigurieren für"
     },
     "correlation": {
       "title": "Korrelation von Warnmeldungen",
@@ -2387,7 +2554,8 @@
       "comparingText": "Vergleich des aktuellen Fensterabfrageergebnisses mit dem Abfrageergebnis des vorherigen {offset}.",
       "addComparisonWindow": "Vergleichsfenster hinzufügen",
       "goToConditions": "Gehe zu den Bedingungen",
-      "goToConditionsTooltip": "Klicken Sie auf „Gehe zu den Bedingungen“, um die Ereignisse für ausgewählte Vergleichsfenster zu überprüfen"
+      "goToConditionsTooltip": "Klicken Sie auf „Gehe zu den Bedingungen“, um die Ereignisse für ausgewählte Vergleichsfenster zu überprüfen",
+      "comparisonDisabledTooltip": "Vergleichsfenster werden nur im SQL-Modus unterstützt. Wechseln Sie im Tab „Alarmregeln“ zu SQL."
     },
     "alertSettings": {
       "cronSchedule": "Cron-Zeitplan",
@@ -2399,13 +2567,22 @@
       "frequencyTooltipCron": "Standard-UNIX-Cronformat mit 5 durch Leerzeichen getrennten Feldern: [Minute 0-59] [Stunde 0-23] [Tag des Monats 1-31] [Monat 1-12 oder JAN-DEC] [Wochentag 0-7 oder '1L-7L', 0 und 7 für Sonntag].",
       "timezoneWarning": "Warnung: Die angezeigte Zeitzone ist eine ungefähre Angabe. Überprüfen Sie die richtige Zeitzone und wählen Sie sie manuell aus.",
       "destinationsTooltip": "Wählen Sie ein oder mehrere Ziele aus, um Warnmeldungen zu senden.",
-      "templateTooltip": "Optional: Wählen Sie eine Vorlage aus, die für alle Ziele in dieser Warnung verwendet werden soll. Mithilfe von Vorlagen können Sie das Format von Warnmeldungen anpassen. Wenn nicht ausgewählt, verwendet jedes Ziel seine eigene konfigurierte Vorlage."
+      "templateTooltip": "Optional: Wählen Sie eine Vorlage aus, die für alle Ziele in dieser Warnung verwendet werden soll. Mithilfe von Vorlagen können Sie das Format von Warnmeldungen anpassen. Wenn nicht ausgewählt, verwendet jedes Ziel seine eigene konfigurierte Vorlage.",
+      "sectionTitle": "Einstellungen",
+      "fieldRequired": "Feld ist erforderlich!",
+      "noDestinationsAvailable": "Keine Ziele verfügbar",
+      "refreshDestinations": "Aktuelle Ziele aktualisieren",
+      "createsIncident": "Erstellt Vorfall",
+      "createsIncidentTooltip": "Wenn ein Alarm einen Vorfall erstellen kann, sendet er keine eigene Benachrichtigung. Stattdessen wird eine Benachrichtigung für den Vorfall gesendet, wenn ein neuer Vorfall erstellt wird oder ein neuer Alarmtyp einem bestehenden Vorfall hinzugefügt wird."
     },
     "advanced": {
       "addVariable": "Variable hinzufügen",
       "variablesTooltip": "Variablen werden verwendet, um Daten von der Warnung an das Ziel zu übergeben.",
       "rowTemplateTooltip": "Die Zeilenvorlage wird verwendet, um die Warnmeldung zu formatieren.",
-      "templateType": "Vorlagentyp:"
+      "templateType": "Vorlagentyp:",
+      "noTemplatesAvailable": "Keine Vorlagen verfügbar",
+      "refreshTemplates": "Aktuelle Vorlagen aktualisieren",
+      "selectTemplate": "Vorlage auswählen"
     },
     "addConditions": "Bedingungen hinzufügen",
     "sqlEditor": "SQL-Editor",
@@ -2509,7 +2686,28 @@
       "destinationRequired": "Es ist mindestens ein Ziel erforderlich!",
       "disabledNotificationsInfo": "Die Anomalieerkennung wird weiterhin ausgeführt und die Ergebnisse werden in den _anomalies-Stream geschrieben. Aktivieren Sie Benachrichtigungen, um Benachrichtigungen zu erhalten, wenn Anomalien erkannt werden."
     },
-    "anomalyName": "Name der Anomalie"
+    "anomalyName": "Name der Anomalie",
+    "subtitle": "Alarmregeln und Benachrichtigungskanäle",
+    "searchThisFolder": "Dieser Ordner",
+    "searchAllFolders": "Alle Ordner",
+    "streamConfig": "Stream-Konfiguration",
+    "alertRules": "Regeln für Warnmeldungen",
+    "addCondition": "Bedingung hinzufügen",
+    "conditionOf": "von",
+    "conditionIs": "ist",
+    "matchingTypeFound": "passender {type} gefunden",
+    "matchingMetricsFound": "übereinstimmende Metriken gefunden",
+    "metricsValueFieldTooltip": "Metrik-Streams speichern ihre Messung standardmäßig im Feld „Wert“",
+    "howOftenCheckTooltip": "Wie oft muss diese Warnbedingung überprüft werden?",
+    "alertIfNoOfEvents": "Warnung bei Anzahl der Ereignisse",
+    "alertIfValueIs": "Warnung, wenn der Wert",
+    "havingSeries": "Serien haben",
+    "clearMultiWindowsTitle": "Multifenster löschen?",
+    "lastTrainedAt": "Zuletzt trainiert am",
+    "noTemplatesMsg": "Es sieht so aus, als ob Sie noch keine Vorlagen erstellt haben. Um eine Warnung zu erstellen, benötigen Sie mindestens ein Ziel und eine Vorlage",
+    "createTemplateBtn": "Vorlage erstellen",
+    "noDestinationsMsg": "Es sieht so aus, als ob Sie noch keine Ziele erstellt haben. Um eine Warnung zu erstellen, benötigen Sie mindestens ein Ziel und eine Vorlage",
+    "createDestinationBtn": "Ziel erstellen"
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -2781,7 +2979,93 @@
       "noMatchingDimensions": "Keine passenden Dimensionen",
       "otherGroup": "Sonstige",
       "fallbackGroup": "Fallback",
-      "fallbackNote": "Fallback-Dimensionen (wie 'service') gelten umgebungsübergreifend, wenn keine umgebungsspezifische Workload übereinstimmt."
+      "fallbackNote": "Fallback-Dimensionen (wie 'service') gelten umgebungsübergreifend, wenn keine umgebungsspezifische Workload übereinstimmt.",
+      "serviceDiscoveryTab": "Erkennungsregeln",
+      "fieldAliasesTab": "Feldzuordnungen",
+      "fieldAliasesSaved": "Feldaliasse erfolgreich gespeichert",
+      "serviceNameFieldAliasNote": "Die tatsächlichen Feldnamen, die dieser Gruppe zugeordnet sind, werden konfiguriert in",
+      "viewFieldAliases": "Feldaliasse bearbeiten →",
+      "fieldAliasesSaveError": "Feldaliasse konnten nicht gespeichert werden",
+      "fieldAliasesUnsavedConfirm": "Sie haben nicht gespeicherte Änderungen an Feldzuordnungen. Verwerfen und verlassen?",
+      "duplicateIdsError": "Doppelte Gruppen-IDs gefunden: {ids}. Bitte stellen Sie sicher, dass jede Gruppe eine eindeutige ID hat.",
+      "duplicateNamesInCategoryError": "Doppelter Name „{name}“ in Kategorie „{category}“ gefunden. Jede Gruppe innerhalb einer Kategorie muss einen eindeutigen Namen haben.",
+      "emptyIdError": " Kategorie hat Gruppen mit leeren Namen. Bitte stellen Sie sicher, dass alle Gruppen gültige Namen haben.",
+      "emptyFieldsError": "Mindestens ein Feldname ist erforderlich",
+      "lastSeen": "Zuletzt gesehen",
+      "serviceIdentitySetupTitle": "Einrichtung der Dienstidentität",
+      "serviceIdentitySetupDescription": "Konfigurieren Sie, wie Dienste in Ihren Telemetriedaten identifiziert werden",
+      "serviceNameFieldLabel": "Feld für Dienstnamen",
+      "serviceNameFieldHelp": "Welches Feld den Dienstnamen in Ihren Telemetriedaten identifiziert",
+      "serviceNameFrom": "Dienstname aus",
+      "serviceNameDerivedPrefix": "Der Dienstname wird anhand der definierten Felder für Dienstnamen abgeleitet in",
+      "serviceNameFields": "Feldaliasse",
+      "serviceNameDetectedFrom": "Dienstname erkannt aus:",
+      "serviceNameNotDetected": "Noch kein Feld für den Dienstnamen in Ihren Daten erkannt",
+      "serviceNameNotDetectedHelp": "Stellen Sie sicher, dass Ihre Telemetrie ein Feld wie service.name oder ähnlich enthält",
+      "serviceNameExpandedHelp": "Diese Feldnamen in Ihren Daten werden alle dem Dienstnamen zugeordnet:",
+      "serviceNameConfiguredNotSeen": "konfiguriert, aber noch nicht in Ihren Daten gesehen",
+      "customizeFieldMappings": "Feldzuordnungen anpassen",
+      "fieldMappingDialogHelp": "Fügen Sie Feldnamen hinzu oder entfernen Sie sie, die in Ihren Telemetriedaten als Dienstname erkannt werden sollen.",
+      "fieldMappingPlaceholder": "Geben Sie einen Feldnamen ein und drücken Sie die Eingabetaste",
+      "foundInLogs": "In Logs gefunden",
+      "foundInTraces": "In Traces gefunden",
+      "foundInMetrics": "In Metriken gefunden",
+      "distinguishByLabel": "Dienste unterscheiden nach",
+      "distinguishByHelp": "Wählen Sie Felder, die festlegen, wo Ihre Dienste ausgeführt werden. Beispielsweise erzeugen Cluster + Namespace + Deployment zusammen eine eindeutige Identität für jeden Dienst. Bis zu 5 Felder.",
+      "serviceOptionalLabel": "Ohne Dienstattribut korrelieren",
+      "serviceOptionalHelp": "Streams nur anhand der folgenden Attribute abgleichen, Dienstattribute ignorieren",
+      "noFieldsConfiguredYet": "Noch keine Felder zur Eindeutigkeit konfiguriert.",
+      "addField": "Feld hinzufügen",
+      "addFieldTooltip": "Fügen Sie ein weiteres Feld hinzu, um Dienste eindeutig zu identifizieren (max. 5). Beispiele: Region, Namespace oder Umgebung.",
+      "addGroup": "Gruppe hinzufügen",
+      "addGroupTooltip": "Erstellen Sie einen separaten Satz von Eindeutigkeitsfeldern für eine andere Umgebung (z. B. unterschiedliche Felder für Kubernetes vs. AWS)",
+      "autoSuggestedBanner": "Diese Felder wurden automatisch vorgeschlagen, da sie wenige eindeutige Werte aufweisen (geringe Kardinalität) und in den meisten Ihrer Dienste vorkommen – ideal, um Dienste mit demselben Namen zu unterscheiden. Sie können sie vor dem Speichern anpassen.",
+      "addDisambiguationField": "Weiteres hinzufügen",
+      "removeDisambiguationField": "Feld entfernen",
+      "nameFieldLockedNote": "Das Feld für den Dienstnamen kann nach der ersten Konfiguration nicht mehr geändert werden",
+      "noGroupsAvailable": "Keine Feldgruppen verfügbar",
+      "selectField": "Feld auswählen",
+      "detectedLabel": "Wir haben anhand Ihrer Daten eine {type}-Workload erkannt.",
+      "suggestionPrompt": "Sollen wir den Vorschlag anwenden?",
+      "applySuggestion": "Vorschlag anwenden",
+      "logStreams": "Log-Streams",
+      "traceStreams": "Trace-Streams",
+      "metricStreams": "Metrik-Streams",
+      "saveIdentityConfig": "Konfiguration speichern",
+      "identityConfigSaved": "Konfiguration der Dienstidentität erfolgreich gespeichert",
+      "identityConfigSaveFailed": "Konfiguration der Dienstidentität konnte nicht gespeichert werden",
+      "loadRecommendationsFailed": "Empfehlungen konnten nicht geladen werden",
+      "resetServices": "Dienste zurücksetzen",
+      "resetServicesTooltip": "Alle erkannten Dienste löschen. Sie werden automatisch erneut erkannt, sobald neue Daten eintreffen.",
+      "resetServicesConfirmTitle": "Alle erkannten Dienste zurücksetzen?",
+      "resetServicesConfirmMessage": "Dadurch werden alle erkannten Dienste für diese Organisation gelöscht. Dienste werden automatisch erneut erkannt, sobald neue Telemetriedaten erfasst werden. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "resetServicesConfirmWarning": "Dienste werden automatisch erneut erkannt, sobald neue Telemetriedaten erfasst werden. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "resetServicesSuccess": "{count} erkannte(r) Dienst(e) erfolgreich gelöscht.",
+      "resetServicesFailed": "Dienste konnten nicht zurückgesetzt werden",
+      "workload": "Workload",
+      "goToConfiguration": "Zur Konfiguration",
+      "configureServicesHint": "um zu konfigurieren, wie Dienste identifiziert und gruppiert werden.",
+      "filterBy": "Filtern nach:",
+      "selectFieldPlaceholder": "Feld auswählen",
+      "selectValuePlaceholder": "Wert auswählen",
+      "selectFieldFirst": "Wählen Sie zuerst ein Feld",
+      "instanceSingular": "Instanz",
+      "instancePlural": "Instanzen",
+      "serviceSingular": "Dienst",
+      "serviceCountSingular": "{count} Dienst",
+      "serviceCountPlural": "{count} Dienste",
+      "instancesCount": "({count} Instanzen)",
+      "noDimensions": "keine Dimensionen",
+      "defaultSetWarningTitle": "Die Korrelation ist möglicherweise unzuverlässig.",
+      "defaultSetWarningBody": "Diese Instanz hat keine Eindeutigkeitsmerkmale – sie wurde ohne übereinstimmende Workload erkannt (kein Cluster-, Namespace- oder Umgebungskontext). Logs und Traces stammen möglicherweise aus unterschiedlichen Deployments desselben Dienstnamens.",
+      "instanceIdentity": "Instanzidentität",
+      "noDimensionsCatchAll": "Keine Dimensionen – Catch-all-Instanz",
+      "streamSources": "Stream-Quellen",
+      "openInLogsTooltip": "In Logs mit Dienstfilter öffnen",
+      "fieldNameMapping": "Feldnamenzuordnung",
+      "logsWithCount": "Logs ({count})",
+      "tracesWithCount": "Traces ({count})",
+      "metricsWithCount": "Metriken ({count})"
     },
     "pageSubtitle": "Passen Sie die Einstellungen für Ihre Anwendung an",
     "platformSettings": "Plattform-Einstellungen",
@@ -2824,7 +3108,29 @@
     "usageStreamEnabledLabel": "Nutzungsstream aktivieren",
     "aiToolsets": "KI-Toolsets",
     "llmModelPricing": "LLM-Modellpreisgestaltung",
-    "ingestionTokens": "Tokens für die Aufnahme"
+    "ingestionTokens": "Tokens für die Aufnahme",
+    "groupGeneral": "Allgemein",
+    "groupAccessSecurity": "Zugriff & Sicherheit",
+    "groupDestinationsTemplates": "Ziele & Vorlagen",
+    "groupDataAI": "Daten & KI",
+    "groupOperations": "Betrieb",
+    "groupAccount": "Konto",
+    "generalDesc": "Design, Standardabfragen und zentrale Einstellungen",
+    "orgDesc": "Organisationsparameter und Kennungen",
+    "cipherKeysDesc": "Verschlüsselungsschlüssel für sensible Felder",
+    "regexPatternsDesc": "Wiederverwendbare regex-Muster zur Schwärzung",
+    "domainManagementDesc": "Anmeldung auf zulässige SSO-Domänen beschränken",
+    "alertDestinationsDesc": "Wohin ausgelöste Alarme zugestellt werden",
+    "pipelineDestinationsDesc": "Externe Ziele für die Pipeline-Ausgabe",
+    "templatesDesc": "Wiederverwendbare Vorlagen für Alarmmeldungen",
+    "storageSettingsDesc": "Speicherkonfiguration pro Organisation",
+    "modelPricingDesc": "Kostenkonfiguration für LLM-Modelle",
+    "correlationSettingsDesc": "Konfiguration der Telemetrie-Korrelation",
+    "llmProvidersDesc": "LLM-Anbieter für Online-Bewertungen",
+    "queryManagementDesc": "Laufende Abfragen prüfen und abbrechen",
+    "nodesDesc": "Cluster-Knoten und deren Zustand",
+    "licenseDesc": "Details zur Enterprise-Lizenz",
+    "organizationManagementDesc": "Organisationen erstellen und verwalten"
   },
   "iam": {
     "users": "Nutzer",
@@ -2857,7 +3163,19 @@
     "externalUserWarningTitle": "Warnung für externe Benutzer",
     "externalUserWarningMessage": "Wenn Sie externe Benutzer direkt zu Rollen hinzufügen, werden keine Berechtigungen erteilt. Fügen Sie sie stattdessen zu Benutzergruppen hinzu.",
     "invitations": "Einladungen",
-    "ingestionTokens": "Tokens für die Aufnahme"
+    "ingestionTokens": "Tokens für die Aufnahme",
+    "sectionAccess": "Zugriff",
+    "sectionPermissions": "Genehmigungen",
+    "sectionOrganization": "Organisation",
+    "usersDesc": "Personen mit Zugang zu dieser Organisation",
+    "serviceAccountsDesc": "Programmatische Zugriffstoken für APIs",
+    "ingestionTokensDesc": "Tokens für die Aufnahme von Daten in diese Organisation",
+    "invitationsDesc": "Ausstehende und gesendete Mitgliedereinladungen",
+    "groupsDesc": "Gruppieren Sie Benutzer, um Rollen zuzuweisen",
+    "rolesDesc": "Definieren Sie Berechtigungen und Zugriffsrichtlinien",
+    "quotaDesc": "Pro Rolle geltende Nutzungsbeschränkungen",
+    "organizationsDesc": "Organisationen, auf die Sie zugreifen können",
+    "nameHelpText": "Verwenden Sie nur alphanumerische Zeichen und '_'-Zeichen ohne Leerzeichen."
   },
   "pipeline": {
     "header": "Rohrleitungen",
@@ -3018,7 +3336,14 @@
     "dimensionWidth": "Breite (px)",
     "dimensionHeight": "Höhe (px)",
     "imagePreview": "Fügen Sie ein Inline-Dashboard-Vorschaubild hinzu",
-    "customDimensions": "Benutzerdefinierte Abmessungen (für Fortgeschrittene)"
+    "customDimensions": "Benutzerdefinierte Abmessungen (für Fortgeschrittene)",
+    "subtitle": "Geplante Berichte und Exporte",
+    "searchThisFolder": "Dieser Ordner",
+    "searchAllFolders": "Alle Ordner",
+    "reloadReports": "Berichte neu laden",
+    "moveToFolder": "In Ordner verschieben",
+    "deleteReportsTitle": "Berichte löschen",
+    "deleteReportsMsg": "Sind Sie sicher, dass Sie {count} Bericht (e) löschen möchten?"
   },
   "queries": {
     "runningQueries": "Abfragen ausführen",
@@ -3146,19 +3471,27 @@
         "p99Latency": "P99",
         "avgLatency": "Durchschnittliche Latenz",
         "lastSeen": "Zuletzt gesehen",
-        "operations": "Operationen"
+        "operations": "Operationen",
+        "avgDuration": "Durchschn. Dauer",
+        "maxDuration": "Max. Dauer"
       },
       "status": {
         "healthy": "Gesund",
         "warning": "Warnung",
-        "degraded": "Degradiert"
+        "degraded": "Degradiert",
+        "critical": "Kritisch"
       },
       "viewTraces": "Spuren ansehen",
       "exportCsv": "CSV exportieren",
       "justNow": "Gerade eben",
       "minutesAgo": "vor {n} m",
       "hoursAgo": "vor {n} h",
-      "daysAgo": "vor {n} d"
+      "daysAgo": "vor {n} d",
+      "serviceLabel": "Dienst",
+      "servicesLabel": "Dienste",
+      "legend": {
+        "title": "Fehlerrate"
+      }
     },
     "noErrorPresent": "Für diese Spanne ist kein Fehler vorhanden",
     "httpStatusCode": "HTTP-Statuscode",
@@ -3196,8 +3529,12 @@
         "duration": "Dauer",
         "tokens": "Tokens",
         "cost": "Kosten",
-        "status": "Status"
-      }
+        "status": "Status",
+        "user": "Benutzer",
+        "firstMessage": "Erste Nachricht"
+      },
+      "streamLabel": "Stream",
+      "unknownUser": "Unbekannter Benutzer"
     },
     "sessionDetail": {
       "backToSessions": "Zurück zu Sessions",
@@ -3239,7 +3576,15 @@
         "output": "Ausgang",
         "total": "Insgesamt",
         "cost": "Kosten",
-        "spans": "Spannweiten"
+        "spans": "Spannweiten",
+        "llmCalls": "LLM-Aufrufe",
+        "toolCalls": "Tool-Aufrufe",
+        "otherCalls": "Sonstige",
+        "otherCallsTooltip": "gen_ai-Spans mit nicht erkannten Operationsnamen:"
+      },
+      "fullscreen": {
+        "expandTurn": "Turn im Vollbild anzeigen",
+        "close": "Schließen"
       }
     },
     "openInFullView": "In Vollansicht öffnen",
@@ -3276,11 +3621,28 @@
       "expandRange": "Erweitern Sie den Zeitbereich",
       "expandRangeDescAbsolute": "Wechseln Sie zu einem breiteren relativen Zeitbereich",
       "removeFilter": "Einen Filter entfernen",
-      "selectedRange": "der gewählte Bereich"
+      "selectedRange": "der gewählte Bereich",
+      "descOutOfRange": "Ihr Zeitfenster enthält keine Daten aus diesem Stream. Springen Sie zu dem Zeitpunkt, an dem zuletzt Daten gesehen wurden.",
+      "descDataAtBoundary": "Der Stream enthält Daten in diesem Zeitfenster, aber keine Traces stimmten überein. Versuchen Sie, den Zeitbereich zu erweitern.",
+      "jumpToData": "Zu den neuesten Daten springen"
     },
     "showAll": "Zeige alles",
     "filterByErrors": "Nach Fehlern filtern",
-    "clearErrorFilter": "Fehlerfilter löschen"
+    "clearErrorFilter": "Fehlerfilter löschen",
+    "spansTab": "Spannweiten",
+    "tracesTab": "Spuren",
+    "serviceGraphTab": "Service-Diagramm",
+    "treeView": "Blick auf den Baum",
+    "graphView": "Diagrammansicht",
+    "layoutHorizontal": "Horizontal",
+    "layoutVertical": "Vertikal",
+    "layoutForce": "Anordnung erzwingen",
+    "exportTraces": "Spuren exportieren",
+    "waterfall": "Wasserfall",
+    "flameGraph": "Flammendiagramm",
+    "traceGraph": "Diagramm verfolgen",
+    "dag": "DAG",
+    "thread": "Gewinde"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -3450,7 +3812,38 @@
     "failed_to_load": "Muster konnten nicht geladen werden",
     "no_patterns_selected": "Bitte wählen Sie mindestens ein Muster aus",
     "name_required": "* Name ist erforderlich",
-    "pattern_required": "* Muster ist erforderlich"
+    "pattern_required": "* Muster ist erforderlich",
+    "associated_breadcrumb": "Stream-Details",
+    "associated_search_placeholder": "Suchen",
+    "applied_patterns_count": "Angewendete Muster ({count})",
+    "all_patterns_count": "Alle Muster ({count})",
+    "no_data_available": "Keine Daten verfügbar",
+    "no_patterns_applied_title": "Noch keine Muster angewendet",
+    "no_patterns_applied_subtitle": "Durchsuchen Sie die Musterbibliothek, um regex auf Ihre Felder anzuwenden.",
+    "pattern_name": "Mustername",
+    "when_value_matches": "Wenn der Wert übereinstimmt",
+    "redact": "Schwärzen",
+    "redact_hint": "Durch [REDACTED] ersetzen",
+    "drop": "Verwerfen",
+    "drop_hint": "Das Feld vollständig verwerfen",
+    "hash": "Hash",
+    "hash_hint": "Durch durchsuchbaren Hash ersetzen",
+    "detect_at": "Erkennen bei",
+    "ingestion": "Ingestion",
+    "query": "Abfrage",
+    "test_pattern": "Muster testen",
+    "test_input": "Eingabe testen",
+    "regex_pattern_label": "Regex-Muster",
+    "input_string": "Eingabezeichenkette",
+    "input_string_placeholder": "Bsp. 1234567890",
+    "output": "Ausgabe",
+    "output_string_placeholder": "Ausgabezeichenkette",
+    "click_test_input_hint": "Bitte klicken Sie auf „Eingabe testen“, um die Ergebnisse anzuzeigen",
+    "remove_pattern": "Muster entfernen",
+    "add_pattern": "Muster hinzufügen",
+    "remove_pattern_confirm_msg": "Möchten Sie dieses Muster wirklich aus dem Feld entfernen?",
+    "failed_to_test_string": "Zeichenkette konnte nicht getestet werden",
+    "select_detect_at_option": "Bitte wählen Sie eine Option für „Erkennen bei“"
   },
   "search_history": {
     "title": "Verlauf durchsuchen",
@@ -3678,7 +4071,10 @@
         "duration": "Dauer",
         "startBeforeEnd": "Die Startzeit muss vor der Endzeit liegen",
         "endAfterStart": "Die Endzeit muss nach der Startzeit liegen"
-      }
+      },
+      "filtersLabel": "Filter",
+      "errorDetails": "Beim Abrufen der Log-Daten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+      "viewLogs": "Logs anzeigen"
     },
     "viewInTraces": "In Traces ansehen",
     "viewInTracesTooltip": "Öffnen Sie die Traces-Seite mit dem RED-Metriken-Dashboard und allen korrelierten Traces",
@@ -4051,7 +4447,12 @@
     "emptyActionLogs": "Logs erkunden",
     "emptyActionLogsDesc": "Suchen und filtern Sie Ihre Log-Streams",
     "emptyActionTraces": "Spuren erkunden",
-    "emptyActionTracesDesc": "Untersuchen Sie verteilte Traces und die Servicelatenz"
+    "emptyActionTracesDesc": "Untersuchen Sie verteilte Traces und die Servicelatenz",
+    "viewAll": "Alles ansehen",
+    "showingOf": "Es werden {gezeigt} von {total} angezeigt",
+    "colErrorRate": "Fehlerrate",
+    "colLatency": "Latenz",
+    "colReqs": "Requen"
   },
   "chatHistory": {
     "title": "Chats",
@@ -4164,7 +4565,13 @@
       "one": "Zeige mir Fehler der letzten Stunde...",
       "two": "Schreiben Sie VRL, um JSON aus Nginx-Protokollen zu analysieren...",
       "three": "Erstellen Sie ein Dashboard für den K8s-Knotenstatus..."
-    }
+    },
+    "autoNavigation": {
+      "label": "Automatische Navigation",
+      "enabledTooltip": "Autonavigation aktiviert — O2 Assistant navigiert automatisch ohne Bestätigung",
+      "disabledTooltip": "Autonavigation deaktiviert — O2 Assistant fragt vor dem Navigieren"
+    },
+    "attachImageTooltip": "Bilder anhängen (PNG, JPEG, max. 2 MB)"
   },
   "emptyState": {
     "noSearchResults": {
@@ -4284,7 +4691,29 @@
       "reports": "Berichte",
       "queries": "Anfragen",
       "serviceAccounts": "Dienstkonten",
-      "invitations": "Einladungen"
+      "invitations": "Einladungen",
+      "searchJobs": "Suchaufträge",
+      "groups": "Gruppen",
+      "roles": "Rollen",
+      "anomalyConfigs": "Konfigurationen zur Anomalieerkennung",
+      "apiLimits": "API-Limits",
+      "roleLimits": "Rollenlimits",
+      "ingestionTokens": "Ingestion-Token",
+      "organizations": "Organisationen",
+      "alertDestinations": "Ziele",
+      "pipelineDestinations": "Ziele",
+      "alertTemplates": "Vorlagen",
+      "evalTemplates": "Bewertungsvorlagen",
+      "enrichmentTables": "Anreicherungstabellen",
+      "cipherKeys": "Verschlüsselungsschlüssel",
+      "aiToolsets": "KI-Toolsets",
+      "llmProviders": "LLM-Anbieter",
+      "sourceMaps": "Source Maps",
+      "backfillJobs": "Backfill-Aufträge",
+      "scorers": "Scorer",
+      "evalJobs": "Bewertungsaufträge",
+      "scoreConfigs": "Score-Konfigurationen",
+      "pipelineHistory": "Pipeline-Verlauf"
     },
     "noDashboardsInFolder": {
       "title": "Keine Dashboards in diesem Ordner",
@@ -4475,13 +4904,21 @@
     },
     "actions": {
       "edit": "Bearbeiten",
-      "delete": "Löschen"
+      "delete": "Löschen",
+      "export": "Exportieren",
+      "activate": "Aktivieren",
+      "pause": "Pausieren",
+      "activated": "Auftrag aktiviert",
+      "paused": "Auftrag pausiert",
+      "activateError": "Auftrag konnte nicht aktiviert werden",
+      "pauseError": "Auftrag konnte nicht pausiert werden"
     },
     "tabs": {
       "jobs": "Stellenangebote evaluieren",
       "scorers": "Torschützen",
       "scoreConfigs": "Score-Konfigurationen",
-      "providers": "Anbieter"
+      "providers": "Anbieter",
+      "quality": "Qualität"
     },
     "singular": {
       "jobs": "Job evaluieren",
@@ -4505,7 +4942,11 @@
     "buttons": {
       "cancel": "Stornieren",
       "create": "Erstellen",
-      "save": "Speichern"
+      "save": "Speichern",
+      "close": "Schließen",
+      "remove": "Entfernen",
+      "saveAsDraft": "Als Entwurf speichern",
+      "createAndActivate": "Erstellen & aktivieren"
     },
     "scorerTypeDialog": {
       "title": "Einen neuen Scorer erstellen",
@@ -4515,7 +4956,11 @@
       "remoteTitle": "Fernbedienung",
       "remoteDescription": "Rufen Sie Ihren eigenen HTTP-Endpunkt für das Scoring auf.",
       "codeTitle": "Kode",
-      "codeDescription": "Kommt bald."
+      "codeDescription": "Kommt bald.",
+      "llmJudgeCta": "Judge konfigurieren",
+      "remoteCta": "Endpunkt konfigurieren",
+      "codeCta": "In einer zukünftigen Version verfügbar",
+      "comingSoonBadge": "Demnächst verfügbar"
     },
     "provider": {
       "backTo": "Zurück zu Anbietern",
@@ -4535,7 +4980,15 @@
       "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
       "useAsDefault": "Als Standardanbieter verwenden",
       "authConfigLabel": "Authentifizierungskonfiguration JSON",
-      "saveError": "Anbieter konnte nicht gespeichert werden"
+      "saveError": "Anbieter konnte nicht gespeichert werden",
+      "authConfigHelp": "Anmeldedaten werden im Ruhezustand verschlüsselt und können nach dem Speichern nicht mehr ausgelesen werden.",
+      "apiKeyLabel": "API-Schlüssel",
+      "apiKeyPlaceholder": "API-Schlüssel eingeben",
+      "apiKeyHelp": "Im Ruhezustand verschlüsselt gespeichert und nie wieder ausgelesen. Lassen Sie das Feld beim Bearbeiten leer, um den vorhandenen Schlüssel beizubehalten.",
+      "authSection": "Authentifizierung",
+      "authEditNote": "Anmeldedaten können nicht ausgelesen werden. Geben Sie den API-Schlüssel nur erneut ein, wenn Sie ihn rotieren möchten.",
+      "cannotRename": "Kann nach der Erstellung nicht umbenannt werden.",
+      "availableModelsHelp": "Optional. Kommagetrennte Liste der bei diesem Anbieter verfügbaren Modelle."
     },
     "scoreConfig": {
       "createTitle": "Neue Score-Konfiguration",
@@ -4552,7 +5005,129 @@
         "categorical": "Kategorisch",
         "boolean": "Boolesch"
       },
-      "saveError": "Die Score-Konfiguration konnte nicht gespeichert werden"
+      "saveError": "Die Score-Konfiguration konnte nicht gespeichert werden",
+      "booleanValues": "true / false",
+      "detail": {
+        "eyebrow": "Score-Konfiguration",
+        "close": "Schließen",
+        "statusActive": "Aktiv",
+        "statusInactive": "Inaktiv",
+        "createdShort": "Erstellt",
+        "tabs": {
+          "overview": "Übersicht",
+          "versions": "Versionen",
+          "usedBy": "Verwendet von"
+        },
+        "descriptionSection": "Beschreibung",
+        "configurationSection": "Konfiguration",
+        "dataTypeLabel": "Datentyp",
+        "rangeLabel": "Bereich",
+        "categoriesLabel": "Kategorien",
+        "valuesLabel": "Werte",
+        "thresholdSection": "Schwellenwert für Gesundheit",
+        "thresholdHint": "Wertet einen Score als gesund",
+        "noThreshold": "Nicht angegeben",
+        "noThresholdHint": "Kein Schwellenwert angegeben – Scores in dieser Dimension tragen nicht zu Qualitätsstatussignalen bei.",
+        "usedByIntro": "Jeder Scorer, der einen Wert mit diesem Dimensionsnamen ausgibt.",
+        "usedByEmpty": "Noch kein Scorer verweist auf diese Konfiguration.",
+        "scorerTypeLlmJudge": "LLM Judge",
+        "scorerTypeRemote": "Remote",
+        "versionsIntro": "Jede Änderung an Bereich, Kategorien oder dem Schwellenwert für Gesundheit erstellt eine neue Version. Historische Scores bleiben der Version zugeordnet, die sie erzeugt hat.",
+        "activeVersionChip": "Aktiv",
+        "lastUpdated": "Zuletzt aktualisiert",
+        "metadataSection": "Metadaten",
+        "statusLabel": "Status",
+        "versionLabel": "Version",
+        "createdLabel": "Erstellt",
+        "updatedLabel": "Aktualisiert"
+      },
+      "editTitlePrefix": "Bearbeiten",
+      "eyebrow": "Score-Konfigurationen",
+      "sectionTitle": "Score-Konfigurationen",
+      "listTitle": "Score-Konfigurationen",
+      "listSubtitle": "Soft-Schema-Dimensionen, die Scorer erzeugen.",
+      "searchPlaceholder": "Konfigurationen suchen",
+      "allTypes": "Alle Typen",
+      "newButton": "Neue Score-Konfiguration",
+      "saveButton": "Änderungen speichern",
+      "createButton": "Erstellen",
+      "columns": {
+        "index": "#",
+        "name": "Name",
+        "type": "Typ",
+        "rangeValues": "Bereich / Werte",
+        "healthy": "Gesund",
+        "activeVersion": "Aktive Version",
+        "usedBy": "Verwendet von",
+        "created": "Erstellt",
+        "actions": "Aktionen"
+      },
+      "active": "aktiv",
+      "usedByScorers": "{count} Scorer",
+      "usedByScorer": "{count} Scorer",
+      "noHealthy": "—",
+      "createInfoNumeric": "Legen Sie fest, wann Scores in dieser Dimension als gesund gelten. Scores außerhalb dieses Bereichs lösen Qualitätsprobleme in Trace-Listen, Sitzungen und anderen Ansichten aus.",
+      "editInfoBannerEmphasis": {
+        "numeric": "Das Ändern des Bereichs oder des Schwellenwerts für Gesundheit erstellt {nextVersion}.",
+        "categorical": "Das Ändern der Kategorien oder des Schwellenwerts für Gesundheit erstellt {nextVersion}.",
+        "boolean": "Das Ändern des Werts für Gesundheit erstellt {nextVersion}."
+      },
+      "editInfoBannerDetail": "Historische Scores bleiben der Version zugeordnet, die sie erzeugt hat. Reine Beschreibungsänderungen werden direkt übernommen.",
+      "createInfoSubtitle": "Reine Beschreibungsänderungen aktualisieren {version} direkt.",
+      "namePlaceholder": "z. B. „faithfulness“",
+      "nameHelp": "Nur Kleinbuchstaben, Zahlen und Unterstriche. Wird als stabile Kennung verwendet.",
+      "cannotBeRenamed": "Kann nicht umbenannt werden",
+      "descriptionPlaceholder": "Was misst diese Dimension?",
+      "descriptionHelp": "Reine Beschreibungsänderungen erstellen keine neue Version.",
+      "dataTypeLocked": "Gesperrt",
+      "dataTypeCannotChange": "Kann nach der Erstellung nicht geändert werden",
+      "dataTypeHelp": {
+        "numeric": "Bewertung als Zahl in einem Bereich",
+        "categorical": "Bewertung als eines von N Labels",
+        "boolean": "Bewertung als true / false"
+      },
+      "minLabel": "Min.",
+      "maxLabel": "Max.",
+      "addCategoryPlaceholder": "Kategorie hinzufügen",
+      "addCategoryButton": "Hinzufügen",
+      "booleanInfo": "Boolesche Konfigurationen akzeptieren die Werte {trueLabel} / {falseLabel}. Keine weitere Konfiguration erforderlich.",
+      "healthyThresholdTitle": "Schwellenwert für Gesundheit",
+      "optional": "Optional",
+      "healthyThresholdIntro": "Legen Sie fest, wann Scores in dieser Dimension als gesund gelten. Scores außerhalb dieses Bereichs lösen Qualitätsprobleme in Trace-Listen, Sitzungen und anderen Ansichten aus.",
+      "healthyWhenValueIs": "Gesund, wenn der Wert ist:",
+      "healthyCategories": "Gesunde Kategorien:",
+      "healthyCategoriesHint": "Markieren Sie alle Werte, die als gesund gelten.",
+      "healthyValue": "Wert für Gesundheit:",
+      "gteLabel": "Größer als oder gleich",
+      "lteLabel": "Kleiner als oder gleich",
+      "trueIsHealthy": "true ist gesund",
+      "trueIsHealthyHint": "Scores von false lösen Qualitätsprobleme aus.",
+      "falseIsHealthy": "false ist gesund",
+      "falseIsHealthyHint": "Scores von true lösen Qualitätsprobleme aus.",
+      "thresholdEmptyHint": "Wenn Sie dieses Feld leer lassen, trägt diese Dimension produktweit nicht zu Qualitätsstatussignalen bei. Scores werden weiterhin erfasst, lösen aber keine Problemindikatoren aus.",
+      "empty": {
+        "title": "Noch keine Score-Konfigurationen",
+        "description": "Score-Konfigurationen definieren die Dimensionen, die Ihre Scorer erzeugen – Name, Datentyp, Wertebereich und Schwellenwert für Gesundheit. Erstellen Sie eine, um mit der Online-Bewertung zu beginnen.",
+        "chipTypes": "Numerisch, Kategorial, Boolesch",
+        "chipThreshold": "Schwellenwert für Gesundheit"
+      },
+      "import": {
+        "title": "Score-Konfiguration importieren",
+        "button": "Importieren",
+        "customLabel": "Benutzerdefiniert",
+        "customSubtitle": "Aus JSON-Datei oder URL importieren",
+        "libraryLabel": "Bibliothek",
+        "librarySubtitle": "Aus kuratiertem Katalog durchsuchen und importieren",
+        "libraryDrawerTitle": "Bibliothek für Score-Konfigurationen",
+        "outputMessages": "Ausgabemeldungen",
+        "creation": "Erstellung der Score-Konfiguration",
+        "errors": {
+          "title": "Validierungsfehler"
+        }
+      },
+      "export": {
+        "bulkButton": "Exportieren"
+      }
     },
     "scorer": {
       "backTo": "Zurück zu Scorers",
@@ -4604,7 +5179,203 @@
         "authHint": "Überprüfen Sie vor dem Speichern die Anmeldeinformationen des Anbieters.",
         "schemaHeader": "Schemafinkongruenz",
         "schemaHint": "Die Antwort entsprach nicht dem konfigurierten Ausgabeschema.",
-        "valuePlaceholder": "Wert für {variable}"
+        "valuePlaceholder": "Wert für {variable}",
+        "disabledHint": "Geben Sie Name, Anbieter, Vorlage und jeden Variablenwert ein, um einen Test auszuführen.",
+        "errorHeader": "Test fehlgeschlagen",
+        "errorFallback": "Scorer-Test fehlgeschlagen. Prüfen Sie die Serverprotokolle für Details.",
+        "resultScore": "Score",
+        "resultLatency": "Latenz",
+        "resultModel": "Modell",
+        "resultTokens": "Token",
+        "resultReasoning": "Begründung",
+        "resultRaw": "Rohantwort"
+      },
+      "detail": {
+        "close": "Schließen",
+        "eyebrow": "Scorer",
+        "refresh": "Aktualisieren",
+        "descriptionSection": "Beschreibung",
+        "configurationSection": "Konfiguration",
+        "scorerTypeLabel": "Scorer-Typ",
+        "providerLabel": "Anbieter",
+        "providerUnknown": "Unbekannt",
+        "modelLabel": "Modell",
+        "endpointLabel": "Endpunkt",
+        "producesSection": "Erzeugt Score-Konfiguration",
+        "producesEmpty": "Dieser Scorer schreibt in keine Score-Konfiguration.",
+        "promptSection": "Judge-Prompt",
+        "requestTemplateSection": "Anfragevorlage",
+        "variablesSuffix": "Variablen",
+        "outputSchemaSection": "Ausgabeschema",
+        "usedBySection": "Verwendet von",
+        "usedByIntro": "Aufträge, die in ihrer Pipeline auf diesen Scorer verweisen.",
+        "usedByEmpty": "Noch kein Auftrag verweist auf diesen Scorer.",
+        "versionsIntro": "Versionen sind unveränderliche Snapshots der Scorer-Konfiguration. Die aktive Version ist die, die Aufträge heute ausführen.",
+        "activeVersionChip": "Aktiv",
+        "lastUpdated": "Zuletzt aktualisiert",
+        "metadataSection": "Metadaten",
+        "versionLabel": "Version",
+        "createdLabel": "Erstellt",
+        "updatedLabel": "Aktualisiert",
+        "typeLlmJudge": "LLM Judge",
+        "typeRemote": "Remote",
+        "tabs": {
+          "configuration": "Konfiguration",
+          "versions": "Versionen",
+          "runs": "Ausführungen",
+          "usedBy": "Verwendet von"
+        },
+        "kpis": {
+          "totalRuns": "Gesamtausführungen (24 h)",
+          "totalRunsSub": "Über alle verweisenden Aufträge",
+          "successRate": "Erfolgsrate",
+          "successRateSub": "Letzte 24 h",
+          "avgLatency": "Durchschn. Latenz",
+          "avgLatencySub": "p50 über alle Ausführungen",
+          "usedBy": "Verwendet von",
+          "usedBySubSingular": "Auftrag",
+          "usedBySubPlural": "Aufträge"
+        },
+        "runs": {
+          "showingPrefix": "Anzeige von",
+          "showingOf": "von",
+          "showingSuffix": "Ausführungen",
+          "empty": "Keine Scorer-Ausführungen in diesem Zeitfenster.",
+          "spanLabel": "Span",
+          "traceLabel": "Trace",
+          "jobUnknown": "—",
+          "col": {
+            "time": "Zeit",
+            "job": "Auftrag",
+            "target": "Ziel",
+            "score": "Score",
+            "latency": "Latenz",
+            "status": "Status"
+          }
+        }
+      },
+      "listTitle": "Scorer",
+      "listSubtitle": "Scorer werden auf Ihre Traces angewendet und erzeugen Scores für definierte Dimensionen.",
+      "searchPlaceholder": "Scorer suchen",
+      "allTypes": "Alle Typen",
+      "newButton": "Neuer Scorer",
+      "usedByJobs": "{count} Aufträge",
+      "usedByJob": "{count} Auftrag",
+      "columns": {
+        "name": "Name",
+        "type": "Typ",
+        "produces": "Erzeugt",
+        "version": "Version",
+        "usedBy": "Verwendet von",
+        "lastRun": "Letzte Ausführung",
+        "successRate": "Erfolgsrate (24 h)",
+        "actions": "Aktionen"
+      },
+      "empty": {
+        "title": "Noch keine Scorer",
+        "description": "Scorer sind die Ausführungseinheiten der Bewertung. Sie verwenden Spans aus Ihren Produktions-Traces und erzeugen Scores entlang der Qualitätsdimensionen, die für Sie wichtig sind.",
+        "chipLlmJudge": "LLM Judge",
+        "chipRemote": "Remote",
+        "chipCode": "Code"
+      },
+      "noProviders": {
+        "title": "Fügen Sie zuerst einen Anbieter hinzu",
+        "description": "Scorer benötigen einen LLM-Anbieter (OpenAI, Anthropic usw.), um ausgeführt zu werden. Fügen Sie in den Einstellungen einen Anbieter hinzu, bevor Sie Scorer erstellen.",
+        "chipRequired": "Erforderlich für LLM Judge",
+        "cta": "Anbieter hinzufügen"
+      },
+      "import": {
+        "title": "Scorer importieren",
+        "button": "Importieren",
+        "customLabel": "Benutzerdefiniert",
+        "customSubtitle": "Aus JSON-Datei oder URL importieren",
+        "libraryLabel": "Bibliothek",
+        "librarySubtitle": "Aus kuratiertem Katalog durchsuchen und importieren",
+        "libraryDrawerTitle": "Scorer-Bibliothek",
+        "outputMessages": "Ausgabemeldungen",
+        "creation": "Scorer-Erstellung",
+        "errors": {
+          "title": "Validierungsfehler"
+        }
+      },
+      "export": {
+        "bulkButton": "Exportieren"
+      },
+      "descriptionPlaceholder": "Eine kurze Zusammenfassung dessen, was dieser Scorer misst.",
+      "producesScoreHelp": "Welche Dimension misst dieser Scorer?",
+      "providerHelp": "Wählen Sie den LLM-Anbieter, den dieser Judge aufruft. Verwalten Sie Anbieter unter {settingsLink}.",
+      "providerHelpSettingsLink": "Einstellungen",
+      "refreshProviders": "Anbieter aktualisieren",
+      "selectedPrefix": "Ausgewählt:",
+      "endpointLabel": "Endpunkt:",
+      "defaultModelPreviewLabel": "Standardmodell:",
+      "authLabel": "Auth:",
+      "authConfigured": "konfiguriert",
+      "authNotConfigured": "nicht konfiguriert",
+      "rangeLabel": "Bereich:",
+      "healthyLabel": "Gesund:",
+      "typeLabel": "Typ:",
+      "promptVariablesLabel": "Variablen:",
+      "promptHelp": "Konzentrieren Sie sich auf die Bewertungslogik. Verwenden Sie {inputVar} und {outputVar} als Platzhalter.",
+      "includeReasoningLabel": "Begründung einbeziehen",
+      "includeReasoningHint": "Das LLM erläutert seinen Score. Gespeichert in score.metadata.reasoning.",
+      "extraFieldsLabel": "Zusätzliche Metadatenfelder",
+      "extraFieldsOptional": "Optional",
+      "extraFieldsHint": "Fügen Sie Felder hinzu, die das LLM neben dem Score ausgeben soll. Gespeichert in score.metadata zur späteren Analyse.",
+      "extraFields": {
+        "colName": "Feldname",
+        "colType": "Typ",
+        "colDescription": "Beschreibung",
+        "namePlaceholder": "field_name",
+        "descriptionPlaceholder": "Was soll das LLM in dieses Feld einfügen?",
+        "addButton": "+ Feld hinzufügen",
+        "previewSchema": "Generiertes Schema anzeigen",
+        "schemaTitle": "Generiertes JSON-Schema",
+        "schemaLoading": "Schema wird abgeleitet…",
+        "schemaCopy": "Kopieren",
+        "schemaCopied": "Kopiert",
+        "schemaCopyFailed": "Schema konnte nicht in die Zwischenablage kopiert werden.",
+        "typeString": "string",
+        "typeNumber": "number",
+        "typeBoolean": "boolean"
+      },
+      "authSection": "Authentifizierung",
+      "headersSection": "Benutzerdefinierte Header",
+      "requestBodySection": "Anfragetext",
+      "remoteUrlLabel": "URL",
+      "remoteTimeoutLabel": "Timeout (ms)",
+      "remoteRetriesLabel": "Max. Wiederholungen",
+      "remoteBackoffLabel": "Backoff",
+      "remoteBackoff": {
+        "exponential": "Exponentiell",
+        "linear": "Linear",
+        "fixed": "Fest"
+      },
+      "remoteAuthLabel": "Auth-Typ",
+      "remoteAuth": {
+        "placeholder": "Auth-Typ auswählen",
+        "bearer": "Bearer-Token",
+        "basic": "Basic Auth",
+        "apiKey": "API-Schlüssel",
+        "tokenLabel": "Token",
+        "usernameLabel": "Benutzername",
+        "passwordLabel": "Passwort",
+        "headerNameLabel": "Header-Name",
+        "bearerTokenPlaceholder": "Bearer-Token einfügen",
+        "basicUsernamePlaceholder": "Benutzer",
+        "basicPasswordPlaceholder": "••••••••",
+        "apiKeyHeaderPlaceholder": "X-API-Key",
+        "apiKeyTokenPlaceholder": "API-Schlüssel einfügen",
+        "encryptedHint": "Im Ruhezustand verschlüsselt. Kann nach dem Speichern nicht mehr angezeigt werden."
+      },
+      "remoteHeaders": {
+        "subtitle": "Wird mit jeder Anfrage gesendet.",
+        "colName": "Name",
+        "colValue": "Wert",
+        "colKey": "Name",
+        "keyPlaceholder": "X-Custom-Header",
+        "valuePlaceholder": "Wert",
+        "addButton": "+ Header hinzufügen"
       }
     },
     "job": {
@@ -4637,7 +5408,10 @@
       "scorerPicker": {
         "title": "Torschützen",
         "hint": "Wählen Sie einen oder mehrere Scorer aus, die für jeden passenden Zeitraum ausgeführt werden sollen.",
-        "meta": "{Typ} · v {Version}"
+        "meta": "{Typ} · v {Version}",
+        "placeholder": "Scorer auswählen",
+        "searchPlaceholder": "Scorer suchen…",
+        "empty": "Keine Scorer verfügbar. Erstellen Sie zuerst einen im Tab „Scorer“."
       },
       "filter": {
         "title": "Zustand des Filters",
@@ -4662,7 +5436,117 @@
         "emptyValue": "—"
       },
       "selectAtLeastOne": "Wählen Sie mindestens einen Scorer aus",
-      "saveError": "Fehler beim Speichern des Evaluierungsauftrags"
+      "saveError": "Fehler beim Speichern des Evaluierungsauftrags",
+      "detail": {
+        "close": "Schließen",
+        "eyebrow": "Bewertungsauftrag",
+        "refresh": "Aktualisieren",
+        "descriptionSection": "Beschreibung",
+        "targetSection": "Ziel",
+        "streamLabel": "Stream",
+        "streamTypeLabel": "Stream-Typ",
+        "filterLabel": "Filter",
+        "filterEmpty": "Kein Filter – jeder Span wird bewertet",
+        "scorersSection": "Scorer",
+        "scorersEmpty": "Diesem Auftrag sind noch keine Scorer zugeordnet.",
+        "scorerUnknown": "(entfernter Scorer)",
+        "scorerTypeLlmJudge": "LLM Judge",
+        "scorerTypeRemote": "Remote",
+        "producesPrefix": "Erzeugt",
+        "viewScorerHint": "Anzeigen",
+        "inputMappingSection": "Eingabezuordnung",
+        "samplingSection": "Stichprobenentnahme",
+        "samplingModeLabel": "Modus",
+        "samplingValueLabel": "Wert",
+        "samplingAll": "Jede Übereinstimmung bewerten",
+        "samplingRate": "Zufallsstichprobe nach Rate",
+        "samplingCount": "Erste N Übereinstimmungen",
+        "metadataSection": "Metadaten",
+        "versionLabel": "Version",
+        "pipelineLabel": "Pipeline-ID",
+        "createdLabel": "Erstellt",
+        "updatedLabel": "Aktualisiert",
+        "tabs": {
+          "configuration": "Konfiguration",
+          "runs": "Ausführungen",
+          "failures": "Fehler"
+        },
+        "kpis": {
+          "totalRuns": "Gesamtausführungen",
+          "totalRunsSub": "Innerhalb des ausgewählten Zeitfensters",
+          "successRate": "Erfolgsrate",
+          "successRateSub": "Über alle Scorer",
+          "avgLatency": "Durchschn. Latenz",
+          "avgLatencySub": "Durchschnitt über alle Ausführungen",
+          "scorers": "Scorer",
+          "scorersSubSingular": "Scorer zugeordnet",
+          "scorersSubPlural": "Scorer zugeordnet"
+        },
+        "runs": {
+          "showingPrefix": "Anzeige von",
+          "showingOf": "von",
+          "showingSuffix": "übereinstimmenden Ausführungen",
+          "empty": "Für diesen Auftrag wurden im ausgewählten Zeitfenster keine Ausführungen aufgezeichnet.",
+          "spanLabel": "SPAN",
+          "traceLabel": "TRACE",
+          "scorerUnknown": "(unbekannter Scorer)",
+          "col": {
+            "time": "Zeit",
+            "scorer": "Scorer",
+            "target": "Ziel",
+            "score": "Score",
+            "latency": "Latenz",
+            "status": "Status"
+          }
+        },
+        "failures": {
+          "byScorerTitle": "Fehler nach Scorer",
+          "byScorerEmpty": "Im ausgewählten Zeitfenster wurden keine Fehler aufgezeichnet.",
+          "recentTitle": "Letzte Fehler",
+          "recentEmpty": "Keine fehlgeschlagenen Ausführungen im ausgewählten Zeitfenster.",
+          "col": {
+            "scorer": "Scorer",
+            "failureRate": "Fehlerrate",
+            "count": "Fehler / Gesamt"
+          }
+        }
+      },
+      "listTitle": "Bewertungsaufträge",
+      "listSubtitle": "Setzen Sie Scorer auf Ihrem Produktions-Trace-Stream ein.",
+      "searchPlaceholder": "Aufträge suchen",
+      "allStatuses": "Alle Status",
+      "newButton": "Neuer Auftrag",
+      "scorersCount": "{count} Scorer",
+      "scorerCount": "{count} Scorer",
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "stream": "Stream",
+        "scorers": "Scorer",
+        "successRate": "Erfolgsrate",
+        "lastRun": "Letzte Ausführung",
+        "created": "Erstellt",
+        "actions": "Aktionen"
+      },
+      "empty": {
+        "title": "Noch keine Bewertungsaufträge",
+        "description": "Bewertungsaufträge setzen Scorer auf Ihrem Produktions-Trace-Stream ein. Sie nehmen Stichproben übereinstimmender Spans, führen die Scorer asynchron aus und speichern die resultierenden Scores zur Analyse.",
+        "chipStreams": "Produktions-Stream",
+        "chipScorers": "Mehrere Scorer",
+        "chipSampling": "Stichprobensteuerung"
+      },
+      "descriptionPlaceholder": "Was überwacht dieser Auftrag?",
+      "samplingValueHelp": "JSON: rate ist eine Zahl 0-1, count ist eine positive Ganzzahl.",
+      "samplingValueAllHelp": "Nicht anwendbar, wenn der Modus „Alle“ ist – jedes übereinstimmende Ereignis wird bewertet.",
+      "samplingHelp": "Wird nach dem Filter angewendet. Steuert die Kosten – nur übereinstimmende Spans zählen für die Rate.",
+      "presets": {
+        "label": "Schnellvorgaben",
+        "rootSpans": "Nur Root-Spans",
+        "llmCalls": "LLM-Aufrufe",
+        "toolCalls": "Tool-Aufrufe"
+      },
+      "createdAndActivated": "Bewertungsauftrag erstellt und aktiviert",
+      "createdButActivateFailed": "Bewertungsauftrag erstellt, aber Aktivierung fehlgeschlagen"
     },
     "quality": {
       "scopeLabel": "Alle Qualitätsabmessungen in diesem Arbeitsbereich",
@@ -4739,6 +5623,10 @@
           "unhealthy": "Ungesund",
           "healthy": "Gesund",
           "coverage": "Deckung"
+        },
+        "empty": {
+          "title": "Warten auf Ihre ersten Scores",
+          "description": "Für diese Konfiguration sind im ausgewählten Zeitbereich keine Scores eingegangen. Sie erscheinen hier automatisch, sobald ein Scorer ausgeführt wird, der sie verwendet."
         }
       },
       "sidebar": {
@@ -4807,7 +5695,53 @@
       "quality": "Qualität",
       "evalJobs": "Stellenangebote evaluieren",
       "scorers": "Torschützen",
-      "scoreConfigs": "Score-Konfigurationen"
+      "scoreConfigs": "Score-Konfigurationen",
+      "llmInsights": "LLM-Einblicke"
+    },
+    "kpi": {
+      "totalCost": "Gesamtkosten",
+      "totalTokens": "Gesamtzahl der Tokens",
+      "totalTraces": "Spuren insgesamt",
+      "p95Latency": "P95-Latenz",
+      "errorRate": "Fehlerrate"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "Kostentrend",
+        "subtitle": "USD nach Modell"
+      },
+      "tokenTrend": {
+        "title": "Token-Trend",
+        "subtitle": "Tokens nach Modell"
+      },
+      "spanTrend": {
+        "title": "Span-Trend",
+        "subtitle": "Anzahl der Spannweiten nach Art"
+      },
+      "latencyPercentiles": {
+        "title": "Latenz p50/p95/p99",
+        "subtitle": "alle LLM-Anrufe"
+      },
+      "tracesOverTime": {
+        "title": "Spuren im Laufe der Zeit",
+        "subtitle": "Anzahl der Spuren nach Dienst"
+      },
+      "errorsOverTime": {
+        "title": "Fehler im Laufe der Zeit",
+        "subtitle": "Anzahl der Fehler"
+      },
+      "spansByModel": {
+        "title": "Spannweiten nach Modell",
+        "subtitle": "Anzahl der Anrufe pro Modell"
+      },
+      "tokensByModel": {
+        "title": "Tokens nach Modell",
+        "subtitle": "Gesamtzahl der Tokens pro Modell"
+      },
+      "recentErrors": {
+        "title": "Aktuelle Fehler",
+        "subtitle": "Die letzten 10 fehlgeschlagenen Spans"
+      }
     }
   },
   "logs": {
@@ -4846,7 +5780,10 @@
       "removeFilterDescSql": "Sie haben SQL-Bedingungen auf diese Abfrage angewendet",
       "openHistory": "Suchverlauf öffnen",
       "askAi": "Bitten Sie AI, meine Anfrage zu korrigieren",
-      "selectedRange": "der gewählte Bereich"
+      "selectedRange": "der gewählte Bereich",
+      "descOutOfRange": "Ihr Zeitfenster enthält keine Daten aus diesem Stream. Springen Sie zu dem Zeitpunkt, an dem zuletzt Daten gesehen wurden.",
+      "jumpToData": "Zu den neuesten Daten springen",
+      "descDataAtBoundary": "Der Stream enthält Daten in diesem Zeitfenster, aber keine Ereignisse stimmten überein. Überprüfen Sie Ihren Suchverlauf oder bitten Sie AI um Hilfe."
     },
     "error": {
       "sqlError": "SQL-Syntaxfehler",
@@ -4915,5 +5852,16 @@
     "askAi": "Bitten Sie AI, meine Anfrage zu korrigieren",
     "showDetail": "Zeige Details",
     "hideDetail": "Details ausblenden"
+  },
+  "refreshButton": {
+    "justNow": "gerade eben",
+    "secondsAgo": "vor {sec} s",
+    "minutesAgo": "vor {min} m",
+    "hoursAgo": "vor {h} h",
+    "notYetRefreshed": "Noch nicht aktualisiert",
+    "dataFresh": "Die Daten sind frisch",
+    "dataGettingStale": "Daten werden veraltet",
+    "dataStale": "Daten sind veraltet",
+    "lastRefreshed": "Letzte Aktualisierung: {time}"
   }
 }

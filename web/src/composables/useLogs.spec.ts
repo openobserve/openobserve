@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach, Mock } from "vitest";
+import { resolveDefaultColumns } from "./useLogs";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -2745,5 +2746,72 @@ describe("Use Logs Composable", () => {
         });
       });
     });
+  });
+});
+
+describe('resolveDefaultColumns', () => {
+  it('returns body field when stream has body as fts key', () => {
+    const streamFields = [
+      { name: 'body', ftsKey: true },
+      { name: 'severity', ftsKey: false },
+      { name: '_timestamp', ftsKey: false },
+    ];
+    const globalFtsKeys: string[] = [];
+    const result = resolveDefaultColumns(streamFields, globalFtsKeys);
+    expect(result).toEqual(['body']);
+  });
+
+  it('prefers body over body_msg and message by static priority when no hits', () => {
+    const streamFields = [
+      { name: 'message', ftsKey: true },
+      { name: 'body', ftsKey: true },
+      { name: 'body_msg', ftsKey: true },
+    ];
+    const result = resolveDefaultColumns(streamFields, []);
+    expect(result).toEqual(['body']);
+  });
+
+  it('picks the field with the most non-empty values in hits', () => {
+    const streamFields = [
+      { name: 'body', ftsKey: true },
+      { name: 'message', ftsKey: true },
+    ];
+    const hits = [
+      { body: '', message: 'hello' },
+      { body: '', message: 'world' },
+      { body: 'foo', message: 'bar' },
+    ];
+    const result = resolveDefaultColumns(streamFields, [], hits);
+    expect(result).toEqual(['message']); // message has 3 non-empty, body has 1
+  });
+
+  it('returns empty array when hits are provided but all candidates are empty', () => {
+    const streamFields = [{ name: 'body', ftsKey: true }];
+    const hits = [{ body: '' }, { body: null }, { body: undefined }];
+    const result = resolveDefaultColumns(streamFields, [], hits as any);
+    expect(result).toEqual([]);
+  });
+
+  it('includes global fts keys that exist in the stream even if not marked ftsKey', () => {
+    const streamFields = [
+      { name: 'pod_name', ftsKey: false },
+      { name: 'message', ftsKey: false },
+    ];
+    const globalFtsKeys = ['message'];
+    const result = resolveDefaultColumns(streamFields, globalFtsKeys);
+    expect(result).toEqual(['message']);
+  });
+
+  it('excludes global fts keys that do not exist in the stream', () => {
+    const streamFields = [{ name: 'pod_name', ftsKey: false }];
+    const globalFtsKeys = ['message'];
+    const result = resolveDefaultColumns(streamFields, globalFtsKeys);
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array when no fts keys found', () => {
+    const streamFields = [{ name: '_timestamp', ftsKey: false }];
+    const result = resolveDefaultColumns(streamFields, []);
+    expect(result).toEqual([]);
   });
 });

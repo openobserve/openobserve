@@ -49,6 +49,13 @@ vi.mock("./colorPalette", () => ({
   ColorModeWithoutMinMax: { palette: "palette" },
   getMetricMinMaxValue: vi.fn(() => [0, 100]),
   getSeriesColor: vi.fn(() => "#FF0000"),
+  getColorPalette: vi.fn(() => ["#FF0000", "#00FF00", "#0000FF"]),
+  getSeriesHash: vi.fn(() => 0),
+  getAreaGradientColor: vi.fn(() => ({ type: "linear", colorStops: [] })),
+  getGridLineStyle: vi.fn(() => ({ type: "dashed", width: 1, color: "rgba(0,0,0,0.08)" })),
+  getAreaStyleOverride: vi.fn((_type, base) =>
+    base ? { areaStyle: { ...base, color: { type: "linear", colorStops: [] } } } : {},
+  ),
 }));
 
 vi.mock("@/utils/dashboard/getAnnotationsData", () => ({
@@ -411,6 +418,48 @@ describe("Convert PromQL Data Utils", () => {
       expect(result.extras.isTimeSeries).toBe(false);
     });
 
+    it("exposes _metricText and _metricLayout on the metric series for copy", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "metric",
+        config: { background: { value: { color: "#FFFFFF" } } },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { job: "test-job" },
+              values: [[1640435200, "42"], [1640435260, "45"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const series = result.options.series[0];
+      // The displayed value is also what gets copied.
+      expect(series._metricText).toBeDefined();
+      // Layout is sized to the panel (mockChartPanelRef: 500x300), centered.
+      expect(series._metricLayout).toMatchObject({
+        left: 0,
+        top: 0,
+        width: 500,
+        height: 300,
+        cx: 250,
+        cy: 150,
+      });
+    });
+
 
     it("should handle bar chart type", async () => {
       const panelSchema = {
@@ -758,7 +807,7 @@ describe("Convert PromQL Data Utils", () => {
 
       expect(result.options).toBeDefined();
       expect(result.options.tooltip.textStyle.color).toBe("#fff");
-      expect(result.options.tooltip.backgroundColor).toBe("rgba(0,0,0,1)");
+      expect(result.options.tooltip.backgroundColor).toBe("rgba(22,23,25,0.97)");
     });
 
     it("should handle non-UTC timezone", async () => {
@@ -1810,7 +1859,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.tooltip.backgroundColor).toBe("rgba(0,0,0,1)");
+      expect(result.options.tooltip.backgroundColor).toBe("rgba(22,23,25,0.97)");
       expect(result.options.tooltip.textStyle.color).toBe("#fff");
     });
 
@@ -1845,7 +1894,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.tooltip.backgroundColor).toBe("rgba(255,255,255,1)");
+      expect(result.options.tooltip.backgroundColor).toBe("rgba(255,255,255,0.97)");
       expect(result.options.tooltip.textStyle.color).toBe("#000");
     });
 
@@ -2075,7 +2124,7 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       // Test that dark theme sets correct backgroundColor (line 662)
-      expect(resultDark.options.tooltip.backgroundColor).toBe("rgba(0,0,0,1)");
+      expect(resultDark.options.tooltip.backgroundColor).toBe("rgba(22,23,25,0.97)");
 
       // Test light theme
       const mockStoreLight = {
@@ -2096,7 +2145,7 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       // Test that light theme sets correct backgroundColor (line 662)
-      expect(resultLight.options.tooltip.backgroundColor).toBe("rgba(255,255,255,1)");
+      expect(resultLight.options.tooltip.backgroundColor).toBe("rgba(255,255,255,0.97)");
     });
 
     it("should test metric chart renderItem function (lines 704-724)", async () => {

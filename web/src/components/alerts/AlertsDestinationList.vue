@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:text-xs tw:flex-shrink-0"
               >{{ t('alert_destinations.templateDefaultBadge') }}</OBadge>
             </div>
-            <span v-else class="tw:text-gray-400">—</span>
+            <span v-else class="tw:text-text-primary">—</span>
           </template>
 
           <template #cell-type="{ row }">
@@ -325,7 +325,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.name,
-        minSize: 160,
+        minSize: 320,
         meta: { align: "left", flex: true },
       },
       {
@@ -335,7 +335,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.type,
+        size: 170,
         meta: { align: "left" },
       },
       {

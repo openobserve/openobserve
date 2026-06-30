@@ -1,7 +1,34 @@
 
 import logsdata from "../../../test-data/logs_data.json";
+const http = require('http');
+const nodeFetch = require('node-fetch');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+
+// node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
+// "Premature close" / ECONNRESET flakiness in CI.
+const noKeepAliveAgent = new http.Agent({ keepAlive: false });
+
+async function fetchWithRetry(url, options, maxRetries = 3) {
+  const requestOpts = { ...options, compress: false, agent: noKeepAliveAgent };
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await nodeFetch(url, requestOpts);
+    } catch (err) {
+      const message = String(err && err.message ? err.message : err);
+      const isTransient = /premature close|ECONNRESET|socket hang up|network|EPIPE|other side closed/i.test(message);
+      if (!isTransient) {
+        testLogger.warn('Non-transient fetch error (not retrying)', { url, error: message });
+        throw err;
+      }
+      if (attempt === maxRetries) throw err;
+      const backoffMs = 500 * (attempt + 1);
+      testLogger.warn('Transient fetch error, retrying ingestion', { url, attempt: attempt + 1, maxRetries, error: message, backoffMs });
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
+  }
+}
+
 export class IngestionPage {
   constructor(page) {
     this.page = page;
@@ -10,7 +37,7 @@ export class IngestionPage {
     const orgId = getOrgIdentifier();
     const streamName = "e2e_automate";
     const headers = getAuthHeaders();
-    const fetchResponse = await fetch(
+    const fetchResponse = await fetchWithRetry(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
@@ -70,7 +97,7 @@ export class IngestionPage {
   async ingestionMultiOrg(orgId) {
     const streamName = "e2e_automate";
     const headers = getAuthHeaders();
-    const fetchResponse = await fetch(
+    const fetchResponse = await fetchWithRetry(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
@@ -96,7 +123,7 @@ export class IngestionPage {
 
   async ingestionMultiOrgStream(orgId, streamName) {
     const headers = getAuthHeaders();
-    const fetchResponse = await fetch(
+    const fetchResponse = await fetchWithRetry(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
@@ -158,7 +185,7 @@ export class IngestionPage {
       testLogger.debug(`ingestionJoinUnion: Ingesting to stream '${streamName}' at ${url}`);
 
       try {
-        const response = await fetch(url, {
+        const response = await fetchWithRetry(url, {
           method: "POST",
           headers: headers,
           body: JSON.stringify(logsdata),

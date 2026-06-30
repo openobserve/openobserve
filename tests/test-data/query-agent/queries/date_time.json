@@ -492,6 +492,24 @@
         "results": [
           [
             "1780736700000000",
+            "ZONE-1",
+            "1",
+            "320.0",
+            "19.2",
+            "75.3",
+            "410"
+          ],
+          [
+            "1780736700000000",
+            "ZONE-2",
+            "1",
+            "480.0",
+            "24.8",
+            "88.7",
+            "275"
+          ],
+          [
+            "1780736700000000",
             "ZONE-3",
             "1",
             "610.0",
@@ -509,24 +527,6 @@
             "275"
           ],
           [
-            "1780736700000000",
-            "ZONE-2",
-            "1",
-            "480.0",
-            "24.8",
-            "88.7",
-            "275"
-          ],
-          [
-            "1780736700000000",
-            "ZONE-1",
-            "1",
-            "320.0",
-            "19.2",
-            "75.3",
-            "410"
-          ],
-          [
             "1780736640000000",
             "ZONE-3",
             "2",
@@ -534,6 +534,15 @@
             "30.1",
             "42.5",
             "498"
+          ],
+          [
+            "1780736640000000",
+            "ZONE-1",
+            "1",
+            "900.0",
+            "30.1",
+            "42.5",
+            "88"
           ],
           [
             "1780736640000000",
@@ -552,15 +561,6 @@
             "35.7",
             "58.0",
             "155"
-          ],
-          [
-            "1780736640000000",
-            "ZONE-1",
-            "1",
-            "900.0",
-            "30.1",
-            "42.5",
-            "88"
           ],
           [
             "1780736580000000",
@@ -620,27 +620,27 @@
         "results": [
           [
             "first_minute",
-            "ZONE-4",
-            "4",
-            "421.25"
-          ],
-          [
-            "first_minute",
             "ZONE-3",
             "4",
             "667.5"
           ],
           [
             "first_minute",
-            "ZONE-2",
-            "3",
-            "451.6666666666667"
+            "ZONE-4",
+            "4",
+            "421.25"
           ],
           [
             "first_minute",
             "ZONE-1",
             "3",
             "686.6666666666666"
+          ],
+          [
+            "first_minute",
+            "ZONE-2",
+            "3",
+            "451.6666666666667"
           ]
         ],
         "results_mode": "rowsort"
@@ -1487,6 +1487,1052 @@
           [
             "18000.0",
             "45"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q878",
+      "sql": "SELECT _timestamp, (_timestamp / 60000000) * 60000000 AS minute_trunc, (_timestamp / 30000000) * 30000000 AS thirty_sec_bucket, latency_ms FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 52619000000,
+        "end_offset": 52693000000
+      },
+      "expected": {
+        "columns": [
+          "minute_trunc",
+          "thirty_sec_bucket",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "1780777980000000.0",
+            "1780777980000000.0",
+            "89"
+          ],
+          [
+            "1780777992000000.0",
+            "1780777992000000.0",
+            "567"
+          ],
+          [
+            "1780777998000000.0",
+            "1780777998000000.0",
+            "567"
+          ],
+          [
+            "1780778016000000.0",
+            "1780778016000000.0",
+            "3200"
+          ],
+          [
+            "1780778034000000.0",
+            "1780778034000000.0",
+            "78"
+          ],
+          [
+            "1780778040000000.0",
+            "1780778040000000.0",
+            "78"
+          ],
+          [
+            "1780778052000000.0",
+            "1780778052000000.0",
+            "1900"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q879",
+      "sql": "SELECT (_timestamp / 60000000) * 60000000 AS minute_bucket, COUNT(*) AS cnt, AVG(latency_ms) AS avg_lat, MAX(latency_ms) AS max_lat FROM \"{stream}\" WHERE latency_ms IS NOT NULL GROUP BY minute_bucket ORDER BY minute_bucket ASC",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 52679000000,
+        "end_offset": 52753000000
+      },
+      "expected": {
+        "columns": [
+          "minute_bucket",
+          "cnt",
+          "avg_lat",
+          "max_lat"
+        ],
+        "results": [
+          [
+            "1780778040000000.0",
+            "1",
+            "78.0",
+            "78"
+          ],
+          [
+            "1780778052000000.0",
+            "1",
+            "1900.0",
+            "1900"
+          ],
+          [
+            "1780778058000000.0",
+            "1",
+            "1900.0",
+            "1900"
+          ],
+          [
+            "1780778076000000.0",
+            "1",
+            "15.0",
+            "15"
+          ],
+          [
+            "1780778094000000.0",
+            "1",
+            "12.0",
+            "12"
+          ],
+          [
+            "1780778100000000.0",
+            "1",
+            "12.0",
+            "12"
+          ],
+          [
+            "1780778112000000.0",
+            "1",
+            "45.0",
+            "45"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q880",
+      "sql": "SELECT _timestamp, to_timestamp_micros(_timestamp) AS ts_converted, latency_ms FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 52739000000,
+        "end_offset": 52813000000
+      },
+      "expected": {
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q881",
+      "sql": "SELECT _timestamp, _timestamp + arrow_cast(3600000000, 'Int64') AS future_ts, _timestamp - arrow_cast(3600000000, 'Int64') AS past_ts FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 52799000000,
+        "end_offset": 52873000000
+      },
+      "expected": {
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q882",
+      "sql": "SELECT _timestamp, (_timestamp - LAG(_timestamp) OVER (ORDER BY _timestamp)) / 1000 AS gap_ms FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 52859000000,
+        "end_offset": 52933000000
+      },
+      "expected": {
+        "columns": [
+          "gap_ms"
+        ],
+        "results": [
+          [
+            "None"
+          ],
+          [
+            "12000.0"
+          ],
+          [
+            "6000.0"
+          ],
+          [
+            "18000.0"
+          ],
+          [
+            "18000.0"
+          ],
+          [
+            "6000.0"
+          ],
+          [
+            "12000.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q883",
+      "sql": "SELECT _timestamp, (_timestamp / 3600000000) * 3600000000 AS hour_bucket, COUNT(*) OVER (PARTITION BY (_timestamp / 3600000000) * 3600000000) AS cnt_in_hour, throughput_rate FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 52919000000,
+        "end_offset": 52993000000
+      },
+      "expected": {
+        "columns": [
+          "hour_bucket",
+          "cnt_in_hour",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "1780778280000000.0",
+            "1",
+            "150.0"
+          ],
+          [
+            "1780778292000000.0",
+            "1",
+            "320.0"
+          ],
+          [
+            "1780778298000000.0",
+            "1",
+            "320.0"
+          ],
+          [
+            "1780778316000000.0",
+            "1",
+            "480.0"
+          ],
+          [
+            "1780778334000000.0",
+            "1",
+            "610.0"
+          ],
+          [
+            "1780778340000000.0",
+            "1",
+            "610.0"
+          ],
+          [
+            "1780778352000000.0",
+            "1",
+            "725.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q884",
+      "sql": "SELECT (_timestamp / 60000000) * 60000000 AS minute_bucket, component_name, COUNT(*) AS cnt, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" WHERE latency_ms IS NOT NULL GROUP BY minute_bucket, component_name ORDER BY minute_bucket ASC, cnt DESC LIMIT 15",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 52979000000,
+        "end_offset": 53053000000
+      },
+      "expected": {
+        "columns": [
+          "minute_bucket",
+          "component_name",
+          "cnt",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "1780778340000000.0",
+            "track-router",
+            "1",
+            "230.0"
+          ],
+          [
+            "1780778352000000.0",
+            "batch-sync",
+            "1",
+            "1450.0"
+          ],
+          [
+            "1780778358000000.0",
+            "batch-sync",
+            "1",
+            "1450.0"
+          ],
+          [
+            "1780778376000000.0",
+            "pallet-mapper",
+            "1",
+            "89.0"
+          ],
+          [
+            "1780778394000000.0",
+            "lane-monitor",
+            "1",
+            "567.0"
+          ],
+          [
+            "1780778400000000.0",
+            "lane-monitor",
+            "1",
+            "567.0"
+          ],
+          [
+            "1780778412000000.0",
+            "temp-regulator",
+            "1",
+            "3200.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q885",
+      "sql": "SELECT _timestamp, _timestamp - (_timestamp % 30000000) AS aligned_30s, lead(_timestamp, 1) OVER (ORDER BY _timestamp) - _timestamp AS lead_gap FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53039000000,
+        "end_offset": 53113000000
+      },
+      "expected": {
+        "columns": [
+          "aligned_30s",
+          "lead_gap"
+        ],
+        "results": [
+          [
+            "1780778400000000",
+            "12000000"
+          ],
+          [
+            "1780778400000000",
+            "6000000"
+          ],
+          [
+            "1780778400000000",
+            "18000000"
+          ],
+          [
+            "1780778430000000",
+            "18000000"
+          ],
+          [
+            "1780778430000000",
+            "6000000"
+          ],
+          [
+            "1780778460000000",
+            "12000000"
+          ],
+          [
+            "1780778460000000",
+            "None"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q886",
+      "sql": "SELECT EXTRACT(HOUR FROM to_timestamp_micros(_timestamp)) AS hour_of_day, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY hour_of_day ORDER BY hour_of_day",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53099000000,
+        "end_offset": 53173000000
+      },
+      "expected": {
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q887",
+      "sql": "SELECT _timestamp, _timestamp / 1000000 AS epoch_seconds, (_timestamp / 1000000) % 60 AS second_of_minute FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53159000000,
+        "end_offset": 53233000000
+      },
+      "expected": {
+        "columns": [
+          "epoch_seconds",
+          "second_of_minute"
+        ],
+        "results": [
+          [
+            "1780778520.0",
+            "0.0"
+          ],
+          [
+            "1780778532.0",
+            "12.0"
+          ],
+          [
+            "1780778538.0",
+            "18.0"
+          ],
+          [
+            "1780778556.0",
+            "36.0"
+          ],
+          [
+            "1780778574.0",
+            "54.0"
+          ],
+          [
+            "1780778580.0",
+            "0.0"
+          ],
+          [
+            "1780778592.0",
+            "12.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q888",
+      "sql": "SELECT (_timestamp / 3600000000) * 3600000000 AS hour_bucket, COUNT(*) AS cnt, SUM(throughput_rate) AS total_rate FROM \"{stream}\" GROUP BY hour_bucket ORDER BY hour_bucket ASC",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53219000000,
+        "end_offset": 53293000000
+      },
+      "expected": {
+        "columns": [
+          "hour_bucket",
+          "cnt",
+          "total_rate"
+        ],
+        "results": [
+          [
+            "1780778580000000.0",
+            "1",
+            "840.0"
+          ],
+          [
+            "1780778592000000.0",
+            "1",
+            "290.0"
+          ],
+          [
+            "1780778598000000.0",
+            "1",
+            "290.0"
+          ],
+          [
+            "1780778616000000.0",
+            "1",
+            "555.0"
+          ],
+          [
+            "1780778634000000.0",
+            "1",
+            "190.0"
+          ],
+          [
+            "1780778640000000.0",
+            "1",
+            "190.0"
+          ],
+          [
+            "1780778652000000.0",
+            "1",
+            "900.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q889",
+      "sql": "SELECT _timestamp, (_timestamp / 1000000) * 1000000 AS second_trunc, latency_ms, throughput_rate FROM \"{stream}\" WHERE throughput_rate > 200 ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53279000000,
+        "end_offset": 53353000000
+      },
+      "expected": {
+        "columns": [
+          "second_trunc",
+          "latency_ms",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "1780778652000000.0",
+            "1900",
+            "900.0"
+          ],
+          [
+            "1780778658000000.0",
+            "1900",
+            "900.0"
+          ],
+          [
+            "1780778694000000.0",
+            "12",
+            "320.0"
+          ],
+          [
+            "1780778700000000.0",
+            "12",
+            "320.0"
+          ],
+          [
+            "1780778712000000.0",
+            "45",
+            "480.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q890",
+      "sql": "SELECT (_timestamp / 15000000) * 15000000 AS fifteen_sec_bucket, facility_zone, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY fifteen_sec_bucket, facility_zone ORDER BY fifteen_sec_bucket ASC LIMIT 15",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53339000000,
+        "end_offset": 53413000000
+      },
+      "expected": {
+        "columns": [
+          "fifteen_sec_bucket",
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "1780778700000000.0",
+            "ZONE-1",
+            "1"
+          ],
+          [
+            "1780778712000000.0",
+            "ZONE-4",
+            "1"
+          ],
+          [
+            "1780778718000000.0",
+            "ZONE-2",
+            "1"
+          ],
+          [
+            "1780778736000000.0",
+            "ZONE-3",
+            "1"
+          ],
+          [
+            "1780778754000000.0",
+            "ZONE-4",
+            "1"
+          ],
+          [
+            "1780778760000000.0",
+            "ZONE-2",
+            "1"
+          ],
+          [
+            "1780778772000000.0",
+            "ZONE-1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q891",
+      "sql": "SELECT _timestamp, to_timestamp_micros(_timestamp) AS ts_dt, arrow_cast(to_timestamp_micros(_timestamp), 'Timestamp(Nanosecond, None)') AS ts_ns FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53399000000,
+        "end_offset": 53473000000
+      },
+      "expected": {
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q892",
+      "sql": "SELECT _timestamp, _timestamp - MIN(_timestamp) OVER () AS offset_from_start, throughput_rate FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53459000000,
+        "end_offset": 53533000000
+      },
+      "expected": {
+        "columns": [
+          "offset_from_start",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "0",
+            "555.0"
+          ],
+          [
+            "12000000",
+            "190.0"
+          ],
+          [
+            "18000000",
+            "190.0"
+          ],
+          [
+            "36000000",
+            "900.0"
+          ],
+          [
+            "54000000",
+            "150.0"
+          ],
+          [
+            "60000000",
+            "150.0"
+          ],
+          [
+            "72000000",
+            "320.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q893",
+      "sql": "SELECT _timestamp, (_timestamp / 60000000) * 60000000 AS minute_bucket, MAX(throughput_rate) OVER (PARTITION BY (_timestamp / 60000000) * 60000000) AS peak_in_minute FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53519000000,
+        "end_offset": 53593000000
+      },
+      "expected": {
+        "columns": [
+          "minute_bucket",
+          "peak_in_minute"
+        ],
+        "results": [
+          [
+            "1780778880000000.0",
+            "150.0"
+          ],
+          [
+            "1780778892000000.0",
+            "320.0"
+          ],
+          [
+            "1780778898000000.0",
+            "320.0"
+          ],
+          [
+            "1780778916000000.0",
+            "480.0"
+          ],
+          [
+            "1780778934000000.0",
+            "610.0"
+          ],
+          [
+            "1780778940000000.0",
+            "610.0"
+          ],
+          [
+            "1780778952000000.0",
+            "725.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q894",
+      "sql": "SELECT (_timestamp / 60000000) * 60000000 AS minute_bucket, COALESCE(operation_mode, 'unknown') AS mode, COUNT(*) AS cnt, AVG(throughput_rate) AS avg_rate FROM \"{stream}\" GROUP BY minute_bucket, mode ORDER BY minute_bucket ASC, cnt DESC LIMIT 15",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53579000000,
+        "end_offset": 53653000000
+      },
+      "expected": {
+        "columns": [
+          "minute_bucket",
+          "mode",
+          "cnt",
+          "avg_rate"
+        ],
+        "results": [
+          [
+            "1780778940000000.0",
+            "auto",
+            "1",
+            "610.0"
+          ],
+          [
+            "1780778952000000.0",
+            "hybrid",
+            "1",
+            "725.0"
+          ],
+          [
+            "1780778958000000.0",
+            "manual",
+            "1",
+            "725.0"
+          ],
+          [
+            "1780778976000000.0",
+            "hybrid",
+            "1",
+            "840.0"
+          ],
+          [
+            "1780778994000000.0",
+            "auto",
+            "1",
+            "290.0"
+          ],
+          [
+            "1780779000000000.0",
+            "auto",
+            "1",
+            "290.0"
+          ],
+          [
+            "1780779012000000.0",
+            "manual",
+            "1",
+            "555.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q895",
+      "sql": "SELECT _timestamp, _timestamp + (latency_ms * 1000) AS response_ts, latency_ms FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53639000000,
+        "end_offset": 53713000000
+      },
+      "expected": {
+        "columns": [
+          "response_ts",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "1780779000567000",
+            "567"
+          ],
+          [
+            "1780779015200000",
+            "3200"
+          ],
+          [
+            "1780779021200000",
+            "3200"
+          ],
+          [
+            "1780779036078000",
+            "78"
+          ],
+          [
+            "1780779055900000",
+            "1900"
+          ],
+          [
+            "1780779061900000",
+            "1900"
+          ],
+          [
+            "1780779072015000",
+            "15"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q896",
+      "sql": "SELECT (_timestamp / 120000000) * 120000000 AS two_min_bucket, COUNT(*) AS cnt, MAX(latency_ms) AS max_lat, MIN(latency_ms) AS min_lat FROM \"{stream}\" WHERE latency_ms IS NOT NULL GROUP BY two_min_bucket ORDER BY two_min_bucket ASC",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53699000000,
+        "end_offset": 53773000000
+      },
+      "expected": {
+        "columns": [
+          "two_min_bucket",
+          "cnt",
+          "max_lat",
+          "min_lat"
+        ],
+        "results": [
+          [
+            "1780779060000000.0",
+            "1",
+            "1900",
+            "1900"
+          ],
+          [
+            "1780779072000000.0",
+            "1",
+            "15",
+            "15"
+          ],
+          [
+            "1780779078000000.0",
+            "1",
+            "15",
+            "15"
+          ],
+          [
+            "1780779096000000.0",
+            "1",
+            "12",
+            "12"
+          ],
+          [
+            "1780779114000000.0",
+            "1",
+            "45",
+            "45"
+          ],
+          [
+            "1780779120000000.0",
+            "1",
+            "45",
+            "45"
+          ],
+          [
+            "1780779132000000.0",
+            "1",
+            "230",
+            "230"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q897",
+      "sql": "SELECT _timestamp, _timestamp / 1000000 AS epoch_seconds, (_timestamp / 1000000) / 60 AS epoch_minutes FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53759000000,
+        "end_offset": 53833000000
+      },
+      "expected": {
+        "columns": [
+          "epoch_seconds",
+          "epoch_minutes"
+        ],
+        "results": [
+          [
+            "1780779120.0",
+            "29679652.0"
+          ],
+          [
+            "1780779132.0",
+            "29679652.2"
+          ],
+          [
+            "1780779138.0",
+            "29679652.3"
+          ],
+          [
+            "1780779156.0",
+            "29679652.6"
+          ],
+          [
+            "1780779174.0",
+            "29679652.9"
+          ],
+          [
+            "1780779180.0",
+            "29679653.0"
+          ],
+          [
+            "1780779192.0",
+            "29679653.2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q898",
+      "sql": "SELECT (_timestamp / 1000000) * 1000000 AS second_bucket, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY second_bucket ORDER BY cnt DESC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53819000000,
+        "end_offset": 53893000000
+      },
+      "expected": {
+        "columns": [
+          "second_bucket",
+          "cnt"
+        ],
+        "results": [
+          [
+            "1780779216000000.0",
+            "1"
+          ],
+          [
+            "1780779234000000.0",
+            "1"
+          ],
+          [
+            "1780779252000000.0",
+            "1"
+          ],
+          [
+            "1780779240000000.0",
+            "1"
+          ],
+          [
+            "1780779180000000.0",
+            "1"
+          ],
+          [
+            "1780779192000000.0",
+            "1"
+          ],
+          [
+            "1780779198000000.0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q899",
+      "sql": "WITH time_data AS (SELECT _timestamp, _timestamp - MIN(_timestamp) OVER () AS rel_time, throughput_rate FROM \"{stream}\") SELECT _timestamp, rel_time / 1000 AS rel_ms, throughput_rate FROM time_data ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53879000000,
+        "end_offset": 53953000000
+      },
+      "expected": {
+        "columns": [
+          "rel_ms",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "0.0",
+            "190.0"
+          ],
+          [
+            "12000.0",
+            "900.0"
+          ],
+          [
+            "18000.0",
+            "900.0"
+          ],
+          [
+            "36000.0",
+            "150.0"
+          ],
+          [
+            "54000.0",
+            "320.0"
+          ],
+          [
+            "60000.0",
+            "320.0"
+          ],
+          [
+            "72000.0",
+            "480.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q900",
+      "sql": "SELECT _timestamp, _timestamp - LAG(_timestamp) OVER (PARTITION BY component_name ORDER BY _timestamp) AS comp_gap, component_name, latency_ms FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY component_name, _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 53939000000,
+        "end_offset": 54013000000
+      },
+      "expected": {
+        "columns": [
+          "comp_gap",
+          "component_name",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "None",
+            "batch-sync",
+            "1450"
+          ],
+          [
+            "6000000",
+            "batch-sync",
+            "1450"
+          ],
+          [
+            "None",
+            "pallet-mapper",
+            "89"
+          ],
+          [
+            "None",
+            "scan-hub",
+            "45"
+          ],
+          [
+            "6000000",
+            "scan-hub",
+            "45"
+          ],
+          [
+            "None",
+            "track-router",
+            "230"
+          ],
+          [
+            "None",
+            "zone-controller",
+            "12"
           ]
         ],
         "results_mode": "rowsort",

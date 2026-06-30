@@ -50,6 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon-left="close"
       />
     </template>
+    <template #cell-user_id="{ row }">
+      <OUserCell :value="row.user_id" />
+    </template>
     <template #cell-duration="{ row }">
       {{ durationFormatter(row.duration) }}
     </template>
@@ -78,6 +81,7 @@ import { ref, type Ref, defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from '@/lib/core/Button/OButton.vue';
 import { durationFormatter } from "@/utils/zincutils";
@@ -87,7 +91,7 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { OEmptyState, OTable, OButton, OSpinner, OCheckbox },
+  components: { OEmptyState, OTable, OUserCell, OButton, OSpinner, OCheckbox },
   props: {
     rows: {
       type: Array,
@@ -132,7 +136,7 @@ export default defineComponent({
       { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       { id: "user_id", header: t("user.email"), accessorKey: "user_id", size: COL.email, sortable: true, meta: { align: "left" , autoWidth: true } },
       { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", size: 130, sortable: true, meta: { align: "left"  } },
-      { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", size: 170, sortable: true, meta: { align: "left" } },
+      { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", size: 170, sortable: true, meta: { align: "right" } },
       { id: "duration", header: t("queries.totalDuration"), accessorKey: "duration", size: 190, cell: " ", sortable: true, meta: { align: "left" } },
       { id: "queryRange", header: t("queries.totalTimeRange"), accessorKey: "queryRange", size: 170, cell: " ", sortable: true, meta: { align: "left" } },
       { id: "actions", header: t("common.actions"), isAction: true, size: 100, meta: { align: "center", actionCount: 1 } },

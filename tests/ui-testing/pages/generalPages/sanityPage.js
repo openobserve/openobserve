@@ -31,7 +31,11 @@ export class SanityPage {
         // ============================================================
         // Pagination and Results locators
         // ============================================================
-        this.resultColumnSource = page.locator('[data-test="log-table-column-0-source"]');
+        // With the FTS default-column feature the first result cell may be the
+        // generic "source" column OR an FTS column (e.g. body/message/log), so
+        // target whichever first-row cell is rendered. A click on any cell
+        // bubbles to the row handler that opens the detail dialog.
+        this.resultColumnSource = page.locator('[data-test^="log-table-column-0-"]').first();
         this.closeDialog = page.locator('[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]');
 
         // ============================================================

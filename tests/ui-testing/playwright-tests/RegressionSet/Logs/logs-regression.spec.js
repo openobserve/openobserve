@@ -70,7 +70,10 @@ test.describe("Logs Regression Bugs", () => {
     const savedViewA = `view_a_${uniqueId}`;
     const savedViewB = `view_b_${uniqueId}`;
     const fieldForStreamA = 'kubernetes_container_name';
-    const fieldForStreamB = 'log';
+    // Must be a non-default schema field: "log" is the stream's full-text/body field and is
+    // auto-selected as the default results column, so its row renders a "remove" toggle (not
+    // "add") — there is no add button to click. Use another distinct schema field instead.
+    const fieldForStreamB = 'kubernetes_namespace_name';
 
     // Ingest data to both streams
     testLogger.info(`Ingesting data to stream A: ${streamA}`);

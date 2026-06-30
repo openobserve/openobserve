@@ -1832,7 +1832,12 @@ test.describe("Logs Regression Bug Fixes", () => {
       await logRow.click();
       await page.waitForTimeout(1000);
 
+      // The log detail sidebar opens on the JSON tab by default (Bug #9724); the wrap
+      // toggle only renders in the Table tab. Switch tabs before asserting its
+      // visibility — otherwise the check always waits out its full timeout on the
+      // hidden toggle and logs a misleading "Wrap toggle not found" warning.
       try {
+        await pm.logsPage.clickLogDetailTableTab();
         await pm.logsPage.verifyWrapToggleVisibleInTableTab();
         testLogger.info('Wrap toggle is visible in log detail table tab');
       } catch (err) {
