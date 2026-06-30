@@ -223,7 +223,7 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
   <div class="tw:flex tw:flex-col tw:min-h-0 tw:w-full tw:p-2">
 
     <!-- Toolbar — adapts in-place to recording state, no layout shift -->
-    <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3 tw:pl-2">
+    <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3 tw:pl-3">
       <!-- Normal: label + filter + step actions -->
       <OCheckbox
         v-if="!isRecording && !readonly"

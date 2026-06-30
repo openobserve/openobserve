@@ -133,28 +133,30 @@ function toggleExpanded() {
   <div class="tw:rounded tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:mb-1">
     <!-- Compact row -->
     <div
-      class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:h-9 tw:min-h-9 tw:group"
+      class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:h-9 tw:min-h-9 tw:group tw:relative"
       :class="{ 'tw:border-b tw:border-[var(--o2-border-color)]': expanded }"
     >
 
+      <!-- Drag handle -->
+      <span
+        class="tw:cursor-grab tw:text-[var(--o2-text-muted)] tw:opacity-0 tw:group-hover:opacity-100 tw:transition-opacity tw:shrink-0 tw:absolute tw:left-[-0.1rem]"
+        data-test="synthetics-journey-step-drag-handle"
+        aria-hidden="true"
+      >
+        <OIcon name="drag-indicator" size="sm" aria-hidden="true" />
+      </span>
       <!-- Selection checkbox -->
       <OCheckbox
         v-if="selectionEnabled"
         :model-value="selected ? true : false"
         size="xs"
+        class="tw:pl-1"
         :data-test="`synthetics-journey-step-checkbox-${index}`"
         @update:model-value="emit('toggle-select')"
       />
 
-      <!-- Drag handle -->
-      <span
-        class="tw:cursor-grab tw:text-[var(--o2-text-muted)] tw:select-none tw:text-base tw:leading-none"
-        data-test="synthetics-journey-step-drag-handle"
-        aria-hidden="true"
-      >⠿</span>
-
       <!-- Step number -->
-      <span class="tw:w-6 tw:text-right tw:text-sm tw:tabular-nums tw:text-[var(--o2-text-muted)] tw:shrink-0">
+      <span class="tw:w-6 tw:text-left tw:text-sm tw:tabular-nums tw:text-[var(--o2-text-muted)] tw:shrink-0">
         {{ index + 1 }}
       </span>
 
