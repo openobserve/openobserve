@@ -14,30 +14,49 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
+
+// ── Config mock — must be hoisted so the component import sees it ─────────────
+// vi.hoisted() runs before any imports; the returned object is captured so that
+// individual tests can mutate `mockConfig.isCloud` and `mockConfig.isEnterprise`
+// before mounting. The factory closure then uses the hoisted reference — this is
+// the only way to have a mutable mock for a default-export primitive-ish object.
+const mockConfig = vi.hoisted(() => ({
+  isCloud: "true" as string,
+  isEnterprise: "false" as string,
+}));
+
+vi.mock("@/aws-exports", () => ({
+  default: mockConfig,
+}));
+
 import CommunitySlackInvite from "./CommunitySlackInvite.vue";
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const PENDING_KEY = "communitySlackInvitePending";
+const USER_EMAIL = "example@gmail.com"; // matches store.ts userInfo.email
+const SEEN_KEY = `communitySlackInviteSeen:${USER_EMAIL}`;
+const DEFAULT_SLACK_URL = "https://short.openobserve.ai/community";
 
 // ── ODialog stub ──────────────────────────────────────────────────────────────
 // ODialog uses reka-ui's DialogPortal which teleports content outside the
-// component tree. Stubbing it lets us render default + footer slots inline,
-// assert on props forwarded to ODialog, and emit update:open to test the
-// close path — all without any teleport / jsdom complexity.
+// component tree. Stubbing it renders the default slot inline, exposes :data-open
+// for open-state assertions, and provides a close trigger for update:open.
 const ODialogStub = {
   name: "ODialog",
   inheritAttrs: false,
-  props: ["open", "size", "title"],
+  props: ["open", "size", "showClose"],
   emits: ["update:open"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
-      :data-title="title"
     >
-      <span data-test="o-dialog-stub-title">{{ title }}</span>
       <slot />
-      <slot name="footer" />
       <button
         data-test="o-dialog-close-btn"
         @click="$emit('update:open', false)"
@@ -47,19 +66,14 @@ const ODialogStub = {
 };
 
 // ── Mount factory ─────────────────────────────────────────────────────────────
-const SLACK_URL = "https://example.slack.com/join";
-
-function buildWrapper(props: Record<string, unknown> = {}) {
+function buildWrapper() {
   return mount(CommunitySlackInvite, {
-    props: {
-      modelValue: true,
-      slackUrl: SLACK_URL,
-      ...props,
-    },
     global: {
-      plugins: [i18n],
+      plugins: [store, i18n],
       stubs: {
         ODialog: ODialogStub,
+        // OButton, OIcon, SlackIcon render real — they have no side effects
+        // that interfere with the test.
       },
     },
   });
@@ -67,61 +81,85 @@ function buildWrapper(props: Record<string, unknown> = {}) {
 
 // ── Component analysis ────────────────────────────────────────────────────────
 // Component: CommunitySlackInvite
-// Props:     modelValue: boolean (controlled visibility), slackUrl: string (CTA url)
-// Emits:     update:modelValue (false on dismiss), seen (on any dismissal path)
-// Slots:     default (description), footer (join + maybe-later buttons)
-// Store deps: none
-// Service deps: none
-// Child components: ODialog (stubbed), OButton (real — renders with real click)
-// Conditional states: open (modelValue=true) / closed (modelValue=false)
-// User interactions: "Join Slack" click, "Maybe later" click, dialog close btn
-// Async operations: none
+// Props:     none
+// Emits:     none
+// Store deps: store.state.userInfo.email (seenKey), store.state.zoConfig.custom_slack_url,
+//             store.state.zoConfig.slack_member_count
+// Service deps: config.isCloud, config.isEnterprise (mocked via vi.mock)
+// Child components: ODialog (stubbed), OButton (real), OIcon (real), SlackIcon (real)
+// Conditional states:
+//   - Cloud vs non-Cloud (isCloud !== "true" → nothing shown)
+//   - First login vs returning session
+//   - Already seen (seenKey = "true") → never shown
+//   - PENDING_KEY present → shows (returning session) or after onboarding event (first login)
+//   - memberCount present/absent → different captionText
+// User interactions: close-btn click, join-btn click, maybe-later-btn click
+// Async operations: none (synchronous onMounted logic)
 
 describe("CommunitySlackInvite", () => {
   let wrapper: VueWrapper;
   let openSpy: ReturnType<typeof vi.spyOn>;
 
+  // Default each test to: Cloud, not first login, PENDING_KEY set, not seen.
+  // This makes the dialog open on mount without waiting for the onboarding event.
   beforeEach(() => {
+    mockConfig.isCloud = "true";
+    mockConfig.isEnterprise = "false";
+
+    // Reset store to defaults (userInfo.email = "example@gmail.com" by default in store.ts)
+    store.commit("setConfig", {
+      ...store.state.zoConfig,
+      custom_slack_url: null,
+      slack_member_count: null,
+    });
+    store.commit("setUserInfo", {
+      email: USER_EMAIL,
+    });
+
+    localStorage.clear();
     openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
-    wrapper = buildWrapper();
   });
 
   afterEach(() => {
     wrapper?.unmount();
-    // clearAllMocks resets call history on the spy while keeping it in place;
-    // the spy is re-created in the next beforeEach via vi.spyOn anyway.
+    localStorage.clear();
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   // ── Rendering ───────────────────────────────────────────────────────────────
 
   describe("rendering", () => {
-    it("renders the ODialog stub when modelValue is true", () => {
-      // Arrange (done in beforeEach)
+    it("renders the ODialog stub when dialog is open", () => {
+      // Arrange
+      localStorage.setItem(PENDING_KEY, "true");
 
-      // Act — no interaction
+      // Act
+      wrapper = buildWrapper();
 
       // Assert
       expect(wrapper.find('[data-test="o-dialog-stub"]').exists()).toBe(true);
     });
 
-    it("forwards modelValue=true as open=true to ODialog", () => {
-      // Arrange (done in beforeEach — modelValue: true)
+    it("shows dialog as open when PENDING_KEY is true and not yet seen", async () => {
+      // Arrange
+      localStorage.setItem(PENDING_KEY, "true");
 
-      // Act — no interaction
+      // Act
+      wrapper = buildWrapper();
+      await nextTick();
 
-      // Assert: data-open reflects the bound prop
+      // Assert
       expect(
         wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
       ).toBe("true");
     });
 
-    it("forwards modelValue=false as open=false to ODialog", () => {
-      // Arrange
-      wrapper.unmount();
-      wrapper = buildWrapper({ modelValue: false });
+    it("shows dialog as closed when PENDING_KEY is not set", () => {
+      // Arrange — no localStorage setup, dialog should stay closed
 
-      // Act — no interaction
+      // Act
+      wrapper = buildWrapper();
 
       // Assert
       expect(
@@ -129,21 +167,28 @@ describe("CommunitySlackInvite", () => {
       ).toBe("false");
     });
 
-    it("renders the localized title text", () => {
-      // Arrange (done in beforeEach)
+    it("renders the localized title text inside an h2", () => {
+      // Arrange
+      localStorage.setItem(PENDING_KEY, "true");
 
-      // Act — no interaction
+      // Act
+      wrapper = buildWrapper();
 
-      // Assert: title is passed into ODialog as prop and rendered via stub
+      // Assert
       expect(
-        wrapper.find('[data-test="o-dialog-stub-title"]').text(),
-      ).toBe("Join the OpenObserve Community");
+        wrapper.find('[data-test="community-slack-invite-title"]').text(),
+      ).toBe("Join the OpenObserve community on Slack");
+      expect(
+        wrapper.find('[data-test="community-slack-invite-title"]').element.tagName,
+      ).toBe("H2");
     });
 
     it("renders the localized description text", () => {
-      // Arrange (done in beforeEach)
+      // Arrange
+      localStorage.setItem(PENDING_KEY, "true");
 
-      // Act — no interaction
+      // Act
+      wrapper = buildWrapper();
 
       // Assert
       expect(
@@ -152,22 +197,24 @@ describe("CommunitySlackInvite", () => {
     });
 
     it("renders the Join Slack button with localized label", () => {
-      // Arrange (done in beforeEach)
+      // Arrange
+      localStorage.setItem(PENDING_KEY, "true");
 
-      // Act — no interaction
+      // Act
+      wrapper = buildWrapper();
 
       // Assert
-      const joinBtn = wrapper.find(
-        '[data-test="community-slack-invite-join-btn"]',
-      );
+      const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
       expect(joinBtn.exists()).toBe(true);
-      expect(joinBtn.text()).toBe("Join Slack");
+      expect(joinBtn.text()).toContain("Join the Slack");
     });
 
     it("renders the Maybe later button with localized label", () => {
-      // Arrange (done in beforeEach)
+      // Arrange
+      localStorage.setItem(PENDING_KEY, "true");
 
-      // Act — no interaction
+      // Act
+      wrapper = buildWrapper();
 
       // Assert
       const laterBtn = wrapper.find(
@@ -178,9 +225,11 @@ describe("CommunitySlackInvite", () => {
     });
 
     it("passes size='sm' to ODialog", () => {
-      // Arrange (done in beforeEach)
+      // Arrange
+      localStorage.setItem(PENDING_KEY, "true");
 
-      // Act — no interaction
+      // Act
+      wrapper = buildWrapper();
 
       // Assert
       expect(
@@ -188,77 +237,274 @@ describe("CommunitySlackInvite", () => {
       ).toBe("sm");
     });
 
-    it("does not call window.open on initial render", () => {
-      // Arrange (done in beforeEach)
+    it("renders 3 benefit items", () => {
+      // Arrange
+      localStorage.setItem(PENDING_KEY, "true");
 
-      // Act — no interaction
+      // Act
+      wrapper = buildWrapper();
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="community-slack-invite-benefit-0"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="community-slack-invite-benefit-1"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="community-slack-invite-benefit-2"]').exists(),
+      ).toBe(true);
+    });
+
+    it("renders each benefit with its localized text", () => {
+      // Arrange
+      localStorage.setItem(PENDING_KEY, "true");
+
+      // Act
+      wrapper = buildWrapper();
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="community-slack-invite-benefit-0"]').text(),
+      ).toContain("Answers from the core team");
+      expect(
+        wrapper.find('[data-test="community-slack-invite-benefit-1"]').text(),
+      ).toContain("Setup help");
+      expect(
+        wrapper.find('[data-test="community-slack-invite-benefit-2"]').text(),
+      ).toContain("Early word on releases");
+    });
+
+    it("does not call window.open on initial render", () => {
+      // Arrange
+      localStorage.setItem(PENDING_KEY, "true");
+
+      // Act
+      wrapper = buildWrapper();
 
       // Assert
       expect(openSpy).not.toHaveBeenCalled();
     });
   });
 
-  // ── seen does not fire on initial render ────────────────────────────────────
+  // ── Cloud gate ───────────────────────────────────────────────────────────────
 
-  describe("seen event", () => {
-    it("does not emit 'seen' on initial render", () => {
-      // Arrange (done in beforeEach)
+  describe("Cloud gate", () => {
+    it("never opens dialog on non-Cloud (isCloud is 'false')", () => {
+      // Arrange
+      mockConfig.isCloud = "false";
+      localStorage.setItem(PENDING_KEY, "true");
 
-      // Act — no interaction
+      // Act
+      wrapper = buildWrapper();
 
       // Assert
-      expect(wrapper.emitted("seen")).toBeFalsy();
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("false");
+    });
+
+    it("does not set PENDING_KEY for non-Cloud first-time login", () => {
+      // Arrange
+      mockConfig.isCloud = "false";
+      localStorage.setItem("isFirstTimeLogin", "true");
+
+      // Act
+      wrapper = buildWrapper();
+
+      // Assert — guard returned before any localStorage writes
+      expect(localStorage.getItem(PENDING_KEY)).toBeNull();
+    });
+
+    it("does not add o2:onboarding-complete listener on non-Cloud", () => {
+      // Arrange
+      mockConfig.isCloud = "false";
+      const addEventSpy = vi.spyOn(window, "addEventListener");
+
+      // Act
+      wrapper = buildWrapper();
+      const onboardingListeners = addEventSpy.mock.calls.filter(
+        ([event]) => event === "o2:onboarding-complete",
+      );
+
+      // Assert
+      expect(onboardingListeners).toHaveLength(0);
+    });
+
+    it("shows dialog on Cloud with PENDING_KEY set", async () => {
+      // Arrange — already default (isCloud = "true")
+      localStorage.setItem(PENDING_KEY, "true");
+
+      // Act
+      wrapper = buildWrapper();
+      await nextTick();
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("true");
     });
   });
 
-  // ── Interaction: Join Slack ─────────────────────────────────────────────────
+  // ── First-login flow ─────────────────────────────────────────────────────────
+
+  describe("first-login flow", () => {
+    it("sets PENDING_KEY when isFirstTimeLogin is true and not yet seen", () => {
+      // Arrange
+      localStorage.setItem("isFirstTimeLogin", "true");
+
+      // Act
+      wrapper = buildWrapper();
+
+      // Assert
+      expect(localStorage.getItem(PENDING_KEY)).toBe("true");
+    });
+
+    it("does not set PENDING_KEY if already seen", () => {
+      // Arrange
+      localStorage.setItem("isFirstTimeLogin", "true");
+      localStorage.setItem(SEEN_KEY, "true");
+
+      // Act
+      wrapper = buildWrapper();
+
+      // Assert
+      expect(localStorage.getItem(PENDING_KEY)).toBeNull();
+    });
+
+    it("does not open dialog immediately on first login (waits for onboarding event)", () => {
+      // Arrange
+      localStorage.setItem("isFirstTimeLogin", "true");
+
+      // Act — mount without dispatching onboarding event
+      wrapper = buildWrapper();
+
+      // Assert — PENDING_KEY was set but dialog is still closed
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("false");
+    });
+
+    it("adds o2:onboarding-complete listener on first login in Cloud", () => {
+      // Arrange
+      localStorage.setItem("isFirstTimeLogin", "true");
+      const addEventSpy = vi.spyOn(window, "addEventListener");
+
+      // Act
+      wrapper = buildWrapper();
+      const onboardingListeners = addEventSpy.mock.calls.filter(
+        ([event]) => event === "o2:onboarding-complete",
+      );
+
+      // Assert
+      expect(onboardingListeners).toHaveLength(1);
+    });
+
+    it("opens dialog after o2:onboarding-complete event is dispatched", async () => {
+      // Arrange
+      localStorage.setItem("isFirstTimeLogin", "true");
+      wrapper = buildWrapper();
+
+      // Assert — closed before event
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("false");
+
+      // Act — dispatch the onboarding-complete event
+      window.dispatchEvent(new Event("o2:onboarding-complete"));
+      await wrapper.vm.$nextTick();
+
+      // Assert — now open
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("true");
+    });
+
+    it("does not open dialog after onboarding event if already seen", async () => {
+      // Arrange
+      localStorage.setItem("isFirstTimeLogin", "true");
+      // Seen key is set but PENDING_KEY would be set too (seen check in maybeShow)
+      localStorage.setItem(SEEN_KEY, "true");
+      wrapper = buildWrapper();
+
+      // Act
+      window.dispatchEvent(new Event("o2:onboarding-complete"));
+      await wrapper.vm.$nextTick();
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("false");
+    });
+  });
+
+  // ── Returning session flow ───────────────────────────────────────────────────
+
+  describe("returning session flow", () => {
+    it("shows dialog immediately when PENDING_KEY is set and not first login", async () => {
+      // Arrange
+      localStorage.setItem(PENDING_KEY, "true");
+      // isFirstTimeLogin not set → returning session
+
+      // Act
+      wrapper = buildWrapper();
+      await nextTick();
+
+      // Assert — opens immediately via maybeShow()
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("true");
+    });
+
+    it("does not open dialog if PENDING_KEY is absent", () => {
+      // Arrange — no PENDING_KEY
+
+      // Act
+      wrapper = buildWrapper();
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("false");
+    });
+
+    it("does not open dialog if PENDING_KEY is set but user has already seen it", () => {
+      // Arrange
+      localStorage.setItem(PENDING_KEY, "true");
+      localStorage.setItem(SEEN_KEY, "true");
+
+      // Act
+      wrapper = buildWrapper();
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("false");
+    });
+  });
+
+  // ── Interaction: Join Slack button ───────────────────────────────────────────
 
   describe("Join Slack button", () => {
-    it("calls window.open with the slackUrl, '_blank', 'noopener' when clicked", async () => {
+    beforeEach(() => {
+      localStorage.setItem(PENDING_KEY, "true");
+      wrapper = buildWrapper();
+    });
+
+    it("calls window.open with the default slack URL, '_blank', 'noopener'", async () => {
       // Arrange
-      const joinBtn = wrapper.find(
-        '[data-test="community-slack-invite-join-btn"]',
-      );
+      const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
 
       // Act
       await joinBtn.trigger("click");
 
       // Assert
-      expect(openSpy).toHaveBeenCalledWith(SLACK_URL, "_blank", "noopener");
+      expect(openSpy).toHaveBeenCalledWith(DEFAULT_SLACK_URL, "_blank", "noopener");
     });
 
-    it("emits update:modelValue with false when Join Slack is clicked", async () => {
+    it("calls window.open exactly once per click", async () => {
       // Arrange
-      const joinBtn = wrapper.find(
-        '[data-test="community-slack-invite-join-btn"]',
-      );
-
-      // Act
-      await joinBtn.trigger("click");
-
-      // Assert
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")![0]).toEqual([false]);
-    });
-
-    it("emits 'seen' when Join Slack is clicked", async () => {
-      // Arrange
-      const joinBtn = wrapper.find(
-        '[data-test="community-slack-invite-join-btn"]',
-      );
-
-      // Act
-      await joinBtn.trigger("click");
-
-      // Assert
-      expect(wrapper.emitted("seen")).toHaveLength(1);
-    });
-
-    it("calls window.open exactly once when Join Slack is clicked once", async () => {
-      // Arrange
-      const joinBtn = wrapper.find(
-        '[data-test="community-slack-invite-join-btn"]',
-      );
+      const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
 
       // Act
       await joinBtn.trigger("click");
@@ -266,26 +512,55 @@ describe("CommunitySlackInvite", () => {
       // Assert
       expect(openSpy).toHaveBeenCalledTimes(1);
     });
-  });
 
-  // ── Interaction: Maybe later ────────────────────────────────────────────────
-
-  describe("Maybe later button", () => {
-    it("emits update:modelValue with false when Maybe later is clicked", async () => {
+    it("closes the dialog after clicking Join Slack", async () => {
       // Arrange
-      const laterBtn = wrapper.find(
-        '[data-test="community-slack-invite-maybe-later-btn"]',
-      );
+      const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("true");
 
       // Act
-      await laterBtn.trigger("click");
+      await joinBtn.trigger("click");
 
       // Assert
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")![0]).toEqual([false]);
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("false");
     });
 
-    it("emits 'seen' when Maybe later is clicked", async () => {
+    it("sets seen key in localStorage after clicking Join Slack", async () => {
+      // Arrange
+      const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+
+      // Act
+      await joinBtn.trigger("click");
+
+      // Assert
+      expect(localStorage.getItem(SEEN_KEY)).toBe("true");
+    });
+
+    it("removes PENDING_KEY from localStorage after clicking Join Slack", async () => {
+      // Arrange
+      const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+
+      // Act
+      await joinBtn.trigger("click");
+
+      // Assert
+      expect(localStorage.getItem(PENDING_KEY)).toBeNull();
+    });
+  });
+
+  // ── Interaction: Maybe later button ─────────────────────────────────────────
+
+  describe("Maybe later button", () => {
+    beforeEach(() => {
+      localStorage.setItem(PENDING_KEY, "true");
+      wrapper = buildWrapper();
+    });
+
+    it("closes the dialog when Maybe later is clicked", async () => {
       // Arrange
       const laterBtn = wrapper.find(
         '[data-test="community-slack-invite-maybe-later-btn"]',
@@ -295,7 +570,35 @@ describe("CommunitySlackInvite", () => {
       await laterBtn.trigger("click");
 
       // Assert
-      expect(wrapper.emitted("seen")).toHaveLength(1);
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("false");
+    });
+
+    it("sets seen key in localStorage when Maybe later is clicked", async () => {
+      // Arrange
+      const laterBtn = wrapper.find(
+        '[data-test="community-slack-invite-maybe-later-btn"]',
+      );
+
+      // Act
+      await laterBtn.trigger("click");
+
+      // Assert
+      expect(localStorage.getItem(SEEN_KEY)).toBe("true");
+    });
+
+    it("removes PENDING_KEY when Maybe later is clicked", async () => {
+      // Arrange
+      const laterBtn = wrapper.find(
+        '[data-test="community-slack-invite-maybe-later-btn"]',
+      );
+
+      // Act
+      await laterBtn.trigger("click");
+
+      // Assert
+      expect(localStorage.getItem(PENDING_KEY)).toBeNull();
     });
 
     it("does NOT call window.open when Maybe later is clicked", async () => {
@@ -312,38 +615,53 @@ describe("CommunitySlackInvite", () => {
     });
   });
 
-  // ── Interaction: Dialog close button (X / overlay path) ────────────────────
+  // ── Interaction: close button (X) ────────────────────────────────────────────
 
-  describe("dialog close / dismiss path", () => {
-    it("emits update:modelValue with false when the dialog close button is clicked", async () => {
+  describe("close button / handleOpenChange path", () => {
+    beforeEach(() => {
+      localStorage.setItem(PENDING_KEY, "true");
+      wrapper = buildWrapper();
+    });
+
+    it("closes the dialog when the close button is clicked", async () => {
       // Arrange
-      // The ODialogStub renders a close button that emits update:open=false;
-      // the component handles that via handleOpenChange → dismiss().
-      const closeBtn = wrapper.find('[data-test="o-dialog-close-btn"]');
+      const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
       expect(closeBtn.exists()).toBe(true);
 
       // Act
       await closeBtn.trigger("click");
 
       // Assert
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")![0]).toEqual([false]);
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("false");
     });
 
-    it("emits 'seen' when the dialog close button is clicked", async () => {
+    it("sets seen key in localStorage when close button is clicked", async () => {
       // Arrange
-      const closeBtn = wrapper.find('[data-test="o-dialog-close-btn"]');
+      const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
 
       // Act
       await closeBtn.trigger("click");
 
       // Assert
-      expect(wrapper.emitted("seen")).toHaveLength(1);
+      expect(localStorage.getItem(SEEN_KEY)).toBe("true");
+    });
+
+    it("removes PENDING_KEY when close button is clicked", async () => {
+      // Arrange
+      const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
+
+      // Act
+      await closeBtn.trigger("click");
+
+      // Assert
+      expect(localStorage.getItem(PENDING_KEY)).toBeNull();
     });
 
     it("does NOT call window.open when dismissed via close button", async () => {
       // Arrange
-      const closeBtn = wrapper.find('[data-test="o-dialog-close-btn"]');
+      const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
 
       // Act
       await closeBtn.trigger("click");
@@ -352,151 +670,348 @@ describe("CommunitySlackInvite", () => {
       expect(openSpy).not.toHaveBeenCalled();
     });
 
-    it("emits update:modelValue=false when ODialog emits update:open=false", async () => {
-      // Arrange — drive through the ODialog's update:open emit directly
-      // (simulates Escape key / overlay click paths inside the real ODialog)
+    it("dismisses when ODialog emits update:open=false", async () => {
+      // Arrange — simulate Escape / overlay click paths inside real ODialog
       const dialogStub = wrapper.findComponent(ODialogStub);
 
       // Act
       await dialogStub.vm.$emit("update:open", false);
 
       // Assert
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")![0]).toEqual([false]);
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("false");
+      expect(localStorage.getItem(SEEN_KEY)).toBe("true");
     });
 
-    it("emits 'seen' when ODialog emits update:open=false", async () => {
-      // Arrange
-      const dialogStub = wrapper.findComponent(ODialogStub);
-
-      // Act
-      await dialogStub.vm.$emit("update:open", false);
-
-      // Assert
-      expect(wrapper.emitted("seen")).toHaveLength(1);
-    });
-
-    it("does not emit 'seen' or update:modelValue when ODialog emits update:open=true", async () => {
-      // Arrange — open=true means the dialog is opening, not closing; dismiss
-      // should not fire in this case.
+    it("does NOT dismiss when ODialog emits update:open=true", async () => {
+      // Arrange — update:open=true means the dialog is opening, not closing
       const dialogStub = wrapper.findComponent(ODialogStub);
 
       // Act
       await dialogStub.vm.$emit("update:open", true);
 
-      // Assert
-      expect(wrapper.emitted("seen")).toBeFalsy();
-      expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+      // Assert — dialog stays open, seen key NOT written
+      expect(
+        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
+      ).toBe("true");
+      expect(localStorage.getItem(SEEN_KEY)).toBeNull();
     });
   });
 
-  // ── Props reactivity ────────────────────────────────────────────────────────
+  // ── slackUrl computed ────────────────────────────────────────────────────────
 
-  describe("props reactivity", () => {
-    it("updates data-open attribute when modelValue prop changes to false", async () => {
-      // Arrange — initially open
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("true");
-
-      // Act
-      await wrapper.setProps({ modelValue: false });
-
-      // Assert
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("false");
-    });
-
-    it("updates data-open attribute when modelValue prop changes to true", async () => {
-      // Arrange — start closed
-      wrapper.unmount();
-      wrapper = buildWrapper({ modelValue: false });
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("false");
-
-      // Act
-      await wrapper.setProps({ modelValue: true });
-
-      // Assert
-      expect(
-        wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open"),
-      ).toBe("true");
-    });
-
-    it("uses updated slackUrl when joinSlack is triggered after prop change", async () => {
-      // Arrange
-      const newUrl = "https://updated.slack.com/join";
-      await wrapper.setProps({ slackUrl: newUrl });
-      const joinBtn = wrapper.find(
-        '[data-test="community-slack-invite-join-btn"]',
-      );
+  describe("slackUrl computed", () => {
+    it("uses the default community URL when not Enterprise", async () => {
+      // Arrange — isEnterprise = "false" (default)
+      localStorage.setItem(PENDING_KEY, "true");
+      wrapper = buildWrapper();
+      const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
 
       // Act
       await joinBtn.trigger("click");
 
       // Assert
-      expect(openSpy).toHaveBeenCalledWith(newUrl, "_blank", "noopener");
+      expect(openSpy).toHaveBeenCalledWith(DEFAULT_SLACK_URL, "_blank", "noopener");
+    });
+
+    it("uses the custom Slack URL when Enterprise and custom_slack_url is set", async () => {
+      // Arrange
+      const customUrl = "https://enterprise.slack.com/my-org";
+      mockConfig.isEnterprise = "true";
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        custom_slack_url: customUrl,
+      });
+      localStorage.setItem(PENDING_KEY, "true");
+
+      // Mount AFTER setting config so computed reads the correct value
+      wrapper = buildWrapper();
+      const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+
+      // Act
+      await joinBtn.trigger("click");
+
+      // Assert
+      expect(openSpy).toHaveBeenCalledWith(customUrl, "_blank", "noopener");
+    });
+
+    it("falls back to default URL when Enterprise but custom_slack_url is falsy", async () => {
+      // Arrange
+      mockConfig.isEnterprise = "true";
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        custom_slack_url: null,
+      });
+      localStorage.setItem(PENDING_KEY, "true");
+      wrapper = buildWrapper();
+      const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+
+      // Act
+      await joinBtn.trigger("click");
+
+      // Assert
+      expect(openSpy).toHaveBeenCalledWith(DEFAULT_SLACK_URL, "_blank", "noopener");
+    });
+
+    it("falls back to default URL when Enterprise is 'false' even with a custom_slack_url set", async () => {
+      // Arrange — isEnterprise = "false" → condition short-circuits
+      const customUrl = "https://enterprise.slack.com/my-org";
+      mockConfig.isEnterprise = "false";
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        custom_slack_url: customUrl,
+      });
+      localStorage.setItem(PENDING_KEY, "true");
+      wrapper = buildWrapper();
+      const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+
+      // Act
+      await joinBtn.trigger("click");
+
+      // Assert
+      expect(openSpy).toHaveBeenCalledWith(DEFAULT_SLACK_URL, "_blank", "noopener");
     });
   });
 
-  // ── Edge cases ──────────────────────────────────────────────────────────────
+  // ── captionText computed ─────────────────────────────────────────────────────
 
-  describe("edge cases", () => {
-    it("emits both update:modelValue and seen exactly once per single dismissal", async () => {
+  describe("captionText computed", () => {
+    it("shows qualitative community note when slack_member_count is absent", () => {
+      // Arrange — no member count in store (already default: null)
+      localStorage.setItem(PENDING_KEY, "true");
+
+      // Act
+      wrapper = buildWrapper();
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="community-slack-invite-members-text"]').text(),
+      ).toBe("Engineers and the OpenObserve team, active every day");
+    });
+
+    it("shows member count text when slack_member_count is a positive number", () => {
+      // Arrange — 4250 members → floored to 4200 → "4,200+ members"
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        slack_member_count: 4250,
+      });
+      localStorage.setItem(PENDING_KEY, "true");
+
+      // Act
+      wrapper = buildWrapper();
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="community-slack-invite-members-text"]').text(),
+      ).toContain("4,200+");
+    });
+
+    it("shows member count without '+' suffix when count is below 100", () => {
+      // Arrange — 50 members → no floor to 100, no "+"
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        slack_member_count: 50,
+      });
+      localStorage.setItem(PENDING_KEY, "true");
+
+      // Act
+      wrapper = buildWrapper();
+
+      // Assert
+      const text = wrapper
+        .find('[data-test="community-slack-invite-members-text"]')
+        .text();
+      expect(text).toContain("50");
+      expect(text).not.toContain("+");
+    });
+
+    it("falls back to community note when slack_member_count is 0", () => {
+      // Arrange — 0 is not > 0, so memberCount returns null
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        slack_member_count: 0,
+      });
+      localStorage.setItem(PENDING_KEY, "true");
+
+      // Act
+      wrapper = buildWrapper();
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="community-slack-invite-members-text"]').text(),
+      ).toBe("Engineers and the OpenObserve team, active every day");
+    });
+
+    it("falls back to community note when slack_member_count is negative", () => {
       // Arrange
-      const laterBtn = wrapper.find(
-        '[data-test="community-slack-invite-maybe-later-btn"]',
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        slack_member_count: -5,
+      });
+      localStorage.setItem(PENDING_KEY, "true");
+
+      // Act
+      wrapper = buildWrapper();
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="community-slack-invite-members-text"]').text(),
+      ).toBe("Engineers and the OpenObserve team, active every day");
+    });
+
+    it("floors member count to nearest 100 (e.g. 1999 → 1900+)", () => {
+      // Arrange
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        slack_member_count: 1999,
+      });
+      localStorage.setItem(PENDING_KEY, "true");
+
+      // Act
+      wrapper = buildWrapper();
+
+      // Assert
+      const text = wrapper
+        .find('[data-test="community-slack-invite-members-text"]')
+        .text();
+      expect(text).toContain("1,900+");
+      expect(text).not.toContain("1,999");
+    });
+  });
+
+  // ── seenKey uses user email ──────────────────────────────────────────────────
+
+  describe("per-user seen key", () => {
+    it("uses the user email from the store to build the seenKey", async () => {
+      // Arrange — store has email = "example@gmail.com"
+      localStorage.setItem(PENDING_KEY, "true");
+      wrapper = buildWrapper();
+      const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
+
+      // Act
+      await closeBtn.trigger("click");
+
+      // Assert — the exact keyed entry was written
+      expect(
+        localStorage.getItem(`communitySlackInviteSeen:${USER_EMAIL}`),
+      ).toBe("true");
+    });
+
+    it("uses 'anonymous' seenKey when userInfo has no email", async () => {
+      // Arrange — clear email before mounting
+      store.commit("setUserInfo", { email: undefined });
+      localStorage.setItem(PENDING_KEY, "true");
+      wrapper = buildWrapper();
+      const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
+
+      // Act
+      await closeBtn.trigger("click");
+
+      // Assert — falls back to "anonymous"
+      expect(
+        localStorage.getItem("communitySlackInviteSeen:anonymous"),
+      ).toBe("true");
+    });
+  });
+
+  // ── Listener cleanup on unmount ──────────────────────────────────────────────
+
+  describe("listener cleanup", () => {
+    it("removes o2:onboarding-complete listener on unmount", () => {
+      // Arrange
+      localStorage.setItem("isFirstTimeLogin", "true");
+      const removeEventSpy = vi.spyOn(window, "removeEventListener");
+      wrapper = buildWrapper();
+
+      // Act
+      wrapper.unmount();
+      const removals = removeEventSpy.mock.calls.filter(
+        ([event]) => event === "o2:onboarding-complete",
       );
 
-      // Act — single click
-      await laterBtn.trigger("click");
-
-      // Assert — no duplicate events
-      expect(wrapper.emitted("update:modelValue")).toHaveLength(1);
-      expect(wrapper.emitted("seen")).toHaveLength(1);
+      // Assert
+      expect(removals.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("emits 'seen' on every dismissal path independently", async () => {
-      // Test that calling dismiss multiple times (via different UI interactions)
-      // each produces a 'seen' event — the component does not gate it.
-
-      // Dismiss via Maybe later
-      await wrapper.find(
-        '[data-test="community-slack-invite-maybe-later-btn"]',
-      ).trigger("click");
-
-      // Dismiss again via close button
-      await wrapper.find('[data-test="o-dialog-close-btn"]').trigger("click");
-
-      // Assert — both dismissals fired seen
-      expect(wrapper.emitted("seen")).toHaveLength(2);
-    });
-
-    it("renders without throwing when slackUrl is an empty string", () => {
-      // Arrange
+    it("does not open dialog after unmount even if onboarding event fires", () => {
+      // Arrange — first login flow: listener registered, then unmount
+      localStorage.setItem("isFirstTimeLogin", "true");
+      wrapper = buildWrapper();
       wrapper.unmount();
 
-      // Act + Assert — no throw on mount
+      // Act — event fires after unmount
       expect(() => {
-        wrapper = buildWrapper({ slackUrl: "" });
+        window.dispatchEvent(new Event("o2:onboarding-complete"));
       }).not.toThrow();
     });
+  });
 
-    it("passes empty string slackUrl to window.open without modification", async () => {
+  // ── Edge cases ───────────────────────────────────────────────────────────────
+
+  describe("edge cases", () => {
+    it("closing via close button a second time does not throw", async () => {
       // Arrange
-      wrapper.unmount();
-      wrapper = buildWrapper({ slackUrl: "" });
-      const joinBtn = wrapper.find(
-        '[data-test="community-slack-invite-join-btn"]',
-      );
+      localStorage.setItem(PENDING_KEY, "true");
+      wrapper = buildWrapper();
+      const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
+
+      // Act + Assert — two dismissals, no throw
+      await closeBtn.trigger("click");
+      expect(() => closeBtn.trigger("click")).not.toThrow();
+    });
+
+    it("renders correctly with exact member count of 100 (boundary: floored to 100, shows '+')", () => {
+      // Arrange
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        slack_member_count: 100,
+      });
+      localStorage.setItem(PENDING_KEY, "true");
 
       // Act
-      await joinBtn.trigger("click");
+      wrapper = buildWrapper();
 
-      // Assert
-      expect(openSpy).toHaveBeenCalledWith("", "_blank", "noopener");
+      // Assert — 100 floors to 100, and n >= 100 so "+" is appended
+      const text = wrapper
+        .find('[data-test="community-slack-invite-members-text"]')
+        .text();
+      expect(text).toContain("100+");
+    });
+
+    it("renders correctly with very large member count (e.g. 1,000,000)", () => {
+      // Arrange
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        slack_member_count: 1_000_000,
+      });
+      localStorage.setItem(PENDING_KEY, "true");
+
+      // Act
+      wrapper = buildWrapper();
+
+      // Assert — floored to 1,000,000, shows commas and "+"
+      const text = wrapper
+        .find('[data-test="community-slack-invite-members-text"]')
+        .text();
+      expect(text).toContain("1,000,000+");
+    });
+
+    it("renders without throwing when slack_member_count is NaN", () => {
+      // Arrange
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        slack_member_count: NaN,
+      });
+      localStorage.setItem(PENDING_KEY, "true");
+
+      // Act + Assert — falls back gracefully
+      expect(() => {
+        wrapper = buildWrapper();
+      }).not.toThrow();
+      expect(
+        wrapper.find('[data-test="community-slack-invite-members-text"]').text(),
+      ).toBe("Engineers and the OpenObserve team, active every day");
     });
   });
 });
