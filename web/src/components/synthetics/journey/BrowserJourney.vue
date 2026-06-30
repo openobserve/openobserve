@@ -9,6 +9,8 @@ import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue'
 import BrowserJourneyStep from './BrowserJourneyStep.vue'
 
 const props = defineProps<{
@@ -41,6 +43,47 @@ const stepsModel = computed<BrowserStep[]>({
 const dragDisabled = computed(() =>
   isRecording.value || props.isReplaying || props.readonly || !!filterQuery.value.trim()
 )
+
+// ── Multi-select ───────────────────────────────────────────────────────────
+const selectedStepIds = ref<Set<string>>(new Set())
+const showBulkDeleteDialog = ref(false)
+
+const selectedCount = computed(() => selectedStepIds.value.size)
+
+const allSelected = computed(() =>
+  props.modelValue.length > 0 && props.modelValue.every((s) => selectedStepIds.value.has(s.id))
+)
+
+const isIndeterminate = computed(() => {
+  const count = props.modelValue.filter((s) => selectedStepIds.value.has(s.id)).length
+  return count > 0 && count < props.modelValue.length
+})
+
+const selectAllModel = computed<boolean | 'indeterminate'>(() =>
+  allSelected.value ? true : isIndeterminate.value ? 'indeterminate' : false
+)
+
+function toggleStepSelection(id: string) {
+  const next = new Set(selectedStepIds.value)
+  next.has(id) ? next.delete(id) : next.add(id)
+  selectedStepIds.value = next
+}
+
+function toggleSelectAll() {
+  selectedStepIds.value = allSelected.value || isIndeterminate.value
+    ? new Set()
+    : new Set(props.modelValue.map((s) => s.id))
+}
+
+function deleteSelectedSteps() {
+  const ids = selectedStepIds.value
+  emit('update:modelValue', props.modelValue.filter((s) => !ids.has(s.id)))
+  selectedStepIds.value = new Set()
+}
+
+// Clear selection when the step list changes externally or filter changes
+watch(() => props.modelValue.length, () => { selectedStepIds.value = new Set() })
+watch(filterQuery, () => { selectedStepIds.value = new Set() })
 
 // ── Recording state ────────────────────────────────────────────────────────
 // All Chrome-extension messaging lives in the composable; this component only
@@ -159,12 +202,32 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
       <!-- Normal: label + filter + step actions -->
       <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:mr-0">Steps</h3>
       <OBadge variant="default" size="sm">{{ modelValue.length }}</OBadge>
+      <OCheckbox
+        v-if="!isRecording && !readonly"
+        :model-value="selectAllModel"
+        size="sm"
+        data-test="synthetics-journey-select-all"
+        @update:model-value="toggleSelectAll"
+      />
       <OInput
         v-model="filterQuery"
         placeholder="Filter steps..."
-        class="tw:w-48 tw:ml-6!"
+        class="tw:w-48 tw:ml-2!"
         data-test="synthetics-journey-filter-input"
       />
+      <!-- Selection actions -->
+      <template v-if="selectedCount > 0 && !isRecording">
+        <span class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:whitespace-nowrap">{{ selectedCount }} selected</span>
+        <OButton
+          variant="outline-destructive"
+          size="sm"
+          data-test="synthetics-journey-delete-selected-btn"
+          @click="showBulkDeleteDialog = true"
+        >
+          <template #icon-left><OIcon name="delete" size="sm" /></template>
+          Delete
+        </OButton>
+      </template>
       <span class="tw:flex-1" aria-hidden="true" />
       <OButton
         variant="outline"
@@ -318,11 +381,14 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
         :step="step"
         :index="index"
         :expanded="isStepExpanded(step.id)"
+        :selected="selectedStepIds.has(step.id)"
+        :selection-enabled="!isRecording && !readonly"
         @update:step="updateStep(index, $event)"
         @update:expanded="setStepExpanded(step.id, $event)"
         @delete="deleteStep(index)"
         @duplicate="duplicateStep(index)"
         @insert-below="insertStepBelow(index)"
+        @toggle-select="toggleStepSelection(step.id)"
       />
     </VueDraggableNext>
 
@@ -334,13 +400,33 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
         :step="step"
         :index="originalIndex"
         :expanded="isStepExpanded(step.id)"
+        :selected="selectedStepIds.has(step.id)"
+        :selection-enabled="!isRecording && !readonly"
         @update:step="updateStep(originalIndex, $event)"
         @update:expanded="setStepExpanded(step.id, $event)"
         @delete="deleteStep(originalIndex)"
         @duplicate="duplicateStep(originalIndex)"
         @insert-below="insertStepBelow(originalIndex)"
+        @toggle-select="toggleStepSelection(step.id)"
       />
     </div>
+
+    <!-- Bulk delete confirmation dialog -->
+    <ODialog
+      v-model:open="showBulkDeleteDialog"
+      size="sm"
+      title="Delete steps"
+      primary-button-label="Delete"
+      secondary-button-label="Cancel"
+      primary-button-variant="destructive"
+      data-test="synthetics-journey-bulk-delete-dialog"
+      @click:primary="deleteSelectedSteps(); showBulkDeleteDialog = false"
+      @click:secondary="showBulkDeleteDialog = false"
+    >
+      <p class="tw:py-2">
+        Delete {{ selectedCount }} step{{ selectedCount !== 1 ? 's' : '' }}? This cannot be undone.
+      </p>
+    </ODialog>
   </div>
 </template>
 

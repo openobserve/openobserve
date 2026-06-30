@@ -8,11 +8,14 @@ import OInput from '@/lib/forms/Input/OInput.vue'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
 
 const props = defineProps<{
   step: BrowserStep
   index: number
   expanded?: boolean
+  selected?: boolean
+  selectionEnabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -21,6 +24,7 @@ const emit = defineEmits<{
   'delete': []
   'duplicate': []
   'insert-below': []
+  'toggle-select': []
 }>()
 
 // Action icon map — all values must be valid IconName keys
@@ -137,6 +141,15 @@ function toggleExpanded() {
         data-test="synthetics-journey-step-drag-handle"
         aria-hidden="true"
       >⠿</span>
+
+      <!-- Selection checkbox -->
+      <OCheckbox
+        v-if="selectionEnabled"
+        :model-value="selected ? true : false"
+        size="xs"
+        :data-test="`synthetics-journey-step-checkbox-${index}`"
+        @update:model-value="emit('toggle-select')"
+      />
 
       <!-- Step number -->
       <span class="tw:w-6 tw:text-right tw:text-sm tw:tabular-nums tw:text-[var(--o2-text-muted)] tw:shrink-0">
