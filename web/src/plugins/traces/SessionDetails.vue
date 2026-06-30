@@ -519,15 +519,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Right rail: hotspot cards. Sticks to the top of the page-scroll so the
-           hotspots stay visible while the conversation scrolls. Each card sizes to
-           its rows (capped at ~5, see the lists' max-h); the rail shrinks to its
-           content and only caps/scrolls at the viewport so there's no wasted gap. -->
+           hotspots stay visible while the conversation scrolls. The three cards
+           split the rail height EQUALLY (flex-1 thirds); each scrolls internally
+           if its rows exceed its third. A card with fewer rows just shows them in
+           its third. Definite height so the thirds distribute. -->
       <aside
-        class="tw:sticky tw:top-0 tw:self-start tw:flex tw:flex-col tw:gap-[0.625rem] tw:max-h-[calc(100vh-2.6rem-68px-1.25rem)] tw:overflow-y-auto tw:pb-[0.625rem]"
+        class="tw:sticky tw:top-0 tw:self-start tw:flex tw:flex-col tw:gap-[0.625rem] tw:h-[calc(100vh-2.6rem-68px-1.25rem)] tw:overflow-hidden tw:pb-[0.625rem]"
         data-test="session-rail"
       >
         <!-- Tool Hotspots (by time + calls; cost pending backend attribution) -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-shrink-0 tw:overflow-hidden">
+        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
           <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
             <OIcon name="build" size="xs" class="tw:text-[var(--o2-text-muted)]" />
             <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
@@ -542,7 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-else-if="toolHotspots.length"
-            class="tw:max-h-[11rem] tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]"
+            class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]"
           >
             <TurnPreviewCard
               v-for="(row, i) in toolHotspots"
@@ -579,14 +580,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Cost Hotspots -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-shrink-0 tw:overflow-hidden">
+        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
           <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
             <OIcon name="trending-up" size="xs" class="tw:text-[var(--o2-text-muted)]" />
             <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
               {{ t('traces.sessionDetail.rail.costHotspots') }}
             </span>
           </div>
-          <div class="tw:max-h-[11rem] tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
+          <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
             <TurnPreviewCard
               v-for="(row, i) in costHotspots"
               :key="row.n"
@@ -622,14 +623,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Slowest Turns -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-shrink-0 tw:overflow-hidden">
+        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
           <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
             <OIcon name="schedule" size="xs" class="tw:text-[var(--o2-text-muted)]" />
             <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
               {{ t('traces.sessionDetail.rail.slowestTurns') }}
             </span>
           </div>
-          <div class="tw:max-h-[11rem] tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
+          <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
             <TurnPreviewCard
               v-for="(row, i) in slowestTurns"
               :key="row.n"
