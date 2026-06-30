@@ -1302,10 +1302,13 @@
     "add": "New service account",
     "confirmDeleteMsg": "Are you sure you want to delete {identifier}?",
     "confirmDeleteHead": "Delete Service Account",
+    "confirmDeleteBtn": "Delete account",
     "confirmRefreshMsg": "Are you sure you want to rotate the token for {identifier}?",
     "confirmRefreshHead": "Rotate Service Token",
+    "confirmRefreshBtn": "Rotate token",
     "confirmBulkDeleteHead": "Delete Service Accounts",
     "confirmBulkDeleteMsg": "Are you sure you want to delete {count} service account(s)?",
+    "confirmBulkDeleteBtn": "Delete {count} accounts",
     "downloadToken": "Download Token",
     "token": "Token",
     "tokenDialogTitle": "Service Account Token",
@@ -1314,7 +1317,17 @@
       "header": "Header",
       "env": "Environment Variable",
       "nextStep": "Use the token in your API requests. Store it securely; it will not be shown again.",
-      "nextStepCloud": "Use the token in your API requests. Contact your admin for the API endpoint."
+      "nextStepCloud": "Use the token in your API requests. Contact your admin for the API endpoint.",
+      "nextStepGrant": "This account has no permissions yet. Add it to a group to grant access.",
+      "nextStepOss": "Grant access from the Roles & Groups page.",
+      "addToGroup": "Add to Group",
+      "addToRole": "Add to Role",
+      "step1Title": "Copy your token",
+      "step2Title": "Grant permissions",
+      "copyHint": "Copy this token now — you won't be able to see it again.",
+      "next": "Next: grant permissions",
+      "back": "Back",
+      "done": "Done"
     },
     "form": {
       "identifier": {
@@ -1327,8 +1340,8 @@
       "col": {
         "identifier": "Identifier",
         "description": "Description",
-        "created": "Created",
-        "createdBy": "Created By"
+        "token": "Token",
+        "created": "Created"
       }
     },
     "empty": {

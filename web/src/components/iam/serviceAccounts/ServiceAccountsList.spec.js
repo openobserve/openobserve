@@ -706,8 +706,8 @@ describe("ServiceAccountsList Component", () => {
       expect(wrapper.vm.columns[0].id).toBe("#");
       expect(wrapper.vm.columns[1].id).toBe("email");
       expect(wrapper.vm.columns[2].id).toBe("first_name");
-      expect(wrapper.vm.columns[3].id).toBe("created_at");
-      expect(wrapper.vm.columns[4].id).toBe("created_by");
+      expect(wrapper.vm.columns[3].id).toBe("token");
+      expect(wrapper.vm.columns[4].id).toBe("created_at");
       expect(wrapper.vm.columns[5].id).toBe("actions");
     });
 
@@ -765,6 +765,15 @@ describe("ServiceAccountsList Component", () => {
       const displayRole = sreAgent.is_system ? "System Managed" : sreAgent.role;
       expect(displayRole).toBe("System Managed");
     });
+
+    it("excludes system-managed rows from selection via isRowSelectable", () => {
+      // Regular accounts are selectable…
+      expect(wrapper.vm.isRowSelectable({ email: "service1@example.com", is_system: false })).toBe(true);
+      // …system-managed accounts are not (checkbox disabled, excluded from select-all).
+      expect(wrapper.vm.isRowSelectable({ email: "o2-sre-agent.org-test-org@openobserve.internal", is_system: true })).toBe(false);
+      // Also caught by the email heuristic even if is_system is missing.
+      expect(wrapper.vm.isRowSelectable({ email: "o2-sre-agent.org-acme@openobserve.internal" })).toBe(false);
+    });
   });
 
   describe("ODialog Migration - Confirm Refresh Dialog", () => {
@@ -811,6 +820,19 @@ describe("ServiceAccountsList Component", () => {
       );
       // After successful refresh, confirm dialog should be closed
       expect(wrapper.vm.confirmRefresh).toBe(false);
+    });
+
+    it("passes a destructive verb label (not generic OK) to the rotate confirm", async () => {
+      wrapper.vm.confirmRefresh = true;
+      wrapper.vm.toBeRefreshed = { email: "service1@example.com" };
+      await nextTick();
+
+      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
+      const refreshDialog = confirmDialogs.find((d) => d.props('modelValue') === true);
+      expect(refreshDialog).toBeDefined();
+      // Verb-labeled, destructive — no hardcoded English / generic OK.
+      expect(refreshDialog.props('okLabel')).toBe('Rotate token');
+      expect(refreshDialog.props('okColor')).toBe('destructive');
     });
   });
 
@@ -1019,7 +1041,7 @@ describe("ServiceAccountsList Component", () => {
 
       const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
       const tokenDialog = dialogs.find(
-        (d) => d.props('open') === true && d.props('title') === 'Service Account Token'
+        (d) => d.props('open') === true && d.props('title') === 'Copy your token'
       );
       expect(tokenDialog).toBeDefined();
       // `persistent` may be received as boolean true or as "" (boolean attr)
@@ -1034,7 +1056,7 @@ describe("ServiceAccountsList Component", () => {
 
       const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
       const tokenDialog = dialogs.find(
-        (d) => d.props('open') === true && d.props('title') === 'Service Account Token'
+        (d) => d.props('open') === true && d.props('title') === 'Copy your token'
       );
       expect(tokenDialog).toBeDefined();
 
@@ -1098,7 +1120,7 @@ describe("ServiceAccountsList Component", () => {
 
     it("renders OTabs with three tab panels (cURL, Header, Environment Variable)", () => {
       const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
-        (d) => d.props("title") === "Service Account Token"
+        (d) => d.props("title") === "Copy your token"
       );
       expect(tokenDialog).toBeDefined();
       // OTabs should render tab triggers for curl, header, env
@@ -1110,16 +1132,42 @@ describe("ServiceAccountsList Component", () => {
 
     it("renders cURL snippet with serviceToken and org identifier", () => {
       const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
-        (d) => d.props("title") === "Service Account Token"
+        (d) => d.props("title") === "Copy your token"
       );
       expect(tokenDialog).toBeDefined();
       const dialogHtml = tokenDialog.html();
       expect(dialogHtml).toContain("test-token-abc123");
     });
 
+    it("cURL snippet uses Basic auth (curl -u identifier:token), not Bearer", () => {
+      wrapper.vm.revealToken("the-token", "svc@example.com");
+      const curl = wrapper.vm.tokenCurlSnippet;
+      // OpenObserve uses HTTP Basic auth, not Bearer tokens.
+      expect(curl).toContain("/streams");
+      expect(curl).toContain('curl -u "svc@example.com:the-token"');
+      expect(curl).not.toContain("Bearer");
+      expect(curl).not.toContain("_search");
+    });
+
+    it("Header snippet is Authorization: Basic base64(identifier:token)", () => {
+      wrapper.vm.revealToken("the-token", "svc@example.com");
+      const header = wrapper.vm.tokenHeaderSnippet;
+      // base64("svc@example.com:the-token")
+      const expected = btoa("svc@example.com:the-token");
+      expect(header).toBe(`Authorization: Basic ${expected}`);
+      expect(header).not.toContain("Bearer");
+    });
+
+    it("Env snippet exposes the Basic credential, not a raw Bearer token", () => {
+      wrapper.vm.revealToken("the-token", "svc@example.com");
+      const env = wrapper.vm.tokenEnvSnippet;
+      expect(env).toContain("Basic ");
+      expect(env).not.toContain("Bearer");
+    });
+
     it("does not render a download button in the token dialog", () => {
       const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
-        (d) => d.props("title") === "Service Account Token"
+        (d) => d.props("title") === "Copy your token"
       );
       expect(tokenDialog).toBeDefined();
       const dialogHtml = tokenDialog.html();
@@ -1129,7 +1177,7 @@ describe("ServiceAccountsList Component", () => {
 
     it("renders a copy button in the token dialog", () => {
       const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
-        (d) => d.props("title") === "Service Account Token"
+        (d) => d.props("title") === "Copy your token"
       );
       expect(tokenDialog).toBeDefined();
       // Copy button should still be present (data-test attribute)
@@ -1137,25 +1185,96 @@ describe("ServiceAccountsList Component", () => {
     });
   });
 
-  describe("Token dialog — next-step hint (edition-gated)", () => {
-    it("renders next-step hint text in the token dialog", async () => {
-      wrapper.vm.serviceToken = "tok";
-      wrapper.vm.isShowToken = true;
+  describe("Token dialog — wizard step 2 (grant permissions, edition-gated)", () => {
+    // aws-exports is mocked with isEnterprise: "true" (see top of file), so the
+    // enterprise next-step (grant-permissions hint + Add-to-Group link) renders.
+    it("opens at step 1 and advances to step 2 via Next", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com");
+      await nextTick();
+      expect(wrapper.vm.wizardStep).toBe(1);
+
+      // Step 2 content is gated behind the Next button.
+      expect(
+        wrapper.find('[data-test="service-accounts-token-step-2"]').exists()
+      ).toBe(false);
+
+      await wrapper.find('[data-test="service-accounts-token-next-btn"]').trigger("click");
+      await nextTick();
+      expect(wrapper.vm.wizardStep).toBe(2);
+      expect(
+        wrapper.find('[data-test="service-accounts-token-step-2"]').exists()
+      ).toBe(true);
+    });
+
+    it("renders the grant-permissions next-step hint on step 2", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com");
+      wrapper.vm.wizardStep = 2;
       await nextTick();
 
       const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
-        (d) => d.props("title") === "Service Account Token"
+        (d) => d.props("title") === "Grant permissions"
       );
       expect(tokenDialog).toBeDefined();
-      // The next-step hint should be present (i18n key contains guidance text)
-      expect(tokenDialog.html()).toContain("API requests");
+      // Enterprise build: hint nudges the user to grant permissions via a group.
+      expect(tokenDialog.html()).toContain("no permissions yet");
+    });
+
+    it("renders Add-to-Role (first) and Add-to-Group links in enterprise builds on step 2", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com");
+      wrapper.vm.wizardStep = 2;
+      await nextTick();
+
+      const roleLink = wrapper.find('[data-test="service-accounts-list-token-add-to-role"]');
+      const groupLink = wrapper.find('[data-test="service-accounts-list-token-add-to-group"]');
+      expect(roleLink.exists()).toBe(true);
+      expect(groupLink.exists()).toBe(true);
+      expect(wrapper.vm.showGroupLink).toBe(true);
+
+      // Role must be the first option (appear before Group in the DOM).
+      const html = wrapper.find('[data-test="service-accounts-token-step-2"]').html();
+      expect(html.indexOf("add-to-role")).toBeLessThan(html.indexOf("add-to-group"));
+    });
+
+    it("Add-to-Role link targets the roles route with the account prefilled", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com");
+      await nextTick();
+      expect(wrapper.vm.roleLinkTarget.name).toBe("roles");
+      expect(wrapper.vm.roleLinkTarget.query.member).toBe("svc@example.com");
+    });
+
+    it("Back returns to step 1; Done closes the dialog", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com");
+      wrapper.vm.wizardStep = 2;
+      await nextTick();
+
+      await wrapper.find('[data-test="service-accounts-token-back-btn"]').trigger("click");
+      await nextTick();
+      expect(wrapper.vm.wizardStep).toBe(1);
+
+      wrapper.vm.wizardStep = 2;
+      await nextTick();
+      await wrapper.find('[data-test="service-accounts-token-done-btn"]').trigger("click");
+      await nextTick();
+      expect(wrapper.vm.isShowToken).toBe(false);
+    });
+
+    it("resets to step 1 each time the token is revealed", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com");
+      wrapper.vm.wizardStep = 2;
+      await nextTick();
+
+      // Revealing again (e.g. another create/rotate) must start at step 1.
+      wrapper.vm.revealToken("tok2", "svc2@example.com");
+      await nextTick();
+      expect(wrapper.vm.wizardStep).toBe(1);
     });
   });
 
-  describe("Columns — no token, created/createdBy, identifier header", () => {
-    it("does not include a 'token' column", () => {
+  describe("Columns — token, created, identifier header", () => {
+    it("includes a 'token' column", () => {
       const tokenCol = wrapper.vm.columns.find((c) => c.id === "token");
-      expect(tokenCol).toBeUndefined();
+      expect(tokenCol).toBeDefined();
+      expect(tokenCol.header).toBe("Token");
     });
 
     it("includes a 'created' column", () => {
@@ -1163,15 +1282,28 @@ describe("ServiceAccountsList Component", () => {
       expect(createdCol).toBeDefined();
     });
 
-    it("includes a 'createdBy' column", () => {
+    it("does not include a 'createdBy' column (API does not return created_by)", () => {
       const createdByCol = wrapper.vm.columns.find((c) => c.id === "created_by");
-      expect(createdByCol).toBeDefined();
+      expect(createdByCol).toBeUndefined();
     });
 
     it("renames email header to 'Identifier'", () => {
       const emailCol = wrapper.vm.columns.find((c) => c.id === "email");
       expect(emailCol).toBeDefined();
       expect(emailCol.header).toBe("Identifier");
+    });
+
+    it("formats created_at (epoch micros) into a readable date string", () => {
+      // 2026-06-30T00:00:00Z in microseconds.
+      const micros = Date.UTC(2026, 5, 30, 0, 0, 0) * 1000;
+      const formatted = wrapper.vm.formatCreatedAt(micros);
+      expect(formatted).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+      expect(formatted).toContain("2026-06-30");
+    });
+
+    it("formatCreatedAt returns an em dash for missing timestamps", () => {
+      expect(wrapper.vm.formatCreatedAt(0)).toBe("—");
+      expect(wrapper.vm.formatCreatedAt(undefined)).toBe("—");
     });
   });
 
