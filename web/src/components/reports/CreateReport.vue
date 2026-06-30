@@ -40,31 +40,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:px-4 tw:my-3"
           style="width: 1024px"
         >
-          <form
+          <OForm
+            :id="formId"
+            :form="form"
             class="create-report-form"
-            @submit.prevent="onSubmit"
           >
             <div
               class="tw:flex tw:items-start tw:gap-4 tw:px-2"
               style="padding-top: 0.75rem"
             >
               <div data-test="add-report-name-input" class="o2-input">
-                <OInput
+                <OFormInput
                   data-test="add-report-name-input"
-                  v-model.trim="formData.name"
-                  :label="t('alerts.name') + ' *'"
+                  name="name"
+                  :label="t('alerts.name')"
+                  required
                   color="input-border"
                   class="showLabelOnTop"
-                  v-bind:readonly="isEditingReport"
+                  :readonly="isEditingReport"
                   :disabled="isEditingReport"
-                  :error="!!nameError"
-                  :error-message="nameError"
                   help-text="Characters like :, ?, /, #, and spaces are not allowed."
-                  @update:model-value="nameError = ''"
                   tabindex="0"
                   style="width: 20.625rem"
-                >
-                </OInput>
+                />
               </div>
 
               <div
@@ -87,9 +85,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-report-description-input"
               class="report-name-input o2-input tw:px-2 tw:pt-3"
             >
-              <OInput
+              <OFormInput
                 data-test="add-report-description-input"
-                v-model="formData.description"
+                name="description"
                 :label="t('reports.description')"
                 color="input-border"
                 class="showLabelOnTop"
@@ -99,9 +97,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div class="tw:flex tw:items-center tw:pt-4">
-              <OSwitch
+              <OFormSwitch
                 data-test="report-cached-toggle-btn"
-                v-model="isCachedReport"
+                name="isCachedReport"
                 size="lg"
                 :label="t('reports.cachedReport')"
               />
@@ -134,8 +132,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon="edit"
                 :done="step > 1"
               >
+                <!-- Dashboard field-array. One fixed row today (no add/remove
+                     UI), iterated so the array structure is preserved and the
+                     controls bind by their `dashboards[i].*` form name. Row
+                     content + per-row report_type read come from the form via the
+                     reactive `dashboardRows` mirror.
+                     NOTE: the key mirrors the pre-migration `folder + dashboard`
+                     (kept for parity). Field VALUES survive the resulting remount
+                     because they live in the form; a stable `index`/`uuid` key
+                     would avoid the remount churn but isn't required for
+                     correctness. -->
                 <template
-                  v-for="(dashboard, index) in formData.dashboards"
+                  v-for="(dashboard, index) in dashboardRows"
                   :key="dashboard.folder + dashboard.dashboard"
                 >
                   <div
@@ -143,86 +151,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:my-2 tw:px-2 tw:flex tw:flex-col"
                   >
                     <div class="tw:flex tw:items-center tw:justify-start">
-                    <div
-                      data-test="add-report-folder-select"
-                      class="o2-input tw:mr-2"
-                      style="padding-top: 0; width: 30%"
-                    >
-                      <OSelect
-                        data-test="add-report-dashboard-folder-select"
-                        v-model="dashboard.folder"
-                        :options="folderOptions"
-                        :label="t('reports.dashboardFolder') + ' *'"
-                        :loading="isFetchingFolders"
-                        :error="index === 0 && !!folderError"
-                        :error-message="index === 0 ? folderError : ''"
-                        @update:model-value="folderError = ''; onFolderSelection(dashboard.folder)"
-                        style="min-width: 250px !important; width: 100% !important;"
-                      />
-                    </div>
-                    <div
-                      data-test="add-report-dashboard-select"
-                      class="o2-input tw:mr-2"
-                      style="padding-top: 0; width: 30%"
-                    >
-                      <OSelect
-                        data-test="add-report-dashboard-name-select"
-                        v-model="dashboard.dashboard"
-                        :options="dashboardOptions"
-                        :label="t('reports.dashboard') + ' *'"
-                        :loading="isFetchingDashboard || isFetchingFolders"
-                        :error="index === 0 && !!dashboardError"
-                        :error-message="index === 0 ? dashboardError : ''"
-                        @update:model-value="dashboardError = ''; onDashboardSelection(dashboard.dashboard)"
-                        style="min-width: 250px !important; width: 100% !important;"
-                      />
-                    </div>
-                    <div
-                      data-test="add-report-tab-select"
-                      class="o2-input"
-                      style="padding-top: 0; width: 30%"
-                    >
-                      <OSelect
-                        data-test="add-report-dashboard-tab-select"
-                        v-model="dashboard.tabs"
-                        :options="dashboardTabOptions"
-                        :label="t('reports.dashboardTab') + ' *'"
-                        :loading="isFetchingDashboard || isFetchingFolders"
-                        :error="index === 0 && !!tabError"
-                        :error-message="index === 0 ? tabError : ''"
-                        @update:model-value="tabError = ''"
-                        style="min-width: 250px !important; width: 100% !important;"
-                      />
-                    </div>
+                      <div
+                        data-test="add-report-folder-select"
+                        class="o2-input tw:mr-2"
+                        style="padding-top: 0; width: 30%"
+                      >
+                        <OFormSelect
+                          data-test="add-report-dashboard-folder-select"
+                          :name="`dashboards[${index}].folder`"
+                          :options="folderOptions"
+                          :label="t('reports.dashboardFolder')"
+                          required
+                          :loading="isFetchingFolders"
+                          @update:model-value="
+                            (v: any) => onFolderSelection(v, index)
+                          "
+                          style="min-width: 250px !important; width: 100% !important;"
+                        />
+                      </div>
+                      <div
+                        data-test="add-report-dashboard-select"
+                        class="o2-input tw:mr-2"
+                        style="padding-top: 0; width: 30%"
+                      >
+                        <OFormSelect
+                          data-test="add-report-dashboard-name-select"
+                          :name="`dashboards[${index}].dashboard`"
+                          :options="dashboardOptions"
+                          :label="t('reports.dashboard')"
+                          required
+                          :loading="isFetchingDashboard || isFetchingFolders"
+                          @update:model-value="
+                            (v: any) => onDashboardSelection(v, index)
+                          "
+                          style="min-width: 250px !important; width: 100% !important;"
+                        />
+                      </div>
+                      <div
+                        data-test="add-report-tab-select"
+                        class="o2-input"
+                        style="padding-top: 0; width: 30%"
+                      >
+                        <OFormSelect
+                          data-test="add-report-dashboard-tab-select"
+                          :name="`dashboards[${index}].tabs`"
+                          :options="dashboardTabOptions"
+                          :label="t('reports.dashboardTab')"
+                          required
+                          :loading="isFetchingDashboard || isFetchingFolders"
+                          style="min-width: 250px !important; width: 100% !important;"
+                        />
+                      </div>
                     </div>
 
                     <div
                       data-test="add-report-timerange-select"
                       class="tw:w-full tw:mt-2"
                     >
-                      <div class="tw:mb-2">
-                        <div
-                          style="font-size: 14px"
-                          class="tw:font-bold tw:text-gray-500"
-                        >
-                          Time Range*
-                        </div>
-                        <div style="font-size: 12px">
-                          Generates report with the data from specified time
-                          range
-                        </div>
-                      </div>
-                      <DateTime
+                      <OFormDateTimeRange
+                        :name="`dashboards[${index}].timerange`"
+                        label="Time Range"
+                        required
+                        description="Generates report with the data from specified time range"
                         auto-apply
-                        :default-type="dashboard.timerange.type"
-                        :default-absolute-time="{
-                          startTime: dashboard.timerange.from,
-                          endTime: dashboard.timerange.to,
-                        }"
-                        :default-relative-time="dashboard.timerange.period"
                         data-test="add-report-timerange-dropdown"
                         menu-align="start"
-                        @on:date-change="updateDateTime"
                       />
                     </div>
 
@@ -231,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:w-full tw:mt-3 o2-input"
                     >
                       <VariablesInput
-                        :variables="dashboard.variables"
+                        :variables="dashboardVariables"
                         @add:variable="addDashboardVariable"
                         @remove:variable="removeDashboardVariable"
                       />
@@ -254,8 +247,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="col-auto o2-input"
                           data-test="add-report-type-select"
                         >
-                          <OSelect
-                            v-model="dashboard.report_type"
+                          <OFormSelect
+                            :name="`dashboards[${index}].report_type`"
                             :options="[
                               { label: 'PDF (default)', value: 'pdf' },
                               { label: 'PNG (Image)', value: 'png' },
@@ -274,11 +267,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="col-auto o2-input"
                           data-test="add-report-attachment-type-select"
                         >
-                          <OSelect
-                            v-model="dashboard.email_attachment_type"
-                            :options="
-                              attachmentTypeOptions(dashboard.report_type)
-                            "
+                          <OFormSelect
+                            :name="`dashboards[${index}].email_attachment_type`"
+                            :options="attachmentTypeOptions(dashboard.report_type)"
                             :label="t('reports.attachmentType')"
                             class="showLabelOnTop"
                             style="min-width: 200px"
@@ -328,13 +319,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="tw:flex tw:gap-3 tw:pt-2"
                         >
                           <div class="col-auto o2-input">
-                            <OInput
-                              :model-value="
-                                dashboard.attachment_dimensions?.width ?? ''
-                              "
-                              @update:model-value="
-                                (v) => setDimension(dashboard, 'width', v)
-                              "
+                            <OFormInput
+                              :name="`dashboards[${index}].attachmentWidth`"
                               type="number"
                               min="1"
                               :label="t('reports.dimensionWidth')"
@@ -346,13 +332,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                           <div class="col-auto o2-input">
-                            <OInput
-                              :model-value="
-                                dashboard.attachment_dimensions?.height ?? ''
-                              "
-                              @update:model-value="
-                                (v) => setDimension(dashboard, 'height', v)
-                              "
+                            <OFormInput
+                              :name="`dashboards[${index}].attachmentHeight`"
                               type="number"
                               min="1"
                               :label="t('reports.dimensionHeight')"
@@ -394,22 +375,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:mt-3"
               >
                 <div class="tw:my-2 tw:px-2">
-                  <!-- <div class="tw:flex tw:justify-start tw:items-center tw:py-2">
-                <OIcon name="event" size="sm" class="tw:mr-2" />
-                <div style="font-size: 14px">
-                  The report will be sent immediately after it is saved and will
-                  be sent every hour.
-                </div>
-              </div> -->
                   <div
                     style="font-size: 14px"
                     class="tw:font-bold tw:text-gray-500 tw:mb-2"
                   >
                     Frequency
                   </div>
-                  <OToggleGroup
-                    :model-value="frequency.type"
-                    @update:model-value="frequency.type = $event as string"
+                  <OFormToggleGroup
+                    name="frequencyType"
                     data-test="add-report-schedule-frequency-tabs"
                   >
                     <OToggleGroupItem
@@ -421,9 +394,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ visual.label }}
                     </OToggleGroupItem>
-                  </OToggleGroup>
+                  </OFormToggleGroup>
 
-                  <template v-if="frequency.type === 'cron'">
+                  <template v-if="frequencyType === 'cron'">
                     <div class="tw:flex tw:items-center tw:justify-start tw:mt-3">
                       <div
                         data-test="add-report-schedule-custom-interval-input"
@@ -456,27 +429,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </OTooltip>
                           </OIcon>
                         </div>
-                        <OInput
-                          v-model="frequency.cron"
+                        <OFormInput
+                          name="cron"
                           color="input-border"
                           type="text"
                           outlined
-                          :error="!!cronError"
-                          :error-message="cronError"
                           style="width: 100%"
                           :debounce="400"
-                          @update:model-value="validateFrequency"
                         />
                       </div>
                       <div class="o2-input">
-                        <OSelect
+                        <OFormSelect
                           data-test="add-report-schedule-start-timezone-select"
-                          v-model="scheduling.timezone"
+                          name="timezone"
                           :options="timezoneOptions"
-                          :label="t('logStream.timezone') + ' *'"
-                          :error="!!timezoneError"
-                          :error-message="timezoneError"
-                          @update:model-value="timezoneError = ''"
+                          :label="t('logStream.timezone')"
+                          required
                           class="timezone-select showLabelOnTop"
                           style="width: 300px"
                         />
@@ -487,10 +455,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       class="tw:mt-3 tw:flex tw:justify-start tw:items-center"
                     >
-                      <OToggleGroup
-                        :model-value="selectedTimeTab"
-                        @update:model-value="selectedTimeTab = $event as string"
-                      >
+                      <OFormToggleGroup name="selectedTimeTab">
                         <OToggleGroupItem
                           v-for="visual in timeTabs"
                           :key="visual.value"
@@ -500,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           {{ visual.label }}
                         </OToggleGroupItem>
-                      </OToggleGroup>
+                      </OFormToggleGroup>
                       <OIcon
                         name="info-outline"
                         class="tw:cursor-pointer tw:ml-2"
@@ -516,7 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <div
-                      v-if="frequency.type === 'custom'"
+                      v-if="frequencyType === 'custom'"
                       class="tw:flex tw:items-start tw:justify-start tw:mt-3"
                     >
                       <div
@@ -524,15 +489,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="o2-input tw:mr-2"
                         style="padding-top: 0; width: 160px"
                       >
-                        <OInput
-                          v-model="frequency.custom.interval"
-                          label="Repeat every *"
+                        <OFormInput
+                          name="customInterval"
+                          label="Repeat every"
+                          required
                           color="input-border"
                           class="showLabelOnTop"
                           type="number"
-                          :error="!!intervalError"
-                          :error-message="intervalError"
-                          @update:model-value="intervalError = ''"
                           style="width: 100%"
                         />
                       </div>
@@ -542,14 +505,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="o2-input"
                         style="padding-top: 0; width: 160px"
                       >
-                        <OSelect
-                          v-model="frequency.custom.period"
+                        <OFormSelect
+                          name="customPeriod"
                           :options="customFrequencyOptions"
-                          :label="'Frequency *'"
+                          :label="'Frequency'"
+                          required
                           class="showLabelOnTop no-case"
-                          :error="!!periodError"
-                          :error-message="periodError"
-                          @update:model-value="periodError = ''"
                           style="width: 100% !important"
                         />
                       </div>
@@ -564,9 +525,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="add-report-schedule-start-date-input"
                         class="o2-input tw:mr-2"
                       >
-                        <ODate
-                          v-model="scheduling.date"
-                          :label="'Start Date *'"
+                        <OFormDate
+                          name="date"
+                          :label="'Start Date'"
+                          required
                           data-test="add-report-schedule-start-date-field"
                         />
                       </div>
@@ -574,21 +536,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="add-report-schedule-start-time-input"
                         class="o2-input tw:mr-2"
                       >
-                        <OTime
-                          v-model="scheduling.time"
-                          :label="'Start Time *'"
+                        <OFormTime
+                          name="time"
+                          :label="'Start Time'"
+                          required
                           data-test="add-report-schedule-start-time-field"
                         />
                       </div>
                       <div class="o2-input">
-                        <OSelect
+                        <OFormSelect
                           data-test="add-report-schedule-start-timezone-select"
-                          v-model="scheduling.timezone"
+                          name="timezone"
                           :options="timezoneOptions"
-                          :label="t('logStream.timezone') + ' *'"
-                          :error="!!timezoneError"
-                          :error-message="timezoneError"
-                          @update:model-value="timezoneError = ''"
+                          :label="t('logStream.timezone')"
+                          required
                           class="timezone-select showLabelOnTop"
                           style="width: 300px"
                         />
@@ -617,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OStep>
 
               <OStep
-                v-if="!isCachedReport"
+                v-if="!isCachedReportValue"
                 data-test="add-report-share-step"
                 :name="3"
                 title="Share"
@@ -630,13 +591,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-report-share-title-input"
                     class="report-name-input o2-input"
                   >
-                    <OInput
+                    <OFormInput
                       data-test="add-report-share-title-input"
-                      v-model="formData.title"
-                      :label="t('reports.title') + ' *'"
-                      :error="!!titleError"
-                      :error-message="titleError"
-                      @update:model-value="titleError = ''"
+                      name="title"
+                      :label="t('reports.title')"
+                      required
                       tabindex="0"
                       style="width: 400px"
                     />
@@ -646,13 +605,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-report-share-recipients-input"
                     class="report-name-input o2-input tw:pt-3"
                   >
-                    <OInput
+                    <OFormInput
                       data-test="add-report-share-recipients-input"
-                      v-model="emails"
-                      :label="t('reports.recipients') + ' *'"
-                      :error="!!recipientsError"
-                      :error-message="recipientsError"
-                      @update:model-value="recipientsError = ''"
+                      name="emails"
+                      :label="t('reports.recipients')"
+                      required
                       tabindex="0"
                       style="width: 100%"
                       :placeholder="t('user.inviteByEmail')"
@@ -664,10 +621,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <div data-test="add-report-share-message-input">
-                      <OInput
-                        v-model="formData.message"
-                        type="textarea"
-                      />
+                      <OFormTextarea name="message" />
                     </div>
                   </div>
 
@@ -677,8 +631,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:flex tw:items-center tw:pt-4"
                     data-test="add-report-image-preview-section"
                   >
-                    <OSwitch
-                      v-model="formData.imagePreview"
+                    <OFormSwitch
+                      name="imagePreview"
                       size="lg"
                       :label="t('reports.imagePreview')"
                       data-test="add-report-image-preview-toggle"
@@ -708,7 +662,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </OStep>
             </OStepper>
-          </form>
+          </OForm>
         </div>
       </div>
     </div>
@@ -722,6 +676,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="sm-action"
         class="tw:mr-2"
+        :disabled="isSaving"
         @click="openCancelDialog"
       >
         {{ t("alerts.cancel") }}
@@ -731,7 +686,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="primary"
         size="sm-action"
         type="submit"
-        @click="saveReport"
+        :form="formId"
+        :loading="isSaving"
       >
         {{ t("alerts.save") }}
       </OButton>
@@ -747,27 +703,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { computed } from "vue";
+import { ref, computed, watch, nextTick, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import DateTime from "@/components/DateTime.vue";
-import {
-  getUUID,
-  useLocalTimezone,
-  isValidResourceName,
-  getCronIntervalDifferenceInSeconds,
-  isAboveMinRefreshInterval,
-} from "@/utils/zincutils";
+import { getUUID, useLocalTimezone } from "@/utils/zincutils";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
 import dashboardService from "@/services/dashboards";
-import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
 import reports from "@/services/reports";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import CronExpressionParser from "cron-parser";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useReo } from "@/services/reodotdev_analytics";
 import SelectFolderDropdown from "@/components/common/sidebar/SelectFolderDropDown.vue";
@@ -777,16 +723,25 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import ODate from "@/lib/forms/Date/ODate.vue";
-import OTime from "@/lib/forms/Time/OTime.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import OFormDate from "@/lib/forms/Date/OFormDate.vue";
+import OFormTime from "@/lib/forms/Time/OFormTime.vue";
+import OFormDateTimeRange from "@/lib/forms/DateTime/OFormDateTimeRange.vue";
 import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeCreateReportSchema,
+  createReportDefaults,
+  type CreateReportForm,
+} from "./CreateReport.schema";
 
 const props = defineProps({
   report: {
@@ -795,6 +750,14 @@ const props = defineProps({
   },
 });
 
+// Payload skeleton — the non-form server fields (destinations, frequency shape,
+// timezone, timestamps, owner/lastEditedBy, ...) that aren't OForm-owned. It is
+// the save base in saveReport(): the validated @submit value overwrites the
+// form-owned parts on top of it. The dashboard row (folder/dashboard/tabs/
+// timerange/report_type/attachment dimensions) is now FORM-OWNED via the
+// `dashboards[i].*` field-array; only the dashboard `variables` stay
+// component-owned (the VariablesInput composite has no OForm* wrapper) and are
+// merged in at save time.
 const defaultReport = {
   dashboards: [
     {
@@ -845,17 +808,33 @@ const defaultReport = {
 
 const { t } = useI18n();
 const router = useRouter();
+const store = useStore();
 
-const isCachedReport = ref(false);
-
-const showInfoTooltip = ref(false);
+// ── OForm wiring (Rule ③ OWNER pattern) ──────────────────────────────────────
+// This page OWNS the <OForm> and must read form state to drive the OStepper /
+// v-if / v-for conditional rendering, so it creates the form here with useOForm
+// and hands it down via <OForm :form="form">. State is read reactively with
+// `form.useStore(selector)` (single source of truth — no mirror, no store
+// subscribe copy) and written with `form.setFieldValue(...)`. The save is wired
+// through useOForm({ onSubmit }); `formId` ties the page footer's Save (which
+// lives OUTSIDE the <form>) to the OForm via the native `form="<id>"` association
+// so footer-Save + Enter submit.
+const formId = "create-report-form";
+// Co-located Zod schema (factory keeps cron min-interval + name messages live).
+const createReportSchema = makeCreateReportSchema(t, store.state?.zoConfig);
+const form = useOForm<CreateReportForm>({
+  defaultValues: createReportDefaults(),
+  schema: createReportSchema,
+  // saveReport is declared later in setup; the arrow defers the lookup to submit
+  // time (after setup completes), so this is safe.
+  onSubmit: (value) => saveReport(value),
+});
 
 const originalReportData: Ref<string> = ref("");
 
 const step = ref(1);
 
 const formData = ref(defaultReport);
-
 
 const { track } = useReo();
 
@@ -878,39 +857,34 @@ const timeTabs = [
 ];
 
 const frequencyTabs = [
-  {
-    label: "Cron Job",
-    value: "cron",
-  },
-  {
-    label: "Once",
-    value: "once",
-  },
-  {
-    label: "Hourly",
-    value: "hours",
-  },
-  {
-    label: "Daily",
-    value: "days",
-  },
-  {
-    label: "Weekly",
-    value: "weeks",
-  },
-  {
-    label: "Monthly",
-    value: "months",
-  },
-  {
-    label: "Custom",
-    value: "custom",
-  },
+  { label: "Cron Job", value: "cron" },
+  { label: "Once", value: "once" },
+  { label: "Hourly", value: "hours" },
+  { label: "Daily", value: "days" },
+  { label: "Weekly", value: "weeks" },
+  { label: "Monthly", value: "months" },
+  { label: "Custom", value: "custom" },
 ];
 
-const selectedTimeTab = ref("scheduleNow");
+// frequencyType + selectedTimeTab (OFormToggleGroup) and the dashboards rows are
+// FORM-OWNED. Read them REACTIVELY from the one form with form.useStore (single
+// source of truth — no mirror, no store-subscribe copy) so the template
+// conditionals (v-if / v-for / OStepper) update on every change, including async
+// edit prefill.
+const frequencyType = form.useStore(
+  (s: any) => s.values?.frequencyType ?? "once",
+);
+const selectedTimeTab = form.useStore(
+  (s: any) => s.values?.selectedTimeTab ?? "scheduleNow",
+);
+// The dashboards field-array — the row v-for + per-row conditionals render from
+// this reactive view; the controls bind by `dashboards[i].*` name.
+const dashboardRows = form.useStore((s: any) => s.values?.dashboards ?? []);
 
-const store = useStore();
+// The dashboard's `variables` stay component-owned (VariablesInput is a composite
+// with no OForm* equivalent + carries no validation); merged into the payload at
+// save.
+const dashboardVariables = ref<{ key: string; value: string; id: string }[]>([]);
 
 const filteredTimezone: any = ref([]);
 
@@ -924,8 +898,6 @@ const dashboardTabOptions: Ref<{ label: string; value: string }[]> = ref([]);
 
 const options: Ref<{ [key: string]: any[] }> = ref({});
 
-const emails = ref("");
-
 const isEditingReport = ref(false);
 
 const selectedReportFolderId = ref<string>(
@@ -933,26 +905,46 @@ const selectedReportFolderId = ref<string>(
 );
 
 const isFetchingReport = ref(false);
+const isFetchingFolders = ref(false);
+const isFetchingDashboard = ref(false);
 
-const cronError = ref("");
-const folderError = ref("");
-const dashboardError = ref("");
-const tabError = ref("");
-const timezoneError = ref("");
-const titleError = ref("");
-const recipientsError = ref("");
-const nameError = ref("");
-const intervalError = ref("");
-const periodError = ref("");
+// ── Form-driven Save loading (R3): the footer Save shows its spinner from the
+// form's awaited isSubmitting; Save itself stays enabled. Read reactively via
+// form.useStore (NOT a form.state snapshot, which a computed won't track). ─────
+const isSaving = form.useStore((s: any) => !!s.isSubmitting);
 
-const frequency = ref({
-  type: "once",
-  custom: {
-    interval: 1,
-    period: "days",
-  },
-  cron: "",
+// Read the form-owned `isCachedReport` reactively (single source of truth) for
+// the template conditionals that depend on it.
+const isCachedReportValue = form.useStore(
+  (s: any) => !!s.values?.isCachedReport,
+);
+
+// Build a full form value from the typed defaults, with overrides for the seeded
+// values (used to reset the form for query/edit prefill). Everything is
+// form-owned now, so this no longer reads component state — callers pass the
+// dashboards row + scalars they want seeded.
+const buildFormValues = (
+  overrides: Partial<CreateReportForm> = {},
+): CreateReportForm => ({
+  ...createReportDefaults(),
+  ...overrides,
 });
+
+// Seed the form's values (create-query / edit prefill). The form is created at
+// setup, so async-arriving data is applied with `form.reset(values)` (the
+// foundation reset rule — not a per-field setFieldValue loop).
+const seedForm = async (values: CreateReportForm) => {
+  await nextTick();
+  form.reset(values);
+};
+
+// A snapshot used to detect unsaved changes on Cancel — the form-owned values
+// (covers every field incl. the dashboards row) + the component-owned variables.
+const snapshot = () =>
+  JSON.stringify({
+    values: form.state.values ?? {},
+    variables: dashboardVariables.value,
+  });
 
 onBeforeMount(async () => {
   await getFoldersListByType(store, "reports");
@@ -961,9 +953,10 @@ onBeforeMount(async () => {
   const query = router.currentRoute.value.query;
   isEditingReport.value = !!(query?.report_id || query?.name);
 
-  if (!isEditingReport.value) setInitialReportData();
-
-  if (isEditingReport.value) {
+  if (!isEditingReport.value) {
+    await setInitialReportData();
+    originalReportData.value = snapshot();
+  } else {
     isFetchingReport.value = true;
 
     const reportId = query?.report_id as string | undefined;
@@ -975,9 +968,9 @@ onBeforeMount(async () => {
       : reports.getReport(org, reportName);
 
     fetchPromise
-      .then((res: any) => {
-        setupEditingReport(res.data);
-        originalReportData.value = JSON.stringify(formData.value);
+      .then(async (res: any) => {
+        await setupEditingReport(res.data);
+        originalReportData.value = snapshot();
       })
       .catch((err) => {
         if (err.response.status != 403) {
@@ -991,65 +984,86 @@ onBeforeMount(async () => {
       .finally(() => {
         isFetchingReport.value = false;
       });
-  } else {
-    originalReportData.value = JSON.stringify(formData.value);
   }
 });
 
-const isFetchingFolders = ref(false);
+// ── OStepper error jump ──────────────────────────────────────────────────────
+// On each Save, reveal step errors + jump to the first erroring step
+// (re-expresses the old validateReportData step jumps; errors surface on first
+// submit per R3). The folder → dashboard → tabs cascade is wired to USER changes
+// via the OFormSelect @update handlers (onFolderSelection/onDashboardSelection),
+// which do NOT fire on programmatic reset/prefill.
 
-const isFetchingDashboard = ref(false);
+// Map the schema's failing paths back to their OStepper step and jump to the
+// first one (errors are revealed on first submit per R3).
+const jumpToFirstErrorStep = () => {
+  const res = createReportSchema.safeParse(form.state.values);
+  if (res.success) return;
+  const top = new Set(res.error.issues.map((i) => String(i.path[0])));
+  // dashboards[0].* errors all surface under the top-level "dashboards" path.
+  const step1 = ["name", "dashboards"];
+  const step2 = [
+    "cron",
+    "timezone",
+    "customInterval",
+    "customPeriod",
+    "date",
+    "time",
+  ];
+  const step3 = ["title", "emails"];
+  if (step1.some((k) => top.has(k))) {
+    step.value = 1;
+  } else if (step2.some((k) => top.has(k))) {
+    step.value = 2;
+  } else if (step3.some((k) => top.has(k))) {
+    step.value = 3;
+  }
+};
 
-const onSubmit = () => {};
-
-const scheduling = ref({
-  date: "",
-  time: "",
-  timezone: "",
-});
-
-const isValidName = computed(() => {
-  const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
-  // Check if the role name is valid
-  return roleNameRegex.test(formData.value.name);
+// Each Save bumps TanStack's submissionAttempts; read it reactively (no
+// store.subscribe mirror) and jump to the first erroring step on each attempt.
+const submissionAttempts = form.useStore((s: any) => s.submissionAttempts ?? 0);
+watch(submissionAttempts, (n, o) => {
+  if (n > o) jumpToFirstErrorStep();
 });
 
 const setInitialReportData = async () => {
   const queryParams = router.currentRoute.value.query;
 
-  if (queryParams.type === "cached") {
-    isCachedReport.value = true;
-  } else {
-    isCachedReport.value = false;
-  }
+  const cached = queryParams.type === "cached";
 
   // Support both ?folder= (from ReportList) and ?folderId= (legacy links)
   const reportFolderId = (queryParams.folder || queryParams.folderId) as
     | string
     | undefined;
-  if (reportFolderId) {
-    formData.value.dashboards[0].folder = reportFolderId;
-    await onFolderSelection(reportFolderId);
-  }
+  const dashboardId = queryParams.dashboardId as string | undefined;
+  const tabId = queryParams.tabId as string | undefined;
 
-  if (reportFolderId && queryParams.dashboardId) {
-    formData.value.dashboards[0].dashboard = queryParams.dashboardId as string;
-    setDashboardTabOptions(queryParams.dashboardId);
-  }
+  // Load the options the query-seeded selections need (no cascade @update fires
+  // for programmatic seeding, so load them here).
+  if (reportFolderId) await setDashboardOptions(reportFolderId);
+  if (reportFolderId && dashboardId) setDashboardTabOptions(dashboardId);
 
-  if (queryParams.dashboardId && queryParams.tabId) {
-    formData.value.dashboards[0].tabs = queryParams.tabId as string;
-  }
+  const row = {
+    ...createReportDefaults().dashboards[0],
+    folder: reportFolderId ?? "",
+    dashboard: reportFolderId && dashboardId ? dashboardId : "",
+    tabs: dashboardId && tabId ? tabId : "",
+  };
+
+  await seedForm(buildFormValues({ isCachedReport: cached, dashboards: [row] }));
 };
 
-const onFolderSelection = async (id: string) => {
-  formData.value.dashboards.forEach((dashboard: any) => {
-    dashboard.dashboard = "";
-    dashboard.tabs = "";
-  });
+// Cascade: USER picks a folder → clear that row's dependent dashboard/tabs + load
+// the dashboard options. Wired via the folder OFormSelect's @update (fires on
+// selection only, not on programmatic reset/prefill). `index` defaults to 0 (the
+// single row) so direct/test calls work with just the folder id.
+const onFolderSelection = async (id: string, index = 0) => {
+  form.setFieldValue(`dashboards[${index}].dashboard`, "");
+  form.setFieldValue(`dashboards[${index}].tabs`, "");
 
   try {
-    await setDashboardOptions(id);
+    if (id) await setDashboardOptions(id);
     return true;
   } catch (err) {
     return false;
@@ -1101,89 +1115,50 @@ const setDashboardOptions = (id: string) => {
   });
 };
 
-const onDashboardSelection = (dashboardId: any) => {
-  formData.value.dashboards.forEach((dashboard: any) => {
-    dashboard.tabs = "";
-  });
-  setDashboardTabOptions(dashboardId);
+// Cascade: USER picks a dashboard → clear that row's tabs + set the tab options.
+// Wired via the dashboard OFormSelect's @update (selection only).
+const onDashboardSelection = (dashboardId: any, index = 0) => {
+  form.setFieldValue(`dashboards[${index}].tabs`, "");
+  if (dashboardId) setDashboardTabOptions(dashboardId);
 };
 
 const setDashboardTabOptions = (dashboardId: any) => {
   const defaultTabs = [{ label: "Default", value: "default" }];
 
-  dashboardTabOptions.value =
-    dashboardOptions.value.filter(
-      (dashboard) => dashboard.value === dashboardId,
-    )[0].tabs || defaultTabs;
+  const match = dashboardOptions.value.find(
+    (dashboard) => dashboard.value === dashboardId,
+  );
+  dashboardTabOptions.value = match?.tabs || defaultTabs;
 
   options.value["tabs"] = [...dashboardTabOptions.value];
 };
 
 const showCustomDimensions = ref(false);
 
-// Returns true when every dashboard in the report is configured as PDF type.
-// Used to show/hide the imagePreview toggle (preview only applies to PDF).
-const allDashboardsArePdf = computed(() =>
-  formData.value.dashboards.every((d: any) => d.report_type === "pdf"),
+// True when EVERY dashboard row's report type is PDF — show/hide the imagePreview
+// toggle (preview only applies to PDF). Reads the form-owned rows via the mirror.
+const allDashboardsArePdf = computed(
+  () =>
+    dashboardRows.value.length > 0 &&
+    dashboardRows.value.every((d: any) => d.report_type === "pdf"),
 );
 
 // Returns the available attachment type options for a given report type.
 // Inline is disabled for PDF since the report server does not support it.
-const attachmentTypeOptions = (reportType: string) => [
+const attachmentTypeOptions = (rType: string) => [
   { label: "Standard — downloadable attachment (default)", value: "standard" },
   {
     label: "Inline — embedded in email body",
     value: "inline",
-    disable: reportType === "pdf",
+    disable: rType === "pdf",
   },
 ];
 
-// Sets a single dimension key (width or height) on a dashboard's attachment_dimensions.
-// If both keys would be empty/zero after the change, clears the object to null.
-const setDimension = (
-  dashboard: any,
-  key: "width" | "height",
-  rawValue: string | number | null,
-) => {
-  const val = rawValue === "" || rawValue === null ? 0 : Number(rawValue);
-  if (!dashboard.attachment_dimensions) {
-    dashboard.attachment_dimensions = { width: 0, height: 0 };
-  }
-  dashboard.attachment_dimensions[key] = val;
-  const { width, height } = dashboard.attachment_dimensions;
-  if (!width && !height) {
-    dashboard.attachment_dimensions = null;
-  }
-};
-
-const updateDateTime = (datetime: any) => {
-  formData.value.dashboards[0].timerange.type =
-    datetime.valueType === "relative-custom" ? "relative" : datetime.valueType;
-
-  formData.value.dashboards[0].timerange.from = datetime.startTime;
-  formData.value.dashboards[0].timerange.to = datetime.endTime;
-
-  formData.value.dashboards[0].timerange.period =
-    datetime.relativeTimePeriod || "30m";
-};
-
 const customFrequencyOptions = [
-  {
-    label: "days",
-    value: "days",
-  },
-  {
-    label: "hours",
-    value: "hours",
-  },
-  {
-    label: "weeks",
-    value: "weeks",
-  },
-  {
-    label: "months",
-    value: "months",
-  },
+  { label: "days", value: "days" },
+  { label: "hours", value: "hours" },
+  { label: "weeks", value: "weeks" },
+  { label: "months", value: "months" },
 ];
 
 const currentTimezone =
@@ -1224,7 +1199,7 @@ timezoneOptions.unshift("UTC");
 timezoneOptions.unshift(browserTime);
 
 const addDashboardVariable = () => {
-  formData.value.dashboards[0].variables.push({
+  dashboardVariables.value.push({
     key: "",
     value: "",
     id: getUUID(),
@@ -1232,10 +1207,9 @@ const addDashboardVariable = () => {
 };
 
 const removeDashboardVariable = (variable: any) => {
-  formData.value.dashboards[0].variables =
-    formData.value.dashboards[0].variables.filter(
-      (_variable: any) => _variable.id !== variable.id,
-    );
+  dashboardVariables.value = dashboardVariables.value.filter(
+    (_variable: any) => _variable.id !== variable.id,
+  );
 };
 
 const getDashboaordFolders = () => {
@@ -1260,72 +1234,101 @@ const getDashboaordFolders = () => {
   });
 };
 
-const saveReport = async () => {
-  // If frequency is cron, then we set the start timestamp as current time and timezone as browser timezone
+// @submit handler — OForm calls this only once the whole schema passes (incl. the
+// conditional superRefine rules), so the schema (not a manual validate) gates the
+// save. `value` is the validated, form-owned payload (name/title/frequency/
+// schedule/timerange/...); the bare/bridged dashboard folder/dashboard/tabs come
+// from component state. Returns the service promise so OForm's awaited
+// isSubmitting drives the footer Save spinner.
+const saveReport = async (value: CreateReportForm) => {
   const reportPayload = JSON.parse(JSON.stringify(formData.value));
 
+  // Form-owned scalars are the source of truth at submit time.
+  reportPayload.name = value.name;
+  reportPayload.description = value.description;
+  reportPayload.title = value.title;
+  reportPayload.message = value.message;
+  reportPayload.imagePreview = value.imagePreview;
+
+  // Build the (single) dashboard row fresh from the form-owned values + the
+  // component-owned variables; derive attachment_dimensions from width/height.
+  const row = value.dashboards[0];
+  const width = Number(row.attachmentWidth) || 0;
+  const height = Number(row.attachmentHeight) || 0;
+  const dashboardPayload: any = {
+    folder: row.folder,
+    dashboard: row.dashboard,
+    tabs: [row.tabs],
+    variables: dashboardVariables.value,
+    timerange: row.timerange,
+    report_type: row.report_type,
+    email_attachment_type: row.email_attachment_type,
+  };
+  // Persist attachment_dimensions only when set (else the server uses defaults).
+  if (width || height) {
+    dashboardPayload.attachment_dimensions = { width, height };
+  }
+  reportPayload.dashboards = [dashboardPayload];
+
+  // Resolve scheduling date/time/timezone from the payload, overriding for the
+  // "schedule now" / cron modes (set to "now" + the browser timezone).
+  let scheduleDate = value.date;
+  let scheduleTime = value.time;
+  let scheduleTimezone = value.timezone;
+
   if (
-    selectedTimeTab.value === "scheduleNow" ||
-    frequency.value.type === "cron"
+    value.selectedTimeTab === "scheduleNow" ||
+    value.frequencyType === "cron"
   ) {
     const now = new Date();
 
-    // Get the day, month, and year from the date object
     const day = String(now.getDate()).padStart(2, "0");
     const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
     const year = now.getFullYear();
+    // YYYY-MM-DD (ISO 8601, for ODate compatibility)
+    scheduleDate = `${year}-${month}-${day}`;
 
-    // Combine them in the YYYY-MM-DD format (ISO 8601, for ODate compatibility)
-    scheduling.value.date = `${year}-${month}-${day}`;
-
-    // Get the hours and minutes, ensuring they are formatted with two digits
     const hours = String(now.getHours()).padStart(2, "0");
     const minutes = String(now.getMinutes()).padStart(2, "0");
-
-    // Combine them in the HH:MM format
-    scheduling.value.time = `${hours}:${minutes}`;
+    // HH:MM
+    scheduleTime = `${hours}:${minutes}`;
   }
 
-  // If the user has selected to schedule now, we set the timezone to the current timezone
-  if (selectedTimeTab.value === "scheduleNow") {
-    scheduling.value.timezone = timezone.value;
+  // If the user has selected to schedule now, set the timezone to the current one.
+  if (value.selectedTimeTab === "scheduleNow") {
+    scheduleTimezone = timezone.value;
   }
 
-  // scheduling.value.date is always YYYY-MM-DD (ISO 8601),
+  // scheduleDate is always YYYY-MM-DD (ISO 8601),
   // but convertDateToTimestamp expects DD-MM-YYYY
-  const [y, m, d] = scheduling.value.date.split("-");
+  const [y, m, d] = scheduleDate.split("-");
   const dateForConversion = `${d}-${m}-${y}`;
 
   const convertedDateTime = convertDateToTimestamp(
     dateForConversion,
-    scheduling.value.time,
-    scheduling.value.timezone,
+    scheduleTime,
+    scheduleTimezone,
   );
 
   reportPayload.start = convertedDateTime.timestamp;
-
   reportPayload.timezoneOffset = convertedDateTime.offset;
-
   reportPayload.orgId = store.state.selectedOrganization.identifier;
-
-  reportPayload.destinations = emails.value.split(/[,;]/).map((email) => ({
+  reportPayload.destinations = value.emails.split(/[,;]/).map((email) => ({
     email: email.trim(),
   }));
 
-  if (frequency.value.type === "custom") {
-    reportPayload.frequency.type = frequency.value.custom.period;
-    reportPayload.frequency.interval = Number(frequency.value.custom.interval);
-  } else if (frequency.value.type === "cron") {
-    reportPayload.frequency.type = frequency.value.type;
-    reportPayload.frequency.cron =
-      frequency.value.cron.toString().trim() + " *";
+  if (value.frequencyType === "custom") {
+    reportPayload.frequency.type = value.customPeriod;
+    reportPayload.frequency.interval = Number(value.customInterval);
+  } else if (value.frequencyType === "cron") {
+    reportPayload.frequency.type = "cron";
+    reportPayload.frequency.cron = String(value.cron).trim() + " *";
   } else {
-    reportPayload.frequency.type = frequency.value.type;
+    reportPayload.frequency.type = value.frequencyType;
     reportPayload.frequency.interval = 1;
-    formData.value.frequency.interval = 1;
   }
 
-  reportPayload.timezone = scheduling.value.timezone;
+  reportPayload.timezone = scheduleTimezone;
 
   if (isEditingReport.value) {
     reportPayload.updatedAt = new Date().toISOString();
@@ -1338,22 +1341,7 @@ const saveReport = async () => {
     reportPayload.updatedAt = new Date().toISOString();
   }
 
-  if (isCachedReport.value) reportPayload.destinations = [];
-
-  // Check if all report input fields are valid
-  const isValidForm = await validateReportData();
-  if (!isValidForm) return;
-
-  // This is unitil we support multiple dashboards and tabs
-  if (reportPayload.dashboards[0]?.tabs)
-    reportPayload.dashboards[0].tabs = [
-      reportPayload.dashboards[0].tabs as string,
-    ];
-
-  // Remove attachment_dimensions when unset so the report server uses its configured defaults.
-  if (!reportPayload.dashboards[0]?.attachment_dimensions) {
-    delete reportPayload.dashboards[0].attachment_dimensions;
-  }
+  if (value.isCachedReport) reportPayload.destinations = [];
 
   const org = store.state.selectedOrganization.identifier;
   const routeQuery = router.currentRoute.value.query;
@@ -1375,17 +1363,22 @@ const saveReport = async () => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait...",
-      timeout: 0,
-});
+    timeout: 0,
+  });
 
-  savePromise
+  track("Button Click", {
+    button: "Save Report",
+    page: "Add Report",
+  });
+
+  return savePromise
     .then(() => {
       // Invalidate the folder cache so ReportList fetches fresh data on mount
-      const folderId = selectedReportFolderId.value || "default";
+      const fId = selectedReportFolderId.value || "default";
       const updated = {
         ...store.state.organizationData.allReportsListByFolderId,
       };
-      delete updated[folderId];
+      delete updated[fId];
       store.dispatch("setAllReportsListByFolderId", updated);
 
       toast({
@@ -1397,7 +1390,7 @@ const saveReport = async () => {
       goToReports();
     })
     .catch((error) => {
-      if (error.response.status != 403) {
+      if (error.response?.status != 403) {
         toast({
           variant: "error",
           message:
@@ -1411,164 +1404,6 @@ const saveReport = async () => {
     .finally(() => {
       dismiss();
     });
-  track("Button Click", {
-    button: "Save Report",
-    page: "Add Report",
-  });
-};
-
-const validateReportData = async (): Promise<boolean> => {
-  if (!formData.value.name) {
-    nameError.value = t('common.nameRequired');
-    step.value = 1;
-    return false;
-  }
-  if (!isValidResourceName(formData.value.name)) {
-    nameError.value = 'Characters like :, ?, /, #, and spaces are not allowed.';
-    step.value = 1;
-    return false;
-  }
-  nameError.value = '';
-
-  if (!formData.value.dashboards[0].folder) {
-    folderError.value = t('validation.required');
-    step.value = 1;
-    return false;
-  }
-  folderError.value = '';
-
-  if (!formData.value.dashboards[0].dashboard) {
-    dashboardError.value = t('validation.required');
-    step.value = 1;
-    return false;
-  }
-  dashboardError.value = '';
-
-  if (!formData.value.dashboards[0].tabs) {
-    tabError.value = t('validation.required');
-    step.value = 1;
-    return false;
-  }
-  tabError.value = '';
-
-  if (formData.value.dashboards[0].timerange) {
-    if (
-      formData.value.dashboards[0].timerange.type === "relative" &&
-      !formData.value.dashboards[0].timerange.period
-    ) {
-      step.value = 1;
-      return false;
-    }
-
-    if (
-      formData.value.dashboards[0].timerange.type === "absolute" &&
-      !(
-        formData.value.dashboards[0].timerange.to &&
-        formData.value.dashboards[0].timerange.from
-      )
-    ) {
-      step.value = 1;
-      return false;
-    }
-  }
-
-  if (formData.value.frequency.type === "cron") {
-    try {
-      cronError.value = "";
-      CronExpressionParser.parse(frequency.value.cron, {
-        currentDate: new Date(),
-        utc: true,
-      });
-      validateFrequency();
-    } catch (err) {
-      cronError.value = "Invalid cron expression!";
-      return false;
-    }
-  }
-
-  if (formData.value.frequency.type === "cron" && cronError.value) {
-    step.value = 2;
-    return false;
-  }
-
-  console.log(JSON.parse(JSON.stringify(formData.value)));
-
-  if (!formData.value.frequency.interval || !formData.value.frequency.type) {
-    if (formData.value.frequency.type === "custom") {
-      if (!frequency.value.custom.interval) {
-        intervalError.value = t('validation.required');
-        step.value = 2;
-        return false;
-      }
-      intervalError.value = '';
-      if (!frequency.value.custom.period) {
-        periodError.value = t('validation.required');
-        step.value = 2;
-        return false;
-      }
-      periodError.value = '';
-    }
-    step.value = 2;
-    return false;
-  }
-
-  if (!scheduling.value.timezone) {
-    timezoneError.value = t('validation.required');
-    step.value = 2;
-    return false;
-  }
-  timezoneError.value = '';
-
-  // Share step validation only applies to non-cached reports
-  if (!isCachedReport.value) {
-    if (!formData.value.title) {
-      titleError.value = t('validation.required');
-      step.value = 3;
-      return false;
-    }
-    titleError.value = '';
-
-    const emailRegex = /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/;
-    if (!emailRegex.test(emails.value)) {
-      recipientsError.value = 'Add valid emails!';
-      step.value = 3;
-      return false;
-    }
-    recipientsError.value = '';
-  }
-
-  return true;
-};
-
-const validateFrequency = () => {
-  cronError.value = "";
-  if (frequency.value.type === "cron") {
-    try {
-      const intervalInSecs = getCronIntervalDifferenceInSeconds(
-        frequency.value.cron,
-      );
-
-      // parse cron expression
-      if (frequency.value.cron.trim().split(" ").length !== 6) {
-        cronError.value =
-          "Cron expression must have exactly 6 fields: [Second] [Minute] [Hour] [Day of Month] [Month] [Day of Week]";
-        return;
-      }
-
-      if (
-        typeof intervalInSecs === "number" &&
-        !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
-      ) {
-        const minInterval =
-          Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
-        cronError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
-        return;
-      }
-    } catch (err) {
-      cronError.value = "Invalid cron expression!";
-      return;
-    }
-  }
 };
 
 const goToReports = () => {
@@ -1621,23 +1456,15 @@ const filterOptions = (options: any[], val: String, update: Function) => {
 };
 
 const setupEditingReport = async (report: any) => {
-  formData.value = {
-    ...report,
-    dashboards: [
-      {
-        folder: "",
-        dashboard: "",
-        tabs: "" as string | string[],
-        variables: report.dashboards[0].variables,
-        timerange: report.dashboards[0].timerange,
-        report_type: report.dashboards[0].report_type,
-        email_attachment_type: report.dashboards[0].email_attachment_type,
-        attachment_dimensions: report.dashboards[0].attachment_dimensions,
-      },
-    ],
-  };
+  // Keep the report skeleton (destinations / frequency / timezone / timestamps /
+  // ...) as the save base; the dashboards row + form-owned scalars are seeded
+  // into the form below.
+  formData.value = { ...report };
 
-  // set date, time and timezone in scheduling
+  // `variables` are component-owned (the VariablesInput composite).
+  dashboardVariables.value = report.dashboards[0].variables ?? [];
+
+  // set date, time and timezone for the form (scheduleLater).
   // Use Luxon to interpret the timestamp in the report's own timezone so that
   // the displayed date/time matches what convertDateToTimestamp will re-encode
   // on save. Using plain `new Date()` would interpret the timestamp in the
@@ -1652,94 +1479,123 @@ const setupEditingReport = async (report: any) => {
     zone: reportTimezone,
   });
 
-  // Combine them in the YYYY-MM-DD format (ISO 8601, for ODate compatibility)
-  scheduling.value.date = dateInReportTz.toFormat("yyyy-MM-dd");
+  // YYYY-MM-DD (ISO 8601, for ODate compatibility)
+  const scheduleDate = dateInReportTz.toFormat("yyyy-MM-dd");
+  // HH:MM
+  const scheduleTime = dateInReportTz.toFormat("HH:mm");
+  const scheduleTimezone = report.timezone;
 
-  // Combine them in the HH:MM format
-  scheduling.value.time = dateInReportTz.toFormat("HH:mm");
+  // edit reports always open on the "Schedule Later" tab (form-owned now).
+  const timeTab = "scheduleLater";
 
-  scheduling.value.timezone = report.timezone;
-
-  // set selectedTimeTab to scheduleLater
-  selectedTimeTab.value = "scheduleLater";
-
-  emails.value = report.destinations
+  const emailsStr = report.destinations
     .map((destination: { email: string }) => destination.email)
     .join(";");
 
-  if (!report.destinations.length) isCachedReport.value = true;
+  const isCached = !report.destinations.length;
 
-  // set frequency
+  // set frequency (form-owned — resolved into locals, seeded via buildFormValues)
+  let cronStr = "";
+  let custInterval: number = 1;
+  let custPeriod = "days";
+  let freqType = "once";
   if (report.frequency.type === "cron") {
-    frequency.value.type = report.frequency.type;
-    frequency.value.cron =
+    freqType = "cron";
+    cronStr =
       report.frequency.cron.split(" ").length === 7
         ? report.frequency.cron.split(" ").slice(0, 6).join(" ")
         : report.frequency.cron;
   } else if (report.frequency.interval > 1) {
-    frequency.value.type = "custom";
-    frequency.value.custom.period = report.frequency.type;
-    frequency.value.custom.interval = report.frequency.interval;
+    freqType = "custom";
+    custPeriod = report.frequency.type;
+    custInterval = report.frequency.interval;
   } else {
-    frequency.value.type = report.frequency.type;
+    freqType = report.frequency.type;
   }
 
-  if (report.dashboards[0].attachment_dimensions) {
+  const dims = report.dashboards[0].attachment_dimensions;
+  if (dims) {
     showCustomDimensions.value = true;
   }
 
   await setDashboardOptions(report.dashboards[0].folder);
 
-  // Check if folder is present in the options and set the folder
+  // Resolve folder/dashboard/tab against the loaded options (drop + warn if the
+  // saved selection has since been deleted).
+  let folder = "";
   if (
-    folderOptions.value.some(
-      (folder) => folder.value === report.dashboards[0].folder,
-    )
+    folderOptions.value.some((f) => f.value === report.dashboards[0].folder)
   ) {
-    formData.value.dashboards[0].folder = report.dashboards[0].folder;
+    folder = report.dashboards[0].folder;
   } else {
-    formData.value.dashboards[0].folder = "";
-    toast({
-      variant: "error",
-      message: "Selected folder has been deleted!",
-    });
+    toast({ variant: "error", message: "Selected folder has been deleted!" });
   }
 
-  // Check if dashboard is present in the options and set the dashboard
+  let dashboard = "";
   if (
     dashboardOptions.value.some(
-      (dashboard) => dashboard.value === report.dashboards[0].dashboard,
+      (d) => d.value === report.dashboards[0].dashboard,
     )
   ) {
-    formData.value.dashboards[0].dashboard = report.dashboards[0].dashboard;
+    dashboard = report.dashboards[0].dashboard;
   } else {
-    formData.value.dashboards[0].dashboard = "";
-    toast({
-      variant: "error",
-      message: "Selected dashboard has been deleted!",
-    });
+    toast({ variant: "error", message: "Selected dashboard has been deleted!" });
   }
 
-  setDashboardTabOptions(formData.value.dashboards[0].dashboard);
+  setDashboardTabOptions(dashboard);
 
-  // Check if tab is present in the options and set the tab
-  const tab = dashboardTabOptions.value.filter(
-    (tab) => tab.value === report.dashboards[0].tabs[0],
-  )[0];
-
+  let tabs = "";
+  const tab = dashboardTabOptions.value.find(
+    (t) => t.value === report.dashboards[0].tabs[0],
+  );
   if (tab) {
-    formData.value.dashboards[0].tabs = tab.value;
+    tabs = tab.value;
   } else {
     toast({
       variant: "error",
       message: "Selected dashboard tab has been deleted!",
     });
-    formData.value.dashboards[0].tabs = "";
   }
+
+  const row = {
+    folder,
+    dashboard,
+    tabs,
+    report_type: report.dashboards[0].report_type ?? "pdf",
+    email_attachment_type:
+      report.dashboards[0].email_attachment_type ?? "standard",
+    attachmentWidth: dims?.width ?? undefined,
+    attachmentHeight: dims?.height ?? undefined,
+    timerange:
+      report.dashboards[0].timerange ??
+      createReportDefaults().dashboards[0].timerange,
+  };
+
+  // Seed every form-owned value from the resolved record (async-arrived data).
+  await seedForm(
+    buildFormValues({
+      name: report.name ?? "",
+      description: report.description ?? "",
+      isCachedReport: isCached,
+      imagePreview: report.imagePreview ?? false,
+      title: report.title ?? "",
+      message: report.message ?? "",
+      emails: emailsStr,
+      cron: cronStr,
+      customInterval: custInterval,
+      customPeriod: custPeriod,
+      timezone: scheduleTimezone,
+      date: scheduleDate,
+      time: scheduleTime,
+      frequencyType: freqType,
+      selectedTimeTab: timeTab,
+      dashboards: [row],
+    }),
+  );
 };
 
 const openCancelDialog = () => {
-  if (originalReportData.value === JSON.stringify(formData.value)) {
+  if (originalReportData.value === snapshot()) {
     goToReports();
     track("Button Click", {
       button: "Cancel Report",
@@ -1753,4 +1609,3 @@ const openCancelDialog = () => {
   dialog.value.okCallback = goToReports;
 };
 </script>
-
