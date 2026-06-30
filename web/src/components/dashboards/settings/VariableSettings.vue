@@ -579,6 +579,7 @@ export default defineComponent({
       tableWrapper,
       columns,
       formatIndex,
+      handleDragEnd,
     };
   },
 });
