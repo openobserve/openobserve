@@ -237,12 +237,10 @@ const isAnyLoading = computed(
 // Refresh button it now renders in the embedded AppPageHeader actions slot.
 defineExpose({ refreshAll, isAnyLoading });
 
-/** Show the skeleton only on the *initial* load — i.e. when we're loading AND
- * no KPI values have been populated yet. Subsequent refreshes keep the rendered
- * cards visible (with their previous values + a subtle refresh spinner). */
-const showKpiSkeleton = computed(
-  () => isLoading.value && kpis.value.every((k) => k.value == null),
-);
+/** Show the KPI skeleton whenever the KPI queries are running — on the initial
+ * load AND on every refresh — matching the rest of the app (e.g. LLM Insights),
+ * so a refresh gives clear feedback instead of leaving the cards frozen. */
+const showKpiSkeleton = computed(() => isLoading.value);
 
 onMounted(() => {
   void refreshAll();

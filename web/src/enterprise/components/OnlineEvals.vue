@@ -152,15 +152,13 @@ the Free Software Foundation, either version 3 of the License, or
             :auto-apply-dashboard="true"
             data-test="quality-time-range-picker"
           />
-          <OButton
-            variant="outline"
-            size="sm-toolbar"
+          <ORefreshButton
+            :last-run-at="qualityLastRunAt"
             :loading="qualityRefreshing"
+            :disabled="qualityRefreshing"
             data-test="quality-refresh-btn"
             @click="onQualityRefresh"
-          >
-            {{ t('common.refresh') }}
-          </OButton>
+          />
         </template>
       </AppPageHeader>
 
@@ -397,6 +395,7 @@ import ImportScorer from "./onlineEvals/ImportScorer.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -699,6 +698,14 @@ watch(orgId, () => {
 const qualityRefreshing = computed(
   () => qualityPageRef.value?.isAnyLoading ?? false,
 );
+
+// Last-refresh timestamp for the header's ORefreshButton — stamped when the
+// quality loaders settle (true → false), mirroring the Sessions / LLM Insights
+// pages so the button shows "last refreshed …".
+const qualityLastRunAt = ref<number | null>(null);
+watch(qualityRefreshing, (isLoading, wasLoading) => {
+  if (wasLoading && !isLoading) qualityLastRunAt.value = Date.now();
+});
 
 // Manual refresh: re-anchor the window from the picker (so relative ranges
 // like "Past 15 minutes" advance to "now") and let the QualityPage watch on
