@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        (the slotted chip). Wrapper is `display:contents` so it adds no box. -->
   <span class="tw:contents">
     <slot />
-    <OTooltip :side="side" :delay="120" max-width="260px" content-class="tw:p-0!">
+    <OTooltip :side="side" :delay="delay" max-width="260px" content-class="tw:p-0!">
       <template #content>
         <div
           class="tw:w-[252px] tw:py-[11px] tw:px-3 tw:text-xs tw:text-[var(--o2-text-primary)]"
@@ -112,8 +112,11 @@ const props = withDefaults(
     /** Which side the preview opens on. Default "top" (KPI chips); the rail rows
      *  pass "right" so the card doesn't cover the rows above it. */
     side?: "top" | "right" | "bottom" | "left";
+    /** Hover delay (ms) before the preview opens. Default 120 (chips/rail); the
+     *  ribbon passes a smaller value so scrubbing across bars feels snappier. */
+    delay?: number;
   }>(),
-  { side: "top" },
+  { side: "top", delay: 120 },
 );
 
 const { t } = useI18n();
