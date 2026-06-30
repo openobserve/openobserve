@@ -100,13 +100,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-regex-pattern-lookaround-note"
             >
               <div class="regex-pattern-lookaround-note">
-                <div>{{ t("regex_patterns.unsupported_lookaround_note") }}</div>
-                <div class="tw:mt-1 tw:flex tw:items-center tw:gap-1">
-                  <span>{{ t("regex_patterns.unsupported_lookaround_example") }}</span>
-                  <code class="regex-pattern-lookaround-code">(?=openobserve)\w+</code>
-                  <OIcon name="arrow-right-alt" size="xs" />
-                  <code class="regex-pattern-lookaround-code">openobserve\w*</code>
-                </div>
+                {{ t("regex_patterns.unsupported_lookaround_note") }}
+                {{ t("regex_patterns.unsupported_lookaround_example") }}
+                <code class="regex-pattern-lookaround-code">(?=openobserve)\w+</code>
+                <OIcon
+                  name="arrow-right-alt"
+                  size="xs"
+                  class="tw:inline-block tw:align-middle tw:mx-1"
+                />
+                <code class="regex-pattern-lookaround-code">openobserve\w*</code>
               </div>
             </OBanner>
             <div class="regex-pattern-input-container">
