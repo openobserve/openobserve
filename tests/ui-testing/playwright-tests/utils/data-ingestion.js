@@ -241,6 +241,11 @@ async function waitForStreamData(page, streamName, expectedMinCount = 1, maxWait
  * @returns {Promise<boolean>} - True if the value became searchable, false if timed out
  */
 async function waitForFieldValueSearchable(page, streamName, fieldName, fieldValue, maxWaitMs = 30000, pollIntervalMs = 2000) {
+  // fieldName is interpolated unescaped into the SQL identifier position, so restrict it
+  // to a plain column identifier (callers pass hardcoded names like "service_name").
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(fieldName)) {
+    throw new Error(`waitForFieldValueSearchable: invalid fieldName "${fieldName}" (expected a column identifier)`);
+  }
   const orgId = getOrgIdentifier();
   const headers = getHeaders();
   const baseUrl = process.env.INGESTION_URL.endsWith('/')
@@ -277,9 +282,13 @@ async function waitForFieldValueSearchable(page, streamName, fieldName, fieldVal
           return true;
         }
         testLogger.debug('Polling for field value', { streamName, fieldName, fieldValue });
+      } else {
+        // Surface non-200s (400/401/403/5xx) so a persistent failure is visible in logs
+        // rather than silently burning the full timeout as "not found yet".
+        testLogger.warn('Field value poll got non-200', { status: response.status(), streamName, fieldName });
       }
     } catch (e) {
-      testLogger.debug('Field value poll error', { error: e.message, streamName, fieldName });
+      testLogger.warn('Field value poll error', { error: e.message, streamName, fieldName });
     }
 
     await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
