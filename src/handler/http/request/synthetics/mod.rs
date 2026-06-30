@@ -346,7 +346,19 @@ pub async fn get_synthetic(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !check_permissions(&id, &org_id, &user_email.user_id, "synthetics", "GET", None, false, true, false).await {
+        if !check_permissions(
+            &id,
+            &org_id,
+            &user_email.user_id,
+            "synthetics",
+            "GET",
+            None,
+            false,
+            true,
+            false,
+        )
+        .await
+        {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::synthetics::service::get_synthetic(&org_id, &id).await {
@@ -394,7 +406,19 @@ pub async fn update_synthetic(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !check_permissions(&id, &org_id, &user_email.user_id, "synthetics", "PUT", _folder_query.folder.as_deref(), false, true, false).await {
+        if !check_permissions(
+            &id,
+            &org_id,
+            &user_email.user_id,
+            "synthetics",
+            "PUT",
+            _folder_query.folder.as_deref(),
+            false,
+            true,
+            false,
+        )
+        .await
+        {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::synthetics::service::update_synthetic(&org_id, &id, body)
@@ -445,7 +469,19 @@ pub async fn delete_synthetic(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !check_permissions(&id, &org_id, &user_email.user_id, "synthetics", "DELETE", _folder_query.folder.as_deref(), false, true, false).await {
+        if !check_permissions(
+            &id,
+            &org_id,
+            &user_email.user_id,
+            "synthetics",
+            "DELETE",
+            _folder_query.folder.as_deref(),
+            false,
+            true,
+            false,
+        )
+        .await
+        {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::synthetics::service::delete_synthetic(&org_id, &id).await {
@@ -586,7 +622,19 @@ pub async fn set_synthetic_enabled(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !check_permissions(&id, &org_id, &user_email.user_id, "synthetics", "PUT", None, false, true, false).await {
+        if !check_permissions(
+            &id,
+            &org_id,
+            &user_email.user_id,
+            "synthetics",
+            "PUT",
+            None,
+            false,
+            true,
+            false,
+        )
+        .await
+        {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         let enabled = match body.get("enabled").and_then(|v| v.as_bool()) {
@@ -642,7 +690,19 @@ pub async fn run_synthetic_now(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !check_permissions(&id, &org_id, &user_email.user_id, "synthetics", "PUT", None, false, true, false).await {
+        if !check_permissions(
+            &id,
+            &org_id,
+            &user_email.user_id,
+            "synthetics",
+            "PUT",
+            None,
+            false,
+            true,
+            false,
+        )
+        .await
+        {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::synthetics::service::run_synthetic_now(&org_id, &id).await
