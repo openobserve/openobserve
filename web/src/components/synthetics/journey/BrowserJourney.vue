@@ -36,9 +36,12 @@ const expandedSteps = ref<Set<string>>(new Set())
 
 // ── Drag-and-drop ──────────────────────────────────────────────────────────
 const stepsModel = ref<BrowserStep[]>([...props.modelValue])
+const dragActive = ref(false)
 
 // Sync from parent mutations (add, delete, recording stop, etc.)
+// Suppressed during drag to prevent watcher from overwriting the reorder.
 watch(() => props.modelValue, (val) => {
+  if (dragActive.value) return
   stepsModel.value = [...val]
 })
 
@@ -46,7 +49,13 @@ const dragDisabled = computed(() =>
   isRecording.value || props.isReplaying || props.readonly || !!filterQuery.value.trim()
 )
 
-function onDragChange() {
+function onDragStart() {
+  dragActive.value = true
+}
+
+function onDragEnd() {
+  dragActive.value = false
+  console.log(" steps after drag ----", JSON.parse(JSON.stringify(stepsModel.value)));
   emit('update:modelValue', [...stepsModel.value])
 }
 
@@ -375,11 +384,12 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
     <VueDraggableNext
       v-else-if="!dragDisabled"
       v-model="stepsModel"
-      @change="onDragChange"
+      @start="onDragStart"
+      @end="onDragEnd"
       handle="[data-test='synthetics-journey-step-drag-handle']"
       :animation="200"
-      ghost-class="tw:opacity-30 tw:bg-[var(--o2-primary-50)] tw:border tw:border-dashed tw:border-[var(--o2-primary-color)] tw:rounded-md"
-      drag-class="tw:opacity-50 tw:shadow-lg"
+      ghost-class="synthetics-drag-ghost"
+      drag-class="synthetics-drag-dragging"
       item-key="id"
     >
       <BrowserJourneyStep
@@ -438,6 +448,17 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
 </template>
 
 <style>
+.synthetics-drag-ghost {
+  opacity: 0.3;
+  background: var(--o2-primary-50);
+  border: 1px dashed var(--o2-primary-color);
+  border-radius: 0.375rem;
+}
+.synthetics-drag-dragging {
+  opacity: 0.5;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
 @keyframes recording-pulse-expand {
   0% {
     transform: scale(1);
