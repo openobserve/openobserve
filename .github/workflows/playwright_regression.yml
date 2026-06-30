@@ -543,9 +543,10 @@ jobs:
     name: Merge Reports
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
-    # GitHub-hosted runner: `playwright merge-reports` crashes mid-merge (extracts a few blobs then
-    # exits non-zero) deterministically on the ubicloud runners — works on github-hosted / eks.
-    runs-on: ubuntu-latest
+    # eks runner: `playwright merge-reports` silently stops mid-merge (exits 0, ~3 of N blobs, no
+    # output) on the ubicloud and github-hosted runners — but works on the eks runners (same as ENT).
+    runs-on:
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
       actions: read  # the no-blobs investigation reads run/job state from the Actions API
@@ -624,45 +625,15 @@ jobs:
           #   PLAYWRIGHT_HTML_OUTPUT_DIR  - html reporter output directory
           #   PLAYWRIGHT_HTML_OPEN=never  - never auto-open the report (required for CI)
           #   PLAYWRIGHT_JSON_OUTPUT_NAME - json reporter output file path
-          # DIAGNOSTIC + WORKAROUND. merge-reports silently stops after a few blobs (exit 0, no
-          # output, no stderr) only on the OSS CI runners — works locally, in linux containers, at
-          # any CPU count, and on eks. Two untested variables: blob bytes as delivered by
-          # download-artifact, and extracting in-place inside the workspace mount. Verify blob
-          # integrity, then merge from an isolated /tmp dir.
-          echo "::group::blob integrity + env"
-          echo "node $(node -v) / playwright $(npx playwright -V 2>&1) / nproc $(nproc 2>/dev/null)"
-          for z in all-blob-reports/report-*.zip; do
-            if unzip -t "$z" >/dev/null 2>&1; then echo "ok   $z ($(stat -c%s "$z")b)"; else echo "::warning::CORRUPT $z"; fi
-          done
-          echo "::endgroup::"
-          WORK=$(mktemp -d "${TMPDIR:-/tmp}/blobs.XXXXXX")
-          cp all-blob-reports/report-*.zip "$WORK"/
-          merge_once() {
-            rm -rf playwright-results/html-report playwright-results/report.json
-            rm -rf "$WORK"/report.jsonl "$WORK"/report-*.jsonl "$WORK"/resources
-            set +e
-            PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-results/html-report \
-            PLAYWRIGHT_HTML_OPEN=never \
-            PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results/report.json \
-              npx playwright merge-reports --reporter html,json "$WORK" 2>merge.stderr
-            local rc=$?
-            set -e
-            echo "::notice::merge-reports exit code: ${rc} (extracted $(ls "$WORK"/*.jsonl 2>/dev/null | wc -l) jsonl of $(ls "$WORK"/*.zip | wc -l) blobs)"
-            echo "----- stderr -----"; cat merge.stderr || true; echo "------------------"
-            [ -f playwright-results/html-report/index.html ] && [ -f playwright-results/report.json ]
-          }
-          merged=
-          for attempt in 1 2 3; do
-            echo "::notice::merge-reports attempt ${attempt}/3"
-            if merge_once; then merged=1; break; fi
-            echo "::warning::merge-reports attempt ${attempt} produced no html-report/report.json; retrying"
-            sleep 5
-          done
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-results/html-report \
+          PLAYWRIGHT_HTML_OPEN=never \
+          PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results/report.json \
+            npx playwright merge-reports --reporter html,json ./all-blob-reports
 
           echo "Contents of playwright-results:"
           ls -la playwright-results/ || true
-          if [ -z "$merged" ]; then
-            echo "::error::merge-reports did not produce html-report/index.html and report.json after 3 attempts"
+          if [ ! -f playwright-results/html-report/index.html ] || [ ! -f playwright-results/report.json ]; then
+            echo "::error::merge-reports did not produce the expected html-report/index.html and report.json"
             echo "::error::all-blob-reports contents:"
             ls -la all-blob-reports/ || true
             exit 1

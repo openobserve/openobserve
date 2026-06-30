@@ -881,9 +881,10 @@ jobs:
     name: Merge Reports
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
-    # GitHub-hosted runner: `playwright merge-reports` crashes mid-merge (extracts a few blobs then
-    # exits non-zero) deterministically on the ubicloud runners — works on github-hosted / eks.
-    runs-on: ubuntu-latest
+    # eks runner: `playwright merge-reports` silently stops mid-merge (exits 0, ~3 of N blobs, no
+    # output) on the ubicloud and github-hosted runners — but works on the eks runners (same as ENT).
+    runs-on:
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
       actions: read  # the no-blobs investigation reads run/job state from the Actions API
@@ -984,29 +985,15 @@ jobs:
           #   PLAYWRIGHT_HTML_OUTPUT_DIR  - html reporter output directory
           #   PLAYWRIGHT_HTML_OPEN=never  - never auto-open the report (required for CI)
           #   PLAYWRIGHT_JSON_OUTPUT_NAME - json reporter output file path
-          # merge-reports has been observed to bail mid-extraction on constrained runners
-          # (extracts a few blobs, then exits without building the report and without an error).
-          # Retry a few times before failing, clearing any partial output each attempt.
-          merge_once() {
-            rm -rf playwright-results/html-report playwright-results/report.json
-            PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-results/html-report \
-            PLAYWRIGHT_HTML_OPEN=never \
-            PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results/report.json \
-              npx playwright merge-reports --reporter html,json ./all-blob-reports || true
-            [ -f playwright-results/html-report/index.html ] && [ -f playwright-results/report.json ]
-          }
-          merged=
-          for attempt in 1 2 3; do
-            echo "::notice::merge-reports attempt ${attempt}/3"
-            if merge_once; then merged=1; break; fi
-            echo "::warning::merge-reports attempt ${attempt} produced no html-report/report.json; retrying"
-            sleep 5
-          done
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-results/html-report \
+          PLAYWRIGHT_HTML_OPEN=never \
+          PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results/report.json \
+            npx playwright merge-reports --reporter html,json ./all-blob-reports
 
           echo "Contents of playwright-results:"
           ls -la playwright-results/ || true
-          if [ -z "$merged" ]; then
-            echo "::error::merge-reports did not produce html-report/index.html and report.json after 3 attempts"
+          if [ ! -f playwright-results/html-report/index.html ] || [ ! -f playwright-results/report.json ]; then
+            echo "::error::merge-reports did not produce the expected html-report/index.html and report.json"
             echo "::error::all-blob-reports contents:"
             ls -la all-blob-reports/ || true
             exit 1
