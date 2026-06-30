@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :turn="bar.turn"
             :index="bar.index"
             :cache-pct="cachePct"
+            :delay="40"
           >
             <div
               class="tw:relative tw:flex-1 tw:min-w-0 tw:rounded-t-[2px] tw:cursor-pointer tw:transition-[height] tw:duration-300 tw:ease-out hover:tw:brightness-110"
