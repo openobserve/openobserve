@@ -876,16 +876,18 @@ jobs:
         if: always()
         run: cat o2.log
 
-  merge_and_upload_reports:
+  merge_reports:
     timeout-minutes: 15
-    name: Merge Reports and Upload to TestDino
+    name: Merge Reports
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
+    # eks runner: `playwright merge-reports` silently stops mid-merge (exits 0, ~3 of N blobs, no
+    # output) on the ubicloud and github-hosted runners — but works on the eks runners (same as ENT).
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
-      actions: read
+      actions: read  # the no-blobs investigation reads run/job state from the Actions API
     outputs:
       # Compact Playwright stats (expected/unexpected/flaky/skipped) from the merged report.json,
       # consumed by report_to_openobserve to record per-test counts in ci_test_runs.
@@ -1029,10 +1031,32 @@ jobs:
           # Log a count only — avoid dumping test file paths/titles into public CI logs.
           echo "flaky/failed test count: $(printf '%s' "$FLAKY" | jq 'length' 2>/dev/null || echo '?')"
 
-      # Non-fatal metrics sidecar — runs HERE inside the report flow (like the TestDino
-      # step below) so it never trails / gates playwright_summary (which doesn't need this
-      # job). One retry-aware run-summary doc to OpenObserve (ci_test_runs, suite=ui) plus
-      # per-test flaky/failed rows to ci_test_results. continue-on-error: never fails the run.
+      - name: Upload merged report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merged-report-${{ github.run_attempt }}
+          path: tests/ui-testing/playwright-results
+          retention-days: 1
+          if-no-files-found: warn
+
+  # OpenObserve metrics — its own job so playwright_summary never depends on it. Emits one
+  # retry-aware run-summary doc (ci_test_runs, suite=ui) + per-test flaky/failed rows
+  # (ci_test_results). The step is continue-on-error and the poster scripts never fail.
+  report_openobserve:
+    timeout-minutes: 10
+    name: Report to OpenObserve
+    needs: [ui_integration_tests, merge_reports]
+    if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
+    runs-on:
+      labels: ubicloud-standard-4
+    permissions:
+      contents: read
+      actions: read  # reads run/job timings from the Actions API
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
       - name: Report run metrics to OpenObserve
         continue-on-error: true
         env:
@@ -1041,8 +1065,8 @@ jobs:
           O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
           O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
           TESTS: ${{ needs.ui_integration_tests.result }}
-          MERGE_STATS: ${{ steps.report_stats.outputs.stats }}
-          MERGE_FLAKY: ${{ steps.report_flaky.outputs.flaky }}
+          MERGE_STATS: ${{ needs.merge_reports.outputs.stats }}
+          MERGE_FLAKY: ${{ needs.merge_reports.outputs.flaky }}
         run: |
           # This job runs only when tests actually ran (merge `if:` gates on !cancelled &&
           # ui != skipped), so TESTS is success|failure here.
@@ -1068,8 +1092,37 @@ jobs:
             fi
           fi
 
+  # TestDino upload — its own job so it never gates playwright_summary. Only runs when tests
+  # failed (and uploads enabled); consumes the merged report via artifact.
+  upload_testdino:
+    timeout-minutes: 15
+    name: Upload to TestDino
+    needs: [ui_integration_tests, merge_reports]
+    if: ${{ !cancelled() && needs.ui_integration_tests.result == 'failure' && needs.merge_reports.result == 'success' }}
+    runs-on:
+      labels: ubicloud-standard-4
+    permissions:
+      contents: read
+      actions: read  # download-artifact fetches the merged-report artifact
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install project dependencies
+        run: cd tests/ui-testing && npm ci
+
+      - name: Download merged report
+        uses: actions/download-artifact@v4
+        with:
+          name: merged-report-${{ github.run_attempt }}
+          path: tests/ui-testing/playwright-results
+
       - name: Cache test failures to TestDino
-        if: ${{ needs.ui_integration_tests.result == 'failure' }}
         env:
           TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
         run: |
@@ -1113,7 +1166,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload to TestDino
-        if: ${{ needs.ui_integration_tests.result == 'failure' && env.UPLOAD_TO_TESTDINO == 'true' }}
+        if: ${{ env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
           cd tests/ui-testing
 
