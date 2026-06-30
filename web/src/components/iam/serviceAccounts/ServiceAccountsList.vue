@@ -271,6 +271,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="content-copy" size="sm" />
             </OButton>
             <span class="tw:text-xs tw:text-text-secondary">{{ t('serviceAccounts.copyToken') }}</span>
+
+            <OButton
+              data-test="service-accounts-list-token-download-btn"
+              variant="outline"
+              size="icon-md"
+              class="tw:ml-2"
+              :title="t('serviceAccounts.downloadToken')"
+              @click.stop="downloadTokenAsFile(serviceToken)"
+            >
+              <OIcon name="file-download" size="sm" />
+            </OButton>
+            <span class="tw:text-xs tw:text-text-secondary">{{ t('serviceAccounts.downloadToken') }}</span>
           </div>
 
           <div class="tw:flex tw:justify-end tw:mt-4 tw:pt-3 tw:border-t tw:border-border-default">
@@ -705,6 +717,15 @@ export default defineComponent({
       return formatDate(iso, "YYYY-MM-DD HH:mm:ss");
     };
 
+    const downloadTokenAsFile = (token: string) => {
+      const blob = new Blob([token], { type: "text/plain" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "service_account_token.txt";
+      link.click();
+      URL.revokeObjectURL(link.href); // Cleanup
+    };
+
     const addMember = async (res: any, data: any, operationType: string) => {
       showAddUserDialog.value = false;
       if (res.code == 200 ) {
@@ -927,6 +948,7 @@ export default defineComponent({
       bulkDeleteServiceAccounts,
       redactToken,
       formatCreatedAt,
+      downloadTokenAsFile,
       isSystemAccount,
       isRowSelectable,
       deleteUserEmailIdentifier,

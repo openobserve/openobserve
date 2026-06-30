@@ -687,8 +687,32 @@ describe("ServiceAccountsList Component", () => {
   });
 
   describe("File Operations", () => {
-    it("downloadTokenAsFile is removed (no longer available)", () => {
-      expect(wrapper.vm.downloadTokenAsFile).toBeUndefined();
+    it("downloadTokenAsFile is available", () => {
+      expect(typeof wrapper.vm.downloadTokenAsFile).toBe("function");
+    });
+
+    it("downloadTokenAsFile triggers a text-file download of the token", () => {
+      const createEl = vi.spyOn(document, "createElement");
+      const createObjUrl = vi
+        .spyOn(URL, "createObjectURL")
+        .mockReturnValue("blob:mock");
+      const revokeObjUrl = vi
+        .spyOn(URL, "revokeObjectURL")
+        .mockImplementation(() => {});
+
+      wrapper.vm.downloadTokenAsFile("my-secret-token");
+
+      const anchor = createEl.mock.results.find(
+        (r) => r.value?.tagName === "A",
+      )?.value;
+      expect(anchor).toBeTruthy();
+      expect(anchor.download).toBe("service_account_token.txt");
+      expect(createObjUrl).toHaveBeenCalled();
+      expect(revokeObjUrl).toHaveBeenCalled();
+
+      createEl.mockRestore();
+      createObjUrl.mockRestore();
+      revokeObjUrl.mockRestore();
     });
   });
 
@@ -1165,14 +1189,13 @@ describe("ServiceAccountsList Component", () => {
       expect(env).not.toContain("Bearer");
     });
 
-    it("does not render a download button in the token dialog", () => {
+    it("renders a download button in the token dialog (step 1)", () => {
       const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
         (d) => d.props("title") === "Copy your token"
       );
       expect(tokenDialog).toBeDefined();
       const dialogHtml = tokenDialog.html();
-      // No download button data-test should exist
-      expect(dialogHtml).not.toContain("service-accounts-list-token-download-btn");
+      expect(dialogHtml).toContain("service-accounts-list-token-download-btn");
     });
 
     it("renders a copy button in the token dialog", () => {
