@@ -747,8 +747,7 @@ import {
   splitDuration,
   splitCost,
 } from "./llmInsightsDashboard.utils";
-import { Marked } from "marked";
-import DOMPurify from "dompurify";
+import { renderMarkdown } from "./markdown";
 
 const { t } = useI18n();
 const route = useRoute();
@@ -1492,14 +1491,6 @@ function formatTokens(n: number): string {
   return `${tk.value}${tk.unit}`;
 }
 
-// Markdown for the assistant message (it returns GFM — headings, tables, code,
-// bold). Own Marked instance so we don't touch the app-wide `marked` config;
-// DOMPurify sanitizes before v-html. Same approach as LLMContentRenderer.
-const md = new Marked({ gfm: true, breaks: false });
-function renderMarkdown(content: string | null | undefined): string {
-  if (!content) return "";
-  return DOMPurify.sanitize(md.parse(content) as string);
-}
 
 onMounted(load);
 </script>

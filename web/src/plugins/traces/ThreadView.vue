@@ -196,14 +196,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @span-selected="emit('span-selected', $event)"
           />
 
-          <!-- Assistant text (the final answer, after any tool calls). -->
+          <!-- Assistant text (the final answer, after any tool calls). Rendered
+               as markdown — headings, tables, code, bold. v-html is sanitized in
+               renderMarkdown(). -->
           <div
             v-for="(msg, mIdx) in turn.assistant"
             :key="`a-${mIdx}`"
-            class="thread-bubble thread-bubble--assistant"
-          >
-            {{ msg.content }}
-          </div>
+            class="thread-bubble thread-bubble--assistant markdown-body"
+            v-html="renderMarkdown(msg.content)"
+          />
+
 
           <!-- Footer. -->
           <div class="thread-turn__footer">
@@ -293,6 +295,7 @@ import {
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
+import { renderMarkdown } from "./markdown";
 
 const store = useStore();
 
@@ -872,6 +875,107 @@ function formatTime(ns: number): string {
       background: rgba(139, 92, 246, 0.18);
       color: #c4b5fd;
     }
+  }
+}
+
+/* ─── markdown rendering (assistant bubble v-html) ─────────────────────────
+   Element styling for the sanitized markdown HTML. Scoped :deep is the one
+   sanctioned case for innerHTML content; colours map to --o2-* tokens. The
+   bubble's pre-wrap is reset so rendered block elements don't get extra gaps. */
+.thread-bubble--assistant.markdown-body {
+  white-space: normal;
+}
+.markdown-body {
+  :deep(> *:first-child) {
+    margin-top: 0;
+  }
+  :deep(> *:last-child) {
+    margin-bottom: 0;
+  }
+  :deep(p) {
+    margin: 0 0 0.5rem;
+  }
+  :deep(h1),
+  :deep(h2),
+  :deep(h3),
+  :deep(h4) {
+    font-weight: 650;
+    margin: 0.75rem 0 0.35rem;
+    line-height: 1.3;
+  }
+  :deep(h1) {
+    font-size: 1.05rem;
+  }
+  :deep(h2) {
+    font-size: 0.95rem;
+  }
+  :deep(h3) {
+    font-size: 0.9rem;
+  }
+  :deep(h4) {
+    font-size: 0.85rem;
+  }
+  :deep(ul),
+  :deep(ol) {
+    margin: 0.4rem 0;
+    padding-left: 1.25rem;
+  }
+  :deep(li) {
+    margin: 0.15rem 0;
+  }
+  :deep(a) {
+    color: var(--o2-interactive-primary, #3b82f6);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  :deep(code) {
+    font-family: monospace;
+    font-size: 0.78rem;
+    background: color-mix(in srgb, var(--o2-text-primary) 8%, transparent);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+  }
+  :deep(pre) {
+    background: color-mix(in srgb, var(--o2-text-primary) 5%, transparent);
+    border: 1px solid var(--o2-border-color);
+    padding: 0.5rem 0.625rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 0.5rem 0;
+  }
+  :deep(pre code) {
+    background: transparent;
+    padding: 0;
+  }
+  :deep(blockquote) {
+    border-left: 3px solid var(--o2-border-color);
+    margin: 0.5rem 0;
+    padding-left: 0.75rem;
+    color: var(--o2-text-secondary);
+  }
+  :deep(table) {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.5rem 0;
+    font-size: 0.78rem;
+  }
+  :deep(th),
+  :deep(td) {
+    border: 1px solid var(--o2-border-color);
+    padding: 0.3rem 0.5rem;
+    text-align: left;
+  }
+  :deep(th) {
+    background: color-mix(in srgb, var(--o2-text-primary) 6%, transparent);
+    font-weight: 600;
+  }
+  :deep(hr) {
+    border: none;
+    border-top: 1px solid var(--o2-border-color);
+    margin: 0.625rem 0;
   }
 }
 </style>
