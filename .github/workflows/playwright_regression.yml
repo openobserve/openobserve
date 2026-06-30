@@ -538,19 +538,20 @@ jobs:
         if: always()
         run: cat o2.log
 
-  merge_and_upload_reports:
+  merge_reports:
     timeout-minutes: 15
-    name: Merge Reports and Upload to TestDino
+    name: Merge Reports
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
-      labels: ubicloud-standard-4
+      # Bumped to standard-8: merge-reports was bailing mid-merge on standard-4 under memory pressure.
+      labels: ubicloud-standard-8
     permissions:
       contents: read
-      actions: read  # report step reads run/job timings from the Actions API
+      actions: read  # the no-blobs investigation reads run/job state from the Actions API
     outputs:
       # Compact Playwright stats (expected/unexpected/flaky/skipped/duration) from the merged
-      # report.json — consumed by report_to_openobserve to record reliability metrics.
+      # report.json — consumed by the report_openobserve job to record reliability metrics.
       stats: ${{ steps.report_stats.outputs.stats }}
 
     steps:
@@ -623,15 +624,29 @@ jobs:
           #   PLAYWRIGHT_HTML_OUTPUT_DIR  - html reporter output directory
           #   PLAYWRIGHT_HTML_OPEN=never  - never auto-open the report (required for CI)
           #   PLAYWRIGHT_JSON_OUTPUT_NAME - json reporter output file path
-          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-results/html-report \
-          PLAYWRIGHT_HTML_OPEN=never \
-          PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results/report.json \
-            npx playwright merge-reports --reporter html,json ./all-blob-reports
+          # merge-reports has been observed to bail mid-extraction on constrained runners
+          # (extracts a few blobs, then exits without building the report and without an error).
+          # Retry a few times before failing, clearing any partial output each attempt.
+          merge_once() {
+            rm -rf playwright-results/html-report playwright-results/report.json
+            PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-results/html-report \
+            PLAYWRIGHT_HTML_OPEN=never \
+            PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results/report.json \
+              npx playwright merge-reports --reporter html,json ./all-blob-reports || true
+            [ -f playwright-results/html-report/index.html ] && [ -f playwright-results/report.json ]
+          }
+          merged=
+          for attempt in 1 2 3; do
+            echo "::notice::merge-reports attempt ${attempt}/3"
+            if merge_once; then merged=1; break; fi
+            echo "::warning::merge-reports attempt ${attempt} produced no html-report/report.json; retrying"
+            sleep 5
+          done
 
           echo "Contents of playwright-results:"
           ls -la playwright-results/ || true
-          if [ ! -f playwright-results/html-report/index.html ] || [ ! -f playwright-results/report.json ]; then
-            echo "::error::merge-reports did not produce the expected html-report/index.html and report.json"
+          if [ -z "$merged" ]; then
+            echo "::error::merge-reports did not produce html-report/index.html and report.json after 3 attempts"
             echo "::error::all-blob-reports contents:"
             ls -la all-blob-reports/ || true
             exit 1
@@ -656,8 +671,45 @@ jobs:
           echo "stats=$STATS" >> "$GITHUB_OUTPUT"
           echo "report stats: $STATS"
 
+      - name: Upload merged report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merged-report-${{ github.run_attempt }}
+          path: tests/ui-testing/playwright-results
+          retention-days: 1
+          if-no-files-found: warn
+
+  # TestDino upload — its own job so it never gates playwright_summary. Only runs when tests
+  # failed (and uploads are enabled); consumes the merged report via artifact.
+  upload_testdino:
+    timeout-minutes: 15
+    name: Upload to TestDino
+    needs: [ui_integration_tests, merge_reports]
+    if: ${{ !cancelled() && needs.ui_integration_tests.result == 'failure' && needs.merge_reports.result == 'success' }}
+    runs-on:
+      labels: ubicloud-standard-4
+    permissions:
+      contents: read
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Install project dependencies
+        run: cd tests/ui-testing && npm ci
+
+      - name: Download merged report
+        uses: actions/download-artifact@v4
+        with:
+          name: merged-report-${{ github.run_attempt }}
+          path: tests/ui-testing/playwright-results
+
       - name: Cache test failures to TestDino
-        if: ${{ needs.ui_integration_tests.result == 'failure' }}
         env:
           TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
         run: |
@@ -693,7 +745,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload to TestDino
-        if: ${{ needs.ui_integration_tests.result == 'failure' && env.UPLOAD_TO_TESTDINO == 'true' }}
+        if: ${{ env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
           cd tests/ui-testing
 
@@ -736,13 +788,23 @@ jobs:
             --verbose \
             --token="${{ secrets.TESTDINO_API_TOKEN }}"
 
-      # ---------------------------------------------------------------------------
-      # Non-fatal metrics sidecar — runs HERE inside the report flow (like the TestDino
-      # step above) so it never trails / gates playwright_summary. One run-summary
-      # document to OpenObserve (stream: ci_regression) + per-shard rows
-      # (ci_regression_shards). continue-on-error + a never-fail poster script mean
-      # this can NEVER break the regression run.
-      # ---------------------------------------------------------------------------
+  # OpenObserve metrics — its own job so playwright_summary never depends on it. Emits one
+  # run-summary doc (stream: ci_regression) + per-shard rows (ci_regression_shards). The step
+  # is continue-on-error and the poster script never fails, so this can never break the run.
+  report_openobserve:
+    timeout-minutes: 10
+    name: Report to OpenObserve
+    needs: [build_binary, ui_integration_tests, merge_reports]
+    if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
+    runs-on:
+      labels: ubicloud-standard-4
+    permissions:
+      contents: read
+      actions: read  # reads run/job timings from the Actions API
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
       - name: Report run metrics to OpenObserve
         continue-on-error: true
         env:
@@ -751,13 +813,10 @@ jobs:
           O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
           O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
-          # We are now inside merge_and_upload_reports (needs: [ui_integration_tests]), which
-          # runs only when tests actually ran. build_binary precedes ui_integration_tests, so
-          # build is effectively success here; merge is in-progress (treated success).
-          BUILD_RESULT: success
+          BUILD_RESULT: ${{ needs.build_binary.result }}
           UI_RESULT: ${{ needs.ui_integration_tests.result }}
-          MERGE_RESULT: success
-          MERGE_STATS: ${{ steps.report_stats.outputs.stats }}
+          MERGE_RESULT: ${{ needs.merge_reports.result }}
+          MERGE_STATS: ${{ needs.merge_reports.outputs.stats }}
         run: |
           set -uo pipefail
           # Forks / unconfigured repos: skip entirely (no API call, no rate-limit spend).
@@ -896,7 +955,7 @@ jobs:
     runs-on:
       labels: ubicloud-standard-4
     permissions: {}
-    needs: [build_binary, ui_integration_tests, merge_and_upload_reports]
+    needs: [build_binary, ui_integration_tests, merge_reports]
     if: always()
     steps:
       - name: Check test results
@@ -913,7 +972,7 @@ jobs:
             UI_OK=true
           fi
 
-          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "failure" ]; then
+          if [ "${{ needs.merge_reports.result }}" == "success" ] || [ "${{ needs.merge_reports.result }}" == "skipped" ] || [ "${{ needs.merge_reports.result }}" == "failure" ]; then
             MERGE_OK=true
           fi
 
@@ -924,6 +983,6 @@ jobs:
             echo "Regression tests failed:"
             echo "  build_binary: ${{ needs.build_binary.result }}"
             echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
-            echo "  merge_and_upload_reports: ${{ needs.merge_and_upload_reports.result }}"
+            echo "  merge_reports: ${{ needs.merge_reports.result }}"
             exit 1
           fi
