@@ -99,6 +99,18 @@ export interface LLMPanelDef {
   emptyStateText?: string;
 }
 
+/**
+ * i18n base key for a panel's title/subtitle. The panel `id` (kebab-case) maps
+ * to a camelCase key under `aiObservability.panels` — e.g. "traces-over-time" →
+ * "aiObservability.panels.tracesOverTime". Render sites resolve `${key}.title` /
+ * `${key}.subtitle` and fall back to the hardcoded `title`/`subtitle` when the
+ * key is missing, so the en.json copy is the source of truth where it exists.
+ */
+export function panelI18nKey(id: string): string {
+  const camel = id.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  return `aiObservability.panels.${camel}`;
+}
+
 // Time-range pruning is handled by the search engine via the start_time /
 // end_time fields on the request payload — no need to repeat it in WHERE.
 //

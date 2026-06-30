@@ -41,13 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-primary)]"
         >
-          {{ panel.title }}
+          {{ displayTitle }}
         </div>
         <div
-          v-if="panel.subtitle"
+          v-if="displaySubtitle"
           class="tw:text-[0.7rem] tw:leading-normal tw:mt-[0.1rem]"
         >
-          {{ panel.subtitle }}
+          {{ displaySubtitle }}
         </div>
       </div>
     </div>
@@ -93,11 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import {
   type LLMPanelDef,
   renderPanelSql,
+  panelI18nKey,
 } from "./config/llmInsightsPanels";
 import { useLLMStreamQuery } from "./composables/useLLMStreamQuery";
 import { timestampToTimezoneDate } from "@/utils/timezone";
@@ -126,6 +128,14 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
   (e: "view-trace", traceId: string): void;
 }>();
+
+const { t } = useI18n();
+
+// Title/subtitle come from the en.json `aiObservability.panels.<id>` copy.
+const displayTitle = computed(() => t(`${panelI18nKey(props.panel.id)}.title`));
+const displaySubtitle = computed(() =>
+  t(`${panelI18nKey(props.panel.id)}.subtitle`),
+);
 
 const store = useStore();
 const { executeQuery } = useLLMStreamQuery();
