@@ -1067,6 +1067,11 @@ jobs:
           TESTS: ${{ needs.ui_integration_tests.result }}
           MERGE_STATS: ${{ needs.merge_reports.outputs.stats }}
           MERGE_FLAKY: ${{ needs.merge_reports.outputs.flaky }}
+          # Branch + PR for per-test rows so the dashboard needs no cross-stream JOIN.
+          # head_ref is set on pull_request (the source branch); ref_name covers push +
+          # merge_group (gh-readonly-queue/main/pr-<n>-<sha>). PR empty on merge_group/push.
+          REPORT_BRANCH: ${{ github.head_ref || github.ref_name }}
+          REPORT_PR: ${{ github.event.pull_request.number }}
         run: |
           # This job runs only when tests actually ran (merge `if:` gates on !cancelled &&
           # ui != skipped), so TESTS is success|failure here.
@@ -1085,7 +1090,8 @@ jobs:
             FLAKY_FILE=$(mktemp "${TMPDIR:-/tmp}/flaky.XXXXXX")
             trap 'rm -f "$FLAKY_FILE"' EXIT
             printf '%s' "$FLAKY" | jq -c --arg run_id "$GITHUB_RUN_ID" --arg repo "$GITHUB_REPOSITORY" \
-              '[.[] | {run_id:$run_id, repo:$repo, suite:"ui", workflow:"test", ingest_source:"live", status:.status, module:.module, test_title:.title, test_file:.file}]' \
+              --arg branch "${REPORT_BRANCH:-}" --arg pr "${REPORT_PR:-}" \
+              '[.[] | {run_id:$run_id, repo:$repo, suite:"ui", workflow:"test", ingest_source:"live", status:.status, module:.module, test_title:.title, test_file:.file, branch:(if $branch=="" then null else $branch end), pr_number:(if $pr=="" then null else ($pr|tonumber) end)}]' \
               > "$FLAKY_FILE" 2>/dev/null || echo '[]' > "$FLAKY_FILE"
             if [ "$(jq 'length' "$FLAKY_FILE" 2>/dev/null || echo 0)" -gt 0 ]; then
               bash .github/scripts/o2-report.sh ci_test_results "$FLAKY_FILE"
