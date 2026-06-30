@@ -769,19 +769,33 @@ jobs:
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
             > jobs.json || echo '{"jobs":[]}' > jobs.json
 
+          # This attempt's start time — the floor for awall (below). On a RE-RUN, GitHub keeps
+          # the jobs that did NOT re-run at their ORIGINAL (earlier-attempt) timestamps, so a
+          # naive min(started) spans the idle gap to a much-later manual re-run and inflates the
+          # duration by hours. Flooring the start at run_started_at counts only this attempt's work.
+          RUN_STARTED=$(curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            | jq 'if .run_started_at then (.run_started_at|fromdateiso8601) else 0 end' 2>/dev/null || echo 0)
+          [ -n "$RUN_STARTED" ] || RUN_STARTED=0
+
           STATS="${MERGE_STATS:-}"; [ -z "$STATS" ] && STATS=null
 
           # Retry-aware: this attempt's wall-clock + total summed across all attempts (so the
           # latest-attempt doc carries the cumulative compute; dashboards keep latest per run_id).
           ATT="${GITHUB_RUN_ATTEMPT:-1}"
-          awall(){ jq '[.jobs[]|select(.completed_at!=null and .started_at!=null)] as $j | (if ($j|length)>0 then (($j|map(.completed_at|fromdateiso8601)|max)-($j|map(.started_at|fromdateiso8601)|min)) else 0 end) | if . < 0 then 0 else . end'; }
-          FINAL_DUR=$(awall < jobs.json 2>/dev/null || echo 0)
+          # $1 = floor epoch (run_started_at); start = max(min job started, floor) so re-run
+          # carry-over jobs with old timestamps don't inflate the wall-clock.
+          awall(){ jq --argjson floor "${1:-0}" '[.jobs[]|select(.completed_at!=null and .started_at!=null)] as $j | (if ($j|length)>0 then (($j|map(.completed_at|fromdateiso8601)|max)-([($j|map(.started_at|fromdateiso8601)|min), $floor]|max)) else 0 end) | if . < 0 then 0 else . end'; }
+          FINAL_DUR=$(awall "$RUN_STARTED" < jobs.json 2>/dev/null || echo 0)
           TOTAL_DUR="$FINAL_DUR"
           if [ "$ATT" -gt 1 ] 2>/dev/null; then
             SUM="$FINAL_DUR"
             for n in $(seq 1 $((ATT-1))); do
+              NFLOOR=$(curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${n}" \
+                | jq 'if .run_started_at then (.run_started_at|fromdateiso8601) else 0 end' 2>/dev/null || echo 0)
               W=$(curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
-                "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${n}/jobs?per_page=100" | awall 2>/dev/null || echo 0)
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${n}/jobs?per_page=100" | awall "${NFLOOR:-0}" 2>/dev/null || echo 0)
               SUM=$(awk -v a="$SUM" -v b="$W" 'BEGIN{print a+b}')
             done
             TOTAL_DUR="$SUM"
