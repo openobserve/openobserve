@@ -1,5 +1,11 @@
 <template>
-  <div
+  <!-- Inline form (no dialog): the Save button lives INSIDE the <OForm>, so it
+       is `type="submit"` and Enter submits natively — no `form-id` needed. The
+       OForm's <form> element carries the toolbar layout classes so the
+       justify-between row is preserved. -->
+  <OForm
+    :form="form"
+    v-slot="{ isSubmitting }"
     class="action-scripts-toolbar tw:pb-1.5 tw:w-full tw:flex tw:justify-between tw:items-center"
   >
     <div class="tw:flex tw:items-center">
@@ -24,29 +30,16 @@
       </div>
       <div class="o2-input">
         <div class="tw:flex tw:items-center">
-          <OInput
+          <OFormInput
             data-test="add-script-name-input"
-            v-model.trim="actionName"
+            name="name"
             :label="t('actions.name')"
+            required
             class="tw:p-0 tw:w-full"
             :readonly="disableName"
             :disabled="disableName"
-            :error="!!scriptNameError"
-            :error-message="scriptNameError"
-            @update:model-value="onUpdate"
-            @blur="onUpdate"
             style="min-width: 300px"
           />
-          <OIcon
-            :key="actionName"
-            v-if="isValidMethodName() !== true && showInputError"
-            name="info"
-            size="md"
-            class="tw:ml-1 tw:cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-7'"
-          >
-            <OTooltip side="right" :content="String(isValidMethodName())" />
-          </OIcon>
         </div>
       </div>
     </div>
@@ -66,35 +59,35 @@
         variant="primary"
         size="sm-action"
         type="submit"
-        @click="onSave"
+        :loading="isSubmitting"
         >{{ t("actions.save") }}</OButton
       >
       <OButton
         data-test="add-script-cancel-btn"
         variant="outline-destructive"
         size="sm-action"
+        :disabled="isSubmitting"
         @click="emit('cancel')"
         >{{ t("common.cancel") }}</OButton
       >
     </div>
-  </div>
+  </OForm>
 </template>
 <script setup lang="ts">
-import { defineComponent, ref, onMounted, computed, watch } from "vue";
+import { watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
-import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toggleFullscreen } from "@/utils/dom";
+import {
+  scriptToolbarSchema,
+  type ScriptToolbarForm,
+} from "./ScriptToolbar.schema";
 
 const { t } = useI18n();
-
-const router = useRouter();
-
-const store = useStore();
 
 const props = defineProps({
   name: {
@@ -109,34 +102,45 @@ const props = defineProps({
 
 const emit = defineEmits(["test", "save", "update:name", "back", "cancel"]);
 
-const addScriptForm = ref(null);
-
-const scriptNameError = computed(() => {
-  if (!showInputError.value) return '';
-  if (!actionName.value) return 'Field is required!';
-  const result = isValidMethodName();
-  return result === true ? '' : result;
-});
-
-const showInputError = ref(false);
-
-const isValidMethodName = () => {
-  if (!actionName.value) return "Field is required!";
-  const methodPattern = /^[A-Z_][A-Z0-9_]*$/i;
-  return (
-    methodPattern.test(actionName.value) ||
-    "Invalid method name. Must start with a letter or underscore. Use only letters, numbers, and underscores."
-  );
+// @submit fires ONLY once the Zod schema passes (name required + method-name
+// regex), so emitting `save` here preserves the old contract — "emit save only
+// after the form validates" — without a hand-rolled validate().
+const onSubmit = (_value: ScriptToolbarForm) => {
+  emit("save");
 };
 
-const onUpdate = () => {
-  showInputError.value = true;
-};
-
-const actionName = computed({
-  get: () => props.name,
-  set: (value) => emit("update:name", value),
+// ── Rule ③ OWNER pattern ─────────────────────────────────────────────────────
+// This component OWNS the <OForm>, so it creates the form headlessly with
+// useOForm and reads it reactively via form.useStore — NO `form.store.subscribe`
+// mirror, NO parallel ref. The form is the single source of truth; the parent
+// keeps its canonical copy via the `update:name` contract. Seeded from the
+// parent-owned `name`; handed down via <OForm :form="form">.
+const form = useOForm<ScriptToolbarForm>({
+  defaultValues: { name: props.name ?? "" },
+  schema: scriptToolbarSchema,
+  onSubmit,
 });
+
+// Mirror the form-owned `name` OUT to the parent (update:name) — a one-way emit
+// driven by the reactive form.useStore read (NOT store.subscribe). The guard
+// prevents an emit/prop echo loop with the reverse watch below.
+const formName = form.useStore((s: any) => s.values.name);
+watch(formName, (v) => {
+  if ((v ?? "") !== (props.name ?? "")) emit("update:name", (v ?? "") as string);
+});
+
+// Keep the form in sync when the parent changes `name` externally (e.g. async
+// prefill). Watching the EXTERNAL source → setFieldValue is the sanctioned
+// prefill path; `dontUpdateMeta` avoids marking the field touched/dirty (no
+// premature re-validation / post-save flash).
+watch(
+  () => props.name,
+  (v) => {
+    if ((form.state.values?.name ?? "") !== (v ?? "")) {
+      form.setFieldValue("name", v ?? "", { dontUpdateMeta: true });
+    }
+  },
+);
 
 const handleFullScreen = () => {
   toggleFullscreen();
@@ -145,13 +149,6 @@ const handleFullScreen = () => {
 const redirectToScripts = () => {
   emit("back");
 };
-
-const onSave = () => {
-  showInputError.value = true;
-  emit("save");
-};
-
-defineExpose({ addScriptForm });
 </script>
 <style scoped lang="scss">
 .action-scripts-toolbar {
