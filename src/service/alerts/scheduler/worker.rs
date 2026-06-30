@@ -55,7 +55,7 @@ pub struct ModuleSchedulerConfig {
 #[derive(Clone)]
 pub struct SchedulerWorker {
     pub id: usize,
-    /// Module this worker's pipeline serves. `None` = shared/legacy pool (all modules).
+    /// Module this worker's lane serves. `None` = shared/legacy pool (all modules).
     pub module: Option<TriggerModule>,
     pub config: SchedulerConfig,
     pub rx: Arc<Mutex<mpsc::Receiver<ScheduledJob>>>,
@@ -70,9 +70,9 @@ pub struct SchedulerJobPuller {
     pub config: SchedulerConfig,
 }
 
-/// One isolated pull-loop + worker-pool + channel. The scheduler runs a single pipeline
-/// (`module = None`) in legacy mode, or one pipeline per module when per-module pullers are on.
-struct Pipeline {
+/// One isolated pull-loop + worker-pool + channel. The scheduler runs a single lane
+/// (`module = None`) in legacy mode, or one lane per module when per-module pullers are on.
+struct SchedulerLane {
     workers: Vec<SchedulerWorker>,
     job_puller: SchedulerJobPuller,
     tx: mpsc::Sender<ScheduledJob>,
@@ -81,9 +81,9 @@ struct Pipeline {
 /// Main scheduler that coordinates workers and the job puller
 pub struct Scheduler {
     pub config: SchedulerConfig,
-    /// Flattened union of every pipeline's workers (kept for introspection/tests).
+    /// Flattened union of every lane's workers (kept for introspection/tests).
     pub workers: Vec<SchedulerWorker>,
-    pipelines: Vec<Pipeline>,
+    lanes: Vec<SchedulerLane>,
 }
 
 impl SchedulerWorker {
@@ -434,9 +434,9 @@ impl SchedulerJobPuller {
     }
 }
 
-impl Pipeline {
-    /// Build one isolated pipeline (channel + worker pool + puller). `module = None` is the
-    /// shared/legacy pipeline that pulls all modules under the global lock; `Some(m)` pulls only
+impl SchedulerLane {
+    /// Build one isolated lane (channel + worker pool + puller). `module = None` is the
+    /// shared/legacy lane that pulls all modules under the global lock; `Some(m)` pulls only
     /// that module. `concurrency` sizes the channel, the worker pool and the pull LIMIT together.
     fn new(module: Option<TriggerModule>, concurrency: i64, config: SchedulerConfig) -> Self {
         let max_workers = std::cmp::max(1, concurrency) as usize;
@@ -462,7 +462,7 @@ impl Pipeline {
 
 impl Scheduler {
     /// Build the scheduler from the base config, honoring `ZO_SCHEDULER_PER_MODULE_PULLERS`.
-    /// When the flag is off, a single shared pipeline handles all modules (legacy behavior).
+    /// When the flag is off, a single shared lane handles all modules (legacy behavior).
     pub fn new(config: SchedulerConfig) -> Self {
         let cfg = config::get_config();
         let module_configs = if cfg.limit.scheduler_per_module_pullers {
@@ -474,14 +474,14 @@ impl Scheduler {
     }
 
     /// Build the scheduler from an explicit set of per-module configs. An empty `module_configs`
-    /// yields the single shared (legacy) pipeline; otherwise one pipeline per module. Kept
+    /// yields the single shared (legacy) lane; otherwise one lane per module. Kept
     /// separate from [`Scheduler::new`] so both paths are unit-testable without env mutation.
     pub fn new_with_modules(
         config: SchedulerConfig,
         module_configs: Vec<ModuleSchedulerConfig>,
     ) -> Self {
-        let pipelines: Vec<Pipeline> = if module_configs.is_empty() {
-            vec![Pipeline::new(
+        let lanes: Vec<SchedulerLane> = if module_configs.is_empty() {
+            vec![SchedulerLane::new(
                 None,
                 config.alert_schedule_concurrency,
                 config.clone(),
@@ -494,13 +494,13 @@ impl Scheduler {
                     let mut module_cfg = config.clone();
                     module_cfg.alert_schedule_concurrency = mc.concurrency;
                     module_cfg.poll_interval_secs = mc.poll_interval_secs;
-                    Pipeline::new(Some(mc.module), mc.concurrency, module_cfg)
+                    SchedulerLane::new(Some(mc.module), mc.concurrency, module_cfg)
                 })
                 .collect()
         };
 
-        // Flattened view of every pipeline's workers (introspection/tests).
-        let workers = pipelines
+        // Flattened view of every lane's workers (introspection/tests).
+        let workers = lanes
             .iter()
             .flat_map(|p| p.workers.iter().cloned())
             .collect();
@@ -508,19 +508,19 @@ impl Scheduler {
         Self {
             config,
             workers,
-            pipelines,
+            lanes,
         }
     }
 
     pub async fn run(&self) -> Result<()> {
         log::debug!(
-            "Starting scheduler with {} pipeline(s)",
-            self.pipelines.len()
+            "Starting scheduler with {} lane(s)",
+            self.lanes.len()
         );
 
-        // Spawn all workers across every pipeline.
+        // Spawn all workers across every lane.
         let worker_handles: Vec<_> = self
-            .pipelines
+            .lanes
             .iter()
             .flat_map(|p| p.workers.iter())
             .map(|worker| {
@@ -533,9 +533,9 @@ impl Scheduler {
             })
             .collect();
 
-        // Spawn one puller per pipeline.
+        // Spawn one puller per lane.
         let puller_handles: Vec<_> = self
-            .pipelines
+            .lanes
             .iter()
             .map(|p| {
                 let puller = p.job_puller.clone();
@@ -552,8 +552,8 @@ impl Scheduler {
             log::error!("[SCHEDULER] Error waiting for puller to complete: {e}");
         }
 
-        // When shutting down: drop every pipeline's sender so its workers see the channel close.
-        for p in &self.pipelines {
+        // When shutting down: drop every lane's sender so its workers see the channel close.
+        for p in &self.lanes {
             drop(p.tx.clone());
         }
 
@@ -571,7 +571,7 @@ impl Scheduler {
 /// Resolve the per-module pull budgets/cadences from config (A4). A per-module concurrency or
 /// interval of `0` inherits the shared default (alert concurrency / alert interval), except
 /// derived_stream's cadence which falls back to `ZO_DERIVED_STREAM_SCHEDULE_INTERVAL`. Every
-/// `TriggerModule` variant gets a pipeline so no module's rows are ever left unclaimed.
+/// `TriggerModule` variant gets a lane so no module's rows are ever left unclaimed.
 fn resolve_module_configs(
     cfg: &config::Config,
     base: &SchedulerConfig,
@@ -681,12 +681,12 @@ mod tests {
     }
 
     #[test]
-    fn test_scheduler_new_with_modules_empty_is_legacy_single_pipeline() {
-        // Empty module list => one shared pipeline with `alert_schedule_concurrency` workers,
+    fn test_scheduler_new_with_modules_empty_is_legacy_single_lane() {
+        // Empty module list => one shared lane with `alert_schedule_concurrency` workers,
         // all module = None (legacy behavior).
         let cfg = make_config();
         let scheduler = Scheduler::new_with_modules(cfg.clone(), vec![]);
-        assert_eq!(scheduler.pipelines.len(), 1);
+        assert_eq!(scheduler.lanes.len(), 1);
         assert_eq!(
             scheduler.workers.len(),
             cfg.alert_schedule_concurrency as usize
@@ -695,7 +695,7 @@ mod tests {
     }
 
     #[test]
-    fn test_scheduler_new_with_modules_builds_one_pipeline_per_module() {
+    fn test_scheduler_new_with_modules_builds_one_lane_per_module() {
         let cfg = make_config();
         let module_configs = vec![
             ModuleSchedulerConfig {
@@ -710,8 +710,8 @@ mod tests {
             },
         ];
         let scheduler = Scheduler::new_with_modules(cfg, module_configs);
-        // One pipeline per module config, workers == sum of per-module concurrencies.
-        assert_eq!(scheduler.pipelines.len(), 2);
+        // One lane per module config, workers == sum of per-module concurrencies.
+        assert_eq!(scheduler.lanes.len(), 2);
         assert_eq!(scheduler.workers.len(), 4 + 1);
         // Each worker is tagged with its module.
         let alert_workers = scheduler
@@ -738,7 +738,7 @@ mod tests {
             poll_interval_secs: 10,
         }];
         let scheduler = Scheduler::new_with_modules(cfg, module_configs);
-        assert_eq!(scheduler.pipelines.len(), 1);
+        assert_eq!(scheduler.lanes.len(), 1);
         assert_eq!(scheduler.workers.len(), 1);
     }
 }
