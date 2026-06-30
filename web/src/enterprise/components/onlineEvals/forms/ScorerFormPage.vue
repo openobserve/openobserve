@@ -1,5 +1,9 @@
 <template>
-  <form class="scorer-form" @submit.prevent="save">
+  <OForm
+    class="scorer-form"
+    :form="form"
+    v-slot="{ isSubmitting }"
+  >
     <div class="scorer-form__top">
       <OButton
         variant="outline"
@@ -7,20 +11,21 @@
         icon-left="arrow-back-ios-new"
         data-test="scorer-form-back-btn"
         :title="t('onlineEvals.scorer.backTo')"
+        :disabled="isSubmitting"
         @click="$emit('cancel')"
       />
       <h1 class="scorer-form__title">{{ titleText }}</h1>
       <span class="scorer-form__subtitle">
         {{
-          form.scorerType === "remote"
+          formValues.scorerType === "remote"
             ? t("onlineEvals.scorer.subtitleRemote")
             : t("onlineEvals.scorer.subtitleLlm")
         }}
       </span>
       <div class="scorer-form__top-spacer" />
-      <span class="scorer-form__badge" :class="`scorer-form__badge--${form.scorerType}`">
+      <span class="scorer-form__badge" :class="`scorer-form__badge--${formValues.scorerType}`">
         {{
-          form.scorerType === "remote"
+          formValues.scorerType === "remote"
             ? t("onlineEvals.scorer.badgeRemote")
             : t("onlineEvals.scorer.badgeLlm")
         }}
@@ -30,6 +35,7 @@
         class="scorer-form__close"
         :aria-label="t('onlineEvals.buttons.cancel')"
         data-test="scorer-form-close-btn"
+        :disabled="isSubmitting"
         @click="$emit('cancel')"
       >
         <svg
@@ -64,8 +70,8 @@
               <span class="scorer-field__req">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="scorer-field__lock" />
             </label>
-            <OInput
-              v-model.trim="form.name"
+            <OFormInput
+              name="name"
               :placeholder="t('onlineEvals.scorer.namePlaceholder')"
               size="sm"
               :disabled="mode === 'edit'"
@@ -77,9 +83,8 @@
             <label class="scorer-field__label">
               {{ t("onlineEvals.scorer.descriptionLabel") }}
             </label>
-            <OInput
-              v-model.trim="form.description"
-              type="textarea"
+            <OFormTextarea
+              name="description"
               :placeholder="t('onlineEvals.scorer.descriptionPlaceholder')"
               size="sm"
               :rows="3"
@@ -93,8 +98,8 @@
               <span class="scorer-field__req">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="scorer-field__lock" />
             </label>
-            <OSelect
-              v-model="form.producesScoreConfigId"
+            <OFormSelect
+              name="producesScoreConfigId"
               :options="scoreConfigOptions"
               :placeholder="t('onlineEvals.scorer.producesScoreConfigNone')"
               size="md"
@@ -132,7 +137,7 @@
         </section>
 
         <!-- Section 02: LLM Judge configuration -->
-        <section v-if="form.scorerType === 'llm_judge'" class="scorer-section">
+        <section v-if="formValues.scorerType === 'llm_judge'" class="scorer-section">
           <div class="scorer-section__head">
             <span class="scorer-section__num">02</span>
             <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.judgeSection") }}</h3>
@@ -144,8 +149,8 @@
               <span class="scorer-field__req">*</span>
             </label>
             <div class="scorer-field__row">
-              <OSelect
-                v-model="form.providerId"
+              <OFormSelect
+                name="providerId"
                 :options="providerOptions"
                 :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
                 size="md"
@@ -198,8 +203,8 @@
 
           <div class="scorer-field">
             <label class="scorer-field__label">{{ t("onlineEvals.scorer.modelLabel") }}</label>
-            <OInput
-              v-model.trim="form.model"
+            <OFormInput
+              name="model"
               :placeholder="t('onlineEvals.scorer.modelPlaceholder')"
               size="sm"
               data-test="scorer-form-model-input"
@@ -211,9 +216,8 @@
               {{ t("onlineEvals.scorer.promptLabel") }}
               <span class="scorer-field__req">*</span>
             </label>
-            <OInput
-              v-model="form.template"
-              type="textarea"
+            <OFormTextarea
+              name="template"
               size="sm"
               :rows="8"
               data-test="scorer-form-prompt-input"
@@ -239,17 +243,18 @@
           </div>
 
           <div class="scorer-field scorer-field--extras">
-            <label class="scorer-extras__toggle">
-              <input
-                v-model="form.includeReasoning"
-                type="checkbox"
-                data-test="scorer-form-include-reasoning"
-              />
-              <span>
-                <strong>{{ t("onlineEvals.scorer.includeReasoningLabel") }}</strong>
-                <small>{{ t("onlineEvals.scorer.includeReasoningHint") }}</small>
-              </span>
-            </label>
+            <OFormCheckbox
+              name="includeReasoning"
+              class="scorer-extras__toggle"
+              data-test="scorer-form-include-reasoning"
+            >
+              <template #label>
+                <span>
+                  <strong>{{ t("onlineEvals.scorer.includeReasoningLabel") }}</strong>
+                  <small>{{ t("onlineEvals.scorer.includeReasoningHint") }}</small>
+                </span>
+              </template>
+            </OFormCheckbox>
 
             <div class="scorer-extras__head">
               <div class="scorer-extras__head-text">
@@ -262,7 +267,7 @@
             </div>
 
             <div
-              v-if="form.extraMetadataFields.length"
+              v-if="formValues.extraMetadataFields.length"
               class="scorer-extras__table"
               data-test="scorer-form-extra-fields"
             >
@@ -273,25 +278,25 @@
                 <span aria-hidden="true" />
               </div>
               <div
-                v-for="(field, idx) in form.extraMetadataFields"
+                v-for="(field, idx) in formValues.extraMetadataFields"
                 :key="idx"
                 class="scorer-extras__row"
               >
-                <OInput
-                  v-model.trim="field.name"
+                <OFormInput
+                  :name="`extraMetadataFields[${idx}].name`"
                   size="sm"
                   :placeholder="t('onlineEvals.scorer.extraFields.namePlaceholder')"
                   :class="{ 'has-error': field.name && extraFieldNameDuplicates.has(field.name) }"
                   :data-test="`scorer-form-extra-field-name-${idx}`"
                 />
-                <OSelect
-                  v-model="field.type"
+                <OFormSelect
+                  :name="`extraMetadataFields[${idx}].type`"
                   size="sm"
                   :options="extraFieldTypeOptions"
                   :data-test="`scorer-form-extra-field-type-${idx}`"
                 />
-                <OInput
-                  v-model="field.description"
+                <OFormInput
+                  :name="`extraMetadataFields[${idx}].description`"
                   size="sm"
                   :placeholder="t('onlineEvals.scorer.extraFields.descriptionPlaceholder')"
                   :data-test="`scorer-form-extra-field-description-${idx}`"
@@ -312,13 +317,13 @@
               <button
                 type="button"
                 class="scorer-extras__add"
-                :disabled="form.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
+                :disabled="formValues.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
                 data-test="scorer-form-extra-field-add"
                 @click="addExtraField"
               >
                 {{ t("onlineEvals.scorer.extraFields.addButton") }}
                 <span class="scorer-extras__count">
-                  ({{ form.extraMetadataFields.length }} / {{ MAX_EXTRA_FIELDS }})
+                  ({{ formValues.extraMetadataFields.length }} / {{ MAX_EXTRA_FIELDS }})
                 </span>
               </button>
 
@@ -348,15 +353,15 @@
               <span class="scorer-field__req">*</span>
             </label>
             <div class="scorer-url-bar">
-              <OSelect
-                v-model="form.httpMethod"
+              <OFormSelect
+                name="httpMethod"
                 size="md"
                 :options="httpMethodOptions"
                 :searchable="false"
                 data-test="scorer-form-remote-method-select"
               />
-              <OInput
-                v-model.trim="form.remoteEndpoint"
+              <OFormInput
+                name="remoteEndpoint"
                 :placeholder="t('onlineEvals.scorer.remoteEndpointPlaceholder')"
                 size="sm"
                 data-test="scorer-form-remote-endpoint-input"
@@ -369,8 +374,8 @@
               <label class="scorer-field__label">
                 {{ t("onlineEvals.scorer.remoteTimeoutLabel") }}
               </label>
-              <OInput
-                v-model.number="form.timeoutMs"
+              <OFormInput
+                name="timeoutMs"
                 type="number"
                 size="sm"
                 :min="0"
@@ -381,8 +386,8 @@
               <label class="scorer-field__label">
                 {{ t("onlineEvals.scorer.remoteRetriesLabel") }}
               </label>
-              <OInput
-                v-model.number="form.maxRetries"
+              <OFormInput
+                name="maxRetries"
                 type="number"
                 size="sm"
                 :min="0"
@@ -393,8 +398,8 @@
               <label class="scorer-field__label">
                 {{ t("onlineEvals.scorer.remoteBackoffLabel") }}
               </label>
-              <OSelect
-                v-model="form.backoffStrategy"
+              <OFormSelect
+                name="backoffStrategy"
                 size="md"
                 :options="backoffOptions"
                 :searchable="false"
@@ -405,7 +410,7 @@
         </section>
 
         <!-- Section 03: Authentication -->
-        <section v-if="form.scorerType === 'remote'" class="scorer-section">
+        <section v-if="formValues.scorerType === 'remote'" class="scorer-section">
           <div class="scorer-section__head">
             <span class="scorer-section__num">03</span>
             <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.authSection") }}</h3>
@@ -415,8 +420,8 @@
             <label class="scorer-field__label">
               {{ t("onlineEvals.scorer.remoteAuthLabel") }}
             </label>
-            <OSelect
-              v-model="form.authType"
+            <OFormSelect
+              name="authType"
               size="md"
               :options="authTypeOptions"
               :searchable="false"
@@ -425,13 +430,13 @@
             />
           </div>
 
-          <div v-if="form.authType === 'bearer'" class="scorer-field">
+          <div v-if="formValues.authType === 'bearer'" class="scorer-field">
             <label class="scorer-field__label">
               {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
               <span class="scorer-field__req">*</span>
             </label>
-            <OInput
-              v-model.trim="form.authBearerToken"
+            <OFormInput
+              name="authBearerToken"
               :placeholder="t('onlineEvals.scorer.remoteAuth.bearerTokenPlaceholder')"
               size="sm"
               type="password"
@@ -442,14 +447,14 @@
             </div>
           </div>
 
-          <div v-if="form.authType === 'basic'" class="scorer-field scorer-field--row">
+          <div v-if="formValues.authType === 'basic'" class="scorer-field scorer-field--row">
             <div class="scorer-field__half">
               <label class="scorer-field__label">
                 {{ t("onlineEvals.scorer.remoteAuth.usernameLabel") }}
                 <span class="scorer-field__req">*</span>
               </label>
-              <OInput
-                v-model.trim="form.authBasicUsername"
+              <OFormInput
+                name="authBasicUsername"
                 :placeholder="t('onlineEvals.scorer.remoteAuth.basicUsernamePlaceholder')"
                 size="sm"
                 data-test="scorer-form-remote-auth-basic-username"
@@ -460,8 +465,8 @@
                 {{ t("onlineEvals.scorer.remoteAuth.passwordLabel") }}
                 <span class="scorer-field__req">*</span>
               </label>
-              <OInput
-                v-model.trim="form.authBasicPassword"
+              <OFormInput
+                name="authBasicPassword"
                 :placeholder="t('onlineEvals.scorer.remoteAuth.basicPasswordPlaceholder')"
                 size="sm"
                 type="password"
@@ -473,14 +478,14 @@
             </div>
           </div>
 
-          <div v-if="form.authType === 'api_key'" class="scorer-field scorer-field--row">
+          <div v-if="formValues.authType === 'api_key'" class="scorer-field scorer-field--row">
             <div class="scorer-field__half">
               <label class="scorer-field__label">
                 {{ t("onlineEvals.scorer.remoteAuth.headerNameLabel") }}
                 <span class="scorer-field__req">*</span>
               </label>
-              <OInput
-                v-model.trim="form.authApiKeyHeaderName"
+              <OFormInput
+                name="authApiKeyHeaderName"
                 :placeholder="t('onlineEvals.scorer.remoteAuth.apiKeyHeaderPlaceholder')"
                 size="sm"
                 data-test="scorer-form-remote-auth-apikey-header"
@@ -491,8 +496,8 @@
                 {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
                 <span class="scorer-field__req">*</span>
               </label>
-              <OInput
-                v-model.trim="form.authApiKeyToken"
+              <OFormInput
+                name="authApiKeyToken"
                 :placeholder="t('onlineEvals.scorer.remoteAuth.apiKeyTokenPlaceholder')"
                 size="sm"
                 type="password"
@@ -506,7 +511,7 @@
         </section>
 
         <!-- Section 04: Custom headers -->
-        <section v-if="form.scorerType === 'remote'" class="scorer-section">
+        <section v-if="formValues.scorerType === 'remote'" class="scorer-section">
           <div class="scorer-section__head">
             <span class="scorer-section__num">04</span>
             <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.headersSection") }}</h3>
@@ -517,7 +522,7 @@
 
           <div class="scorer-field">
             <div
-              v-if="form.customHeaders.length"
+              v-if="formValues.customHeaders.length"
               class="scorer-headers"
               data-test="scorer-form-remote-headers"
             >
@@ -527,18 +532,18 @@
                 <span aria-hidden="true" />
               </div>
               <div
-                v-for="(header, idx) in form.customHeaders"
+                v-for="(header, idx) in formValues.customHeaders"
                 :key="idx"
                 class="scorer-headers__row"
               >
-                <OInput
-                  v-model.trim="header.key"
+                <OFormInput
+                  :name="`customHeaders[${idx}].key`"
                   size="sm"
                   :placeholder="t('onlineEvals.scorer.remoteHeaders.keyPlaceholder')"
                   :data-test="`scorer-form-remote-header-key-${idx}`"
                 />
-                <OInput
-                  v-model="header.value"
+                <OFormInput
+                  :name="`customHeaders[${idx}].value`"
                   size="sm"
                   :placeholder="t('onlineEvals.scorer.remoteHeaders.valuePlaceholder')"
                   :data-test="`scorer-form-remote-header-value-${idx}`"
@@ -569,7 +574,7 @@
         </section>
 
         <!-- Section 05: Request body template -->
-        <section v-if="form.scorerType === 'remote'" class="scorer-section">
+        <section v-if="formValues.scorerType === 'remote'" class="scorer-section">
           <div class="scorer-section__head">
             <span class="scorer-section__num">05</span>
             <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.requestBodySection") }}</h3>
@@ -580,9 +585,8 @@
               {{ t("onlineEvals.scorer.requestBodyLabel") }}
               <span class="scorer-field__req">*</span>
             </label>
-            <OInput
-              v-model="form.template"
-              type="textarea"
+            <OFormTextarea
+              name="template"
               size="sm"
               :rows="10"
               data-test="scorer-form-request-body-input"
@@ -619,6 +623,7 @@
         type="button"
         variant="outline"
         size="sm-action"
+        :disabled="isSubmitting"
         @click="$emit('cancel')"
       >
         {{ t("onlineEvals.buttons.cancel") }}
@@ -628,7 +633,7 @@
         type="submit"
         variant="primary"
         size="sm-action"
-        :loading="isSaving"
+        :loading="isSubmitting"
       >
         {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
       </OButton>
@@ -674,7 +679,7 @@
         </div>
       </template>
     </ODialog>
-  </form>
+  </OForm>
 </template>
 
 <script setup lang="ts">
@@ -682,8 +687,12 @@ import { computed, onMounted, ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
@@ -706,6 +715,10 @@ import {
 } from "../utils/evalFormat";
 import { useScorerTest } from "../composables/useScorerTest";
 import ScorerTestPanel from "./scorer/ScorerTestPanel.vue";
+import {
+  makeScorerFormSchema,
+  type ScorerForm,
+} from "./ScorerFormPage.schema";
 
 const props = defineProps<{
   orgId: string;
@@ -726,8 +739,26 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const form = ref(initForm(props.row, props.scorerType));
-const isSaving = ref(false);
+
+// Co-located Zod schema (factory keeps messages i18n-driven). The form is
+// mounted fresh for each create/edit action, so building it once is safe.
+const scorerFormSchema = makeScorerFormSchema(t);
+
+// OWNER pattern (Rule ③): this component owns <OForm>, so it creates the form
+// with useOForm and reads it reactively via form.useStore — a SINGLE source of
+// truth, NO mirror ref and NO store.subscribe array sync. `formValues` drives
+// the parent-side reads a parent can't get from form context: the
+// `scorerType`/`authType` `v-if` sections, the previews
+// (selectedScoreConfig/selectedProvider), the duplicate-field highlight, the
+// repeatable-row arrays (extraMetadataFields/customHeaders), and the live Scorer
+// Test panel + schema-preview. Writes go through form.setFieldValue; the @submit
+// handler builds the payload from the validated `value`.
+const form = useOForm<ScorerForm>({
+  defaultValues: initForm(props.row, props.scorerType),
+  schema: scorerFormSchema,
+  onSubmit: save,
+});
+const formValues = form.useStore((s: any) => s.values as ScorerForm);
 
 const {
   scorerTestInputs,
@@ -736,16 +767,16 @@ const {
   scorerTestResult,
   scorerTestError,
   runScorerTest,
-} = useScorerTest(toRef(() => form.value.template));
+} = useScorerTest(toRef(() => formValues.value.template));
 
 const canRunScorerTest = computed(() => {
   if (!props.orgId) return false;
-  if (!form.value.name?.trim()) return false;
-  if (!form.value.template?.trim()) return false;
-  if (form.value.scorerType === "llm_judge") {
-    if (!form.value.providerId) return false;
-  } else if (form.value.scorerType === "remote") {
-    if (!form.value.remoteEndpoint?.trim()) return false;
+  if (!formValues.value.name?.trim()) return false;
+  if (!formValues.value.template?.trim()) return false;
+  if (formValues.value.scorerType === "llm_judge") {
+    if (!formValues.value.providerId) return false;
+  } else if (formValues.value.scorerType === "remote") {
+    if (!formValues.value.remoteEndpoint?.trim()) return false;
   }
   if (scorerTestVariables.value.length === 0) return false;
   return scorerTestVariables.value.every((variable) =>
@@ -754,16 +785,16 @@ const canRunScorerTest = computed(() => {
 });
 
 function buildScorerTestPayload() {
-  const isLlmJudge = form.value.scorerType === "llm_judge";
+  const isLlmJudge = formValues.value.scorerType === "llm_judge";
   const scoreConfigRef: Record<string, any> = {};
-  if (form.value.producesScoreConfigId) {
-    scoreConfigRef.producesScoreConfigId = form.value.producesScoreConfigId;
+  if (formValues.value.producesScoreConfigId) {
+    scoreConfigRef.producesScoreConfigId = formValues.value.producesScoreConfigId;
     if (
-      form.value.pinScoreConfigVersion &&
-      form.value.producesScoreConfigVersion
+      formValues.value.pinScoreConfigVersion &&
+      formValues.value.producesScoreConfigVersion
     ) {
       scoreConfigRef.producesScoreConfigVersion = Number(
-        form.value.producesScoreConfigVersion,
+        formValues.value.producesScoreConfigVersion,
       );
     }
   }
@@ -772,11 +803,11 @@ function buildScorerTestPayload() {
     ? {
         type: "llm_judge" as const,
         ...scoreConfigRef,
-        template: form.value.template,
+        template: formValues.value.template,
         params: {
-          provider_id: form.value.providerId,
-          ...(form.value.model ? { model: form.value.model } : {}),
-          include_reasoning: form.value.includeReasoning,
+          provider_id: formValues.value.providerId,
+          ...(formValues.value.model.trim() ? { model: formValues.value.model.trim() } : {}),
+          include_reasoning: formValues.value.includeReasoning,
           ...(cleanedExtraFields.value.length
             ? { extra_metadata_fields: cleanedExtraFields.value }
             : {}),
@@ -785,14 +816,14 @@ function buildScorerTestPayload() {
     : {
         type: "remote" as const,
         ...scoreConfigRef,
-        template: form.value.template,
-        params: buildRemoteParams(),
+        template: formValues.value.template,
+        params: buildRemoteParams(formValues.value),
       };
 
   return {
-    name: form.value.name.trim(),
-    ...(form.value.description?.trim()
-      ? { description: form.value.description.trim() }
+    name: formValues.value.name.trim(),
+    ...(formValues.value.description?.trim()
+      ? { description: formValues.value.description.trim() }
       : {}),
     scorer,
     inputVariables: { ...scorerTestInputs.value },
@@ -828,58 +859,37 @@ const backoffOptions = computed(() => [
   { label: t("onlineEvals.scorer.remoteBackoff.fixed"), value: "fixed" },
 ]);
 
+// Custom headers are a FORM-OWNED field-array — add/remove operate directly on
+// the one form (the single source of truth); the template v-for + build helpers
+// read it back via `formValues`.
 function addCustomHeader() {
-  form.value.customHeaders.push({ key: "", value: "" });
+  const cur = formValues.value.customHeaders;
+  form.setFieldValue("customHeaders", [...cur, { key: "", value: "" }], {
+    dontUpdateMeta: true,
+  });
 }
 
 function removeCustomHeader(index: number) {
-  form.value.customHeaders.splice(index, 1);
+  const cur = formValues.value.customHeaders;
+  form.setFieldValue(
+    "customHeaders",
+    cur.filter((_, i) => i !== index),
+    { dontUpdateMeta: true },
+  );
 }
 
-const cleanedCustomHeaders = computed(() =>
-  form.value.customHeaders
+// Pure cleaners — used reactively against the read-mirror (the computeds below,
+// for the live duplicate-name highlight + the Test panel) AND at @submit against
+// the validated `value`. They take their source so the @submit handler never
+// reads the mirror.
+function cleanHeaders(headers: CustomHeader[]) {
+  return headers
     .map((h) => ({ key: h.key.trim(), value: h.value }))
-    .filter((h) => h.key.length > 0),
-);
-
-function buildAuthPayload(): Record<string, any> | null {
-  const t = form.value.authType;
-  if (t === "bearer") {
-    const token = form.value.authBearerToken.trim();
-    if (!token) return null;
-    return { type: "bearer", token };
-  }
-  if (t === "basic") {
-    const username = form.value.authBasicUsername.trim();
-    const password = form.value.authBasicPassword;
-    if (!username || !password) return null;
-    return { type: "basic", username, password };
-  }
-  if (t === "api_key") {
-    const token = form.value.authApiKeyToken.trim();
-    const headerName = form.value.authApiKeyHeaderName.trim();
-    if (!token || !headerName) return null;
-    return { type: "api_key", token, header_name: headerName };
-  }
-  return null;
+    .filter((h) => h.key.length > 0);
 }
 
-function buildRemoteParams(): Record<string, any> {
-  const params: Record<string, any> = {
-    endpoint: form.value.remoteEndpoint,
-    http_method: form.value.httpMethod || DEFAULT_HTTP_METHOD,
-    timeout_ms: Number(form.value.timeoutMs) || DEFAULT_TIMEOUT_MS,
-  };
-  const retries = Number(form.value.maxRetries);
-  if (Number.isFinite(retries) && retries > 0) params.max_retries = retries;
-  const auth = buildAuthPayload();
-  if (auth) params.auth = auth;
-  if (cleanedCustomHeaders.value.length) params.custom_headers = cleanedCustomHeaders.value;
-  return params;
-}
-
-const cleanedExtraFields = computed<ExtraMetadataField[]>(() =>
-  form.value.extraMetadataFields
+function cleanExtraFields(fields: ExtraMetadataField[]): ExtraMetadataField[] {
+  return fields
     .map((field) => ({
       name: field.name.trim(),
       type: field.type,
@@ -890,8 +900,52 @@ const cleanedExtraFields = computed<ExtraMetadataField[]>(() =>
       name: field.name,
       type: field.type,
       ...(field.description ? { description: field.description } : {}),
-    })),
+    }));
+}
+
+const cleanedCustomHeaders = computed(() => cleanHeaders(formValues.value.customHeaders));
+const cleanedExtraFields = computed<ExtraMetadataField[]>(() =>
+  cleanExtraFields(formValues.value.extraMetadataFields),
 );
+
+// Builds the remote `auth` / `params` from a SOURCE object — the live `form`
+// mirror for the Test panel, or the validated `value` at @submit.
+function buildAuthPayload(src: ScorerForm): Record<string, any> | null {
+  const kind = src.authType;
+  if (kind === "bearer") {
+    const token = src.authBearerToken.trim();
+    if (!token) return null;
+    return { type: "bearer", token };
+  }
+  if (kind === "basic") {
+    const username = src.authBasicUsername.trim();
+    const password = src.authBasicPassword;
+    if (!username || !password) return null;
+    return { type: "basic", username, password };
+  }
+  if (kind === "api_key") {
+    const token = src.authApiKeyToken.trim();
+    const headerName = src.authApiKeyHeaderName.trim();
+    if (!token || !headerName) return null;
+    return { type: "api_key", token, header_name: headerName };
+  }
+  return null;
+}
+
+function buildRemoteParams(src: ScorerForm): Record<string, any> {
+  const params: Record<string, any> = {
+    endpoint: src.remoteEndpoint,
+    http_method: src.httpMethod || DEFAULT_HTTP_METHOD,
+    timeout_ms: Number(src.timeoutMs) || DEFAULT_TIMEOUT_MS,
+  };
+  const retries = Number(src.maxRetries);
+  if (Number.isFinite(retries) && retries > 0) params.max_retries = retries;
+  const auth = buildAuthPayload(src);
+  if (auth) params.auth = auth;
+  const headers = cleanHeaders(src.customHeaders);
+  if (headers.length) params.custom_headers = headers;
+  return params;
+}
 
 const extraFieldNameDuplicates = computed(() => {
   const seen = new Map<string, number>();
@@ -905,13 +959,24 @@ const extraFieldNameDuplicates = computed(() => {
   );
 });
 
+// Extra-metadata fields are a FORM-OWNED field-array — see addCustomHeader.
 function addExtraField() {
-  if (form.value.extraMetadataFields.length >= MAX_EXTRA_FIELDS) return;
-  form.value.extraMetadataFields.push({ name: "", type: "string", description: "" });
+  const cur = formValues.value.extraMetadataFields;
+  if (cur.length >= MAX_EXTRA_FIELDS) return;
+  form.setFieldValue(
+    "extraMetadataFields",
+    [...cur, { name: "", type: "string", description: "" }],
+    { dontUpdateMeta: true },
+  );
 }
 
 function removeExtraField(index: number) {
-  form.value.extraMetadataFields.splice(index, 1);
+  const cur = formValues.value.extraMetadataFields;
+  form.setFieldValue(
+    "extraMetadataFields",
+    cur.filter((_, i) => i !== index),
+    { dontUpdateMeta: true },
+  );
 }
 
 const schemaPreview = ref<string>("");
@@ -952,13 +1017,13 @@ async function previewOutputSchema() {
     const data = await onlineEvalsService.scorers.previewLlmJudgeOutputSchema(
       props.orgId,
       {
-        ...(form.value.producesScoreConfigId
-          ? { producesScoreConfigId: form.value.producesScoreConfigId }
+        ...(formValues.value.producesScoreConfigId
+          ? { producesScoreConfigId: formValues.value.producesScoreConfigId }
           : {}),
-        ...(form.value.pinScoreConfigVersion && form.value.producesScoreConfigVersion
-          ? { producesScoreConfigVersion: Number(form.value.producesScoreConfigVersion) }
+        ...(formValues.value.pinScoreConfigVersion && formValues.value.producesScoreConfigVersion
+          ? { producesScoreConfigVersion: Number(formValues.value.producesScoreConfigVersion) }
           : {}),
-        includeReasoning: form.value.includeReasoning,
+        includeReasoning: formValues.value.includeReasoning,
         extraMetadataFields: cleanedExtraFields.value,
       },
     );
@@ -974,7 +1039,7 @@ async function previewOutputSchema() {
 }
 
 const titleText = computed(() => {
-  const isRemote = form.value.scorerType === "remote";
+  const isRemote = formValues.value.scorerType === "remote";
   if (props.mode === "create") {
     return isRemote
       ? t("onlineEvals.scorer.createTitleRemote")
@@ -1000,7 +1065,7 @@ const providerOptions = computed(() =>
 );
 
 const selectedScoreConfig = computed(() =>
-  props.scoreConfigs.find((c) => entityId(c) === form.value.producesScoreConfigId) || null,
+  props.scoreConfigs.find((c) => entityId(c) === formValues.value.producesScoreConfigId) || null,
 );
 
 const selectedRange = computed(() => {
@@ -1042,13 +1107,13 @@ const selectedHealthy = computed(() => {
 });
 
 const selectedProvider = computed(
-  () => props.providers.find((p) => p.id === form.value.providerId) || null,
+  () => props.providers.find((p) => p.id === formValues.value.providerId) || null,
 );
 
-const promptVariables = computed(() => extractTemplateVariables(form.value.template || ""));
+const promptVariables = computed(() => extractTemplateVariables(formValues.value.template || ""));
 
 onMounted(() => {
-  if (props.mode === "edit" && form.value.producesScoreConfigId) {
+  if (props.mode === "edit" && formValues.value.producesScoreConfigId) {
     void prepareSelectedScoreConfigVersion(true);
   }
 });
@@ -1111,7 +1176,7 @@ function readCustomHeaders(rawHeaders: any): CustomHeader[] {
     .map((h) => ({ key: String(h.key || ""), value: String(h.value || "") }));
 }
 
-function initForm(row: Scorer | null, scorerType: ScorerType) {
+function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
   if (!row) {
     return {
       name: "",
@@ -1193,13 +1258,13 @@ function providerHostFallback(provider: Provider) {
 }
 
 async function handleScoreConfigSelection() {
-  form.value.pinScoreConfigVersion = false;
-  form.value.producesScoreConfigVersion = "";
+  form.setFieldValue("pinScoreConfigVersion", false);
+  form.setFieldValue("producesScoreConfigVersion", "");
   await prepareSelectedScoreConfigVersion(false);
 }
 
 async function prepareSelectedScoreConfigVersion(keepSelectedVersion: boolean) {
-  const selectedId = form.value.producesScoreConfigId;
+  const selectedId = formValues.value.producesScoreConfigId;
   if (!selectedId) return;
 
   emit("request-versions", selectedId);
@@ -1209,58 +1274,66 @@ async function prepareSelectedScoreConfigVersion(keepSelectedVersion: boolean) {
   const latestVersion = versions?.[0]?.version;
   if (!latestVersion) return;
 
-  const currentVersion = form.value.producesScoreConfigVersion;
+  const currentVersion = formValues.value.producesScoreConfigVersion;
   const selectedVersionExists =
     Array.isArray(versions) && versions.some((c) => String(c.version) === currentVersion);
 
   if (!keepSelectedVersion || !currentVersion || !selectedVersionExists) {
-    form.value.producesScoreConfigVersion = String(latestVersion);
+    form.setFieldValue("producesScoreConfigVersion", String(latestVersion));
   }
 }
 
-async function save() {
+// @submit handler — OForm only calls this once the whole schema passes (incl.
+// the conditional auth/provider/endpoint requireds + extra-field uniqueness), so
+// the schema (not a manual guard) gates the save. The entangled `form` mirror is
+// schema-synced, so the existing build helpers read from it unchanged; OForm
+// awaits this promise → the Save spinner spans the save (no manual `isSaving`).
+async function save(value: ScorerForm) {
   if (!props.orgId) return;
-  isSaving.value = true;
   try {
-    const isLlmJudge = form.value.scorerType === "llm_judge";
+    const isLlmJudge = value.scorerType === "llm_judge";
+    // producesScoreConfigVersion / pinScoreConfigVersion are set programmatically
+    // (handleScoreConfigSelection / version-prep) but they ARE schema fields, so
+    // the validated `value` carries them — read the single source of truth.
     const scoreConfigRef = {
-      producesScoreConfigId: form.value.producesScoreConfigId || null,
+      producesScoreConfigId: value.producesScoreConfigId || null,
       producesScoreConfigVersion:
-        form.value.pinScoreConfigVersion && form.value.producesScoreConfigVersion
-          ? Number(form.value.producesScoreConfigVersion)
+        value.pinScoreConfigVersion && value.producesScoreConfigVersion
+          ? Number(value.producesScoreConfigVersion)
           : null,
     };
+    const extraFields = cleanExtraFields(value.extraMetadataFields);
     const scorerPayload: Record<string, any> = isLlmJudge
       ? {
           type: "llm_judge",
           ...scoreConfigRef,
-          template: form.value.template,
+          template: value.template,
           params: {
-            provider_id: form.value.providerId,
-            ...(form.value.model ? { model: form.value.model } : {}),
-            include_reasoning: form.value.includeReasoning,
-            ...(cleanedExtraFields.value.length
-              ? { extra_metadata_fields: cleanedExtraFields.value }
+            provider_id: value.providerId,
+            ...(value.model.trim() ? { model: value.model.trim() } : {}),
+            include_reasoning: value.includeReasoning,
+            ...(extraFields.length
+              ? { extra_metadata_fields: extraFields }
               : {}),
           },
         }
       : {
           type: "remote",
           ...scoreConfigRef,
-          template: form.value.template,
-          params: buildRemoteParams(),
+          template: value.template,
+          params: buildRemoteParams(value),
         };
 
     if (props.mode === "edit" && props.row) {
       await onlineEvalsService.scorers.update(props.orgId, entityId(props.row), {
-        name: form.value.name,
-        description: form.value.description || null,
+        name: value.name.trim(),
+        description: value.description?.trim() || null,
         scorer: scorerPayload,
       });
     } else {
       await onlineEvalsService.scorers.create(props.orgId, {
-        name: form.value.name,
-        description: form.value.description || null,
+        name: value.name.trim(),
+        description: value.description?.trim() || null,
         scorer: scorerPayload,
       });
     }
@@ -1271,8 +1344,6 @@ async function save() {
     emit("saved");
   } catch (err: any) {
     showError(err, t("onlineEvals.scorer.saveError"));
-  } finally {
-    isSaving.value = false;
   }
 }
 </script>

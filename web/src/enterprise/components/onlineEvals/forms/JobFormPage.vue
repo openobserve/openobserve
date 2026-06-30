@@ -1,5 +1,9 @@
 <template>
-  <form class="job-form" @submit.prevent="save(false)">
+  <OForm
+    class="job-form"
+    :form="form"
+    v-slot="{ isSubmitting }"
+  >
     <AppPageHeader
       :back="{
         label: t('onlineEvals.job.backTo'),
@@ -22,6 +26,7 @@
           :aria-label="t('onlineEvals.buttons.cancel')"
           :title="t('onlineEvals.buttons.cancel')"
           data-test="job-form-close-btn"
+          :disabled="isSubmitting"
           @click="$emit('cancel')"
         />
       </template>
@@ -42,8 +47,8 @@
               <span class="job-field__req">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="job-field__lock" />
             </label>
-            <OInput
-              v-model.trim="form.name"
+            <OFormInput
+              name="name"
               :placeholder="t('onlineEvals.job.namePlaceholder')"
               size="sm"
               :disabled="mode === 'edit'"
@@ -57,8 +62,8 @@
               <span class="job-field__req">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="job-field__lock" />
             </label>
-            <OSelect
-              v-model="form.stream"
+            <OFormSelect
+              name="stream"
               :options="streamOptions"
               :placeholder="t('onlineEvals.job.streamPlaceholder')"
               size="md"
@@ -69,9 +74,8 @@
 
           <div class="job-field job-field--desc">
             <label class="job-field__label">{{ t("onlineEvals.job.descriptionLabel") }}</label>
-            <OInput
-              v-model.trim="form.description"
-              type="textarea"
+            <OFormTextarea
+              name="description"
               :placeholder="t('onlineEvals.job.descriptionPlaceholder')"
               size="sm"
               :rows="3"
@@ -88,8 +92,9 @@
           </div>
 
           <JobScorerPicker
-            v-model="form.scorerIds"
+            :model-value="formValues.scorerIds"
             :scorers="scorers"
+            @update:model-value="form.setFieldValue('scorerIds', $event)"
           />
 
           <JobFilterBuilder
@@ -142,8 +147,8 @@
           <div class="job-field-row">
             <div class="job-field">
               <label class="job-field__label">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
-              <OSelect
-                v-model="form.samplingMode"
+              <OFormSelect
+                name="samplingMode"
                 :options="samplingModeOptions"
                 size="md"
                 data-test="job-form-sampling-mode-select"
@@ -154,16 +159,16 @@
             <div class="job-field">
               <label class="job-field__label">
                 {{ t("onlineEvals.job.samplingValueLabel") }}
-                <span v-if="form.samplingMode !== 'all'" class="job-field__req">*</span>
+                <span v-if="formValues.samplingMode !== 'all'" class="job-field__req">*</span>
               </label>
-              <OInput
-                v-model="form.samplingValue"
+              <OFormInput
+                name="samplingValue"
                 size="sm"
-                :disabled="form.samplingMode === 'all'"
+                :disabled="formValues.samplingMode === 'all'"
                 data-test="job-form-sampling-value-input"
               />
               <div class="job-field__help">
-                {{ form.samplingMode === 'all'
+                {{ formValues.samplingMode === 'all'
                   ? t("onlineEvals.job.samplingValueAllHelp")
                   : t("onlineEvals.job.samplingValueHelp") }}
               </div>
@@ -172,7 +177,7 @@
         </section>
       </div>
 
-      <JobPreviewPanel :name="form.name" :stream-type="form.streamType" :mode="mode" />
+      <JobPreviewPanel :name="formValues.name" :stream-type="formValues.streamType" :mode="mode" />
     </div>
 
     <footer class="job-form__foot">
@@ -181,30 +186,34 @@
         type="button"
         variant="outline"
         size="sm-action"
+        :disabled="isSubmitting"
         @click="$emit('cancel')"
       >
         {{ t("onlineEvals.buttons.cancel") }}
       </OButton>
       <template v-if="mode === 'create'">
+        <!-- Both create actions submit through the form (so Enter + schema
+             validation apply); the click sets which one before the form submit
+             fires, and loading is form-driven (isSubmitting). -->
         <OButton
           data-test="job-form-save-draft-btn"
-          type="button"
+          type="submit"
           variant="outline"
           size="sm-action"
-          :loading="isSaving && !pendingActivateOnSave"
-          :disabled="isSaving && pendingActivateOnSave"
-          @click="save(false)"
+          :loading="isSubmitting && !activateOnSave"
+          :disabled="isSubmitting && activateOnSave"
+          @click="activateOnSave = false"
         >
           {{ t("onlineEvals.buttons.saveAsDraft") }}
         </OButton>
         <OButton
           data-test="job-form-save-activate-btn"
-          type="button"
+          type="submit"
           variant="primary"
           size="sm-action"
-          :loading="isSaving && pendingActivateOnSave"
-          :disabled="isSaving && !pendingActivateOnSave"
-          @click="save(true)"
+          :loading="isSubmitting && activateOnSave"
+          :disabled="isSubmitting && !activateOnSave"
+          @click="activateOnSave = true"
         >
           {{ t("onlineEvals.buttons.createAndActivate") }}
         </OButton>
@@ -215,12 +224,12 @@
         type="submit"
         variant="primary"
         size="sm-action"
-        :loading="isSaving"
+        :loading="isSubmitting"
       >
         {{ t("onlineEvals.buttons.save") }}
       </OButton>
     </footer>
-  </form>
+  </OForm>
 </template>
 
 <script setup lang="ts">
@@ -228,8 +237,11 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import useStreams from "@/composables/useStreams";
@@ -260,6 +272,7 @@ import JobScorerPicker from "./job/JobScorerPicker.vue";
 import JobFilterBuilder from "./job/JobFilterBuilder.vue";
 import JobInputMapping from "./job/JobInputMapping.vue";
 import JobPreviewPanel from "./job/JobPreviewPanel.vue";
+import { makeJobFormSchema, type JobForm } from "./JobFormPage.schema";
 
 const props = defineProps<{
   orgId: string;
@@ -274,15 +287,37 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const form = ref(initForm(props.row));
+
+// Co-located Zod schema (factory keeps messages i18n-driven). The form is
+// mounted fresh per create/edit action, so building it once is safe.
+const jobFormSchema = makeJobFormSchema(t);
+
+// OWNER pattern (Rule ③): this component owns <OForm>, so it creates the form
+// with useOForm and reads it reactively via form.useStore — a SINGLE source of
+// truth, NO mirror ref. `formValues` drives the parent-side reads a parent can't
+// get from form context: JobPreviewPanel (name/streamType), the stream-option
+// list (stream), selectedScorers + the mapping sync (scorerIds), and the
+// sampling `v-if`/disabled (samplingMode). Writes go through form.setFieldValue
+// (the composite JobScorerPicker bridges `scorerIds` that way); the @submit
+// handler reads the validated `value`.
+const form = useOForm<JobForm>({
+  defaultValues: initForm(props.row),
+  schema: jobFormSchema,
+  onSubmit,
+});
+const formValues = form.useStore((s: any) => s.values as JobForm);
+
+// Composite / un-validated working state (built into the payload at submit) —
+// kept as local non-form state, not mirrored into the form.
 const filterGroup = ref(initFilterGroup(props.row));
 const inputMappings = ref(initInputMappings(props.row));
 const scorerVersions = ref(initScorerVersions(props.row));
-const isSaving = ref(false);
-const pendingActivateOnSave = ref(false);
+// Which create-mode submit was triggered (draft vs. create-and-activate). Set
+// on click before the form submit fires; loading is form-driven (isSubmitting).
+const activateOnSave = ref(false);
 
 const selectedScorers = computed(() =>
-  form.value.scorerIds
+  formValues.value.scorerIds
     .map((id) => props.scorers.find((scorer) => entityId(scorer) === id))
     .filter((scorer): scorer is Scorer => Boolean(scorer)),
 );
@@ -293,8 +328,8 @@ const traceStreams = ref<string[]>([]);
 const streamOptions = computed(() => {
   const opts = traceStreams.value.map((name) => ({ label: name, value: name }));
   // Ensure currently selected value is always present (e.g. on edit before list loads)
-  if (form.value.stream && !opts.some((o) => o.value === form.value.stream)) {
-    opts.unshift({ label: form.value.stream, value: form.value.stream });
+  if (formValues.value.stream && !opts.some((o) => o.value === formValues.value.stream)) {
+    opts.unshift({ label: formValues.value.stream, value: formValues.value.stream });
   }
   return opts;
 });
@@ -319,10 +354,10 @@ const samplingModeOptions = computed(() => [
   { label: t("onlineEvals.job.samplingModes.count"), value: "count" },
 ]);
 
-watch(() => form.value.scorerIds.slice(), () => syncMappings());
+watch(() => formValues.value.scorerIds.slice(), () => syncMappings());
 watch(() => props.scorers, () => syncMappings());
 
-function initForm(row: EvalJob | null) {
+function initForm(row: EvalJob | null): JobForm {
   if (!row) {
     return {
       name: "",
@@ -391,7 +426,7 @@ function applyPreset(preset: "rootSpans" | "llmCalls" | "toolCalls") {
 
 function syncMappings() {
   const { nextMappings, nextVersions } = syncJobInputMappings(
-    form.value.scorerIds,
+    formValues.value.scorerIds,
     props.scorers,
     inputMappings.value,
     scorerVersions.value,
@@ -400,28 +435,34 @@ function syncMappings() {
   scorerVersions.value = nextVersions;
 }
 
-async function save(activateAfter = false) {
+// @submit handler — OForm only calls this once the schema passes (name/stream
+// required + the sampling-value conditional), so the schema gates most fields;
+// scorerIds is guarded here as a toast (the composite picker has no inline slot).
+// The clicked create button sets `activateOnSave`; loading is form-driven
+// (isSubmitting). The validated `value` is the source of truth.
+async function onSubmit(value: JobForm) {
   if (!props.orgId) return;
-  if (!form.value.scorerIds.length) {
+  // Scorer selection is validated here, not in the schema: surface the empty
+  // case as a toast (matching the pre-migration guard) since JobScorerPicker
+  // renders no inline error.
+  if (!value.scorerIds.length) {
     showError(new Error(t("onlineEvals.job.selectAtLeastOne")), t("onlineEvals.job.saveError"));
     return;
   }
-
-  isSaving.value = true;
-  pendingActivateOnSave.value = activateAfter;
+  const activateAfter = activateOnSave.value;
   try {
     const payload = {
-      name: form.value.name,
-      description: form.value.description || null,
-      stream: form.value.stream,
-      streamType: form.value.streamType,
+      name: value.name.trim(),
+      description: value.description?.trim() || null,
+      stream: value.stream,
+      streamType: value.streamType,
       filterCondition: buildJobFilterConditionPayload(filterGroup.value),
-      scorers: form.value.scorerIds.map((id) => ({ id, version: scorerVersions.value[id] ?? null })),
-      inputMapping: buildJobInputMappingPayload(form.value.scorerIds, inputMappings.value),
-      samplingMode: form.value.samplingMode as any,
-      samplingValue: form.value.samplingMode === "all"
+      scorers: value.scorerIds.map((id) => ({ id, version: scorerVersions.value[id] ?? null })),
+      inputMapping: buildJobInputMappingPayload(value.scorerIds, inputMappings.value),
+      samplingMode: value.samplingMode as any,
+      samplingValue: value.samplingMode === "all"
         ? null
-        : parseJson(form.value.samplingValue, t("onlineEvals.job.samplingValueLabel")),
+        : parseJson(value.samplingValue ?? "", t("onlineEvals.job.samplingValueLabel")),
     };
 
     if (props.mode === "edit" && props.row) {
@@ -455,8 +496,7 @@ async function save(activateAfter = false) {
   } catch (err: any) {
     showError(err, t("onlineEvals.job.saveError"));
   } finally {
-    isSaving.value = false;
-    pendingActivateOnSave.value = false;
+    activateOnSave.value = false;
   }
 }
 </script>
