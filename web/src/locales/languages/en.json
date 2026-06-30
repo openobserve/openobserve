@@ -14,7 +14,7 @@
     },
     "noStreamSelected": {
       "title": "Select a stream to get started",
-      "description": "Choose a stream from the dropdown on the left, then press 'Run query' to start exploring. You can also apply additional filters and adjust the date range."
+      "description": "Pick a stream, then run your query to explore its data. Refine results with filters and a custom time range."
     },
     "noQueryApplied": {
       "title": "Run a query to see results",
@@ -609,6 +609,8 @@
     "streamNotExist": "The following [STREAM_NAME] stream(s) were not found. Please verify if the streams exist.",
     "noFieldFound": "No fields found for the selected stream",
     "noFieldFoundInStream": "No field found in selected stream.",
+    "quickPickStreamsLabel": "Recently active streams",
+    "quickPickMoreStreams": "Search above for {count} more",
     "regionTitle": "Select a Region",
     "userDefinedSchemaLabel": "User-Defined Schema",
     "allFieldsLabel": "All Fields",
