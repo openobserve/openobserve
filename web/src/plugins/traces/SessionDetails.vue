@@ -458,8 +458,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="copyText(turnDetail(trace.traceId)?.assistantMessage?.content)"
                     />
                   </div>
-                  <div class="tw:px-[0.75rem] tw:py-[0.625rem] tw:text-[0.8rem] tw:leading-relaxed tw:text-[var(--o2-text-primary)] tw:whitespace-pre-wrap tw:break-words tw:max-h-[16rem] tw:overflow-y-auto">
-                    {{ turnDetail(trace.traceId)?.assistantMessage?.content || t('traces.sessionDetail.noAssistantMessage') }}
+                  <!-- assistant content rendered as markdown (headings, tables,
+                       code, bold). v-html is sanitized in renderMarkdown(). -->
+                  <div
+                    v-if="turnDetail(trace.traceId)?.assistantMessage?.content"
+                    class="markdown-body tw:px-[0.75rem] tw:py-[0.625rem] tw:text-[0.8rem] tw:text-[var(--o2-text-primary)] tw:break-words tw:max-h-[16rem] tw:overflow-auto"
+                    v-html="renderMarkdown(turnDetail(trace.traceId)?.assistantMessage?.content)"
+                  />
+                  <div
+                    v-else
+                    class="tw:px-[0.75rem] tw:py-[0.625rem] tw:text-[0.8rem] tw:text-[var(--o2-text-muted)]"
+                  >
+                    {{ t('traces.sessionDetail.noAssistantMessage') }}
                   </div>
                 </div>
 
@@ -727,6 +737,8 @@ import {
   splitDuration,
   splitCost,
 } from "./llmInsightsDashboard.utils";
+import { Marked } from "marked";
+import DOMPurify from "dompurify";
 
 const { t } = useI18n();
 const route = useRoute();
@@ -1441,5 +1453,116 @@ function formatTokens(n: number): string {
   return `${tk.value}${tk.unit}`;
 }
 
+// Markdown for the assistant message (it returns GFM — headings, tables, code,
+// bold). Own Marked instance so we don't touch the app-wide `marked` config;
+// DOMPurify sanitizes before v-html. Same approach as LLMContentRenderer.
+const md = new Marked({ gfm: true, breaks: false });
+function renderMarkdown(content: string | null | undefined): string {
+  if (!content) return "";
+  return DOMPurify.sanitize(md.parse(content) as string);
+}
+
 onMounted(load);
 </script>
+
+<style scoped lang="scss">
+/* Markdown styling for the assistant message (v-html). Scoped CSS is the one
+   sanctioned case (§5a): you can't target innerHTML-injected elements with
+   Tailwind utility classes, so `:deep()` rules are used. All colours map to
+   --o2-* tokens so it adapts to the theme. */
+.markdown-body {
+  line-height: 1.55;
+
+  :deep(> *:first-child) {
+    margin-top: 0;
+  }
+  :deep(> *:last-child) {
+    margin-bottom: 0;
+  }
+  :deep(p) {
+    margin: 0 0 0.5rem;
+  }
+  :deep(h1),
+  :deep(h2),
+  :deep(h3),
+  :deep(h4) {
+    font-weight: 650;
+    margin: 0.75rem 0 0.35rem;
+    line-height: 1.3;
+  }
+  :deep(h1) {
+    font-size: 1.05rem;
+  }
+  :deep(h2) {
+    font-size: 0.95rem;
+  }
+  :deep(h3) {
+    font-size: 0.875rem;
+  }
+  :deep(h4) {
+    font-size: 0.8rem;
+  }
+  :deep(ul),
+  :deep(ol) {
+    margin: 0.4rem 0;
+    padding-left: 1.25rem;
+  }
+  :deep(li) {
+    margin: 0.15rem 0;
+  }
+  :deep(a) {
+    color: var(--o2-interactive-primary, #3b82f6);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  :deep(code) {
+    font-family: monospace;
+    font-size: 0.72rem;
+    background: color-mix(in srgb, var(--o2-text-primary) 8%, transparent);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+  }
+  :deep(pre) {
+    background: color-mix(in srgb, var(--o2-text-primary) 5%, transparent);
+    border: 1px solid var(--o2-border-color);
+    padding: 0.5rem 0.625rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 0.5rem 0;
+  }
+  :deep(pre code) {
+    background: transparent;
+    padding: 0;
+  }
+  :deep(blockquote) {
+    border-left: 3px solid var(--o2-border-color);
+    margin: 0.5rem 0;
+    padding-left: 0.75rem;
+    color: var(--o2-text-secondary);
+  }
+  :deep(table) {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.5rem 0;
+    font-size: 0.72rem;
+  }
+  :deep(th),
+  :deep(td) {
+    border: 1px solid var(--o2-border-color);
+    padding: 0.3rem 0.5rem;
+    text-align: left;
+  }
+  :deep(th) {
+    background: color-mix(in srgb, var(--o2-text-primary) 6%, transparent);
+    font-weight: 600;
+  }
+  :deep(hr) {
+    border: none;
+    border-top: 1px solid var(--o2-border-color);
+    margin: 0.625rem 0;
+  }
+}
+</style>
