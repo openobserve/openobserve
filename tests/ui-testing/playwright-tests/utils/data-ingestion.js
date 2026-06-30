@@ -225,6 +225,70 @@ async function waitForStreamData(page, streamName, expectedMinCount = 1, maxWait
   return false;
 }
 
+/**
+ * Polls the search API until a specific field value is searchable in a stream.
+ * Use this as a readiness gate after ingesting a unique value into a SHARED stream
+ * (e.g. e2e_automate) before driving the UI: freshly-ingested data is not queryable
+ * immediately (WAL -> index lag), so the field-values panel can return stale/other
+ * values and miss the just-ingested one. Waiting on the actual value (not just a row
+ * count) guarantees the value is present before the UI assertion runs.
+ * @param {import('@playwright/test').Page} page - Playwright page object
+ * @param {string} streamName - Name of the stream to check
+ * @param {string} fieldName - Field to filter on (e.g. "service_name")
+ * @param {string} fieldValue - Exact value that must be searchable
+ * @param {number} maxWaitMs - Maximum wait time in ms (default: 30000)
+ * @param {number} pollIntervalMs - Polling interval in ms (default: 2000)
+ * @returns {Promise<boolean>} - True if the value became searchable, false if timed out
+ */
+async function waitForFieldValueSearchable(page, streamName, fieldName, fieldValue, maxWaitMs = 30000, pollIntervalMs = 2000) {
+  const orgId = getOrgIdentifier();
+  const headers = getHeaders();
+  const baseUrl = process.env.INGESTION_URL.endsWith('/')
+    ? process.env.INGESTION_URL.slice(0, -1)
+    : process.env.INGESTION_URL;
+
+  const startTime = Date.now();
+  // Escape single quotes to keep the SQL literal well-formed.
+  const safeValue = String(fieldValue).replace(/'/g, "''");
+  const searchPayload = {
+    query: {
+      sql: `SELECT COUNT(*) as count FROM "${streamName}" WHERE ${fieldName} = '${safeValue}'`,
+      start_time: (Date.now() - 3600000) * 1000, // 1 hour ago in microseconds
+      end_time: Date.now() * 1000,
+      from: 0,
+      size: 1
+    }
+  };
+
+  while (Date.now() - startTime < maxWaitMs) {
+    try {
+      // end_time must advance each poll so newly-ingested records fall inside the window.
+      searchPayload.query.end_time = Date.now() * 1000;
+      const response = await page.request.post(`${baseUrl}/api/${orgId}/_search?type=logs`, {
+        headers: headers,
+        data: searchPayload
+      });
+
+      if (response.status() === 200) {
+        const data = await response.json().catch(() => null);
+        const count = data?.hits?.[0]?.count || 0;
+        if (count >= 1) {
+          testLogger.debug('Field value searchable', { streamName, fieldName, fieldValue, count, waitedMs: Date.now() - startTime });
+          return true;
+        }
+        testLogger.debug('Polling for field value', { streamName, fieldName, fieldValue });
+      }
+    } catch (e) {
+      testLogger.debug('Field value poll error', { error: e.message, streamName, fieldName });
+    }
+
+    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+  }
+
+  testLogger.warn('Field value poll timed out', { streamName, fieldName, fieldValue, maxWaitMs });
+  return false;
+}
+
 module.exports = {
   ingestTestData,
   getHeaders,
@@ -232,5 +296,6 @@ module.exports = {
   sendRequest,
   ingestCustomData,
   enableLogPatternsExtraction,
-  waitForStreamData
+  waitForStreamData,
+  waitForFieldValueSearchable
 };
