@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        (the slotted chip). Wrapper is `display:contents` so it adds no box. -->
   <span class="tw:contents">
     <slot />
-    <OTooltip side="top" :delay="120" max-width="260px" content-class="tw:p-0!">
+    <OTooltip :side="side" :delay="120" max-width="260px" content-class="tw:p-0!">
       <template #content>
         <div
           class="tw:w-[252px] tw:py-[11px] tw:px-3 tw:text-xs tw:text-[var(--o2-text-primary)]"
@@ -101,14 +101,20 @@ import {
   splitDuration,
 } from "./llmInsightsDashboard.utils";
 
-const props = defineProps<{
-  /** The turn whose metrics the card shows. */
-  turn: SessionTraceRow;
-  /** Zero-based turn index — display number is `index + 1`. */
-  index: number;
-  /** Cache-hit percentage (placeholder until cache metrics exist). */
-  cachePct: number;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** The turn whose metrics the card shows. */
+    turn: SessionTraceRow;
+    /** Zero-based turn index — display number is `index + 1`. */
+    index: number;
+    /** Cache-hit percentage (placeholder until cache metrics exist). */
+    cachePct: number;
+    /** Which side the preview opens on. Default "top" (KPI chips); the rail rows
+     *  pass "right" so the card doesn't cover the rows above it. */
+    side?: "top" | "right" | "bottom" | "left";
+  }>(),
+  { side: "top" },
+);
 
 const { t } = useI18n();
 

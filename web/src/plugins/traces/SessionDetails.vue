@@ -590,10 +590,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <OIcon name="chevron-right" size="xs" class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0" />
               </button>
-              <!-- Hover: which turns this (deduped) tool actually ran in. side="top"
-                   matches the other rail hovers (TurnPreviewCard) so it pops above
-                   the row instead of floating left over the conversation. -->
-              <OTooltip side="top" :delay="120" max-width="220px" content-class="tw:p-0!">
+              <!-- Hover: which turns this (deduped) tool actually ran in. side="left"
+                   (like the Cost/Slowest hovers) so it opens to the side instead of
+                   covering the rows above it. -->
+              <OTooltip side="left" :delay="120" max-width="220px" content-class="tw:p-0!">
                 <template #content>
                   <div class="tw:w-[200px] tw:py-[9px] tw:px-3 tw:text-xs tw:text-[var(--o2-text-primary)]">
                     <div class="tw:font-bold tw:mb-[2px] tw:break-words">{{ row.name }}</div>
@@ -635,6 +635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :turn="traces[row.n - 1]"
               :index="row.n - 1"
               :cache-pct="cacheRatio"
+              side="right"
             >
               <button
                 class="tw:flex tw:items-center tw:gap-[0.5rem] tw:w-full tw:px-[0.4rem] tw:py-[0.35rem] tw:rounded-md tw:text-left tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
@@ -678,6 +679,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :turn="traces[row.n - 1]"
               :index="row.n - 1"
               :cache-pct="cacheRatio"
+              side="right"
             >
               <button
                 class="tw:flex tw:items-center tw:gap-[0.5rem] tw:w-full tw:px-[0.4rem] tw:py-[0.35rem] tw:rounded-md tw:text-left tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
