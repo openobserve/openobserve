@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::synthetics::{
-    BrowserConfig, ListSyntheticsParams, MonitorSettings, Synthetic, SyntheticFrequency,
+    BrowserConfig, ListSyntheticsParams, Synthetic, SyntheticFrequency, SyntheticSettings,
     SyntheticStatus, SyntheticType,
 };
 use sea_orm::{
@@ -32,10 +32,13 @@ impl TryFrom<synthetics_monitors::Model> for Synthetic {
 
     fn try_from(m: synthetics_monitors::Model) -> Result<Self, Self::Error> {
         let monitor_type: SyntheticType = serde_json::from_value(serde_json::Value::String(
-            m.monitor_type.clone(),
+            m.synthetics_type.clone(),
         ))
         .map_err(|e| {
-            errors::Error::Message(format!("invalid monitor_type '{}': {e}", m.monitor_type))
+            errors::Error::Message(format!(
+                "invalid synthetics_type '{}': {e}",
+                m.synthetics_type
+            ))
         })?;
 
         let locations: Vec<String> = serde_json::from_value(m.locations)
@@ -48,7 +51,7 @@ impl TryFrom<synthetics_monitors::Model> for Synthetic {
 
         let frequency: SyntheticFrequency = serde_json::from_value(m.frequency).unwrap_or_default();
 
-        let settings: MonitorSettings = serde_json::from_value(m.settings).unwrap_or_default();
+        let settings: SyntheticSettings = serde_json::from_value(m.settings).unwrap_or_default();
 
         let last_check_status: SyntheticStatus =
             serde_json::from_value(serde_json::Value::String(m.last_check_status))
@@ -138,7 +141,7 @@ pub async fn create<C: TransactionTrait>(
     am.id = Set(id);
     am.org_id = Set(org_id.to_owned());
     am.folder_id = Set(monitor.folder_id.clone());
-    am.monitor_type = Set(monitor_type_to_str(&monitor.monitor_type).to_owned());
+    am.synthetics_type = Set(monitor_type_to_str(&monitor.monitor_type).to_owned());
     am.created_at = Set(now);
     am.updated_at = Set(now);
     am.next_run_at = Set(monitor.start.unwrap_or(0));
@@ -194,7 +197,7 @@ pub async fn put<C: TransactionTrait>(
             am.id = Set(monitor.id.clone());
             am.org_id = Set(org_id.to_owned());
             am.folder_id = Set(monitor.folder_id.clone());
-            am.monitor_type = Set(monitor_type_to_str(&monitor.monitor_type).to_owned());
+            am.synthetics_type = Set(monitor_type_to_str(&monitor.monitor_type).to_owned());
             am.created_at = Set(now);
             am.updated_at = Set(now);
             let model = am.insert(&txn).await?.try_into_model()?;
@@ -302,15 +305,14 @@ pub async fn fetch_due<C: ConnectionTrait>(
     models
         .into_iter()
         .map(|m| {
-            let monitor_type: SyntheticType = serde_json::from_value(serde_json::Value::String(
-                m.monitor_type.clone(),
-            ))
-            .map_err(|e| {
-                errors::Error::Message(format!(
-                    "invalid monitor_type '{}' for {}: {e}",
-                    m.monitor_type, m.id
-                ))
-            })?;
+            let monitor_type: SyntheticType =
+                serde_json::from_value(serde_json::Value::String(m.synthetics_type.clone()))
+                    .map_err(|e| {
+                        errors::Error::Message(format!(
+                            "invalid synthetics_type '{}' for {}: {e}",
+                            m.synthetics_type, m.id
+                        ))
+                    })?;
 
             let locations: Vec<String> = serde_json::from_value(m.locations).map_err(|e| {
                 errors::Error::Message(format!("invalid locations for {}: {e}", m.id))
@@ -401,7 +403,7 @@ async fn list_models<C: ConnectionTrait>(
 }
 
 fn pack_settings(monitor: &Synthetic) -> Result<serde_json::Value, errors::Error> {
-    Ok(serde_json::to_value(MonitorSettings {
+    Ok(serde_json::to_value(SyntheticSettings {
         retries: monitor.retries,
         cooldown_mins: monitor.cooldown_mins,
         wait_before_retry_secs: monitor.wait_before_retry_secs,
@@ -464,6 +466,8 @@ fn monitor_type_to_str(t: &SyntheticType) -> &'static str {
         SyntheticType::Tls => "tls",
         SyntheticType::Ssh => "ssh",
         SyntheticType::Browser => "browser",
+        SyntheticType::Ping => "ping",
+        SyntheticType::Dns => "dns",
     }
 }
 
@@ -480,7 +484,7 @@ impl ApplyMonitorFilters for sea_orm::Select<Entity> {
             q = q.filter(Column::FolderId.eq(folder_id.clone()));
         }
         if let Some(monitor_type) = &params.monitor_type {
-            q = q.filter(Column::MonitorType.eq(monitor_type_to_str(monitor_type)));
+            q = q.filter(Column::SyntheticsType.eq(monitor_type_to_str(monitor_type)));
         }
         if let Some(enabled) = params.enabled {
             q = q.filter(Column::Enabled.eq(enabled));
@@ -500,7 +504,7 @@ mod tests {
             org_id: "org1".to_string(),
             folder_id: "folder-1".to_string(),
             name: "Login Flow".to_string(),
-            monitor_type: "browser".to_string(),
+            synthetics_type: "browser".to_string(),
             target: "https://app.example.com".to_string(),
             description: "Monitors the login flow".to_string(),
             tags: serde_json::json!(["prod"]),
@@ -512,7 +516,9 @@ mod tests {
             locations: serde_json::json!(["aws-us-east-1"]),
             enabled: true,
             destinations: serde_json::json!([]),
-            settings: serde_json::json!({"retries": 1, "cooldown_mins": 0, "wait_before_retry_secs": 5, "alert_if_fails": 1, "collect_rum_data": false, "session_replay": false, "variables": []}),
+            settings: serde_json::json!({"retries": 1, "cooldown_mins": 0, "wait_before_retry_secs": 5, "alert_if_fails": 1, "collect_rum_data": false, "session_replay": false}),
+            variables: String::new(),
+            auth: String::new(),
             next_run_at: 0,
             last_triggered_at: 0,
             last_check_status: "unknown".to_string(),
@@ -536,9 +542,9 @@ mod tests {
     }
 
     #[test]
-    fn test_try_from_invalid_monitor_type() {
+    fn test_try_from_invalid_synthetics_type() {
         let mut m = make_model();
-        m.monitor_type = "invalid".to_string();
+        m.synthetics_type = "invalid".to_string();
         assert!(Synthetic::try_from(m).is_err());
     }
 
@@ -550,6 +556,8 @@ mod tests {
         assert_eq!(monitor_type_to_str(&SyntheticType::Tcp), "tcp");
         assert_eq!(monitor_type_to_str(&SyntheticType::Tls), "tls");
         assert_eq!(monitor_type_to_str(&SyntheticType::Ssh), "ssh");
+        assert_eq!(monitor_type_to_str(&SyntheticType::Ping), "ping");
+        assert_eq!(monitor_type_to_str(&SyntheticType::Dns), "dns");
     }
 
     #[test]

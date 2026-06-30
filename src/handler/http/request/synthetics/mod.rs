@@ -346,12 +346,13 @@ pub async fn get_synthetic(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        // get_by_id returns full decrypted credentials — requires write permission.
         if !check_permissions(
             &id,
             &org_id,
             &user_email.user_id,
             "synthetics",
-            "GET",
+            "PUT",
             None,
             false,
             true,

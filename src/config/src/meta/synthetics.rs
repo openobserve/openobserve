@@ -153,10 +153,10 @@ pub struct Synthetic {
     pub session_replay: bool,
     /// Optional authentication config (basic auth, bearer token, etc.).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub auth: Option<MonitorAuth>,
+    pub auth: Option<SyntheticAuth>,
     /// Key-value variables injected into the probe environment.
     #[serde(default)]
-    pub variables: Vec<MonitorVariable>,
+    pub variables: Vec<SyntheticVariable>,
     /// Unix epoch microseconds — when to first run the check ("schedule later").
     /// When set, the scheduler uses this as the initial next_run_at instead of firing immediately.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -188,9 +188,14 @@ pub enum SyntheticType {
     Http,
     Api,
     Tcp,
+    /// TLS/SSL certificate check — checks expiry, chain validity, hostname.
     Tls,
     Ssh,
     Browser,
+    /// ICMP ping — checks host reachability and round-trip time.
+    Ping,
+    /// DNS record check — verifies record type/value from a nameserver.
+    Dns,
 }
 
 // ── SyntheticStatus ─────────────────────────────────────────────────────────────
@@ -211,7 +216,7 @@ pub enum SyntheticStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum MonitorAuth {
+pub enum SyntheticAuth {
     Basic {
         username: String,
         password: String,
@@ -227,18 +232,24 @@ pub enum MonitorAuth {
 
 // ── Variables ─────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct MonitorVariable {
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
+pub struct SyntheticVariable {
     pub name: String,
-    /// Inline value OR reference to a secret (prefixed "$secret:name").
     pub value: String,
+    /// UI display flag: true = mask value as ••••. No effect on storage — all values are
+    /// AES-encrypted at rest unconditionally.
+    #[serde(default)]
+    pub secure: bool,
+    /// Placeholder shown in the UI when secure=true and value is empty/redacted.
+    #[serde(default)]
+    pub example: String,
 }
 
 // ── Settings (packed into the `settings` JSON column) ────────────────────────
 
 /// Non-type-specific monitor settings stored as a single `settings` JSON blob.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct MonitorSettings {
+pub struct SyntheticSettings {
     #[serde(default)]
     pub retries: i32,
     #[serde(default, alias = "cooldown_secs")]
@@ -252,9 +263,9 @@ pub struct MonitorSettings {
     #[serde(default)]
     pub session_replay: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub auth: Option<MonitorAuth>,
+    pub auth: Option<SyntheticAuth>,
     #[serde(default)]
-    pub variables: Vec<MonitorVariable>,
+    pub variables: Vec<SyntheticVariable>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start: Option<i64>,
 }
@@ -460,6 +471,31 @@ pub struct TlsConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PingConfig {
+    /// Number of ICMP packets to send per check.
+    #[serde(default = "default_ping_count")]
+    pub packet_count: u32,
+    /// Packet size in bytes.
+    #[serde(default = "default_ping_packet_size")]
+    pub packet_size: u32,
+    #[serde(default = "default_timeout_ms")]
+    pub timeout_ms: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DnsConfig {
+    /// DNS record type to query: "A", "AAAA", "CNAME", "MX", "TXT", "NS".
+    #[serde(default = "default_dns_record_type")]
+    pub record_type: String,
+    /// Optional expected value to assert against (e.g. expected IP or CNAME target).
+    pub expected_value: Option<String>,
+    /// Nameserver to query (e.g. "8.8.8.8"). Defaults to system resolver.
+    pub nameserver: Option<String>,
+    #[serde(default = "default_timeout_ms")]
+    pub timeout_ms: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SshConfig {
     #[serde(default = "default_ssh_port")]
     pub port: u16,
@@ -549,6 +585,18 @@ fn default_ssh_port() -> u16 {
 
 fn default_min_days() -> u32 {
     30
+}
+
+fn default_ping_count() -> u32 {
+    4
+}
+
+fn default_ping_packet_size() -> u32 {
+    56
+}
+
+fn default_dns_record_type() -> String {
+    "A".to_string()
 }
 
 fn default_browser_devices() -> Vec<BrowserDevice> {
@@ -643,7 +691,7 @@ mod tests {
 
     #[test]
     fn test_monitor_auth_serde() {
-        let auth = MonitorAuth::Basic {
+        let auth = SyntheticAuth::Basic {
             username: "user".to_string(),
             password: "pass".to_string(),
         };

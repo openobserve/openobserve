@@ -11,7 +11,7 @@ pub struct Model {
     pub folder_id: String,
     pub tz_offset: i32,
     pub name: String,
-    pub monitor_type: String,
+    pub synthetics_type: String,
     pub target: String,
     pub description: String,
     pub tags: Json,
@@ -21,8 +21,12 @@ pub struct Model {
     pub locations: Json,
     pub enabled: bool,
     pub destinations: Json,
-    /// Extra monitor settings (retries, cooldown, auth, variables, rum toggles).
+    /// Extra monitor settings (retries, cooldown, rum toggles). No secrets here.
     pub settings: Json,
+    /// AESenc:<base64> — whole Vec<SyntheticVariable> JSON encrypted with org DEK.
+    pub variables: String,
+    /// AESenc:<base64> — whole SyntheticAuth JSON encrypted with org DEK.
+    pub auth: String,
     /// Pre-computed next fire time (microseconds). 0 = fire on next scheduler tick.
     pub next_run_at: i64,
     /// When the scheduler last fanned out this monitor (microseconds).
@@ -50,7 +54,7 @@ mod tests {
             folder_id: "folder-1".to_string(),
             tz_offset: 0,
             name: "Login Flow".to_string(),
-            monitor_type: "browser".to_string(),
+            synthetics_type: "browser".to_string(),
             target: "https://app.example.com".to_string(),
             description: "Monitors the login flow".to_string(),
             tags: serde_json::json!(["prod", "checkout"]),
@@ -60,6 +64,8 @@ mod tests {
             enabled: true,
             destinations: serde_json::json!([]),
             settings: serde_json::json!({"retries": 1, "cooldown_mins": 0}),
+            variables: String::new(),
+            auth: String::new(),
             next_run_at: 0,
             last_triggered_at: 0,
             last_check_status: "unknown".to_string(),
@@ -67,7 +73,7 @@ mod tests {
             updated_at: 1750000000000000,
         };
         assert_eq!(m.id, "mon-1");
-        assert_eq!(m.monitor_type, "browser");
+        assert_eq!(m.synthetics_type, "browser");
         assert!(m.enabled);
         assert_eq!(m.next_run_at, 0);
     }

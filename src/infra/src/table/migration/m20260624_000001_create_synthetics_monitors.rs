@@ -102,7 +102,7 @@ fn create_synthetics_table() -> TableCreateStatement {
                 .not_null(),
         )
         .col(
-            ColumnDef::new(Synthetics::MonitorType)
+            ColumnDef::new(Synthetics::SyntheticsType)
                 .string_len(32)
                 .not_null(),
         )
@@ -129,8 +129,13 @@ fn create_synthetics_table() -> TableCreateStatement {
                 .json()
                 .not_null(),
         )
-        // Extra monitor settings: retries, cooldown, auth, variables, rum toggles, etc.
+        // Extra monitor settings: retries, cooldown, rum toggles, etc. (no secrets here).
         .col(ColumnDef::new(Synthetics::Settings).json().not_null())
+        // Encrypted secret columns — both store AESenc:<base64> blobs using the org DEK.
+        // variables: whole Vec<SyntheticVariable> JSON encrypted as one blob.
+        // auth: whole SyntheticAuth JSON encrypted as one blob.
+        .col(ColumnDef::new(Synthetics::Variables).text().not_null().default(""))
+        .col(ColumnDef::new(Synthetics::Auth).text().not_null().default(""))
         // Scheduler fields — managed by the synthetics scheduler, not by the client.
         .col(
             ColumnDef::new(Synthetics::NextRunAt)
@@ -207,7 +212,7 @@ enum Synthetics {
     FolderId,
     TzOffset,
     Name,
-    MonitorType,
+    SyntheticsType,
     Target,
     Description,
     Tags,
@@ -217,6 +222,8 @@ enum Synthetics {
     Enabled,
     Destinations,
     Settings,
+    Variables,
+    Auth,
     NextRunAt,
     LastTriggeredAt,
     LastCheckStatus,
@@ -241,7 +248,7 @@ mod tests {
                 "folder_id" char(27) NOT NULL,
                 "tz_offset" integer NOT NULL DEFAULT 0,
                 "name" varchar(256) NOT NULL,
-                "monitor_type" varchar(32) NOT NULL,
+                "synthetics_type" varchar(32) NOT NULL,
                 "target" text NOT NULL,
                 "description" text NOT NULL DEFAULT '',
                 "tags" json NOT NULL,
@@ -251,6 +258,8 @@ mod tests {
                 "enabled" bool NOT NULL DEFAULT TRUE,
                 "destinations" json NOT NULL,
                 "settings" json NOT NULL,
+                "variables" text NOT NULL DEFAULT '',
+                "auth" text NOT NULL DEFAULT '',
                 "next_run_at" bigint NOT NULL DEFAULT 0,
                 "last_triggered_at" bigint NOT NULL DEFAULT 0,
                 "last_check_status" varchar(16) NOT NULL DEFAULT 'unknown',
@@ -284,7 +293,7 @@ mod tests {
                 "folder_id" char(27) NOT NULL,
                 "tz_offset" integer NOT NULL DEFAULT 0,
                 "name" varchar(256) NOT NULL,
-                "monitor_type" varchar(32) NOT NULL,
+                "synthetics_type" varchar(32) NOT NULL,
                 "target" text NOT NULL,
                 "description" text NOT NULL DEFAULT '',
                 "tags" json_text NOT NULL,
