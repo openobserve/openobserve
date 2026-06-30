@@ -1116,6 +1116,7 @@ jobs:
       labels: ubicloud-standard-4
     permissions:
       contents: read
+      actions: read  # download-artifact fetches the merged-report artifact
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
