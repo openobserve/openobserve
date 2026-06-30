@@ -55,12 +55,15 @@ jobs:
   dispatch-test-assist:
     # Two doors:
     #   - workflow_dispatch (manual): GitHub already restricts dispatch to users with repo write.
-    #   - issue_comment: exact `/verify-bug` on an ISSUE by an org member/collaborator. This
+    #   - issue_comment: exact `/verify-bug` on an ISSUE (NOT a PR) by an org member/collaborator.
+    #     The `.issue.pull_request == null` filter excludes /verify-bug typed on a PR — test-assist
+    #     verifies bug ISSUES, and a PR number would confuse the engine downstream. The
     #     org-member gate is the trust boundary for the PAT — a stranger's comment fails this
     #     `if:`, so the dispatch step (and therefore the PAT) never runs.
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request == null &&
        github.event.comment.body == '/verify-bug' &&
        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
