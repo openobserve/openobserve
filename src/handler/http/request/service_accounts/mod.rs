@@ -261,7 +261,12 @@ pub async fn update(
             }
         }
 
-        return match crate::service::organization::update_passcode(Some(&org_id), &email_id).await {
+        return match crate::service::organization::update_service_account_passcode(
+            Some(&org_id),
+            &email_id,
+        )
+        .await
+        {
             Ok(passcode) => (
                 StatusCode::OK,
                 Json(APIToken {
