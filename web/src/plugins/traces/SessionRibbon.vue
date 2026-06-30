@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:p-[1rem] tw:flex tw:flex-col"
+    class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:pt-[1rem] tw:px-[1rem] tw:pb-[0.625rem] tw:flex tw:flex-col"
     data-test="session-ribbon"
   >
     <!-- Header: title + subtitle (left) · metric toggle (right) -->
@@ -47,19 +47,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OToggleGroup>
     </div>
 
-    <!-- Plot: y-axis labels + bars area (gridlines via mid/baseline borders) -->
-    <div class="tw:flex tw:gap-[0.5rem]">
-      <div
-        class="tw:flex tw:flex-col tw:justify-between tw:items-end tw:h-[70px] tw:w-[2.75rem] tw:flex-shrink-0 tw:text-[0.6rem] tw:text-[var(--o2-text-muted)] tw:tabular-nums"
-      >
-        <span>{{ maxLabel }}</span>
-        <span>{{ midLabel }}</span>
-        <span>0</span>
-      </div>
-
-      <div class="tw:flex-1 tw:min-w-0">
+    <!-- Plot fills the remaining panel height so the chart uses the space rather
+         than leaving a gap below it. The chart region (y-axis + bars) grows; the
+         x-axis row sits beneath it, offset by the y-axis width so the turn
+         numbers stay aligned under their bars. -->
+    <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+      <!-- chart region: y-axis labels + bars, sharing the grown height -->
+      <div class="tw:flex tw:gap-[0.5rem] tw:flex-1 tw:min-h-0">
         <div
-          class="tw:relative tw:h-[70px] tw:flex tw:items-end tw:gap-[3px] tw:border-l tw:border-b tw:border-[var(--o2-border-color)]"
+          class="tw:flex tw:flex-col tw:justify-between tw:items-end tw:h-full tw:w-[2.75rem] tw:flex-shrink-0 tw:text-[0.6rem] tw:text-[var(--o2-text-muted)] tw:tabular-nums"
+        >
+          <span>{{ maxLabel }}</span>
+          <span>{{ midLabel }}</span>
+          <span>0</span>
+        </div>
+
+        <div
+          class="tw:relative tw:flex-1 tw:min-w-0 tw:min-h-0 tw:flex tw:items-end tw:gap-[3px] tw:border-l tw:border-b tw:border-[var(--o2-border-color)]"
         >
           <!-- gridlines (top + mid) to echo the dashboard chart grid -->
           <div class="tw:absolute tw:inset-x-0 tw:top-0 tw:border-t tw:border-[var(--o2-border-color)] tw:opacity-60" />
@@ -79,24 +83,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </TurnPreviewCard>
         </div>
+      </div>
 
-        <!-- x-axis: turn numbers, aligned under each bar -->
-        <div class="tw:flex tw:gap-[3px] tw:mt-[0.25rem]">
-          <span
-            v-for="bar in bars"
-            :key="bar.index"
-            class="tw:flex-1 tw:min-w-0 tw:text-center tw:text-[0.6rem] tw:text-[var(--o2-text-muted)] tw:tabular-nums"
+      <!-- x-axis + title, offset by the y-axis column width so the numbers stay
+           aligned under their bars. Every bar keeps a spacer span, but once there
+           are many turns we only print a label on round milestones (see
+           labeledTurns) to avoid the numbers cramming together. -->
+      <div class="tw:flex tw:gap-[0.5rem] tw:flex-shrink-0">
+        <div class="tw:w-[2.75rem] tw:flex-shrink-0" />
+        <div class="tw:flex-1 tw:min-w-0">
+          <div class="tw:flex tw:gap-[3px] tw:mt-[0.25rem]">
+            <span
+              v-for="bar in bars"
+              :key="bar.index"
+              class="tw:flex-1 tw:min-w-0 tw:text-center tw:text-[0.6rem] tw:text-[var(--o2-text-muted)] tw:tabular-nums"
+            >
+              {{ labeledTurns.has(bar.index + 1) ? bar.index + 1 : "" }}
+            </span>
+          </div>
+
+          <!-- x-axis title — matches the dashboard axis name (nameLocation
+               "middle" + nameTextStyle bold/14px). -->
+          <div
+            class="tw:text-center tw:text-[14px] tw:font-bold tw:text-[var(--o2-text-primary)] tw:mt-[0.25rem]"
           >
-            {{ bar.index + 1 }}
-          </span>
-        </div>
-
-        <!-- x-axis title — matches the dashboard axis name (nameLocation
-             "middle" + nameTextStyle bold/14px). -->
-        <div
-          class="tw:text-center tw:text-[14px] tw:font-bold tw:text-[var(--o2-text-primary)] tw:mt-[0.25rem]"
-        >
-          {{ t('traces.sessionDetail.turnLabel') }}
+            {{ t('traces.sessionDetail.turnLabel') }}
+          </div>
         </div>
       </div>
     </div>
@@ -179,4 +191,36 @@ const bars = computed(() =>
     };
   }),
 );
+
+// X-axis labels get crowded once there are many turns (59 bars → 59 numbers
+// jammed together). At or below this count we label every turn; above it we
+// thin to a handful of round milestones.
+const ALL_LABELS_MAX = 10;
+
+// Round the raw step (total / ~target labels) up to a "nice" number — 1, 2, 5
+// or 10 × a power of ten — so labels land on readable milestones (…10, 20, 30
+// or …25, 50, 75) instead of arbitrary turns.
+function niceStep(total: number, targetCount: number): number {
+  const raw = total / targetCount;
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / pow;
+  const nice = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+  return Math.max(1, nice * pow);
+}
+
+// The set of 1-based turn numbers that should print an x-axis label: every turn
+// when there are few, otherwise turn 1 plus each round step (e.g. 1, 10, 20, 30…
+// for 59 turns). Bars without a label still render an empty spacer span.
+const labeledTurns = computed<Set<number>>(() => {
+  const total = bars.value.length;
+  const set = new Set<number>();
+  if (total <= ALL_LABELS_MAX) {
+    for (let n = 1; n <= total; n++) set.add(n);
+    return set;
+  }
+  const step = niceStep(total, 8);
+  set.add(1);
+  for (let n = step; n <= total; n += step) set.add(n);
+  return set;
+});
 </script>

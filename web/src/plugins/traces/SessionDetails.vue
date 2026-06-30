@@ -82,9 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[6.5rem] tw:h-[0.6rem] tw:mt-[0.4rem]" />
           </div>
         </div>
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:p-[1rem]">
-          <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[8rem] tw:h-[0.85rem]" />
-          <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-full tw:h-[70px] tw:mt-[0.75rem]" />
+        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:pt-[1rem] tw:px-[1rem] tw:pb-[0.625rem] tw:flex tw:flex-col">
+          <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[8rem] tw:h-[0.85rem] tw:flex-shrink-0" />
+          <!-- Fill the panel height (it stretches to the 6-tile block on the left)
+               so the skeleton matches the real ribbon and leaves no gap below. -->
+          <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-full tw:flex-1 tw:min-h-0 tw:mt-[0.75rem]" />
         </div>
       </div>
 
