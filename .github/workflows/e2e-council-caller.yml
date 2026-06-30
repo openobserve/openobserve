@@ -1,0 +1,171 @@
+name: E2E Council Caller (openobserve)
+
+# Thin caller: on an org member's `/e2e[-dryrun]` comment on an OSS PR (or manual dispatch, or an
+# auto-on-merge), DISPATCH the E2E Council engine that lives in the PRIVATE o2-enterprise repo,
+# authenticated with the org-admin PAT. This mirrors docgen-caller.yml.
+#
+# WHY DISPATCH (not `workflow_call`/`uses:`): a cross-repo reusable-workflow call would require the
+# private repo to grant this repo an Actions *access policy*. A PAT with `Actions: R/W` on
+# o2-enterprise can trigger its `workflow_dispatch` with no such org/repo setting. The engine then
+# runs IN o2-enterprise CI (where it builds the ENTERPRISE binary to validate the spec) and posts
+# results back to this OSS PR + opens the OSS test PR using the same PAT.
+#
+# This caller only: (1) gates the command to org members, (2) resolves pr/dry-run/clobber/actor,
+# (3) dispatches the engine via the PAT, (4) posts an immediate ack on the OSS PR.
+#
+# REQUIRED — secrets.ORG_ADMIN_TOKEN (fine-grained PAT) permissions:
+#   o2-enterprise:  Actions: R/W (dispatch) + Issues/Pull requests: R/W (engine comments)
+#   openobserve:    Issues/Pull requests: R/W + Contents: R/W (engine comments + autoe2e/* branches + test PR)
+#   NOTE: "Actions" (run triggering) is a DIFFERENT permission from "Workflows" (file editing).
+#   This PAT also posts THIS caller's own "started" ack as the human (not github-actions[bot]); REQUIRED
+#   — if it's missing the dispatch step fails first, so the ack (gated on dispatch success) never runs.
+#   The dispatch-FAILURE notice falls back to the run token so a broken PAT can't also silence the error.
+# KILL SWITCH: the engine honors the E2E_COUNCIL_DISABLED variable; auto-on-merge honors E2E_AUTO_ON_MERGE.
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "OSS PR number or URL (required)"
+        required: true
+      feature_hint:
+        description: "Feature/area hint (optional)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry-run: triage only, don't generate"
+        type: boolean
+        required: true
+        default: true
+      force_overwrite:
+        description: "Force-overwrite the autoe2e branch (clobber existing branch/manual edits). Untick to protect/reuse."
+        type: boolean
+        required: false
+        default: true
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: write   # post the ack comment on the OSS PR (this run is in OSS context)
+  issues: write
+
+# NO caller-level concurrency on purpose. issue_comment fires the caller for EVERY comment on a PR
+# (the /e2e filter is only in the job `if:`), and a run enters the concurrency group BEFORE its `if:`
+# is evaluated — so cancel-in-progress:true would let an unrelated comment cancel an in-flight /e2e
+# DISPATCH. Dedup of duplicate /e2e is owned by the ENGINE's concurrency (keyed on source_repo+pr,
+# cancel-in-progress for workflow_dispatch). Mirrors docgen-caller.yml (no caller concurrency).
+
+jobs:
+  dispatch-e2e:
+    # Three doors (all PR-bound):
+    #   - workflow_dispatch (manual): GitHub already restricts dispatch to users with repo write access.
+    #   - issue_comment: exact `/e2e` or `/e2e-dryrun` on a PR by an org member/collaborator. This
+    #     org-member gate is the trust boundary for the PAT — a stranger's comment fails this `if:`,
+    #     so the dispatch step (and therefore the PAT) never runs.
+    #   - pull_request closed+merged: auto-on-merge, gated OFF by default behind vars.E2E_AUTO_ON_MERGE.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
+       (github.event.comment.body == '/e2e' || github.event.comment.body == '/e2e-dryrun') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true &&
+       github.event.pull_request.base.ref == 'main' &&
+       vars.E2E_AUTO_ON_MERGE == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10   # the dispatch is a quick API call; bound it as defense-in-depth
+    steps:
+      - name: Resolve context (untrusted event data via env, never spliced into commands)
+        id: ctx
+        env:
+          IN_PR: ${{ inputs.pr_number || github.event.issue.number || github.event.pull_request.number }}
+          EVENT: ${{ github.event_name }}
+          DISPATCH_DRY: ${{ inputs.dry_run }}
+          DISPATCH_FORCE: ${{ inputs.force_overwrite }}
+          DISPATCH_HINT: ${{ inputs.feature_hint }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_LOGIN: ${{ github.event.comment.user.login }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          DISPATCH_ACTOR: ${{ github.actor }}
+        run: |
+          # Accept a bare number, "#123", or a PR URL. Prefer the /pull/<n> or #<n> segment so a URL
+          # with a trailing numeric query (…/pull/12345?foo=678) resolves to the PR, not the query.
+          if   [[ "$IN_PR" =~ /pull/([0-9]+) ]]; then PR="${BASH_REMATCH[1]}"
+          elif [[ "$IN_PR" =~ \#([0-9]+) ]];     then PR="${BASH_REMATCH[1]}"
+          elif [[ "$IN_PR" =~ ^[0-9]+$ ]];       then PR="$IN_PR"
+          else echo "::error::invalid PR number: $IN_PR"; exit 1; fi
+          # force_overwrite (clobber) defaults: dispatch honors its box; comment/auto default to REUSE
+          # (clobber off) so re-running /e2e refines/extends the existing tests rather than clobbering.
+          FORCE="false"; HINT=""
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            DRY="$DISPATCH_DRY"; FORCE="${DISPATCH_FORCE:-true}"; HINT="$DISPATCH_HINT"; ACTOR="$DISPATCH_ACTOR"
+          elif [ "$EVENT" = "issue_comment" ]; then
+            [ "$COMMENT_BODY" = "/e2e-dryrun" ] && DRY="true" || DRY="false"
+            ACTOR="$COMMENT_LOGIN"
+          else
+            # pull_request closed+merged (auto-on-merge): full run, reuse, author as actor.
+            DRY="false"; ACTOR="$PR_AUTHOR"
+          fi
+          ACTOR=$(printf '%s' "$ACTOR" | tr -cd 'A-Za-z0-9-')   # GitHub login charset; defensive
+          { echo "pr=$PR"; echo "dry=$DRY"; echo "force=$FORCE"; echo "actor=$ACTOR"; } >> "$GITHUB_OUTPUT"
+          # feature_hint may contain arbitrary (even multiline) text — use a RANDOM heredoc delimiter so
+          # a hint containing a line "EOF" can't break/inject the multiline $GITHUB_OUTPUT write.
+          DELIM="hintEOF_$(openssl rand -hex 16 2>/dev/null || echo "${RANDOM}${RANDOM}${RANDOM}")"
+          printf 'hint<<%s\n%s\n%s\n' "$DELIM" "$HINT" "$DELIM" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch the E2E Council engine (o2-enterprise) via the org-admin PAT
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          PR: ${{ steps.ctx.outputs.pr }}
+          DRY: ${{ steps.ctx.outputs.dry }}
+          FORCE: ${{ steps.ctx.outputs.force }}
+          ACTOR: ${{ steps.ctx.outputs.actor }}
+          HINT: ${{ steps.ctx.outputs.hint }}
+        run: |
+          gh workflow run e2e-council.yml --repo openobserve/o2-enterprise \
+            -f source_repo=openobserve \
+            -f pr_number="$PR" \
+            -f dry_run="$DRY" \
+            -f force_overwrite="$FORCE" \
+            -f feature_hint="$HINT" \
+            -f actor="$ACTOR"
+          echo "Dispatched E2E Council engine for openobserve PR #$PR (dry_run=$DRY, force=$FORCE, by @$ACTOR)."
+
+      - name: Acknowledge on the source PR
+        # success() => only ack if the dispatch actually succeeded (don't mislead the author if the
+        # dispatch 403'd on a missing PAT permission, etc.). Only on a human /e2e comment.
+        if: github.event_name == 'issue_comment' && success()
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}   # PAT only — post as the human, NEVER github-actions[bot]
+          PR: ${{ steps.ctx.outputs.pr }}
+          DRY: ${{ steps.ctx.outputs.dry }}
+        run: |
+          MODE="full run"; [ "$DRY" = "true" ] && MODE="dry-run (triage only)"
+          gh pr comment "$PR" --repo openobserve/openobserve --body \
+          "### 🤖 E2E Council — started ($MODE)
+
+          Running in o2-enterprise CI now (builds the enterprise binary to validate the spec) — I'll post the result back here when ready. ([engine runs](https://github.com/openobserve/o2-enterprise/actions/workflows/e2e-council.yml))"
+
+      - name: Notify dispatch failure on the source PR
+        # If the dispatch itself failed (expired/insufficient PAT, engine workflow missing, network),
+        # the /e2e commenter would otherwise get NO feedback. Tell them + link the caller run.
+        if: github.event_name == 'issue_comment' && failure()
+        env:
+          PAT: ${{ secrets.ORG_ADMIN_TOKEN }}
+          BOT: ${{ github.token }}
+          PR: ${{ steps.ctx.outputs.pr }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "$PR" ] || exit 0
+          BODY="### ❌ E2E Council — could not start
+
+          Dispatching the E2E Council engine failed (likely an expired/insufficient \`ORG_ADMIN_TOKEN\`, a missing engine workflow on o2-enterprise main, or a transient error). See the [caller run logs]($RUN_URL) and retry \`/e2e\` once resolved."
+          # Post as the human PAT first. BUT this notice fires when the DISPATCH failed — and an
+          # expired/insufficient PAT is a likely cause — so if the PAT itself can't post, fall back to
+          # the run token so the author STILL hears about the failure. This is the ONE error-delivery
+          # channel that must survive a broken PAT; every routine/result comment stays PAT-only.
+          GH_TOKEN="$PAT" gh pr comment "$PR" --repo openobserve/openobserve --body "$BODY" \
+            || GH_TOKEN="$BOT" gh pr comment "$PR" --repo openobserve/openobserve --body "$BODY" \
+            || true

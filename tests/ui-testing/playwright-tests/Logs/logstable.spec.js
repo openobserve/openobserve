@@ -569,42 +569,48 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
   }, async ({ page }) => {
     testLogger.info('Testing severity color mapping for all severity levels');
 
-    // Expected color mapping based on STATUS_COLORS in statusParser.ts.
-    // Colors are aligned with convertLogData.ts SEMANTIC_COLORS_LIGHT.
-    const expectedColors = {
-      0: '#1e88e5', // OTEL UNSPECIFIED - mapped to info
-      1: '#ea580c', // alert - unchanged (no convertLogData equivalent)
-      2: '#f4511e', // critical
-      3: '#ef5350', // error
-      4: '#fb8c00', // warning
-      5: '#16a34a', // notice - unchanged (no convertLogData equivalent)
-      6: '#1e88e5', // info
-      7: '#00acc1'  // debug
+    // Expected color per detected level, based on STATUS_COLORS in statusParser.ts
+    // (aligned with convertLogData.ts SEMANTIC_COLORS_LIGHT). The status color bar
+    // exposes the detected level via data-test-status-level, so this is verified
+    // independently of which column is displayed (e.g. the FTS "body" column).
+    // Severity 0 and 6 both map to "info", so 8 severity numbers collapse to 7
+    // distinct levels.
+    const expectedColorByLevel = {
+      info:     '#1e88e5', // severity 0 (UNSPECIFIED) and 6
+      alert:    '#ea580c', // severity 1
+      critical: '#f4511e', // severity 2
+      error:    '#ef5350', // severity 3
+      warning:  '#fb8c00', // severity 4
+      notice:   '#16a34a', // severity 5
+      debug:    '#00acc1', // severity 7
     };
 
     // Get severity colors using POM method
     const results = await pageManager.logsPage.getSeverityColors();
-    testLogger.info(`Found ${results.length} rows with severity values`);
+    testLogger.info(`Found ${results.length} rows with status color bars`);
 
-    // Verify each severity level
+    // Verify each distinct level renders its expected color.
     const verified = new Set();
 
     for (const result of results) {
-      if (verified.has(result.severity)) continue;
+      const level = result.level;
+      if (!level || verified.has(level)) continue;
+      const expected = expectedColorByLevel[level];
+      if (!expected) continue; // ignore levels outside the tested set
 
       const hexColor = pageManager.logsPage.normalizeHexColor(pageManager.logsPage.rgbToHex(result.color));
-      const expectedHex = pageManager.logsPage.normalizeHexColor(expectedColors[result.severity]);
+      const expectedHex = pageManager.logsPage.normalizeHexColor(expected);
 
-      testLogger.info(`Severity ${result.severity}: Expected ${expectedHex}, Got ${hexColor}`);
+      testLogger.info(`Level "${level}": Expected ${expectedHex}, Got ${hexColor}`);
       expect(hexColor).toBe(expectedHex);
-      testLogger.info(`✓ Severity ${result.severity} color verified`);
+      testLogger.info(`✓ Level "${level}" color verified`);
 
-      verified.add(result.severity);
+      verified.add(level);
     }
 
-    // Ensure all 8 severity levels were tested
-    expect(verified.size).toBe(8);
-    testLogger.info(`Successfully verified all 8 severity levels`);
+    // All 7 distinct levels (severity 0-7 collapses 0 and 6 to "info") must render.
+    expect(verified.size).toBe(Object.keys(expectedColorByLevel).length);
+    testLogger.info(`Successfully verified all ${verified.size} severity levels`);
   });
 
   test.afterAll(async ({ browser }) => {

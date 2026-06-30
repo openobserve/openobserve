@@ -31,6 +31,8 @@ export interface DropdownProps {
   align?: DropdownAlign;
   /** Pixel offset from the trigger */
   sideOffset?: DropdownMenuContentProps["sideOffset"];
+  /** Extra class(es) for the content (menu) element — e.g. to match trigger width. */
+  contentClass?: string;
   /**
    * Outside-click persistence. Controls how many outside-click events must
    * happen before this dropdown actually dismisses:

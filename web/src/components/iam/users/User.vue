@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the table's own toolbar (built-in global filter) per the layout system. -->
     <AppPageHeader
       :title="t('iam.basicUsers')"
-      :subtitle="'People with access to this organization'"
+      :subtitle="t('user.subtitle')"
       icon="person"
       class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
@@ -94,31 +94,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
           <template #cell-auth="{ row }">
-            <OBadge
-              v-if="row.auth_type"
-              :variant="row.auth_type === 'SSO' ? 'primary-outline' : 'default-outline'"
-              size="sm"
-              class="o2-role-chip"
-            >
-              {{ row.auth_type }}
-            </OBadge>
+            <OTag v-if="row.auth_type" type="authType" :value="row.auth_type" />
+            <span v-else class="tw:text-text-primary">—</span>
           </template>
 
-          <!-- Roles badges — yellow outline for built-in, red outline for custom.
-               Built-in role names are displayed capitalised (Admin/Viewer/User),
-               custom role names keep their original casing (nmcdev/admin/etc.). -->
+          <!-- Roles badges — typed userRole tags for built-in roles, custom
+               roles keep their original casing via an untyped tag. -->
           <template #cell-roles="{ row }">
             <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-1">
-              <OBadge
+              <OTag
                 v-for="(roleName, idx) in (row.roles || [])"
                 :key="`${roleName}-${idx}`"
-                :variant="isBuiltinRole(roleName) ? 'warning-outline' : 'error-outline'"
-                size="md"
-                class="o2-role-chip"
-              >
-                {{ isBuiltinRole(roleName) ? toCamelCase(roleName) : roleName }}
-              </OBadge>
+                :type="isBuiltinRole(roleName) ? 'userRole' : undefined"
+                :value="isBuiltinRole(roleName) ? roleName : roleName"
+                :label="isBuiltinRole(roleName) ? undefined : roleName"
+              />
             </div>
+          </template>
+
+          <!-- Single-role column (open-source). Built-in role gets a typed
+               userRole tag; the "(Invited)" suffix becomes a pending tag. -->
+          <template #cell-role="{ row }">
+            <span class="tw:inline-flex tw:items-center tw:gap-1">
+              <OTag
+                type="userRole"
+                :value="String(row.role || '').replace(/\s*\(Invited\)\s*$/i, '')"
+              />
+              <OTag
+                v-if="row.status === 'pending'"
+                value="Invited"
+                variant="warning-soft"
+              />
+            </span>
           </template>
 
           <template #cell-actions="{ row }">
@@ -203,25 +210,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog data-test="user-revoke-dialog"
       v-model:open="confirmRevoke"
       size="xs"
-      title="Revoke Invitation"
+      :title="t('user.revokeInvitationTitle')"
       :secondary-button-label="t('user.cancel')"
       :primary-button-label="t('user.ok')"
       @click:secondary="confirmRevoke = false"
       @click:primary="revokeInvite"
     >
-      <p>Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</p>
+      <p>{{ t('user.revokeInvitationMsg', { email: revokeInviteEmail }) }}</p>
     </ODialog>
 
     <ODialog data-test="user-bulk-delete-dialog"
       v-model:open="confirmBulkDelete"
       size="sm"
-      title="Delete Users"
-      secondary-button-label="Cancel"
-      primary-button-label="OK"
+      :title="t('user.deleteUsersTitle')"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
       @click:secondary="confirmBulkDelete = false"
       @click:primary="bulkDeleteUsers"
     >
-      <p>Are you sure you want to delete {{ selectedUsers.length }} user(s)?</p>
+      <p>{{ t('user.deleteUsersMsg', { count: selectedUsers.length }) }}</p>
     </ODialog>
   </div>
 </template>
@@ -231,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -271,6 +279,7 @@ export default defineComponent({
     MemberInvitation,
     OButton,
     OBadge,
+    OTag,
     OIcon,
     ODialog,
     OEmptyState,
@@ -413,7 +422,7 @@ export default defineComponent({
       if (isEnterpriseOrCloud) {
         cols.push({
           id: "auth",
-          header: "Auth",
+          header: t("user.authType"),
           accessorKey: "auth_type",
           sortable: true,
           resizable: true,
@@ -426,7 +435,7 @@ export default defineComponent({
       // Roles column — array of role chips in enterprise/cloud, single role string otherwise
       cols.push({
         id: isEnterpriseOrCloud ? "roles" : "role",
-        header: isEnterpriseOrCloud ? "Roles" : t("user.role"),
+        header: isEnterpriseOrCloud ? t("user.roles") : t("user.role"),
         accessorKey: isEnterpriseOrCloud ? "roles" : "role",
         sortable: true,
         resizable: true,

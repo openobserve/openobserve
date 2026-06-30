@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="viewSpanLogs"
                 data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
               >
-                View Logs
+                {{ t('traces.viewLogs') }}
               </OButton>
               <OTooltip :content="viewLogsTooltipContent" />
             </span>
@@ -882,7 +882,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { cloneDeep } from "lodash-es";
-import { formatTimestamp, formatTimestampNs } from "@/utils/date";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref, inject } from "vue";
@@ -945,6 +945,9 @@ import {
   useSpanServiceDetection,
 } from "@/utils/traces/useSpanServiceDetection";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
+
+// luxon equivalent of "MMM DD, YYYY HH:mm:ss.SSS Z" → e.g. "Jun 24, 2026 17:39:32.157 +0530"
+const HUMAN_TZ_FORMAT = "MMM dd, yyyy HH:mm:ss.SSS ZZZ";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1223,7 +1226,7 @@ export default defineComponent({
     );
 
     watch(
-      () => props.span,
+      [() => props.span, () => store.state.timezone],
       () => {
         tags.value = {};
         spanDetails.value = getFormattedSpanDetails();
@@ -1321,9 +1324,10 @@ export default defineComponent({
         name: "@timestamp",
         field: "@timestamp",
         prop: (row: any) =>
-          formatTimestampNs(
-            row[store.state.zoConfig.timestamp_column],
-            "MMM DD, YYYY HH:mm:ss.SSS Z",
+          timestampToTimezoneDate(
+            row[store.state.zoConfig.timestamp_column] / 1000000,
+            store.state.timezone,
+            HUMAN_TZ_FORMAT,
           ),
         label: "Timestamp",
         align: "left" as const,
@@ -1383,9 +1387,10 @@ export default defineComponent({
           header: "Timestamp",
           size: eventsColSizes.value[tsCol] ?? 220,
           accessorFn: (row: any) =>
-            formatTimestampNs(
-              row[tsCol],
-              "MMM DD, YYYY HH:mm:ss.SSS Z",
+            timestampToTimezoneDate(
+              row[tsCol] / 1000000,
+              store.state.timezone,
+              HUMAN_TZ_FORMAT,
             ),
           meta: {
             headerClass:
@@ -1478,19 +1483,22 @@ export default defineComponent({
 
       spanDetails.attrs.duration = spanDetails.attrs.duration + "us";
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
-        formatTimestamp(
-          spanDetails.attrs[store.state.zoConfig.timestamp_column],
-          "MMM DD, YYYY HH:mm:ss.SSS Z",
+        timestampToTimezoneDate(
+          spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000,
+          store.state.timezone,
+          HUMAN_TZ_FORMAT,
         );
 
-      spanDetails.attrs["start_time"] = formatTimestampNs(
-        spanDetails.attrs["start_time"],
-        "MMM DD, YYYY HH:mm:ss.SSS Z",
+      spanDetails.attrs["start_time"] = timestampToTimezoneDate(
+        spanDetails.attrs["start_time"] / 1000000,
+        store.state.timezone,
+        HUMAN_TZ_FORMAT,
       );
 
-      spanDetails.attrs["end_time"] = formatTimestampNs(
-        spanDetails.attrs["end_time"],
-        "MMM DD, YYYY HH:mm:ss.SSS Z",
+      spanDetails.attrs["end_time"] = timestampToTimezoneDate(
+        spanDetails.attrs["end_time"] / 1000000,
+        store.state.timezone,
+        HUMAN_TZ_FORMAT,
       );
 
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);

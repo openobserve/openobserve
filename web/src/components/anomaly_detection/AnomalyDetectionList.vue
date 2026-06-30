@@ -64,31 +64,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="row.detection_window_seconds">
           {{ formatSeconds(row.detection_window_seconds) }}
         </span>
-        <span v-else class="tw:text-gray-400">—</span>
+        <span v-else class="tw:text-text-primary">—</span>
       </template>
 
       <!-- Last Triggered At column -->
       <template #cell-last_triggered_at="{ row }">
-        <span v-if="row.last_detection_run && row.last_detection_run > 0">
-          {{ formatTimestamp(row.last_detection_run) }}
-        </span>
-        <span v-else class="tw:text-gray-400">—</span>
+        <OTimeCell :value="row.last_detection_run" unit="us" empty-label="—" />
       </template>
 
       <!-- Last Anomaly Detected At column -->
       <template #cell-last_anomaly_detected_at="{ row }">
-        <span v-if="row.last_anomaly_detected_at">
-          {{ formatTimestamp(row.last_anomaly_detected_at) }}
-        </span>
-        <span v-else class="tw:text-gray-400">—</span>
+        <OTimeCell :value="row.last_anomaly_detected_at" unit="us" empty-label="—" />
       </template>
 
       <!-- Last Trained At column -->
       <template #cell-last_trained_at="{ row }">
-        <span v-if="row.training_completed_at">
-          {{ formatTimestamp(row.training_completed_at) }}
-        </span>
-        <span v-else class="tw:text-gray-400">—</span>
+        <OTimeCell :value="row.training_completed_at" unit="us" empty-label="—" />
       </template>
 
       <!-- Actions column -->
@@ -242,6 +233,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
@@ -250,7 +242,7 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OBadge, OButton, ODialog, OEmptyState, OIcon, OSpinner, OTable, OTooltip },
+  components: { OBadge, OButton, ODialog, OEmptyState, OIcon, OSpinner, OTable, OTimeCell, OTooltip },
 
   props: {
     org_identifier: {

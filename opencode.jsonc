@@ -53,6 +53,10 @@
       "mode": "primary",
       "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-healer.md}"
     },
+    "e2e-ci-refiner": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-refiner.md}"
+    },
     "e2e-ci-responder": {
       "mode": "primary",
       "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-responder.md}"

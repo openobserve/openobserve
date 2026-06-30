@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -82,6 +82,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
+        <template #cell-type="{ row }">
+          <OTag type="pipelineType" :value="row.type" />
+        </template>
+
         <template #cell-actions="{ row }">
           <div class="tw:flex tw:items-center actions-container">
             <OButton
@@ -99,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('pipeline.view')"
               icon-left="visibility"
             >
-              <OTooltip max-width="none">
+              <OTooltip max-width="none" side="left">
                 <template #content
                   ><PipelineView :pipeline="row"
                 /></template>
@@ -399,6 +403,7 @@ import config from "@/aws-exports";
 import NoData from "../shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
