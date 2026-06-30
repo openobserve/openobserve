@@ -19,16 +19,6 @@
           <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
         </template>
         <template #actions>
-          <OInput
-            v-model="searchQuery"
-            class="tw:w-50"
-            :placeholder="t('llmProviders.searchPlaceholder')"
-            data-test="llm-providers-search-input"
-          >
-            <template #icon-left>
-              <OIcon name="search" size="sm" />
-            </template>
-          </OInput>
           <OButton
             data-test="llm-providers-add-btn"
             variant="primary"
@@ -62,7 +52,7 @@
         />
       </div>
 
-      <div v-else class="tw:flex-1 tw:min-h-0 tw:p-4">
+      <div v-else class="tw:flex-1 tw:min-h-0">
         <OTable
           data-test="llm-providers-table"
           :data="filteredProviders"
@@ -82,6 +72,14 @@
           class="tw:w-full tw:h-full"
           @row-click="(row: any) => openEdit(row)"
         >
+          <template #toolbar>
+            <OSearchInput
+              v-model="searchQuery"
+              class="tw:flex-1"
+              :placeholder="t('llmProviders.searchPlaceholder')"
+              data-test="llm-providers-search-input"
+            />
+          </template>
           <template #empty>
             <OEmptyState
               size="hero"
@@ -153,10 +151,9 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
