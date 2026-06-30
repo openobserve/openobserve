@@ -10,7 +10,14 @@ import type { SelectModelValue } from "./OSelect.types";
 
 defineOptions({ inheritAttrs: false });
 
-const props = defineProps<FormSelectProps>();
+// OSelect defaults `searchable` to true. Because OFormSelect re-declares it as a
+// boolean prop, an OMITTED `searchable` would be cast to `false` (Vue's
+// absent-boolean rule) and then forwarded, clobbering OSelect's default and
+// making every form select non-searchable. Mirror OSelect's default so the
+// wrapper is transparent (consumers can still pass `:searchable="false"`).
+const props = withDefaults(defineProps<FormSelectProps>(), {
+  searchable: true,
+});
 
 const form = inject(FORM_CONTEXT_KEY, null);
 

@@ -150,7 +150,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`add-report-dashboard-${index}`"
                     class="tw:my-2 tw:px-2 tw:flex tw:flex-col"
                   >
-                    <div class="tw:flex tw:items-center tw:justify-start">
+                    <!-- items-start (not items-center): each OFormSelect cell is a
+                         column (label → select → error). When a validation error
+                         appears under one select, items-center would re-center the
+                         taller cell and shift its select out of line with the
+                         others; items-start keeps all selects top-aligned and lets
+                         the error text flow downward. -->
+                    <div class="tw:flex tw:items-start tw:justify-start">
                       <div
                         data-test="add-report-folder-select"
                         class="o2-input tw:mr-2"
