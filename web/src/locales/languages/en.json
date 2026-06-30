@@ -4403,6 +4403,8 @@
     "edit_regex_pattern": "Edit Pattern",
     "update_close": "Update and Close",
     "description": "Description",
+    "unsupported_lookaround_note": "Lookahead, lookbehind, backreferences and recursion are not supported. Rewrite them as plain patterns.",
+    "unsupported_lookaround_example": "Eg.",
     "create_regex_pattern_field": "Redact / Drop using Regex",
     "import": "Import",
     "import_title": "Import Pattern",

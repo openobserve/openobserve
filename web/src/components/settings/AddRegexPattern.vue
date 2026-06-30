@@ -93,6 +93,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-regex-pattern-description-input"
               placeholder="Describe your pattern to help users understand"
             />
+            <OBanner
+              variant="info"
+              icon="info"
+              dense
+              data-test="add-regex-pattern-lookaround-note"
+            >
+              <div class="regex-pattern-lookaround-note">
+                <div>{{ t("regex_patterns.unsupported_lookaround_note") }}</div>
+                <div class="tw:mt-1 tw:flex tw:items-center tw:gap-1">
+                  <span>{{ t("regex_patterns.unsupported_lookaround_example") }}</span>
+                  <code class="regex-pattern-lookaround-code">(?=openobserve)\w+</code>
+                  <OIcon name="arrow-right-alt" size="xs" />
+                  <code class="regex-pattern-lookaround-code">openobserve\w*</code>
+                </div>
+              </div>
+            </OBanner>
             <div class="regex-pattern-input-container">
               <div class="tw:flex tw:items-center tw:justify-between">
                 <span class="regex-pattern-input-label"> Regex Pattern </span>
@@ -330,6 +346,7 @@ import { useRouter } from "vue-router";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import {
   makeAddRegexPatternSchema,
   type AddRegexPatternForm,
@@ -355,6 +372,7 @@ export default defineComponent({
   emit: ["close", "update:list", "update:open"],
   components: {
     OSeparator,
+    OBanner,
     FullViewContainer,
     O2AIChat,
     OButton,
@@ -702,6 +720,18 @@ export default defineComponent({
   .monaco-editor-background {
     background-color: #181a1b !important;
   }
+}
+.regex-pattern-lookaround-note {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+}
+.regex-pattern-lookaround-code {
+  font-family: monospace;
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background-color: var(--color-banner-info-border);
 }
 .regex-pattern-input-label {
   font-size: 14px;
