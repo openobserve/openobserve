@@ -15,6 +15,7 @@
     :footer-title="footerTitle"
     :empty-message="emptyMessage"
     :data-test="dataTest"
+    :horizontal-scroll="true"
     @row-click="(row: any) => emit('row-click', row)"
   >
     <!-- Status dot -->
