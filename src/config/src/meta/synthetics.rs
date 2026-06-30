@@ -248,6 +248,7 @@ pub struct SyntheticVariable {
 // ── Settings (packed into the `settings` JSON column) ────────────────────────
 
 /// Non-type-specific monitor settings stored as a single `settings` JSON blob.
+/// auth and variables are stored in their own dedicated encrypted TEXT columns, not here.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SyntheticSettings {
     #[serde(default)]
@@ -262,10 +263,6 @@ pub struct SyntheticSettings {
     pub collect_rum_data: bool,
     #[serde(default)]
     pub session_replay: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub auth: Option<SyntheticAuth>,
-    #[serde(default)]
-    pub variables: Vec<SyntheticVariable>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start: Option<i64>,
 }

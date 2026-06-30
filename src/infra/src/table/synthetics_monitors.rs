@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::synthetics::{
-    BrowserConfig, ListSyntheticsParams, Synthetic, SyntheticFrequency, SyntheticSettings,
-    SyntheticStatus, SyntheticType,
+    BrowserConfig, ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticFrequency,
+    SyntheticSettings, SyntheticStatus, SyntheticType, SyntheticVariable,
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
@@ -53,6 +53,18 @@ impl TryFrom<synthetics_monitors::Model> for Synthetic {
 
         let settings: SyntheticSettings = serde_json::from_value(m.settings).unwrap_or_default();
 
+        let variables: Vec<SyntheticVariable> = if m.variables.is_empty() {
+            vec![]
+        } else {
+            serde_json::from_str(&m.variables).unwrap_or_default()
+        };
+
+        let auth: Option<SyntheticAuth> = if m.auth.is_empty() {
+            None
+        } else {
+            serde_json::from_str(&m.auth).ok()
+        };
+
         let last_check_status: SyntheticStatus =
             serde_json::from_value(serde_json::Value::String(m.last_check_status))
                 .unwrap_or_default();
@@ -78,8 +90,8 @@ impl TryFrom<synthetics_monitors::Model> for Synthetic {
             alert_if_fails: settings.alert_if_fails,
             collect_rum_data: settings.collect_rum_data,
             session_replay: settings.session_replay,
-            auth: settings.auth,
-            variables: settings.variables,
+            auth,
+            variables,
             start: settings.start,
             next_run_at: m.next_run_at,
             last_triggered_at: m.last_triggered_at,
@@ -410,10 +422,24 @@ fn pack_settings(monitor: &Synthetic) -> Result<serde_json::Value, errors::Error
         alert_if_fails: monitor.alert_if_fails,
         collect_rum_data: monitor.collect_rum_data,
         session_replay: monitor.session_replay,
-        auth: monitor.auth.clone(),
-        variables: monitor.variables.clone(),
         start: monitor.start,
     })?)
+}
+
+fn pack_variables(monitor: &Synthetic) -> Result<String, errors::Error> {
+    if monitor.variables.is_empty() {
+        return Ok(String::new());
+    }
+    Ok(serde_json::to_string(&monitor.variables)
+        .map_err(|e| errors::Error::Message(format!("variables serialize failed: {e}")))?)
+}
+
+fn pack_auth(monitor: &Synthetic) -> Result<String, errors::Error> {
+    match &monitor.auth {
+        None => Ok(String::new()),
+        Some(a) => serde_json::to_string(a)
+            .map_err(|e| errors::Error::Message(format!("auth serialize failed: {e}"))),
+    }
 }
 
 fn update_mutable_fields(am: &mut ActiveModel, monitor: &Synthetic) -> Result<(), errors::Error> {
@@ -434,6 +460,8 @@ fn update_mutable_fields(am: &mut ActiveModel, monitor: &Synthetic) -> Result<()
     am.enabled = Set(monitor.enabled);
     am.destinations = Set(destinations);
     am.settings = Set(settings);
+    am.variables = Set(pack_variables(monitor)?);
+    am.auth = Set(pack_auth(monitor)?);
     Ok(())
 }
 
@@ -454,6 +482,8 @@ fn build_active_model(monitor: &Synthetic) -> Result<ActiveModel, errors::Error>
         enabled: Set(monitor.enabled),
         destinations: Set(destinations),
         settings: Set(settings),
+        variables: Set(pack_variables(monitor)?),
+        auth: Set(pack_auth(monitor)?),
         ..Default::default()
     })
 }
