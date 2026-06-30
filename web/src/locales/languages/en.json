@@ -5019,7 +5019,6 @@
         "title": "Score Configs Overview",
         "countSuffix": "{n} configs",
         "searchPlaceholder": "Filter configs…",
-        "loading": "Loading per-config aggregates…",
         "emptyNoConfigsTitle": "No Score Configs yet",
         "emptyNoConfigsHint": "Define your first Score Config to start tracking quality dimensions.",
         "emptyWaitingTitle": "Waiting for the first scores to land",

@@ -1,12 +1,7 @@
 <template>
   <section class="qsc-overview" data-test="quality-score-configs-overview">
-    <div v-if="isLoading && rows.length === 0" class="qsc-overview__loading">
-      <OSpinner size="sm" />
-      <span>{{ t("onlineEvals.quality.overview.loading") }}</span>
-    </div>
-
     <div
-      v-else-if="rows.length === 0"
+      v-if="rows.length === 0 && !isLoading"
       class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center"
       data-test="quality-overview-empty"
     >
@@ -127,7 +122,6 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -307,18 +301,6 @@ function relativeTime(timestampMs: number): string {
   gap: 10px;
   min-height: 0;
   flex: 1;
-}
-
-.qsc-overview__loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 32px 12px;
-  border: 1px dashed var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  text-align: center;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .qsc-overview__table-wrap {
