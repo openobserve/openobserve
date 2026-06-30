@@ -35,14 +35,20 @@ const filterQuery = ref('')
 const expandedSteps = ref<Set<string>>(new Set())
 
 // ── Drag-and-drop ──────────────────────────────────────────────────────────
-const stepsModel = computed<BrowserStep[]>({
-  get: () => props.modelValue,
-  set: (val: BrowserStep[]) => emit('update:modelValue', val),
+const stepsModel = ref<BrowserStep[]>([...props.modelValue])
+
+// Sync from parent mutations (add, delete, recording stop, etc.)
+watch(() => props.modelValue, (val) => {
+  stepsModel.value = [...val]
 })
 
 const dragDisabled = computed(() =>
   isRecording.value || props.isReplaying || props.readonly || !!filterQuery.value.trim()
 )
+
+function onDragChange() {
+  emit('update:modelValue', [...stepsModel.value])
+}
 
 // ── Multi-select ───────────────────────────────────────────────────────────
 const selectedStepIds = ref<Set<string>>(new Set())
@@ -369,6 +375,7 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
     <VueDraggableNext
       v-else-if="!dragDisabled"
       v-model="stepsModel"
+      @change="onDragChange"
       handle="[data-test='synthetics-journey-step-drag-handle']"
       :animation="200"
       ghost-class="tw:opacity-30 tw:bg-[var(--o2-primary-50)] tw:border tw:border-dashed tw:border-[var(--o2-primary-color)] tw:rounded-md"
