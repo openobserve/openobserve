@@ -23,7 +23,6 @@ use prost::Message;
 use proto::cluster_rpc;
 use tonic::{
     Request, Status,
-    codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
     service::interceptor::InterceptedService,
     transport::Channel,
@@ -91,8 +90,6 @@ pub async fn make_flight_client(
             Ok(req)
         });
     let client = client
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
 

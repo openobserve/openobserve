@@ -65,6 +65,10 @@ pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
 pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
 pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
+/// HTTP/2 flow-control windows (bytes) for internal gRPC channels. Used only when
+/// `ZO_GRPC_HTTP2_ADAPTIVE_WINDOW=false`.
+pub const GRPC_HTTP2_STREAM_WINDOW_SIZE: u32 = 8 * 1024 * 1024; // 8 MB
+pub const GRPC_HTTP2_CONNECTION_WINDOW_SIZE: u32 = 16 * 1024 * 1024; // 16 MB
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 // The current value is recorded in each tantivy index file (puffin `row_group_size`
 // property) so it can be changed safely without breaking row_id → row_group mapping
@@ -781,6 +785,12 @@ pub struct Grpc {
     pub connect_timeout: u64,
     #[env_config(name = "ZO_GRPC_CHANNEL_CACHE_DISABLED", default = false)]
     pub channel_cache_disabled: bool,
+    #[env_config(
+        name = "ZO_GRPC_HTTP2_ADAPTIVE_WINDOW",
+        default = true,
+        help = "Enable HTTP/2 adaptive (BDP-based) flow-control window growth"
+    )]
+    pub http2_adaptive_window: bool,
     #[env_config(name = "ZO_GRPC_TLS_ENABLED", default = false)]
     pub tls_enabled: bool,
     #[env_config(name = "ZO_GRPC_TLS_CERT_DOMAIN", default = "")]
