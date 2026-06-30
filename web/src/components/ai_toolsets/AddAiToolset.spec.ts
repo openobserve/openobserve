@@ -331,15 +331,17 @@ describe("AddAiToolset", () => {
   describe("field-array delete gate (rendered inputs)", () => {
     // Rendered key-input values for an array, in DOM order, e.g. namePrefix
     // "mcp.headers" → reads every `mcp.headers[i].key` OInput's model-value.
-    const renderedKeys = (namePrefix: string): string[] => {
-      const re = new RegExp(
-        `^${namePrefix.replace(/[.[\]]/g, "\\$&")}\\[\\d+\\]\\.key$`,
-      );
-      return wrapper
+    // Matched with startsWith/endsWith (not a RegExp built from a string) so
+    // there is no escaping to get wrong — `${prefix}[` ... `].key` pins it to
+    // an indexed `key` field of exactly this array.
+    const renderedKeys = (namePrefix: string): string[] =>
+      wrapper
         .findAllComponents(OFormInput)
-        .filter((c: any) => re.test(c.props("name")))
+        .filter((c: any) => {
+          const name = String(c.props("name"));
+          return name.startsWith(`${namePrefix}[`) && name.endsWith("].key");
+        })
         .map((c: any) => c.findComponent(OInput).props("modelValue"));
-    };
 
     it("keeps mcp.headers inputs in sync after deleting a NON-last row", async () => {
       wrapper = createWrapper();
