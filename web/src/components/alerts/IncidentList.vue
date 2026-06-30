@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loading"
               @click="refreshIncidents"
               data-test="incident-refresh-btn"
-            >{{ t('common.refresh') }}</OButton>
+            ><OIcon name="refresh" size="sm"/>{{ t('common.refresh') }}</OButton>
           </template>
         </AppPageHeader>
       </template>

@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md tw:p-0" data-test="incident-detail-page">
-    <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-2.5 tw:pt-1 tw:pb-2.5">
+    <div class="tw:w-full tw:h-full tw:flex tw:flex-col">
     <!-- Header -->
-    <div class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-2.5 tw:h-[60px] tw:px-2.5 tw:-mx-2.5 tw:border-b tw:border-border-default">
+    <div class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-2.5 tw:h-[60px] tw:px-2.5">
       <div class="tw:flex tw:items-center tw:gap-3 tw:flex-1">
         <button
           type="button"
@@ -111,34 +111,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :loading="updating"
           @click="acknowledgeIncident"
-        >{{ t("alerts.incidents.acknowledge") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')" /></OButton>
+        ><OIcon name="visibility" size="sm"/>{{ t("alerts.incidents.acknowledge") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')" /></OButton>
         <OButton
           v-if="incidentDetails.status !== 'resolved'"
           variant="outline"
           size="sm"
           :loading="updating"
           @click="resolveIncident"
-        >{{ t("alerts.incidents.resolve") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsResolvedTooltip')" /></OButton>
+        ><OIcon name="task-alt" size="sm"/>{{ t("alerts.incidents.resolve") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsResolvedTooltip')" /></OButton>
         <OButton
           v-if="incidentDetails.status === 'resolved'"
           variant="outline"
           size="sm"
           :loading="updating"
           @click="reopenIncident"
-        ><OIcon name="refresh" size="sm" class="tw:mr-1" />{{ t("alerts.incidents.reopen") }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')" /></OButton>
+        ><OIcon name="refresh" size="sm"/>{{ t("alerts.incidents.reopen") }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')" /></OButton>
 
         <!-- Edit Title Button -->
         <OButton
           variant="outline"
           size="sm"
           @click="startTitleEdit"
-        >{{ t("alerts.edit") }}<OTooltip :delay="500" :content="t('alerts.incidents.editIncidentTitleTooltip')" /></OButton>
+        ><OIcon name="edit" size="sm"/>{{ t("alerts.edit") }}<OTooltip :delay="500" :content="t('alerts.incidents.editIncidentTitleTooltip')" /></OButton>
       </div>
     </div>
 
     <!-- Content -->
-    <div v-if="!loading && incidentDetails" class="card-container tw:flex tw:flex-col tw:overflow-hidden" style="height: calc(100vh - 130px);">
-      <div class="tw:flex-shrink-0 tw:px-2">
+    <div v-if="!loading && incidentDetails" class="card-container tw:flex tw:flex-col tw:overflow-hidden tw:-mt-2 tw:flex-1 tw:min-h-0">
+      <div class="tw:flex-shrink-0 tw:px-2 tw:border-b tw:border-border-default">
         <OTabs
           v-model="activeTab"
           align="left"

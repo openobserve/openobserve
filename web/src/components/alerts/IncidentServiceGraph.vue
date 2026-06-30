@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="incident-service-graph" style="height: calc(100vh - 202px); position: relative;">
+  <div class="incident-service-graph tw:relative tw:h-full tw:w-full">
     <!-- Info Icon → Graph Legend popover (hover to show, like the previous behavior) -->
     <span
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      class="info-icon-btn"
+      class="info-icon-btn tw:absolute tw:top-12 tw:right-12 tw:z-10"
     >
       <OButton variant="ghost" size="icon-circle-sm">
         <OIcon name="info-outline" size="sm" />
@@ -657,12 +657,6 @@ export default defineComponent({
   transition: all 0.2s ease;
 }
 
-.info-icon-btn {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 10;
-}
 
 /* Graph Legend popover — appears on hover of the info-icon-btn wrapper.
    Background/text use explicit colors per theme because `--o2-popover-background`
