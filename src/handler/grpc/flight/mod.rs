@@ -26,7 +26,7 @@ use config::{
 };
 use datafusion::{
     common::{DataFusionError, Result},
-    physical_plan::execute_stream,
+    physical_plan::execute_stream_partitioned,
 };
 use flight::common::{MetricsInfo, PreCustomMessage};
 use futures::{StreamExt, stream::BoxStream};
@@ -59,6 +59,7 @@ use crate::{
     },
 };
 
+mod partition_encoder;
 mod stream;
 pub mod visitor;
 
@@ -209,17 +210,20 @@ impl FlightService for FlightServiceImpl {
         let peak_memory_ref = get_peak_memory(&physical_plan);
         let partial_err_ref = get_partial_err(&physical_plan);
 
-        let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
-            clear_session_data(&trace_id);
-            #[cfg(feature = "enterprise")]
-            if get_o2_config().work_group.max_nodes_per_query > 0 {
-                o2_enterprise::enterprise::search::admission::ledger::release(&trace_id);
-                log::error!(
-                    "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
-                );
-            }
-            Status::internal(e.to_string())
-        })?;
+        // One stream per output partition so they encode in parallel; the encoder stream
+        // merges them onto the single do_get response.
+        let streams =
+            execute_stream_partitioned(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
+                clear_session_data(&trace_id);
+                #[cfg(feature = "enterprise")]
+                if get_o2_config().work_group.max_nodes_per_query > 0 {
+                    o2_enterprise::enterprise::search::admission::ledger::release(&trace_id);
+                    log::error!(
+                        "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
+                    );
+                }
+                Status::internal(e.to_string())
+            })?;
 
         let mut stream = FlightEncoderStreamBuilder::new(write_options, 33554432)
             .with_trace_id(trace_id.to_string())
@@ -236,7 +240,7 @@ impl FlightService for FlightServiceImpl {
                 partial_err_ref.clone(),
             ))
             .with_custom_message(PreCustomMessage::PartialErrRef(partial_err_ref))
-            .build(stream, span);
+            .build(streams, span);
 
         let stream = async_stream::stream! {
             let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));

@@ -15,23 +15,26 @@
 
 use std::{collections::VecDeque, pin::Pin, task::Poll};
 
-use arrow::{array::RecordBatch, ipc::writer::IpcWriteOptions};
+use arrow::ipc::writer::IpcWriteOptions;
 use arrow_flight::{FlightData, error::FlightError};
 use config::metrics;
 use datafusion::execution::SendableRecordBatchStream;
 use flight::{common::PreCustomMessage, encoder::FlightDataEncoder};
 use futures::{Stream, StreamExt};
-use futures_core::ready;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::info_span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{handler::grpc::flight::clear_session_data, service::search::work_group::DeferredLock};
+use crate::{
+    handler::grpc::flight::{clear_session_data, partition_encoder::PartitionEncoderStream},
+    service::search::work_group::DeferredLock,
+};
 
 pub struct FlightEncoderStreamBuilder {
-    encoder: FlightDataEncoder,
-    queue: VecDeque<FlightData>,
+    options: IpcWriteOptions,
+    max_flight_data_size: usize,
     custom_messages: Vec<PreCustomMessage>,
     // query context
     trace_id: String,
@@ -43,8 +46,8 @@ pub struct FlightEncoderStreamBuilder {
 impl FlightEncoderStreamBuilder {
     pub fn new(options: IpcWriteOptions, max_flight_data_size: usize) -> Self {
         Self {
-            encoder: FlightDataEncoder::new(options, max_flight_data_size),
-            queue: VecDeque::new(),
+            options,
+            max_flight_data_size,
             custom_messages: vec![],
             trace_id: String::new(),
             is_super: false,
@@ -78,24 +81,49 @@ impl FlightEncoderStreamBuilder {
         self
     }
 
+    /// Build the encoder stream over the plan's output partitions. Each partition gets its
+    /// own encoder and they are merged, so partitions encode in parallel.
     pub fn build(
         self,
-        inner: SendableRecordBatchStream,
+        partitions: Vec<SendableRecordBatchStream>,
         span: tracing::Span,
     ) -> FlightEncoderStream {
         let child_span = info_span!("grpc:search:flight:execute_physical_plan");
         let _ = child_span.set_parent(span.context());
+        // One task per partition (like CoalescePartitionsExec) so their execution and
+        // encoding run in parallel; each forwards its FlightData into the shared channel.
+        let cap = (partitions.len() * 2).max(2);
+        let mut handles = Vec::with_capacity(partitions.len());
+        let (tx, rx) = mpsc::channel(cap);
+        for inner in partitions {
+            let tx = tx.clone();
+            let mut pstream =
+                PartitionEncoderStream::new(inner, self.options.clone(), self.max_flight_data_size);
+            handles.push(tokio::spawn(async move {
+                while let Some(item) = pstream.next().await {
+                    let is_err = item.is_err();
+                    if tx.send(item).await.is_err() {
+                        break; // receiver gone (client disconnect / error)
+                    }
+                    if is_err {
+                        break;
+                    }
+                }
+            }));
+        }
         FlightEncoderStream {
-            inner,
-            encoder: self.encoder,
-            queue: self.queue,
-            done: false,
+            rx,
+            handles,
+            encoder: FlightDataEncoder::new(self.options, self.max_flight_data_size),
+            queue: VecDeque::new(),
             custom_messages: self.custom_messages,
+            first_data: true,
+            customs_emitted: false,
+            done: false,
             trace_id: self.trace_id,
             is_super: self.is_super,
             defer_lock: self.defer_lock,
             start: self.start,
-            first_batch: true,
             span,
             child_span,
             req_id: 0,
@@ -106,12 +134,17 @@ impl FlightEncoderStreamBuilder {
 }
 
 pub struct FlightEncoderStream {
-    inner: SendableRecordBatchStream,
+    /// Encoded FlightData merged from all per-partition encoder tasks.
+    rx: mpsc::Receiver<Result<FlightData, FlightError>>,
+    /// Per-partition encoder tasks; aborted on drop before session cleanup.
+    handles: Vec<JoinHandle<()>>,
+    /// Only used to encode custom messages (scan stats, peak memory, ...).
     encoder: FlightDataEncoder,
     queue: VecDeque<FlightData>,
-    done: bool,
-    first_batch: bool,
     custom_messages: Vec<PreCustomMessage>,
+    first_data: bool,
+    customs_emitted: bool,
+    done: bool,
     // query context
     trace_id: String,
     is_super: bool,
@@ -125,24 +158,10 @@ pub struct FlightEncoderStream {
 }
 
 impl FlightEncoderStream {
-    fn encode_batch(&mut self, batch: RecordBatch) -> Result<(), FlightError> {
-        let flight_data = self.encoder.encode_batch(batch)?;
-        self.queue.extend(flight_data);
-
-        Ok(())
-    }
-
-    fn finish_encoder(&mut self) -> Result<(), FlightError> {
-        let flight_data = self.encoder.finish()?;
-        self.queue.extend(flight_data);
-        Ok(())
-    }
-
     fn encode_custom_messages(&mut self) -> Result<(), FlightError> {
         let custom_messages = std::mem::take(&mut self.custom_messages);
         for message in custom_messages.into_iter() {
-            let message = message.get_custom_message();
-            if let Some(message) = message {
+            if let Some(message) = message.get_custom_message() {
                 let flight_data = self.encoder.encode_custom(&message)?;
                 self.queue.push_back(flight_data);
             }
@@ -155,8 +174,7 @@ impl FlightEncoderStream {
         let mut remainder_messages = Vec::new();
         for message in custom_messages.into_iter() {
             if message.is_early_emit() {
-                let message = message.get_custom_message();
-                if let Some(message) = message {
+                if let Some(message) = message.get_custom_message() {
                     let flight_data = self.encoder.encode_custom(&message)?;
                     self.queue.push_back(flight_data);
                 }
@@ -167,93 +185,96 @@ impl FlightEncoderStream {
         self.custom_messages = remainder_messages;
         Ok(())
     }
+
+    fn fail(
+        &mut self,
+        e: impl std::string::ToString,
+    ) -> Poll<Option<Result<FlightData, tonic::Status>>> {
+        self.done = true;
+        self.queue.clear();
+        Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))))
+    }
 }
 
 impl Stream for FlightEncoderStream {
     type Item = std::result::Result<FlightData, tonic::Status>;
 
     fn poll_next(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
         loop {
-            if self.done && self.queue.is_empty() {
-                if self.print_key_event {
-                    log::info!(
-                        "[trace_id {}] flight->search: stream Poll::Ready(None) is_super: {}, took: {} ms",
-                        self.trace_id,
-                        self.is_super,
-                        self.req_last_time.elapsed().as_millis(),
-                    );
-                }
-                return Poll::Ready(None);
-            }
-
-            if let Some(data) = self.queue.pop_front() {
-                self.req_id += 1;
-                let took = self.req_last_time.elapsed().as_millis();
-                self.req_last_time = std::time::Instant::now();
-                if self.print_key_event
-                    && (took > 100 || config::utils::util::is_power_of_two(self.req_id))
+            // 1) yield any already-encoded output
+            if let Some(data) = this.queue.pop_front() {
+                this.req_id += 1;
+                let took = this.req_last_time.elapsed().as_millis();
+                this.req_last_time = std::time::Instant::now();
+                if this.print_key_event
+                    && (took > 100 || config::utils::util::is_power_of_two(this.req_id))
                 {
                     log::info!(
                         "[trace_id {}] flight->search: stream Poll::Ready(#{}) message, is_super: {}, took: {took} ms",
-                        self.trace_id,
-                        self.req_id,
-                        self.is_super,
+                        this.trace_id,
+                        this.req_id,
+                        this.is_super,
                     );
                 }
                 return Poll::Ready(Some(Ok(data)));
             }
 
-            let batch = ready!(self.inner.poll_next_unpin(cx));
-
-            match batch {
-                None => {
-                    // Flush remaining coalesced batches first, then send custom
-                    // messages (e.g. peak memory). Ordering: all data before stats.
-                    if let Err(e) = self.finish_encoder() {
-                        self.done = true;
-                        self.queue.clear();
-                        return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
-                    }
-                    // TODO: maybe we can embed custom messages into the last batch to avoid extra
-                    // FlightData at the end?
-                    if let Err(e) = self.encode_custom_messages() {
-                        self.done = true;
-                        self.queue.clear();
-                        return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
-                    }
-                    self.done = true;
-                    // loop continues to drain queue before returning None
+            // 2) fully finished
+            if this.done {
+                if this.print_key_event {
+                    log::info!(
+                        "[trace_id {}] flight->search: stream Poll::Ready(None) is_super: {}, took: {} ms",
+                        this.trace_id,
+                        this.is_super,
+                        this.req_last_time.elapsed().as_millis(),
+                    );
                 }
-                Some(Err(e)) => {
-                    self.done = true;
-                    self.queue.clear();
+                return Poll::Ready(None);
+            }
+
+            // 3) pull the next encoded FlightData from the partition tasks
+            match this.rx.poll_recv(cx) {
+                Poll::Ready(Some(Ok(fd))) => {
+                    // before the first data, emit early-emit custom messages
+                    if this.first_data {
+                        this.first_data = false;
+                        if !this.custom_messages.is_empty()
+                            && let Err(e) = this.encode_early_emit_messages()
+                        {
+                            return this.fail(e);
+                        }
+                    }
+                    this.queue.push_back(fd);
+                    continue;
+                }
+                Poll::Ready(Some(Err(e))) => {
                     log::error!(
                         "[trace_id {}] flight->search: stream error: {e:?}, is_super: {}, took: {} ms",
-                        self.trace_id,
-                        self.is_super,
-                        self.start.elapsed().as_millis()
+                        this.trace_id,
+                        this.is_super,
+                        this.start.elapsed().as_millis()
                     );
-                    return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
+                    return this.fail(e);
                 }
-                Some(Ok(batch)) => {
-                    // before send the first batch, send the early emit messages first
-                    if self.first_batch && !self.custom_messages.is_empty() {
-                        if let Err(e) = self.encode_early_emit_messages() {
-                            self.done = true;
-                            self.queue.clear();
-                            return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
+                Poll::Ready(None) => {
+                    // all partitions done; append trailing custom messages (e.g. peak memory)
+                    if !this.customs_emitted {
+                        this.customs_emitted = true;
+                        if let Err(e) = this.encode_custom_messages() {
+                            return this.fail(e);
                         }
-                        self.first_batch = false;
+                        if !this.queue.is_empty() {
+                            continue;
+                        }
                     }
-                    if let Err(e) = self.encode_batch(batch) {
-                        self.done = true;
-                        self.queue.clear();
-                        return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
-                    }
+                    this.done = true;
+                    continue;
                 }
+                Poll::Pending => return Poll::Pending,
             }
         }
     }
@@ -261,6 +282,10 @@ impl Stream for FlightEncoderStream {
 
 impl Drop for FlightEncoderStream {
     fn drop(&mut self) {
+        // Stop the partition tasks before clearing the session data they may still read.
+        for handle in &self.handles {
+            handle.abort();
+        }
         let trace_id = &self.trace_id;
         let is_super = self.is_super;
         let took = self.start.elapsed().as_millis();
@@ -304,9 +329,17 @@ impl Drop for FlightEncoderStream {
 
 #[cfg(test)]
 mod tests {
-    use arrow::ipc::writer::IpcWriteOptions;
+    use std::sync::Arc;
+
+    use arrow::{
+        array::{Int32Array, RecordBatch},
+        ipc::writer::IpcWriteOptions,
+    };
+    use arrow_schema::{DataType, Field, Schema};
     use config::meta::search::ScanStats;
+    use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
     use flight::common::PreCustomMessage;
+    use futures::TryStreamExt;
 
     use super::*;
 
@@ -321,7 +354,6 @@ mod tests {
         assert!(!b.is_super);
         assert!(b.defer_lock.is_none());
         assert!(b.custom_messages.is_empty());
-        assert!(b.queue.is_empty());
     }
 
     #[test]
@@ -352,7 +384,6 @@ mod tests {
     fn test_builder_with_start() {
         let t = std::time::Instant::now();
         let b = make_builder().with_start(t);
-        // Can't compare Instant directly, but at least verify it compiled and ran
         let _ = b.start;
     }
 
@@ -370,5 +401,65 @@ mod tests {
             .with_is_super(true);
         assert_eq!(b.trace_id, "trace-xyz");
         assert!(b.is_super);
+    }
+
+    // End-to-end: two partitions encode in parallel and merge onto one stream. Decode the
+    // output and assert no rows are lost (cross-partition order is not preserved, so sort).
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_multi_partition_no_row_loss() {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
+        let total = 6 * 8192i32;
+
+        let make_partition = |range: std::ops::Range<i32>| -> SendableRecordBatchStream {
+            let schema = schema.clone();
+            let batches: Vec<RecordBatch> = range
+                .clone()
+                .step_by(8192)
+                .map(|s| {
+                    let end = (s + 8192).min(range.end);
+                    let vals = Int32Array::from((s..end).collect::<Vec<i32>>());
+                    RecordBatch::try_new(schema.clone(), vec![Arc::new(vals)]).unwrap()
+                })
+                .collect();
+            Box::pin(RecordBatchStreamAdapter::new(
+                schema.clone(),
+                futures::stream::iter(batches.into_iter().map(Ok)),
+            ))
+        };
+
+        let partitions = vec![
+            make_partition(0..total / 2),
+            make_partition(total / 2..total),
+        ];
+
+        let options = IpcWriteOptions::default()
+            .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
+            .unwrap();
+        let stream = FlightEncoderStreamBuilder::new(options, 33554432)
+            .build(partitions, tracing::Span::none());
+
+        let fds: Vec<FlightData> = stream.try_collect().await.unwrap();
+
+        let dicts = std::collections::HashMap::new();
+        let mut decoded: Vec<i32> = fds
+            .iter()
+            .flat_map(|fd| {
+                let b = arrow_flight::utils::flight_data_to_arrow_batch(fd, schema.clone(), &dicts)
+                    .unwrap();
+                b.column(0)
+                    .as_any()
+                    .downcast_ref::<Int32Array>()
+                    .unwrap()
+                    .values()
+                    .to_vec()
+            })
+            .collect();
+        decoded.sort();
+
+        assert_eq!(
+            decoded,
+            (0..total).collect::<Vec<_>>(),
+            "no rows may be lost across partitions"
+        );
     }
 }
