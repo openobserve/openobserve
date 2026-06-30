@@ -21,7 +21,11 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    common::utils::auth::UserEmail,
+    handler::http::extractors::Headers,
+};
 
 // ── Local query / body types ──────────────────────────────────────────────────
 
@@ -290,11 +294,13 @@ pub async fn list_synthetics(
 pub async fn create_synthetic(
     Path(org_id): Path<String>,
     Query(_folder_query): Query<FolderQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(body): Json<config::meta::synthetics::Synthetic>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::create_synthetic(&org_id, body).await
+        let created_by = user_email.user_id.as_str();
+        match o2_enterprise::enterprise::synthetics::service::create_synthetic(&org_id, body, created_by).await
         {
             Ok(monitor) => MetaHttpResponse::json(monitor),
             Err(e) => {
