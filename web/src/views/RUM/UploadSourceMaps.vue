@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:flex tw:flex-col tw:w-full tw:h-full tw:px-2.5 tw:bg-(--q-background)">
     <!-- Top Header Bar -->
-    <div class="header-bar tw:shrink-0 card-container tw:flex tw:items-center tw:justify-between tw:py-[0.675rem] tw:h-16 tw:px-[0.675rem] tw:mb-[0.675rem] tw:border-b tw:border-(--q-border-color)">
+    <div class="header-bar tw:shrink-0 card-container tw:flex tw:items-center tw:justify-between tw:py-[0.675rem] tw:h-16 tw:px-[0.675rem] tw:mb-[0.675rem] tw:border-b tw:border-[var(--o2-border-color)]">
       <div class="tw:flex tw:items-center tw:gap-3">
         <div
           data-test="add-alert-back-btn"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex-1 tw:overflow-y-auto card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 172px); overflow: auto">
       <div class="tw:max-w-300 tw:mx-auto">
         <!-- Input Fields -->
-        <div class="tw:grid tw:grid-cols-1 tw:md:grid-cols-3 tw:gap-4 tw:mb-6">
+        <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-3 tw:gap-4 tw:mb-6">
           <!-- Service Input -->
           <div>
             <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Service *</div>
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Source Map ZIP File *</div>
           <div
             data-test="rum-upload-source-maps-file-dropzone"
-            class="tw:border-2 tw:border-dashed tw:border-(--q-border-color) tw:rounded-lg tw:p-8 tw:text-center tw:cursor-pointer tw:transition-all tw:duration-300 tw:bg-(--q-background) tw:hover:border-(--q-primary) tw:dark:border-[rgba(255,255,255,0.1)] tw:dark:hover:bg-[rgba(var(--q-primary-rgb),0.05)]"
+            class="tw:border-2 tw:border-dashed tw:border-[var(--o2-border-color)] tw:rounded-lg tw:p-8 tw:text-center tw:cursor-pointer tw:transition-all tw:duration-300 tw:bg-(--q-background) tw:hover:border-(--q-primary) tw:dark:border-[rgba(255,255,255,0.1)] tw:dark:hover:bg-[rgba(var(--q-primary-rgb),0.05)]"
             :class="[
               isDragging ? 'tw:border-[var(--q-primary)]! tw:bg-[rgba(var(--q-primary-rgb),0.05)]! tw:border-solid! tw:dark:bg-[rgba(var(--q-primary-rgb),0.1)]!' : '',
               formData.file ? 'tw:p-6! tw:text-left! tw:border-solid! tw:border-[var(--q-positive)]! tw:bg-[rgba(var(--q-positive-rgb),0.02)]! tw:dark:bg-[rgba(var(--q-positive-rgb),0.05)]!' : ''
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Bottom Action Bar -->
-    <div class="action-bar tw:shrink-0 card-container tw:flex tw:items-center tw:justify-end tw:gap-3 tw:py-3 tw:pr-3 tw:border-t tw:border-(--q-border-color)"
+    <div class="action-bar tw:shrink-0 card-container tw:flex tw:items-center tw:justify-end tw:gap-3 tw:py-3 tw:pr-3 tw:border-t tw:border-[var(--o2-border-color)]"
       style="position: sticky; z-index: 2">
       <OButton
         data-test="rum-upload-source-maps-cancel-btn"
