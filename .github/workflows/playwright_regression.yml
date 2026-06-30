@@ -624,25 +624,31 @@ jobs:
           #   PLAYWRIGHT_HTML_OUTPUT_DIR  - html reporter output directory
           #   PLAYWRIGHT_HTML_OPEN=never  - never auto-open the report (required for CI)
           #   PLAYWRIGHT_JSON_OUTPUT_NAME - json reporter output file path
-          # TEMP DIAGNOSTICS — merge-reports crashes mid-extraction only on the OSS CI runners
-          # (works locally, in a node:24 linux container, and on ENT eks). Capture the real exit
-          # code, stderr, versions and resource limits to find the cause.
-          echo "::group::merge env diagnostics"
-          echo "node: $(node -v)"; echo "playwright: $(npx playwright -V 2>&1)"
-          echo "nproc: $(nproc 2>/dev/null)"; free -m 2>/dev/null || true; ulimit -a 2>/dev/null || true
-          echo "blob count: $(ls all-blob-reports/*.zip 2>/dev/null | wc -l)"
+          # DIAGNOSTIC + WORKAROUND. merge-reports silently stops after a few blobs (exit 0, no
+          # output, no stderr) only on the OSS CI runners — works locally, in linux containers, at
+          # any CPU count, and on eks. Two untested variables: blob bytes as delivered by
+          # download-artifact, and extracting in-place inside the workspace mount. Verify blob
+          # integrity, then merge from an isolated /tmp dir.
+          echo "::group::blob integrity + env"
+          echo "node $(node -v) / playwright $(npx playwright -V 2>&1) / nproc $(nproc 2>/dev/null)"
+          for z in all-blob-reports/report-*.zip; do
+            if unzip -t "$z" >/dev/null 2>&1; then echo "ok   $z ($(stat -c%s "$z")b)"; else echo "::warning::CORRUPT $z"; fi
+          done
           echo "::endgroup::"
+          WORK=$(mktemp -d "${TMPDIR:-/tmp}/blobs.XXXXXX")
+          cp all-blob-reports/report-*.zip "$WORK"/
           merge_once() {
             rm -rf playwright-results/html-report playwright-results/report.json
+            rm -rf "$WORK"/report.jsonl "$WORK"/report-*.jsonl "$WORK"/resources
             set +e
             PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-results/html-report \
             PLAYWRIGHT_HTML_OPEN=never \
             PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results/report.json \
-              npx playwright merge-reports --reporter html,json ./all-blob-reports 2>merge.stderr
+              npx playwright merge-reports --reporter html,json "$WORK" 2>merge.stderr
             local rc=$?
             set -e
-            echo "::notice::merge-reports exit code: ${rc}"
-            echo "----- merge-reports stderr -----"; cat merge.stderr || true; echo "--------------------------------"
+            echo "::notice::merge-reports exit code: ${rc} (extracted $(ls "$WORK"/*.jsonl 2>/dev/null | wc -l) jsonl of $(ls "$WORK"/*.zip | wc -l) blobs)"
+            echo "----- stderr -----"; cat merge.stderr || true; echo "------------------"
             [ -f playwright-results/html-report/index.html ] && [ -f playwright-results/report.json ]
           }
           merged=
