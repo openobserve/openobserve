@@ -81,7 +81,8 @@ const selectorTypeOptions: { label: string; value: SelectorType }[] = [
 ]
 
 function update(patch: Partial<BrowserStep>) {
-  emit('update:step', { ...props.step, ...patch })
+  // Clear the wire so replay uses the edited fields, not the original recording
+  emit('update:step', { ...props.step, wire: undefined, ...patch })
 }
 
 const actionIcon = computed(() => ACTION_ICON_MAP[props.step.action])

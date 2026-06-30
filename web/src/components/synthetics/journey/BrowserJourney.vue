@@ -194,7 +194,9 @@ function setStepExpanded(id: string, val: boolean) {
 }
 
 function updateStep(index: number, updated: BrowserStep) {
-  const next = [...props.modelValue]; next[index] = updated; emit('update:modelValue', next)
+  const next = [...props.modelValue]; 
+  next[index] = updated; 
+  emit('update:modelValue', next)
 }
 function deleteStep(index: number) {
   const next = [...props.modelValue]; next.splice(index, 1); emit('update:modelValue', next)
