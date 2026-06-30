@@ -93,6 +93,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-regex-pattern-description-input"
               placeholder="Describe your pattern to help users understand"
             />
+            <OBanner
+              variant="info"
+              icon="info"
+              dense
+              data-test="add-regex-pattern-lookaround-note"
+            >
+              <div class="tw:text-[12px] tw:font-normal tw:leading-[18px]">
+                {{ t("regex_patterns.unsupported_lookaround_note") }}
+                {{ t("regex_patterns.unsupported_lookaround_example") }}
+                <code
+                  class="tw:font-mono tw:text-[12px] tw:px-[4px] tw:py-[1px] tw:rounded-[4px] tw:bg-[var(--color-banner-info-border)]"
+                  >(?=openobserve)\w+</code
+                >
+                <OIcon
+                  name="arrow-right-alt"
+                  size="xs"
+                  class="tw:inline-block tw:align-middle tw:mx-1"
+                />
+                <code
+                  class="tw:font-mono tw:text-[12px] tw:px-[4px] tw:py-[1px] tw:rounded-[4px] tw:bg-[var(--color-banner-info-border)]"
+                  >openobserve\w*</code
+                >
+              </div>
+            </OBanner>
             <div class="regex-pattern-input-container">
               <div class="tw:flex tw:items-center tw:justify-between">
                 <span class="tw:text-sm tw:font-bold tw:leading-5.25"> Regex Pattern </span>
@@ -321,6 +345,7 @@ import { useRouter } from "vue-router";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import {
   makeAddRegexPatternSchema,
   type AddRegexPatternForm,
@@ -346,6 +371,7 @@ export default defineComponent({
   emit: ["close", "update:list", "update:open"],
   components: {
     OSeparator,
+    OBanner,
     FullViewContainer,
     O2AIChat,
     OButton,

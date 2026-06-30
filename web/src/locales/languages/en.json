@@ -1764,6 +1764,17 @@
     "errorSpikePeriod": "Error Spike Period:",
     "errorsGreaterThan": "Errors >="
   },
+  "communitySlackInvite": {
+    "title": "Join the OpenObserve community on Slack",
+    "description": "Learn, ask questions, and get support from other users and the OpenObserve team.",
+    "benefit1": "Answers from the core team, often within hours",
+    "benefit2": "Setup help, dashboards & query tips from other users",
+    "benefit3": "Early word on releases",
+    "communityNote": "Engineers and the OpenObserve team, active every day",
+    "membersCount": "{count} members",
+    "joinSlack": "Join the Slack",
+    "maybeLater": "Maybe later"
+  },
   "confirmDialog": {
     "cancel": "Cancel",
     "ok": "OK",
@@ -4403,6 +4414,8 @@
     "edit_regex_pattern": "Edit Pattern",
     "update_close": "Update and Close",
     "description": "Description",
+    "unsupported_lookaround_note": "Lookahead, lookbehind, backreferences and recursion are not supported. Rewrite them as plain patterns.",
+    "unsupported_lookaround_example": "Eg.",
     "create_regex_pattern_field": "Redact / Drop using Regex",
     "import": "Import",
     "import_title": "Import Pattern",
