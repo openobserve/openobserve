@@ -22,8 +22,10 @@ use axum::{
 use serde::Deserialize;
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    common::utils::auth::UserEmail,
+    common::{
+        meta::http::HttpResponse as MetaHttpResponse,
+        utils::auth::{UserEmail, check_permissions},
+    },
     handler::http::extractors::Headers,
 };
 
@@ -300,7 +302,10 @@ pub async fn create_synthetic(
     #[cfg(feature = "enterprise")]
     {
         let created_by = user_email.user_id.as_str();
-        match o2_enterprise::enterprise::synthetics::service::create_synthetic(&org_id, body, created_by).await
+        match o2_enterprise::enterprise::synthetics::service::create_synthetic(
+            &org_id, body, created_by,
+        )
+        .await
         {
             Ok(monitor) => MetaHttpResponse::json(monitor),
             Err(e) => {
@@ -335,9 +340,15 @@ pub async fn create_synthetic(
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
 )]
-pub async fn get_synthetic(Path((org_id, id)): Path<(String, String)>) -> Response {
+pub async fn get_synthetic(
+    Path((org_id, id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !check_permissions(&id, &org_id, &user_email.user_id, "synthetics", "GET", None, false, true, false).await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::synthetics::service::get_synthetic(&org_id, &id).await {
             Ok(Some(monitor)) => MetaHttpResponse::json(monitor),
             Ok(None) => MetaHttpResponse::not_found("monitor not found"),
@@ -378,10 +389,14 @@ pub async fn get_synthetic(Path((org_id, id)): Path<(String, String)>) -> Respon
 pub async fn update_synthetic(
     Path((org_id, id)): Path<(String, String)>,
     Query(_folder_query): Query<FolderQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(body): Json<config::meta::synthetics::Synthetic>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !check_permissions(&id, &org_id, &user_email.user_id, "synthetics", "PUT", _folder_query.folder.as_deref(), false, true, false).await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::synthetics::service::update_synthetic(&org_id, &id, body)
             .await
         {
@@ -426,9 +441,13 @@ pub async fn update_synthetic(
 pub async fn delete_synthetic(
     Path((org_id, id)): Path<(String, String)>,
     Query(_folder_query): Query<FolderQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !check_permissions(&id, &org_id, &user_email.user_id, "synthetics", "DELETE", _folder_query.folder.as_deref(), false, true, false).await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::synthetics::service::delete_synthetic(&org_id, &id).await {
             Ok(true) => MetaHttpResponse::ok("monitor deleted"),
             Ok(false) => MetaHttpResponse::not_found("monitor not found"),
@@ -562,10 +581,14 @@ pub async fn move_synthetics(
 )]
 pub async fn set_synthetic_enabled(
     Path((org_id, id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !check_permissions(&id, &org_id, &user_email.user_id, "synthetics", "PUT", None, false, true, false).await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         let enabled = match body.get("enabled").and_then(|v| v.as_bool()) {
             Some(v) => v,
             None => return MetaHttpResponse::bad_request("missing boolean field 'enabled'"),
@@ -613,9 +636,15 @@ pub async fn set_synthetic_enabled(
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
 )]
-pub async fn run_synthetic_now(Path((org_id, id)): Path<(String, String)>) -> Response {
+pub async fn run_synthetic_now(
+    Path((org_id, id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !check_permissions(&id, &org_id, &user_email.user_id, "synthetics", "PUT", None, false, true, false).await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::synthetics::service::run_synthetic_now(&org_id, &id).await
         {
             Ok(()) => (StatusCode::ACCEPTED, "").into_response(),
