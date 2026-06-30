@@ -972,16 +972,36 @@ jobs:
             fi
           fi
 
-          # Unset CI to use non-CI reporter config (html + json instead of blob)
-          unset CI
-          npx playwright merge-reports --config playwright.config.js ./all-blob-reports
+          # Force the html + json reporters explicitly with their output paths instead of
+          # relying on `unset CI` to flip playwright.config.js's `process.env.CI ? blob : html/json`
+          # ternary. The runner exports CI=true and `unset CI` does not reliably reach the
+          # merge subprocess, so the config would intermittently re-select the `blob` reporter —
+          # which writes a merged blob-report/ and NOTHING to playwright-results/, making the
+          # downstream `ls playwright-results/html-report/` fail with a cryptic exit 2.
+          mkdir -p playwright-results
+          # These env vars override playwright.config.js's reporter settings:
+          #   PLAYWRIGHT_HTML_OUTPUT_DIR  - html reporter output directory
+          #   PLAYWRIGHT_HTML_OPEN=never  - never auto-open the report (required for CI)
+          #   PLAYWRIGHT_JSON_OUTPUT_NAME - json reporter output file path
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-results/html-report \
+          PLAYWRIGHT_HTML_OPEN=never \
+          PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results/report.json \
+            npx playwright merge-reports --reporter html,json ./all-blob-reports
 
           echo "Contents of playwright-results:"
-          ls -la playwright-results/
+          ls -la playwright-results/ || true
+          if [ ! -f playwright-results/html-report/index.html ] || [ ! -f playwright-results/report.json ]; then
+            echo "::error::merge-reports did not produce the expected html-report/index.html and report.json"
+            echo "::error::all-blob-reports contents:"
+            ls -la all-blob-reports/ || true
+            exit 1
+          fi
+          # Diagnostics only — never fail the step on these (the guard above already
+          # confirmed the outputs exist).
           echo "Contents of html-report:"
-          ls -la playwright-results/html-report/
+          ls -la playwright-results/html-report/ || true
           echo "Checking report.json:"
-          ls -lh playwright-results/report.json
+          ls -lh playwright-results/report.json || true
 
       - name: Extract report stats for OpenObserve
         id: report_stats
