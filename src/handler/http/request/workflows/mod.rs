@@ -36,6 +36,12 @@ pub struct WorkflowErrorList {
     errors: Vec<WorkflowRunErrors>,
 }
 
+#[derive(Deserialize)]
+pub struct WorkflowRetryDetails {
+    run_id: String,
+    from_node: Option<String>,
+}
+
 /// CreateWorkflow
 
 #[utoipa::path(
@@ -300,6 +306,42 @@ pub async fn test_workflow(
 pub async fn get_workflow_errors(Path((org_id, workflow_id)): Path<(String, String)>) -> Response {
     match workflows::get_workflow_errors(&org_id, &workflow_id).await {
         Ok(v) => MetaHttpResponse::json(WorkflowErrorList { errors: v }),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+/// RetryWorkflowRun
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/workflows/{id}/retry",
+    context_path = "/api",
+    tag = "Workflows",
+    operation_id = "retryWorkflowRun",
+    summary = "Retry a particular failed workflow run",
+    description = "",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+        ("id" = String, Path, description = "Workflow id"),
+    ),
+    request_body(content = inline(Object), description = "retry details", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+    )
+)]
+pub async fn retry_workflow(
+    Path((org_id, workflow_id)): Path<(String, String)>,
+    Json(details): Json<WorkflowRetryDetails>,
+) -> Response {
+    match workflows::retry_run(&org_id, &workflow_id, &details.run_id, details.from_node).await {
+        Ok(v) => MetaHttpResponse::json(WorkflowTestResult { errors: v.errors }),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }

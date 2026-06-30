@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
 use infra::table::workflows::{self, Workflow, WorkflowError, WorkflowRunErrors};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::service::pipeline::batch_execution::{ExecutablePipeline, WorkflowResult};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct InputMap {
     complete: Vec<Value>,
     node_map: HashMap<String, Vec<Value>>,
@@ -181,5 +181,50 @@ pub async fn get_workflow_errors(
     wid: &str,
 ) -> Result<Vec<WorkflowRunErrors>, anyhow::Error> {
     let res = workflows::list_errors_for_workflow(org_id, wid).await?;
+    Ok(res)
+}
+
+pub async fn retry_run(
+    org_id: &str,
+    wid: &str,
+    run_id: &str,
+    from_node: Option<String>,
+) -> Result<WorkflowResult, anyhow::Error> {
+    let workflow = workflows::get_by_org_wid(org_id, wid)
+        .await?
+        .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
+    let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
+
+    let input_file = get_inputs_file_path(org_id, wid, run_id);
+
+    let get_res = infra::storage::get("", &input_file).await.map_err(|e| {
+        log::error!(
+            "error getting input file for workflow {org_id}/{wid} run id {run_id} from storage: {e}"
+        );
+        anyhow::anyhow!("error retrieving inputs from storage : {e}")
+    })?;
+
+    let bytes = get_res.bytes().await.map_err(|e|{
+        log::error!("error getting input data bytes for workflow {org_id}/{wid} run id {run_id} from storage: {e}");
+        anyhow::anyhow!("error retrieving inputs from storage : {e}")
+    })?;
+
+    let mut ip_map: InputMap = serde_json::from_slice(&bytes).map_err(|e| {
+        log::error!(
+            "error deserializing input file for workflow {org_id}/{wid} run id {run_id} : {e}"
+        );
+        anyhow::anyhow!("error deserializing inputs : {e}")
+    })?;
+
+    let inputs = match from_node.as_ref() {
+        Some(node) => ip_map.node_map.remove(node).ok_or(anyhow::anyhow!(
+            "node id {node} does not have any associated input data in the stored inputs"
+        ))?,
+        None => ip_map.complete,
+    };
+
+    let res = executable
+        .process_workflow(org_id, inputs, from_node)
+        .await?;
     Ok(res)
 }
