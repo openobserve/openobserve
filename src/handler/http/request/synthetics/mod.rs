@@ -26,7 +26,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 // ── Local query / body types ──────────────────────────────────────────────────
 
 #[derive(Debug, Default, Deserialize)]
-pub(crate) struct ListSyntheticsQuery {
+pub struct ListSyntheticsQuery {
     pub folder: Option<String>,
     #[serde(rename = "type")]
     pub monitor_type: Option<config::meta::synthetics::SyntheticType>,
@@ -52,7 +52,7 @@ impl From<ListSyntheticsQuery> for config::meta::synthetics::ListSyntheticsParam
 }
 
 #[derive(Debug, Default, Deserialize)]
-pub(crate) struct FolderQuery {
+pub struct FolderQuery {
     pub folder: Option<String>,
 }
 

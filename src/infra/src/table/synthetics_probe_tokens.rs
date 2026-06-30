@@ -19,7 +19,7 @@
 //! (`/synthetics/jobs/resolve`, `/ack`, `/lease`). Separate from
 //! `org_ingestion_tokens` (`o2oi_`) which is write-only ingest.
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, entity::prelude::*};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 
 use super::{
     entity::synthetics_probe_tokens::{ActiveModel, Column, Entity},
