@@ -28,6 +28,7 @@ import {
   detectPrebuiltTypeFromUrl,
   generateDestinationUrl,
   generateDestinationHeaders,
+  generatePrebuiltMetadata,
   getPopularPrebuiltTypes,
   getPrebuiltTypesByCategory
 } from '@/utils/prebuilt-templates';
@@ -246,6 +247,8 @@ export function usePrebuiltDestinations() {
       alert_url: `${baseUrl}/web/logs?org_identifier=${orgId}&stream_type=logs&stream=system-metrics&from=${oneHourAgo}&to=${now}&type=alert_destination_test`,
       // Default values for credential-based fields
       integration_key: 'sample-integration-key',
+      routing_key: 'sample-integration-key',
+      source: 'openobserve',
       severity: 'error',
       assignment_group: 'IT Operations',
       api_key: 'sample-api-key'
@@ -256,6 +259,7 @@ export function usePrebuiltDestinations() {
       // Map credential keys to template placeholder names
       if (credentials.integrationKey) {
         sampleData.integration_key = credentials.integrationKey;
+        sampleData.routing_key = credentials.integrationKey;
       }
       if (credentials.severity) {
         sampleData.severity = credentials.severity;
@@ -354,6 +358,8 @@ export function usePrebuiltDestinations() {
         alert_time: new Date().toLocaleString(),
         alert_url: `${baseUrl}/web/logs?org_identifier=${orgId}&stream_type=logs&stream=system-metrics&from=${oneHourAgo}&to=${now}&type=alert_destination_test`,
         integration_key: 'sample-integration-key',
+        routing_key: 'sample-integration-key',
+        source: 'openobserve',
         severity: 'error',
         assignment_group: 'IT Operations',
         api_key: 'sample-api-key'
@@ -361,7 +367,10 @@ export function usePrebuiltDestinations() {
 
       // Override with actual credentials
       if (credentials) {
-        if (credentials.integrationKey) sampleData.integration_key = credentials.integrationKey;
+        if (credentials.integrationKey) {
+          sampleData.integration_key = credentials.integrationKey;
+          sampleData.routing_key = credentials.integrationKey;
+        }
         if (credentials.severity) sampleData.severity = credentials.severity;
         if (credentials.apiKey) sampleData.api_key = credentials.apiKey;
         if (credentials.assignmentGroup) sampleData.assignment_group = credentials.assignmentGroup;
@@ -492,7 +501,10 @@ export function usePrebuiltDestinations() {
                 !key.toLowerCase().includes('key') &&
                 !key.toLowerCase().includes('token')
               ).map(([k, v]) => [`credential_${k}`, String(v)])
-            )
+            ),
+            // Bare template-body variables the alert engine substitutes
+            // server-side (e.g. PagerDuty routing_key/severity/source).
+            ...generatePrebuiltMetadata(type, credentials)
           }
         };
       } else {
@@ -516,7 +528,10 @@ export function usePrebuiltDestinations() {
                 !key.toLowerCase().includes('key') &&
                 !key.toLowerCase().includes('token')
               ).map(([k, v]) => [`credential_${k}`, String(v)])
-            )
+            ),
+            // Bare template-body variables the alert engine substitutes
+            // server-side (e.g. PagerDuty routing_key/severity/source).
+            ...generatePrebuiltMetadata(type, credentials)
           }
         };
 
@@ -610,7 +625,10 @@ export function usePrebuiltDestinations() {
                 !key.toLowerCase().includes('key') &&
                 !key.toLowerCase().includes('token')
               ).map(([k, v]) => [`credential_${k}`, String(v)])
-            )
+            ),
+            // Bare template-body variables the alert engine substitutes
+            // server-side (e.g. PagerDuty routing_key/severity/source).
+            ...generatePrebuiltMetadata(type, credentials)
           }
         };
       } else {
@@ -632,7 +650,10 @@ export function usePrebuiltDestinations() {
                 !key.toLowerCase().includes('key') &&
                 !key.toLowerCase().includes('token')
               ).map(([k, v]) => [`credential_${k}`, String(v)])
-            )
+            ),
+            // Bare template-body variables the alert engine substitutes
+            // server-side (e.g. PagerDuty routing_key/severity/source).
+            ...generatePrebuiltMetadata(type, credentials)
           }
         };
 
