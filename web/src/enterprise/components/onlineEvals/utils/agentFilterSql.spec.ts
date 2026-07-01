@@ -16,35 +16,31 @@ const agentWithId: AgentFilterSelection = {
 };
 
 describe("agentFilterSql", () => {
-  it("builds stream-scoped score filters through source trace IDs", () => {
+  it("filters _llm_scores inline on agent_id", () => {
     const sql = buildScoresAgentFilterWhere(agentWithId);
 
-    expect(sql).toContain("source_stream = 'prod_traces'");
-    expect(sql).toContain("source_stream_type = 'traces'");
-    expect(sql).toContain("trace_id IN (");
-    expect(sql).toContain('FROM "traces"."prod_traces"');
-    expect(sql).toContain("WHERE gen_ai_agent_id = 'agent-123'");
-    expect(sql).toContain("GROUP BY trace_id");
-    expect(sql).not.toContain("agent_name");
+    expect(sql).toBe("agent_id = 'agent-123'");
   });
 
-  it("falls back to canonical agent name when id is missing", () => {
+  it("falls back to agent_name when id is missing", () => {
     const sql = buildScoresAgentFilterWhere({ ...agentWithId, id: null });
 
-    expect(sql).toContain("WHERE gen_ai_agent_name = 'support-agent'");
+    expect(sql).toBe("agent_name = 'support-agent'");
   });
 
-  it("builds evaluator filters through source trace IDs", () => {
+  it("filters _evaluator inline on attributes_target_agent_id", () => {
     const sql = buildEvaluatorAgentFilterWhere(agentWithId);
 
-    expect(sql).toContain("attributes_target_stream = 'prod_traces'");
-    expect(sql).toContain("attributes_target_stream_type = 'traces'");
-    expect(sql).toContain("attributes_target_trace_id IN (");
-    expect(sql).toContain('FROM "traces"."prod_traces"');
-    expect(sql).toContain("WHERE gen_ai_agent_id = 'agent-123'");
+    expect(sql).toBe("attributes_target_agent_id = 'agent-123'");
   });
 
-  it("escapes stream names and agent values", () => {
+  it("falls back to attributes_target_agent_name when id is missing", () => {
+    const sql = buildEvaluatorAgentFilterWhere({ ...agentWithId, id: null });
+
+    expect(sql).toBe("attributes_target_agent_name = 'support-agent'");
+  });
+
+  it("escapes agent values", () => {
     const sql = buildScoresAgentFilterWhere({
       name: "agent'one",
       id: null,
@@ -52,9 +48,7 @@ describe("agentFilterSql", () => {
       source_stream_type: 'traces"prod',
     });
 
-    expect(sql).toContain("source_stream = 'prod\"traces'");
-    expect(sql).toContain('FROM "traces""prod"."prod""traces"');
-    expect(sql).toContain("WHERE gen_ai_agent_name = 'agent''one'");
+    expect(sql).toBe("agent_name = 'agent''one'");
   });
 
   it("keys identity by source stream and id-or-name", () => {

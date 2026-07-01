@@ -741,9 +741,13 @@ watch(orgId, () => {
 // list is unchanged. Driven explicitly from the dropdown's update event (not a
 // watch on the key) so the programmatic reset inside loadQualityAgents()
 // during reloadQuality() never double-fires a data reload.
-function onQualityAgentChange(key: string) {
+async function onQualityAgentChange(key: string) {
   qualityAgentKey.value = key;
-  void qualityPageRef.value?.refreshAll?.();
+  // `selectedQualityAgent` → the `agent-filter` prop → the child's
+  // `agentFilterRef` only update on the next render tick. Wait for it so
+  // `refreshAll()` queries the newly selected agent, not the previous one.
+  await nextTick();
+  await qualityPageRef.value?.refreshAll?.();
 }
 
 // Aggregated "is a quality reload in flight" — covers the agent-load phase
