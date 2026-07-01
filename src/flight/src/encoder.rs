@@ -21,57 +21,93 @@ use arrow::{
         writer::{CompressionContext, DictionaryTracker, IpcDataGenerator, IpcWriteOptions},
     },
 };
-use arrow_flight::{FlightData, SchemaAsIpc, error::Result};
-use arrow_schema::Schema;
+use arrow_flight::{FlightData, error::Result};
 use bytes::Bytes;
 use flatbuffers::FlatBufferBuilder;
 
 use crate::common::CustomMessage;
 
-/// Encoder for RecordBatch, Schema, CustomMessage to FlightData
+/// Encodes CustomMessages and RecordBatch chunks into FlightData (coalescing is separate — see
+/// [`ChunkCoalescer`]). Owns the zstd compressor, so it's not `Clone`: use one per thread.
 pub struct FlightDataEncoder {
     options: IpcWriteOptions,
-    data_gen: IpcDataGenerator,
-    dictionary_tracker: DictionaryTracker,
-    compression_context: CompressionContext,
-    /// Lazily initialised on the first `encode_batch` call; reused across calls
-    /// to avoid re-allocating per-column InProgressArray builders every time.
-    coalescer: Option<BatchCoalescer>,
     /// Maximum bytes per FlightData message (0 = unlimited).
     max_flight_data_size: usize,
+    /// Reused across chunks; lazily initialised, so a custom-message-only encoder never allocates
+    /// it.
+    compression_context: CompressionContext,
 }
 
 impl FlightDataEncoder {
     pub fn new(options: IpcWriteOptions, max_flight_data_size: usize) -> Self {
         Self {
             options,
-            data_gen: IpcDataGenerator::default(),
-            dictionary_tracker: DictionaryTracker::new(false),
-            compression_context: CompressionContext::default(),
-            coalescer: None,
             max_flight_data_size,
+            compression_context: CompressionContext::default(),
         }
     }
 
-    /// Encode a schema as a FlightData
-    pub fn encode_schema(&self, schema: &Schema) -> FlightData {
-        SchemaAsIpc::new(schema, &self.options).into()
+    /// Encode a CustomMessage to a FlightData
+    pub fn encode_custom(&self, custom_message: &CustomMessage) -> Result<FlightData> {
+        let metadata = serde_json::to_string(custom_message)
+            .unwrap_or_default()
+            .as_bytes()
+            .to_vec();
+        Ok(FlightData::new()
+            .with_data_header(header_none())
+            .with_app_metadata(metadata))
     }
 
-    /// Encode a RecordBatch to a Vec of FlightData
+    /// Encode one chunk into FlightData message(s): split by `max_flight_data_size`, then IPC +
+    /// ZSTD.
     ///
-    /// Rows are accumulated inside the coalescer until a full 8192-row chunk is
-    /// ready. Call [`Self::finish`] when the input stream ends to flush the
-    /// remaining partial chunk.
+    /// Fresh [`DictionaryTracker`] per call: `BatchCoalescer` may rebuild a dictionary's values
+    /// per chunk, so a shared tracker could wrongly skip re-sending a changed dictionary.
+    pub fn encode_chunk(&mut self, chunk: RecordBatch) -> Result<Vec<FlightData>> {
+        let data_gen = IpcDataGenerator::default();
+        let mut dictionary_tracker = DictionaryTracker::new(false);
+        // Populate the tracker's dict ids (a no-op without Dictionary columns) so `encode()` finds
+        // them; the returned schema bytes are unused (the leader knows the schema).
+        let schema = chunk.schema();
+        let _ = data_gen.schema_to_bytes_with_dictionary_tracker(
+            &schema,
+            &mut dictionary_tracker,
+            &self.options,
+        );
+        let mut flight_data = Vec::new();
+        for batch in split_batch_for_grpc_response(chunk, self.max_flight_data_size) {
+            let (encoded_dictionaries, encoded_batch) = data_gen.encode(
+                &batch,
+                &mut dictionary_tracker,
+                &self.options,
+                &mut self.compression_context,
+            )?;
+            flight_data.extend(encoded_dictionaries.into_iter().map(Into::into));
+            flight_data.push(encoded_batch.into());
+        }
+        Ok(flight_data)
+    }
+}
+
+/// Coalesces RecordBatches into 8192-row chunks (the expensive per-chunk IPC + ZSTD encoding is
+/// [`FlightDataEncoder::encode_chunk`]).
+#[derive(Default)]
+pub struct ChunkCoalescer {
+    /// Lazily initialised; reused to avoid re-allocating per-column builders every call.
+    coalescer: Option<BatchCoalescer>,
+}
+
+impl ChunkCoalescer {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Push a RecordBatch; returns completed 8192-row chunks. Call [`Self::finish`] at stream end.
     ///
-    /// BatchCoalescer handles both coalescing/splitting and GC:
-    /// - top-level Utf8View/BinaryView: copies only the string bytes needed per chunk when the
-    ///   source array is sparse (actual_buffer > 2x used)
-    /// - nested Utf8View inside Struct/List: materialised via concat, so stale backing buffers are
-    ///   released naturally
-    /// - <https://github.com/openobserve/openobserve/issues/8280>
-    /// - <https://github.com/apache/datafusion/pull/11587>
-    pub fn encode_batch(&mut self, batch: RecordBatch) -> Result<Vec<FlightData>> {
+    /// BatchCoalescer also GCs sparse Utf8View/BinaryView buffers — see
+    /// <https://github.com/openobserve/openobserve/issues/8280> and
+    /// <https://github.com/apache/datafusion/pull/11587>.
+    pub fn push_batch(&mut self, batch: RecordBatch) -> Result<Vec<RecordBatch>> {
         if self.coalescer.is_none() {
             self.coalescer = Some(BatchCoalescer::new(batch.schema(), 8192));
         }
@@ -82,10 +118,8 @@ impl FlightDataEncoder {
         self.drain_completed()
     }
 
-    /// Flush any buffered rows and encode them as FlightData.
-    ///
-    /// Call this once after all batches have been pushed via [`Self::encode_batch`].
-    pub fn finish(&mut self) -> Result<Vec<FlightData>> {
+    /// Flush any buffered rows as a final chunk, once all batches have been pushed.
+    pub fn finish(&mut self) -> Result<Vec<RecordBatch>> {
         let Some(coalescer) = self.coalescer.as_mut() else {
             return Ok(vec![]);
         };
@@ -93,35 +127,15 @@ impl FlightDataEncoder {
         self.drain_completed()
     }
 
-    fn drain_completed(&mut self) -> Result<Vec<FlightData>> {
+    fn drain_completed(&mut self) -> Result<Vec<RecordBatch>> {
         let Some(coalescer) = self.coalescer.as_mut() else {
             return Ok(vec![]);
         };
-        let mut flight_data = Vec::new();
+        let mut chunks = Vec::new();
         while let Some(batch) = coalescer.next_completed_batch() {
-            for batch in split_batch_for_grpc_response(batch, self.max_flight_data_size) {
-                let (encoded_dictionaries, encoded_batch) = self.data_gen.encode(
-                    &batch,
-                    &mut self.dictionary_tracker,
-                    &self.options,
-                    &mut self.compression_context,
-                )?;
-                flight_data.extend(encoded_dictionaries.into_iter().map(Into::into));
-                flight_data.push(encoded_batch.into());
-            }
+            chunks.push(batch);
         }
-        Ok(flight_data)
-    }
-
-    /// Encode a CustomMessage to a FlightData
-    pub fn encode_custom(&mut self, custom_message: &CustomMessage) -> Result<FlightData> {
-        let metadata = serde_json::to_string(custom_message)
-            .unwrap_or_default()
-            .as_bytes()
-            .to_vec();
-        Ok(FlightData::new()
-            .with_data_header(header_none())
-            .with_app_metadata(metadata))
+        Ok(chunks)
     }
 }
 
@@ -230,38 +244,155 @@ mod tests {
         CustomMessage::ScanStats(scan_stats)
     }
 
+    /// Encode all coalesced chunks, building a fresh encoder per chunk exactly like the do_get
+    /// `spawn_blocking` path does.
+    fn encode_all(
+        options: &IpcWriteOptions,
+        max_flight_data_size: usize,
+        chunks: Vec<RecordBatch>,
+    ) -> Vec<arrow_flight::FlightData> {
+        chunks
+            .into_iter()
+            .flat_map(|c| {
+                FlightDataEncoder::new(options.clone(), max_flight_data_size)
+                    .encode_chunk(c)
+                    .unwrap()
+            })
+            .collect()
+    }
+
+    /// Decode FlightData messages back to RecordBatches, mirroring FlightDataDecoder's
+    /// per-message dictionary handling (read each dictionary batch into a shared map).
+    fn decode_all(
+        fds: Vec<arrow_flight::FlightData>,
+        schema: arrow_schema::SchemaRef,
+    ) -> Vec<RecordBatch> {
+        use std::collections::HashMap;
+
+        use arrow::{
+            buffer::Buffer,
+            ipc::{MessageHeader, reader::read_dictionary, root_as_message},
+        };
+
+        let mut dictionaries: HashMap<i64, ArrayRef> = HashMap::new();
+        let mut out = Vec::new();
+        for data in fds {
+            let message = root_as_message(&data.data_header[..]).unwrap();
+            match message.header_type() {
+                MessageHeader::DictionaryBatch => {
+                    let buffer = Buffer::from(data.data_body.as_ref());
+                    let dict_batch = message.header_as_dictionary_batch().unwrap();
+                    read_dictionary(
+                        &buffer,
+                        dict_batch,
+                        &schema,
+                        &mut dictionaries,
+                        &message.version(),
+                    )
+                    .unwrap();
+                }
+                MessageHeader::RecordBatch => {
+                    out.push(
+                        arrow_flight::utils::flight_data_to_arrow_batch(
+                            &data,
+                            schema.clone(),
+                            &dictionaries,
+                        )
+                        .unwrap(),
+                    );
+                }
+                _ => {}
+            }
+        }
+        out
+    }
+
+    // The crux of the parallel-encode design: each chunk is encoded independently with
+    // its OWN dictionary tracker, so a dictionary column emits a full dictionary per
+    // chunk. Verify the sequential decoder still reconstructs every row correctly.
+    #[test]
+    fn test_parallel_chunks_roundtrip_with_dictionary() {
+        use arrow::array::{DictionaryArray, Int32Array, types::Int32Type};
+
+        let n = 20_000i32;
+        let values: ArrayRef = Arc::new(StringArray::from(vec!["red", "green", "blue"]));
+        let keys = Int32Array::from((0..n).map(|i| i % 3).collect::<Vec<_>>());
+        let color = DictionaryArray::<Int32Type>::try_new(keys, values).unwrap();
+        let id = Int32Array::from((0..n).collect::<Vec<_>>());
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new(
+                "color",
+                DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8)),
+                false,
+            ),
+        ]));
+        let batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(id), Arc::new(color)]).unwrap();
+
+        let options = IpcWriteOptions::default()
+            .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
+            .unwrap();
+        let mut coalescer = ChunkCoalescer::new();
+        // coalescer emits 8192-row chunks -> multiple chunks for 20000 rows
+        let mut chunks = coalescer.push_batch(batch).unwrap();
+        chunks.extend(coalescer.finish().unwrap());
+        assert!(
+            chunks.len() >= 2,
+            "expected multiple chunks, got {}",
+            chunks.len()
+        );
+
+        // encode each chunk INDEPENDENTLY, exactly as the parallel pipeline does
+        let fds = encode_all(&options, 0, chunks);
+        let decoded = decode_all(fds, schema);
+
+        let total_rows: usize = decoded.iter().map(|b| b.num_rows()).sum();
+        assert_eq!(
+            total_rows, n as usize,
+            "all rows must survive per-chunk dictionaries"
+        );
+
+        // row 0: id 0, color key 0 -> "red"
+        let first = &decoded[0];
+        let color0 = first
+            .column(1)
+            .as_any()
+            .downcast_ref::<DictionaryArray<Int32Type>>()
+            .unwrap();
+        let dict_values = color0
+            .values()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(dict_values.value(color0.keys().value(0) as usize), "red");
+    }
+
     #[test]
     fn test_flight_data_encoder_new() {
         let options = IpcWriteOptions::default();
         let encoder = FlightDataEncoder::new(options, 8192);
-        assert!(encoder.coalescer.is_none());
         assert_eq!(encoder.max_flight_data_size, 8192);
     }
 
     #[test]
-    fn test_encode_schema() {
-        let options = IpcWriteOptions::default();
-        let encoder = FlightDataEncoder::new(options, 8192);
-        let schema = create_test_schema();
-
-        let flight_data = encoder.encode_schema(&schema);
-
-        assert!(!flight_data.data_header.is_empty());
-        // Schema flight data may not always have a data body, only header
-        assert!(flight_data.app_metadata.is_empty());
+    fn test_chunk_coalescer_new() {
+        let coalescer = ChunkCoalescer::new();
+        assert!(coalescer.coalescer.is_none());
     }
 
     #[test]
     fn test_encode_batch() {
         let options = IpcWriteOptions::default();
-        let mut encoder = FlightDataEncoder::new(options, 8192);
+        let mut coalescer = ChunkCoalescer::new();
         let batch = create_test_record_batch();
 
-        // encode_batch accumulates; data is only emitted once a full chunk is
+        // push_batch accumulates; a chunk is only emitted once a full 8192 rows are
         // ready or finish() is called at stream end.
-        let mid = encoder.encode_batch(batch).unwrap();
-        let end = encoder.finish().unwrap();
-        let flight_data_vec: Vec<_> = mid.into_iter().chain(end).collect();
+        let mut chunks = coalescer.push_batch(batch).unwrap();
+        chunks.extend(coalescer.finish().unwrap());
+        let flight_data_vec = encode_all(&options, 8192, chunks);
 
         assert!(!flight_data_vec.is_empty());
         for flight_data in flight_data_vec {
@@ -272,7 +403,7 @@ mod tests {
     #[test]
     fn test_encode_custom() {
         let options = IpcWriteOptions::default();
-        let mut encoder = FlightDataEncoder::new(options, 8192);
+        let encoder = FlightDataEncoder::new(options, 8192);
         let custom_message = create_test_custom_message();
 
         let flight_data = encoder.encode_custom(&custom_message).unwrap();
@@ -308,17 +439,18 @@ mod tests {
     #[test]
     fn test_encode_batch_coalesces() {
         let options = IpcWriteOptions::default();
-        let mut encoder = FlightDataEncoder::new(options, 0);
+        let mut coalescer = ChunkCoalescer::new();
         let schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int32, false)]));
-        // 10000 rows: BatchCoalescer emits one 8192-row chunk during encode_batch,
+        // 10000 rows: BatchCoalescer emits one 8192-row chunk during push_batch,
         // then finish() flushes the remaining 1808 rows → total 2 messages
         let ids: Vec<i32> = (0..10000).collect();
         let batch =
             arrow::array::RecordBatch::try_new(schema, vec![Arc::new(Int32Array::from(ids))])
                 .unwrap();
 
-        let mut flight_data_vec = encoder.encode_batch(batch).unwrap();
-        flight_data_vec.extend(encoder.finish().unwrap());
+        let mut chunks = coalescer.push_batch(batch).unwrap();
+        chunks.extend(coalescer.finish().unwrap());
+        let flight_data_vec = encode_all(&options, 0, chunks);
         assert!(
             flight_data_vec.len() > 1,
             "10000-row batch should be split into multiple FlightData messages"
@@ -354,10 +486,11 @@ mod tests {
         let max_flight_data_size = batch_size / 2;
 
         let options = IpcWriteOptions::default();
-        let mut encoder = FlightDataEncoder::new(options, max_flight_data_size);
+        let mut coalescer = ChunkCoalescer::new();
 
-        let mut flight_data_vec = encoder.encode_batch(batch).unwrap();
-        flight_data_vec.extend(encoder.finish().unwrap());
+        let mut chunks = coalescer.push_batch(batch).unwrap();
+        chunks.extend(coalescer.finish().unwrap());
+        let flight_data_vec = encode_all(&options, max_flight_data_size, chunks);
         assert!(
             flight_data_vec.len() > 1,
             "batch exceeding max_flight_data_size ({max_flight_data_size} bytes) should split"
@@ -589,7 +722,7 @@ mod tests {
     #[test]
     fn test_encode_custom_peak_memory() {
         let options = IpcWriteOptions::default();
-        let mut encoder = FlightDataEncoder::new(options, 8192);
+        let encoder = FlightDataEncoder::new(options, 8192);
         let peak_memory = 1024 * 1024 * 100; // 100 MB
         let custom_message = CustomMessage::PeakMemory(peak_memory);
 
