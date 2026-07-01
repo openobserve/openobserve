@@ -198,10 +198,12 @@ const handleBackspace = () => {
   background: transparent;
   padding: 4px;
   font-size: 14px;
-  color: var(--q-color-text-primary);
+  // Was var(--q-color-text-primary) / --q-color-text-hint — both undefined, so
+  // the placeholder inherited the dark body text and looked like a typed value.
+  color: var(--color-text-primary, currentColor);
 
   &::placeholder {
-    color: var(--q-color-text-hint);
+    color: var(--color-text-secondary, var(--o2-text-secondary));
   }
 }
 </style>

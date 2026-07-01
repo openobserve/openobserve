@@ -3109,6 +3109,25 @@
     "aiToolsets": "AI 工具集",
     "llmModelPricing": "LLM 模型定价",
     "ingestionTokens": "写入令牌",
+    "genAiAgentMapping": {
+      "tabLabel": "GenAI 代理映射",
+      "title": "GenAI 代理映射",
+      "description": "配置备用遥测属性，用于对 LLM 跟踪和评估的代理身份进行标准化。",
+      "howItWorksTitle": "映射的工作原理",
+      "howItWorksDescription": "OpenObserve 首先保留了标准的 gen_ai.agent.name 和 gen_ai.agent.id 属性。仅当标准属性缺失或为空时，才会检查这些列表。每行添加一个传入遥测属性。",
+      "agentNameFields": "代理名称备用字段",
+      "agentNameHelp": "传入的属性用作 gen_ai.agent.name 的备用属性。",
+      "agentIdFields": "代理 ID 备用字段",
+      "agentIdHelp": "传入属性用作 gen_ai.agent.id 的备用属性。",
+      "fieldsPlaceholder": "代理人姓名\nllm.agent.name",
+      "applyDefaults": "应用默认值",
+      "resetToEmpty": "重置为空",
+      "defaultsSource": "默认值是从 openobserve/sdr_patterns 加载的，可以在为该组织保存之前进行修改。",
+      "saved": "GenAI 代理映射已成功保存",
+      "loadFailed": "无法加载 GenAI 代理映射",
+      "saveFailed": "无法保存 GenAI 代理映射",
+      "defaultsLoadFailed": "无法加载 GenAI 代理映射默认值"
+    },
     "groupGeneral": "常规",
     "groupAccessSecurity": "访问与安全",
     "groupDestinationsTemplates": "目标与模板",
@@ -4940,6 +4959,14 @@
         "title": "最近的错误",
         "subtitle": "最近 10 次失败的跨度"
       }
+    },
+    "subtitle": {
+      "llmInsights": "跟踪 LLM 流量的延迟、错误、代币和成本",
+      "sessions": "依次浏览和检查代理会话",
+      "quality": "对您的 LLM 回复进行评分和跟踪",
+      "evalJobs": "在会话中运行和监控评估作业",
+      "scorers": "创建和管理对 LLM 输出进行评分的记分员",
+      "scoreConfigs": "配置评估时使用的评分标准"
     }
   },
   "onlineEvals": {

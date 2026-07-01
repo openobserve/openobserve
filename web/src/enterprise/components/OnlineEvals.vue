@@ -16,7 +16,7 @@ the Free Software Foundation, either version 3 of the License, or
       v-if="formPage?.entity === 'scorers'"
       :org-id="orgId"
       :mode="formPage.mode"
-      :row="(dialog.row as Scorer | null)"
+      :row="scorerFormRow"
       :scorer-type="pendingScorerType"
       :providers="providers"
       :score-configs="scoreConfigs"
@@ -31,7 +31,7 @@ the Free Software Foundation, either version 3 of the License, or
       v-else-if="formPage?.entity === 'jobs'"
       :org-id="orgId"
       :mode="formPage.mode"
-      :row="(dialog.row as EvalJob | null)"
+      :row="jobFormRow"
       :scorers="scorers"
       @saved="handleSaved"
       @cancel="closeFormPage"
@@ -63,6 +63,7 @@ the Free Software Foundation, either version 3 of the License, or
       <AppPageHeader
         v-if="hideTabBar && embeddedHeader"
         :title="embeddedHeader.title"
+        :subtitle="embeddedHeader.subtitle"
         :icon="embeddedHeader.icon"
         class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       >
@@ -93,7 +94,9 @@ the Free Software Foundation, either version 3 of the License, or
                 <span>
                   {{ t(`onlineEvals.${importI18nKey}.import.customLabel`) }}
                 </span>
-                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+                <span
+                  class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
+                >
                   {{ t(`onlineEvals.${importI18nKey}.import.customSubtitle`) }}
                 </span>
               </div>
@@ -110,7 +113,9 @@ the Free Software Foundation, either version 3 of the License, or
                 <span>
                   {{ t(`onlineEvals.${importI18nKey}.import.libraryLabel`) }}
                 </span>
-                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+                <span
+                  class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
+                >
                   {{ t(`onlineEvals.${importI18nKey}.import.librarySubtitle`) }}
                 </span>
               </div>
@@ -138,21 +143,28 @@ the Free Software Foundation, either version 3 of the License, or
           </OButton>
         </template>
         <template v-else-if="activeTab === 'quality'" #actions>
+          <!-- Agent filter is rendered inside QualityPage (right-aligned, above
+               the KPIs) so it sits within the content container alongside the
+               data it filters — only the date picker + refresh stay here. -->
           <DateTimePickerDashboard
             ref="qualityDatePickerRef"
             v-model="qualitySelectedDate"
             :auto-apply-dashboard="true"
             data-test="quality-time-range-picker"
           />
-          <OButton
-            variant="outline"
-            size="sm-toolbar"
-            :loading="qualityRefreshing"
-            data-test="quality-refresh-btn"
-            @click="onQualityRefresh"
+          <!-- Bordered wrapper matches the Sessions / LLM Insights headers —
+               ORefreshButton renders no border of its own. -->
+          <div
+            class="tw:inline-flex tw:items-center tw:border tw:border-border-default tw:rounded-md tw:px-1 tw:h-[2rem] tw:overflow-hidden"
           >
-            {{ t('common.refresh') }}
-          </OButton>
+            <ORefreshButton
+              :last-run-at="qualityLastRunAt"
+              :loading="qualityRefreshing"
+              :disabled="qualityRefreshing"
+              data-test="quality-refresh-btn"
+              @click="onQualityRefresh"
+            />
+          </div>
         </template>
       </AppPageHeader>
 
@@ -174,12 +186,19 @@ the Free Software Foundation, either version 3 of the License, or
           <QualityPage
             v-if="activeTab === 'quality'"
             ref="qualityPageRef"
+            :agent-key="qualityAgentKey"
+            :agent-options="qualityAgentOptions"
+            :agents-loading="qualityAgentsLoading"
             :date-window="qualityDateWindow"
+            :agent-filter="selectedQualityAgent"
             :score-configs="scoreConfigs"
+            :configs-loading="isLoading"
+            @update:agent-key="onQualityAgentChange"
+            @ready="reloadQuality"
           />
           <ScoreConfigList
             v-else-if="activeTab === 'scoreConfigs'"
-            :rows="(filteredRows as ScoreConfig[])"
+            :rows="filteredRows as ScoreConfig[]"
             :all-score-configs="scoreConfigs"
             :scorers="scorers"
             :search="filterQuery"
@@ -196,7 +215,7 @@ the Free Software Foundation, either version 3 of the License, or
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
-            :rows="(filteredRows as Scorer[])"
+            :rows="filteredRows as Scorer[]"
             :all-scorers="scorers"
             :jobs="jobs"
             :score-configs="scoreConfigs"
@@ -216,7 +235,7 @@ the Free Software Foundation, either version 3 of the License, or
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
-            :rows="(filteredRows as EvalJob[])"
+            :rows="filteredRows as EvalJob[]"
             :search="filterQuery"
             :loading="isLoading"
             :pending-status-id="pendingJobStatusId"
@@ -241,7 +260,7 @@ the Free Software Foundation, either version 3 of the License, or
         v-if="dialog.open && activeTab === 'scoreConfigs'"
         :org-id="orgId"
         :mode="dialog.mode"
-        :row="(dialog.row as ScoreConfig | null)"
+        :row="scoreConfigDialogRow"
         @saved="handleSaved"
         @cancel="closeDialog"
       />
@@ -262,7 +281,9 @@ the Free Software Foundation, either version 3 of the License, or
         <ScoreConfigLibrary
           ref="scoreConfigLibraryRef"
           :org-id="orgId"
-          @update:selected-count="(n: number) => (scoreConfigLibrarySelectedCount = n)"
+          @update:selected-count="
+            (n: number) => (scoreConfigLibrarySelectedCount = n)
+          "
           @imported="handleScoreConfigLibraryImported"
         />
       </ODrawer>
@@ -286,7 +307,9 @@ the Free Software Foundation, either version 3 of the License, or
           :score-configs="scoreConfigs"
           :scorers="scorers"
           :providers="providers"
-          @update:selected-count="(n: number) => (scorerLibrarySelectedCount = n)"
+          @update:selected-count="
+            (n: number) => (scorerLibrarySelectedCount = n)
+          "
           @imported="handleScorerLibraryImported"
         />
       </ODrawer>
@@ -321,7 +344,11 @@ the Free Software Foundation, either version 3 of the License, or
       <ConfirmDialog
         v-model="confirmDeleteOpen"
         :title="pendingDeleteLabel"
-        :message="t('onlineEvals.deleteConfirmMessage', { name: pendingDeleteRow?.name ?? '' })"
+        :message="
+          t('onlineEvals.deleteConfirmMessage', {
+            name: pendingDeleteRow?.name ?? '',
+          })
+        "
         @update:ok="performDelete"
         @update:cancel="cancelDelete"
       />
@@ -330,7 +357,7 @@ the Free Software Foundation, either version 3 of the License, or
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeMount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeMount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -342,10 +369,7 @@ import onlineEvalsService, {
   type ScorerType,
 } from "@/services/online-evals.service";
 import { useOnlineEvalsData } from "./onlineEvals/composables/useOnlineEvalsData";
-import {
-  entityId,
-  statusOf,
-} from "./onlineEvals/utils/evalEntity";
+import { entityId, statusOf } from "./onlineEvals/utils/evalEntity";
 import { showError } from "./onlineEvals/utils/evalFormat";
 import {
   buildCrossNavigationQuery,
@@ -380,12 +404,24 @@ import ImportScorer from "./onlineEvals/ImportScorer.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type { DateWindow } from "./onlineEvals/composables/useQualityData";
-import { useAiDateRange } from "@/enterprise/composables/useAiDateRange";
+import {
+  useAiDateRange,
+  resolveAiDateWindow,
+} from "@/enterprise/composables/useAiDateRange";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import { downloadFile } from "@/utils/dom";
+import {
+  ALL_AGENTS_VALUE,
+  agentFilterKey,
+  agentFilterLabel,
+  type AgentFilterSelection,
+} from "./onlineEvals/utils/agentFilterSql";
 import {
   bulkExportFileName as bulkExportScoreConfigFileName,
   exportScoreConfigFileName,
@@ -412,13 +448,26 @@ const activeTab = ref<ActiveTab>(parseTabFromRoute(route.query.tab));
 const filterQuery = ref("");
 const scorerTypeDialog = ref(false);
 const pendingScorerType = ref<ScorerType>("llm_judge");
-const formPage = ref<{ entity: FullPageEntity; mode: "create" | "edit" } | null>(null);
+const formPage = ref<{
+  entity: FullPageEntity;
+  mode: "create" | "edit";
+} | null>(null);
 
-const dialog = ref<{ open: boolean; mode: "create" | "edit"; row: AnyRow | null }>({
+const dialog = ref<{
+  open: boolean;
+  mode: "create" | "edit";
+  row: AnyRow | null;
+}>({
   open: false,
   mode: "create",
   row: null,
 });
+
+const scorerFormRow = computed(() => dialog.value.row as Scorer | null);
+const jobFormRow = computed(() => dialog.value.row as EvalJob | null);
+const scoreConfigDialogRow = computed(
+  () => dialog.value.row as ScoreConfig | null,
+);
 
 const viewRow = ref<ScoreConfig | null>(null);
 const scorerViewRow = ref<Scorer | null>(null);
@@ -432,7 +481,9 @@ const catalogOpenTab = ref<ActiveTab | null>(null);
 const showScoreConfigLibrary = ref(false);
 const scoreConfigLibrarySelectedCount = ref(0);
 const scoreConfigLibraryImporting = ref(false);
-const scoreConfigLibraryRef = ref<InstanceType<typeof ScoreConfigLibrary> | null>(null);
+const scoreConfigLibraryRef = ref<InstanceType<
+  typeof ScoreConfigLibrary
+> | null>(null);
 const showScorerLibrary = ref(false);
 const scorerLibrarySelectedCount = ref(0);
 const scorerLibraryImporting = ref(false);
@@ -482,7 +533,9 @@ const filteredRows = computed<AnyRow[]>(() => {
   );
 });
 
-const tabs = computed<Array<{ value: ActiveTab; label: string; badge?: string }>>(() => [
+const tabs = computed<
+  Array<{ value: ActiveTab; label: string; badge?: string }>
+>(() => [
   { value: "quality", label: t("onlineEvals.tabs.quality") },
   { value: "jobs", label: t("onlineEvals.tabs.jobs") },
   { value: "scorers", label: t("onlineEvals.tabs.scorers") },
@@ -492,18 +545,23 @@ const tabs = computed<Array<{ value: ActiveTab; label: string; badge?: string }>
 // Header chrome shown only when embedded in the AI Observability shell —
 // mirrors the LLM Insights / Sessions pages so every section in the rail
 // shares the same title strip. Title + icon track the active rail item.
-const EMBEDDED_HEADER_META: Record<ActiveTab, { i18nKey: string; icon: IconName }> = {
-  quality: { i18nKey: "aiObservability.nav.quality", icon: "star-rate" },
-  jobs: { i18nKey: "aiObservability.nav.evalJobs", icon: "event" },
-  scorers: { i18nKey: "aiObservability.nav.scorers", icon: "rule" },
-  scoreConfigs: { i18nKey: "aiObservability.nav.scoreConfigs", icon: "tune" },
+const EMBEDDED_HEADER_META: Record<
+  ActiveTab,
+  { i18nKey: string; subtitleKey: string; icon: IconName }
+> = {
+  quality: { i18nKey: "aiObservability.nav.quality", subtitleKey: "aiObservability.subtitle.quality", icon: "star-rate" },
+  jobs: { i18nKey: "aiObservability.nav.evalJobs", subtitleKey: "aiObservability.subtitle.evalJobs", icon: "event" },
+  scorers: { i18nKey: "aiObservability.nav.scorers", subtitleKey: "aiObservability.subtitle.scorers", icon: "rule" },
+  scoreConfigs: { i18nKey: "aiObservability.nav.scoreConfigs", subtitleKey: "aiObservability.subtitle.scoreConfigs", icon: "tune" },
 };
 
-const embeddedHeader = computed<{ title: string; icon: IconName } | null>(() => {
-  const meta = EMBEDDED_HEADER_META[activeTab.value];
-  if (!meta) return null;
-  return { title: t(meta.i18nKey), icon: meta.icon };
-});
+const embeddedHeader = computed<{ title: string; subtitle: string; icon: IconName } | null>(
+  () => {
+    const meta = EMBEDDED_HEADER_META[activeTab.value];
+    if (!meta) return null;
+    return { title: t(meta.i18nKey), subtitle: t(meta.subtitleKey), icon: meta.icon };
+  },
+);
 
 // Per-tab "create" button label for the embedded AppPageHeader. Quality has
 // no list-style create, so it returns an empty string and the button is
@@ -538,10 +596,27 @@ const importI18nKey = computed<"scorer" | "scoreConfig">(() =>
 // lands on the other two (incl. across reloads via localStorage).
 const { state: qualitySelectedDate } = useAiDateRange();
 
-const qualityDateWindow = ref<DateWindow>({
-  startUs: (Date.now() - 15 * 60 * 1000) * 1000,
-  endUs: Date.now() * 1000,
-});
+// Seed the window from the *persisted* AI date range (relative or absolute),
+// resolved synchronously, so QualityPage's initial onMounted refresh queries
+// the correct window from the very first paint. Previously this was a hardcoded
+// 15-minute placeholder, so the first KPI query ran against 15m (e.g. "2
+// evaluated") and then the picker-mount sync re-queried the real range (e.g.
+// "36"), causing a visible flash. Fall back to the 15m default only if the
+// persisted state can't be resolved.
+const initialQualityWindow = resolveAiDateWindow(qualitySelectedDate.value);
+const qualityDateWindow = ref<DateWindow>(
+  initialQualityWindow
+    ? {
+        startUs: initialQualityWindow.startTime,
+        endUs: initialQualityWindow.endTime,
+      }
+    : {
+        startUs: (Date.now() - 15 * 60 * 1000) * 1000,
+        endUs: Date.now() * 1000,
+      },
+);
+const qualityAgents = ref<AgentFilterSelection[]>([]);
+const qualityAgentKey = ref(ALL_AGENTS_VALUE);
 const qualityDatePickerRef = ref<{
   getConsumableDateTime: () => { startTime: number; endTime: number };
 } | null>(null);
@@ -550,65 +625,173 @@ const qualityPageRef = ref<{
   isAnyLoading: boolean;
 } | null>(null);
 
+const qualityAgentOptions = computed(() => [
+  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  ...qualityAgents.value.map((agent) => ({
+    label: agentFilterLabel(agent),
+    value: agentFilterKey(agent),
+  })),
+]);
+
+const selectedQualityAgent = computed<AgentFilterSelection | null>(() => {
+  if (qualityAgentKey.value === ALL_AGENTS_VALUE) return null;
+  return (
+    qualityAgents.value.find(
+      (agent) => agentFilterKey(agent) === qualityAgentKey.value,
+    ) ?? null
+  );
+});
+
+// True while the agent list is being fetched (the FIRST phase of reloadQuality,
+// before any quality data loader runs). QualityPage uses this to skeleton the
+// agent dropdown + the KPI/table so the page reads as "loading" from the very
+// start of a reload instead of looking idle until the data queries kick in.
+const qualityAgentsLoading = ref(false);
+
+async function loadQualityAgents() {
+  const { startUs, endUs } = qualityDateWindow.value;
+  if (!orgId.value || !startUs || !endUs) return;
+  qualityAgentsLoading.value = true;
+  try {
+    const response = await genAiAgentMappingService.listAgents(
+      orgId.value,
+      startUs,
+      endUs,
+    );
+    qualityAgents.value = response.agents;
+    if (
+      qualityAgentKey.value !== ALL_AGENTS_VALUE &&
+      !qualityAgents.value.some(
+        (agent) => agentFilterKey(agent) === qualityAgentKey.value,
+      )
+    ) {
+      qualityAgentKey.value = ALL_AGENTS_VALUE;
+    }
+  } catch (err) {
+    console.warn("Failed to load GenAI agents", err);
+    qualityAgents.value = [];
+    qualityAgentKey.value = ALL_AGENTS_VALUE;
+  } finally {
+    qualityAgentsLoading.value = false;
+  }
+}
+
 function syncQualityDateWindow() {
   const picker = qualityDatePickerRef.value;
   if (!picker) return;
   const dt = picker.getConsumableDateTime();
-  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
+  if (
+    dt &&
+    typeof dt.startTime === "number" &&
+    typeof dt.endTime === "number"
+  ) {
     qualityDateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
   }
 }
 
-// LocalStorage persistence is handled inside the composable now. This watch
-// only forwards the change into the absolute `dateWindow` the QualityPage
-// reads as a prop. No deep flag: DateTimePickerDashboard's
-// `update:modelValue` emits a brand-new object on every commit, so the
-// top-level ref identity changes and this watch fires.
-watch(qualitySelectedDate, () => {
-  syncQualityDateWindow();
-});
+// ── Quality reload orchestration ─────────────────────────────────────────
+// ONE path drives every quality fetch. Exactly three triggers reload
+// everything (agent list + KPIs + table + charts):
+//   1. The Quality page mounts            → @ready
+//   2. The user clicks Refresh            → onQualityRefresh
+//   3. The date-time window changes       → watch(qualitySelectedDate)
+// All three run the SAME sequence: re-anchor the window from the picker, load
+// the agent list FIRST, then load the quality data — so the agent filter is
+// always populated before the data it scopes is fetched.
+//
+// Changing the agent filter is a data-only reload (the agent list itself is
+// unchanged) and is handled separately by onQualityAgentChange below.
+const qualityReloading = ref(false);
 
-// Aggregated "is any quality query in flight" — exposed by QualityPage so the
-// Refresh button can show its spinner regardless of which loader is running.
-const qualityRefreshing = computed(
-  () => qualityPageRef.value?.isAnyLoading ?? false,
-);
-
-// Manual refresh: re-anchor the window from the picker (so relative ranges
-// like "Past 15 minutes" advance to "now") and let the QualityPage watch on
-// `dateWindow` drive the actual refetch. We deliberately don't call
-// `qualityPageRef.refreshAll()` here — `syncQualityDateWindow` always
-// assigns a fresh `{startUs,endUs}` object, so the prop's ref identity
-// changes and the watch fires. Calling refreshAll() explicitly on top of
-// that would race two concurrent loads on every Refresh click.
-function onQualityRefresh() {
-  if (qualityDatePickerRef.value) {
+async function reloadQuality() {
+  qualityReloading.value = true;
+  try {
+    // On the @ready trigger this runs from QualityPage's onMounted; wait a
+    // tick so the parent's `qualityPageRef` is guaranteed assigned before we
+    // call into it.
+    await nextTick();
     syncQualityDateWindow();
-  } else {
-    // Picker isn't mounted (shouldn't happen — button + picker render
-    // together for the quality tab — but cover the race during initial
-    // teardown). Run the refresh directly so the click isn't lost.
-    void qualityPageRef.value?.refreshAll?.();
+    await loadQualityAgents();
+    await qualityPageRef.value?.refreshAll?.();
+  } finally {
+    qualityReloading.value = false;
   }
 }
 
-// Sync the initial dateWindow once the picker mounts (it only mounts while
-// the Quality tab is active). Without this the first render uses the
-// 7-day default instead of the user's persisted/picked range.
-watch(qualityDatePickerRef, (next) => {
-  if (next) syncQualityDateWindow();
+// Trigger 2 — Refresh button. Re-anchors relative ranges ("Past 15 minutes")
+// to "now" via the shared reload path.
+function onQualityRefresh() {
+  void reloadQuality();
+}
+
+// Trigger 3 — date-time change. DateTimePickerDashboard's inner DateTime emits
+// `update:modelValue` ONCE on mount (its onMounted calls saveDate → on:date-change),
+// re-anchoring qualitySelectedDate to the same window it already holds. That echo
+// would fire a second full reloadQuality on top of the @ready one, double-hitting
+// every quality API. The picker remounts every time the quality tab is (re-)entered
+// (it lives in the tab-scoped header slot), so this echo recurs on each entry — not
+// just first load. `qualityDateEchoPending` is armed on entry (see watch(activeTab))
+// and here swallows exactly the next (mount) change; genuine user date changes reload.
+let qualityDateEchoPending = true;
+watch(qualitySelectedDate, () => {
+  if (qualityDateEchoPending) {
+    qualityDateEchoPending = false;
+    return;
+  }
+  void reloadQuality();
 });
 
-const currentSingularLabel = computed(() => t(`onlineEvals.singular.${activeTab.value}`));
+// Org switch — reset the agent filter and reload from scratch.
+watch(orgId, () => {
+  qualityAgentKey.value = ALL_AGENTS_VALUE;
+  void reloadQuality();
+});
+
+// User picked a different agent — only the data needs refetching; the agent
+// list is unchanged. Driven explicitly from the dropdown's update event (not a
+// watch on the key) so the programmatic reset inside loadQualityAgents()
+// during reloadQuality() never double-fires a data reload.
+async function onQualityAgentChange(key: string) {
+  qualityAgentKey.value = key;
+  // `selectedQualityAgent` → the `agent-filter` prop → the child's
+  // `agentFilterRef` only update on the next render tick. Wait for it so
+  // `refreshAll()` queries the newly selected agent, not the previous one.
+  await nextTick();
+  await qualityPageRef.value?.refreshAll?.();
+}
+
+// Aggregated "is a quality reload in flight" — covers the agent-load phase
+// plus every in-flight QualityPage loader, so the Refresh button spins from
+// click to settle.
+const qualityRefreshing = computed(
+  () => qualityReloading.value || (qualityPageRef.value?.isAnyLoading ?? false),
+);
+
+// Last-refresh timestamp for the header's ORefreshButton — stamped when a
+// reload settles (true → false), mirroring the Sessions / LLM Insights pages.
+const qualityLastRunAt = ref<number | null>(null);
+watch(qualityRefreshing, (isLoading, wasLoading) => {
+  if (wasLoading && !isLoading) qualityLastRunAt.value = Date.now();
+});
+
+const currentSingularLabel = computed(() =>
+  t(`onlineEvals.singular.${activeTab.value}`),
+);
 
 const pendingDeleteLabel = computed(() => {
   const tab = pendingDeleteTab.value;
   if (!tab || tab === "quality") return t("onlineEvals.actions.delete");
-  return t("onlineEvals.deleteTitle", { label: t(`onlineEvals.singular.${tab}`) });
+  return t("onlineEvals.deleteTitle", {
+    label: t(`onlineEvals.singular.${tab}`),
+  });
 });
 
 watch(activeTab, (next) => {
   filterQuery.value = "";
+  // Re-arm the date-picker mount-echo guard: entering quality remounts the
+  // picker, which emits `update:modelValue` once on mount. @ready already owns
+  // the entry reload, so that echo must be swallowed to avoid a double fetch.
+  if (next === "quality") qualityDateEchoPending = true;
   if (route.query.tab !== next) {
     router.replace({ query: { ...route.query, tab: next } }).catch(() => {});
   }
@@ -708,12 +891,20 @@ function closeJobView() {
  * and overwrite the `action` / `id` params. The URL → state watcher then
  * syncs activeTab + opens the right drawer. */
 function crossNavigateToScorer(row: Scorer) {
-  const query = buildCrossNavigationQuery({ ...route.query }, "scorers", entityId(row));
+  const query = buildCrossNavigationQuery(
+    { ...route.query },
+    "scorers",
+    entityId(row),
+  );
   router.push({ name: route.name as string, query }).catch(() => {});
 }
 
 function crossNavigateToJob(row: EvalJob) {
-  const query = buildCrossNavigationQuery({ ...route.query }, "jobs", String(row.id));
+  const query = buildCrossNavigationQuery(
+    { ...route.query },
+    "jobs",
+    String(row.id),
+  );
   router.push({ name: route.name as string, query }).catch(() => {});
 }
 
@@ -878,8 +1069,8 @@ function exportScorerRow(row: Scorer) {
 }
 
 function exportScorerBulk(ids: string[]) {
-  const selected = scorers.value.filter((row) =>
-    ids.includes(entityId(row)) || ids.includes(row.id),
+  const selected = scorers.value.filter(
+    (row) => ids.includes(entityId(row)) || ids.includes(row.id),
   );
   if (selected.length === 0) {
     toast({ variant: "warning", message: "No scorers selected" });
@@ -907,8 +1098,8 @@ function exportScorerBulk(ids: string[]) {
 }
 
 function exportScoreConfigBulk(ids: string[]) {
-  const selected = scoreConfigs.value.filter((row) =>
-    ids.includes(entityId(row)) || ids.includes(row.id),
+  const selected = scoreConfigs.value.filter(
+    (row) => ids.includes(entityId(row)) || ids.includes(row.id),
   );
   if (selected.length === 0) {
     toast({ variant: "warning", message: "No score configs selected" });
@@ -981,7 +1172,12 @@ function syncFromRoute() {
 }
 
 watch(
-  () => [route.query.action, route.query.id, route.query.scorer_type, route.query.tab],
+  () => [
+    route.query.action,
+    route.query.id,
+    route.query.scorer_type,
+    route.query.tab,
+  ],
   () => syncFromRoute(),
 );
 
@@ -1004,9 +1200,15 @@ async function performDelete() {
   const singular = t(`onlineEvals.singular.${tab}`);
   try {
     if (tab === "scoreConfigs")
-      await onlineEvalsService.scoreConfigs.delete(orgId.value, entityId(row as ScoreConfig));
+      await onlineEvalsService.scoreConfigs.delete(
+        orgId.value,
+        entityId(row as ScoreConfig),
+      );
     else if (tab === "scorers")
-      await onlineEvalsService.scorers.delete(orgId.value, entityId(row as Scorer));
+      await onlineEvalsService.scorers.delete(
+        orgId.value,
+        entityId(row as Scorer),
+      );
     else if (tab === "jobs")
       await onlineEvalsService.jobs.delete(orgId.value, (row as EvalJob).id);
 
@@ -1016,14 +1218,16 @@ async function performDelete() {
     });
     await loadAll(orgId.value);
   } catch (err: any) {
-    showError(err, t("onlineEvals.deleteError", { label: singular.toLowerCase() }));
+    showError(
+      err,
+      t("onlineEvals.deleteError", { label: singular.toLowerCase() }),
+    );
   } finally {
     pendingDeleteRow.value = null;
     pendingDeleteTab.value = null;
   }
 }
 </script>
-
 
 <style lang="scss">
 .online-evals {

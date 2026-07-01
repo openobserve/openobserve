@@ -44,22 +44,34 @@
       </header>
 
       <!-- Tab strip -->
-      <nav class="scd__tabs" role="tablist">
-        <button
+      <OTabs
+        :model-value="activeTab"
+        bordered
+        class="tw:flex-shrink-0 tw:px-5"
+        data-test="score-config-detail-tabs"
+        @update:model-value="activeTab = $event as TabId"
+      >
+        <!-- Slot mode (no `label` prop) so each tab can carry a count badge
+             alongside its label. -->
+        <OTab
           v-for="tab in tabs"
           :key="tab.id"
-          type="button"
-          class="scd__tab"
-          :class="{ 'scd__tab--active': activeTab === tab.id }"
-          role="tab"
-          :aria-selected="activeTab === tab.id"
+          :name="tab.id"
           :data-test="`score-config-detail-tab-${tab.id}`"
-          @click="activeTab = tab.id"
         >
           <span>{{ tab.label }}</span>
-          <span v-if="tab.count != null" class="scd__tab-count">{{ tab.count }}</span>
-        </button>
-      </nav>
+          <span
+            v-if="tab.count != null"
+            class="tw:inline-flex tw:items-center tw:justify-center tw:px-[0.375rem] tw:min-w-[1.125rem] tw:h-[1rem] tw:rounded-full tw:text-[0.625rem] tw:font-semibold"
+            :class="
+              activeTab === tab.id
+                ? 'tw:bg-[color-mix(in_srgb,var(--color-primary-600,#3f7994)_18%,transparent)] tw:text-[var(--color-primary-600,#3f7994)]'
+                : 'tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] tw:text-[var(--color-text-secondary)]'
+            "
+            >{{ tab.count }}</span
+          >
+        </OTab>
+      </OTabs>
 
       <div class="scd__body">
         <!-- ─────────── OVERVIEW TAB ─────────── -->
@@ -79,7 +91,7 @@
 
               <template v-if="dataType === 'numeric' && numericRange">
                 <dt>{{ t("onlineEvals.scoreConfig.detail.rangeLabel") }}</dt>
-                <dd class="scd-mono">{{ numericRange.min }} – {{ numericRange.max }}</dd>
+                <dd>{{ numericRange.min }} – {{ numericRange.max }}</dd>
               </template>
 
               <template v-if="dataType === 'categorical' && categories.length">
@@ -91,7 +103,7 @@
 
               <template v-if="dataType === 'boolean'">
                 <dt>{{ t("onlineEvals.scoreConfig.detail.valuesLabel") }}</dt>
-                <dd class="scd-mono">true / false</dd>
+                <dd>true / false</dd>
               </template>
             </dl>
           </section>
@@ -126,11 +138,11 @@
                 </span>
               </dd>
               <dt>{{ t("onlineEvals.scoreConfig.detail.versionLabel") }}</dt>
-              <dd class="scd-mono">v{{ row.version }}</dd>
+              <dd>v{{ row.version }}</dd>
               <dt v-if="createdAt">{{ t("onlineEvals.scoreConfig.detail.createdLabel") }}</dt>
-              <dd v-if="createdAt" class="scd-mono">{{ formatTimestamp(createdAt) }}</dd>
+              <dd v-if="createdAt">{{ formatTimestamp(createdAt) }}</dd>
               <dt v-if="updatedAt">{{ t("onlineEvals.scoreConfig.detail.updatedLabel") }}</dt>
-              <dd v-if="updatedAt" class="scd-mono">{{ formatTimestamp(updatedAt) }}</dd>
+              <dd v-if="updatedAt">{{ formatTimestamp(updatedAt) }}</dd>
             </dl>
           </section>
         </template>
@@ -141,12 +153,12 @@
           <ul class="scd-versions">
             <li class="scd-versions__item scd-versions__item--active">
               <div class="scd-versions__head">
-                <span class="scd-mono scd-versions__label">v{{ row.version }}</span>
+                <span class="scd-versions__label">v{{ row.version }}</span>
                 <span class="scd-versions__chip">{{ t("onlineEvals.scoreConfig.detail.activeVersionChip") }}</span>
               </div>
               <div v-if="updatedAt" class="scd-versions__meta">
                 {{ t("onlineEvals.scoreConfig.detail.lastUpdated") }}
-                <span class="scd-mono">{{ formatTimestamp(updatedAt) }}</span>
+                <span>{{ formatTimestamp(updatedAt) }}</span>
               </div>
             </li>
           </ul>
@@ -169,7 +181,7 @@
               >
                 <div class="scd-used-card__main">
                   <div class="scd-used-card__row">
-                    <span class="scd-mono scd-used-card__name">{{ scorer.name }}</span>
+                    <span class="scd-used-card__name">{{ scorer.name }}</span>
                     <span class="scd-used-card__type" :class="`scd-used-card__type--${scorerTypeOf(scorer)}`">
                       {{ scorerTypeLabel(scorerTypeOf(scorer)) }}
                     </span>
@@ -193,6 +205,8 @@ import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import {
   dataTypeOf,
@@ -328,15 +342,6 @@ function formatTimestamp(microsOrMs: number): string {
     return String(microsOrMs);
   }
 }
-
-function formatDateShort(microsOrMs: number): string {
-  const ms = microsOrMs > 1e14 ? Math.round(microsOrMs / 1000) : microsOrMs;
-  try {
-    return new Date(ms).toISOString().slice(0, 10);
-  } catch {
-    return String(microsOrMs);
-  }
-}
 </script>
 
 <style lang="scss" scoped>
@@ -356,11 +361,11 @@ function formatDateShort(microsOrMs: number): string {
 }
 
 .scd {
-  width: 560px;
+  width: 35rem;
   max-width: 92vw;
   height: 100%;
   background: var(--color-card-bg);
-  border-left: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border-left: 0.0625rem solid var(--color-dialog-header-border, var(--o2-border));
   display: flex;
   flex-direction: column;
   animation: scd-slide 0.22s ease-out;
@@ -375,9 +380,9 @@ function formatDateShort(microsOrMs: number): string {
 .scd__header {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 16px 20px 14px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  gap: 0.625rem;
+  padding: 1rem 1.25rem 0.875rem;
+  border-bottom: 0.0625rem solid var(--color-dialog-header-border, var(--o2-border));
   background: var(--color-card-bg);
   flex-shrink: 0;
 }
@@ -387,64 +392,21 @@ function formatDateShort(microsOrMs: number): string {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.25rem;
 }
 
 .scd__eyebrow {
-  font: 600 11px/1.4 var(--o2-font);
-  letter-spacing: 0.02em;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.scd__title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.scd__title {
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: -0.005em;
-  color: var(--color-text-primary, currentColor);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.scd__type-pill {
-  display: inline-flex;
-  padding: 1px 7px;
-  border-radius: 3px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.scd__type-pill--categorical {
-  background: color-mix(in srgb, #9333ea 14%, transparent);
-  color: #7c3aed;
-}
-
-.scd__type-pill--boolean {
-  background: color-mix(in srgb, #16a34a 14%, transparent);
-  color: #15803d;
-}
-
-.scd__meta-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .scd__status {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 0.3125rem;
   color: var(--o2-status-success-text, #2e7d32);
   font-weight: 600;
 }
@@ -454,22 +416,18 @@ function formatDateShort(microsOrMs: number): string {
 }
 
 .scd__status-dot {
-  width: 6px;
-  height: 6px;
+  width: 0.375rem;
+  height: 0.375rem;
   border-radius: 50%;
   background: currentColor;
 }
-
-.scd__meta-version { color: var(--color-text-primary, currentColor); }
-
-.scd__meta-sep { opacity: 0.5; }
 
 .scd__close {
   flex-shrink: 0;
   background: transparent;
   border: 0;
-  padding: 4px;
-  border-radius: 4px;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
   cursor: pointer;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
@@ -479,80 +437,22 @@ function formatDateShort(microsOrMs: number): string {
   color: var(--color-text-primary, currentColor);
 }
 
-/* — Tab strip — */
-.scd__tabs {
-  display: flex;
-  gap: 18px;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  background: var(--color-card-bg);
-  flex-shrink: 0;
-}
-
-.scd__tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 0;
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font: 600 13px var(--o2-font);
-  margin-bottom: -1px;
-}
-
-.scd__tab:hover { color: var(--color-text-primary, currentColor); }
-
-.scd__tab--active {
-  color: var(--color-primary-600, #3F7994);
-  border-bottom-color: var(--color-primary-600, #3F7994);
-}
-
-.scd__tab-count {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 6px;
-  min-width: 18px;
-  height: 16px;
-  border-radius: 999px;
-  font: 600 10px/1 var(--o2-font);
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  justify-content: center;
-}
-
-.scd__tab--active .scd__tab-count {
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 18%, transparent);
-  color: var(--color-primary-600, #3F7994);
-}
-
 /* — Body — */
 .scd__body {
   flex: 1;
   overflow: auto;
-  padding: 18px 20px;
+  padding: 1.125rem 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 1.125rem;
   min-height: 0;
   background: var(--color-card-bg);
 }
 
 .scd__tab-intro {
   margin: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.scd__tab-note {
-  margin: 6px 0 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
@@ -560,33 +460,36 @@ function formatDateShort(microsOrMs: number): string {
 .scd-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .scd-section__title {
   margin: 0;
-  font: 600 13px/1.5 var(--o2-font);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.5;
   color: var(--color-text-primary, currentColor);
-  padding-bottom: 6px;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
+  padding-bottom: 0.375rem;
+  border-bottom: 0.0625rem solid color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 0.375rem;
 }
 
 .scd-section__chip {
   display: inline-flex;
   align-items: center;
-  padding: 0 5px;
-  border-radius: 3px;
-  font: 600 10px var(--o2-font);
+  padding: 0 0.3125rem;
+  border-radius: 0.1875rem;
+  font-size: 0.625rem;
+  font-weight: 600;
   background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .scd-section__text {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.55;
   color: var(--color-text-primary, currentColor);
 }
@@ -595,31 +498,30 @@ function formatDateShort(microsOrMs: number): string {
 
 .scd-kv {
   display: grid;
-  grid-template-columns: 120px 1fr;
-  gap: 6px 14px;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 0.375rem 0.875rem;
   margin: 0;
 }
 
+// Field labels follow the alert form convention (AddAlert.vue's
+// `.alert-v3-inline-label`): 12px / 600 in the muted-secondary color.
 .scd-kv dt {
-  font-size: 11px;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .scd-kv dd {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--color-text-primary, currentColor);
-}
-
-.scd-mono {
-  font-variant-numeric: tabular-nums;
 }
 
 .scd-type-chip {
   display: inline-flex;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 11px;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 0.1875rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   background: color-mix(in srgb, #6b76e3 14%, transparent);
   color: #4f5bcf;
@@ -637,11 +539,12 @@ function formatDateShort(microsOrMs: number): string {
 
 .scd-tag {
   display: inline-flex;
-  margin-right: 6px;
-  margin-bottom: 4px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font: 600 11px var(--o2-font);
+  margin-right: 0.375rem;
+  margin-bottom: 0.25rem;
+  padding: 0.0625rem 0.5rem;
+  border-radius: 62.4375rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
   background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
   color: var(--color-text-primary, currentColor);
 }
@@ -649,39 +552,39 @@ function formatDateShort(microsOrMs: number): string {
 .scd-threshold {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 35%, transparent);
+  gap: 0.5rem;
+  padding: 0.75rem 0.875rem;
+  border: 0.0625rem solid color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 35%, transparent);
   background: color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 8%, transparent);
-  border-radius: 6px;
+  border-radius: 0.375rem;
 }
 
 .scd-threshold__sign {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 700;
   color: var(--o2-status-success-text, #2e7d32);
 }
 
 .scd-threshold__value {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--color-text-primary, currentColor);
 }
 
 .scd-threshold__hint {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .scd-empty {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
+  gap: 0.375rem;
+  padding: 0.5rem 0.625rem;
   background: color-mix(in srgb, var(--color-text-secondary) 6%, transparent);
-  border-radius: 5px;
-  font-size: 12px;
+  border-radius: 0.3125rem;
+  font-size: 0.75rem;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
@@ -692,14 +595,14 @@ function formatDateShort(microsOrMs: number): string {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .scd-versions__item {
-  padding: 12px 14px;
+  padding: 0.75rem 0.875rem;
   background: var(--color-card-bg);
-  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
-  border-radius: 6px;
+  border: 0.0625rem solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
+  border-radius: 0.375rem;
 }
 
 .scd-versions__item--active {
@@ -710,27 +613,28 @@ function formatDateShort(microsOrMs: number): string {
 .scd-versions__head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .scd-versions__label {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--color-text-primary, currentColor);
 }
 
 .scd-versions__chip {
   display: inline-flex;
-  padding: 1px 7px;
-  border-radius: 3px;
-  font: 600 10px var(--o2-font);
+  padding: 0.0625rem 0.4375rem;
+  border-radius: 0.1875rem;
+  font-size: 0.625rem;
+  font-weight: 600;
   background: color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 14%, transparent);
   color: var(--o2-status-success-text, #2e7d32);
 }
 
 .scd-versions__meta {
-  margin-top: 6px;
-  font-size: 11.5px;
+  margin-top: 0.375rem;
+  font-size: 0.71875rem;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
@@ -741,7 +645,7 @@ function formatDateShort(microsOrMs: number): string {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 /* OButton is sized for compact action buttons; the "Used by" cards need
@@ -750,8 +654,8 @@ function formatDateShort(microsOrMs: number): string {
 .scd-used-card {
   width: 100%;
   background: var(--color-card-bg) !important;
-  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent) !important;
-  border-radius: 6px !important;
+  border: 0.0625rem solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent) !important;
+  border-radius: 0.375rem !important;
   transition: border-color 0.15s, background 0.15s;
 }
 
@@ -762,8 +666,8 @@ function formatDateShort(microsOrMs: number): string {
 
 .scd-used-card:deep(button) {
   height: auto !important;
-  padding: 12px 14px !important;
-  gap: 10px;
+  padding: 0.75rem 0.875rem !important;
+  gap: 0.625rem;
   justify-content: flex-start;
   text-align: left;
 }
@@ -781,20 +685,21 @@ function formatDateShort(microsOrMs: number): string {
 .scd-used-card__row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .scd-used-card__name {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--color-text-primary, currentColor);
 }
 
 .scd-used-card__type {
   display: inline-flex;
-  padding: 1px 7px;
-  border-radius: 3px;
-  font: 600 10px var(--o2-font);
+  padding: 0.0625rem 0.4375rem;
+  border-radius: 0.1875rem;
+  font-size: 0.625rem;
+  font-weight: 600;
   background: color-mix(in srgb, #6b76e3 14%, transparent);
   color: #4f5bcf;
 }
@@ -805,9 +710,8 @@ function formatDateShort(microsOrMs: number): string {
 }
 
 .scd-used-card__version {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-variant-numeric: tabular-nums;
 }
 
 .scd-used-card__chevron {

@@ -29,13 +29,13 @@
 
     <div class="job-form__body">
       <div class="job-form__main">
-        <!-- Section 01: Target -->
-        <section class="job-section">
-          <div class="job-section__head">
-            <span class="job-section__num">01</span>
-            <h3 class="job-section__title">{{ t("onlineEvals.job.targetSection") }}</h3>
+        <!-- Target -->
+        <section class="job-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.job.targetSection") }}</span>
           </div>
-
+          <div class="job-section__body">
           <div class="job-field">
             <label class="job-field__label">
               {{ t("onlineEvals.job.nameLabel") }}
@@ -78,15 +78,16 @@
               data-test="job-form-description-input"
             />
           </div>
+          </div>
         </section>
 
-        <!-- Section 02: Scorers + Filter + Mapping -->
-        <section class="job-section">
-          <div class="job-section__head">
-            <span class="job-section__num">02</span>
-            <h3 class="job-section__title">{{ t("onlineEvals.job.scorersSection") }}</h3>
+        <!-- Scorers + Filter + Mapping -->
+        <section class="job-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.job.scorersSection") }}</span>
           </div>
-
+          <div class="job-section__body">
           <JobScorerPicker
             v-model="form.scorerIds"
             :scorers="scorers"
@@ -97,48 +98,21 @@
             @update:group="filterGroup = $event"
           />
 
-          <div class="job-presets">
-            <span class="job-presets__label">{{ t("onlineEvals.job.presets.label") }}</span>
-            <button
-              type="button"
-              class="job-presets__chip"
-              data-test="job-form-preset-root-spans"
-              @click="applyPreset('rootSpans')"
-            >
-              {{ t("onlineEvals.job.presets.rootSpans") }}
-            </button>
-            <button
-              type="button"
-              class="job-presets__chip"
-              data-test="job-form-preset-llm-calls"
-              @click="applyPreset('llmCalls')"
-            >
-              {{ t("onlineEvals.job.presets.llmCalls") }}
-            </button>
-            <button
-              type="button"
-              class="job-presets__chip"
-              data-test="job-form-preset-tool-calls"
-              @click="applyPreset('toolCalls')"
-            >
-              {{ t("onlineEvals.job.presets.toolCalls") }}
-            </button>
-          </div>
-
           <JobInputMapping
             :selected-scorers="selectedScorers"
             :input-mappings="inputMappings"
             @update:input-mappings="inputMappings = $event"
           />
+          </div>
         </section>
 
-        <!-- Section 03: Sampling -->
-        <section class="job-section">
-          <div class="job-section__head">
-            <span class="job-section__num">03</span>
-            <h3 class="job-section__title">{{ t("onlineEvals.job.stepper.sampling") }}</h3>
+        <!-- Sampling -->
+        <section class="job-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.job.stepper.sampling") }}</span>
           </div>
-
+          <div class="job-section__body">
           <div class="job-field-row">
             <div class="job-field">
               <label class="job-field__label">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
@@ -169,10 +143,18 @@
               </div>
             </div>
           </div>
+          </div>
         </section>
       </div>
 
-      <JobPreviewPanel :name="form.name" :stream-type="form.streamType" :mode="mode" />
+      <JobPreviewPanel
+        :name="form.name"
+        :stream-type="form.streamType"
+        :mode="mode"
+        :stream="form.stream"
+        :filter-where="filterWhere"
+        :filter-ready="filterReady"
+      />
     </div>
 
     <footer class="job-form__foot">
@@ -248,9 +230,12 @@ import {
 import { parseJson, showError, stringifyJson } from "../utils/evalFormat";
 import {
   buildJobFilterConditionPayload,
+  cleanFilterGroup,
   createEmptyJobFilterGroup,
+  isJobFilterComplete,
   normalizeJobFilterCondition,
 } from "../utils/jobFilter";
+import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import {
   buildJobInputMappingPayload,
   normalizeJobInputMappings,
@@ -280,6 +265,28 @@ const inputMappings = ref(initInputMappings(props.row));
 const scorerVersions = ref(initScorerVersions(props.row));
 const isSaving = ref(false);
 const pendingActivateOnSave = ref(false);
+
+// SQL WHERE body built from the filter builder — feeds the live "matched
+// spans" count in the preview panel. Built from the CLEANED group (incomplete
+// conditions stripped) so the SQL is always valid. Same formatter the form's
+// filter preview line uses (sqlMode → quoted, comparable values).
+const filterWhere = computed<string>(() => {
+  try {
+    return buildConditionsString(cleanFilterGroup(filterGroup.value), {
+      sqlMode: true,
+      addWherePrefix: false,
+      formatValues: true,
+    });
+  } catch {
+    return "";
+  }
+});
+
+// Pauses the match-count query while a condition is half-filled (column picked
+// but value still empty), so we don't query on every keystroke / partial edit.
+const filterReady = computed<boolean>(() =>
+  isJobFilterComplete(filterGroup.value),
+);
 
 const selectedScorers = computed(() =>
   form.value.scorerIds
@@ -366,29 +373,6 @@ function initScorerVersions(row: EvalJob | null) {
   );
 }
 
-function applyPreset(preset: "rootSpans" | "llmCalls" | "toolCalls") {
-  const presets: Record<string, { column: string; operator: string; value: string }> = {
-    rootSpans: { column: "parent_span_id", operator: "=", value: "" },
-    llmCalls: { column: "gen_ai_system", operator: "!=", value: "" },
-    toolCalls: { column: "gen_ai_operation_name", operator: "=", value: "execute_tool" },
-  };
-  const cond = presets[preset];
-  filterGroup.value = {
-    filterType: "group",
-    logicalOperator: "AND",
-    conditions: [
-      {
-        filterType: "condition",
-        column: cond.column,
-        operator: cond.operator,
-        value: cond.value,
-        values: [],
-        logicalOperator: "AND",
-      },
-    ],
-  } as any;
-}
-
 function syncMappings() {
   const { nextMappings, nextVersions } = syncJobInputMappings(
     form.value.scorerIds,
@@ -470,22 +454,26 @@ async function save(activateAfter = false) {
   gap: 10px;
 }
 
+// AddAlert "single pane" layout: flex 6.5 form column / flex 3.5 preview rail
+// (the rail's left border is the only divider — no heavy grid gap + shadows).
 .job-form__body {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
-  gap: 10px;
+  display: flex;
+  gap: 8px;
 }
 
+// Left column — scrollable stack of card sections.
 .job-form__main {
+  flex: 6.5;
   min-width: 0;
+  min-height: 0;
   overflow: auto;
-  padding: 18px 24px 24px;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
 }
 
 .job-form__foot {
@@ -512,41 +500,52 @@ async function save(activateAfter = false) {
   max-height: 120px;
 }
 
+// Section card — bg comes from .card-container; we add the border + radius so
+// each section reads as a discrete card (AddAlert pattern).
 .job-section {
-  margin-bottom: 24px;
+  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border-radius: 6px;
+  overflow: hidden;
+  // In the column flex container the sections must NOT shrink — otherwise they
+  // get squeezed to fit the viewport and `overflow: hidden` clips their content
+  // (lost Description, hidden filter conditions). Natural height + column scroll.
+  flex-shrink: 0;
 }
 
-.job-section__head {
+// Accent-bar section header — copied from AddAlert.vue's `.section-header`
+// (replaces the old numbered "01/02/03" badges).
+.section-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-default, var(--o2-border));
 }
 
-.job-section__num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-weight: 700;
-  font-size: 11px;
+.section-header-accent {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  margin-right: 8px;
+  flex-shrink: 0;
+  background: var(--q-primary);
 }
 
-.job-section__title {
-  margin: 0;
-  font-size: 14px;
+.section-header-title {
+  font-size: 13px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--color-text-primary, currentColor);
 }
 
+.job-section__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
 .job-field {
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .job-field__label {
@@ -580,43 +579,12 @@ async function save(activateAfter = false) {
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.job-presets {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0 16px;
-}
-
-.job-presets__label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.job-presets__chip {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 10px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 999px;
-  background: var(--color-card-bg);
-  color: var(--color-text-primary, currentColor);
-  font: 500 11px inherit;
-  cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
-}
-
-.job-presets__chip:hover {
-  border-color: var(--color-primary-600, #3F7994);
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 6%, var(--color-card-bg));
-  color: var(--color-primary-600, #3F7994);
-}
-
 @media (max-width: 1100px) {
   .job-form__body {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+  .job-form__main {
+    flex: 1 1 auto;
   }
   .job-field-row {
     grid-template-columns: 1fr;

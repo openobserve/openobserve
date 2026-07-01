@@ -54,6 +54,13 @@ pub(crate) const OPTIONAL_GEN_AI_FIELDS: &[&str] = &[
     "gen_ai_input_messages",
     "gen_ai_output_messages",
     "gen_ai_usage_total_tokens",
+    "gen_ai_usage_cache_read_input_tokens",
+    "gen_ai_usage_cache_creation_input_tokens",
+    "gen_ai_usage_cost_cache_read_input",
+    "gen_ai_usage_cost_cache_creation_input",
+    "gen_ai_usage_cost_estimated_without_cache",
+    "gen_ai_usage_cost_cache_read_savings",
+    "gen_ai_usage_cost_net_cache_impact",
 ];
 
 /// Required fields for the legacy (llm_*) schema.
@@ -149,6 +156,13 @@ pub(super) struct ValidatedLlmSchema {
     #[allow(dead_code)]
     pub(super) has_output_messages: bool,
     pub(super) has_total_tokens: bool,
+    pub(super) has_cache_read_input_tokens: bool,
+    pub(super) has_cache_creation_input_tokens: bool,
+    pub(super) has_cost_cache_read_input: bool,
+    pub(super) has_cost_cache_creation_input: bool,
+    pub(super) has_cost_estimated_without_cache: bool,
+    pub(super) has_cost_cache_read_savings: bool,
+    pub(super) has_cost_net_cache_impact: bool,
 }
 
 impl ValidatedLlmSchema {
@@ -167,6 +181,13 @@ impl ValidatedLlmSchema {
             has_input_messages: false,
             has_output_messages: false,
             has_total_tokens: false,
+            has_cache_read_input_tokens: false,
+            has_cache_creation_input_tokens: false,
+            has_cost_cache_read_input: false,
+            has_cost_cache_creation_input: false,
+            has_cost_estimated_without_cache: false,
+            has_cost_cache_read_savings: false,
+            has_cost_net_cache_impact: false,
         }
     }
 }
@@ -216,6 +237,20 @@ pub(super) fn validate_llm_schema(
     let has_input_messages = schema.field_with_name(optional_fields[0]).is_ok();
     let has_output_messages = schema.field_with_name(optional_fields[1]).is_ok();
     let has_total_tokens = schema.field_with_name(optional_fields[2]).is_ok();
+    let has_cache_read_input_tokens =
+        has_gen_ai && schema.field_with_name(optional_fields[3]).is_ok();
+    let has_cache_creation_input_tokens =
+        has_gen_ai && schema.field_with_name(optional_fields[4]).is_ok();
+    let has_cost_cache_read_input =
+        has_gen_ai && schema.field_with_name(optional_fields[5]).is_ok();
+    let has_cost_cache_creation_input =
+        has_gen_ai && schema.field_with_name(optional_fields[6]).is_ok();
+    let has_cost_estimated_without_cache =
+        has_gen_ai && schema.field_with_name(optional_fields[7]).is_ok();
+    let has_cost_cache_read_savings =
+        has_gen_ai && schema.field_with_name(optional_fields[8]).is_ok();
+    let has_cost_net_cache_impact =
+        has_gen_ai && schema.field_with_name(optional_fields[9]).is_ok();
 
     Ok(ValidatedLlmSchema {
         has_gen_ai,
@@ -227,6 +262,13 @@ pub(super) fn validate_llm_schema(
         has_input_messages,
         has_output_messages,
         has_total_tokens,
+        has_cache_read_input_tokens,
+        has_cache_creation_input_tokens,
+        has_cost_cache_read_input,
+        has_cost_cache_creation_input,
+        has_cost_estimated_without_cache,
+        has_cost_cache_read_savings,
+        has_cost_net_cache_impact,
     })
 }
 
