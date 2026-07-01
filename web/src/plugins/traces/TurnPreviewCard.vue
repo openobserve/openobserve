@@ -23,8 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   the tooltip popover.
 
   Styling is Tailwind-only (no scoped classes) per the redesign rules. Data is
-  measured from the SessionTraceRow except the cache %, which is a placeholder
-  until per-request cache metrics exist (see redesign doc §3/§7, D1).
+  measured from the SessionTraceRow; cache % is passed from the session rollup.
 -->
 <template>
   <!-- Child mode (app convention): OTooltip attaches to its trigger sibling
@@ -107,7 +106,7 @@ const props = withDefaults(
     turn: SessionTraceRow;
     /** Zero-based turn index — display number is `index + 1`. */
     index: number;
-    /** Cache-hit percentage (placeholder until cache metrics exist). */
+    /** Session-level cache reuse percentage. */
     cachePct: number;
     /** Which side the preview opens on. Default "top" (KPI chips); the rail rows
      *  pass "right" so the card doesn't cover the rows above it. */

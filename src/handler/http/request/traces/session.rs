@@ -386,6 +386,41 @@ pub async fn get_latest_sessions(
         } else {
             "0 as gen_ai_usage_details_total"
         };
+        let cache_read_tokens_expr = optional_sum_expr(
+            validated.has_cache_read_input_tokens,
+            "gen_ai_usage_cache_read_input_tokens",
+            "gen_ai_usage_cache_read_input_tokens",
+        );
+        let cache_creation_tokens_expr = optional_sum_expr(
+            validated.has_cache_creation_input_tokens,
+            "gen_ai_usage_cache_creation_input_tokens",
+            "gen_ai_usage_cache_creation_input_tokens",
+        );
+        let cost_cache_read_expr = optional_sum_expr(
+            validated.has_cost_cache_read_input,
+            "gen_ai_usage_cost_cache_read_input",
+            "gen_ai_usage_cost_cache_read_input",
+        );
+        let cost_cache_creation_expr = optional_sum_expr(
+            validated.has_cost_cache_creation_input,
+            "gen_ai_usage_cost_cache_creation_input",
+            "gen_ai_usage_cost_cache_creation_input",
+        );
+        let cost_estimated_without_cache_expr = optional_sum_expr(
+            validated.has_cost_estimated_without_cache,
+            "gen_ai_usage_cost_estimated_without_cache",
+            "gen_ai_usage_cost_estimated_without_cache",
+        );
+        let cost_cache_read_savings_expr = optional_sum_expr(
+            validated.has_cost_cache_read_savings,
+            "gen_ai_usage_cost_cache_read_savings",
+            "gen_ai_usage_cost_cache_read_savings",
+        );
+        let cost_net_cache_impact_expr = optional_sum_expr(
+            validated.has_cost_net_cache_impact,
+            "gen_ai_usage_cost_net_cache_impact",
+            "gen_ai_usage_cost_net_cache_impact",
+        );
         format!(
             "SELECT trace_id, \
             max(user_id) as user_id,
@@ -395,6 +430,13 @@ pub async fn get_latest_sessions(
             sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
             {total_tokens_expr}, \
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+            {cache_read_tokens_expr}, \
+            {cache_creation_tokens_expr}, \
+            {cost_cache_read_expr}, \
+            {cost_cache_creation_expr}, \
+            {cost_estimated_without_cache_expr}, \
+            {cost_cache_read_savings_expr}, \
+            {cost_net_cache_impact_expr}, \
             sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
             {first_msg_clause} as gen_ai_input_messages \
             FROM \"{stream_name}\" \
@@ -496,6 +538,34 @@ pub async fn get_latest_sessions(
                 ),
                 gen_ai_usage_cost: json::get_float_value(
                     item.get("gen_ai_usage_cost_details").unwrap_or_default(),
+                ),
+                gen_ai_usage_cache_read_input_tokens: json::get_int_value(
+                    item.get("gen_ai_usage_cache_read_input_tokens")
+                        .unwrap_or_default(),
+                ),
+                gen_ai_usage_cache_creation_input_tokens: json::get_int_value(
+                    item.get("gen_ai_usage_cache_creation_input_tokens")
+                        .unwrap_or_default(),
+                ),
+                gen_ai_usage_cost_cache_read_input: json::get_float_value(
+                    item.get("gen_ai_usage_cost_cache_read_input")
+                        .unwrap_or_default(),
+                ),
+                gen_ai_usage_cost_cache_creation_input: json::get_float_value(
+                    item.get("gen_ai_usage_cost_cache_creation_input")
+                        .unwrap_or_default(),
+                ),
+                gen_ai_usage_cost_estimated_without_cache: json::get_float_value(
+                    item.get("gen_ai_usage_cost_estimated_without_cache")
+                        .unwrap_or_default(),
+                ),
+                gen_ai_usage_cost_cache_read_savings: json::get_float_value(
+                    item.get("gen_ai_usage_cost_cache_read_savings")
+                        .unwrap_or_default(),
+                ),
+                gen_ai_usage_cost_net_cache_impact: json::get_float_value(
+                    item.get("gen_ai_usage_cost_net_cache_impact")
+                        .unwrap_or_default(),
                 ),
                 error_count: json::get_int_value(item.get("error_count").unwrap_or_default()),
                 user_id: item
@@ -1049,6 +1119,41 @@ fn build_session_trace_details_sql(
         } else {
             "0 as gen_ai_usage_details_total"
         };
+        let cache_read_tokens_expr = optional_sum_expr(
+            validated.has_cache_read_input_tokens,
+            "gen_ai_usage_cache_read_input_tokens",
+            "gen_ai_usage_cache_read_input_tokens",
+        );
+        let cache_creation_tokens_expr = optional_sum_expr(
+            validated.has_cache_creation_input_tokens,
+            "gen_ai_usage_cache_creation_input_tokens",
+            "gen_ai_usage_cache_creation_input_tokens",
+        );
+        let cost_cache_read_expr = optional_sum_expr(
+            validated.has_cost_cache_read_input,
+            "gen_ai_usage_cost_cache_read_input",
+            "gen_ai_usage_cost_cache_read_input",
+        );
+        let cost_cache_creation_expr = optional_sum_expr(
+            validated.has_cost_cache_creation_input,
+            "gen_ai_usage_cost_cache_creation_input",
+            "gen_ai_usage_cost_cache_creation_input",
+        );
+        let cost_estimated_without_cache_expr = optional_sum_expr(
+            validated.has_cost_estimated_without_cache,
+            "gen_ai_usage_cost_estimated_without_cache",
+            "gen_ai_usage_cost_estimated_without_cache",
+        );
+        let cost_cache_read_savings_expr = optional_sum_expr(
+            validated.has_cost_cache_read_savings,
+            "gen_ai_usage_cost_cache_read_savings",
+            "gen_ai_usage_cost_cache_read_savings",
+        );
+        let cost_net_cache_impact_expr = optional_sum_expr(
+            validated.has_cost_net_cache_impact,
+            "gen_ai_usage_cost_net_cache_impact",
+            "gen_ai_usage_cost_net_cache_impact",
+        );
         format!(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
@@ -1057,6 +1162,13 @@ fn build_session_trace_details_sql(
             sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
             {total_tokens_expr}, \
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+            {cache_read_tokens_expr}, \
+            {cache_creation_tokens_expr}, \
+            {cost_cache_read_expr}, \
+            {cost_cache_creation_expr}, \
+            {cost_estimated_without_cache_expr}, \
+            {cost_cache_read_savings_expr}, \
+            {cost_net_cache_impact_expr}, \
             array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
             {first_msg_clause} as gen_ai_input_messages, \
             {trace_selects} \
@@ -1177,6 +1289,34 @@ fn build_session_trace_response_item(
         gen_ai_usage_cost: json::get_float_value(
             item.get("gen_ai_usage_cost_details").unwrap_or_default(),
         ),
+        gen_ai_usage_cache_read_input_tokens: json::get_int_value(
+            item.get("gen_ai_usage_cache_read_input_tokens")
+                .unwrap_or_default(),
+        ),
+        gen_ai_usage_cache_creation_input_tokens: json::get_int_value(
+            item.get("gen_ai_usage_cache_creation_input_tokens")
+                .unwrap_or_default(),
+        ),
+        gen_ai_usage_cost_cache_read_input: json::get_float_value(
+            item.get("gen_ai_usage_cost_cache_read_input")
+                .unwrap_or_default(),
+        ),
+        gen_ai_usage_cost_cache_creation_input: json::get_float_value(
+            item.get("gen_ai_usage_cost_cache_creation_input")
+                .unwrap_or_default(),
+        ),
+        gen_ai_usage_cost_estimated_without_cache: json::get_float_value(
+            item.get("gen_ai_usage_cost_estimated_without_cache")
+                .unwrap_or_default(),
+        ),
+        gen_ai_usage_cost_cache_read_savings: json::get_float_value(
+            item.get("gen_ai_usage_cost_cache_read_savings")
+                .unwrap_or_default(),
+        ),
+        gen_ai_usage_cost_net_cache_impact: json::get_float_value(
+            item.get("gen_ai_usage_cost_net_cache_impact")
+                .unwrap_or_default(),
+        ),
         gen_ai_input_messages: item.get("gen_ai_input_messages").cloned(),
         models: item
             .get("gen_ai_response_models")
@@ -1219,6 +1359,14 @@ fn escape_sql_string(value: &str) -> String {
     value.replace('\'', "''")
 }
 
+fn optional_sum_expr(has_field: bool, column: &str, alias: &str) -> String {
+    if has_field {
+        format!("sum({column}) as {alias}")
+    } else {
+        format!("0 as {alias}")
+    }
+}
+
 #[derive(Debug, Serialize)]
 struct SessionTraceResponseItem {
     trace_id: String,
@@ -1232,6 +1380,13 @@ struct SessionTraceResponseItem {
     gen_ai_usage_output_tokens: i64,
     gen_ai_usage_total_tokens: i64,
     gen_ai_usage_cost: f64,
+    gen_ai_usage_cache_read_input_tokens: i64,
+    gen_ai_usage_cache_creation_input_tokens: i64,
+    gen_ai_usage_cost_cache_read_input: f64,
+    gen_ai_usage_cost_cache_creation_input: f64,
+    gen_ai_usage_cost_estimated_without_cache: f64,
+    gen_ai_usage_cost_cache_read_savings: f64,
+    gen_ai_usage_cost_net_cache_impact: f64,
     gen_ai_input_messages: Option<json::Value>,
     models: Vec<String>,
 }
@@ -1320,6 +1475,13 @@ struct SessionDetails {
     gen_ai_usage_output_tokens: i64,
     gen_ai_usage_total_tokens: i64,
     gen_ai_usage_cost: f64,
+    gen_ai_usage_cache_read_input_tokens: i64,
+    gen_ai_usage_cache_creation_input_tokens: i64,
+    gen_ai_usage_cost_cache_read_input: f64,
+    gen_ai_usage_cost_cache_creation_input: f64,
+    gen_ai_usage_cost_estimated_without_cache: f64,
+    gen_ai_usage_cost_cache_read_savings: f64,
+    gen_ai_usage_cost_net_cache_impact: f64,
     error_count: i64,
     user_ids: Vec<String>,
     first_user_message: Option<String>,
@@ -1333,6 +1495,13 @@ impl SessionDetails {
         let mut usage_output: i64 = 0;
         let mut usage_total: i64 = 0;
         let mut cost_total: f64 = 0.0;
+        let mut cache_read_tokens: i64 = 0;
+        let mut cache_creation_tokens: i64 = 0;
+        let mut cost_cache_read: f64 = 0.0;
+        let mut cost_cache_creation: f64 = 0.0;
+        let mut cost_estimated_without_cache: f64 = 0.0;
+        let mut cost_cache_read_savings: f64 = 0.0;
+        let mut cost_net_cache_impact: f64 = 0.0;
         let mut error_count: i64 = 0;
         let mut user_ids: HashSet<String> = HashSet::with_capacity(details.len());
         let mut first_user_message: Option<String> = None;
@@ -1348,6 +1517,13 @@ impl SessionDetails {
             usage_output += detail.gen_ai_usage_output_tokens;
             usage_total += detail.gen_ai_usage_total_tokens;
             cost_total += detail.gen_ai_usage_cost;
+            cache_read_tokens += detail.gen_ai_usage_cache_read_input_tokens;
+            cache_creation_tokens += detail.gen_ai_usage_cache_creation_input_tokens;
+            cost_cache_read += detail.gen_ai_usage_cost_cache_read_input;
+            cost_cache_creation += detail.gen_ai_usage_cost_cache_creation_input;
+            cost_estimated_without_cache += detail.gen_ai_usage_cost_estimated_without_cache;
+            cost_cache_read_savings += detail.gen_ai_usage_cost_cache_read_savings;
+            cost_net_cache_impact += detail.gen_ai_usage_cost_net_cache_impact;
             error_count += detail.error_count;
             if let Some(ref uid) = detail.user_id {
                 user_ids.insert(uid.clone());
@@ -1380,6 +1556,13 @@ impl SessionDetails {
             gen_ai_usage_output_tokens: usage_output,
             gen_ai_usage_total_tokens: usage_total,
             gen_ai_usage_cost: cost_total,
+            gen_ai_usage_cache_read_input_tokens: cache_read_tokens,
+            gen_ai_usage_cache_creation_input_tokens: cache_creation_tokens,
+            gen_ai_usage_cost_cache_read_input: cost_cache_read,
+            gen_ai_usage_cost_cache_creation_input: cost_cache_creation,
+            gen_ai_usage_cost_estimated_without_cache: cost_estimated_without_cache,
+            gen_ai_usage_cost_cache_read_savings: cost_cache_read_savings,
+            gen_ai_usage_cost_net_cache_impact: cost_net_cache_impact,
             error_count,
             user_ids,
             first_user_message,

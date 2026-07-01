@@ -79,6 +79,13 @@ describe("useSessions — fetchPage: field mapping", () => {
       gen_ai_usage_output_tokens: "200",
       gen_ai_usage_total_tokens: "300",
       gen_ai_usage_cost: "0.0042",
+      gen_ai_usage_cache_read_input_tokens: "70",
+      gen_ai_usage_cache_creation_input_tokens: "10",
+      gen_ai_usage_cost_cache_read_input: "0.00007",
+      gen_ai_usage_cost_cache_creation_input: "0.00002",
+      gen_ai_usage_cost_estimated_without_cache: "0.0012",
+      gen_ai_usage_cost_cache_read_savings: "0.00063",
+      gen_ai_usage_cost_net_cache_impact: "0.00061",
       error_count: "0",
     };
     mockSessionsList.mockResolvedValue({ data: { hits: [hit], total: 1 } });
@@ -96,6 +103,13 @@ describe("useSessions — fetchPage: field mapping", () => {
     expect(row.outputTokens).toBe(200);
     expect(row.tokens).toBe(300);
     expect(row.cost).toBeCloseTo(0.0042);
+    expect(row.cacheReadInputTokens).toBe(70);
+    expect(row.cacheCreationInputTokens).toBe(10);
+    expect(row.cacheReadInputCost).toBeCloseTo(0.00007);
+    expect(row.cacheCreationInputCost).toBeCloseTo(0.00002);
+    expect(row.estimatedCostWithoutCache).toBeCloseTo(0.0012);
+    expect(row.cacheReadSavings).toBeCloseTo(0.00063);
+    expect(row.netCacheImpact).toBeCloseTo(0.00061);
     expect(row.errorCount).toBe(0);
   });
 

@@ -183,7 +183,7 @@ import {
 
 const props = defineProps<{
   traces: SessionTraceRow[];
-  /** Cache-hit % forwarded to the hover card (placeholder until real data). */
+  /** Session-level cache reuse percentage forwarded to hover cards. */
   cachePct: number;
 }>();
 

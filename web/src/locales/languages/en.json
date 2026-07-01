@@ -4153,7 +4153,8 @@
         "cost": "Cost",
         "errors": "Errors",
         "tokens": "Tokens",
-        "cacheSaved": "Cache Saved"
+        "cacheSaved": "Cache Saved",
+        "cacheImpact": "Cache Impact"
       },
       "kpiSub": {
         "turns": "Complete Session · {duration}",
@@ -4165,7 +4166,14 @@
         "costLead": "Peak {peak} ·",
         "tokens": "{ratio}% Cached",
         "cacheSaved": "{ratio}% of Input Reused · {tokens} Tok",
-        "cacheEstimate": "Estimated — per-request cache metrics aren't available yet."
+        "cacheImpact": "{ratio}% Reused · {tokens} Tok Read",
+        "cacheEstimate": "Net impact includes cache reads and cache creation costs.",
+        "cacheImpactTooltipTitle": "Cache Cost Breakdown",
+        "actualCost": "Actual Cost",
+        "estimatedWithoutCache": "Estimated Without Cache",
+        "grossCacheReadSavings": "Gross Cache-Read Savings",
+        "cacheCreationCost": "Cache Creation Cost",
+        "netCacheImpact": "Net Cache Impact"
       },
       "ribbon": {
         "title": "Session Ribbon",

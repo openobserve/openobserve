@@ -115,16 +115,23 @@ const ATTR_STATUS_MESSAGE: &str = "status_message";
 // Gen-AI semantic-convention column names produced by the OTEL processor after
 // dot→underscore flattening. Must stay in sync with GEN_AI_SCHEMA_FIELDS in
 // service/db/schema.rs.
-const GEN_AI_INT64_FIELDS: [&str; 3] = [
+const GEN_AI_INT64_FIELDS: [&str; 5] = [
     "gen_ai_usage_input_tokens",
     "gen_ai_usage_output_tokens",
     "gen_ai_usage_total_tokens",
+    "gen_ai_usage_cache_read_input_tokens",
+    "gen_ai_usage_cache_creation_input_tokens",
 ];
-const GEN_AI_FLOAT64_FIELDS: [&str; 4] = [
+const GEN_AI_FLOAT64_FIELDS: [&str; 9] = [
     "gen_ai_response_time_to_first_chunk",
     "gen_ai_usage_cost",
     "gen_ai_usage_cost_input",
     "gen_ai_usage_cost_output",
+    "gen_ai_usage_cost_cache_read_input",
+    "gen_ai_usage_cost_cache_creation_input",
+    "gen_ai_usage_cost_estimated_without_cache",
+    "gen_ai_usage_cost_cache_read_savings",
+    "gen_ai_usage_cost_net_cache_impact",
 ];
 
 #[cfg(feature = "enterprise")]
@@ -1615,9 +1622,16 @@ mod tests {
             "gen_ai_usage_input_tokens": "12",
             "gen_ai_usage_output_tokens": 34.8,
             "gen_ai_usage_total_tokens": true,
+            "gen_ai_usage_cache_read_input_tokens": "7",
+            "gen_ai_usage_cache_creation_input_tokens": 3.8,
             "gen_ai_response_time_to_first_chunk": "123456789",
             "gen_ai_usage_cost_input": "0.25",
             "gen_ai_usage_cost_output": 1,
+            "gen_ai_usage_cost_cache_read_input": "0.07",
+            "gen_ai_usage_cost_cache_creation_input": 2,
+            "gen_ai_usage_cost_estimated_without_cache": "0.32",
+            "gen_ai_usage_cost_cache_read_savings": "0.18",
+            "gen_ai_usage_cost_net_cache_impact": "0.11",
             "gen_ai_usage_cost": false,
             "unrelated": "value"
         })
@@ -1647,6 +1661,18 @@ mod tests {
         );
         assert_eq!(
             record
+                .get("gen_ai_usage_cache_read_input_tokens")
+                .and_then(|v| v.as_i64()),
+            Some(7)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_cache_creation_input_tokens")
+                .and_then(|v| v.as_i64()),
+            Some(3)
+        );
+        assert_eq!(
+            record
                 .get("gen_ai_response_time_to_first_chunk")
                 .and_then(|v| v.as_f64()),
             Some(123456789.0)
@@ -1662,6 +1688,36 @@ mod tests {
                 .get("gen_ai_usage_cost_output")
                 .and_then(|v| v.as_f64()),
             Some(1.0)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_cost_cache_read_input")
+                .and_then(|v| v.as_f64()),
+            Some(0.07)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_cost_cache_creation_input")
+                .and_then(|v| v.as_f64()),
+            Some(2.0)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_cost_estimated_without_cache")
+                .and_then(|v| v.as_f64()),
+            Some(0.32)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_cost_cache_read_savings")
+                .and_then(|v| v.as_f64()),
+            Some(0.18)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_cost_net_cache_impact")
+                .and_then(|v| v.as_f64()),
+            Some(0.11)
         );
         assert_eq!(
             record.get("gen_ai_usage_cost").and_then(|v| v.as_f64()),

@@ -30,6 +30,13 @@ export interface SessionApiHit {
   gen_ai_usage_output_tokens: number;
   gen_ai_usage_total_tokens: number;
   gen_ai_usage_cost: number;
+  gen_ai_usage_cache_read_input_tokens?: number;
+  gen_ai_usage_cache_creation_input_tokens?: number;
+  gen_ai_usage_cost_cache_read_input?: number;
+  gen_ai_usage_cost_cache_creation_input?: number;
+  gen_ai_usage_cost_estimated_without_cache?: number;
+  gen_ai_usage_cost_cache_read_savings?: number;
+  gen_ai_usage_cost_net_cache_impact?: number;
   /** Number of error spans across all traces in this session. */
   error_count: number;
   user_ids?: string[];

@@ -204,6 +204,13 @@ function makeSession(overrides: Record<string, any> = {}) {
     outputTokens: 200,
     tokens: 300,
     cost: 0.0042,
+    cacheReadInputTokens: 0,
+    cacheCreationInputTokens: 0,
+    cacheReadInputCost: 0,
+    cacheCreationInputCost: 0,
+    estimatedCostWithoutCache: 0,
+    cacheReadSavings: 0,
+    netCacheImpact: 0,
     errorCount: 0,
     status: "ok" as const,
     ...overrides,
@@ -227,7 +234,10 @@ beforeEach(() => {
     ],
   });
   mockListAgents.mockResolvedValue({ agents: [] });
-  mockFetchPage.mockResolvedValue(undefined);
+  mockFetchPage.mockImplementation(async () => {
+    mockHasLoadedOnce.value = true;
+    mockLoading.value = false;
+  });
 });
 
 async function mountComponent(props = defaultProps) {
@@ -246,6 +256,11 @@ async function mountComponent(props = defaultProps) {
   });
   await flushPromises();
   return wrapper;
+}
+
+async function refreshComponent(wrapper: any, startTime?: number, endTime?: number) {
+  await wrapper.vm.refresh(startTime, endTime);
+  await flushPromises();
 }
 
 // ---------------------------------------------------------------------------
@@ -320,22 +335,24 @@ describe("SessionsList — loading state", () => {
 
 describe("SessionsList — sessions table", () => {
   it("fetches stream sessions with no agent filter by default", async () => {
-    await mountComponent();
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
 
     expect(mockFetchPage).toHaveBeenCalledWith(
       "test-stream",
       1000,
       2000,
       0,
-      25,
+      20,
       "",
     );
   });
 
-  it("loads agents in stream mode so the Agent tab can be opened", async () => {
-    await mountComponent();
+  it("does not load agents while refreshing in stream mode", async () => {
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
 
-    expect(mockListAgents).toHaveBeenCalledWith("test-org", 1000, 2000);
+    expect(mockListAgents).not.toHaveBeenCalled();
   });
 
   it("renders session rows when sessions data is present", async () => {
@@ -431,14 +448,15 @@ describe("SessionsList — agent filter", () => {
     });
     mockListAgents.mockResolvedValue({ agents: [supportAgent] });
 
-    await mountComponent({ streamName: "", startTime: 1000, endTime: 2000 });
+    const wrapper = await mountComponent({ streamName: "", startTime: 1000, endTime: 2000 });
+    await refreshComponent(wrapper);
 
     expect(mockFetchPage).toHaveBeenCalledWith(
       "agent-stream",
       1000,
       2000,
       0,
-      25,
+      20,
       `gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM "agent-stream" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND gen_ai_agent_id = 'agent-1' GROUP BY gen_ai_conversation_id)`,
     );
   });
@@ -451,6 +469,7 @@ describe("SessionsList — agent filter", () => {
     mockListAgents.mockResolvedValue({ agents: [] });
 
     const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
 
     expect(mockFetchPage).not.toHaveBeenCalled();
     expect(wrapper.find("[data-test='sessions-empty-no-agents']").exists()).toBe(true);
@@ -467,6 +486,7 @@ describe("SessionsList — agent filter", () => {
     mockTotal.value = 1;
 
     const wrapper = await mountComponent({ streamName: "", startTime: 1000, endTime: 2000 });
+    await refreshComponent(wrapper);
     await wrapper.find(".table-row").trigger("click");
 
     expect(mockRouterPush).toHaveBeenCalledWith({

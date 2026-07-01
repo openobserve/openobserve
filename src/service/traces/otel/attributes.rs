@@ -93,8 +93,15 @@ impl GenAiAttributes {
     pub const USAGE_TOTAL_TOKENS: &'static str = "gen_ai.usage.total_tokens";
     pub const USAGE_PROMPT_TOKENS: &'static str = "gen_ai.usage.prompt_tokens";
     pub const USAGE_COMPLETION_TOKENS: &'static str = "gen_ai.usage.completion_tokens";
+    pub const USAGE_CACHE_READ_INPUT_TOKENS: &'static str = "gen_ai.usage.cache_read.input_tokens";
+    pub const USAGE_CACHE_CREATION_INPUT_TOKENS: &'static str =
+        "gen_ai.usage.cache_creation.input_tokens";
     pub const USAGE_CACHE_READ_TOKENS: &'static str = "gen_ai.usage.cache_read_tokens";
     pub const USAGE_CACHE_WRITE_TOKENS: &'static str = "gen_ai.usage.cache_write_tokens";
+    pub const USAGE_CACHED_TOKENS: &'static str = "gen_ai.usage.cached_tokens";
+    pub const USAGE_PROMPT_CACHE_HIT_TOKENS: &'static str = "gen_ai.usage.prompt_cache_hit_tokens";
+    pub const USAGE_PROMPT_CACHE_MISS_TOKENS: &'static str =
+        "gen_ai.usage.prompt_cache_miss_tokens";
     pub const USAGE_COST: &'static str = "gen_ai.usage.cost";
 
     // Gen-AI Conversation
@@ -130,6 +137,18 @@ impl GenAiExtensions {
     /// Output-side cost (Float64). OO extension — spec only defines a single total
     /// `gen_ai.usage.cost`.
     pub const USAGE_COST_OUTPUT: &'static str = "gen_ai.usage.cost.output";
+    /// Cache-read input cost (Float64). OO extension — spec does not define cost breakdowns.
+    pub const USAGE_COST_CACHE_READ_INPUT: &'static str = "gen_ai.usage.cost.cache_read.input";
+    /// Cache-creation input cost (Float64). OO extension — spec does not define cost breakdowns.
+    pub const USAGE_COST_CACHE_CREATION_INPUT: &'static str =
+        "gen_ai.usage.cost.cache_creation.input";
+    /// Estimated cost if the same input had no cache hits (Float64). OO extension.
+    pub const USAGE_COST_ESTIMATED_WITHOUT_CACHE: &'static str =
+        "gen_ai.usage.cost.estimated_without_cache";
+    /// Gross savings from cache-read tokens only (Float64). OO extension.
+    pub const USAGE_COST_CACHE_READ_SAVINGS: &'static str = "gen_ai.usage.cost.cache_read_savings";
+    /// Net cost impact after cache reads and writes (Float64). OO extension.
+    pub const USAGE_COST_NET_CACHE_IMPACT: &'static str = "gen_ai.usage.cost.net_cache_impact";
 }
 
 pub struct LLMAttributes;

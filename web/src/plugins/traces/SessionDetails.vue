@@ -209,9 +209,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 class="tw:ml-[0.15rem] tw:cursor-default tw:text-[var(--o2-text-muted)]"
               />
-              <OTooltip max-width="240px">
+              <OTooltip max-width="280px">
                 <template #content>
-                  {{ t('traces.sessionDetail.kpiSub.cacheEstimate') }}
+                  <div class="tw:flex tw:flex-col tw:gap-2 tw:min-w-[230px]">
+                    <div class="tw:text-xs tw:font-semibold tw:text-[var(--o2-text-primary)]">
+                      {{ t('traces.sessionDetail.kpiSub.cacheImpactTooltipTitle') }}
+                    </div>
+                    <div class="tw:flex tw:flex-col tw:gap-1">
+                      <div
+                        v-for="row in card.tooltipRows || []"
+                        :key="row.label"
+                        class="tw:flex tw:items-center tw:justify-between tw:gap-3 tw:text-[11px]"
+                      >
+                        <span class="tw:text-[var(--o2-text-muted)]">{{ row.label }}</span>
+                        <span class="tw:font-semibold tw:tabular-nums tw:text-[var(--o2-text-primary)]">{{ row.value }}</span>
+                      </div>
+                    </div>
+                    <div class="tw:text-[10.5px] tw:leading-snug tw:text-[var(--o2-text-secondary)]">
+                      {{ t('traces.sessionDetail.kpiSub.cacheEstimate') }}
+                    </div>
+                  </div>
                 </template>
               </OTooltip>
             </template>
@@ -362,6 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- collapsed header (click to expand) -->
             <div
               class="tw:grid tw:grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] tw:items-center tw:gap-[0.75rem] tw:px-[0.75rem] tw:py-[0.6rem] tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_3%,var(--o2-card-bg))]"
+              :data-test="`session-turn-header-${trace.traceId}`"
               @click="toggleTurn(trace.traceId)"
             >
               <OIcon
@@ -416,6 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="isExpanded(trace.traceId)"
               class="tw:border-t tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg-solid)] tw:p-[0.75rem]"
+              :data-test="`session-turn-body-${trace.traceId}`"
             >
               <!-- loading skeleton -->
               <div v-if="sessionSpansLoading" class="tw:flex tw:flex-col tw:gap-[0.4rem]">
@@ -763,16 +782,6 @@ const traces = ref<SessionTraceRow[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 
-// ──────────────────────────────────────────────────────────────────────────
-// PLACEHOLDER — cached-token data is not exposed by the session-detail API yet
-// (only total input tokens). Until it lands, the "Cache Saved" tile and the
-// "% cached" sub-lines are derived from these two fixed constants so the tile
-// isn't empty. Swap these for real per-request cache metrics when available.
-// Tracked in designs/ui/llm-observability-ui/session-detail-redesign.md (§3, §7).
-const CACHE_RATIO_PLACEHOLDER = 0.61; // fraction of input tokens assumed cached
-const CACHE_SAVINGS_RATE = 0.0135; // $ saved per 1K cached tokens vs full input
-// ──────────────────────────────────────────────────────────────────────────
-
 const sessionId = computed(() =>
   typeof route.query.session_id === "string" ? route.query.session_id : "",
 );
@@ -787,7 +796,7 @@ const endTime = computed(() =>
 );
 
 // Per-turn rollups used by the KPI sub-lines. All values are measured from the
-// real trace rows — only the cache numbers are placeholders (see constants).
+// real trace rows returned by the session-detail API.
 const sessionStats = computed(() => {
   const d = detail.value;
   const rows = traces.value;
@@ -812,9 +821,13 @@ const sessionStats = computed(() => {
   const maxCost = costs.length ? Math.max(...costs) : 0;
   const peakTurn = (costs.indexOf(maxCost) >= 0 ? costs.indexOf(maxCost) : 0) + 1;
 
-  const cachedTokens = Math.round(d.inputTokens * CACHE_RATIO_PLACEHOLDER);
-  const cacheRatio = Math.round(CACHE_RATIO_PLACEHOLDER * 100);
-  const cacheSaved = (cachedTokens / 1000) * CACHE_SAVINGS_RATE;
+  const cachedTokens = d.cacheReadInputTokens;
+  const cacheDenominator = cacheInputDenominator(d);
+  const cacheRatio = cacheDenominator
+    ? Math.round((cachedTokens / cacheDenominator) * 100)
+    : 0;
+  const hasNetCacheImpact = d.estimatedCostWithoutCache > 0 || d.netCacheImpact !== 0;
+  const cacheImpact = hasNetCacheImpact ? d.netCacheImpact : d.cacheReadSavings;
 
   return {
     errors,
@@ -827,12 +840,24 @@ const sessionStats = computed(() => {
     peakTurn,
     cachedTokens,
     cacheRatio,
-    cacheSaved,
+    cacheImpact,
   };
 });
 
-// Cache-hit % placeholder, surfaced to the template for the turn-preview chips.
+// Session-level cache reuse %, surfaced to turn-preview chips and ribbon hovers.
 const cacheRatio = computed(() => sessionStats.value?.cacheRatio ?? 0);
+
+function cacheInputDenominator(d: SessionDetail): number {
+  const promptTokensFromTotal = Math.max(0, d.tokens - d.outputTokens);
+  let denominator = Math.max(promptTokensFromTotal, d.inputTokens);
+  const separateCacheTokens = d.cacheReadInputTokens + d.cacheCreationInputTokens;
+
+  if (separateCacheTokens > denominator) {
+    denominator = d.inputTokens + separateCacheTokens;
+  }
+
+  return denominator;
+}
 
 // KPI tile classes. Mirrors the `statusBadgeClass()` pattern this module already
 // uses — a function returns the Tailwind class string for a given variant, so the
@@ -874,6 +899,7 @@ const kpiCards = computed<
     subTail: string;
     variant?: "danger";
     estimate?: boolean;
+    tooltipRows?: { label: string; value: string }[];
     /** Errors tile: show a "Filter Errors" button instead of per-turn chips
      *  when there are too many error turns to list as chips. */
     filterErrors?: boolean;
@@ -887,7 +913,6 @@ const kpiCards = computed<
   const lat = splitDuration(s.avgLat / 1000);
   const cost = splitCost(d.cost);
   const tokens = splitNumberWithUnit(d.tokens);
-  const cacheSaved = splitCost(s.cacheSaved);
   const turnWord = t("traces.sessionDetail.turnLabel");
 
   return [
@@ -964,12 +989,35 @@ const kpiCards = computed<
       subTail: "",
     },
     {
-      key: "cacheSaved",
-      label: t("traces.sessionDetail.kpi.cacheSaved"),
-      value: cacheSaved.value,
-      unit: cacheSaved.unit,
+      key: "cacheImpact",
+      label: t("traces.sessionDetail.kpi.cacheImpact"),
+      value: signedUsd4(s.cacheImpact),
+      unit: "",
+      variant: s.cacheImpact < 0 ? "danger" : undefined,
       estimate: true,
-      subLead: t("traces.sessionDetail.kpiSub.cacheSaved", {
+      tooltipRows: [
+        {
+          label: t("traces.sessionDetail.kpiSub.actualCost"),
+          value: usd4(d.cost),
+        },
+        {
+          label: t("traces.sessionDetail.kpiSub.estimatedWithoutCache"),
+          value: usd4(d.estimatedCostWithoutCache),
+        },
+        {
+          label: t("traces.sessionDetail.kpiSub.grossCacheReadSavings"),
+          value: usd4(d.cacheReadSavings),
+        },
+        {
+          label: t("traces.sessionDetail.kpiSub.cacheCreationCost"),
+          value: usd4(d.cacheCreationInputCost),
+        },
+        {
+          label: t("traces.sessionDetail.kpiSub.netCacheImpact"),
+          value: signedUsd4(s.cacheImpact),
+        },
+      ],
+      subLead: t("traces.sessionDetail.kpiSub.cacheImpact", {
         ratio: s.cacheRatio,
         tokens: formatTokens(s.cachedTokens),
       }),
@@ -1480,6 +1528,10 @@ function copyText(text: string | null | undefined) {
 
 function usd4(v: number): string {
   return `$${v.toFixed(4)}`;
+}
+
+function signedUsd4(v: number): string {
+  return v < 0 ? `-$${Math.abs(v).toFixed(4)}` : usd4(v);
 }
 
 function formatDuration(nanos: number): string {

@@ -30,6 +30,13 @@ export interface SessionDetail {
   outputTokens: number;
   tokens: number;
   cost: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputCost: number;
+  cacheCreationInputCost: number;
+  estimatedCostWithoutCache: number;
+  cacheReadSavings: number;
+  netCacheImpact: number;
   errorCount: number;
   status: "ok" | "error";
 }
@@ -43,6 +50,13 @@ export interface SessionTraceRow {
   outputTokens: number;
   tokens: number;
   cost: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputCost: number;
+  cacheCreationInputCost: number;
+  estimatedCostWithoutCache: number;
+  cacheReadSavings: number;
+  netCacheImpact: number;
   errorCount: number;
   status: "ok" | "error";
   /** Primary model (first entry in the trace's models array). */
@@ -105,6 +119,13 @@ export interface SessionRow {
   outputTokens: number;
   tokens: number;
   cost: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputCost: number;
+  cacheCreationInputCost: number;
+  estimatedCostWithoutCache: number;
+  cacheReadSavings: number;
+  netCacheImpact: number;
   errorCount: number;
   /** Derived from error_count: any error span → "error", else "ok". */
   status: "ok" | "error";
@@ -191,6 +212,13 @@ export function useSessions() {
           outputTokens: Number(h.gen_ai_usage_output_tokens) || 0,
           tokens: Number(h.gen_ai_usage_total_tokens) || 0,
           cost: Number(h.gen_ai_usage_cost) || 0,
+          cacheReadInputTokens: Number(h.gen_ai_usage_cache_read_input_tokens) || 0,
+          cacheCreationInputTokens: Number(h.gen_ai_usage_cache_creation_input_tokens) || 0,
+          cacheReadInputCost: Number(h.gen_ai_usage_cost_cache_read_input) || 0,
+          cacheCreationInputCost: Number(h.gen_ai_usage_cost_cache_creation_input) || 0,
+          estimatedCostWithoutCache: Number(h.gen_ai_usage_cost_estimated_without_cache) || 0,
+          cacheReadSavings: Number(h.gen_ai_usage_cost_cache_read_savings) || 0,
+          netCacheImpact: Number(h.gen_ai_usage_cost_net_cache_impact) || 0,
           errorCount,
           status: errorCount > 0 ? "error" : "ok",
           userId: usersArr[0] || "",
@@ -302,6 +330,13 @@ export function useSessions() {
         outputTokens: Number(r.gen_ai_usage_output_tokens) || 0,
         tokens: Number(r.gen_ai_usage_total_tokens) || 0,
         cost: Number(r.gen_ai_usage_cost) || 0,
+        cacheReadInputTokens: Number(r.gen_ai_usage_cache_read_input_tokens) || 0,
+        cacheCreationInputTokens: Number(r.gen_ai_usage_cache_creation_input_tokens) || 0,
+        cacheReadInputCost: Number(r.gen_ai_usage_cost_cache_read_input) || 0,
+        cacheCreationInputCost: Number(r.gen_ai_usage_cost_cache_creation_input) || 0,
+        estimatedCostWithoutCache: Number(r.gen_ai_usage_cost_estimated_without_cache) || 0,
+        cacheReadSavings: Number(r.gen_ai_usage_cost_cache_read_savings) || 0,
+        netCacheImpact: Number(r.gen_ai_usage_cost_net_cache_impact) || 0,
         errorCount,
         status: errorCount > 0 ? "error" : "ok",
         model: modelsArr[0] ?? null,
@@ -320,6 +355,13 @@ export function useSessions() {
     let totalOutputTokens = 0;
     let totalTokens = 0;
     let totalCost = 0;
+    let totalCacheReadInputTokens = 0;
+    let totalCacheCreationInputTokens = 0;
+    let totalCacheReadInputCost = 0;
+    let totalCacheCreationInputCost = 0;
+    let totalEstimatedCostWithoutCache = 0;
+    let totalCacheReadSavings = 0;
+    let totalNetCacheImpact = 0;
     let totalErrors = 0;
     let serviceName: string | null = null;
     for (let i = 0; i < accumulated.length; i++) {
@@ -333,6 +375,13 @@ export function useSessions() {
       totalOutputTokens += t.outputTokens;
       totalTokens += t.tokens;
       totalCost += t.cost;
+      totalCacheReadInputTokens += t.cacheReadInputTokens;
+      totalCacheCreationInputTokens += t.cacheCreationInputTokens;
+      totalCacheReadInputCost += t.cacheReadInputCost;
+      totalCacheCreationInputCost += t.cacheCreationInputCost;
+      totalEstimatedCostWithoutCache += t.estimatedCostWithoutCache;
+      totalCacheReadSavings += t.cacheReadSavings;
+      totalNetCacheImpact += t.netCacheImpact;
       totalErrors += t.errorCount;
       if (!serviceName && t.serviceName) serviceName = t.serviceName;
     }
@@ -350,6 +399,13 @@ export function useSessions() {
       outputTokens: totalOutputTokens,
       tokens: totalTokens,
       cost: totalCost,
+      cacheReadInputTokens: totalCacheReadInputTokens,
+      cacheCreationInputTokens: totalCacheCreationInputTokens,
+      cacheReadInputCost: totalCacheReadInputCost,
+      cacheCreationInputCost: totalCacheCreationInputCost,
+      estimatedCostWithoutCache: totalEstimatedCostWithoutCache,
+      cacheReadSavings: totalCacheReadSavings,
+      netCacheImpact: totalNetCacheImpact,
       errorCount: totalErrors,
       status: totalErrors > 0 ? "error" : "ok",
     };

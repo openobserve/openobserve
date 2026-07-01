@@ -49,6 +49,7 @@ struct SpanExtractions {
     output: Option<json::Value>,
     model_params: HashMap<String, String>,
     usage: HashMap<String, i64>,
+    input_includes_cache: bool,
     cost: HashMap<String, f64>,
     user_id: Option<String>,
     session_id: Option<String>,
@@ -191,9 +192,9 @@ impl OtelIngestionProcessor {
         let model_params = self
             .parameters_extractor
             .extract(span_attributes, scope_name_default);
-        let usage = self
+        let usage_details = self
             .usage_extractor
-            .extract_usage(span_attributes, scope_name_default);
+            .extract_usage_details(span_attributes, scope_name_default);
         let cost = self.usage_extractor.extract_cost(span_attributes);
         let user_id = self
             .metadata_extractor
@@ -227,7 +228,8 @@ impl OtelIngestionProcessor {
             input,
             output,
             model_params,
-            usage,
+            usage: usage_details.usage,
+            input_includes_cache: usage_details.input_includes_cache,
             cost,
             user_id,
             session_id,
@@ -252,6 +254,7 @@ impl OtelIngestionProcessor {
     ) -> (HashMap<String, i64>, HashMap<String, f64>) {
         let mut usage = extracted.usage.clone();
         let mut cost = extracted.cost.clone();
+        let mut input_includes_cache = extracted.input_includes_cache;
 
         if is_generation_or_embedding(extracted.op_name) {
             let span_ts_micros = i64::try_from(span_start_nanos / 1_000).unwrap_or(i64::MAX);
@@ -270,6 +273,7 @@ impl OtelIngestionProcessor {
                 let prompt = v.to_string();
                 let prompt_tokens = pricing::calculate_token_count(tokenizer_key, &prompt);
                 usage.insert("input".to_string(), prompt_tokens);
+                input_includes_cache = true;
             }
             if let Some(v) = &extracted.output
                 && !usage.contains_key("output")
@@ -279,12 +283,23 @@ impl OtelIngestionProcessor {
                 usage.insert("output".to_string(), output_tokens);
             }
 
+            if !usage.contains_key("input") {
+                usage.insert("input".to_string(), 0);
+            }
+            if !usage.contains_key("output") {
+                usage.insert("output".to_string(), 0);
+            }
+
+            let (billable_usage, tier_usage) = build_pricing_usage(&usage, input_includes_cache);
+
             if cost.is_empty() {
                 if let Some(pricing_def) = matched_pricing {
-                    let result = crate::service::db::model_pricing::calculate_cost_from_definition(
-                        &pricing_def,
-                        &usage,
-                    );
+                    let result =
+                        crate::service::db::model_pricing::calculate_cost_from_definition_with_tier_usage(
+                            &pricing_def,
+                            &billable_usage,
+                            &tier_usage,
+                        );
                     if !result.cost.is_empty() {
                         log::debug!(
                             "[model_pricing] model='{}' pattern='{}' tier='{}' total_cost={:.8}",
@@ -294,10 +309,11 @@ impl OtelIngestionProcessor {
                             result.cost.get("total").copied().unwrap_or(0.0),
                         );
                         cost = result.cost;
+                        add_cache_derived_costs(&mut cost, &tier_usage, &result.prices);
                     }
                 } else if let Some(ref model_name) = extracted.model_name {
-                    let input_tokens = usage.get("input").cloned().unwrap_or_default();
-                    let output_tokens = usage.get("output").cloned().unwrap_or_default();
+                    let input_tokens = billable_usage.get("input").cloned().unwrap_or_default();
+                    let output_tokens = billable_usage.get("output").cloned().unwrap_or_default();
                     if let Some((input_cost, output_cost, total_cost)) =
                         pricing::calculate_cost(model_name, input_tokens, output_tokens)
                     {
@@ -319,12 +335,17 @@ impl OtelIngestionProcessor {
         if !usage.contains_key("total") {
             let input = usage.get("input").copied().unwrap_or(0);
             let output = usage.get("output").copied().unwrap_or(0);
-            usage.insert("total".to_string(), input + output);
+            let cache_input = if input_includes_cache {
+                0
+            } else {
+                cache_input_tokens(&usage)
+            };
+            usage.insert("total".to_string(), input + cache_input + output);
         }
 
         // Ensure cost total (sum all components, not just input+output).
         if !cost.contains_key("total") {
-            let total: f64 = cost.values().sum();
+            let total = actual_cost_total(&cost);
             cost.insert("total".to_string(), total);
         }
 
@@ -383,39 +404,93 @@ impl OtelIngestionProcessor {
 
         // Token usage as individual scalar attributes.
         if let Some(&v) = usage.get("input") {
-            span_attributes.insert(
-                GenAiAttributes::USAGE_INPUT_TOKENS.to_string(),
+            insert_if_absent(
+                span_attributes,
+                GenAiAttributes::USAGE_INPUT_TOKENS,
                 json::json!(v),
             );
         }
         if let Some(&v) = usage.get("output") {
-            span_attributes.insert(
-                GenAiAttributes::USAGE_OUTPUT_TOKENS.to_string(),
+            insert_if_absent(
+                span_attributes,
+                GenAiAttributes::USAGE_OUTPUT_TOKENS,
                 json::json!(v),
             );
         }
         if let Some(&v) = usage.get("total") {
-            span_attributes.insert(
-                GenAiAttributes::USAGE_TOTAL_TOKENS.to_string(),
+            insert_if_absent(
+                span_attributes,
+                GenAiAttributes::USAGE_TOTAL_TOKENS,
+                json::json!(v),
+            );
+        }
+        if let Some(&v) = usage.get("cache_read_input_tokens") {
+            insert_if_absent(
+                span_attributes,
+                GenAiAttributes::USAGE_CACHE_READ_INPUT_TOKENS,
+                json::json!(v),
+            );
+        }
+        if let Some(&v) = usage.get("cache_creation_input_tokens") {
+            insert_if_absent(
+                span_attributes,
+                GenAiAttributes::USAGE_CACHE_CREATION_INPUT_TOKENS,
                 json::json!(v),
             );
         }
 
         // Cost: per-direction breakdown + total.
         if let Some(&v) = cost.get("input") {
-            span_attributes.insert(
-                GenAiExtensions::USAGE_COST_INPUT.to_string(),
+            insert_if_absent(
+                span_attributes,
+                GenAiExtensions::USAGE_COST_INPUT,
                 json::json!(v),
             );
         }
         if let Some(&v) = cost.get("output") {
-            span_attributes.insert(
-                GenAiExtensions::USAGE_COST_OUTPUT.to_string(),
+            insert_if_absent(
+                span_attributes,
+                GenAiExtensions::USAGE_COST_OUTPUT,
+                json::json!(v),
+            );
+        }
+        if let Some(&v) = cost.get("cache_read_input_tokens") {
+            insert_if_absent(
+                span_attributes,
+                GenAiExtensions::USAGE_COST_CACHE_READ_INPUT,
+                json::json!(v),
+            );
+        }
+        if let Some(&v) = cost.get("cache_creation_input_tokens") {
+            insert_if_absent(
+                span_attributes,
+                GenAiExtensions::USAGE_COST_CACHE_CREATION_INPUT,
+                json::json!(v),
+            );
+        }
+        if let Some(&v) = cost.get("estimated_without_cache") {
+            insert_if_absent(
+                span_attributes,
+                GenAiExtensions::USAGE_COST_ESTIMATED_WITHOUT_CACHE,
+                json::json!(v),
+            );
+        }
+        if let Some(&v) = cost.get("cache_read_savings") {
+            insert_if_absent(
+                span_attributes,
+                GenAiExtensions::USAGE_COST_CACHE_READ_SAVINGS,
+                json::json!(v),
+            );
+        }
+        if let Some(&v) = cost.get("net_cache_impact") {
+            insert_if_absent(
+                span_attributes,
+                GenAiExtensions::USAGE_COST_NET_CACHE_IMPACT,
                 json::json!(v),
             );
         }
         if let Some(&v) = cost.get("total") {
-            span_attributes.insert(GenAiAttributes::USAGE_COST.to_string(), json::json!(v));
+            insert_if_absent(span_attributes, GenAiAttributes::USAGE_COST, json::json!(v));
         }
 
         if let Some(ref uid) = extracted.user_id {
@@ -556,6 +631,122 @@ impl OtelIngestionProcessor {
             0,
         );
     }
+}
+
+fn build_pricing_usage(
+    usage: &HashMap<String, i64>,
+    input_includes_cache: bool,
+) -> (HashMap<String, i64>, HashMap<String, i64>) {
+    let cache_input = cache_input_tokens(usage);
+    let input = usage.get("input").copied().unwrap_or_default();
+    let output = usage.get("output").copied().unwrap_or_default();
+    let context_input = if input_includes_cache {
+        input
+    } else {
+        input.saturating_add(cache_input)
+    };
+
+    let mut billable_usage = usage.clone();
+    let billable_input = if input_includes_cache {
+        input.saturating_sub(cache_input)
+    } else {
+        input
+    };
+    billable_usage.insert("input".to_string(), billable_input);
+    billable_usage
+        .entry("total".to_string())
+        .or_insert_with(|| billable_input.saturating_add(output));
+
+    let mut tier_usage = usage.clone();
+    tier_usage.insert("input".to_string(), context_input);
+    let context_total = context_input.saturating_add(output);
+    let tier_total = tier_usage.get("total").copied().unwrap_or_default();
+    if context_total > tier_total {
+        tier_usage.insert("total".to_string(), context_total);
+    }
+
+    (billable_usage, tier_usage)
+}
+
+fn cache_input_tokens(usage: &HashMap<String, i64>) -> i64 {
+    let cache_read = usage
+        .get("cache_read_input_tokens")
+        .copied()
+        .unwrap_or_default();
+    let cache_creation = usage
+        .get("cache_creation_input_tokens")
+        .copied()
+        .unwrap_or_default();
+    cache_read.saturating_add(cache_creation)
+}
+
+fn insert_if_absent(
+    span_attributes: &mut HashMap<String, json::Value>,
+    key: &str,
+    value: json::Value,
+) {
+    span_attributes.entry(key.to_string()).or_insert(value);
+}
+
+fn add_cache_derived_costs(
+    cost: &mut HashMap<String, f64>,
+    usage: &HashMap<String, i64>,
+    prices: &HashMap<String, f64>,
+) {
+    let cache_read = usage
+        .get("cache_read_input_tokens")
+        .copied()
+        .unwrap_or_default();
+    let cache_creation = usage
+        .get("cache_creation_input_tokens")
+        .copied()
+        .unwrap_or_default();
+    if cache_read == 0 && cache_creation == 0 {
+        return;
+    }
+
+    let Some(&input_price) = prices.get("input") else {
+        return;
+    };
+
+    let total_input = usage.get("input").copied().unwrap_or_default();
+    let output = usage.get("output").copied().unwrap_or_default();
+    let output_price = prices.get("output").copied().unwrap_or_default();
+    let estimated_without_cache = total_input as f64 * input_price + output as f64 * output_price;
+    if estimated_without_cache > 0.0 {
+        cost.insert(
+            "estimated_without_cache".to_string(),
+            estimated_without_cache,
+        );
+    }
+
+    if let Some(&cache_read_price) = prices.get("cache_read_input_tokens") {
+        let cache_read_savings = cache_read as f64 * (input_price - cache_read_price).max(0.0);
+        if cache_read_savings > 0.0 {
+            cost.insert("cache_read_savings".to_string(), cache_read_savings);
+        }
+    }
+
+    let actual = cost
+        .get("total")
+        .copied()
+        .unwrap_or_else(|| actual_cost_total(cost));
+    let net_cache_impact = estimated_without_cache - actual;
+    if net_cache_impact.is_finite() && net_cache_impact != 0.0 {
+        cost.insert("net_cache_impact".to_string(), net_cache_impact);
+    }
+}
+
+fn actual_cost_total(cost: &HashMap<String, f64>) -> f64 {
+    cost.iter()
+        .filter(|(key, _)| {
+            !matches!(
+                key.as_str(),
+                "total" | "estimated_without_cache" | "cache_read_savings" | "net_cache_impact"
+            )
+        })
+        .map(|(_, value)| *value)
+        .sum()
 }
 
 #[cfg(test)]
@@ -1284,6 +1475,281 @@ mod tests {
         // 500 tokens * $0.00002 = $0.01
         assert!((output_cost - 0.01).abs() < 1e-10);
         assert!((total_cost - 0.015).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_process_span_calculates_cache_cost_and_savings_without_double_counting() {
+        use config::meta::model_pricing::{ModelPricingDefinition, PricingTierDefinition};
+
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("cache-aware-model"),
+        );
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(1000));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(100));
+        span_attrs.insert(
+            "gen_ai.usage.cache_read.input_tokens".to_string(),
+            json::json!(700),
+        );
+        span_attrs.insert(
+            "gen_ai.usage.cache_creation.input_tokens".to_string(),
+            json::json!(100),
+        );
+
+        let pricing_entries = vec![CachedModelPricing {
+            definition: ModelPricingDefinition {
+                name: "Cache Aware".to_string(),
+                match_pattern: "(?i)^cache-aware-model".to_string(),
+                enabled: true,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: std::collections::HashMap::from([
+                        ("input".to_string(), 0.000001),
+                        ("output".to_string(), 0.000002),
+                        ("cache_read_input_tokens".to_string(), 0.0000001),
+                        ("cache_creation_input_tokens".to_string(), 0.0000005),
+                    ]),
+                }],
+                ..Default::default()
+            },
+            compiled_regex: regex::Regex::new("(?i)^cache-aware-model").unwrap(),
+        }];
+
+        processor.process_span_with_pricing(
+            &mut span_attrs,
+            &HashMap::new(),
+            None,
+            &[],
+            &pricing_entries,
+            0,
+        );
+
+        assert_eq!(
+            span_attrs
+                .get(GenAiAttributes::USAGE_INPUT_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(1000)
+        );
+        assert_eq!(
+            span_attrs
+                .get(GenAiAttributes::USAGE_TOTAL_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(1100)
+        );
+        assert_eq!(
+            span_attrs
+                .get("gen_ai.usage.cache_read.input_tokens")
+                .and_then(|v| v.as_i64()),
+            Some(700)
+        );
+        assert_eq!(
+            span_attrs
+                .get("gen_ai.usage.cache_creation.input_tokens")
+                .and_then(|v| v.as_i64()),
+            Some(100)
+        );
+        let input_cost = span_attrs
+            .get(GenAiExtensions::USAGE_COST_INPUT)
+            .and_then(|v| v.as_f64())
+            .unwrap();
+        let cache_read_cost = span_attrs
+            .get("gen_ai.usage.cost.cache_read.input")
+            .and_then(|v| v.as_f64())
+            .unwrap();
+        let cache_creation_cost = span_attrs
+            .get("gen_ai.usage.cost.cache_creation.input")
+            .and_then(|v| v.as_f64())
+            .unwrap();
+        let total_cost = span_attrs
+            .get(GenAiAttributes::USAGE_COST)
+            .and_then(|v| v.as_f64())
+            .unwrap();
+        assert!((input_cost - 0.0002).abs() < 1e-12);
+        assert!((cache_read_cost - 0.00007).abs() < 1e-12);
+        assert!((cache_creation_cost - 0.00005).abs() < 1e-12);
+        assert!((total_cost - 0.00052).abs() < 1e-12);
+        let estimated_without_cache = span_attrs
+            .get("gen_ai.usage.cost.estimated_without_cache")
+            .and_then(|v| v.as_f64())
+            .unwrap();
+        let cache_read_savings = span_attrs
+            .get("gen_ai.usage.cost.cache_read_savings")
+            .and_then(|v| v.as_f64())
+            .unwrap();
+        let net_cache_impact = span_attrs
+            .get("gen_ai.usage.cost.net_cache_impact")
+            .and_then(|v| v.as_f64())
+            .unwrap();
+        assert!((estimated_without_cache - 0.0012).abs() < 1e-12);
+        assert!((cache_read_savings - 0.00063).abs() < 1e-12);
+        assert!((net_cache_impact - 0.00068).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_process_span_preserves_native_cache_miss_input_tokens() {
+        use config::meta::model_pricing::{ModelPricingDefinition, PricingTierDefinition};
+
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("native-cache-model"),
+        );
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(100));
+        span_attrs.insert(
+            "gen_ai.usage.prompt_cache_hit_tokens".to_string(),
+            json::json!(700),
+        );
+        span_attrs.insert(
+            "gen_ai.usage.prompt_cache_miss_tokens".to_string(),
+            json::json!(300),
+        );
+
+        let pricing_entries = vec![CachedModelPricing {
+            definition: ModelPricingDefinition {
+                name: "Native Cache".to_string(),
+                match_pattern: "(?i)^native-cache-model".to_string(),
+                enabled: true,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: std::collections::HashMap::from([
+                        ("input".to_string(), 0.000001),
+                        ("output".to_string(), 0.000002),
+                        ("cache_read_input_tokens".to_string(), 0.0000001),
+                    ]),
+                }],
+                ..Default::default()
+            },
+            compiled_regex: regex::Regex::new("(?i)^native-cache-model").unwrap(),
+        }];
+
+        processor.process_span_with_pricing(
+            &mut span_attrs,
+            &HashMap::new(),
+            None,
+            &[],
+            &pricing_entries,
+            0,
+        );
+
+        assert_eq!(
+            span_attrs
+                .get(GenAiAttributes::USAGE_INPUT_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(300)
+        );
+        assert_eq!(
+            span_attrs
+                .get(GenAiAttributes::USAGE_TOTAL_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(1100)
+        );
+        assert_eq!(
+            span_attrs
+                .get("gen_ai.usage.cache_read.input_tokens")
+                .and_then(|v| v.as_i64()),
+            Some(700)
+        );
+        assert_eq!(
+            span_attrs
+                .get(GenAiExtensions::USAGE_COST_INPUT)
+                .and_then(|v| v.as_f64()),
+            Some(0.0003)
+        );
+    }
+
+    #[test]
+    fn test_process_span_prices_legacy_cached_tokens_as_additional_cache_read() {
+        use config::meta::model_pricing::{ModelPricingDefinition, PricingTierDefinition};
+
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("deepseek-v4-pro"),
+        );
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(13_890));
+        span_attrs.insert(
+            "gen_ai.usage.cached_tokens".to_string(),
+            json::json!(49_920),
+        );
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(381));
+
+        let pricing_entries = vec![CachedModelPricing {
+            definition: ModelPricingDefinition {
+                name: "DeepSeek V4 Pro".to_string(),
+                match_pattern: "(?i)^deepseek-v4-pro".to_string(),
+                enabled: true,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: std::collections::HashMap::from([
+                        ("input".to_string(), 0.435 / 1_000_000.0),
+                        ("output".to_string(), 0.87 / 1_000_000.0),
+                        (
+                            "cache_read_input_tokens".to_string(),
+                            0.003625 / 1_000_000.0,
+                        ),
+                    ]),
+                }],
+                ..Default::default()
+            },
+            compiled_regex: regex::Regex::new("(?i)^deepseek-v4-pro").unwrap(),
+        }];
+
+        processor.process_span_with_pricing(
+            &mut span_attrs,
+            &HashMap::new(),
+            None,
+            &[],
+            &pricing_entries,
+            0,
+        );
+
+        let total_cost = span_attrs
+            .get(GenAiAttributes::USAGE_COST)
+            .and_then(|v| v.as_f64())
+            .unwrap();
+        let estimated_without_cache = span_attrs
+            .get(GenAiExtensions::USAGE_COST_ESTIMATED_WITHOUT_CACHE)
+            .and_then(|v| v.as_f64())
+            .unwrap();
+        let cache_read_savings = span_attrs
+            .get(GenAiExtensions::USAGE_COST_CACHE_READ_SAVINGS)
+            .and_then(|v| v.as_f64())
+            .unwrap();
+
+        assert_eq!(
+            span_attrs
+                .get(GenAiAttributes::USAGE_INPUT_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(13_890)
+        );
+        assert_eq!(
+            span_attrs
+                .get(GenAiAttributes::USAGE_TOTAL_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(64_191)
+        );
+        assert_eq!(
+            span_attrs
+                .get(GenAiAttributes::USAGE_CACHE_READ_INPUT_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(49_920)
+        );
+        assert!((total_cost - 0.00655458).abs() < 1e-8);
+        assert!((estimated_without_cache - 0.02808882).abs() < 1e-8);
+        assert!((cache_read_savings - 0.02153424).abs() < 1e-8);
     }
 
     #[test]
