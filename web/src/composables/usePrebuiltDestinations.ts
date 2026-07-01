@@ -243,6 +243,7 @@ export function usePrebuiltDestinations() {
       alert_operator: 'greater than',
       alert_threshold: '80%',
       alert_time: new Date().toLocaleString(),
+      alert_trigger_time_str: new Date().toLocaleString(),
       // Use actual OpenObserve instance URL instead of fake example
       alert_url: `${baseUrl}/web/logs?org_identifier=${orgId}&stream_type=logs&stream=system-metrics&from=${oneHourAgo}&to=${now}&type=alert_destination_test`,
       // Default values for credential-based fields
@@ -356,6 +357,7 @@ export function usePrebuiltDestinations() {
         alert_operator: 'greater than',
         alert_threshold: '80%',
         alert_time: new Date().toLocaleString(),
+        alert_trigger_time_str: new Date().toLocaleString(),
         alert_url: `${baseUrl}/web/logs?org_identifier=${orgId}&stream_type=logs&stream=system-metrics&from=${oneHourAgo}&to=${now}&type=alert_destination_test`,
         integration_key: 'sample-integration-key',
         routing_key: 'sample-integration-key',
