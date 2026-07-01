@@ -82,7 +82,12 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
 
     destinations: notifications.destinations,
 
-    variables: (variables ?? []).map(({ id: _id, ...v }) => v),
+    variables: (variables ?? []).map(({ id: _id, name, value, secure, example }) => ({
+      name,
+      value,
+      secure: secure ?? false,
+      example: example ?? '',
+    })),
 
     frequency: buildFrequency(schedule),
 
@@ -91,19 +96,18 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
       browser_devices: browserDevices ?? [{ browser: 'chromium', device: 'laptop_large' }],
       timeout_ms: 30000,
       capture: { screenshot: 'on_fail', trace: 'on_fail', video: 'off' },
-      ...(auth?.basicAuth && {
-        auth: {
-          basic_auth: {
-            enabled: auth.basicAuth.enabled,
-            username: auth.basicAuth.username,
-            password_secret_ref: auth.basicAuth.passwordSecretRef,
-          },
-        },
-      }),
       ...(secrets?.length && { secrets: secrets.map(({ id: _id, ...s }) => s) }),
       ...(headers?.length && { headers: headers.map(({ id: _id, ...h }) => h) }),
       ...(cookies?.length && { cookies: cookies.map(({ id: _id, ...c }) => c) }),
     },
+
+    ...(auth && {
+      auth: {
+        type: auth.type,
+        username: auth.username,
+        password: auth.password,
+      },
+    }),
   }
 }
 
@@ -151,7 +155,7 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     destinations,
     retries, wait_before_retry_secs, alert_if_fails, cooldown_mins,
     target, folder_id,
-    variables, start,
+    variables, start, auth: apiAuth,
     ...rest
   } = data as any
 
@@ -181,16 +185,19 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
 
     journey: mapWireSteps(config?.steps ?? []),
 
-    ...(variables?.length && { variables }),
-    ...(config?.auth && {
+    ...(variables?.length && {
+      variables: (variables as any[]).map((v) => ({
+        name: v.name,
+        value: v.value,
+        secure: v.secure ?? false,
+        example: v.example ?? '',
+      })),
+    }),
+    ...(apiAuth && {
       auth: {
-        basicAuth: config.auth.basic_auth
-          ? {
-              enabled: config.auth.basic_auth.enabled,
-              username: config.auth.basic_auth.username,
-              passwordSecretRef: config.auth.basic_auth.password_secret_ref,
-            }
-          : undefined,
+        type: (apiAuth as any).type,
+        username: (apiAuth as any).username,
+        password: (apiAuth as any).password,
       },
     }),
     ...(config?.secrets && { secrets: config.secrets }),

@@ -156,6 +156,7 @@ const check = ref<BrowserCheck>({
   cooldownMins: 5,
   notifications: { destinations: [] },
   rum: { collect: true, sessionReplay: false },
+  variables: [],
 })
 
 function commitGate() {

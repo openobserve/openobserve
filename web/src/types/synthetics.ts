@@ -195,13 +195,11 @@ export interface BrowserCheck {
   }
   rum: { collect: boolean; sessionReplay: boolean }
   auth?: {
-    basicAuth?: {
-      enabled: boolean
-      username: string
-      passwordSecretRef: string
-    }
+    type: 'basic'
+    username: string
+    password: string
   }
-  variables?: { id?: string; name: string; value: string }[]
+  variables?: { id?: string; name: string; value: string; secure?: boolean; example?: string }[]
   secrets?: { id?: string; name: string; value: string }[]
   headers?: { id?: string; key: string; value: string }[]
   cookies?: { id?: string; name: string; value: string; domain: string }[]

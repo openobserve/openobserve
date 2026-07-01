@@ -9,6 +9,8 @@ import OBadge from '@/lib/core/Badge/OBadge.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OCollapsible from '@/lib/core/Collapsible/OCollapsible.vue'
 import OSeparator from '@/lib/core/Separator/OSeparator.vue'
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
+import { getUUID } from '@/utils/uuid'
 
 const props = defineProps<{ check: BrowserCheck }>()
 const emit = defineEmits<{ 'update:check': [value: BrowserCheck] }>()
@@ -18,66 +20,49 @@ const emit = defineEmits<{ 'update:check': [value: BrowserCheck] }>()
 const summary = computed(() => {
   const parts: string[] = []
   const pluralize = (n: number, w: string) => `${n} ${w}${n > 1 ? 's' : ''}`
-  // Variables, secrets and cookies are disabled for now.
+  if (variables.value.length) parts.push(pluralize(variables.value.length, 'variable'))
   if (headers.value.length) parts.push(pluralize(headers.value.length, 'header'))
   return parts.join(' · ')
 })
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
-const basicAuthEnabled = computed({
-  get: () => props.check.auth?.basicAuth?.enabled ?? false,
+const authEnabled = computed({
+  get: () => !!props.check.auth,
   set: (v: boolean) =>
     emit('update:check', {
       ...props.check,
-      auth: {
-        ...props.check.auth,
-        basicAuth: {
-          enabled: v,
-          username: props.check.auth?.basicAuth?.username ?? '',
-          passwordSecretRef: props.check.auth?.basicAuth?.passwordSecretRef ?? '',
-        },
-      },
+      auth: v ? { type: 'basic' as const, username: '', password: '' } : undefined,
     }),
 })
 
-const basicAuthUsername = computed({
-  get: () => props.check.auth?.basicAuth?.username ?? '',
+const authUsername = computed({
+  get: () => props.check.auth?.username ?? '',
   set: (v: string) =>
     emit('update:check', {
       ...props.check,
-      auth: {
-        ...props.check.auth,
-        basicAuth: {
-          enabled: props.check.auth?.basicAuth?.enabled ?? false,
-          username: v,
-          passwordSecretRef: props.check.auth?.basicAuth?.passwordSecretRef ?? '',
-        },
-      },
+      auth: props.check.auth
+        ? { ...props.check.auth, username: v }
+        : { type: 'basic' as const, username: v, password: '' },
     }),
 })
 
-const basicAuthPassword = computed({
-  get: () => props.check.auth?.basicAuth?.passwordSecretRef ?? '',
+const authPassword = computed({
+  get: () => props.check.auth?.password ?? '',
   set: (v: string) =>
     emit('update:check', {
       ...props.check,
-      auth: {
-        ...props.check.auth,
-        basicAuth: {
-          enabled: props.check.auth?.basicAuth?.enabled ?? false,
-          username: props.check.auth?.basicAuth?.username ?? '',
-          passwordSecretRef: v,
-        },
-      },
+      auth: props.check.auth
+        ? { ...props.check.auth, password: v }
+        : { type: 'basic' as const, username: '', password: v },
     }),
 })
 
-// ── Variables (disabled for now) ────────────────────────────────────────────────
+// ── Variables ────────────────────────────────────────────────────────────────
 
 const variables = computed(() => props.check.variables ?? [])
 
-function updateVariable(index: number, field: 'name' | 'value', val: string) {
+function updateVariable(index: number, field: 'name' | 'value' | 'secure' | 'example', val: string | boolean) {
   const updated = variables.value.map((item, i) =>
     i === index ? { ...item, [field]: val } : item,
   )
@@ -87,7 +72,7 @@ function updateVariable(index: number, field: 'name' | 'value', val: string) {
 function addVariable() {
   emit('update:check', {
     ...props.check,
-    variables: [...variables.value, { id: crypto.randomUUID(), name: '', value: '' }],
+    variables: [...variables.value, { id: getUUID(), name: '', value: '', secure: false, example: '' }],
   })
 }
 
@@ -95,31 +80,6 @@ function removeVariable(index: number) {
   emit('update:check', {
     ...props.check,
     variables: variables.value.filter((_, i) => i !== index),
-  })
-}
-
-// ── Secrets (disabled for now) ──────────────────────────────────────────────────
-
-const secrets = computed(() => props.check.secrets ?? [])
-
-function updateSecret(index: number, field: 'name' | 'value', val: string) {
-  const updated = secrets.value.map((item, i) =>
-    i === index ? { ...item, [field]: val } : item,
-  )
-  emit('update:check', { ...props.check, secrets: updated })
-}
-
-function addSecret() {
-  emit('update:check', {
-    ...props.check,
-    secrets: [...secrets.value, { id: crypto.randomUUID(), name: '', value: '' }],
-  })
-}
-
-function removeSecret(index: number) {
-  emit('update:check', {
-    ...props.check,
-    secrets: secrets.value.filter((_, i) => i !== index),
   })
 }
 
@@ -207,13 +167,13 @@ function removeCookie(index: number) {
         <!-- HTTP Basic auth -->
         <div class="tw:flex tw:flex-col tw:gap-3">
           <OSwitch
-            v-model="basicAuthEnabled"
+            v-model="authEnabled"
             label="HTTP Basic auth"
             data-test="synthetics-check-auth-network-basic-auth-switch"
           />
-          <template v-if="check.auth?.basicAuth?.enabled">
+          <template v-if="check.auth">
             <OInput
-              v-model="basicAuthUsername"
+              v-model="authUsername"
               label="Username"
               placeholder="username"
               data-test="synthetics-check-auth-network-username-input"
@@ -224,7 +184,7 @@ function removeCookie(index: number) {
                 <OBadge variant="default-soft" size="sm" class="tw:ml-1">secret</OBadge>
               </label>
               <OInput
-                v-model="basicAuthPassword"
+                v-model="authPassword"
                 type="password"
                 placeholder="••••••••"
                 data-test="synthetics-check-auth-network-password-input"
@@ -233,14 +193,12 @@ function removeCookie(index: number) {
           </template>
         </div>
         
-        <!-- Variables & secrets — disabled for now -->
-        <template v-if="false">
+        <!-- Variables -->
         <OSeparator></OSeparator>
 
         <div class="tw:flex tw:flex-col tw:gap-3">
           <div class="tw:flex tw:items-center tw:gap-2">
-            <h5 class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)]">Variables &amp; secrets</h5>
-            <OBadge variant="warning-soft" size="sm" icon="key">masked</OBadge>
+            <h5 class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)]">Variables</h5>
           </div>
 
           <!-- Variables -->
@@ -248,36 +206,59 @@ function removeCookie(index: number) {
             <li
               v-for="(variable, index) in variables"
               :key="variable.id ?? index"
-              class="tw:flex tw:items-center tw:gap-2"
+              class="tw:flex tw:flex-col tw:gap-2"
             >
-              <OInput
-                :model-value="variable.name"
-                placeholder="Name"
-                :data-test="`synthetics-check-auth-network-variable-name-${index}-input`"
-                class="tw:flex-1"
-                @update:model-value="updateVariable(index, 'name', String($event))"
-              />
-              <span class="tw:text-[var(--o2-text-muted)] tw:shrink-0">=</span>
-              <OInput
-                :model-value="variable.value"
-                placeholder="Value"
-                :data-test="`synthetics-check-auth-network-variable-value-${index}-input`"
-                class="tw:flex-1"
-                @update:model-value="updateVariable(index, 'value', String($event))"
-              />
-              <button
-                type="button"
-                :aria-label="`Remove variable ${index}`"
-                :data-test="`synthetics-check-auth-network-remove-variable-${index}-btn`"
-                class="tw:flex tw:items-center tw:text-[var(--o2-text-muted)] tw:hover:text-[var(--o2-text-body)] tw:transition-colors tw:shrink-0"
-                @click="removeVariable(index)"
-              >
-                <OIcon name="delete-outline" size="sm" class="tw:text-[var(--o2-text-muted)]" />
-              </button>
+              <!-- Main row: name = value [secure toggle] [remove] -->
+              <div class="tw:flex tw:items-center tw:gap-2">
+                <OInput
+                  :model-value="variable.name"
+                  placeholder="Name"
+                  :data-test="`synthetics-check-auth-network-variable-name-${index}-input`"
+                  class="tw:flex-1"
+                  @update:model-value="updateVariable(index, 'name', String($event))"
+                />
+                <span class="tw:text-[var(--o2-text-muted)] tw:shrink-0">=</span>
+                <OInput
+                  :model-value="variable.value"
+                  :type="variable.secure ? 'password' : 'text'"
+                  :placeholder="variable.secure && !variable.value ? variable.example || '••••••••' : 'Value'"
+                  :data-test="`synthetics-check-auth-network-variable-value-${index}-input`"
+                  class="tw:flex-1"
+                  @update:model-value="updateVariable(index, 'value', String($event))"
+                />
+
+                <OButton
+                  :data-test="`synthetics-check-auth-network-variable-secure-${index}-switch`"
+                  size="sm"
+                  variant="outline"
+                  class="tw:gap-1.5"
+                  @click="updateVariable(index, 'secure', !variable.secure)"
+                >
+                  <OSwitch
+                    v-model="variable.secure"
+                    size="md"
+                  />
+                  <OIcon name="lock" size="sm" />
+                  <OTooltip
+                    :content="variable.secure ? 'Value is masked. Click to show.' : 'Mask this value as sensitive data.'"
+                    side="top"
+                  />
+                </OButton>
+ 
+                <OButton
+                  icon-only
+                  icon-left="delete"
+                  variant="ghost"
+                  size="sm"
+                  :aria-label="`Remove variable ${index}`"
+                  :data-test="`synthetics-check-auth-network-remove-variable-${index}-btn`"
+                  @click="removeVariable(index)"
+                />
+              </div>
             </li>
           </ul>
           <OButton
-            variant="ghost"
+            variant="outline"
             size="sm"
             icon-left="add"
             class="tw:self-start"
@@ -287,52 +268,7 @@ function removeCookie(index: number) {
             Add variable
           </OButton>
 
-          <!-- Secrets -->
-          <ul v-if="secrets.length" class="tw:flex tw:flex-col tw:gap-2">
-            <li
-              v-for="(secret, index) in secrets"
-              :key="secret.id ?? index"
-              class="tw:flex tw:items-center tw:gap-2"
-            >
-              <OInput
-                :model-value="secret.name"
-                placeholder="Name"
-                :data-test="`synthetics-check-auth-network-secret-name-${index}-input`"
-                class="tw:flex-1"
-                @update:model-value="updateSecret(index, 'name', String($event))"
-              />
-              <span class="tw:text-[var(--o2-text-muted)] tw:shrink-0">=</span>
-              <OInput
-                :model-value="secret.value"
-                type="password"
-                placeholder="••••••••"
-                :data-test="`synthetics-check-auth-network-secret-value-${index}-input`"
-                class="tw:flex-1"
-                @update:model-value="updateSecret(index, 'value', String($event))"
-              />
-              <button
-                type="button"
-                :aria-label="`Remove secret ${index}`"
-                :data-test="`synthetics-check-auth-network-remove-secret-${index}-btn`"
-                class="tw:flex tw:items-center tw:text-[var(--o2-text-muted)] tw:hover:text-[var(--o2-text-body)] tw:transition-colors tw:shrink-0"
-                @click="removeSecret(index)"
-              >
-                <OIcon name="delete-outline" size="sm" class="tw:text-[var(--o2-text-muted)]" />
-              </button>
-            </li>
-          </ul>
-          <OButton
-            variant="ghost"
-            size="sm"
-            icon-left="add"
-            class="tw:self-start"
-            data-test="synthetics-check-auth-network-add-secret-btn"
-            @click="addSecret"
-          >
-            Add secret
-          </OButton>
         </div>
-        </template>
 
         <!-- Custom headers -->
         <div v-if="false" class="tw:flex tw:flex-col tw:gap-3">
