@@ -4283,6 +4283,7 @@
         "errorsLead": "{errors} of {total} · Turns",
         "errorsLeadMany": "{errors} of {total} Turns",
         "filterErrors": "Filter Errors",
+        "resetFilters": "Reset Filters",
         "errorsNone": "No Errors · {total} Turns",
         "latencyLead": "Slowest {slowest} ·",
         "costLead": "Peak {peak} ·",

@@ -251,13 +251,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </TurnPreviewCard>
             </template>
             <OButton
-              v-if="card.filterErrors"
+              v-if="card.filterErrors && !errorsFiltered"
               variant="outline-destructive"
               size="xs"
               data-test="session-detail-filter-errors"
               @click="filterToErrors"
             >
               {{ t('traces.sessionDetail.kpiSub.filterErrors') }}
+            </OButton>
+            <OButton
+              v-else-if="card.filterErrors && errorsFiltered"
+              variant="outline"
+              size="xs"
+              data-test="session-detail-reset-errors"
+              @click="resetErrorFilter"
+            >
+              {{ t('traces.sessionDetail.kpiSub.resetFilters') }}
             </OButton>
             <span v-if="card.subTail">{{ card.subTail }}</span>
           </div>
@@ -1392,6 +1401,8 @@ function jumpToTurn(n: number) {
 
 // "Filter Errors" (Errors KPI, > 3 errors): narrow the conversation to error
 // turns and scroll the list into view instead of listing every error number.
+// True once the error filter is applied, so the KPI button flips to "Reset".
+const errorsFiltered = computed(() => statusFilter.value === "error");
 function filterToErrors() {
   searchText.value = "";
   modelFilter.value = "all";
@@ -1403,6 +1414,16 @@ function filterToErrors() {
       .querySelector('[data-test="session-conversation-panel"]')
       ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   });
+}
+
+// "Reset Filters" (shown in place of "Filter Errors" once errors are filtered):
+// clear the status filter so the full conversation is visible again.
+function resetErrorFilter() {
+  searchText.value = "";
+  statusFilter.value = "all";
+  modelFilter.value = "all";
+  sortKey.value = "turn";
+  sortDir.value = "asc";
 }
 
 function openTrace(traceId: string) {
