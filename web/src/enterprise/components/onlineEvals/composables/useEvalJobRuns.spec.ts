@@ -142,7 +142,7 @@ describe("useEvalJobRuns — KPI refresh", () => {
     expect(sql).toContain("'job''1'");
   });
 
-  it("filters evaluator KPIs through source-stream trace IDs when agent is selected", async () => {
+  it("filters evaluator KPIs inline on attributes_target_agent_id when agent is selected", async () => {
     mockExecuteQuery.mockResolvedValue([]);
     useEvalJobRuns(
       ref<string | null>("job-1"),
@@ -153,10 +153,8 @@ describe("useEvalJobRuns — KPI refresh", () => {
     await flushAsync();
 
     const sql = mockExecuteQuery.mock.calls[0][0];
-    expect(sql).toContain("attributes_target_stream = 'prod_traces'");
-    expect(sql).toContain("attributes_target_trace_id IN (");
-    expect(sql).toContain('FROM "traces"."prod_traces"');
-    expect(sql).toContain("WHERE gen_ai_agent_id = 'agent-123'");
+    expect(sql).toContain("attributes_target_agent_id = 'agent-123'");
+    expect(sql).not.toContain("attributes_target_trace_id IN (");
   });
 });
 
