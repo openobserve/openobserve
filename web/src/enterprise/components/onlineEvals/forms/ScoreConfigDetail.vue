@@ -74,7 +74,7 @@
             <dl class="scd-kv">
               <dt>{{ t("onlineEvals.scoreConfig.detail.dataTypeLabel") }}</dt>
               <dd>
-                <OTag type="evalDataType" :value="dataType">{{ dataType }}</OTag>
+                <OTag type="evalDataType" :value="dataType" />
               </dd>
 
               <template v-if="dataType === 'numeric' && numericRange">

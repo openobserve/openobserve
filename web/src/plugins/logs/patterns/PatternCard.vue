@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OTag
               type="wildcardChip"
+              data-test="pattern-card-wildcard-chip"
               :class="wildcardChipColor(tok.value, tok.sampleValues)"
             >
               {{ wildcardLabel(tok.value, tok.sampleValues) }}

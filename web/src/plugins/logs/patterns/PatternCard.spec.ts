@@ -49,7 +49,6 @@ describe("PatternCard", () => {
   const OBadgeStub = {
     name: "OBadge",
     props: ["size"],
-    // Vue 3 auto-merges parent class onto root element, so wildcard-chip etc. appear naturally
     template: '<span data-test-stub="o-badge"><slot /></span>',
   };
   const OTooltipStub = {
@@ -270,7 +269,7 @@ describe("PatternCard", () => {
 
   describe("Wildcard chip hover interactions", () => {
     it("should render wildcard chips for each wildcard in the template", () => {
-      const chips = wrapper.findAll(".wildcard-chip");
+      const chips = wrapper.findAll('[data-test="pattern-card-wildcard-chip"]');
       expect(chips.length).toBeGreaterThan(0);
     });
 

@@ -20,9 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :value="type"
     class="tw:mr-1.5"
     :data-test="dataTest"
-  >
-    {{ type }}
-  </OTag>
+  />
 </template>
 
 <script setup lang="ts">

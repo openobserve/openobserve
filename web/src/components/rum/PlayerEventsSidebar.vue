@@ -99,9 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :value="filteredEvent.type"
                 class="tw:mr-3"
                 data-test="event-type-badge"
-              >
-                {{ filteredEvent.type }}
-              </OTag>
+              />
               <template
                 v-if="
                   filteredEvent.frustration_types &&

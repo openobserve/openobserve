@@ -101,7 +101,7 @@
             </span>
           </label>
           <div v-if="mode === 'edit'" class="sc-locked-row">
-            <OTag type="evalDataType" :value="form.dataType">{{ form.dataType }}</OTag>
+            <OTag type="evalDataType" :value="form.dataType" />
           </div>
           <template v-else>
             <div class="sc-dtype-grid">
