@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            variant are Tailwind utilities (see kpiCardClass / kpiAccentClass),
            matching the LLM Insights dashboard so the AI module stays consistent. -->
       <div
-        class="tw:grid tw:grid-cols-3 tw:gap-[0.625rem]"
+        class="tw:grid tw:grid-cols-3 tw:grid-rows-2 tw:h-full tw:gap-[0.625rem]"
         data-test="session-detail-kpis"
       >
         <div
@@ -866,7 +866,7 @@ function cacheInputDenominator(d: SessionDetail): number {
 // Errors uses a variant (red when > 50% error rate); every other tile is neutral.
 function kpiCardClass(variant?: "danger"): string {
   const base =
-    "tw:flex tw:flex-col tw:justify-between tw:gap-1 tw:px-3.5 tw:py-2.5 tw:rounded-lg tw:border tw:transition-shadow hover:tw:shadow-[0_1px_6px_rgba(0,0,0,0.08)]";
+    "tw:flex tw:flex-col tw:justify-center tw:gap-1 tw:px-3.5 tw:py-2.5 tw:rounded-lg tw:border tw:transition-shadow hover:tw:shadow-[0_1px_6px_rgba(0,0,0,0.08)]";
   if (variant === "danger")
     return `${base} tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_5%,var(--o2-card-bg))] tw:border-[color-mix(in_srgb,var(--o2-service-health-critical)_35%,var(--o2-border-color))]`;
   return `${base} tw:bg-[var(--o2-card-bg)] tw:border-[var(--o2-border-color)]`;
