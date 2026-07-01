@@ -141,7 +141,7 @@ type AgentObservationBuffer = std::collections::BTreeMap<
 >;
 
 #[cfg(not(feature = "enterprise"))]
-type AgentObservationBuffer = ();
+type AgentObservationBuffer = Option<std::convert::Infallible>;
 
 fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
     for &field in GEN_AI_INT64_FIELDS.iter() {
