@@ -291,6 +291,7 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
         data-test="synthetics-journey-stop-btn"
         @click="stopRecording"
         icon-left="stop"
+        class="tw:w-24!"
       >
         Stop
       </OButton>
@@ -302,6 +303,7 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
         data-test="synthetics-journey-record-btn"
         @click="onRecordButtonClick"
         icon-left="smart-display"
+        class="tw:w-24!"
       >
         Record
       </OButton>
