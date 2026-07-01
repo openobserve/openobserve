@@ -3184,7 +3184,8 @@ pub async fn spawn_maintenance_task() -> std::result::Result<(), anyhow::Error> 
 
     tokio::task::spawn(async move {
         loop {
-            let wait = duration_until_next_utc_hour(get_config().compact.file_list_maintenance_hour);
+            let wait =
+                duration_until_next_utc_hour(get_config().compact.file_list_maintenance_hour);
             log::info!(
                 "[POSTGRES] maintenance: next run in {} minutes",
                 wait.as_secs() / 60
@@ -4396,11 +4397,7 @@ mod tests {
 
     #[test]
     fn test_same_utc_day() {
-        let day = |s: &str| {
-            DateTime::parse_from_rfc3339(s)
-                .unwrap()
-                .timestamp_micros()
-        };
+        let day = |s: &str| DateTime::parse_from_rfc3339(s).unwrap().timestamp_micros();
         // Same day, different times.
         assert!(same_utc_day(
             day("2026-07-01T00:00:00Z"),
