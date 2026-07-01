@@ -187,17 +187,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ card.unit }}
               </span>
             </div>
-            <div
-              v-if="card.trend"
-              class="kpi-trend tw:text-[0.65rem] tw:font-medium tw:flex tw:items-center tw:gap-[0.25rem]"
-              :class="`kpi-trend--${card.trend.sentiment}`"
-            >
-              <span class="kpi-trend-arrow">{{ trendArrow(card.trend.direction) }}</span>
-              <span>
-                {{ card.trend.deltaPct.toFixed(card.trend.deltaPct < 10 ? 1 : 0) }}%
-                vs prev{{ previousWindowLabel ? " " + previousWindowLabel : "" }}
-              </span>
-            </div>
           </div>
           <KpiSparkline
             v-if="card.sparkData && card.sparkData.length > 1"
@@ -258,13 +247,9 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useLLMInsights } from "./composables/useLLMInsights";
 import {
-  computeTrend,
-  trendArrow,
   splitNumberWithUnit,
   splitDuration,
   splitCost,
-  formatWindowLabel,
-  type KpiTrend,
 } from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
 import LLMSchemaPanel from "./LLMSchemaPanel.vue";
@@ -316,7 +301,6 @@ const STREAM_LS_KEY = "llmInsights_streamFilter";
 
 const {
   kpi,
-  kpiPrev,
   sparklines,
   loading,
   error,
@@ -579,14 +563,6 @@ async function loadAgents(startTime?: number, endTime?: number) {
 
 const hasData = computed(() => kpi.value.requestCount > 0);
 
-// Short label for the comparison window — drives the KPI trend chip
-// text, e.g. "▲ 100% vs prev 12h". Computed from the current
-// time-range props rather than the user-picked relative period so it
-// stays correct for absolute ranges too.
-const previousWindowLabel = computed(() =>
-  formatWindowLabel(props.endTime - props.startTime),
-);
-
 // DataFusion returns "Schema error: No field named gen_ai_..." when the
 // chosen stream lacks LLM instrumentation. Detect that specific case so we
 // can show a friendly empty state instead of the generic error fallback.
@@ -631,7 +607,6 @@ interface KpiCard {
   label: string;
   value: string;
   unit?: string;
-  trend?: KpiTrend | null;
   sparkData?: number[];
   sparkColor?: string;
 }
@@ -645,24 +620,12 @@ const kpiCards = computed<KpiCard[]>(() => {
       ? (kpi.value.errorCount / kpi.value.traceCount) * 100
       : 0;
 
-  const errorRatePrev =
-    kpiPrev.value.traceCount > 0
-      ? (kpiPrev.value.errorCount / kpiPrev.value.traceCount) * 100
-      : 0;
-
   // Cost comes straight from SUM(gen_ai_usage_cost) on the KPI summary.
   // If it's 0, either there are no LLM spans in the window or the SDK
   // isn't emitting cost; either way we render "$0".
-  const costTrend = computeTrend(
-    kpi.value.totalCost,
-    kpiPrev.value.totalCost,
-    true,
-  );
-
   const costCard: KpiCard = {
     label: "Total Cost",
     ...splitCost(kpi.value.totalCost),
-    trend: costTrend,
     sparkData: sparklines.value.cost,
     sparkColor: "#0ea5e9",
   };
@@ -673,7 +636,6 @@ const kpiCards = computed<KpiCard[]>(() => {
       label: "Total Tokens",
       value: tokens.value,
       unit: tokens.unit,
-      trend: computeTrend(kpi.value.totalTokens, kpiPrev.value.totalTokens, true),
       sparkData: sparklines.value.tokens,
       sparkColor: "#a855f7",
     },
@@ -681,7 +643,6 @@ const kpiCards = computed<KpiCard[]>(() => {
       label: "Total Traces",
       value: traces.value,
       unit: traces.unit,
-      trend: computeTrend(kpi.value.traceCount, kpiPrev.value.traceCount, true),
       sparkData: sparklines.value.traces,
       sparkColor: "#3b82f6",
     },
@@ -689,11 +650,6 @@ const kpiCards = computed<KpiCard[]>(() => {
       label: "P95 Latency",
       value: p95.value,
       unit: p95.unit,
-      trend: computeTrend(
-        kpi.value.p95DurationMicros,
-        kpiPrev.value.p95DurationMicros,
-        true,
-      ),
       sparkData: sparklines.value.p95Micros,
       sparkColor: "#f97316",
     },
@@ -701,7 +657,6 @@ const kpiCards = computed<KpiCard[]>(() => {
       label: "Error Rate",
       value: errorRate.toFixed(1),
       unit: "%",
-      trend: computeTrend(errorRate, errorRatePrev, true),
       sparkData: sparklines.value.errorRate,
       sparkColor: "#ef4444",
     },
@@ -782,7 +737,6 @@ async function loadInsights(
     if (!force && kpiCache.has(ck)) {
       const snap = kpiCache.get(ck)!;
       kpi.value = snap.kpi;
-      kpiPrev.value = snap.kpiPrev;
       sparklines.value = snap.sparklines;
       lastRunAt.value = snap.lastRunAt;
       error.value = null; // restoring a prior success — drop any stale error
@@ -796,7 +750,6 @@ async function loadInsights(
     if (!error.value) {
       kpiCache.set(ck, {
         kpi: kpi.value,
-        kpiPrev: kpiPrev.value,
         sparklines: sparklines.value,
         lastRunAt: lastRunAt.value,
       });
@@ -877,18 +830,6 @@ onUnmounted(() => {
 
   &:hover {
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
-  }
-}
-
-.kpi-trend {
-  &--good {
-    color: #16a34a;
-  }
-  &--bad {
-    color: var(--o2-status-error-text);
-  }
-  &--neutral {
-    color: var(--o2-text-muted);
   }
 }
 

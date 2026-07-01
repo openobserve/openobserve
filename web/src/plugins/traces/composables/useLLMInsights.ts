@@ -65,7 +65,7 @@ const EMPTY_KPI: LLMKPI = {
  * when to ask).
  *
  * @example
- *   const { kpi, kpiPrev, sparklines, loading, error, fetchAll } =
+ *   const { kpi, sparklines, loading, error, fetchAll } =
  *     useLLMInsights();
  *   await fetchAll("default", 1700000000000000, 1700001000000000);
  *   console.log(kpi.value.totalCost, kpi.value.totalTokens);
@@ -76,7 +76,6 @@ export function useLLMInsights() {
     useHttpStreaming();
 
   const kpi = ref<LLMKPI>({ ...EMPTY_KPI });
-  const kpiPrev = ref<LLMKPI>({ ...EMPTY_KPI });
   const sparklines = ref<LLMSparklineSeries>({
     cost: [],
     tokens: [],
@@ -186,10 +185,8 @@ export function useLLMInsights() {
   }
 
   /**
-   * Internal — fetch one KPI summary into the given ref. Used twice per
-   * `fetchAll` call: once for the current window (→ `kpi`) and once for
-   * the immediately preceding window of the same length (→ `kpiPrev`).
-   * The "prev" numbers feed the "% vs prev" trend chips on the cards.
+   * Internal — fetch one KPI summary into the given ref (→ `kpi`) for the
+   * current window.
    *
    * Writes `{ ...EMPTY_KPI }` first so a partial response (server returns
    * 0 hits) leaves the target at a clean zero state instead of stale
@@ -197,7 +194,6 @@ export function useLLMInsights() {
    *
    * @example (internal)
    *   await fetchKPIInto(kpi, "default", 100, 200);          // current window
-   *   await fetchKPIInto(kpiPrev, "default", 0, 100);        // previous window
    */
   async function fetchKPIInto(
     target: Ref<LLMKPI>,
@@ -420,7 +416,6 @@ export function useLLMInsights() {
   /**
    * The single public fetch entry point. Kicks off (in parallel):
    *   - KPI summary for the current window     → `kpi`
-   *   - KPI summary for the previous window    → `kpiPrev` (for trend chips)
    *   - bucketed sparkline series              → `sparklines`
    *
    * Manages `loading` (true while any sub-query is in flight) and
@@ -446,14 +441,9 @@ export function useLLMInsights() {
     loading.value = true;
     error.value = null;
 
-    const windowDuration = endTime - startTime;
-    const prevEnd = startTime;
-    const prevStart = startTime - windowDuration;
-
     try {
       await Promise.all([
         fetchKPIInto(kpi, streamName, startTime, endTime, agent),
-        fetchKPIInto(kpiPrev, streamName, prevStart, prevEnd, agent),
         fetchSparklines(streamName, startTime, endTime, agent),
       ]);
       hasLoadedOnce.value = true;
@@ -467,7 +457,6 @@ export function useLLMInsights() {
 
   return {
     kpi,
-    kpiPrev,
     sparklines,
     loading,
     error,

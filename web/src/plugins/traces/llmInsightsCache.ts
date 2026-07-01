@@ -40,7 +40,6 @@ const MAX_ENTRIES = 60;
 /** One KPI-strip result, snapshotted for a single selection+window. */
 export interface KpiSnapshot {
   kpi: LLMKPI;
-  kpiPrev: LLMKPI;
   sparklines: LLMSparklineSeries;
   lastRunAt: number | null;
 }

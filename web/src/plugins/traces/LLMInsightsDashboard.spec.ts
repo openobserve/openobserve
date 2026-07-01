@@ -50,15 +50,6 @@ const mockKpi = ref({
   avgDurationMicros: 0,
   p95DurationMicros: 0,
 });
-const mockKpiPrev = ref({
-  requestCount: 0,
-  traceCount: 0,
-  errorCount: 0,
-  totalTokens: 0,
-  totalCost: 0,
-  avgDurationMicros: 0,
-  p95DurationMicros: 0,
-});
 const mockSparklines = ref({
   cost: [],
   tokens: [],
@@ -75,7 +66,6 @@ const mockStreamsLoaded = ref(false);
 vi.mock("./composables/useLLMInsights", () => ({
   useLLMInsights: () => ({
     kpi: mockKpi,
-    kpiPrev: mockKpiPrev,
     sparklines: mockSparklines,
     loading: mockLoading,
     error: mockError,
@@ -180,7 +170,6 @@ beforeEach(() => {
     avgDurationMicros: 0,
     p95DurationMicros: 0,
   };
-  mockKpiPrev.value = { ...mockKpi.value };
   mockSparklines.value = {
     cost: [],
     tokens: [],

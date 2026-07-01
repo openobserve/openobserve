@@ -68,7 +68,6 @@ describe("useLLMInsights — return shape", () => {
     const api = useLLMInsights();
     // Refs
     expect(isRef(api.kpi)).toBe(true);
-    expect(isRef(api.kpiPrev)).toBe(true);
     expect(isRef(api.sparklines)).toBe(true);
     expect(isRef(api.loading)).toBe(true);
     expect(isRef(api.error)).toBe(true);
@@ -81,7 +80,7 @@ describe("useLLMInsights — return shape", () => {
   });
 
   it("starts with empty KPI / sparkline / streams state", () => {
-    const { kpi, kpiPrev, sparklines, availableStreams, streamsLoaded, hasLoadedOnce, loading, error } =
+    const { kpi, sparklines, availableStreams, streamsLoaded, hasLoadedOnce, loading, error } =
       useLLMInsights();
     expect(kpi.value).toEqual({
       requestCount: 0,
@@ -92,7 +91,6 @@ describe("useLLMInsights — return shape", () => {
       avgDurationMicros: 0,
       p95DurationMicros: 0,
     });
-    expect(kpiPrev.value).toEqual(kpi.value);
     expect(sparklines.value).toEqual({
       cost: [],
       tokens: [],
@@ -154,32 +152,12 @@ describe("useLLMInsights — fetchAll early returns", () => {
 // fetchAll — happy path
 // ---------------------------------------------------------------------------
 
-describe("useLLMInsights — fetchAll fires 3 parallel queries", () => {
-  it("kicks off KPI(current) + KPI(prev) + sparklines in parallel", () => {
+describe("useLLMInsights — fetchAll fires 2 parallel queries", () => {
+  it("kicks off KPI(current) + sparklines in parallel", () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
-    // KPI cur, KPI prev, sparklines = 3 calls
-    expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(3);
-  });
-
-  // The "previous" window is computed as the same-length window
-  // immediately preceding the current one — drives the "% vs prev" trend.
-  it("derives the previous window as immediately preceding (same length)", () => {
-    const { fetchAll } = useLLMInsights();
-    // current window: [1000, 1100] (length 100)
-    // prev window:    [900, 1000]  (length 100)
-    fetchAll("default", 1000, 1100);
-
-    const calls = mockFetchQueryDataWithHttpStream.mock.calls;
-    const queryWindows = calls.map(([payload]: any) => ({
-      start: payload.queryReq.query.start_time,
-      end: payload.queryReq.query.end_time,
-    }));
-
-    // One of the calls is the prev window:
-    expect(queryWindows).toContainEqual({ start: 900, end: 1000 });
-    // And one is the current window:
-    expect(queryWindows).toContainEqual({ start: 1000, end: 1100 });
+    // KPI cur, sparklines = 2 calls
+    expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2);
   });
 
   // The sparkline query references `histogram(_timestamp, '<interval>')`
@@ -223,20 +201,8 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
     });
     allCallbacks[0].complete();
 
-    // KPI(prev) — minimal
-    driveKpiHits(allCallbacks[1], {
-      request_count: 50,
-      trace_count: 10,
-      error_count: 1,
-      total_tokens: 25_000,
-      total_cost: 0.5,
-      avg_duration: 2_000,
-      p95_duration: 5_000,
-    });
-    allCallbacks[1].complete();
-
     // Sparklines — no rows
-    allCallbacks[2].complete();
+    allCallbacks[1].complete();
 
     await promise;
 
@@ -265,7 +231,6 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
     driveKpiHits(allCallbacks[0], { request_count: "not-a-number" });
     allCallbacks[0].complete();
     allCallbacks[1].complete();
-    allCallbacks[2].complete();
 
     await promise;
     expect(kpi.value.requestCount).toBe(0);
@@ -278,7 +243,7 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
 // ---------------------------------------------------------------------------
 
 describe("useLLMInsights — fetchAll error path", () => {
-  // A failure on ANY of the three queries should populate `error.value`
+  // A failure on ANY of the two queries should populate `error.value`
   // and the dashboard renders its error state. We catch internally so
   // callers don't need a try/catch.
   it("captures error message and clears loading on rejection", async () => {
@@ -290,7 +255,6 @@ describe("useLLMInsights — fetchAll error path", () => {
     );
     allCallbacks[0].error({ message: "schema error" });
     allCallbacks[1].complete();
-    allCallbacks[2].complete();
 
     await promise;
     expect(error.value).toBe("schema error");
@@ -308,7 +272,6 @@ describe("useLLMInsights — fetchAll error path", () => {
     );
     allCallbacks[0].error({});
     allCallbacks[1].complete();
-    allCallbacks[2].complete();
 
     await promise;
     // message picked up by executeQuery's "Failed to fetch query data"
@@ -328,7 +291,6 @@ describe("useLLMInsights — fetchAll error path", () => {
     );
     allCallbacks[0].error({ message: "x" });
     allCallbacks[1].complete();
-    allCallbacks[2].complete();
 
     await promise;
     expect(hasLoadedOnce.value).toBe(false);
@@ -352,9 +314,8 @@ describe("useLLMInsights — sparklines accumulation", () => {
       ([, cbs]: any) => cbs,
     );
     allCallbacks[0].complete();
-    allCallbacks[1].complete();
     // Sparkline row
-    allCallbacks[2].data(null, {
+    allCallbacks[1].data(null, {
       content: {
         results: {
           hits: [
@@ -371,7 +332,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
         },
       },
     });
-    allCallbacks[2].complete();
+    allCallbacks[1].complete();
 
     await promise;
     expect(sparklines.value.cost).toEqual([0.12]);
@@ -394,8 +355,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
       ([, c]: any) => c,
     );
     cbs[0].complete();
-    cbs[1].complete();
-    cbs[2].data(null, {
+    cbs[1].data(null, {
       content: {
         results: {
           hits: [
@@ -405,7 +365,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
         },
       },
     });
-    cbs[2].complete();
+    cbs[1].complete();
 
     await promise;
     expect(sparklines.value.tokens).toEqual([100, 200]);
@@ -424,8 +384,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
       ([, c]: any) => c,
     );
     cbs[0].complete();
-    cbs[1].complete();
-    cbs[2].data(null, {
+    cbs[1].data(null, {
       content: {
         results: {
           hits: [
@@ -435,7 +394,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
         },
       },
     });
-    cbs[2].complete();
+    cbs[1].complete();
 
     await promise;
     expect(sparklines.value.errorRate).toEqual([0]);
@@ -460,8 +419,7 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
 
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
     cbs[0].complete();
-    cbs[1].complete();
-    cbs[2].data(null, {
+    cbs[1].data(null, {
       content: {
         results: {
           hits: [
@@ -471,7 +429,7 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
         },
       },
     });
-    cbs[2].complete();
+    cbs[1].complete();
 
     await promise;
     expect(sparklines.value.errorRate[0]).toBe(100);
@@ -483,8 +441,7 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
 
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
     cbs[0].complete();
-    cbs[1].complete();
-    cbs[2].data(null, {
+    cbs[1].data(null, {
       content: {
         results: {
           hits: [
@@ -493,7 +450,7 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
         },
       },
     });
-    cbs[2].complete();
+    cbs[1].complete();
 
     await promise;
     expect(sparklines.value.errorRate[0]).toBe(0);
@@ -575,20 +532,20 @@ describe("useLLMInsights — cancelAll", () => {
     expect(mockCancelStreamQuery).not.toHaveBeenCalled();
   });
 
-  // After kicking off fetchAll, all 3 trace IDs are active. cancelAll
+  // After kicking off fetchAll, both trace IDs are active. cancelAll
   // should cancel them all and pass the org ID for routing.
   it("cancels every in-flight trace ID with the current org ID", () => {
     const { fetchAll, cancelAll } = useLLMInsights();
     fetchAll("default", 100, 200);
 
     cancelAll();
-    expect(mockCancelStreamQuery).toHaveBeenCalledTimes(3);
-    // Verify all three trace IDs were passed (order doesn't matter).
+    expect(mockCancelStreamQuery).toHaveBeenCalledTimes(2);
+    // Verify both trace IDs were passed (order doesn't matter).
     const traceIds = mockCancelStreamQuery.mock.calls.map(
       (c) => (c[0] as any).trace_id,
     );
     expect(traceIds).toEqual(
-      expect.arrayContaining(["trace-1", "trace-2", "trace-3"]),
+      expect.arrayContaining(["trace-1", "trace-2"]),
     );
     // Every cancel includes the org id from the (mocked) store.
     for (const [arg] of mockCancelStreamQuery.mock.calls) {
@@ -606,7 +563,6 @@ describe("useLLMInsights — cancelAll", () => {
     );
     cbs[0].complete();
     cbs[1].complete();
-    cbs[2].complete();
 
     cancelAll();
     expect(mockCancelStreamQuery).not.toHaveBeenCalled();
@@ -623,7 +579,6 @@ describe("useLLMInsights — cancelAll", () => {
     );
     cbs[0].error({ message: "x" });
     cbs[1].complete();
-    cbs[2].complete();
     await promise;
 
     cancelAll();
@@ -700,7 +655,7 @@ describe("useLLMInsights — SQL surface", () => {
     const sqls = mockFetchQueryDataWithHttpStream.mock.calls.map(
       ([p]: any) => p.queryReq.query.sql,
     );
-    expect(sqls).toHaveLength(3);
+    expect(sqls).toHaveLength(2);
     for (const sql of sqls) {
       expect(sql).toContain(`gen_ai_agent_id = 'agent-123'`);
       expect(sql).not.toContain("trace_id IN (SELECT trace_id");
