@@ -1,53 +1,45 @@
 <template>
   <form class="scorer-form" @submit.prevent="save">
-    <div class="scorer-form__top">
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="arrow-back-ios-new"
-        data-test="scorer-form-back-btn"
-        :title="t('onlineEvals.scorer.backTo')"
-        @click="$emit('cancel')"
-      />
-      <h1 class="scorer-form__title">{{ titleText }}</h1>
-      <span class="scorer-form__subtitle">
-        {{
-          form.scorerType === "remote"
-            ? t("onlineEvals.scorer.subtitleRemote")
-            : t("onlineEvals.scorer.subtitleLlm")
-        }}
-      </span>
-      <div class="scorer-form__top-spacer" />
-      <span class="scorer-form__badge" :class="`scorer-form__badge--${form.scorerType}`">
-        {{
-          form.scorerType === "remote"
-            ? t("onlineEvals.scorer.badgeRemote")
-            : t("onlineEvals.scorer.badgeLlm")
-        }}
-      </span>
-      <button
-        type="button"
-        class="scorer-form__close"
-        :aria-label="t('onlineEvals.buttons.cancel')"
-        data-test="scorer-form-close-btn"
-        @click="$emit('cancel')"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+    <!-- Shared page header (same as JobFormPage) so the two eval forms read
+         identically: Back pill in the module-icon slot, title, and the
+         scorer-type badge + close button in #actions. -->
+    <AppPageHeader
+      :back="{
+        label: t('onlineEvals.scorer.backTo'),
+        onClick: () => $emit('cancel'),
+        dataTest: 'scorer-form-back-btn',
+      }"
+      class="card-container tw:px-3 tw:border-b tw:border-border-default"
+    >
+      <template #title>
+        <span data-test="scorer-form-title">{{ titleText }}</span>
+      </template>
+      <!-- Scorer-type badge sits inline, immediately after the title. -->
+      <template #title-trail>
+        <OBadge
+          :variant="form.scorerType === 'remote' ? 'success-soft' : 'blue-soft'"
+          size="sm"
+          data-test="scorer-form-type-badge"
         >
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
-    </div>
+          {{
+            form.scorerType === "remote"
+              ? t("onlineEvals.scorer.badgeRemote")
+              : t("onlineEvals.scorer.badgeLlm")
+          }}
+        </OBadge>
+      </template>
+      <template #actions>
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="close"
+          :aria-label="t('onlineEvals.buttons.cancel')"
+          :title="t('onlineEvals.buttons.cancel')"
+          data-test="scorer-form-close-btn"
+          @click="$emit('cancel')"
+        />
+      </template>
+    </AppPageHeader>
 
     <div class="scorer-form__body">
       <div class="scorer-form__main">
@@ -697,6 +689,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
   type ExtraMetadataField,
@@ -1296,80 +1290,6 @@ async function save() {
   flex: 1;
   min-height: 0;
   gap: 10px;
-}
-
-.scorer-form__top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 8px 14px;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
-  flex-shrink: 0;
-}
-
-.scorer-form__title {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  letter-spacing: 0.005em;
-  white-space: nowrap;
-}
-
-.scorer-form__subtitle {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.scorer-form__top-spacer {
-  flex: 1;
-  min-width: 8px;
-}
-
-.scorer-form__badge {
-  padding: 3px 8px;
-  border-radius: 4px;
-  font: 700 11px inherit;
-  background: color-mix(in srgb, var(--color-text-primary) 10%, transparent);
-  color: var(--color-text-primary, currentColor);
-  white-space: nowrap;
-}
-
-.scorer-form__badge--llm_judge {
-  background: color-mix(in srgb, var(--o2-status-info-text) 14%, transparent);
-  color: var(--o2-status-info-text);
-}
-
-.scorer-form__badge--remote {
-  background: color-mix(in srgb, var(--o2-status-success-text) 14%, transparent);
-  color: var(--o2-status-success-text);
-}
-
-.scorer-form__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.scorer-form__close:hover {
-  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
-  color: var(--color-primary-600, #3F7994);
 }
 
 .scorer-form__body {
