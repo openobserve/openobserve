@@ -23,8 +23,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-center! tw:w-full tw:overflow-hidden tw:border-b tw:solid tw:border-b-[var(--o2-border-color)]">
       <div
         ref="toolbarLeftRef"
-        class="tw:flex tw:items-center tw:gap-1 tw:flex-nowrap tw:flex-1 tw:min-w-0 tw:overflow-hidden"
+        class="tw:flex tw:items-center tw:gap-1 tw:flex-nowrap tw:flex-1 tw:min-w-0"
       >
+        <!-- Collapsible region — clips its overflow so the More button (a
+             shrink-0 sibling below) always stays visible. Pinned items hide via
+             the pinBudget computation before they would clip. `flex-initial`
+             (not `flex-1`) keeps this sized to its content so the More button
+             sits right after the pinned items instead of being pushed to the
+             far right; it still shrinks + clips when content overflows. -->
+        <div class="tw:flex tw:items-center tw:gap-1 tw:flex-nowrap tw:flex-initial tw:min-w-0 tw:overflow-hidden">
         <!-- View Mode: Dropdown when very narrow, Toggle Group otherwise -->
         <ODropdown v-if="toolbarToggleAsDropdown" side="bottom" align="start">
           <template #trigger>
@@ -130,10 +137,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSwitch
             v-model="searchObj.meta.showHistogram"
-            size="md"
+            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop
           />
-          <OIcon name="bar-chart" size="sm" class="tw:shrink-0" />
+          <OIcon name="bar-chart" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="tw:shrink-0" />
           <OTooltip :content="searchObj.meta.showHistogram ? t('search.hideHistogram') : t('search.showHistogramLabel')" />
         </OButton>
 
@@ -154,10 +161,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSwitch
             :model-value="searchObj.meta.sqlMode"
             :disabled="isSqlModeDisabled"
-            size="md"
+            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
           />
-          <OIcon name="code" size="sm" class="tw:shrink-0" />
+          <OIcon name="code" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="tw:shrink-0" />
           <OTooltip :content="t('search.sqlModeLabel')" />
         </OButton>
 
@@ -172,41 +179,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSwitch
             :model-value="searchObj.meta.quickMode"
-            size="md"
+            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop="handleQuickMode"
           />
-          <OIcon name="bolt" size="sm" class="tw:shrink-0" />
+          <!-- child-mode OTooltip attaches to its previous sibling, so this one
+               gives the switch its own tooltip (the button-level tooltip below
+               only covers the bolt icon). -->
+          <OTooltip :content="t('search.quickModeLabel')" :side-offset="2" />
+          <OIcon name="bolt" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="tw:shrink-0" />
           <OTooltip :content="t('search.quickModeLabel')" />
         </OButton>
 
-        <!-- Saved Views (pinned) — split button: create + open list dialog -->
-        <div
+        <!-- Saved Views (pinned) — button group styled to match the function
+             selector for visual consistency: open-list dropdown trigger + create. -->
+        <OButtonGroup
           v-if="showPinnedSavedViews"
           data-test="logs-search-bar-saved-views-pinned"
-          class="tw:inline-flex tw:items-center element-box-shadow tw:rounded-md tw:overflow-hidden"
+          class="tw:p-0 element-box-shadow tw:border tw:border-button-outline-border"
         >
           <OButton
-            data-test="logs-search-bar-saved-views-pinned-create-btn"
-            size="xs"
-            variant="outline"
-            class="tw:rounded-none"
-            @click="fnSavedView"
-          >
-            <OIcon name="save" size="sm" />
-            <OTooltip :content="t('search.createSavedView')" />
-          </OButton>
-          <OButton
             data-test="logs-search-bar-saved-views-pinned-list-btn"
-            size="xs"
-            variant="outline"
-            class="tw:rounded-none"
+            variant="ghost"
+            size="icon-toolbar"
             @click="openSavedViewsList"
           >
             <OIcon name="saved-search" size="sm" />
-            <OIcon name="expand-more" size="sm" />
-            <OTooltip :content="t('search.listSavedViews')" />
+            <OIcon name="arrow-drop-down" size="sm" class="tw:-ml-0.5" />
+            <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
           </OButton>
-        </div>
+          <OButton
+            data-test="logs-search-bar-saved-views-pinned-create-btn"
+            variant="ghost"
+            size="icon-toolbar"
+            @click="fnSavedView"
+          >
+            <OIcon name="save" size="sm" />
+            <OTooltip :content="t('search.createSavedView')" :side-offset="6" />
+          </OButton>
+        </OButtonGroup>
 
         <!-- Syntax Guide (pinned) — icon+label, becomes icon-only at narrow widths -->
         <SyntaxGuide
@@ -217,8 +227,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-syntax-guide-pinned-btn"
         />
 
+        </div>
         <!-- this is the button group responsible for showing all the utilities -->
-        <ODropdown side="bottom" align="start">
+        <ODropdown class="tw:flex-shrink-0" side="bottom" align="start">
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
@@ -665,7 +676,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSwitch
             v-model="searchObj.meta.showTransformEditor"
-            size="md"
+            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop
           />
           <span class="more-menu-icon-badge--mono tw:text-xs tw:shrink-0">fx</span>
@@ -2374,28 +2385,80 @@ export default defineComponent({
 
     // ── Pinned toolbar items ──────────────────────────────────────────────
     // Items pinned out of the "More" menu render as fixed-position toolbar
-    // controls (order defined in useToolbarPins). On narrow widths they collapse
-    // back into the menu in a fixed priority: syntax guide (label→icon→hidden)
-    // first, then saved views → function editor → quick mode → sql mode.
+    // controls. They share the left section with the toggle group / reset /
+    // histogram, so we allocate the leftover width to pinned items with a running
+    // budget: the More button is always reserved, then pinned items are kept in
+    // priority order (sql mode kept longest, syntax guide dropped first).
     const { isPinned, togglePin } = useToolbarPins();
 
-    // Collapse thresholds for pinned controls. Each hidden pinned item still
-    // remains accessible inside the More menu.
-    // Left-section collapse thresholds (first to hide → last): syntax guide →
-    // saved views → quick mode → sql mode. Function editor lives on the right
-    // toolbar (next to the date picker) so it is not part of this chain.
-    const pinSyntaxGuideIconOnly = computed(() => availableLeftWidth.value < 640);
-    const pinHideSyntaxGuide     = computed(() => availableLeftWidth.value < 560);
-    const pinHideSavedViews      = computed(() => availableLeftWidth.value < 480);
-    const pinHideQuickMode       = computed(() => availableLeftWidth.value < 360);
-    const pinHideSqlMode         = computed(() => availableLeftWidth.value < 300);
+    // Approximate rendered widths (px) of each pinned control and of the fixed
+    // left-section content, used only to decide how many pinned items fit before
+    // they would clip. Hidden pinned items stay reachable inside the More menu.
+    const PIN_ITEM_WIDTH = { sqlMode: 46, quickMode: 46, savedViews: 62 };
+    const SYNTAX_GUIDE_LABEL_WIDTH = 108;
+    const SYNTAX_GUIDE_ICON_WIDTH = 40;
+    const PIN_ITEM_GAP = 4;
 
-    // Whether a pinned item is currently shown outside the menu (pinned AND fits).
-    const showPinnedSqlMode        = computed(() => isPinned("sqlMode") && !pinHideSqlMode.value);
-    const showPinnedQuickMode      = computed(() => isPinned("quickMode") && !pinHideQuickMode.value);
+    // Width consumed by the always-present left content (toggle group in its
+    // current collapse state, reset, histogram) plus the reserved More button.
+    const baseReservedWidth = computed(() => {
+      let w = 0;
+      if (toolbarToggleAsDropdown.value) w += 120;
+      else if (toolbarToggleIconOnly.value) w += 190;
+      else w += 350;
+      if (!toolbarMoveResetToMenu.value) w += shouldHideToolbarButtonText.value ? 40 : 88;
+      if (!shouldMoveButtonsToMenu.value) w += 64; // histogram button
+      w += 92; // More button (always visible)
+      w += 24; // inter-item gaps / padding buffer
+      return w;
+    });
+
+    const pinBudget = computed(() =>
+      Math.max(0, availableLeftWidth.value - baseReservedWidth.value),
+    );
+
+    // Greedily fit pinned items within the budget. Order = kept-longest-first, so
+    // the last item (syntax guide) is the first to drop when space runs out.
+    const pinnedVisibility = computed(() => {
+      const budget = pinBudget.value;
+      let used = 0;
+      const res = {
+        sqlMode: false,
+        quickMode: false,
+        savedViews: false,
+        syntaxGuide: false,
+        syntaxGuideIconOnly: false,
+      };
+      const tryFit = (width: number) => {
+        const need = (used > 0 ? PIN_ITEM_GAP : 0) + width;
+        if (used + need <= budget) {
+          used += need;
+          return true;
+        }
+        return false;
+      };
+      if (isPinned("sqlMode")) res.sqlMode = tryFit(PIN_ITEM_WIDTH.sqlMode);
+      if (isPinned("quickMode")) res.quickMode = tryFit(PIN_ITEM_WIDTH.quickMode);
+      if (isPinned("savedViews")) res.savedViews = tryFit(PIN_ITEM_WIDTH.savedViews);
+      if (isPinned("syntaxGuide")) {
+        if (tryFit(SYNTAX_GUIDE_LABEL_WIDTH)) {
+          res.syntaxGuide = true;
+        } else if (tryFit(SYNTAX_GUIDE_ICON_WIDTH)) {
+          res.syntaxGuide = true;
+          res.syntaxGuideIconOnly = true;
+        }
+      }
+      return res;
+    });
+
+    // Function editor lives on the right toolbar (next to the date picker), so it
+    // is not part of the left-section budget.
+    const showPinnedSqlMode        = computed(() => pinnedVisibility.value.sqlMode);
+    const showPinnedQuickMode      = computed(() => pinnedVisibility.value.quickMode);
     const showPinnedFunctionEditor = computed(() => isPinned("functionEditor"));
-    const showPinnedSavedViews     = computed(() => isPinned("savedViews") && !pinHideSavedViews.value);
-    const showPinnedSyntaxGuide    = computed(() => isPinned("syntaxGuide") && !pinHideSyntaxGuide.value);
+    const showPinnedSavedViews     = computed(() => pinnedVisibility.value.savedViews);
+    const showPinnedSyntaxGuide    = computed(() => pinnedVisibility.value.syntaxGuide);
+    const pinSyntaxGuideIconOnly   = computed(() => pinnedVisibility.value.syntaxGuideIconOnly);
 
     // Computed label/icon for the toggle-group-as-dropdown trigger
     const toggleViewOptions = computed(() => [
@@ -5657,7 +5720,7 @@ html.dark .file-type label,
 
 .group-menu-btn {
   padding: 0.25rem 0.25rem !important; // 4px 8px
-  margin-left: 0.25rem; // 8px
+  margin-left: 0.05rem; // 8px
   border: 0.0625rem solid var(--color-button-outline-border) !important; // 1px
   border-radius: 0.375rem; // 6px
   transition: all 0.2s ease;
