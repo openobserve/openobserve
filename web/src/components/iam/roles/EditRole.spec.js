@@ -677,3 +677,88 @@ describe('EditRole - modifyResourcePermissions new resource types', () => {
     expect(r.permission.AllowPut.show).toBe(true);
   });
 });
+
+// Default permissions filter for a brand-new (empty) role
+describe('EditRole - empty role default filter', () => {
+  it('defaults the permissions filter to "all" when the role has no permissions', async () => {
+    // getAllRolePermissions is mocked to return [] (empty role).
+    const wrapper = await mountEditRole();
+    expect(wrapper.vm.selectedPermissionsHash.size).toBe(0);
+    expect(wrapper.vm.filter.permissions).toBe('all');
+  });
+});
+
+// Per-tab dirty state
+describe('EditRole - dirty state', () => {
+  it('is not dirty on initial load', async () => {
+    const wrapper = await mountEditRole();
+    expect(wrapper.vm.isAnyDirty).toBe(false);
+    const permTab = wrapper.vm.tabs.find((t) => t.value === 'permissions');
+    const usersTab = wrapper.vm.tabs.find((t) => t.value === 'users');
+    expect(permTab.dirty).toBe(false);
+    expect(usersTab.dirty).toBe(false);
+  });
+
+  it('marks the permissions tab dirty after a permission change', async () => {
+    const wrapper = await mountEditRole();
+    const resource = wrapper.vm.permissionsState.permissions[0];
+    wrapper.vm.handlePermissionChange(resource, 'AllowGet');
+    await wrapper.vm.$nextTick();
+    const permTab = wrapper.vm.tabs.find((t) => t.value === 'permissions');
+    expect(permTab.dirty).toBe(true);
+    expect(wrapper.vm.isAnyDirty).toBe(true);
+  });
+
+  it('marks the users tab dirty when a user is staged for addition', async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.addedUsers.add('new@example.com');
+    await wrapper.vm.$nextTick();
+    const usersTab = wrapper.vm.tabs.find((t) => t.value === 'users');
+    expect(usersTab.dirty).toBe(true);
+    expect(wrapper.vm.isAnyDirty).toBe(true);
+  });
+
+  it('tracks Users and Service Accounts dirty state independently', async () => {
+    const wrapper = await mountEditRole();
+
+    // Staging a service account must NOT mark the Users tab dirty.
+    wrapper.vm.addedServiceAccounts.add('svc@example.com');
+    await wrapper.vm.$nextTick();
+    const usersTab = wrapper.vm.tabs.find((t) => t.value === 'users');
+    const saTab = wrapper.vm.tabs.find((t) => t.value === 'serviceAccounts');
+    expect(saTab?.dirty).toBe(true);
+    expect(usersTab.dirty).toBe(false);
+    expect(wrapper.vm.isAnyDirty).toBe(true);
+
+    // ...and vice-versa.
+    wrapper.vm.addedServiceAccounts.clear();
+    wrapper.vm.addedUsers.add('user@example.com');
+    await wrapper.vm.$nextTick();
+    const usersTab2 = wrapper.vm.tabs.find((t) => t.value === 'users');
+    const saTab2 = wrapper.vm.tabs.find((t) => t.value === 'serviceAccounts');
+    expect(usersTab2.dirty).toBe(true);
+    expect(saTab2?.dirty).toBe(false);
+  });
+});
+
+// Read-only preset seeding
+describe('EditRole - read-only preset', () => {
+  it('seeds AllowList + AllowGet on visible top-level resources', async () => {
+    router.currentRoute.value.query = { preset: 'readonly' };
+    const wrapper = await mountEditRole();
+    router.currentRoute.value.query = {};
+
+    // At least one resource should now carry pending read-only permissions.
+    const added = Object.values(wrapper.vm.addedPermissions);
+    expect(added.length).toBeGreaterThan(0);
+    const perms = added.map((p) => p.permission);
+    expect(perms).toContain('AllowGet');
+    expect(perms.every((p) => p === 'AllowGet' || p === 'AllowList')).toBe(true);
+  });
+
+  it('does not seed permissions without the readonly preset', async () => {
+    router.currentRoute.value.query = {};
+    const wrapper = await mountEditRole();
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+  });
+});

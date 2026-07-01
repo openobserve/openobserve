@@ -24,6 +24,7 @@ import {
   getDefaultTheme,
   resolveThemeForMode,
   migrateLegacyThemeStorage,
+  themeDisplayName,
 } from "./themes";
 
 // A small in-memory Storage stand-in for migration tests.
@@ -67,6 +68,22 @@ describe("theme registry", () => {
     it("resolves the default theme to O2 Signature", () => {
       expect(DEFAULT_THEME_NAME).toBe("O2 Signature");
       expect(getDefaultTheme().name).toBe("O2 Signature");
+    });
+  });
+
+  describe("themeDisplayName", () => {
+    it("keeps the O2 prefix on the signature theme", () => {
+      expect(themeDisplayName("O2 Signature")).toBe("O2 Signature");
+    });
+
+    it("strips the O2 prefix from every other theme", () => {
+      expect(themeDisplayName("O2 Pulse")).toBe("Pulse");
+      expect(themeDisplayName("O2 Horizon")).toBe("Horizon");
+      expect(themeDisplayName("O2 Crimson Ink")).toBe("Crimson Ink");
+    });
+
+    it("leaves a name without the O2 prefix unchanged", () => {
+      expect(themeDisplayName("Custom Color")).toBe("Custom Color");
     });
   });
 

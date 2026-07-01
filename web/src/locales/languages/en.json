@@ -591,6 +591,8 @@
     "savedViewName": "View Name",
     "createSavedView": "Create Saved View",
     "listSavedViews": "List Saved Views",
+    "pinToToolbar": "Pin to toolbar",
+    "unpinFromToolbar": "Unpin from toolbar",
     "shareLink": "Share Link",
     "downloadTable": "Download results",
     "customRange": "Download results for custom range",
@@ -1318,10 +1320,10 @@
       "env": "Environment Variable",
       "nextStep": "Use the token in your API requests. Store it securely; it will not be shown again.",
       "nextStepCloud": "Use the token in your API requests. Contact your admin for the API endpoint.",
-      "nextStepGrant": "This account has no permissions yet. Add it to a group to grant access.",
+      "nextStepGrant": "This service account has no permissions yet. Assign it a role, or add it to a user group, to grant access.",
       "nextStepOss": "Grant access from the Roles & Groups page.",
-      "addToGroup": "Add to Group",
-      "addToRole": "Add to Role",
+      "addToGroup": "Add to a user group",
+      "addToRole": "Assign a role",
       "step1Title": "Copy your token",
       "step2Title": "Grant permissions",
       "copyHint": "Copy this token now — you won't be able to see it again.",
@@ -1400,7 +1402,60 @@
     "invitations": "Invitations",
     "quota": "Quotas",
     "externalUserWarningTitle": "External user warning",
-    "externalUserWarningMessage": "Adding external users directly to roles won't grant permissions. Add them to User Groups instead."
+    "externalUserWarningMessage": "Role changes for SSO/external users apply on their next login, in line with their identity-provider claims, and may be overridden by them. To grant lasting access, add them to a User Group mapped from your IdP instead.",
+    "role": {
+      "startFrom": {
+        "label": "Start from",
+        "custom": "Custom (empty role)",
+        "readonly": "Read-only (view access to all resources)"
+      },
+      "name": {
+        "required": "Role name is required.",
+        "invalidChars": "Use letters, numbers and underscores only, without spaces."
+      }
+    },
+    "editRole": {
+      "unsavedDot": {
+        "title": "This tab has unsaved changes."
+      },
+      "leaveConfirm": {
+        "title": "Discard unsaved changes?",
+        "message": "You have unsaved permission or member changes. Leaving this page will discard them."
+      }
+    },
+    "rolesPage": {
+      "subtitle": "Roles bundle permissions — assign them to Users, Service Accounts, or Groups to grant access.",
+      "delete": {
+        "impact": "{count} user(s) and any service accounts bound to this role will lose access."
+      },
+      "bulkDelete": {
+        "impact": "Any users and service accounts bound to these roles will lose access."
+      }
+    },
+    "group": {
+      "name": {
+        "required": "Group name is required.",
+        "invalidChars": "Use letters, numbers and underscores only, without spaces."
+      }
+    },
+    "editGroup": {
+      "unsavedDot": {
+        "title": "This tab has unsaved changes."
+      },
+      "leaveConfirm": {
+        "title": "Discard unsaved changes?",
+        "message": "You have unsaved role or member changes. Leaving this page will discard them."
+      }
+    },
+    "groupsPage": {
+      "subtitle": "User Groups bundle roles — add members to a group to grant them all its roles at once.",
+      "delete": {
+        "impact": "{count} member(s) will lose the roles granted by this group."
+      },
+      "bulkDelete": {
+        "impact": "Members of these groups will lose the roles granted by them."
+      }
+    }
   },
   "ticket": {
     "header": "Support Tickets",
@@ -1927,6 +1982,11 @@
     "deleteTokenBtn": "Delete",
     "copyTokenBtn": "Copy",
     "copyTokenWarning": "Copy this token now. It will not be shown again.",
+    "tokenAuthHeader": "Authorization",
+    "authHeaderLabel": "Authorization header (ready to use)",
+    "authHeaderHelp": "Paste this into the Authorization header of your ingestion request — no manual encoding needed.",
+    "copyAuthHeaderBtn": "Copy Authorization header",
+    "copyRawTokenBtn": "Copy raw token",
     "newTokenRevealed": "New Token Generated",
     "deleteTokenConfirm": "Delete token \"{name}\"? Pipelines using this token will stop working.",
     "rotateTokenConfirm": "Rotate token \"{name}\"? All pipelines using this token must be updated with the new value.",

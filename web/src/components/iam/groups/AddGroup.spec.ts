@@ -152,7 +152,7 @@ describe("AddGroup Component", () => {
       await flushPromises();
 
       expect(wrapper.text()).toContain(
-        "Use alphanumeric and '_' characters only, without spaces.",
+        "Use letters, numbers and underscores only, without spaces.",
       );
     });
 
@@ -286,7 +286,9 @@ describe("AddGroup Component", () => {
         store.state.selectedOrganization.identifier,
       );
       expect(wrapper.emitted("added:group")).toBeTruthy();
-      expect(wrapper.emitted("added:group")?.[0]).toEqual([mockResponse.data]);
+      expect(wrapper.emitted("added:group")?.[0]).toEqual([
+        { group_name: "test_group", data: mockResponse.data },
+      ]);
 
       const updateOpen = wrapper.emitted("update:open");
       expect(updateOpen).toBeTruthy();
