@@ -14,9 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::synthetics::{
-    BrowserConfig, ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticFrequency,
-    SyntheticSettings, SyntheticStatus, SyntheticType, SyntheticVariable,
+    BrowserConfig, ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticCookie,
+    SyntheticFrequency, SyntheticSettings, SyntheticStatus, SyntheticType, SyntheticVariable,
 };
+use serde::{Deserialize, Serialize};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Set, TransactionTrait, TryIntoModel, prelude::Expr,
@@ -53,17 +54,10 @@ impl TryFrom<synthetics_monitors::Model> for Synthetic {
 
         let settings: SyntheticSettings = serde_json::from_value(m.settings).unwrap_or_default();
 
-        let variables: Vec<SyntheticVariable> = if m.variables.is_empty() {
-            vec![]
-        } else {
-            serde_json::from_str(&m.variables).unwrap_or_default()
-        };
-
-        let auth: Option<SyntheticAuth> = if m.auth.is_empty() {
-            None
-        } else {
-            serde_json::from_str(&m.auth).ok()
-        };
+        let stored: StoredSecrets = serde_json::from_str(&m.secrets).unwrap_or_default();
+        let auth = stored.auth;
+        let cookies = stored.cookies;
+        let variables = stored.variables;
 
         let last_check_status = SyntheticStatus::from_db(m.last_check_status);
 
@@ -89,6 +83,7 @@ impl TryFrom<synthetics_monitors::Model> for Synthetic {
             collect_rum_data: settings.collect_rum_data,
             session_replay: settings.session_replay,
             auth,
+            cookies,
             variables,
             start: settings.start,
             next_run_at: m.next_run_at,
@@ -424,20 +419,25 @@ fn pack_settings(monitor: &Synthetic) -> Result<serde_json::Value, errors::Error
     })?)
 }
 
-fn pack_variables(monitor: &Synthetic) -> Result<String, errors::Error> {
-    if monitor.variables.is_empty() {
-        return Ok(String::new());
-    }
-    Ok(serde_json::to_string(&monitor.variables)
-        .map_err(|e| errors::Error::Message(format!("variables serialize failed: {e}")))?)
+/// Internal serde shape for the `secrets` column.
+/// All three fields default to empty so missing keys deserialize cleanly.
+#[derive(Serialize, Deserialize, Default)]
+struct StoredSecrets {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    auth: Option<SyntheticAuth>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    cookies: Vec<SyntheticCookie>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    variables: Vec<SyntheticVariable>,
 }
 
-fn pack_auth(monitor: &Synthetic) -> Result<String, errors::Error> {
-    match &monitor.auth {
-        None => Ok(String::new()),
-        Some(a) => serde_json::to_string(a)
-            .map_err(|e| errors::Error::Message(format!("auth serialize failed: {e}"))),
-    }
+fn pack_secrets(monitor: &Synthetic) -> Result<String, errors::Error> {
+    serde_json::to_string(&StoredSecrets {
+        auth: monitor.auth.clone(),
+        cookies: monitor.cookies.clone(),
+        variables: monitor.variables.clone(),
+    })
+    .map_err(|e| errors::Error::Message(format!("secrets serialize failed: {e}")))
 }
 
 fn update_mutable_fields(am: &mut ActiveModel, monitor: &Synthetic) -> Result<(), errors::Error> {
@@ -458,8 +458,7 @@ fn update_mutable_fields(am: &mut ActiveModel, monitor: &Synthetic) -> Result<()
     am.enabled = Set(monitor.enabled);
     am.destinations = Set(destinations);
     am.settings = Set(settings);
-    am.variables = Set(pack_variables(monitor)?);
-    am.auth = Set(pack_auth(monitor)?);
+    am.secrets = Set(pack_secrets(monitor)?);
     Ok(())
 }
 
@@ -480,8 +479,7 @@ fn build_active_model(monitor: &Synthetic) -> Result<ActiveModel, errors::Error>
         enabled: Set(monitor.enabled),
         destinations: Set(destinations),
         settings: Set(settings),
-        variables: Set(pack_variables(monitor)?),
-        auth: Set(pack_auth(monitor)?),
+        secrets: Set(pack_secrets(monitor)?),
         ..Default::default()
     })
 }
@@ -545,8 +543,7 @@ mod tests {
             enabled: true,
             destinations: serde_json::json!([]),
             settings: serde_json::json!({"retries": 1, "cooldown_mins": 0, "wait_before_retry_secs": 5, "alert_if_fails": 1, "collect_rum_data": false, "session_replay": false}),
-            variables: String::new(),
-            auth: String::new(),
+            secrets: "{}".to_string(),
             next_run_at: 0,
             last_triggered_at: 0,
             last_check_status: 0,

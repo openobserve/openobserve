@@ -23,10 +23,9 @@ pub struct Model {
     pub destinations: Json,
     /// Extra monitor settings (retries, cooldown, rum toggles). No secrets here.
     pub settings: Json,
-    /// AESenc:<base64> — whole Vec<SyntheticVariable> JSON encrypted with org DEK.
-    pub variables: String,
-    /// AESenc:<base64> — whole SyntheticAuth JSON encrypted with org DEK.
-    pub auth: String,
+    /// JSON blob: { "auth": {...}, "cookies": [...], "variables": [...] }
+    /// All secret values encrypted per-field with AESenc:<base64> using the org DEK.
+    pub secrets: String,
     /// Pre-computed next fire time (microseconds). 0 = fire on next scheduler tick.
     pub next_run_at: i64,
     /// When the scheduler last fanned out this monitor (microseconds).
@@ -65,8 +64,7 @@ mod tests {
             enabled: true,
             destinations: serde_json::json!([]),
             settings: serde_json::json!({"retries": 1, "cooldown_mins": 0}),
-            variables: String::new(),
-            auth: String::new(),
+            secrets: "{}".to_string(),
             next_run_at: 0,
             last_triggered_at: 0,
             last_check_status: 0,

@@ -154,6 +154,10 @@ pub struct Synthetic {
     /// Optional authentication config (basic auth, bearer token, etc.).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth: Option<SyntheticAuth>,
+    /// Cookies injected into the browser context before any steps run.
+    /// Orthogonal to auth — can be combined with basic/bearer auth.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cookies: Vec<SyntheticCookie>,
     /// Key-value variables injected into the probe environment.
     #[serde(default)]
     pub variables: Vec<SyntheticVariable>,
@@ -253,10 +257,6 @@ pub enum SyntheticAuth {
     },
     Bearer {
         token: String,
-    },
-    /// Browser cookies injected via context.addCookies() before any steps run.
-    Cookie {
-        cookies: Vec<SyntheticCookie>,
     },
     /// Reference to a secret stored in OO secrets manager.
     Secret {

@@ -131,11 +131,10 @@ fn create_synthetics_table() -> TableCreateStatement {
         )
         // Extra monitor settings: retries, cooldown, rum toggles, etc. (no secrets here).
         .col(ColumnDef::new(Synthetics::Settings).json().not_null())
-        // Encrypted secret columns — both store AESenc:<base64> blobs using the org DEK.
-        // variables: whole Vec<SyntheticVariable> JSON encrypted as one blob.
-        // auth: whole SyntheticAuth JSON encrypted as one blob.
-        .col(ColumnDef::new(Synthetics::Variables).text().not_null().default(""))
-        .col(ColumnDef::new(Synthetics::Auth).text().not_null().default(""))
+        // Single secrets column — JSON blob with per-value AESenc:<base64> encryption using org DEK.
+        // Shape: { "auth": {...}, "cookies": [...], "variables": [...] }
+        // All three are optional; new secret types can be added without a migration.
+        .col(ColumnDef::new(Synthetics::Secrets).text().not_null().default("{}"))
         // Scheduler fields — managed by the synthetics scheduler, not by the client.
         .col(
             ColumnDef::new(Synthetics::NextRunAt)
@@ -222,8 +221,7 @@ enum Synthetics {
     Enabled,
     Destinations,
     Settings,
-    Variables,
-    Auth,
+    Secrets,
     NextRunAt,
     LastTriggeredAt,
     LastCheckStatus,
@@ -258,8 +256,7 @@ mod tests {
                 "enabled" bool NOT NULL DEFAULT TRUE,
                 "destinations" json NOT NULL,
                 "settings" json NOT NULL,
-                "variables" text NOT NULL DEFAULT '',
-                "auth" text NOT NULL DEFAULT '',
+                "secrets" text NOT NULL DEFAULT '{}',
                 "next_run_at" bigint NOT NULL DEFAULT 0,
                 "last_triggered_at" bigint NOT NULL DEFAULT 0,
                 "last_check_status" integer NOT NULL DEFAULT 0,
