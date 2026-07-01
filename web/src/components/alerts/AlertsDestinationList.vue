@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="templateDefaultFlag"
                 value="default"
                 class="tw:flex-shrink-0"
-              >{{ t('alert_destinations.templateDefaultBadge') }}</OTag>
+              />
             </div>
             <span v-else class="tw:text-text-primary">—</span>
           </template>

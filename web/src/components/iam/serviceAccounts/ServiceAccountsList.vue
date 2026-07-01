@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-email="{ row }">
               <template v-if="row.is_system">
                 <span data-test="service-accounts-system-account-label" class="text-weight-medium">{{ row.first_name }}</span>
-                <OTag data-test="service-accounts-system-badge" type="serviceAccountKind" value="system" class="tw:ml-2">system</OTag>
+                <OTag data-test="service-accounts-system-badge" type="serviceAccountKind" value="system" class="tw:ml-2" />
               </template>
               <template v-else>
                 <span :data-test="`service-accounts-email-${row.email}`"><OUserCell :value="row.email" /></span>
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="service-accounts-system-managed-badge"
                   class="tw:inline-flex tw:items-center tw:gap-1"
                 >
-                  <OTag type="serviceAccountKind" value="managed">{{ t('serviceAccounts.row.managedBy') }}</OTag>
+                  <OTag type="serviceAccountKind" value="managed" />
                   <OTooltip :content="t('serviceAccounts.row.managedByTooltip')" />
                 </span>
               </template>

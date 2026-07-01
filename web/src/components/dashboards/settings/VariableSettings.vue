@@ -109,9 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     type="variableScope"
                     value="global"
                     v-if="getScopeType(variable) === 'global'"
-                  >
-                    Global
-                  </OTag>
+                  />
                   <OTag
                     type="variableScope"
                     value="tabs"

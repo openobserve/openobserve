@@ -156,17 +156,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     type="reportTag"
                     value="png"
                     class="tw:ml-1"
-                  >
-                    PNG
-                  </OTag>
+                  />
                   <OTag
                     v-if="row.imagePreview"
                     type="reportTag"
                     value="preview"
                     class="tw:ml-1"
-                  >
-                    Preview
-                  </OTag>
+                  />
                 </template>
 
                 <!-- Owner column -->

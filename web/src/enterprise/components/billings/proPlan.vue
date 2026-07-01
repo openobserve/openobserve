@@ -28,9 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="billingTag"
         value="subscribed"
         class="tw:mt-2"
-      >
-        {{ t("billing.subscribed") }}
-      </OTag>
+      />
     </div>
 
     <OSeparator class="tw:my-2" />

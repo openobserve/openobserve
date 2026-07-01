@@ -406,8 +406,8 @@ export const BADGE_GROUPS = {
     size: "md",
     class: "tw:px-2 tw:py-3",
     values: {
-      discount: { variant: "primary-soft" },
-      subscribed: { variant: "primary-soft" },
+      discount: { variant: "primary-soft", labelKey: "billing.discountTag" },
+      subscribed: { variant: "primary-soft", labelKey: "billing.subscribed" },
     },
     fallback: { variant: "primary-soft" },
   },
@@ -547,8 +547,8 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "md",
     values: {
-      png: { variant: "primary-outline" },
-      preview: { variant: "default-outline" },
+      png: { variant: "primary-outline", label: "PNG" },
+      preview: { variant: "default-outline", label: "Preview" },
     },
     fallback: { variant: "default-outline" },
   },
@@ -561,7 +561,7 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "sm",
     values: {},
-    fallback: { variant: "success", icon: "check-circle" },
+    fallback: { variant: "success", icon: "check-circle", labelKey: "storage_settings.active" },
   },
 
   // Setup-card step chip (SetupCardRenderer) — required vs optional, with a
@@ -585,8 +585,8 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      system: { variant: "primary-outline", size: "sm" },
-      managed: { variant: "default-outline", size: "md" },
+      system: { variant: "primary-outline", size: "sm", label: "system" },
+      managed: { variant: "default-outline", size: "md", labelKey: "serviceAccounts.row.managedBy" },
     },
     fallback: { variant: "default-outline" },
   },
@@ -701,7 +701,7 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "md",
     values: {
-      default: { variant: "default" },
+      default: { variant: "default", labelKey: "alert_destinations.templateDefaultBadge" },
     },
     fallback: { variant: "default" },
   },

@@ -198,10 +198,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ feature.name }}
                   <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
                   <OTag v-if="feature.beta" type="featureFlag" value="beta" data-test="feature-beta-badge" />
-                  <OTag v-if="feature.requiresHA" type="featureFlag" value="ha" data-test="feature-ha-badge">
-                    HA
+                  <span v-if="feature.requiresHA" class="tw:inline-flex">
+                    <OTag type="featureFlag" value="ha" data-test="feature-ha-badge" />
                     <OTooltip side="top" align="center" :sideOffset="8" :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')" />
-                  </OTag>
+                  </span>
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
               </div>
