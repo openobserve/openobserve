@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Row 1: standard header — title + actions only (Import/Add). The alert
            type toggle, search and folder scope moved into the table toolbar. -->
       <template #header>
-        <AppPageHeader :title="t('alerts.header')" :subtitle="'Alert rules and notification channels'" icon="shield-alert-outline">
+        <AppPageHeader :title="t('alerts.header')" :subtitle="t('alerts.subtitle')" icon="shield-alert-outline">
           <template #actions>
             <!-- Import button -->
             <OButton
@@ -155,14 +155,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               icon-left="folder-outline"
                               data-test="alert-list-search-scope-current"
                               title="Search only this folder"
-                            >This folder</OToggleGroupItem>
+                            >{{ t('alerts.searchThisFolder') }}</OToggleGroupItem>
                             <OToggleGroupItem
                               value="all"
                               size="xs"
                               icon-left="search"
                               data-test="alert-list-search-across-folders-toggle"
                               title="Search across all folders"
-                            >All folders</OToggleGroupItem>
+                            >{{ t('alerts.searchAllFolders') }}</OToggleGroupItem>
                           </OToggleGroup>
                         </template>
                       </OInput>
@@ -212,54 +212,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #cell-owner="{ row }">
-                  {{ computedOwner(row.owner) }}
-                  <OTooltip
-                    v-if="row.owner?.length > 15"
-                    :content="row.owner"
-                    content-class="alert-name-tooltip"
-                  />
+                  <OUserCell :value="row.owner" />
                 </template>
 
                 <template #cell-last_triggered_at="{ row }">
-                  <span v-if="row.last_triggered_at">{{ row.last_triggered_at }}</span>
-                  <span v-else class="tw:block">--</span>
+                  <OTimeCell
+                    :value="row.last_triggered_at"
+                    unit="iso"
+                    mode="absolute"
+                    :timezone="store.state.timezone"
+                    empty-label="Never"
+                  />
                 </template>
 
                 <template #cell-last_satisfied_at="{ row }">
-                  <span v-if="row.last_satisfied_at">{{ row.last_satisfied_at }}</span>
-                  <span v-else class="tw:block">--</span>
+                  <OTimeCell
+                    :value="row.last_satisfied_at"
+                    unit="iso"
+                    mode="absolute"
+                    :timezone="store.state.timezone"
+                    empty-label="Never"
+                  />
                 </template>
 
                 <template #cell-last_trained_at="{ row }">
-                  <span v-if="row.last_trained_at">{{ row.last_trained_at }}</span>
-                  <span v-else class="tw:block">--</span>
+                  <OTimeCell
+                    :value="row.last_trained_at"
+                    unit="iso"
+                    mode="absolute"
+                    :timezone="store.state.timezone"
+                    empty-label="—"
+                  />
                 </template>
 
                 <template #cell-status="{ row }">
-                  <template v-if="row.status && row.status !== '--'">
-                    <OBadge
-                      :variant="
-                        row.status === 'failed'
-                          ? 'error'
-                          : row.status === 'active'
-                            ? 'success'
-                            : row.status === 'training'
-                              ? 'warning'
-                              : row.status === 'disabled'
-                                ? 'default'
-                                : 'success'
-                      "
-                      class="tw:capitalize tw:cursor-default"
-                    >
-                      {{ row.status }}
-                      <OTooltip
-                        v-if="row.status === 'failed' && row.last_error"
-                        :max-width="'400px'"
-                        :content="row.last_error"
-                      />
-                    </OBadge>
-                  </template>
-                  <span v-else class="tw:block">--</span>
+                  <span
+                    v-if="row.status && row.status !== '--'"
+                    class="tw:relative tw:inline-flex"
+                  >
+                    <OTag type="alertStatus" :value="row.status" />
+                    <OTooltip
+                      v-if="row.status === 'failed' && row.last_error"
+                      :max-width="'400px'"
+                      :content="row.last_error"
+                    />
+                  </span>
+                  <span v-else class="tw:text-text-primary">—</span>
                 </template>
 
                 <template #cell-period="{ row }">
@@ -421,9 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="tw:text-sm"
                           data-test="alert-list-create-template-text"
                         >
-                          It looks like you haven't created any Templates yet.
-                          To create an Alert, you'll need to have at least one
-                          Destination and one Template in place
+                          {{ t('alerts.noTemplatesMsg') }}
                         </div>
                         <OButton
                           data-test="alert-list-create-template-btn"
@@ -431,16 +427,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           variant="primary"
                           size="sm"
                           @click="routeTo('alertTemplates')"
-                        >Create Template</OButton>
+                        >{{ t('alerts.createTemplateBtn') }}</OButton>
                       </template>
                       <template v-if="!destinations.length && templates.length">
                         <div
                           class="tw:text-sm"
                           data-test="alert-list-create-destination-text"
                         >
-                          It looks like you haven't created any Destinations
-                          yet. To create an Alert, you'll need to have at least
-                          one Destination and one Template in place
+                          {{ t('alerts.noDestinationsMsg') }}
                         </div>
                         <OButton
                           data-test="alert-list-create-destination-btn"
@@ -448,7 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           variant="primary"
                           size="sm"
                           @click="routeTo('alertDestinations')"
-                        >Create Destination</OButton>
+                        >{{ t('alerts.createDestinationBtn') }}</OButton>
                       </template>
                     </div>
                   </div>
@@ -718,6 +712,9 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -756,6 +753,9 @@ export default defineComponent({
     OBadge,
     OSelect,
     OTable,
+    OTimeCell,
+    OUserCell,
+    OTag,
   },
   emits: [
     "update:changeRecordPerPage",
@@ -1014,7 +1014,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 120,
+          size: COL.owner,
           meta: { align: "left" },
         },
         // "period" (Look back window) — all tabs except realTime
@@ -1028,8 +1028,8 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: COL.frequency,
-                meta: { align: "center" },
+                size: 150,
+                meta: { align: "left" },
               } as OTableColumnDef,
             ]
           : []),
@@ -1057,7 +1057,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 160,
+          size: COL.dateAbsolute,
           meta: { align: "left" },
         },
         {
@@ -1068,7 +1068,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 160,
+          size: COL.dateAbsolute,
           meta: { align: "left" },
         },
         // Anomaly Detection columns — shown on anomalyDetection and all tabs
@@ -1077,18 +1077,18 @@ export default defineComponent({
               {
                 id: "last_trained_at",
                 accessorKey: "last_trained_at",
-                header: "Last Trained At",
+                header: t("alerts.lastTrainedAt"),
                 cell: " ",
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: 160,
+                size: COL.dateAbsolute,
                 meta: { align: "left" },
               } as OTableColumnDef,
               {
                 id: "status",
                 accessorKey: "status",
-                header: "Status",
+                header: t("alerts.status"),
                 cell: " ",
                 sortable: true,
                 resizable: true,
@@ -1119,7 +1119,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: COL.folder,
-          meta: { align: "center" },
+          meta: { align: "left" },
         } as OTableColumnDef);
       }
 

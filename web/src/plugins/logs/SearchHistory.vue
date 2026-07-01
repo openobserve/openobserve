@@ -70,8 +70,17 @@
             width="100%"
             @update:expanded-ids="onExpandedIdsChange"
           >
+            <template #cell-executed_time="{ row }">
+              <OTimeCell
+                :value="row.rawExecutedTime"
+                unit="us"
+                mode="absolute"
+                :timezone="store.state.timezone"
+              />
+            </template>
+
             <template #cell-sql="{ row }">
-              <span>{{ row.sql }}</span>
+              <span class="tw:text-text-primary">{{ row.sql }}</span>
             </template>
 
             <template #expansion="{ row }">
@@ -225,6 +234,7 @@ import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -252,6 +262,7 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OTable,
+    OTimeCell,
     AppPageHeader,
 },
   props: {
@@ -318,7 +329,7 @@ export default defineComponent({
           header: t("search_history.executed_at"),
           accessorKey: "executed_time",
           sortable: true,
-          size: COL.createdAt,
+          size: COL.dateAbsolute,
           meta: { align: "left" },
         },
         {

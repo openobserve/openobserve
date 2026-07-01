@@ -27,6 +27,8 @@ import { computed, inject, onBeforeUnmount, provide, ref, watch, type Ref } from
 import {
   O_DROPDOWN_NESTED_KEY,
   type DropdownNestedRegistry,
+  setActiveOverlay,
+  clearActiveOverlay,
 } from "./ODropdown.context";
 
 const props = withDefaults(defineProps<DropdownProps>(), {
@@ -45,6 +47,11 @@ defineSlots<DropdownSlots>();
 // DropdownMenuRoot into controlled-closed mode. We manage state ourselves
 // so reka-ui stays responsive in both uncontrolled and controlled usage.
 const internalOpen = ref(props.open ?? false);
+
+// Ref to the DropdownMenuTrigger; its `$el` is the rendered trigger element.
+// Used by the close-on-scroll handler to tell whether a scroll moves this
+// dropdown's trigger (vs. an unrelated section).
+const triggerRef = ref<{ $el?: Node } | null>(null);
 
 watch(
   () => props.open,
@@ -106,6 +113,18 @@ onBeforeUnmount(() => {
     closeNestedRegistration = null;
   }
 });
+
+// Single-active-overlay coordination. Only top-level dropdowns participate —
+// a dropdown nested inside another open ODropdown must not close its ancestor.
+// Stable identity so set/clearActiveOverlay match across calls.
+const closeSelf = () => handleOpenChange(false);
+if (!parentDropdownRegistry) {
+  watch(internalOpen, (open) => {
+    if (open) setActiveOverlay(closeSelf);
+    else clearActiveOverlay(closeSelf);
+  });
+  onBeforeUnmount(() => clearActiveOverlay(closeSelf));
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Nested-overlay coordination
@@ -205,6 +224,43 @@ if (sidebarScrollTick) {
     if (internalOpen.value) handleOpenChange(false);
   });
 }
+
+// Generic close-on-scroll: while open, any scroll on an ancestor scroll
+// container (the page, the query-builder area, a joins popup, etc.) would
+// otherwise leave the portaled menu floating detached from its trigger. We
+// close instead. Scrolls that originate *inside* an open menu (a long,
+// scrollable menu list) are ignored so the menu itself stays scrollable.
+function handleViewportScroll(event: Event) {
+  if (!internalOpen.value) return;
+  const target = event.target as (Element & Node) | Document | null;
+  if (!target) return;
+  // Ignore scrolls inside an open menu so long menu lists stay scrollable.
+  if (target instanceof Element && target.closest?.('[role="menu"]')) return;
+  // Only close when the scrolled container actually holds this dropdown's
+  // trigger — scrolling an unrelated section must not dismiss the menu.
+  const triggerEl = triggerRef.value?.$el as Node | undefined;
+  if (triggerEl && target.contains(triggerEl)) {
+    handleOpenChange(false);
+  }
+}
+
+watch(internalOpen, (open) => {
+  if (typeof window === "undefined") return;
+  if (open) {
+    window.addEventListener("scroll", handleViewportScroll, {
+      capture: true,
+      passive: true,
+    });
+  } else {
+    window.removeEventListener("scroll", handleViewportScroll, true);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (typeof window !== "undefined") {
+    window.removeEventListener("scroll", handleViewportScroll, true);
+  }
+});
 </script>
 
 <template>
@@ -213,7 +269,7 @@ if (sidebarScrollTick) {
     :modal="modal"
     @update:open="handleOpenChange"
   >
-    <DropdownMenuTrigger as-child>
+    <DropdownMenuTrigger ref="triggerRef" as-child>
       <slot name="trigger" />
     </DropdownMenuTrigger>
 
@@ -239,6 +295,7 @@ if (sidebarScrollTick) {
           'tw:data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
           'tw:data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
           'tw:data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
+          props.contentClass,
         ]"
       >
         <slot />

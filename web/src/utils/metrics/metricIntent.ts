@@ -124,6 +124,7 @@ export const ESSENTIALS_BY_WORKLOAD_SUBJECT: Record<string, string[]> = {
     "k8s_pod_cpu_limit_utilization",
     "k8s_pod_memory_request_utilization",
     "k8s_pod_memory_limit_utilization",
+    "k8s_pod_filesystem_usage",
     "k8s_node_allocatable_cpu",
   ],
   // Streams derived from the "Kubernetes / Nodes" preset dashboard's panels.

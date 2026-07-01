@@ -1,3 +1,4 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
 <!-- Unified Query Editor Component
   Supports: SQL, PromQL, VRL, JavaScript
   Features: NL Mode (AI), Language Switching, Auto-detection
@@ -76,6 +77,7 @@
         :query="query"
         :nlp-mode="nlpMode"
         :read-only="readOnly"
+        :release-wheel-to-page="releaseWheelToPage"
         :show-auto-complete="showAutoComplete"
         :keywords="keywords"
         :suggestions="suggestions"
@@ -134,6 +136,7 @@ interface Props {
   query: string;
   readOnly?: boolean;
   showAutoComplete?: boolean;
+  releaseWheelToPage?: boolean; // default true: let the page scroll when editor has nothing left to scroll
 
   // Editor autocomplete (forwarded to CodeQueryEditor)
   keywords?: any[];              // Autocomplete keywords for Monaco
@@ -161,6 +164,7 @@ const props = withDefaults(defineProps<Props>(), {
   defaultLanguage: 'sql',
   readOnly: false,
   showAutoComplete: true,
+  releaseWheelToPage: true,
   keywords: () => [],
   suggestions: () => [],
   debounceTime: 500,
@@ -462,15 +466,18 @@ watch(() => props.query, (newQuery) => {
   if (!editorRef.value?.getValue) return;
 
   const currentValue = editorRef.value.getValue();
+  // Coerce to string so a null/undefined query (e.g. switching PromQL → SQL)
+  // doesn't reach Monaco's setValue, which throws "Illegal argument"
+  const nextValue = newQuery ?? "";
 
   // Compare trimmed values to avoid cursor jumps from whitespace differences
   // This prevents setValue calls when user is typing trailing spaces
-  if (currentValue?.trim() === newQuery?.trim()) {
+  if (currentValue?.trim() === nextValue.trim()) {
     return;
   }
 
   if (editorRef.value.setValue) {
-    editorRef.value.setValue(newQuery);
+    editorRef.value.setValue(nextValue);
   }
 });
 

@@ -301,9 +301,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #cell-last_seen="{ row }">
-              <span class="last-seen-text" :class="row.__type === 'group' ? 'tw:text-sm' : 'tw:text-xs'">{{
-                formatRelativeTime(row.lastSeen)
-              }}</span>
+              <OTimeCell
+                :value="row.lastSeen"
+                unit="us"
+                :timezone="store.state.timezone"
+                :class="row.__type === 'group' ? 'tw:text-sm' : 'tw:text-xs'"
+              />
             </template>
 
             <!-- Bottom -->
@@ -526,6 +529,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -892,21 +896,6 @@ const getDimensionColorClass = (key: string): string => {
     hash = hash & hash;
   }
   return classes[Math.abs(hash) % classes.length];
-};
-
-const formatRelativeTime = (microseconds: number): string => {
-  if (!microseconds) return "—";
-  const nowMs = Date.now();
-  const thenMs = microseconds / 1000;
-  const diffSeconds = Math.floor((nowMs - thenMs) / 1000);
-
-  if (diffSeconds < 60) return `${diffSeconds}s ago`;
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
 };
 
 const loadServices = async (isRefresh = false) => {

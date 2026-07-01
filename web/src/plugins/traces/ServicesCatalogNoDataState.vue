@@ -16,40 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   ServicesCatalogNoDataState — empty state for the services catalog panel.
-  Shows the services-catalog illustration + a "widen time range" action card.
-  Emits `widen-range` with the suggested period string so the parent can
-  update the global datetime and re-fetch.
+  Shows the services-catalog illustration. No widen-range action: the panel
+  aggregates across the selected window, so widening would not reliably
+  surface data and the suggestion was not useful.
 -->
 <template>
-  <OEmptyState preset="no-services-catalog" size="block" :hide-action="true">
-    <template #actions>
-      <EmptyStateActionCard
-        icon="schedule"
-        :label="t('traces.noEvents.expandRange')"
-        :sublabel="expandRangeSublabel"
-        data-test="services-catalog-empty-expand-range-card"
-        class="tw:w-full"
-        @click="onWidenRange"
-      />
-    </template>
-  </OEmptyState>
+  <OEmptyState preset="no-services-catalog" size="block" :hide-action="true" />
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
-import useTraces from "@/composables/useTraces";
-import useWidenRange from "@/composables/useWidenRange";
-
-const { t } = useI18n();
-const emit = defineEmits<{ "widen-range": [period: string] }>();
-const { searchObj } = useTraces();
-const { suggestedPeriod, expandRangeSublabel } = useWidenRange(
-  () => searchObj.data?.datetime?.type ?? "",
-  () => searchObj.data?.datetime?.relativeTimePeriod ?? "",
-  { absoluteExpandDesc: t("traces.noEvents.expandRangeDescAbsolute") },
-);
-
-const onWidenRange = () => emit("widen-range", suggestedPeriod.value);
 </script>

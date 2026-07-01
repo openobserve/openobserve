@@ -780,6 +780,7 @@ const useLogs = () => {
   }
 
   return {
+    resolveDefaultColumns,
     getJobData,
     refreshData,
     loadLogsData,
@@ -799,6 +800,56 @@ const useLogs = () => {
     loadPatternsData,
     getHistogramTitle,
   };
+};
+
+// Priority order for FTS field selection as default columns
+const FTS_PRIORITY = ['body', 'body_msg', 'message', 'log', 'msg'];
+
+export const resolveDefaultColumns = (
+  streamFields: Array<{ name: string; ftsKey: boolean }>,
+  globalFtsKeys: string[],
+  hits?: Record<string, unknown>[],
+): string[] => {
+  const streamFieldNames = new Set(streamFields.map((f) => f.name));
+  const streamFtsNames = streamFields
+    .filter((f) => f.ftsKey)
+    .map((f) => f.name);
+
+  // Only include global FTS keys that actually exist in this stream's fields
+  const globalFtsInStream = globalFtsKeys.filter((k) => streamFieldNames.has(k));
+  const candidates = [...new Set([...streamFtsNames, ...globalFtsInStream])];
+
+  if (candidates.length === 0) return [];
+
+  const priorityIndex = (name: string) => {
+    const idx = FTS_PRIORITY.indexOf(name);
+    return idx === -1 ? FTS_PRIORITY.length : idx;
+  };
+
+  // When hits are available, pick the candidate with the highest fill rate.
+  // Break ties using FTS_PRIORITY so the more meaningful body field wins when
+  // multiple candidates are equally populated (e.g. body beats log).
+  if (hits && hits.length > 0) {
+    let bestField = '';
+    let bestCount = -1;
+    for (const field of candidates) {
+      const count = hits.filter(
+        (h) => h[field] !== undefined && h[field] !== null && h[field] !== '',
+      ).length;
+      if (
+        count > bestCount ||
+        (count === bestCount && priorityIndex(field) < priorityIndex(bestField))
+      ) {
+        bestCount = count;
+        bestField = field;
+      }
+    }
+    return bestField && bestCount > 0 ? [bestField] : [];
+  }
+
+  // No hits yet — fall back to static priority order
+  const sorted = candidates.sort((a, b) => priorityIndex(a) - priorityIndex(b));
+  return sorted.slice(0, 1);
 };
 
 export default useLogs;

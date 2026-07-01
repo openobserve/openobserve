@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Row 1: standard header — title + actions only. Tabs / search / folder
            scope moved into the table's own toolbar below. -->
       <template #header>
-        <AppPageHeader icon="description" :subtitle="'Scheduled reports and exports'">
+        <AppPageHeader icon="description" :subtitle="t('reports.subtitle')">
           <template #title><span data-test="report-list-title">{{ t('reports.header') }}</span></template>
           <template #actions>
             <OButton
@@ -109,14 +109,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               icon-left="folder-outline"
                               data-test="report-list-search-scope-current"
                               title="Search only this folder"
-                            >This folder</OToggleGroupItem>
+                            >{{ t('reports.searchThisFolder') }}</OToggleGroupItem>
                             <OToggleGroupItem
                               value="all"
                               size="xs"
                               icon-left="search"
                               data-test="report-list-search-across-folders-toggle"
                               title="Search across all folders"
-                            >All folders</OToggleGroupItem>
+                            >{{ t('reports.searchAllFolders') }}</OToggleGroupItem>
                           </OToggleGroup>
                         </template>
                       </OInput>
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     icon-left="refresh"
                     :loading="isLoadingReports"
-                    title="Reload reports"
+                    :title="t('reports.reloadReports')"
                     data-test="report-list-refresh-btn"
                     @click="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
                   />
@@ -167,9 +167,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OBadge>
                 </template>
 
+                <!-- Owner column -->
+                <template #cell-owner="{ row }">
+                  <OUserCell :value="row.owner" />
+                </template>
+
                 <!-- Folder column -->
                 <template #cell-folder_name="{ row }">
                   {{ row.folder_name || "default" }}
+                </template>
+
+                <!-- Last triggered timestamp -->
+                <template #cell-last_triggered_at="{ row }">
+                  <OTimeCell
+                    :value="row.last_triggered_at_raw"
+                    unit="us"
+                    mode="absolute"
+                    :timezone="store.state.timezone"
+                    empty-label="Never"
+                  />
                 </template>
 
                 <!-- Actions column -->
@@ -209,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="drive-file-move"
                     variant="ghost"
                     size="icon-sm"
-                    title="Move to Folder"
+                    :title="t('reports.moveToFolder')"
                     @click="openMoveDialog(row)"
                   />
 
@@ -240,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm-action"
                         @click="moveMultipleReports"
                       >
-                        Move
+                        {{ t('common.move') }}
                       </OButton>
                       <OButton
                         v-if="selectedReports.length > 0"
@@ -250,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm-action"
                         @click="openBulkDeleteDialog"
                       >
-                        Delete
+                        {{ t('common.delete') }}
                       </OButton>
                     </div>
                   </div>
@@ -273,8 +289,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Bulk delete confirm -->
     <ConfirmDialog
       v-model="confirmBulkDelete"
-      title="Delete Reports"
-      :message="`Are you sure you want to delete ${selectedReports.length} report(s)?`"
+      :title="t('reports.deleteReportsTitle')"
+      :message="t('reports.deleteReportsMsg', { count: selectedReports.length })"
       @update:ok="bulkDeleteReports"
       @update:cancel="confirmBulkDelete = false"
     />
@@ -304,6 +320,8 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import { formatDate } from "@/utils/date";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
@@ -391,8 +409,8 @@ const columns = computed<OTableColumnDef[]>(() => {
     { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "center" } },
     { id: "name", header: t("alerts.name"), accessorKey: "name", cell: " ", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
     { id: "owner", header: t("alerts.owner"), accessorKey: "owner", sortable: true, resizable: true, hideable: true, size: COL.owner },
-    { id: "description", header: t("alerts.description"), accessorKey: "description", sortable: false, resizable: true, hideable: true, size: COL.description, meta: { align: "center" } },
-    { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_triggered_at", sortable: true, resizable: true, hideable: true, size: 200, meta: { align: "left" } },
+    { id: "description", header: t("alerts.description"), accessorKey: "description", sortable: false, resizable: true, hideable: true, size: COL.description, meta: { align: "left" } },
+    { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_triggered_at", sortable: true, resizable: true, hideable: true, size: COL.dateAbsolute, meta: { align: "left" } },
     { id: "actions", header: t("alerts.actions"), isAction: true, size: 150, meta: { align: "center", cellClass: "actions-column", actionCount: 4 } },
   ];
 
@@ -448,6 +466,7 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
     const mapped = (res.data ?? []).map((report: any, index: number) => ({
       "#": index + 1,
       ...report,
+      last_triggered_at_raw: report.last_triggered_at || null,
       last_triggered_at: report.last_triggered_at
         ? convertUnixToQuasarFormat(report.last_triggered_at)
         : "-",

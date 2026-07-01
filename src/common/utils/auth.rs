@@ -339,7 +339,18 @@ where
             None => local_path.strip_prefix("/").unwrap_or(&local_path),
         };
 
-        let path_columns = path.split('/').collect::<Vec<&str>>();
+        let mut path_columns = path.split('/').collect::<Vec<&str>>();
+        // Drop a trailing empty segment produced by a trailing slash (e.g.
+        // "default/" -> ["default", ""]). Without this, the segment count is off
+        // by one and exact-length route matching in `resolve_permission` fails —
+        // e.g. the ES-compat org-root route `["{org}"]` never matches the
+        // slash-mandatory `/{org_id}/` handler. Mirrors `validate_credentials`.
+        if path_columns.len() > 1
+            && let Some(v) = path_columns.last()
+            && v.is_empty()
+        {
+            path_columns.pop();
+        }
         let url_len = path_columns.len();
         let org_id = if url_len > 1 && path_columns[0].eq(V2_API_PREFIX) {
             path_columns[1].to_string()

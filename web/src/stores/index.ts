@@ -22,6 +22,7 @@ import {
 import streams from "./streams";
 import logs from "./logs";
 import incidents from "./incidents";
+import { getDefaultTheme } from "@/constants/themes";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -110,12 +111,13 @@ export default createStore({
     isWebinarBannerVisible: false,
     currentChatTimestamp: null,
     chatUpdated: false,
-    // Default theme colors (Default Blue theme)
-    // These are the application's default colors used as fallback when no custom colors are set
-    // Centralized here so they can be updated in one place instead of duplicating across components
+    // Default theme colors — derived from the default theme (O2 Signature) in the
+    // theme registry so there is a single source of truth. Used as the fallback
+    // by chart consumers that read colors directly. Changing the default theme's
+    // colors in `@/constants/themes` automatically updates these.
     defaultThemeColors: {
-      light: "#3F7994",  // Blue-teal — matches --color-primary-600
-      dark: "#79a1b4",   // Blue-teal 400 for dark mode (brighter on dark surfaces)
+      light: getDefaultTheme().light.themeColor,
+      dark: getDefaultTheme().dark.themeColor,
     },
     // GitHub dashboard gallery cache
     githubDashboardGallery: {

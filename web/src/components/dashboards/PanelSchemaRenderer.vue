@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="tableRendererRef"
           :data="tableRendererData"
           :config="panelSchema.config"
+          :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
           @row-click="onChartClick"
         />
         <TableRenderer
@@ -65,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             panelSchema.config?.table_pagination && !store.state.printMode
           "
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
+          :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -114,9 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @domcontextmenu="onChartDomContextMenu"
         />
       </div>
-      <!-- Metric chart: per-value copy icon, revealed on hover of each number -->
       <div
-        v-if="metricItems.length"
+        v-if="metricItems.length && !noData && !loading"
         style="position: absolute; inset: 0; pointer-events: none; z-index: 8"
         data-test="dashboard-metric-copy-overlay"
       >
@@ -584,10 +585,14 @@ export default defineComponent({
           text: s?._metricText,
           layout: s?._metricLayout,
         }))
-        .filter(
-          (m: any) =>
-            m.layout && m.text != null && String(m.text).trim() !== "",
-        );
+        .filter((m: any) => {
+          if (!m.layout || m.text == null || String(m.text).trim() === "")
+            return false;
+          const num = parseFloat(
+            String(m.text).replace(/,/g, "").replace(/[^0-9.eE+-]/g, ""),
+          );
+          return Number.isNaN(num) || num !== 0;
+        });
     });
     // Hover zone = each value's grid cell.
     const metricZoneStyle = (m: any) => ({
@@ -1587,22 +1592,16 @@ export default defineComponent({
       emit("is-partial-data-update", newValue);
     });
 
-    // Computed property for table data with logging
     const tableRendererData = computed(() => {
       if (panelSchema.value.type === "table") {
-        let tableData;
-
         if (panelSchema.value.queryType === "promql") {
           // For PromQL tables, the data is in panelData.options (same as pie/donut)
           // The TableConverter returns {columns, rows, ...} which gets placed in options
-          tableData = panelData.value?.options || { rows: [], columns: [] };
+          return panelData.value?.options || { rows: [], columns: [] };
         } else if (panelData.value?.chartType == "table") {
-          tableData = panelData.value;
-        } else {
-          tableData = { options: { backgroundColor: "transparent" } };
+          return panelData.value;
         }
-
-        return tableData;
+        return { options: { backgroundColor: "transparent" } };
       }
       return { options: { backgroundColor: "transparent" } };
     });
@@ -1768,6 +1767,21 @@ export default defineComponent({
   inset: 0;
   width: 100%;
   height: 100%;
+  // Override the inline empty-state's intrinsic min-height/padding so the
+  // content centers within the actual panel box (top/bottom/left/right)
+  // instead of being pushed down by a fixed 160px min-height.
+  min-height: 0 !important;
+  padding: 0.5rem !important;
+  // Establish a size container so we can react to very short panels.
+  container-type: size;
+}
+
+// When the panel is too short to comfortably fit the icon, hide it and
+// show just the centered "No Data" message.
+@container (max-height: 5rem) {
+  .noData :deep(.o2-empty-state__inline-icon) {
+    display: none;
+  }
 }
 
 .annotation-popup-bg {
