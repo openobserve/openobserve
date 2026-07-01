@@ -26,7 +26,7 @@ use {
             utils::auth::{check_permissions, remove_ownership, set_ownership},
         },
         handler::http::models::action::{GetActionDetailsResponse, GetActionInfoResponse},
-        service::organization::get_passcode,
+        service::organization::get_service_account_passcode,
     },
     bytes::Bytes,
     config::meta::actions::action::{Action, ExecutionDetailsType},
@@ -329,12 +329,11 @@ pub async fn update_action_details(
             }
             Some(sa) => sa,
         };
-        let passcode =
-            if let Ok(res) = crate::service::organization::get_passcode(Some(&org_id), &sa).await {
-                res.passcode
-            } else {
-                return MetaHttpResponse::bad_request("Failed to fetch passcode");
-            };
+        let passcode = if let Ok(res) = get_service_account_passcode(Some(&org_id), &sa).await {
+            res.passcode
+        } else {
+            return MetaHttpResponse::bad_request("Failed to fetch passcode");
+        };
 
         req.service_account = Some(sa);
         match update_app_on_target_cluster(&org_id, action_id, req, &passcode).await {
@@ -759,7 +758,9 @@ pub async fn upload_zipped_action(
 
         let file_path = format!("files/{}/actions/{}", org_id, action.zip_file_name);
 
-        let passcode = if let Ok(res) = get_passcode(Some(&org_id), &action.service_account).await {
+        let passcode = if let Ok(res) =
+            get_service_account_passcode(Some(&org_id), &action.service_account).await
+        {
             res.passcode
         } else {
             return MetaHttpResponse::bad_request("Failed to fetch passcode");
