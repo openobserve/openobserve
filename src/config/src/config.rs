@@ -66,6 +66,10 @@ pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
 pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
 pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
+/// Initial HTTP/2 flow-control windows (bytes) for internal gRPC channels. Apply when
+/// `ZO_GRPC_HTTP2_ADAPTIVE_WINDOW=false` (default); adaptive resets to 64 KB and grows via BDP.
+pub const GRPC_HTTP2_STREAM_WINDOW_SIZE: u32 = 8 * 1024 * 1024; // 8 MB
+pub const GRPC_HTTP2_CONNECTION_WINDOW_SIZE: u32 = 16 * 1024 * 1024; // 16 MB
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
@@ -756,6 +760,14 @@ pub struct Grpc {
     pub connect_timeout: u64,
     #[env_config(name = "ZO_GRPC_CHANNEL_CACHE_DISABLED", default = false)]
     pub channel_cache_disabled: bool,
+    #[env_config(
+        name = "ZO_GRPC_HTTP2_ADAPTIVE_WINDOW",
+        default = false,
+        help = "Enable HTTP/2 adaptive (BDP-based) flow-control window growth for inter-node \
+                gRPC. Off by default (fixed stream/connection windows apply). Turn on for \
+                high-latency links; costs more memory under many concurrent streams."
+    )]
+    pub http2_adaptive_window: bool,
     #[env_config(name = "ZO_GRPC_TLS_ENABLED", default = false)]
     pub tls_enabled: bool,
     #[env_config(name = "ZO_GRPC_TLS_CERT_DOMAIN", default = "")]
