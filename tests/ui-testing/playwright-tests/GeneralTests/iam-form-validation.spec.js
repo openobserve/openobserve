@@ -194,6 +194,46 @@ test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {
 
         testLogger.info('Group created successfully');
     });
+
+    test("should auto-route to Edit Group after create", {
+        tag: ['@iamFormValidation', '@functional', '@P1']
+    }, async ({ page }) => {
+        const groupName = `e2e_iam_group_${Date.now()}`;
+        testLogger.info(`Creating group and expecting auto-route: ${groupName}`);
+
+        await pm.iamFormValidation.openGroupForm();
+        await pm.iamFormValidation.fillGroupName(groupName);
+        await pm.iamFormValidation.submitGroupForm();
+
+        // Lands on the Edit Group page instead of returning to the list.
+        await expect(pm.iamFormValidation.getEditGroupSectionLocator()).toBeVisible({ timeout: 15000 });
+        await expect(page).toHaveURL(/groups\/edit\//);
+
+        testLogger.info('Auto-routed to Edit Group');
+    });
+
+    test("should warn about access loss in the group delete confirm dialog", {
+        tag: ['@iamFormValidation', '@functional', '@P1']
+    }, async ({ page }) => {
+        const groupName = `e2e_iam_group_${Date.now()}`;
+        testLogger.info(`Creating then deleting group to check blast-radius: ${groupName}`);
+
+        await pm.iamFormValidation.openGroupForm();
+        await pm.iamFormValidation.fillGroupName(groupName);
+        await pm.iamFormValidation.submitGroupForm();
+        await expect(pm.iamFormValidation.getEditGroupSectionLocator()).toBeVisible({ timeout: 15000 });
+
+        // Back to the groups list, then delete.
+        await pm.iamFormValidation.navigateToGroupsTab();
+        await pm.iamFormValidation.clickDeleteGroup(groupName);
+
+        await expect(pm.iamFormValidation.getConfirmDialogLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getConfirmDialogLocator()).toContainText(/lose the roles/i);
+
+        await pm.iamFormValidation.getConfirmDialogOkBtnLocator().click();
+
+        testLogger.info('Group delete blast-radius warning shown');
+    });
 });
 
 // ── Role form (@enterprise — Roles tab requires isEnterprise && rbac_enabled) ──
@@ -277,6 +317,94 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
         await expect(pm.iamFormValidation.getRoleDialogLocator()).not.toBeVisible();
 
         testLogger.info('Role created successfully');
+    });
+
+    test("should show 'Start from' preset options in the Add Role dialog", {
+        tag: ['@iamFormValidation', '@functional', '@P1']
+    }, async ({ page }) => {
+        testLogger.info('Testing Start-from preset options render');
+
+        await pm.iamFormValidation.openRoleForm();
+        await expect(pm.iamFormValidation.getRoleStartFromCustomLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getRoleStartFromReadonlyLocator()).toBeVisible();
+
+        testLogger.info('Start-from Custom + Read-only options rendered');
+    });
+
+    test("should auto-route to Edit Role Permissions tab after create", {
+        tag: ['@iamFormValidation', '@functional', '@P1']
+    }, async ({ page }) => {
+        const roleName = `e2e_iam_role_${Date.now()}`;
+        testLogger.info(`Creating role and expecting auto-route: ${roleName}`);
+
+        await pm.iamFormValidation.openRoleForm();
+        await pm.iamFormValidation.fillRoleName(roleName);
+        await pm.iamFormValidation.submitRoleForm();
+
+        // Instead of returning to the list, we land on the Edit Role page with the
+        // Permissions tab active.
+        await expect(pm.iamFormValidation.getEditRolePageLocator()).toBeVisible({ timeout: 15000 });
+        await expect(pm.iamFormValidation.getEditRolePermsSectionLocator()).toBeVisible();
+        await expect(page).toHaveURL(/roles\/edit\//);
+
+        testLogger.info('Auto-routed to Edit Role Permissions tab');
+    });
+
+    test("should warn about access loss in the delete confirm dialog", {
+        tag: ['@iamFormValidation', '@functional', '@P1']
+    }, async ({ page }) => {
+        const roleName = `e2e_iam_role_${Date.now()}`;
+        testLogger.info(`Creating then deleting role to check blast-radius: ${roleName}`);
+
+        // Create a role, then return to the list to delete it.
+        await pm.iamFormValidation.openRoleForm();
+        await pm.iamFormValidation.fillRoleName(roleName);
+        await pm.iamFormValidation.submitRoleForm();
+        await expect(pm.iamFormValidation.getEditRolePageLocator()).toBeVisible({ timeout: 15000 });
+
+        // Back to the roles list.
+        await pm.iamFormValidation.navigateToRolesTab();
+        await pm.iamFormValidation.clickDeleteRole(roleName);
+
+        // Confirm dialog shows a blast-radius warning banner mentioning access loss.
+        await expect(pm.iamFormValidation.getConfirmDialogLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getConfirmDialogLocator()).toContainText(/lose access/i);
+
+        // Confirm the delete to clean up.
+        await pm.iamFormValidation.getConfirmDialogOkBtnLocator().click();
+
+        testLogger.info('Delete confirm blast-radius warning shown');
+    });
+
+    test("should mark the Permissions tab dirty and prompt on leave with unsaved changes", {
+        tag: ['@iamFormValidation', '@functional', '@P2']
+    }, async ({ page }) => {
+        const roleName = `e2e_iam_role_${Date.now()}`;
+        testLogger.info(`Testing dirty dot + discard guard: ${roleName}`);
+
+        await pm.iamFormValidation.openRoleForm();
+        await pm.iamFormValidation.fillRoleName(roleName);
+        await pm.iamFormValidation.submitRoleForm();
+        await expect(pm.iamFormValidation.getEditRolePageLocator()).toBeVisible({ timeout: 15000 });
+
+        // Toggle a permission to dirty the Permissions tab.
+        const toggled = await pm.iamFormValidation.toggleFirstPermissionCheckbox();
+        if (!toggled) {
+            test.skip(true, 'No permission checkboxes rendered for this org — cannot exercise dirty state');
+            return;
+        }
+
+        await expect(pm.iamFormValidation.getEditRolePermsDirtyDotLocator()).toBeVisible();
+
+        // Attempt to leave — a discard-changes confirm dialog should appear.
+        await pm.iamFormValidation.navigateToRolesTab();
+        await expect(pm.iamFormValidation.getConfirmDialogLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getConfirmDialogLocator()).toContainText(/discard/i);
+
+        // Discard and continue.
+        await pm.iamFormValidation.getConfirmDialogOkBtnLocator().click();
+
+        testLogger.info('Dirty dot + discard-changes guard verified');
     });
 });
 
