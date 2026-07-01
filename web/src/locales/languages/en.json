@@ -3620,6 +3620,8 @@
     "saveChanges": "Save",
     "invalidDomain": "Please enter a valid domain name",
     "invalidEmail": "Please enter a valid email address for this domain",
+    "domainRequired": "Domain is required",
+    "emailRequired": "Email is required",
     "domainAlreadyExists": "This domain has already been added",
     "domainAdded": "Domain added successfully",
     "confirmRemoveDomain": "Are you sure you want to remove the domain '{domain}'?",

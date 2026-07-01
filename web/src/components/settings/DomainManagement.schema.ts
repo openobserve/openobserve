@@ -9,8 +9,11 @@
 // Restores the Quasar BEFORE rules (truthy→Zod inversion):
 //   • newDomain: `isValidDomain(v) || invalidDomain` → required + domain regex
 //     (the audit adds ≤253 + reject-malicious, already enforced by isValidDomain).
-//   • domain.newEmail: `!v || isValidEmail(v, domain) || invalidEmail` → kept
-//     CONDITIONAL (empty passes; only format-checked when present).
+//   • domain.newEmail: REQUIRED for the Add-Email action — the email must be
+//     present, valid, and belong to the domain (clicking "Add Email" with an
+//     empty box shows "Email is required" on first submit). The add-email form is
+//     its OWN OForm, so requiring it does NOT affect the domain-level
+//     "Save Changes" button. (Deliberate UX choice over the old empty-passes rule.)
 //
 // The pure validators live here so they are shared by the schema AND re-exposed
 // from the component (the spec exercises them directly). Validation TIMING is
@@ -120,8 +123,9 @@ export type AddDomainForm = z.infer<ReturnType<typeof makeAddDomainSchema>>;
 // …) instead of an inline `{ newDomain: '' }` literal in the template.
 export const addDomainDefaults = (): AddDomainForm => ({ newDomain: "" });
 
-// ── Add-email row (per-domain): CONDITIONAL — empty passes, format-checked when
-//    present and must belong to the domain. ──────────────────────────────────
+// ── Add-email row (per-domain): REQUIRED + valid + belongs to the domain.
+//    Empty → "Email is required" (first submit); non-empty invalid → email error.
+//    Its own OForm, so requiring it does not gate the domain-level save. ────────
 export const makeAddEmailSchema = (
   domainName: string,
   t: (_key: string) => string,
@@ -129,8 +133,8 @@ export const makeAddEmailSchema = (
   z.object({
     newEmail: z
       .string()
-      .optional()
-      .refine((v) => !v || isValidEmail(v, domainName), {
+      .min(1, t("settings.emailRequired") || "Email is required")
+      .refine((v) => isValidEmail(v, domainName), {
         message: t("settings.invalidEmail") || "Please enter a valid email",
       }),
   });

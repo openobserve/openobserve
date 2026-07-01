@@ -874,15 +874,15 @@ describe("DomainManagement Component", () => {
   });
 });
 
-describe("makeAddEmailSchema (conditional: empty passes, format-checked when present)", () => {
+describe("makeAddEmailSchema (required: empty fails, must be valid + belong to domain)", () => {
   const schema = makeAddEmailSchema("example.com", (k: string) => k);
 
-  it("passes when the email is empty/omitted (optional field)", () => {
-    // The `!v ||` short-circuit makes empty valid even though
-    // isValidEmail("") is false — this is the behaviour the OForm relies on.
-    expect(schema.safeParse({ newEmail: "" }).success).toBe(true);
-    expect(schema.safeParse({ newEmail: undefined }).success).toBe(true);
-    expect(schema.safeParse({}).success).toBe(true);
+  it("FAILS when the email is empty/omitted (required for the Add-Email action)", () => {
+    // Option A: the Add-Email field is required, so empty → "Email is required".
+    // (No .trim() — matches pre-migration; whitespace-only is caught as invalid.)
+    expect(schema.safeParse({ newEmail: "" }).success).toBe(false);
+    expect(schema.safeParse({ newEmail: undefined }).success).toBe(false);
+    expect(schema.safeParse({}).success).toBe(false);
   });
 
   it("passes a valid email that belongs to the domain", () => {
@@ -896,5 +896,59 @@ describe("makeAddEmailSchema (conditional: empty passes, format-checked when pre
     expect(schema.safeParse({ newEmail: "user@other.com" }).success).toBe(
       false,
     );
+  });
+
+  describe("Add-email form — first-submit validation (repro)", () => {
+    const createWrapper = () =>
+      mount(DomainManagement, { global: { plugins: [i18n] } });
+    const emailFormFor = async (wrapper: any, name: string) => {
+      const vm = wrapper.vm as any;
+      vm.domains.push({ name, allowAllUsers: false, allowedEmails: [] });
+      await nextTick();
+      await flushPromises();
+      await nextTick();
+      return vm.emailFormRefs[name]?.form;
+    };
+
+    it("INVALID email on the FIRST submit reveals the error and does not add", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const form = await emailFormFor(wrapper, "openobaseve.ai");
+      expect(form).toBeTruthy();
+
+      form.setFieldValue("newEmail", "abc"); // invalid
+      await nextTick();
+      await form.handleSubmit(); // FIRST submit
+      await flushPromises();
+      await nextTick();
+
+      const domain = (wrapper.vm as any).domains.find(
+        (d: any) => d.name === "openobaseve.ai",
+      );
+      expect(domain.allowedEmails).not.toContain("abc");
+      // The bug would be: isValid true / no error on first submit.
+      expect(form.state.isValid).toBe(false);
+      expect((form.getFieldMeta("newEmail")?.errors ?? []).length).toBeGreaterThan(0);
+      wrapper.unmount();
+    });
+
+    it("EMPTY email on the FIRST submit shows 'required' and does not add (Option A)", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const form = await emailFormFor(wrapper, "openobaseve.ai");
+      expect(form).toBeTruthy();
+
+      await form.handleSubmit(); // FIRST submit, empty
+      await flushPromises();
+      await nextTick();
+
+      const domain = (wrapper.vm as any).domains.find(
+        (d: any) => d.name === "openobaseve.ai",
+      );
+      expect(domain.allowedEmails).toEqual([]);
+      expect(form.state.isValid).toBe(false); // required now → empty blocked
+      expect((form.getFieldMeta("newEmail")?.errors ?? []).length).toBeGreaterThan(0);
+      wrapper.unmount();
+    });
   });
 });
