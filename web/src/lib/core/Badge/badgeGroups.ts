@@ -380,7 +380,7 @@ export const BADGE_GROUPS = {
     values: {
       runtime: { variant: "default-outline", icon: "code" },
       setuptime: { variant: "primary-soft", icon: "schedule" },
-      cost: { variant: "default-outline", icon: "attach-money" },
+      cost: { variant: "default-outline", icon: "attach-money", label: "Cost & Tokens Captured" },
       meta: { variant: "default-outline" },
     },
     fallback: { variant: "default-outline" },
@@ -450,7 +450,7 @@ export const BADGE_GROUPS = {
     size: "md",
     values: {
       weakest: { variant: "warning" },
-      template: { variant: "primary-outline" },
+      template: { variant: "primary-outline", labelKey: "traces.evaluations.templateBadge" },
     },
     fallback: { variant: "default" },
   },

@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                         type="evalBadge"
                         value="template"
                         class="eval-badge-sm"
-                      >{{ $t('traces.evaluations.templateBadge') }}</OTag>
+                      />
                     </div>
                     <div class="tw:flex tw:items-center tw:gap-1.5">
                       <!-- Pass/Fail verdict badge for template dimensions -->

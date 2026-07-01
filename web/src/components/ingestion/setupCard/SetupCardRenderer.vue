@@ -450,9 +450,7 @@ function fireConfetti() {
               >{{ b }}</OTag
             >
           </template>
-          <OTag v-else type="setupCardMeta" value="cost"
-            >Cost &amp; Tokens Captured</OTag
-          >
+          <OTag v-else type="setupCardMeta" value="cost" />
         </div>
       </div>
 
