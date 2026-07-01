@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed } from 'vue'
-import type { BrowserStep, StepAction, SelectorType } from '@/types/synthetics'
+import type { BrowserStep, StepAction, SelectorType, WireStep } from '@/types/synthetics'
 import type { IconName } from '@/lib/core/Icon/OIcon.icons'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
@@ -81,8 +81,19 @@ const selectorTypeOptions: { label: string; value: SelectorType }[] = [
 ]
 
 function update(patch: Partial<BrowserStep>) {
-  // Clear the wire so replay uses the edited fields, not the original recording
-  emit('update:step', { ...props.step, wire: undefined, ...patch })
+  // Patch edited fields into wire instead of clearing it, so replay still has
+  // the original extension metadata (framePath, pageAlias, position, snapshot).
+  // Action changes clear wire since the step type fundamentally changed.
+  let wire = props.step.wire ? { ...props.step.wire } : undefined
+  if (wire) {
+    if (patch.name !== undefined) wire.name = patch.name
+    if (patch.selector !== undefined) wire.selector = patch.selector
+    if (patch.selectorType !== undefined) wire.selector_type = patch.selectorType.toLowerCase() as WireStep['selector_type']
+    if (patch.value !== undefined) wire.value = patch.value
+    if (patch.timeout !== undefined) wire.timeout_ms = patch.timeout
+    if (patch.action !== undefined) wire = undefined // action changed — wire metadata is no longer accurate
+  }
+  emit('update:step', { ...props.step, wire, ...patch })
 }
 
 const actionIcon = computed(() => ACTION_ICON_MAP[props.step.action])
