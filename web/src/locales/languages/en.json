@@ -591,6 +591,8 @@
     "savedViewName": "View Name",
     "createSavedView": "Create Saved View",
     "listSavedViews": "List Saved Views",
+    "pinToToolbar": "Pin to toolbar",
+    "unpinFromToolbar": "Unpin from toolbar",
     "shareLink": "Share Link",
     "downloadTable": "Download results",
     "customRange": "Download results for custom range",
