@@ -421,7 +421,7 @@ export default defineComponent({
     };
 
     // Watch for file changes
-    watch(jsonFiles, async (newVal: any, oldVal: any) => {
+    watch(jsonFiles, async (newVal: any) => {
       if (newVal && newVal.length > 0) {
         let combinedJson: any[] = [];
 
@@ -457,15 +457,6 @@ export default defineComponent({
         // Update the refs with combined JSON data
         jsonArrayOfObj.value = combinedJson;
         jsonStr.value = JSON.stringify(combinedJson, null, 2);
-        emit("update:jsonStr", jsonStr.value);
-        emit("update:jsonArray", jsonArrayOfObj.value);
-      } else if (oldVal && oldVal.length > 0) {
-        // File(s) removed after having been loaded — clear the editor so it
-        // stays in sync with the (now empty) file input instead of retaining
-        // stale JSON. Guarded on oldVal so a no-op reset doesn't wipe JSON
-        // that arrived through another path (URL / manual paste).
-        jsonArrayOfObj.value = [];
-        jsonStr.value = "";
         emit("update:jsonStr", jsonStr.value);
         emit("update:jsonArray", jsonArrayOfObj.value);
       }

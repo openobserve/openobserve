@@ -370,15 +370,7 @@ export default defineComponent({
       };
     });
 
-    watch(jsonFiles, (newVal, oldVal) => {
-      if ((!newVal || newVal.length === 0) && oldVal && oldVal.length > 0) {
-        // File(s) removed after having been loaded — clear the editor so it
-        // stays in sync with the (now empty) file input instead of retaining
-        // stale JSON. Guarded on oldVal so a no-op reset (e.g. undefined→null)
-        // doesn't clobber JSON that arrived through another path.
-        jsonStr.value = "";
-        return;
-      }
+    watch(jsonFiles, (newVal) => {
       if (newVal && newVal.length > 0) {
         const fileContents = []; // Array to store parsed JSON objects
 
