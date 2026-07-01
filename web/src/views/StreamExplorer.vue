@@ -108,7 +108,7 @@ onBeforeMount(() => {
       }));
       getQueryData();
     })
-    .catch((err) => console.log(err));
+    .catch(() => {});
 });
 
 onMounted(() => {

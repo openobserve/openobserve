@@ -378,7 +378,6 @@ const setupSession = async () => {
           });
         }
       } catch (e) {
-        console.log(e);
       }
       session.value.push(segCopy);
     });

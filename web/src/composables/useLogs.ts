@@ -247,7 +247,6 @@ const useLogs = () => {
         store.dispatch("setRefreshIntervalID", 0);
       }
     } catch (e: any) {
-      console.log("Error while refreshing data", e);
     }
   };
 
@@ -334,7 +333,6 @@ const useLogs = () => {
       refreshData();
     } catch (e: any) {
       searchObj.loading = false;
-      console.log("Error while loading logs data");
     }
   };
 
@@ -355,7 +353,6 @@ const useLogs = () => {
       }
       await getQueryData();
     } catch (e: any) {
-      console.log("Error while loading logs data");
     }
   };
 
@@ -613,7 +610,6 @@ const useLogs = () => {
 
       return expression;
     } catch (e: any) {
-      console.log("Error while getting filter expression by field type", e);
       const quotedField =
         searchObj.meta.sqlMode === true
           ? quoteSqlIdentifierIfNeeded(String(field))

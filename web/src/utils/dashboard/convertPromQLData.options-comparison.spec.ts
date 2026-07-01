@@ -188,10 +188,6 @@ describe("convertPromQLData - Options Comparison Test", () => {
     expect(limitedOptions.yAxisType).toBe(fullOptions.yAxisType);
     expect(limitedOptions.isTimeSeries).toBe(fullOptions.isTimeSeries);
 
-    console.log("✅ Options comparison test passed!");
-    console.log(`   - Limited data series: ${limitedOptions.seriesCount}`);
-    console.log(`   - Full data series: ${fullOptions.seriesCount}`);
-    console.log(`   - Both produce identical chart options!`);
   });
 
   /**
@@ -308,6 +304,5 @@ describe("convertPromQLData - Options Comparison Test", () => {
       expect(options.series[0].dataLength).toBeGreaterThan(0);
     }
 
-    console.log(`✅ Series limiting test passed with ${options.seriesCount} series (limited from 250)`);
   });
 });

@@ -1665,7 +1665,6 @@ export default defineComponent({
             ? filteredData.value
             : data.value;
         console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
-        console.log(chartData);
         console.groupEnd();
       },
       loadingProgressPercentage,

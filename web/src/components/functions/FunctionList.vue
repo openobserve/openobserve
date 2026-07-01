@@ -532,7 +532,6 @@ export default defineComponent({
           confirmForceDelete.value = true;
         })
         .catch((err) => {
-          console.log(err);
         });
     };
 

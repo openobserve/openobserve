@@ -1508,7 +1508,6 @@ export default defineComponent({
           (event: any) => event,
         );
       } catch (_e: any) {
-        console.log(_e);
         spanDetails.events = [];
       }
 
@@ -1615,7 +1614,6 @@ export default defineComponent({
 
         return parsedLinks || [];
       } catch (e) {
-        console.log("Error parsing span links:", e);
         // Return sample data even on error for testing
         return [];
       }

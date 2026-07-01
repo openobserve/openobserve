@@ -2603,7 +2603,6 @@ export default defineComponent({
           try {
             parsedQuery = fnParsedSQL(value);
           } catch (e) {
-            console.log(e, "Logs: Error while parsing query");
           }
 
           if (parsedQuery?.from?.length > 0) {
@@ -2665,7 +2664,6 @@ export default defineComponent({
           }
         }
       } catch (e) {
-        console.log(e, "Logs: Error while updating query value");
       }
     };
     const handleEscKey = (event: KeyboardEvent) => {
@@ -3662,7 +3660,6 @@ export default defineComponent({
                 searchObj.shouldIgnoreWatcher = false;
               } catch (e) {
                 searchObj.shouldIgnoreWatcher = false;
-                console.log("Error while applying saved view", e);
               }
             }, 1000);
 
@@ -3714,7 +3711,6 @@ export default defineComponent({
             message: `Error while applying saved view.`,
             variant: "error",
           });
-          console.log("Error while applying saved view", err);
         });
     };
 
@@ -3806,10 +3802,8 @@ export default defineComponent({
               message: t("search.errorDeletingSavedView"),
               variant: "error",
             });
-            console.log("Error while deleting saved view", err);
           });
       } catch (e: any) {
-        console.log("Error while getting saved views", e);
       }
     };
 
@@ -3856,7 +3850,6 @@ export default defineComponent({
         return savedSearchObj;
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
       } catch (e) {
-        console.log("Error while encoding search obj", e);
       }
     };
 
@@ -3912,7 +3905,6 @@ export default defineComponent({
               message: t("search.errorCreatingSavedView"),
               variant: "error",
             });
-            console.log("Error while creating saved view", err);
           });
       } catch (e: any) {
         isSavedViewAction.value = "create";
@@ -3922,7 +3914,6 @@ export default defineComponent({
           message: `Error while saving view: ${e}`,
           variant: "error",
         });
-        console.log("Error while saving view", e);
       }
     };
 
@@ -3978,7 +3969,6 @@ export default defineComponent({
               message: t("search.errorUpdatingSavedView"),
               variant: "error",
             });
-            console.log("Error while updating saved view", err);
           });
       } catch (e: any) {
         isSavedViewAction.value = "create";
@@ -3988,7 +3978,6 @@ export default defineComponent({
           message: `Error while saving view: ${e}`,
           variant: "error",
         });
-        console.log("Error while saving view", e);
       }
     };
 
@@ -5227,7 +5216,6 @@ export default defineComponent({
             newValue = this.searchObj.data.editorValue;
           }
         } catch (e) {
-          console.log("Error removing field condition from SQL:", e);
           newValue = removeFieldCondition(
             this.searchObj.data.editorValue,
             fieldName,

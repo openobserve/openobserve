@@ -136,7 +136,6 @@ export const useStreamFields = () => {
         }
       }
     } catch (e: any) {
-      console.log("Error while updating field values", e);
     }
   };
 
@@ -912,7 +911,6 @@ export const useStreamFields = () => {
       searchObj.loadingStream = false;
     } catch (e: any) {
       searchObj.loadingStream = false;
-      console.log("Error while extracting fields.", e);
       notificationMsg.value = "Error while extracting stream fields.";
     }
   };
@@ -930,7 +928,6 @@ export const useStreamFields = () => {
       }
       return;
     } catch (e: any) {
-      console.log("Error while loading stream fields");
     }
   };
 
@@ -1020,7 +1017,6 @@ export const useStreamFields = () => {
       }
       return;
     } catch (e: any) {
-      console.log("Error while loading stream list");
     }
   };
 

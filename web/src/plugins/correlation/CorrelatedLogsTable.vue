@@ -1015,7 +1015,6 @@ const handleResetFilters = () => {
 };
 
 const handleRowClick = (row: any) => {
-  console.log("[CorrelatedLogsTable] Row clicked:", row);
 };
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
@@ -1035,11 +1034,6 @@ const handleAddSearchTerm = (
   fieldValue: string | number | boolean,
   action: string,
 ) => {
-  console.log("[CorrelatedLogsTable] Add search term:", {
-    field,
-    fieldValue,
-    action,
-  });
   emit("addSearchTerm", field, fieldValue, action);
 };
 
@@ -1118,7 +1112,6 @@ const handleColumnOrderChange = (newOrder: string[]) => {
   const newOrderStr = JSON.stringify(newOrder);
 
   if (currentOrder === newOrderStr) {
-    console.log("[CorrelatedLogsTable] Order unchanged, skipping update");
     return;
   }
 
@@ -1211,7 +1204,6 @@ const handleViewTrace = (log: any) => {
 
 const handleNestedCorrelation = (row: any) => {
   // Nested correlation is disabled (as per hideViewRelatedButton prop)
-  console.log("[CorrelatedLogsTable] Nested correlation disabled");
 };
 
 // Lifecycle
@@ -1229,7 +1221,6 @@ onBeforeUnmount(() => {
 watch(
   () => props.timeRange,
   (newRange) => {
-    console.log("[CorrelatedLogsTable] Time range changed:", newRange);
   },
   { deep: true },
 );

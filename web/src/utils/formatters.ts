@@ -13,7 +13,6 @@ export const b64EncodeUnicode = (str: string) => {
       .replace(/\//g, "_")
       .replace(/=/g, ".");
   } catch (e) {
-    console.log("Error: getBase64Encode: error while encoding.");
     return null;
   }
 };
@@ -31,7 +30,6 @@ export const b64DecodeUnicode = (str: string) => {
         .join(""),
     );
   } catch (e) {
-    console.log("Error: getBase64Decode: error while decoding.");
   }
 };
 
@@ -88,7 +86,6 @@ export const b64EncodeStandard = (str: string) => {
       ),
     );
   } catch (e) {
-    console.log("Error: getBase64Encode: error while encoding.");
   }
 };
 
@@ -102,7 +99,6 @@ export const b64DecodeStandard = (str: string) => {
         .join(""),
     );
   } catch (e) {
-    console.log("Error: getBase64Decode: error while decoding.");
   }
 };
 

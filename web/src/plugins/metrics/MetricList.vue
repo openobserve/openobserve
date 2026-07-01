@@ -424,7 +424,7 @@ export default defineComponent({
             });
           }
         })
-        .catch((err) => console.log(err))
+        .catch(() => {})
         .finally(() => {
           metricLabelValues.value[name].isLoading = false;
         });

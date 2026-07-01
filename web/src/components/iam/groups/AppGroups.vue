@@ -267,7 +267,6 @@ const setupGroups = async () => {
       updateTable();
     })
     .catch((err) => {
-      console.log(err);
     })
     .finally(() => {
       loading.value = false;

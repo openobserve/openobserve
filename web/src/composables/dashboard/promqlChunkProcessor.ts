@@ -86,13 +86,7 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
 
     if (enableLogging) {
       if (metricsCount > maxSeries) {
-        console.log(
-          `[PromQL Chunk] ⚠️ First chunk limited from ${metricsCount} to ${limitedResult.length} metrics`
-        );
       }
-      console.log(
-        `[PromQL Chunk] Built index for ${limitedResult.length} metrics in ${(performance.now() - startTime).toFixed(1)}ms`
-      );
     }
 
     return {
@@ -153,10 +147,6 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
     stats.metricsStored = mergedResult.length;
 
     if (enableLogging) {
-      console.log(
-        `[PromQL Chunk] Merged in ${(performance.now() - mergeStart).toFixed(1)}ms ` +
-          `(${newMetricsAdded} new metrics, ${valuesAppended} values appended)`
-      );
     }
 
     return {
@@ -175,9 +165,6 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
     const metricsCount = newData?.result?.length || 0;
 
     if (enableLogging) {
-      console.log(
-        `[PromQL Chunk] Chunk ${stats.chunkCount} received: ${metricsCount} metrics`
-      );
     }
 
     const result = !currentResult
@@ -185,9 +172,6 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
       : mergeChunk(currentResult, newData);
 
     if (enableLogging) {
-      console.log(
-        `[PromQL Chunk] Total chunk processing: ${(performance.now() - chunkStartTime).toFixed(1)}ms`
-      );
     }
 
     return result;
@@ -210,12 +194,6 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
     const finalStats = getStats();
 
     if (enableLogging) {
-      console.log(
-        `[PromQL Chunk] ✅ Processing complete! Total time: ${finalStats.totalTime.toFixed(0)}ms (${stats.chunkCount} chunks)`
-      );
-      console.log(
-        `[PromQL Chunk] Final metrics: ${stats.metricsStored} stored (${stats.totalMetricsReceived} received, ${stats.valuesAppended} values appended)`
-      );
     }
   }
 
