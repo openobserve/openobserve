@@ -5185,6 +5185,8 @@
       "nameLabel": "Name",
       "namePlaceholder": "e.g. \"faithfulness\"",
       "nameHelp": "Lowercase letters, numbers, underscores only. Used as a stable identifier.",
+      "nameRequired": "Name is required",
+      "nameFormat": "Use lowercase letters, numbers, and underscores only",
       "cannotBeRenamed": "Cannot be renamed",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "What does this dimension measure?",
