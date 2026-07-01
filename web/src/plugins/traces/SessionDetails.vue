@@ -1471,13 +1471,15 @@ function secondaryLine(trace: SessionTraceRow): string {
 // Turn-row chrome: colored left accent by status + a transient ring on jump.
 function turnRowClass(trace: SessionTraceRow): string {
   const n = originalTurnIndex(trace.traceId) + 1;
-  const accent =
+  // Status is conveyed by a subtle surface tint (red for errors) instead of a
+  // coloured left border — keeps the row chrome flat, matching the KPI tiles.
+  const surface =
     trace.status === "error"
-      ? "tw:border-l-[var(--o2-service-health-critical)]"
-      : "tw:border-l-[var(--o2-service-health-healthy)]";
+      ? "tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_5%,var(--o2-card-bg))]"
+      : "tw:bg-[var(--o2-card-bg)]";
   const flash =
     flashTurn.value === n ? " tw:ring-2 tw:ring-[#3b82f6]" : "";
-  return `tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:border-l-[3px] ${accent} tw:overflow-hidden tw:bg-[var(--o2-card-bg)]${flash}`;
+  return `tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] ${surface} tw:overflow-hidden${flash}`;
 }
 
 async function load() {
