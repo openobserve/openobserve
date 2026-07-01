@@ -17,11 +17,11 @@ use config::meta::synthetics::{
     BrowserConfig, ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticCookie,
     SyntheticFrequency, SyntheticSettings, SyntheticStatus, SyntheticType, SyntheticVariable,
 };
-use serde::{Deserialize, Serialize};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Set, TransactionTrait, TryIntoModel, prelude::Expr,
 };
+use serde::{Deserialize, Serialize};
 
 use super::entity::synthetics_monitors::{self, ActiveModel, Column, Entity};
 use crate::errors;
