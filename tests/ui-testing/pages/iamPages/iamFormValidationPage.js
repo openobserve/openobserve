@@ -84,6 +84,24 @@ export class IamFormValidationPage {
         this.updateRoleSaveBtn     = '[data-test="add-user-dialog"] [data-test="o-dialog-primary-btn"]';
         this.updateRoleCancelBtn   = '[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]';
 
+        // ── Add Role "Start from" preset (new) ────────────────────────────────
+        this.roleStartFromCustom   = '[data-test="add-role-start-from-custom-radio"]';
+        this.roleStartFromReadonly = '[data-test="add-role-start-from-readonly-radio"]';
+
+        // ── Edit Role / Edit Group pages (auto-route + dirty state, new) ───────
+        this.editRolePage          = '[data-test="edit-role-page"]';
+        this.editRolePermsSection  = '[data-test="edit-role-permissions-section"]';
+        this.editRolePermsTab      = '[data-test="tab-permissions"]';
+        this.editRolePermsDirtyDot = '[data-test="tab-permissions-dirty-dot"]';
+        this.editGroupSection      = '[data-test="edit-group-section"]';
+        this.editGroupRolesTab     = '[data-test="tab-roles"]';
+        this.editGroupRolesDirtyDot= '[data-test="tab-roles-dirty-dot"]';
+
+        // ── Confirm dialog (shared) — delete blast-radius warning banner (new) ─
+        this.confirmDialog         = '[data-test="confirm-dialog"]';
+        this.confirmDialogOkBtn    = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.confirmDialogCancelBtn= '[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]';
+
         // ── Toast / success messages ──────────────────────────────────────────
         this.toastSuccess          = '[data-test-variant="success"]';
         this.toastMessage          = '[data-test="o-toast-message"]';
@@ -206,6 +224,39 @@ export class IamFormValidationPage {
         await this.page.locator(this.roleCancelBtn).click();
     }
 
+    // Select the "Read-only" start-from preset before submitting the role form.
+    async selectRoleStartFromReadonly() {
+        await this.page.locator(this.roleStartFromReadonly).click();
+    }
+
+    // Delete the first role/group in the list via its row trash icon, keyed by name.
+    async clickDeleteRole(roleName) {
+        await this.page
+            .locator(`[data-test="iam-roles-delete-${roleName}-role-icon"]`)
+            .click();
+    }
+
+    async clickDeleteGroup(groupName) {
+        await this.page
+            .locator(`[data-test="iam-groups-delete-${groupName}-role-icon"]`)
+            .click();
+    }
+
+    // Toggle the first available permission checkbox on the Edit Role Permissions
+    // tab (used to dirty the tab). Returns true if a checkbox was found+clicked.
+    async toggleFirstPermissionCheckbox() {
+        const checkbox = this.page
+            .locator('[data-test*="-permissions-table-body-row-"][data-test$="-checkbox"]')
+            .first();
+        try {
+            await checkbox.waitFor({ state: 'visible', timeout: 15000 });
+            await checkbox.click();
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     // ── Service Account form actions ──────────────────────────────────────────
 
     async openServiceAccountForm() {
@@ -263,6 +314,17 @@ export class IamFormValidationPage {
     getRoleDialogLocator()        { return this.page.locator(this.roleDialog); }
     getSaDialogLocator()          { return this.page.locator(this.saDialog); }
     getAddUserDialogLocator()     { return this.page.locator(this.addUserDialog); }
+
+    // New-behavior getters (start-from, auto-route, delete banner, dirty dots)
+    getRoleStartFromCustomLocator()   { return this.page.locator(this.roleStartFromCustom); }
+    getRoleStartFromReadonlyLocator() { return this.page.locator(this.roleStartFromReadonly); }
+    getEditRolePageLocator()          { return this.page.locator(this.editRolePage); }
+    getEditRolePermsSectionLocator()  { return this.page.locator(this.editRolePermsSection); }
+    getEditRolePermsDirtyDotLocator() { return this.page.locator(this.editRolePermsDirtyDot); }
+    getEditGroupSectionLocator()      { return this.page.locator(this.editGroupSection); }
+    getConfirmDialogLocator()         { return this.page.locator(this.confirmDialog); }
+    getConfirmDialogOkBtnLocator()    { return this.page.locator(this.confirmDialogOkBtn); }
+    getConfirmDialogCancelBtnLocator(){ return this.page.locator(this.confirmDialogCancelBtn); }
     getUserEmailErrorLocator()    { return this.page.locator(this.userEmailError); }
     getUserPasswordErrorLocator() { return this.page.locator(this.userPasswordError); }
     getUserRoleErrorLocator()     { return this.page.locator(this.userRoleError); }

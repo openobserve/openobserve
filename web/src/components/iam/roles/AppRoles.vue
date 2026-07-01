@@ -21,9 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="t('iam.roles')"
       icon="shield"
-      :subtitle="'Define permissions and access policies'"
       class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
+      <template #subtitle>
+        <span data-test="iam-roles-subtitle">
+          {{ t('iam.rolesPage.subtitle') }}
+        </span>
+      </template>
       <template #actions>
         <OButton
           data-test="alert-list-add-alert-btn"
@@ -53,11 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <AddRole
     v-model:open="showAddGroup"
-    @added:role="setupRoles"
+    @added:role="onRoleAdded"
   />
   <ConfirmDialog
     title="Delete Role"
     :message="`Are you sure you want to delete '${deleteConformDialog?.data?.role_name as string}' role?`"
+    :warning-message="deleteImpactMessage"
     @update:ok="_deleteRole"
     @update:cancel="deleteConformDialog.show = false"
     v-model="deleteConformDialog.show"
@@ -65,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     title="Bulk Delete Roles"
     :message="`Are you sure you want to delete ${selectedRoleNames.length} role(s)?`"
+    :warning-message="bulkDeleteImpactMessage"
     @update:ok="bulkDeleteUserRoles"
     @update:cancel="confirmBulkDelete = false"
     v-model="confirmBulkDelete"
@@ -79,7 +85,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { useI18n } from "vue-i18n";
 import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";
-import { getRoles, deleteRole, bulkDeleteRoles } from "@/services/iam";
+import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -136,6 +142,29 @@ const addRole = () => {
   showAddGroup.value = true;
 };
 
+// After a role is created, route straight into EditRole on the Permissions tab
+// so the user can start assigning permissions instead of being dropped back on
+// the list with an empty, useless role. The "Read-only" preset is passed
+// through so EditRole can seed the starting permissions.
+const onRoleAdded = (payload: { role_name: string; startFrom?: string }) => {
+  if (!payload?.role_name) {
+    setupRoles();
+    return;
+  }
+
+  router.push({
+    name: "editRole",
+    params: {
+      role_name: payload.role_name,
+    },
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+      tab: "permissions",
+      ...(payload.startFrom === "readonly" ? { preset: "readonly" } : {}),
+    },
+  });
+};
+
 const editRole = (role: any) => {
   router.push({
     name: "editRole",
@@ -189,9 +218,31 @@ const deleteUserRole = (role: any) => {
     });
 };
 
-const showConfirmDialog = (row: any) => {
+// Blast-radius warning for the single-role delete dialog. We resolve the live
+// user count with one getRoleUsers call on delete-click (the list payload has
+// no counts), and always warn about bound service accounts via static copy
+// since there is no role→service-accounts count endpoint.
+const deleteImpactMessage = ref("");
+
+const showConfirmDialog = async (row: any) => {
   deleteConformDialog.value.show = true;
   deleteConformDialog.value.data = row;
+  deleteImpactMessage.value = t("iam.rolesPage.delete.impact", { count: 0 });
+
+  try {
+    const res = await getRoleUsers(
+      row.role_name,
+      store.state.selectedOrganization.identifier,
+    );
+    const userCount = Array.isArray(res.data) ? res.data.length : 0;
+    deleteImpactMessage.value = t("iam.rolesPage.delete.impact", {
+      count: userCount,
+    });
+  } catch (err) {
+    // If the count lookup fails, keep the generic static warning rather than
+    // blocking the delete.
+    console.log(err);
+  }
 };
 
 const _deleteRole = () => {
@@ -199,8 +250,33 @@ const _deleteRole = () => {
   deleteConformDialog.value.data = null;
 };
 
-const openBulkDeleteDialog = () => {
+// Blast-radius warning for the bulk-delete dialog. With exactly one role
+// selected we resolve its live user count (one getRoleUsers call), matching the
+// per-row delete. For 2+ roles we keep static copy to avoid N requests.
+const bulkDeleteImpactMessage = ref("");
+
+const openBulkDeleteDialog = async () => {
   confirmBulkDelete.value = true;
+
+  if (selectedRoleNames.value.length === 1) {
+    bulkDeleteImpactMessage.value = t("iam.rolesPage.delete.impact", {
+      count: 0,
+    });
+    try {
+      const res = await getRoleUsers(
+        selectedRoleNames.value[0],
+        store.state.selectedOrganization.identifier,
+      );
+      const userCount = Array.isArray(res.data) ? res.data.length : 0;
+      bulkDeleteImpactMessage.value = t("iam.rolesPage.delete.impact", {
+        count: userCount,
+      });
+    } catch (err) {
+      console.log(err);
+    }
+  } else {
+    bulkDeleteImpactMessage.value = t("iam.rolesPage.bulkDelete.impact");
+  }
 };
 
 const bulkDeleteUserRoles = async () => {
