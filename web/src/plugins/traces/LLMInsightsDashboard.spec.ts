@@ -281,8 +281,13 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
   it("restores KPI from cache on a same-window reload (no refetch)", async () => {
     const wrapper = mountDashboard();
     await flushPromises();
-    expect(mockFetchAll).toHaveBeenCalledTimes(1); // onMounted
+    // The insights fetch is parent-driven — trigger the first fetch via the
+    // exposed refresh(), which populates the KPI cache for this window.
+    await (wrapper.vm as any).refresh();
+    await flushPromises();
+    expect(mockFetchAll).toHaveBeenCalledTimes(1);
     mockFetchAll.mockClear();
+    // Same window + selection, non-forced → served from the cache snapshot.
     await (wrapper.vm as any).loadInsights();
     expect(mockFetchAll).not.toHaveBeenCalled();
   });
@@ -356,13 +361,19 @@ describe("LLMInsightsDashboard — onStreamChange", () => {
 // ===========================================================================
 
 describe("LLMInsightsDashboard — onMounted", () => {
-  // First-time visit: loadTraceStreams runs, then loadInsights fires
-  // once with the resolved stream. We assert getStreams was called
-  // (so the dashboard discovered LLM streams) and fetchAll fired.
-  it("fetches streams then loads insights on first mount", async () => {
-    mountDashboard();
+  // First-time visit: onMounted loads the stream list ONLY — the insights
+  // fetch is owned by the parent (via the exposed refresh()), so we don't
+  // double-fetch on load. Mount discovers streams; the parent's refresh()
+  // is what fires fetchAll.
+  it("loads streams on mount but leaves the insights fetch to the parent", async () => {
+    const wrapper = mountDashboard();
     await flushPromises();
     expect(mockGetStreams).toHaveBeenCalled();
+    // Mount alone must NOT fetch — that's the parent's job.
+    expect(mockFetchAll).not.toHaveBeenCalled();
+    // Parent-driven fetch.
+    await (wrapper.vm as any).refresh();
+    await flushPromises();
     expect(mockFetchAll).toHaveBeenCalled();
   });
 

@@ -372,20 +372,25 @@ describe("ThreadView", () => {
       });
     }
 
-    it("should render a tool call card when the turn has tool spans", () => {
+    // The tool thread renders COLLAPSED (a "Show calls" pill). The per-tool
+    // rows/pills/view button/body only exist once the thread is revealed.
+    async function reveal(w: VueWrapper) {
+      await w.find(".tt-toggle").trigger("click");
+    }
+
+    it("should render a tool call thread when the turn has tool spans", () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p");
       wrapper = mountThreadView({ spans: [llm, tool] });
-      const card = wrapper.find(".thread-tools-card");
-      expect(card.exists()).toBe(true);
+      expect(wrapper.find(".thread-tools-thread").exists()).toBe(true);
     });
 
-    it("should display the tool call count in the card header", () => {
+    it("should display the tool call count in the collapsed toggle", () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p");
       wrapper = mountThreadView({ spans: [llm, tool] });
-      const header = wrapper.find(".thread-tools-card__header");
-      expect(header.text()).toContain("1 Tool call");
+      const count = wrapper.find(".tt-count");
+      expect(count.text().replace(/\s+/g, " ")).toContain("1 tool call");
     });
 
     it("should use pluralised label for multiple tool calls", () => {
@@ -393,14 +398,22 @@ describe("ThreadView", () => {
       const t1 = makeLinkedToolSpan("llm-p", { span_id: "tool-1" });
       const t2 = makeLinkedToolSpan("llm-p", { span_id: "tool-2", tool_name: "write_file" });
       wrapper = mountThreadView({ spans: [llm, t1, t2] });
-      const header = wrapper.find(".thread-tools-card__header");
-      expect(header.text()).toContain("2 Tool calls");
+      const count = wrapper.find(".tt-count");
+      expect(count.text().replace(/\s+/g, " ")).toContain("2 tool calls");
     });
 
-    it("should not show tool body by default (collapsed)", () => {
+    it("should not show tool rows until the thread is revealed", () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p");
       wrapper = mountThreadView({ spans: [llm, tool] });
+      expect(wrapper.find(".thread-tool-row").exists()).toBe(false);
+    });
+
+    it("should not show tool body by default (collapsed)", async () => {
+      const llm = makeLLMSpan({ span_id: "llm-p" });
+      const tool = makeLinkedToolSpan("llm-p");
+      wrapper = mountThreadView({ spans: [llm, tool] });
+      await reveal(wrapper);
       const body = wrapper.find(".thread-tool-body");
       expect(body.exists()).toBe(false);
     });
@@ -409,6 +422,7 @@ describe("ThreadView", () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p");
       wrapper = mountThreadView({ spans: [llm, tool] });
+      await reveal(wrapper);
       const row = wrapper.find(".thread-tool-row");
       await row.trigger("click");
       const body = wrapper.find(".thread-tool-body");
@@ -419,6 +433,7 @@ describe("ThreadView", () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p");
       wrapper = mountThreadView({ spans: [llm, tool] });
+      await reveal(wrapper);
       const row = wrapper.find(".thread-tool-row");
       await row.trigger("click"); // expand
       await row.trigger("click"); // collapse
@@ -433,6 +448,7 @@ describe("ThreadView", () => {
         gen_ai_output_messages: JSON.stringify({ result: "ok" }),
       });
       wrapper = mountThreadView({ spans: [llm, tool] });
+      await reveal(wrapper);
       const row = wrapper.find(".thread-tool-row");
       await row.trigger("click");
       const labels = wrapper.findAll(".thread-tool-body__label");
@@ -445,6 +461,7 @@ describe("ThreadView", () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p", { span_id: "tool-xyz" });
       wrapper = mountThreadView({ spans: [llm, tool] });
+      await reveal(wrapper);
       const viewBtn = wrapper.find(".thread-tool-row__view");
       await viewBtn.trigger("click");
       const emitted = wrapper.emitted("span-selected");
@@ -452,19 +469,21 @@ describe("ThreadView", () => {
       expect(emitted![0]).toEqual(["tool-xyz"]);
     });
 
-    it("should show ERROR pill when tool span has ERROR status", () => {
+    it("should show ERROR pill when tool span has ERROR status", async () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p", { span_status: "ERROR" });
       wrapper = mountThreadView({ spans: [llm, tool] });
+      await reveal(wrapper);
       const errorPill = wrapper.find(".thread-pill--error");
       expect(errorPill.exists()).toBe(true);
       expect(errorPill.text()).toContain("ERROR");
     });
 
-    it("should show OK pill when tool span is not in error state", () => {
+    it("should show OK pill when tool span is not in error state", async () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const tool = makeLinkedToolSpan("llm-p", { span_status: "UNSET" });
       wrapper = mountThreadView({ spans: [llm, tool] });
+      await reveal(wrapper);
       const okPill = wrapper.find(".thread-pill--ok");
       expect(okPill.exists()).toBe(true);
     });
