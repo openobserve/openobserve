@@ -55,16 +55,37 @@ reoInit();
 
 // app.use(SearchPlugin);
 
+interface ConfigResponse {
+  data?: {
+    telemetry_enabled?: boolean;
+    commit_hash?: string;
+    rum?: {
+      enabled: boolean;
+      client_token: string;
+      application_id: string;
+      site: string;
+      service: string;
+      env: string;
+      version?: string;
+      organization_identifier: string;
+      insecure_http?: boolean;
+      api_version?: string;
+    };
+  };
+}
+
 const getConfig = async () => {
-  await configService.get_config().then((res: any) => {
+  await configService.get_config().then((res: ConfigResponse) => {
+    if (!res.data) return;
+
     store.dispatch("setConfig", res.data);
-    config.enableAnalytics = res.data.telemetry_enabled.toString();
+    config.enableAnalytics = res.data.telemetry_enabled?.toString() ?? "false";
 
     // Store initial commit hash for version checking
     if (res.data.commit_hash) {
       buildVersionChecker.setInitialVersion(res.data.commit_hash);
     }
-    if (res.data.rum.enabled) {
+    if (res.data.rum?.enabled) {
       const options = {
         clientToken: res.data.rum.client_token,
         applicationId: res.data.rum.application_id,
