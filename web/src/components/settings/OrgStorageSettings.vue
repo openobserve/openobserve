@@ -184,13 +184,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:text-base tw:font-medium" style="font-weight: 700; line-height: 1.3;">
                 {{ configuredProviderLabel }}
               </div>
-              <OBadge
-                variant="success"
+              <OTag
+                type="activeFlag"
                 style="font-size: 11px; padding: 2px 8px; margin-top: 4px;"
               >
-                <OIcon name="check-circle" size="xs" style="margin-right: 3px;" />
                 {{ t("storage_settings.active") }}
-              </OBadge>
+              </OTag>
             </div>
           </div>
           <OButton
@@ -277,7 +276,7 @@ import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';

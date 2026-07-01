@@ -64,17 +64,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              used in the Incident list (no heavy ring/icon). -->
         <template v-if="incidentDetails && !isEditingTitle">
           <span class="tw:inline-flex tw:cursor-default">
-            <OBadge :variant="getStatusVariant(incidentDetails.status)" dot size="sm">{{ getStatusLabel(incidentDetails.status) }}</OBadge>
+            <OTag type="incidentStatus" :value="incidentDetails.status" />
             <OTooltip :content="t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)" />
           </span>
 
           <span class="tw:inline-flex tw:cursor-default">
-            <OBadge :variant="getSeverityVariant(incidentDetails.severity)" dot size="sm">{{ incidentDetails.severity }}</OBadge>
+            <OTag type="severity" :value="incidentDetails.severity" />
             <OTooltip :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
           </span>
 
           <span class="tw:inline-flex tw:cursor-default">
-            <OBadge variant="primary-soft" dot size="sm">{{ triggers.length }} Alerts</OBadge>
+            <OTag type="countChip" value="alerts">{{ triggers.length }} Alerts</OTag>
             <OTooltip :content="t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'" />
           </span>
         </template>
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #default>
               <div class="tw:flex tw:items-center tw:gap-1.5">
                 <span>{{ t('alerts.incidents.alertTriggers') }}</span>
-                <OBadge variant="default-soft" size="sm">{{ triggers.length }}</OBadge>
+                <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
               </div>
             </template>
           </OTab>
@@ -616,11 +616,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :class="editableStatus === option.value ? 'tw:cursor-default' : 'tw:cursor-pointer'"
                         :data-test="`incident-manage-status-${option.value}`"
                       >
-                        <OBadge
-                          :variant="editableStatus === option.value ? getStatusVariant(option.value) : 'default-soft'"
+                        <OTag
+                          :type="editableStatus === option.value ? 'incidentStatus' : 'countChip'"
+                          :value="editableStatus === option.value ? option.value : 'neutral'"
                           dot
-                          size="sm"
-                        >{{ option.label }}</OBadge>
+                        >{{ option.label }}</OTag>
                       </button>
                     </div>
                   </div>
@@ -644,11 +644,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`incident-manage-severity-${option.value}`"
                       >
                         <!-- Selected → semantic severity colour; unselected → neutral grey. -->
-                        <OBadge
-                          :variant="editableSeverity === option.value ? getSeverityVariant(option.value) : 'default-soft'"
+                        <OTag
+                          :type="editableSeverity === option.value ? 'severity' : 'countChip'"
+                          :value="editableSeverity === option.value ? option.value : 'neutral'"
                           dot
-                          size="sm"
-                        >{{ option.label }}</OBadge>
+                        >{{ option.label }}</OTag>
                       </button>
                     </div>
                   </div>
@@ -879,7 +879,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OTag
                             type="streamType"
                             :value="alerts[selectedAlertIndex]?.stream_type || 'N/A'"
-                            size="sm"
                             class="tw:w-fit"
                           />
                         </div>
@@ -1167,9 +1166,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -1191,7 +1188,6 @@ export default defineComponent({
     OSpinner,
     OTooltip,
     OIcon,
-    OBadge,
     OTag,
 },
   emits: ['close', 'status-updated', 'sendToAiChat'],
@@ -2159,19 +2155,6 @@ export default defineComponent({
       }
     };
 
-    const getStatusVariant = (status: string): BadgeVariant => {
-      switch (status) {
-        case "open":
-          return "error-soft";
-        case "acknowledged":
-          return "warning-soft";
-        case "resolved":
-          return "success-soft";
-        default:
-          return "default-soft";
-      }
-    };
-
     const getStatusLabel = (status: string) => {
       switch (status) {
         case "open":
@@ -2199,24 +2182,6 @@ export default defineComponent({
           return "#6b7280"; // gray-500
       }
     };
-
-    // Matches the incident-list severity badge colours (P1→error, P2→orange,
-    // P3→amber, P4→blue) so a severity reads the same here and in the list.
-    const getSeverityVariant = (severity: string): BadgeVariant => {
-      switch (severity) {
-        case "P1":
-          return "error-soft";
-        case "P2":
-          return "orange-soft";
-        case "P3":
-          return "amber-soft";
-        case "P4":
-          return "blue-soft";
-        default:
-          return "default-soft";
-      }
-    };
-
 
     const formatPeriod = (periodInSeconds: number | undefined) => {
       if (!periodInSeconds) return 'N/A';
@@ -2889,10 +2854,8 @@ export default defineComponent({
       handleStatusChange,
       handleSeverityChange,
       handleTriggerRowClick,
-      getStatusVariant,
       getStatusLabel,
       getSeverityColorHex,
-      getSeverityVariant,
       formatPeriod,
       formatCustomConditions,
       formatTimestamp,

@@ -100,17 +100,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-name="{ row }">
           <div class="tw:flex tw:items-center tw:gap-2">
             <span>{{ row.name }}</span>
-            <span
+            <OTag
               v-if="row.isPrebuilt"
-              class="dimension-badge badge-blue"
+              type="dimensionKey"
+              :value="'deployment'"
               :title="t('alert_templates.prebuiltBadgeHint')"
               data-test="alert-template-prebuilt-badge"
-            >{{ t('alert_templates.prebuiltBadge') }}</span>
-            <span
+            >{{ t('alert_templates.prebuiltBadge') }}</OTag>
+            <OTag
               v-else
-              class="dimension-badge"
+              type="fieldTag"
+              value="soft"
               data-test="alert-template-custom-badge"
-            >{{ t('alert_templates.customBadge') }}</span>
+            >{{ t('alert_templates.customBadge') }}</OTag>
           </div>
         </template>
         <template #cell-actions="{ row }">
@@ -229,6 +231,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import ImportTemplate from "./ImportTemplate.vue";
@@ -592,39 +595,4 @@ const bulkDeleteTemplates = () => {
 };
 </script>
 <style lang="scss" scoped>
-// Badge style copied from ModelPricingList.vue so the "Prebuilt" / "Default"
-// labels match the LLM-pricing list visually.
-.dimension-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  border: 1px solid #d1d5db;
-  color: inherit;
-}
-
-.badge-blue {
-  border: 1px solid #1d4ed8;
-}
-
-.badge-green {
-  border: 1px solid #065f46;
-}
-
-:global(body.body--dark) .dimension-badge {
-  color: #ffffff;
-  border-color: #4b5563;
-}
-
-:global(body.body--dark) .badge-blue {
-  border-color: #93c5fd;
-}
-
-:global(body.body--dark) .badge-green {
-  border-color: #6ee7b7;
-}
 </style>

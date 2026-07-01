@@ -53,15 +53,12 @@
               <OTooltip content="These stable dimensions were used to find related telemetry" />
             </div>
             <div class="service-dimensions">
-              <OBadge
+              <ODimensionChip
                 v-for="(value, key) in correlationResult.correlationData.matched_dimensions"
                 :key="`matched-${key}`"
-                size="sm"
-                variant="success"
-              >
-                <span class="dimension-key">{{ key }}:</span>
-                <span class="dimension-value">{{ value }}</span>
-              </OBadge>
+                :dim-key="String(key)"
+                :value="value"
+              />
             </div>
           </div>
 
@@ -77,15 +74,12 @@
               <OTooltip content="These additional dimensions can be used for more specific filtering" />
             </div>
             <div class="service-dimensions">
-              <OBadge
+              <ODimensionChip
                 v-for="(value, key) in correlationResult.correlationData.additional_dimensions"
                 :key="`additional-${key}`"
-                size="sm"
-                variant="default-outline"
-              >
-                <span class="dimension-key">{{ key }}:</span>
-                <span class="dimension-value">{{ value }}</span>
-              </OBadge>
+                :dim-key="String(key)"
+                :value="value"
+              />
             </div>
           </div>
 
@@ -94,14 +88,12 @@
             v-if="!correlationResult.correlationData"
             class="service-dimensions"
           >
-            <OBadge
+            <ODimensionChip
               v-for="(value, key) in correlationResult.service.dimensions"
               :key="key"
-              size="sm"
-            >
-              <span class="dimension-key">{{ key }}:</span>
-              <span class="dimension-value">{{ value }}</span>
-            </OBadge>
+              :dim-key="String(key)"
+              :value="value"
+            />
           </div>
         </div>
 
@@ -201,6 +193,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 
 interface Props {
   show: boolean;
@@ -399,15 +392,6 @@ function navigateToQuery(query: CorrelationQuery, type: "logs" | "traces" | "met
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-
-    .dimension-key {
-      font-weight: 500;
-      margin-right: 4px;
-    }
-
-    .dimension-value {
-      opacity: 0.9;
-    }
   }
 }
 

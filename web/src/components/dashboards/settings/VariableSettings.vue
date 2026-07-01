@@ -105,25 +105,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="item-scope">
                 <div class="scope-info">
-                  <OBadge
-                    variant="primary-soft"
+                  <OTag
+                    type="variableScope"
+                    value="global"
                     class="tw:ring-1 tw:ring-inset tw:ring-current"
                     v-if="getScopeType(variable) === 'global'"
                   >
                     Global
-                  </OBadge>
-                  <OBadge
-                    variant="primary-outline"
+                  </OTag>
+                  <OTag
+                    type="variableScope"
+                    value="tabs"
                     v-else-if="getScopeType(variable) === 'tabs'"
                   >
                     {{ variable.tabs?.length || 0 }} Tabs
-                  </OBadge>
-                  <OBadge
-                    variant="primary-outline"
+                  </OTag>
+                  <OTag
+                    type="variableScope"
+                    value="panels"
                     v-else-if="getScopeType(variable) === 'panels'"
                   >
                     {{ variable.panels?.length || 0 }} Panels
-                  </OBadge>
+                  </OTag>
 
                   <OTooltip
                     v-if="getScopeType(variable) === 'tabs' && variable.tabs?.length"
@@ -224,7 +227,7 @@ import useNotifications from "@/composables/useNotifications";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 export default defineComponent({
   name: "VariableSettings",
@@ -238,7 +241,7 @@ export default defineComponent({
     OButton,
     OIcon,
     ODialog,
-    OBadge,
+    OTag,
     OTooltip,
   },
   emits: ["save"],

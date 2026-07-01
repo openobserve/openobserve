@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="feature-name">
                   {{ feature.name }}
                   <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
-                  <span v-if="feature.beta" class="beta-badge">BETA</span>
+                  <OTag v-if="feature.beta" type="featureFlag" value="beta" />
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
               </div>
@@ -197,11 +197,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="feature-name">
                   {{ feature.name }}
                   <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
-                  <span v-if="feature.beta" class="beta-badge">BETA</span>
-                  <span v-if="feature.requiresHA" class="ha-badge">
+                  <OTag v-if="feature.beta" type="featureFlag" value="beta" />
+                  <OTag v-if="feature.requiresHA" type="featureFlag" value="ha">
                     HA
                     <OTooltip side="top" align="center" :sideOffset="8" :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')" />
-                  </span>
+                  </OTag>
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
               </div>
@@ -225,6 +225,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const ChartRenderer = defineAsyncComponent(
@@ -281,6 +282,7 @@ export default defineComponent({
     ODialog,
     OSkeleton,
     OTooltip,
+    OTag,
   },
   props: {
     modelValue: {
@@ -1378,35 +1380,6 @@ export default defineComponent({
       vertical-align: middle;
     }
 
-    .ha-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 7px;
-      background: rgba(var(--q-primary-rgb), 0.15);
-      color: var(--q-primary);
-      border-radius: 4px;
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      line-height: 1;
-      cursor: pointer;
-      margin-left: 4px;
-    }
-
-    .beta-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 1px 4px;
-      color: var(--q-primary);
-      border: 1px solid var(--q-primary);
-      border-radius: 10px;
-      font-size: 8px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      line-height: 1.4;
-      text-transform: uppercase;
-    }
-
     .feature-desc {
       font-size: 11px;
       color: rgba(0, 0, 0, 0.55);
@@ -1461,16 +1434,6 @@ body.body--dark {
 
       .feature-name {
         color: rgba(255, 255, 255, 0.95);
-      }
-
-      .ha-badge {
-        background: rgba(var(--q-primary-rgb), 0.2);
-        color: var(--q-primary);
-      }
-
-      .beta-badge {
-        color: var(--q-primary);
-        border-color: var(--q-primary);
       }
 
       .feature-desc {

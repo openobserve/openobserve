@@ -211,17 +211,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div v-else class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
                 <span class="set-id-badge">{{ row.set_id }}</span>
-                <span
+                <ODimensionChip
                   v-for="[key, value] in Object.entries(
                     row.disambiguation,
                   ).sort(([a], [b]) => a.localeCompare(b))"
                   :key="`${key}=${value}`"
-                  class="dimension-badge"
-                  :class="getDimensionColorClass(key)"
-                >
-                  <span class="tw:font-medium">{{ key }}</span
-                  >=<span>{{ value }}</span>
-                </span>
+                  :dim-key="key"
+                  :value="value"
+                />
                 <span
                   v-if="Object.keys(row.disambiguation).length === 0"
                   class="tw:text-xs tw:italic no-dimensions-text"
@@ -231,29 +228,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-telemetry="{ row }">
               <div v-if="row.__type === 'group'" class="instance-telemetry-grid">
-                <span
+                <OTag
                   v-if="row.totalLogs > 0"
-                  class="telemetry-badge telemetry-logs"
-                  >{{ t("settings.correlation.logs") }}</span
-                >
+                  type="streamType"
+                  :value="'logs'"
+                />
                 <span v-else class="telemetry-slot-empty"></span>
-                <span
+                <OTag
                   v-if="row.totalTraces > 0"
-                  class="telemetry-badge telemetry-traces"
-                  >{{ t("settings.correlation.traces") }}</span
-                >
+                  type="streamType"
+                  :value="'traces'"
+                />
                 <span v-else class="telemetry-slot-empty"></span>
-                <span
+                <OTag
                   v-if="row.totalMetrics > 0"
-                  class="telemetry-badge telemetry-metrics"
-                  >{{ t("settings.correlation.metrics") }}</span
-                >
+                  type="streamType"
+                  :value="'metrics'"
+                />
                 <span v-else class="telemetry-slot-empty"></span>
               </div>
               <div v-else class="instance-telemetry-grid">
-                <span
+                <OTag
                   v-if="row.logs_streams.length > 0"
-                  class="telemetry-badge telemetry-sm telemetry-logs"
+                  type="streamType"
+                  :value="'logs'"
                 >
                   <OTooltip
                     :content="row.logs_streams.join(', ')"
@@ -264,12 +262,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       count: row.logs_streams.length,
                     })
                   }}
-                </span>
+                </OTag>
                 <span v-else class="telemetry-slot-empty"></span>
 
-                <span
+                <OTag
                   v-if="row.traces_streams.length > 0"
-                  class="telemetry-badge telemetry-sm telemetry-traces"
+                  type="streamType"
+                  :value="'traces'"
                 >
                   <OTooltip
                     :content="row.traces_streams.join(', ')"
@@ -280,12 +279,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       count: row.traces_streams.length,
                     })
                   }}
-                </span>
+                </OTag>
                 <span v-else class="telemetry-slot-empty"></span>
 
-                <span
+                <OTag
                   v-if="row.metrics_streams.length > 0"
-                  class="telemetry-badge telemetry-sm telemetry-metrics"
+                  type="streamType"
+                  :value="'metrics'"
                 >
                   <OTooltip
                     :content="row.metrics_streams.join(', ')"
@@ -296,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       count: row.metrics_streams.length,
                     })
                   }}
-                </span>
+                </OTag>
                 <span v-else class="telemetry-slot-empty"></span>
               </div>
             </template>
@@ -383,17 +383,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="tw:flex tw:flex-wrap tw:gap-1.5"
           >
-            <span
+            <ODimensionChip
               v-for="[key, value] in Object.entries(
                 selectedService.disambiguation,
               ).sort(([a], [b]) => a.localeCompare(b))"
               :key="`${key}=${value}`"
-              class="dimension-badge"
-              :class="getDimensionColorClass(key)"
-            >
-              <span class="tw:font-medium">{{ key }}</span
-              >=<span>{{ value }}</span>
-            </span>
+              :dim-key="key"
+              :value="value"
+            />
           </div>
           <div v-else class="panel-empty-text">
             {{ t("settings.correlation.noDimensionsCatchAll") }}
@@ -411,10 +408,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="selectedService && selectedService.logs_streams.length > 0"
             >
               <div class="panel-signal-row">
-                <span
-                  class="telemetry-badge telemetry-logs panel-signal-type"
-                  >{{ t("settings.correlation.logs") }}</span
-                >
+                <OTag
+                  type="streamType"
+                  :value="'logs'"
+                  class="panel-signal-type"
+                />
                 <div class="tw:flex tw:flex-wrap tw:gap-1.5">
                   <span
                     v-for="stream in selectedService.logs_streams"
@@ -433,10 +431,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <div class="panel-signal-row">
-                <span
-                  class="telemetry-badge telemetry-traces panel-signal-type"
-                  >{{ t("settings.correlation.traces") }}</span
-                >
+                <OTag
+                  type="streamType"
+                  :value="'traces'"
+                  class="panel-signal-type"
+                />
                 <div class="tw:flex tw:flex-wrap tw:gap-1.5">
                   <span
                     v-for="stream in selectedService.traces_streams"
@@ -455,10 +454,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <div class="panel-signal-row">
-                <span
-                  class="telemetry-badge telemetry-metrics panel-signal-type"
-                  >{{ t("settings.correlation.metrics") }}</span
-                >
+                <OTag
+                  type="streamType"
+                  :value="'metrics'"
+                  class="panel-signal-type"
+                />
                 <div class="tw:flex tw:flex-wrap tw:gap-1.5">
                   <span
                     v-for="stream in selectedService.metrics_streams"
@@ -529,6 +529,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -860,44 +862,6 @@ const totalInstances = computed(() =>
   filteredGroups.value.filter((r: any) => r.__type === 'group').reduce((sum: number, g: any) => sum + g.instances.length, 0),
 );
 
-const getDimensionColorClass = (key: string): string => {
-  const colorMap: Record<string, string> = {
-    "k8s-deployment": "badge-blue",
-    "k8s-namespace": "badge-orange",
-    "k8s-cluster": "badge-indigo",
-    deployment: "badge-blue",
-    namespace: "badge-orange",
-    cluster: "badge-indigo",
-    env: "badge-green",
-    environment: "badge-green",
-    host: "badge-purple",
-    hostname: "badge-purple",
-    service: "badge-cyan",
-    service_name: "badge-cyan",
-    region: "badge-pink",
-    zone: "badge-pink",
-    pod: "badge-teal",
-    container: "badge-red",
-    app: "badge-yellow",
-    application: "badge-yellow",
-  };
-
-  if (colorMap[key]) return colorMap[key];
-
-  const lowerKey = key.toLowerCase();
-  for (const [pattern, className] of Object.entries(colorMap)) {
-    if (lowerKey.includes(pattern)) return className;
-  }
-
-  const classes = ["badge-gray", "badge-amber", "badge-violet", "badge-rose"];
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash << 5) - hash + key.charCodeAt(i);
-    hash = hash & hash;
-  }
-  return classes[Math.abs(hash) % classes.length];
-};
-
 const loadServices = async (isRefresh = false) => {
   if (isRefresh) {
     refreshing.value = true;
@@ -1096,82 +1060,6 @@ onMounted(() => {
   color: #c4b5fd;
   border-color: #7c3aed;
 }
-
-/* Dimension badges */
-.dimension-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.125rem;
-  padding: 0.1875rem 0.625rem;
-  border-radius: 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.badge-more {
-  background: #e5e7eb;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-/* Telemetry badges */
-.telemetry-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.75rem;
-  border-radius: 0.375rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.telemetry-sm {
-  padding: 0.1875rem 0.625rem;
-  font-size: 0.75rem;
-}
-
-.telemetry-logs { border: 1px solid #1d4ed8; }
-.telemetry-traces { border: 1px solid #c2410c; }
-.telemetry-metrics { border: 1px solid #065f46; }
-.telemetry-inactive { border: 1px solid #9ca3af; color: #9ca3af; }
-
-/* Dimension color palette */
-.badge-blue { border: 1px solid #1d4ed8; }
-.badge-green { border: 1px solid #065f46; }
-.badge-yellow { border: 1px solid #92400e; }
-.badge-pink { border: 1px solid #9f1239; }
-.badge-purple { border: 1px solid #7c3aed; }
-.badge-orange { border: 1px solid #c2410c; }
-.badge-cyan { border: 1px solid #0e7490; }
-.badge-indigo { border: 1px solid #4f46e5; }
-.badge-teal { border: 1px solid #0f766e; }
-.badge-red { border: 1px solid #dc2626; }
-.badge-gray { border: 1px solid #4b5563; }
-.badge-amber { border: 1px solid #d97706; }
-.badge-violet { border: 1px solid #7c3aed; }
-.badge-rose { border: 1px solid #e11d48; }
-
-/* Dark mode */
-.ds-dark .badge-more { background: #4b5563; color: #d1d5db; }
-.ds-dark .telemetry-logs { border-color: #93c5fd; }
-.ds-dark .telemetry-traces { border-color: #fdba74; }
-.ds-dark .telemetry-metrics { border-color: #6ee7b7; }
-.ds-dark .telemetry-inactive { border-color: #6b7280; color: #6b7280; }
-.ds-dark .badge-blue { border-color: #93c5fd; }
-.ds-dark .badge-green { border-color: #6ee7b7; }
-.ds-dark .badge-yellow { border-color: #fcd34d; }
-.ds-dark .badge-pink { border-color: #f9a8d4; }
-.ds-dark .badge-purple { border-color: #c4b5fd; }
-.ds-dark .badge-orange { border-color: #fdba74; }
-.ds-dark .badge-cyan { border-color: #67e8f9; }
-.ds-dark .badge-indigo { border-color: #a5b4fc; }
-.ds-dark .badge-teal { border-color: #5eead4; }
-.ds-dark .badge-red { border-color: #fca5a5; }
-.ds-dark .badge-gray { border-color: #d1d5db; }
-.ds-dark .badge-amber { border-color: #fbbf24; }
-.ds-dark .badge-violet { border-color: #c4b5fd; }
-.ds-dark .badge-rose { border-color: #fda4af; }
 
 /* Side panel */
 .panel-warning-banner {

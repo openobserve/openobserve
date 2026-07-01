@@ -107,9 +107,9 @@
             <h4 class="sd-section__title">{{ t("onlineEvals.scorer.detail.configurationSection") }}</h4>
             <dl class="sd-kv">
               <dt>{{ t("onlineEvals.scorer.detail.scorerTypeLabel") }}</dt>
-              <dd>
-                <span class="sd-type-chip" :class="`sd-type-chip--${scorerType}`">{{ scorerTypeLabel }}</span>
-                <span class="sd-version-chip">v{{ row.version }}</span>
+              <dd class="sd-type-row">
+                <OTag type="scorerType" :value="scorerType">{{ scorerTypeLabel }}</OTag>
+                <OTag type="fieldTag" value="soft">v{{ row.version }}</OTag>
               </dd>
 
               <template v-if="scorerType === 'llm_judge'">
@@ -253,10 +253,7 @@
               <span class="sd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
             </template>
             <template #cell-status="{ row }">
-              <span class="sd-status-cell" :class="`sd-status-cell--${row.status}`">
-                <span class="sd-status-cell__dot" />
-                {{ row.status }}
-              </span>
+              <OTag type="evalRunStatus" :value="row.status" />
             </template>
           </OTable>
         </template>
@@ -296,6 +293,7 @@ import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type {
@@ -871,30 +869,10 @@ function relativeTime(timestampMs: number): string {
   font-style: italic;
 }
 
-.sd-type-chip {
+.sd-type-row {
   display: inline-flex;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 600;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.sd-type-chip--remote {
-  background: color-mix(in srgb, #b25400 14%, transparent);
-  color: #b25400;
-}
-
-.sd-version-chip {
-  display: inline-flex;
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 600;
-  background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  align-items: center;
+  gap: 6px;
 }
 
 .sd-produces {
@@ -1049,32 +1027,6 @@ function relativeTime(timestampMs: number): string {
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
-}
-
-.sd-status-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sd-status-cell__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sd-status-cell--success { color: var(--o2-status-success-text, #2e7d32); }
-.sd-status-cell--success .sd-status-cell__dot { background: var(--o2-status-success-text, #2e7d32); }
-
-.sd-status-cell--error,
-.sd-status-cell--timeout { color: var(--o2-status-error-text, #c62828); }
-.sd-status-cell--error .sd-status-cell__dot,
-.sd-status-cell--timeout .sd-status-cell__dot { background: var(--o2-status-error-text, #c62828); }
-
-.sd-status-cell--skipped .sd-status-cell__dot {
-  background: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
 }
 
 /* — Used by tab — */

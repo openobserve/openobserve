@@ -104,18 +104,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ pattern.name }}
               </span>
               <div class="tw:flex tw:flex-wrap tw:gap-1">
-                <OBadge
+                <OTag
                   v-for="tag in pattern.tags.slice(0, 3)"
                   :key="tag"
-                  size="md"
-                  variant="primary-soft"
+                  type="fieldTag"
+                  value="primarysoft"
                   class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current"
                 >
                   {{ tag }}
-                </OBadge>
-                <OBadge v-if="pattern.tags.length > 3" size="md" variant="default-soft" class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current">
+                </OTag>
+                <OTag v-if="pattern.tags.length > 3" size="md" variant="default-soft" class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current">
                   +{{ pattern.tags.length - 3 }}
-                </OBadge>
+                </OTag>
               </div>
               <div class="pattern-preview tw:line-clamp-1">
                 {{ pattern.pattern.substring(0, 100)
@@ -183,15 +183,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:mb-3">
           <div class="text-weight-bold tw:mb-1">{{ t('regex_patterns.tags') }}</div>
           <div class="tw:flex tw:flex-wrap tw:gap-2">
-            <OBadge
+            <OTag
               v-for="tag in previewedPattern?.tags"
               :key="tag"
-              size="md"
-              variant="primary-soft"
+              type="fieldTag"
+              value="primarysoft"
               class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current"
             >
               {{ tag }}
-            </OBadge>
+            </OTag>
           </div>
         </div>
 
@@ -237,7 +237,7 @@ import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -265,7 +265,7 @@ interface BuiltInPattern {
 
 export default defineComponent({
   name: "BuiltInPatternsTab",
-  components: { OButton, ODialog, OSpinner, OIcon, OBadge, OSelect, OSearchInput, OCheckbox, OTooltip, OTextarea },
+  components: { OButton, ODialog, OSpinner, OIcon, OTag, OSelect, OSearchInput, OCheckbox, OTooltip, OTextarea },
   emits: ["import-patterns"],
   setup(props, { emit }) {
     const { t } = useI18n();

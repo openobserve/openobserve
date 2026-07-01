@@ -25,12 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("billing.enterpriseSubtitle") }}
         </p>
       </div>
-      <OBadge
-        variant="primary-soft"
-        class="tw:mt-2 tw:text-xs tw:px-2 tw:py-3"
+      <OTag
+        type="billingTag"
+        value="discount"
+        class="tw:mt-2 tw:px-2 tw:py-3"
       >
         {{ t("billing.discountTag") }}
-      </OBadge>
+      </OTag>
     </div>
 
     <OSeparator class="tw:my-2" />
@@ -87,14 +88,14 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { siteURL } from "@/constants/config";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 
 export default defineComponent({
   name: "enterprisePlan",
-  components: { OSeparator, OButton, OBadge, OIcon, OCard },
+  components: { OSeparator, OButton, OTag, OIcon, OCard },
   props: ["features", "pricingError"],
   setup(props, { emit }) {
     const { t } = useI18n();

@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="ov-section-header">
         <div class="ov-section-label">
           {{ t('overview.activeIncidents') }}
-          <span class="ov-count-badge">{{ incidentsTotal }}</span>
+          <OTag type="fieldTag" value="soft">{{ incidentsTotal }}</OTag>
           <span v-if="incidentsTotal > incidents.length" class="ov-showing-hint">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
         </div>
         <button class="ov-view-all" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
@@ -65,18 +65,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <div class="ov-row-body">
             <div class="ov-row-title">
-              <span class="ov-severity-badge" :class="`ov-sev-${(inc.severity || 'p4').toLowerCase()}`">
+              <OTag type="severity" :value="(inc.severity || 'p4').toLowerCase()">
                 {{ (inc.severity || 'P4').toUpperCase() }}
-              </span>
+              </OTag>
               {{ inc.title || t('overview.untitledIncident') }}
               <template v-if="inc.group_values && Object.keys(inc.group_values).length > 0">
-                <span
+                <ODimensionChip
                   v-for="[key, val] in sortedDimensions(inc.group_values)"
                   :key="key"
-                  class="dimension-badge"
-                  :class="dimColorClass(key)"
-                  :title="`${key}=${val}`"
-                ><span>{{ shortDimKey(key) }}: {{ val }}</span></span>
+                  :dim-key="key"
+                  :key-label="shortDimKey(key)"
+                  :value="val"
+                />
               </template>
             </div>
           </div>
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="ov-section-header">
         <div class="ov-section-label">
           {{ t('overview.services') }}
-          <span class="ov-count-badge">{{ services.length }}</span>
+          <OTag type="fieldTag" value="soft">{{ services.length }}</OTag>
           <span v-if="servicePanelVisible && selectedService" class="ov-panel-context">
             — viewing <strong>{{ selectedService.label ?? selectedService.id }}</strong>
           </span>
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="ov-section-header">
         <div class="ov-section-label">
           {{ t('overview.activeAnomalies') }}
-          <span class="ov-count-badge">{{ anomalies.length }}</span>
+          <OTag type="fieldTag" value="soft">{{ anomalies.length }}</OTag>
         </div>
         <button class="ov-view-all" @click="goToAnomalies">{{ t('overview.viewAll') }} →</button>
       </div>
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="ov-section-header">
         <div class="ov-section-label">
           {{ t('overview.recentEvents') }}
-          <span class="ov-count-badge">{{ recentEvents.length }}</span>
+          <OTag type="fieldTag" value="soft">{{ recentEvents.length }}</OTag>
         </div>
         <button class="ov-view-all" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
       </div>
@@ -250,14 +250,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="ev.id"
           class="ov-event-row"
         >
-          <span class="ov-event-type-badge" :class="ev.typeLabel === 'Failed' ? 'ov-badge-failed' : ev.typeLabel === 'Error' ? 'ov-badge-error' : 'ov-badge-firing'">
-            {{ ev.typeLabel }}
-          </span>
+          <OTag type="eventStatus" :value="ev.typeLabel" class="tw:shrink-0" />
           <span class="ov-event-service">{{ ev.service }}</span>
           <span class="ov-event-desc">{{ ev.description }}</span>
-          <span v-if="ev.failCount > 1" class="ov-fail-count" :title="`Failed ${ev.failCount} times in this window`">
-            ×{{ ev.failCount }}
-          </span>
+          <OTag
+            v-if="ev.failCount > 1"
+            variant="error-soft"
+            shape="pill"
+            class="tw:shrink-0"
+            :title="`Failed ${ev.failCount} times in this window`"
+          >×{{ ev.failCount }}</OTag>
           <span class="ov-event-time">{{ ev.timeAgo }}</span>
         </div>
       </div>
@@ -350,6 +352,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -751,36 +755,6 @@ const sortedDimensions = (dims: Record<string, string>): [string, string][] =>
 const shortDimKey = (key: string): string =>
   key.replace(/^k8s-/, "").replace(/^kubernetes[_-]/, "");
 
-const DIM_COLOR_MAP: Record<string, string> = {
-  deployment: "badge-blue",
-  "k8s-deployment": "badge-blue",
-  namespace: "badge-orange",
-  "k8s-namespace": "badge-orange",
-  env: "badge-green",
-  environment: "badge-green",
-  host: "badge-purple",
-  hostname: "badge-purple",
-  service: "badge-cyan",
-  service_name: "badge-cyan",
-  region: "badge-pink",
-  zone: "badge-pink",
-  cluster: "badge-indigo",
-  "k8s-cluster": "badge-indigo",
-  pod: "badge-teal",
-  container: "badge-red",
-  app: "badge-yellow",
-  application: "badge-yellow",
-};
-
-const dimColorClass = (key: string): string => {
-  if (DIM_COLOR_MAP[key]) return DIM_COLOR_MAP[key];
-  const lower = key.toLowerCase();
-  for (const [pattern, cls] of Object.entries(DIM_COLOR_MAP)) {
-    if (lower.includes(pattern)) return cls;
-  }
-  return "badge-gray";
-};
-
 const severityRowClass = (severity: string) =>
   severity === "critical" ? "ov-row-critical" : "ov-row-warning";
 
@@ -978,24 +952,6 @@ watch(isIncidentsEnabled, (enabled) => {
   &:hover { opacity: 1; text-decoration: underline; }
 }
 
-/* ── Count badge ── */
-.ov-count-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.25rem;
-  height: 1.25rem;
-  padding: 0 0.3rem;
-  border-radius: 0.625rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  background: var(--o2-status-warning-bg);
-  color: var(--o2-status-warning-text);
-  border: 0.0625em solid var(--o2-warning);
-  margin-left: 0.375rem;
-  vertical-align: middle;
-}
-
 /* ── Showing X of Y hint ── */
 .ov-showing-hint {
   margin-left: 0.5rem;
@@ -1177,71 +1133,6 @@ watch(isIncidentsEnabled, (enabled) => {
 .ov-investigate-wrap {
   flex-shrink: 0;
   white-space: nowrap;
-}
-
-/* ── Dimension badges — exact match to IncidentList.vue ── */
-.dimension-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.125em;
-  padding: 0.125em 0.5em;
-  border-radius: 0.75em;
-  font-size: 0.6875em;
-  font-weight: 600;
-  margin: 0 0.125em;
-  max-width: 11.25em;
-  overflow: hidden;
-
-  span {
-    display: inline-block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
-.badge-blue   { border: 0.0625em solid var(--o2-status-info-text); }
-.badge-green  { border: 0.0625em solid var(--o2-positive); }
-.badge-yellow { border: 0.0625em solid var(--o2-warning); }
-.badge-pink   { border: 0.0625em solid var(--o2-negative); }
-.badge-purple { border: 0.0625em solid var(--o2-primary-color); }
-.badge-orange { border: 0.0625em solid var(--o2-status-warning-text); }
-.badge-cyan   { border: 0.0625em solid var(--o2-positive); }
-.badge-indigo { border: 0.0625em solid var(--o2-theme-color); }
-.badge-teal   { border: 0.0625em solid var(--o2-positive); }
-.badge-red    { border: 0.0625em solid var(--o2-negative); }
-.badge-gray   { border: 0.0625em solid var(--o2-border-color); }
-.badge-amber  { border: 0.0625em solid var(--o2-warning); }
-
-/* ── Severity badge ── */
-.ov-severity-badge {
-  display: inline-block;
-  font-size: 0.625rem;
-  font-weight: 700;
-  padding: 0.1rem 0.35rem;
-  border-radius: 0.2rem;
-  letter-spacing: 0.04em;
-
-  &.ov-sev-p1 {
-    background: var(--o2-status-error-bg);
-    color: var(--o2-status-error-text);
-    border: 0.0625em solid var(--o2-negative);
-  }
-  &.ov-sev-p2 {
-    background: var(--o2-status-warning-bg);
-    color: var(--o2-status-warning-text);
-    border: 0.0625em solid var(--o2-warning);
-  }
-  &.ov-sev-p3 {
-    background: var(--o2-status-warning-bg);
-    color: var(--o2-status-warning-text);
-    border: 0.0625em solid var(--o2-warning);
-  }
-  &.ov-sev-p4 {
-    background: var(--o2-status-info-bg);
-    color: var(--o2-status-info-text);
-    border: 0.0625em solid var(--o2-status-info-text);
-  }
 }
 
 /* ── Services scroll wrapper ── */
@@ -1434,29 +1325,6 @@ watch(isIncidentsEnabled, (enabled) => {
   }
 }
 
-.ov-event-type-badge {
-  flex-shrink: 0;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  padding: 0.15rem 0.4rem;
-  border-radius: 0.2rem;
-  letter-spacing: 0.03em;
-
-  &.ov-badge-firing {
-    background: var(--o2-status-error-bg);
-    color: var(--o2-status-error-text);
-  }
-  &.ov-badge-error {
-    background: var(--o2-status-warning-bg);
-    color: var(--o2-status-warning-text);
-  }
-  &.ov-badge-failed {
-    background: var(--o2-status-error-bg);
-    color: var(--o2-status-error-text);
-    font-weight: 700;
-  }
-}
-
 .ov-event-service {
   font-weight: 500;
   color: var(--o2-text-primary);
@@ -1473,18 +1341,6 @@ watch(isIncidentsEnabled, (enabled) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.ov-fail-count {
-  flex-shrink: 0;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  color: var(--o2-status-error-text);
-  background: var(--o2-status-error-bg);
-  border: 0.0625em solid var(--o2-negative);
-  border-radius: 0.75rem;
-  padding: 0.1rem 0.4rem;
-  white-space: nowrap;
 }
 
 .ov-event-time {

@@ -74,7 +74,7 @@
             <dl class="scd-kv">
               <dt>{{ t("onlineEvals.scoreConfig.detail.dataTypeLabel") }}</dt>
               <dd>
-                <span class="scd-type-chip" :class="`scd-type-chip--${dataType}`">{{ dataType }}</span>
+                <OTag type="evalDataType" :value="dataType">{{ dataType }}</OTag>
               </dd>
 
               <template v-if="dataType === 'numeric' && numericRange">
@@ -118,12 +118,11 @@
             <dl class="scd-kv">
               <dt>{{ t("onlineEvals.scoreConfig.detail.statusLabel") }}</dt>
               <dd>
-                <span class="scd__status" :class="{ 'scd__status--inactive': !isActive }">
-                  <span class="scd__status-dot" />
+                <OTag type="booleanState" :value="isActive ? 'enabled' : 'disabled'">
                   {{ isActive
                     ? t("onlineEvals.scoreConfig.detail.statusActive")
                     : t("onlineEvals.scoreConfig.detail.statusInactive") }}
-                </span>
+                </OTag>
               </dd>
               <dt>{{ t("onlineEvals.scoreConfig.detail.versionLabel") }}</dt>
               <dd class="scd-mono">v{{ row.version }}</dd>
@@ -192,6 +191,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import {
@@ -441,25 +441,6 @@ function formatDateShort(microsOrMs: number): string {
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.scd__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--o2-status-success-text, #2e7d32);
-  font-weight: 600;
-}
-
-.scd__status--inactive {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.scd__status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
 .scd__meta-version { color: var(--color-text-primary, currentColor); }
 
 .scd__meta-sep { opacity: 0.5; }
@@ -613,26 +594,6 @@ function formatDateShort(microsOrMs: number): string {
 
 .scd-mono {
   font-variant-numeric: tabular-nums;
-}
-
-.scd-type-chip {
-  display: inline-flex;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 600;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.scd-type-chip--categorical {
-  background: color-mix(in srgb, #9333ea 14%, transparent);
-  color: #7c3aed;
-}
-
-.scd-type-chip--boolean {
-  background: color-mix(in srgb, #16a34a 14%, transparent);
-  color: #15803d;
 }
 
 .scd-tag {

@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
                   <OIcon name="trending-down" size="xs" />
                   <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">{{ $t("traces.evaluations.weakestDimension") }}</span>
-                  <OBadge variant="warning">{{ formatDimLabel(getWeakestDimension(record)!.dimension) }}</OBadge>
+                  <OTag type="evalBadge" value="weakest">{{ formatDimLabel(getWeakestDimension(record)!.dimension) }}</OTag>
                 </div>
                 <div v-if="getWeakestDimension(record)!.reasoning" class="tw:text-sm tw:bg-[var(--o2-border-color)] tw:p-3 tw:rounded-md tw:leading-relaxed">
                   {{ getWeakestDimension(record)!.reasoning }}
@@ -241,11 +241,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                       {{ formatDimLabel(dim.dimension) }}
                     </div>
                     <!-- Pass/Fail tw:inline -->
-                    <OBadge
+                    <OTag
                       v-if="isTemplateDimension(dim.dimension)"
-                      :variant="getDimVerdict(dim.score) === 'PASS' ? 'success' : 'error'"
+                      type="evaluationVerdict"
+                      :value="getDimVerdict(dim.score)"
                       class="eval-badge-sm"
-                    >{{ getDimVerdict(dim.score) }}</OBadge>
+                    />
                   </div>
                   <div class="tw:text-xs tw:leading-relaxed tw:text-[var(--o2-text-primary)]">
                     {{ truncateContent(dim.reasoning, 200) }}
@@ -361,19 +362,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                       <OIcon :name="getDimIcon(dim.dimension)" :class="getDimColorClass(dim.dimension)" size="sm" />
                       <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-primary)]">{{ formatDimLabel(dim.dimension) }}</span>
                       <!-- Template aspect badge -->
-                      <OBadge
+                      <OTag
                         v-if="isTemplateDimension(dim.dimension)"
-                        variant="primary-outline"
+                        type="evalBadge"
+                        value="template"
                         class="eval-badge-sm"
-                      >{{ $t('traces.evaluations.templateBadge') }}</OBadge>
+                      >{{ $t('traces.evaluations.templateBadge') }}</OTag>
                     </div>
                     <div class="tw:flex tw:items-center tw:gap-1.5">
                       <!-- Pass/Fail verdict badge for template dimensions -->
-                      <OBadge
+                      <OTag
                         v-if="isTemplateDimension(dim.dimension)"
-                        :variant="getDimVerdict(dim.score) === 'PASS' ? 'success' : 'error'"
+                        type="evaluationVerdict"
+                        :value="getDimVerdict(dim.score)"
                         class="eval-badge-sm"
-                      >{{ getDimVerdict(dim.score) }}</OBadge>
+                      />
                       <span class="tw:text-xs tw:font-bold tw:text-[var(--o2-text-primary)]">{{ formatScore(dim.score) }}</span>
                     </div>
                   </div>
@@ -416,10 +419,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 <div class="eval-meta-row">
                   <div class="tw:text-[10px] tw:font-bold tw:text-[var(--o2-text-secondary)] tw:uppercase">{{ $t("traces.evaluations.status") }}</div>
                   <div>
-                    <OBadge
-                      :variant="record.exit_status === 'ok' ? 'success' : 'error'"
-                      size="sm"
-                    >{{ record.exit_status?.toUpperCase() || 'UNKNOWN' }}</OBadge>
+                    <OTag
+                      type="evalStatus"
+                      :value="record.exit_status"
+                      :label="record.exit_status?.toUpperCase() || 'UNKNOWN'"
+                    />
                   </div>
                 </div>
                 <div v-if="record.is_multi_step" class="eval-meta-row">
@@ -444,7 +448,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 
 export default defineComponent({
@@ -455,7 +459,7 @@ export default defineComponent({
     OSelect,
     OTooltip,
     OIcon,
-    OBadge,
+    OTag,
     OCollapsible,
   },
   props: {

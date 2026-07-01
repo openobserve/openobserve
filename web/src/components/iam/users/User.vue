@@ -106,8 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="(roleName, idx) in (row.roles || [])"
                 :key="`${roleName}-${idx}`"
                 :type="isBuiltinRole(roleName) ? 'userRole' : undefined"
-                :value="isBuiltinRole(roleName) ? roleName : roleName"
-                :label="isBuiltinRole(roleName) ? undefined : roleName"
+                :value="roleName"
               />
             </div>
           </template>
@@ -122,8 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OTag
                 v-if="row.status === 'pending'"
-                value="Invited"
-                variant="warning-soft"
+                type="userStatus"
+                value="invited"
               />
             </span>
           </template>
@@ -237,7 +236,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -278,7 +276,6 @@ export default defineComponent({
     AddUser,
     MemberInvitation,
     OButton,
-    OBadge,
     OTag,
     OIcon,
     ODialog,

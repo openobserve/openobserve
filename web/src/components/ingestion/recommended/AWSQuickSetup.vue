@@ -74,10 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
             />
             <div class="step-label">Select services to monitor</div>
-            <OBadge variant="primary" size="sm">
+            <OTag type="countChip" value="accent">
               {{ enabledServices.length }} /
               {{ QUICK_SETUP_SERVICES.length }} selected
-            </OBadge>
+            </OTag>
           </div>
           <div class="tw:flex tw:gap-2" @click.stop>
             <OButton variant="ghost-primary" size="xs" @click="selectAll"
@@ -160,11 +160,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >(where stacks will be deployed)</span
                 >
               </div>
-              <OBadge
+              <OTag
                 v-if="targetRegions.length > 0"
                 variant="primary"
                 size="sm"
-                >{{ targetRegions.length }} selected</OBadge
+                >{{ targetRegions.length }} selected</OTag
               >
             </div>
             <div class="tw:flex tw:gap-2" @click.stop>
@@ -334,12 +334,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 Target regions to enter in "Deployment targets":
               </div>
               <div class="tw:flex tw:flex-wrap tw:gap-1 tw:mt-1">
-                <OBadge
+                <OTag
                   v-for="r in targetRegions"
                   :key="r"
-                  variant="primary"
-                  size="sm"
-                  >{{ r }}</OBadge
+                  type="fieldTag"
+                  value="primarysm"
+                  >{{ r }}</OTag
                 >
               </div>
             </div>
@@ -364,7 +364,7 @@ import {
 } from "@/utils/awsIntegrations";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -380,7 +380,7 @@ export default defineComponent({
   name: "AWSQuickSetup",
   components: { OSeparator, OToggleGroup, OToggleGroupItem, OButton, OSelect, OTooltip, OCheckbox,
     OIcon,
-    OBadge,
+    OTag,
 },
   setup() {
     const store = useStore();

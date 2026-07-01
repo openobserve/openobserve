@@ -205,9 +205,9 @@ describe("IncidentAlertTriggersTable", () => {
       expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toContain("Alert ID");
     });
 
-    it("shows raw reason for unknown correlation reason", () => {
+    it("humanises an unknown correlation reason", () => {
       wrapper = mountComp({ triggers: [makeAlert({ correlation_reason: "unknown_reason" })] });
-      expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toBe("unknown_reason");
+      expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toBe("Unknown Reason");
     });
   });
 
@@ -250,32 +250,6 @@ describe("IncidentAlertTriggersTable", () => {
     it("renders without error in light mode", () => {
       wrapper = mountComp({ isDarkMode: false, triggers: [] });
       expect(wrapper.find('[data-test="no-triggers-message"]').exists()).toBe(true);
-    });
-  });
-
-  describe("getReasonVariant logic (via component method)", () => {
-    beforeEach(() => {
-      wrapper = mountComp({ triggers: makeAlerts(1) });
-    });
-
-    it("returns primary-soft variant for service_discovery", () => {
-      expect((wrapper.vm as any).getReasonVariant("service_discovery")).toBe("primary-soft");
-    });
-
-    it("returns primary-soft variant for primary_match", () => {
-      expect((wrapper.vm as any).getReasonVariant("primary_match")).toBe("primary-soft");
-    });
-
-    it("returns warning-soft variant for secondary_match", () => {
-      expect((wrapper.vm as any).getReasonVariant("secondary_match")).toBe("warning-soft");
-    });
-
-    it("returns default-soft variant for alert_id", () => {
-      expect((wrapper.vm as any).getReasonVariant("alert_id")).toBe("default-soft");
-    });
-
-    it("returns default-soft variant for unknown reason", () => {
-      expect((wrapper.vm as any).getReasonVariant("foo")).toBe("default-soft");
     });
   });
 

@@ -98,9 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #cell-status="{ row }">
-              <OBadge :variant="statusVariant(row.status)">
-                {{ statusLabel(row.status) }}
-              </OBadge>
+              <OTag type="billingGroupMemberStatus" :value="row.status" />
             </template>
             <template #cell-invited_by="{ row }">
               <OUserCell :value="row.invited_by" />
@@ -351,7 +349,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import BillingService from "@/services/billings";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -392,7 +390,7 @@ interface BillingGroupInvite {
 
 export default defineComponent({
   name: "BillingGroup",
-  components: { OBadge, OButton, OIcon, OInput, OSpinner, OTable, OUserCell, ODrawer, OTooltip, AppTabs },
+  components: { OTag, OButton, OIcon, OInput, OSpinner, OTable, OUserCell, ODrawer, OTooltip, AppTabs },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -550,14 +548,6 @@ export default defineComponent({
       { label: t("billing.billingGroup.statusActive"), value: "Active" },
       { label: t("billing.billingGroup.statusPending"), value: "Pending" },
     ]);
-
-    const statusVariant = (status: string): "success" | "warning" =>
-      status === "Active" ? "success" : "warning";
-
-    const statusLabel = (status: string) =>
-      status === "Active"
-        ? t("billing.billingGroup.statusActive")
-        : t("billing.billingGroup.statusPending");
 
     const inviteColumns = computed<OTableColumnDef[]>(() => [
       {
@@ -775,8 +765,6 @@ export default defineComponent({
       activeCount,
       pendingCount,
       totalCount,
-      statusVariant,
-      statusLabel,
       goToUsage,
       receivedInvites,
       inviteColumns,

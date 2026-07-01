@@ -18,13 +18,13 @@
         }}
       </span>
       <div class="scorer-form__top-spacer" />
-      <span class="scorer-form__badge" :class="`scorer-form__badge--${form.scorerType}`">
+      <OTag type="scorerType" :value="form.scorerType">
         {{
           form.scorerType === "remote"
             ? t("onlineEvals.scorer.badgeRemote")
             : t("onlineEvals.scorer.badgeLlm")
         }}
-      </span>
+      </OTag>
       <button
         type="button"
         class="scorer-form__close"
@@ -684,6 +684,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
@@ -1319,25 +1320,6 @@ async function save() {
 .scorer-form__top-spacer {
   flex: 1;
   min-width: 8px;
-}
-
-.scorer-form__badge {
-  padding: 3px 8px;
-  border-radius: 4px;
-  font: 700 11px inherit;
-  background: color-mix(in srgb, var(--color-text-primary) 10%, transparent);
-  color: var(--color-text-primary, currentColor);
-  white-space: nowrap;
-}
-
-.scorer-form__badge--llm_judge {
-  background: color-mix(in srgb, var(--o2-status-info-text) 14%, transparent);
-  color: var(--o2-status-info-text);
-}
-
-.scorer-form__badge--remote {
-  background: color-mix(in srgb, var(--o2-status-success-text) 14%, transparent);
-  color: var(--o2-status-success-text);
 }
 
 .scorer-form__close {

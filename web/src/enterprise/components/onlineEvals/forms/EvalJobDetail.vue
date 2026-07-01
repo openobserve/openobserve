@@ -130,7 +130,7 @@
           <section class="jd-section">
             <h4 class="jd-section__title">
               {{ t("onlineEvals.job.detail.scorersSection") }}
-              <span class="jd-section__chip">{{ resolvedScorers.length }}</span>
+              <OTag type="fieldTag" value="soft">{{ resolvedScorers.length }}</OTag>
             </h4>
             <div v-if="resolvedScorers.length === 0" class="jd-empty">
               <OIcon name="info" size="xs" />
@@ -285,10 +285,7 @@
               <span class="jd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
             </template>
             <template #cell-status="{ row }">
-              <span class="jd-status-cell" :class="`jd-status-cell--${row.status}`">
-                <span class="jd-status-cell__dot" />
-                {{ row.status }}
-              </span>
+              <OTag type="evalRunStatus" :value="row.status" />
             </template>
           </OTable>
         </template>
@@ -318,7 +315,7 @@
           <section class="jd-section">
             <h4 class="jd-section__title">
               {{ t("onlineEvals.job.detail.failures.byScorerTitle") }}
-              <span class="jd-section__chip">{{ failureRows.length }}</span>
+              <OTag type="fieldTag" value="soft">{{ failureRows.length }}</OTag>
             </h4>
             <div v-if="failureRows.length === 0" class="jd-empty">
               <OIcon name="info" size="xs" />
@@ -357,7 +354,7 @@
           <section class="jd-section">
             <h4 class="jd-section__title">
               {{ t("onlineEvals.job.detail.failures.recentTitle") }}
-              <span class="jd-section__chip">{{ failedRuns.length }}</span>
+              <OTag type="fieldTag" value="soft">{{ failedRuns.length }}</OTag>
             </h4>
             <div v-if="failedRuns.length === 0 && !isLoadingRuns" class="jd-empty">
               <OIcon name="info" size="xs" />
@@ -402,10 +399,7 @@
                 <span class="jd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
               </template>
               <template #cell-status="{ row }">
-                <span class="jd-status-cell" :class="`jd-status-cell--${row.status}`">
-                  <span class="jd-status-cell__dot" />
-                  {{ row.status }}
-                </span>
+                <OTag type="evalRunStatus" :value="row.status" />
               </template>
             </OTable>
           </section>
@@ -422,6 +416,7 @@ import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type {
@@ -1161,16 +1156,6 @@ function relativeTime(timestampMs: number): string {
   gap: 6px;
 }
 
-.jd-section__chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 5px;
-  border-radius: 3px;
-  font: 600 10px var(--o2-font);
-  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
 .jd-kv {
   display: grid;
   grid-template-columns: 130px 1fr;
@@ -1483,32 +1468,7 @@ function relativeTime(timestampMs: number): string {
   min-width: 0;
 }
 
-.jd-status-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-status-cell__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-status-cell--success { color: var(--o2-status-success-text, #2e7d32); }
-.jd-status-cell--success .jd-status-cell__dot { background: var(--o2-status-success-text, #2e7d32); }
-
-.jd-status-cell--error,
-.jd-status-cell--timeout { color: var(--o2-status-error-text, #c62828); }
-.jd-status-cell--error .jd-status-cell__dot,
-.jd-status-cell--timeout .jd-status-cell__dot { background: var(--o2-status-error-text, #c62828); }
-
-.jd-status-cell--skipped .jd-status-cell__dot {
-  background: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
-}
-
+/* Failure-rate tone (applied to the failureRate cell via failTone()). */
 .jd-status-cell--warn { color: #b45309; }
 .jd-status-cell--bad { color: var(--o2-status-error-text, #c62828); }
 </style>

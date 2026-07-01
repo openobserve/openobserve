@@ -32,58 +32,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Summary toolbar — sidebar-style badge chips. -->
     <div class="thread-summary">
-      <OBadge
-        size="sm"
+      <OTag
+        type="metricChip"
         class="thread-chip thread-chip--steps"
         :title="`${summary.turnCount} LLM step${summary.turnCount === 1 ? '' : 's'}`"
       >
         <template #icon><OIcon name="auto-awesome" size="xs" /></template>
         <span class="thread-chip__label">Steps</span>
         <span class="thread-chip__value">{{ summary.turnCount }}</span>
-      </OBadge>
+      </OTag>
 
-      <OBadge size="sm" class="thread-chip thread-chip--tools">
+      <OTag type="metricChip" class="thread-chip thread-chip--tools">
         <template #icon><OIcon name="build" size="xs" /></template>
         <span class="thread-chip__label">Tools</span>
         <span class="thread-chip__value">{{ summary.toolCallCount }}</span>
-      </OBadge>
+      </OTag>
 
-      <OBadge size="sm" class="thread-chip thread-chip--duration">
+      <OTag type="metricChip" class="thread-chip thread-chip--duration">
         <template #icon><OIcon name="schedule" size="xs" /></template>
         <span class="thread-chip__label">Duration</span>
         <span class="thread-chip__value">
           {{ formatDuration(summary.totalDurationNs) }}
         </span>
-      </OBadge>
+      </OTag>
 
-      <OBadge size="sm" class="thread-chip thread-chip--cost">
+      <OTag type="metricChip" class="thread-chip thread-chip--cost">
         <template #icon><OIcon name="payments" size="xs" /></template>
         <span class="thread-chip__label">Cost</span>
         <span class="thread-chip__value">
           {{ formatCost(summary.totalCost) }}
         </span>
-      </OBadge>
+      </OTag>
 
-      <OBadge
+      <OTag
         v-if="summary.dominantModel"
-        size="sm"
+        type="metricChip"
         class="thread-chip thread-chip--model"
         :title="summary.dominantModel"
       >
         <template #icon><OIcon name="bolt" size="xs" /></template>
         <span class="thread-chip__label">Model</span>
         <span class="thread-chip__value">{{ summary.dominantModel }}</span>
-      </OBadge>
+      </OTag>
 
-      <OBadge
+      <OTag
         v-if="summary.errorCount > 0"
-        size="sm"
+        type="metricChip"
         class="thread-chip thread-chip--error"
       >
         <template #icon><OIcon name="error-outline" size="xs" /></template>
         <span class="thread-chip__label">Errors</span>
         <span class="thread-chip__value">{{ summary.errorCount }}</span>
-      </OBadge>
+      </OTag>
 
     </div>
 
@@ -345,7 +345,7 @@ import {
   type TraceGroup,
 } from "./threadView.utils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 const store = useStore();
 

@@ -20,16 +20,13 @@
         <dd class="sc-mono-cell">{{ streamType }}</dd>
         <dt>{{ t("onlineEvals.job.preview.summaryStatus") }}</dt>
         <dd>
-          <span
-            class="job-preview__status"
-            :class="mode === 'edit' ? 'job-preview__status--editing' : 'job-preview__status--draft'"
-          >
+          <OTag type="jobPreviewState" :value="mode === 'edit' ? 'editing' : 'draft'">
             {{
               mode === "edit"
                 ? t("onlineEvals.job.preview.statusEditing")
                 : t("onlineEvals.job.preview.statusDraft")
             }}
-          </span>
+          </OTag>
         </dd>
       </dl>
     </section>
@@ -39,6 +36,7 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 defineProps<{
   name: string;
@@ -109,22 +107,4 @@ const { t } = useI18n();
   color: var(--color-text-primary, currentColor);
 }
 
-.job-preview__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font: 600 11px inherit;
-}
-
-.job-preview__status--draft {
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.job-preview__status--editing {
-  background: color-mix(in srgb, var(--o2-status-info-text) 14%, transparent);
-  color: var(--o2-status-info-text);
-}
 </style>

@@ -101,7 +101,7 @@
             </span>
           </label>
           <div v-if="mode === 'edit'" class="sc-locked-row">
-            <span class="sc-dtype-chip" :class="`sc-dtype-chip--${form.dataType}`">{{ form.dataType }}</span>
+            <OTag type="evalDataType" :value="form.dataType">{{ form.dataType }}</OTag>
           </div>
           <template v-else>
             <div class="sc-dtype-grid">
@@ -333,6 +333,7 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
   type ScoreConfig,
@@ -687,18 +688,6 @@ async function save() {
   border: 1px solid var(--color-dialog-header-border, var(--o2-border));
   border-radius: 6px;
 }
-
-.sc-dtype-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 7px;
-  border-radius: 3px;
-  font: 600 11px/1.5 var(--o2-font);
-}
-.sc-dtype-chip--numeric { background: color-mix(in srgb, var(--o2-status-info-text) 14%, transparent); color: var(--o2-status-info-text); }
-.sc-dtype-chip--categorical { background: color-mix(in srgb, var(--o2-status-warning-text) 14%, transparent); color: var(--o2-status-warning-text); }
-.sc-dtype-chip--boolean { background: color-mix(in srgb, var(--o2-status-success-text) 14%, transparent); color: var(--o2-status-success-text); }
 
 .sc-dtype-grid {
   display: grid;

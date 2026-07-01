@@ -219,9 +219,4 @@ const getLocation = () => {
 .tags-title {
   font-size: 16px;
 }
-
-.tag-block {
-  border: 1px solid #e6e7f0;
-  border-radius: 4px;
-}
 </style>

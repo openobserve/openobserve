@@ -59,13 +59,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
             @mouseleave="onMouseLeave"
           >
-            <OBadge
-              size="sm"
-              class="wildcard-chip tw:my-0 tw:mx-0"
+            <OTag
+              type="wildcardChip"
               :class="wildcardChipColor(tok.value, tok.sampleValues)"
             >
               {{ wildcardLabel(tok.value, tok.sampleValues) }}
-            </OBadge>
+            </OTag>
           </span>
         </template>
       </div>
@@ -145,7 +144,7 @@ import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
@@ -235,15 +234,4 @@ function highlightLevels(text: string): HighlightSegment[] {
 
 <style lang="scss">
 @import "@/assets/styles/log-highlighting.css";
-.wildcard-chip {
-  font-family: monospace;
-  font-size: 0.75rem;
-  font-weight: bold;
-  height: 1.125rem;
-  padding: 0 0.3125rem;
-  border-radius: 0.1875rem;
-  line-height: 1.125rem;
-  // Prevent chips from inheriting the truncate overflow of the parent "row"
-  flex-shrink: 0;
-}
 </style>

@@ -53,14 +53,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-correlation_reason="{ row }">
-        <OBadge
-          data-test="correlation-reason-badge"
-          :variant="getReasonVariant(row.correlation_reason)"
-          size="sm"
-        >
-          {{ getReasonLabel(row.correlation_reason) }}
+        <span class="tw:inline-flex">
+          <OTag
+            data-test="correlation-reason-badge"
+            type="correlationReason"
+            :value="row.correlation_reason"
+          />
           <OTooltip :content="getReasonTooltip(row.correlation_reason)" side="top" />
-        </OBadge>
+        </span>
       </template>
     </OTable>
   </div>
@@ -70,8 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, PropType, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { formatToReadable } from "@/utils/date";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -89,7 +88,7 @@ interface IncidentAlert {
 export default defineComponent({
   name: "IncidentAlertTriggersTable",
   components: {
-    OBadge,
+    OTag,
     OTooltip,
     OTable,
   },
@@ -146,36 +145,6 @@ export default defineComponent({
       return formatToReadable(timestamp);
     };
 
-    const getReasonVariant = (reason: string): BadgeVariant => {
-      switch (reason) {
-        case "service_discovery":
-          return "primary-soft";
-        case "primary_match":
-          return "primary-soft";
-        case "secondary_match":
-          return "warning-soft";
-        case "alert_id":
-          return "default-soft";
-        default:
-          return "default-soft";
-      }
-    };
-
-    const getReasonLabel = (reason: string) => {
-      switch (reason) {
-        case "service_discovery":
-          return t("alerts.incidents.correlationServiceDiscovery");
-        case "primary_match":
-          return t("alerts.incidents.correlationPrimaryMatch");
-        case "secondary_match":
-          return t("alerts.incidents.correlationSecondaryMatch");
-        case "alert_id":
-          return t("alerts.incidents.correlationAlertId");
-        default:
-          return reason;
-      }
-    };
-
     const getReasonTooltip = (reason: string) => {
       switch (reason) {
         case "service_discovery":
@@ -198,8 +167,6 @@ export default defineComponent({
     return {
       columns,
       formatTimestamp,
-      getReasonVariant,
-      getReasonLabel,
       getReasonTooltip,
       onRowClick,
     };

@@ -58,14 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleNodeClick(data.span_id)"
           >
             <div class="node-operation" :class="getObservationTypeTextClass(data.gen_ai_operation_name)">{{ data.operation_name }}</div>
-            <OBadge
+            <OTag
               v-if="data.span_status === 'ERROR'"
-              size="sm"
-              variant="error"
+              type="spanStatus"
+              :value="data.span_status"
+              label="ERR"
               class="error-chip"
-            >
-              ERR
-            </OBadge>
+            />
           </div>
           <Handle v-if="data.hasOutgoing" type="source" :position="Position.Bottom" class="dag-handle" />
         </template>
@@ -89,7 +88,7 @@ import "@vue-flow/controls/dist/style.css";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 export interface SpanNode {
   span_id: string;
@@ -122,7 +121,7 @@ export default defineComponent({
     Handle,
     OSpinner,
     OIcon,
-    OBadge,
+    OTag,
 },
   props: {
     traceId: {

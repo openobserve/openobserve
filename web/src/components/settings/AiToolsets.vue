@@ -71,10 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-kind="{ row }">
-          <OBadge
-            :variant="kindBadgeVariant(row.kind)"
-            size="sm"
-          >{{ row.kind.toUpperCase() }}</OBadge>
+          <OTag type="aiToolsetKind" :value="row.kind" />
         </template>
 
         <template #cell-actions="{ row }">
@@ -130,7 +127,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -140,14 +137,6 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import aiToolsetsService from "@/services/ai_toolsets";
-// Distinct variants so each kind reads visually different (mcp=blue, cli=green,
-// skill=amber/warning, generic=neutral). Previously skill/mcp both rendered blue.
-const KIND_VARIANTS: Record<string, string> = {
-  mcp: "primary",
-  cli: "success",
-  skill: "warning",
-  generic: "default",
-};
 
 export default defineComponent({
   name: "PageAiToolsets",
@@ -157,7 +146,7 @@ export default defineComponent({
     ConfirmDialog,
     AddAiToolset,
     OButton,
-    OBadge,
+    OTag,
     OSearchInput,
     OTable,
 },
@@ -344,11 +333,6 @@ export default defineComponent({
         });
     };
 
-    // -----------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------
-    const kindBadgeVariant = (kind: string) => KIND_VARIANTS[kind] ?? "default";
-
     return {
       t,
       store,
@@ -367,7 +351,6 @@ export default defineComponent({
       confirmDeleteToolset,
       cancelDelete,
       deleteToolset,
-      kindBadgeVariant,
     };
   },
 });

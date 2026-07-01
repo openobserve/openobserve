@@ -29,9 +29,9 @@ limitations under the License. -->
         </div>
         <div data-test="test-success-timestamp" class="result-meta">
           {{ formatTimestamp(result.timestamp) }}
-          <span v-if="result.statusCode" class="status-badge success-badge">
+          <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
-          </span>
+          </OTag>
           <span v-if="result.responseTime" class="response-time">
             {{ result.responseTime }}ms
           </span>
@@ -54,9 +54,9 @@ limitations under the License. -->
         </div>
         <div v-if="result.timestamp" data-test="test-failure-timestamp" class="result-meta">
           {{ formatTimestamp(result.timestamp) }}
-          <span v-if="result.statusCode" class="status-badge error-badge">
+          <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
-          </span>
+          </OTag>
           <span v-if="result.responseTime" class="response-time">
             {{ result.responseTime }}ms
           </span>
@@ -157,6 +157,8 @@ import type { TestResult } from '@/utils/prebuilt-templates/types';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { httpStatusBucket } from "@/lib/core/Badge/badgeGroups";
 import { ref } from 'vue';
 
 // Define component props
@@ -381,26 +383,6 @@ function getSuggestedFix(result: TestResult): string | null {
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
-
-      .status-badge {
-        display: inline-block;
-        padding: 2px 6px;
-        border-radius: 3px;
-        font-size: 10px;
-        font-weight: 600;
-        font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
-        letter-spacing: 0.3px;
-
-        &.success-badge {
-          background-color: var(--q-positive);
-          color: white;
-        }
-
-        &.error-badge {
-          background-color: var(--q-negative);
-          color: white;
-        }
-      }
 
       .response-time {
         font-family: 'Monaco', 'Consolas', 'Courier New', monospace;

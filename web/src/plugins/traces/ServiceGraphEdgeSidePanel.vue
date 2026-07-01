@@ -28,9 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="from-service">{{ selectedEdge?.from }}</span>
             <OIcon name="arrow-forward" size="xs" class="edge-arrow" />
             <span class="to-service">{{ selectedEdge?.to }}</span>
-            <span class="health-badge" :class="edgeHealth.status">
+            <OTag type="serviceStatus" :value="edgeHealth.status">
               {{ edgeHealth.text }}
-            </span>
+            </OTag>
           </h2>
         </div>
         <div class="panel-header-actions">
@@ -95,17 +95,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="getLatencyClass(p50Latency)"
                 data-test="service-graph-edge-side-panel-p50"
               >
-                <span class="col-metric"><span class="percentile-badge">P50</span></span>
+                <span class="col-metric"><OTag type="fieldTag" value="soft">P50</OTag></span>
                 <span class="col-current latency-current">{{ p50Latency }}</span>
                 <span class="col-baseline latency-baseline">{{ baselineP50 }}</span>
                 <span class="col-delta">
-                  <span class="delta-badge" :class="getDeltaClass(p50DeltaPct)">
-                    <OIcon
-                      :name="p50DeltaPct > 2 ? 'arrow-upward' : p50DeltaPct < -2 ? 'arrow-downward' : 'remove'"
-                      size="xs"
-                    />
+                  <OTag type="deltaTrend" :value="getDeltaTrend(p50DeltaPct)">
+                    <template #icon>
+                      <OIcon
+                        :name="p50DeltaPct > 2 ? 'arrow-upward' : p50DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                        size="xs"
+                      />
+                    </template>
                     {{ p50DeltaFormatted }}
-                  </span>
+                  </OTag>
                 </span>
               </div>
 
@@ -115,17 +117,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="getLatencyClass(p95Latency)"
                 data-test="service-graph-edge-side-panel-p95"
               >
-                <span class="col-metric"><span class="percentile-badge">P95</span></span>
+                <span class="col-metric"><OTag type="fieldTag" value="soft">P95</OTag></span>
                 <span class="col-current latency-current">{{ p95Latency }}</span>
                 <span class="col-baseline latency-baseline">{{ baselineP95 }}</span>
                 <span class="col-delta">
-                  <span class="delta-badge" :class="getDeltaClass(p95DeltaPct)">
-                    <OIcon
-                      :name="p95DeltaPct > 2 ? 'arrow-upward' : p95DeltaPct < -2 ? 'arrow-downward' : 'remove'"
-                      size="xs"
-                    />
+                  <OTag type="deltaTrend" :value="getDeltaTrend(p95DeltaPct)">
+                    <template #icon>
+                      <OIcon
+                        :name="p95DeltaPct > 2 ? 'arrow-upward' : p95DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                        size="xs"
+                      />
+                    </template>
                     {{ p95DeltaFormatted }}
-                  </span>
+                  </OTag>
                 </span>
               </div>
 
@@ -135,17 +139,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="getLatencyClass(p99Latency)"
                 data-test="service-graph-edge-side-panel-p99"
               >
-                <span class="col-metric"><span class="percentile-badge">P99</span></span>
+                <span class="col-metric"><OTag type="fieldTag" value="soft">P99</OTag></span>
                 <span class="col-current latency-current">{{ p99Latency }}</span>
                 <span class="col-baseline latency-baseline">{{ baselineP99 }}</span>
                 <span class="col-delta">
-                  <span class="delta-badge" :class="getDeltaClass(p99DeltaPct)">
-                    <OIcon
-                      :name="p99DeltaPct > 2 ? 'arrow-upward' : p99DeltaPct < -2 ? 'arrow-downward' : 'remove'"
-                      size="xs"
-                    />
+                  <OTag type="deltaTrend" :value="getDeltaTrend(p99DeltaPct)">
+                    <template #icon>
+                      <OIcon
+                        :name="p99DeltaPct > 2 ? 'arrow-upward' : p99DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                        size="xs"
+                      />
+                    </template>
                     {{ p99DeltaFormatted }}
-                  </span>
+                  </OTag>
                 </span>
               </div>
             </div>
@@ -238,13 +244,14 @@ import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 type ChartTab = 'rate' | 'errors' | 'duration';
 
 export default defineComponent({
   name: 'ServiceGraphEdgeSidePanel',
   components: { OButton, OToggleGroup, OToggleGroupItem, OSpinner, OTooltip,
-    OIcon,
+    OIcon, OTag,
 },
   props: {
     selectedEdge: {
@@ -369,12 +376,12 @@ export default defineComponent({
     const p95DeltaFormatted = computed(() => formatDelta(p95DeltaPct.value));
     const p99DeltaFormatted = computed(() => formatDelta(p99DeltaPct.value));
 
-    const getDeltaClass = (pct: number): string => {
-      if (Math.abs(pct) < 2) return 'delta-neutral';
-      if (pct <= -5) return 'delta-improved';
-      if (pct < 0) return 'delta-improved-slight';
-      if (pct < 20) return 'delta-warning';
-      return 'delta-critical';
+    const getDeltaTrend = (pct: number): string => {
+      if (Math.abs(pct) < 2) return 'neutral';
+      if (pct <= -5) return 'improved';
+      if (pct < 0) return 'slight';
+      if (pct < 20) return 'warning';
+      return 'critical';
     };
 
     const trendDataPoints = computed<any[]>(
@@ -777,7 +784,7 @@ export default defineComponent({
       p50DeltaFormatted,
       p95DeltaFormatted,
       p99DeltaFormatted,
-      getDeltaClass,
+      getDeltaTrend,
       getErrorRateClass,
       getLatencyClass,
       formatNumber,
@@ -866,27 +873,6 @@ export default defineComponent({
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-
-    .health-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: 600;
-      line-height: 1;
-      flex-shrink: 0;
-
-      &::before {
-        content: '●';
-        font-size: 10px;
-      }
-
-      &.healthy  { background: rgba(16,185,129,0.15); color: #10b981; }
-      &.degraded { background: rgba(251,191,36,0.15);  color: #fbbf24; }
-      &.critical { background: rgba(239,68,68,0.15);   color: #ef4444; }
-    }
   }
 
   .panel-header-actions {
@@ -906,12 +892,6 @@ export default defineComponent({
     .from-service { color: #1d4ed8; }
     .to-service   { color: #6d28d9; }
     .edge-arrow   { color: rgba(0,0,0,0.3); }
-
-    .health-badge {
-      &.healthy  { background: rgba(16,185,129,0.08); color: #059669; }
-      &.degraded { background: rgba(251,191,36,0.08); color: #d97706; }
-      &.critical { background: rgba(239,68,68,0.08);  color: #dc2626; }
-    }
   }
 }
 
@@ -1108,16 +1088,6 @@ export default defineComponent({
 
         .col-current, .col-baseline, .col-delta { text-align: right; }
 
-        .percentile-badge {
-          font-size: 11px;
-          font-weight: 700;
-          color: #9ca3af;
-          background: rgba(107, 114, 128, 0.14);
-          padding: 2px 6px;
-          border-radius: 3px;
-          letter-spacing: 0.03em;
-        }
-
         .latency-current {
           font-size: 13px;
           font-weight: 700;
@@ -1128,24 +1098,6 @@ export default defineComponent({
           font-size: 11px;
           font-weight: 500;
           color: #9ca3af;
-        }
-
-        .delta-badge {
-          display: inline-flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 2px;
-          padding: 2px 5px;
-          border-radius: 3px;
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: -0.01em;
-
-          &.delta-improved       { background: rgba(16, 185, 129, 0.14); color: #10b981; }
-          &.delta-improved-slight { background: rgba(16, 185, 129, 0.08); color: #34d399; }
-          &.delta-neutral        { background: rgba(107, 114, 128, 0.12); color: #6b7280; }
-          &.delta-warning        { background: rgba(251, 191, 36, 0.14);  color: #fbbf24; }
-          &.delta-critical       { background: rgba(239, 68, 68, 0.14);   color: #ef4444; }
         }
       }
     }
@@ -1222,16 +1174,7 @@ export default defineComponent({
           .latency-current { color: #dc2626; }
         }
 
-        .percentile-badge { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
         .latency-baseline { color: #6b7280; }
-
-        .delta-badge {
-          &.delta-improved       { background: rgba(16, 185, 129, 0.1);  color: #059669; }
-          &.delta-improved-slight { background: rgba(16, 185, 129, 0.06); color: #10b981; }
-          &.delta-neutral        { background: rgba(107, 114, 128, 0.08); color: #6b7280; }
-          &.delta-warning        { background: rgba(217, 119, 6, 0.1);    color: #d97706; }
-          &.delta-critical       { background: rgba(220, 38, 38, 0.1);    color: #dc2626; }
-        }
       }
     }
   }

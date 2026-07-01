@@ -156,17 +156,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="tw:text-xs tw:text-gray-400"
                 >{{ t("aiToolset.presets") }}:</span
               >
-              <OBadge
+              <OTag
                 v-for="preset in CLI_PRESETS"
                 :key="preset.id"
+                type="cliPreset"
+                :value="preset.id"
                 clickable
-                variant="primary-soft"
                 class="tw:cursor-pointer"
                 :data-test="`cli-preset-${preset.id}`"
                 @click="applyPreset(preset)"
               >
                 {{ preset.label }}
-              </OBadge>
+              </OTag>
             </div>
           </div>
           <div class="o2-input tw:mb-4">
@@ -364,7 +365,7 @@ import { useI18n } from "vue-i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -379,7 +380,7 @@ const QueryEditor = defineAsyncComponent(
 
 export default defineComponent({
   name: "AddAiToolset",
-  components: { OSeparator, OBadge, OButton, OIcon, OInput, OSelect, OSwitch, OTextarea, QueryEditor },
+  components: { OSeparator, OTag, OButton, OIcon, OInput, OSelect, OSwitch, OTextarea, QueryEditor },
   emits: ["cancel:hideform"],
   setup(_, { emit }) {
     const store = useStore();

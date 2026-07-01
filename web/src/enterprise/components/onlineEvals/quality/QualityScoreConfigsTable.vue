@@ -60,7 +60,7 @@
         </template>
 
         <template #cell-status="{ row }">
-          <span class="qsc-status" :class="`qsc-status--${row.status}`" :aria-label="row.status">●</span>
+          <OTag type="qualityStatus" :value="row.status" label="" :aria-label="row.status" />
         </template>
 
         <template #cell-name="{ row }">
@@ -73,13 +73,11 @@
         </template>
 
         <template #cell-type="{ row }">
-          <OBadge
+          <OTag
             v-if="shortType(row.dataType) !== '—'"
-            :variant="dataTypeBadgeVariant(row.dataType)"
-            size="sm"
-          >
-            {{ row.dataType }}
-          </OBadge>
+            type="evalDataType"
+            :value="row.dataType"
+          />
           <span v-else class="qsc-muted">—</span>
         </template>
 
@@ -130,7 +128,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";
@@ -246,15 +244,6 @@ function shortType(type: ScoreConfigRow["dataType"]): string {
   return "—";
 }
 
-// Map a score-config data type to a neutral design-system OBadge soft variant
-// (numeric → blue, categorical → purple, boolean → teal). Data types are just
-// labels, so use neutral palette colors rather than semantic variants.
-function dataTypeBadgeVariant(type: ScoreConfigRow["dataType"]) {
-  if (type === "categorical") return "purple-soft" as const;
-  if (type === "boolean") return "teal-soft" as const;
-  return "blue-soft" as const; // numeric
-}
-
 function formatCount(n: number | null): string {
   if (n == null) return "—";
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
@@ -327,18 +316,6 @@ function relativeTime(timestampMs: number): string {
   display: flex;
   flex-direction: column;
 }
-
-.qsc-status {
-  display: inline-flex;
-  font-size: 16px;
-  line-height: 1;
-}
-
-.qsc-status--unhealthy { color: var(--o2-status-warning-text, #b25400); }
-.qsc-status--warn { color: var(--o2-status-warning-text, #b25400); opacity: 0.7; }
-.qsc-status--healthy { color: var(--o2-status-success-text, #2e7d32); }
-.qsc-status--noThreshold { color: var(--color-text-secondary, var(--o2-text-secondary)); }
-.qsc-status--noData { color: var(--color-text-secondary, var(--o2-text-secondary)); opacity: 0.55; }
 
 .qsc-name {
   font-weight: 600;

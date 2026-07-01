@@ -206,20 +206,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 Object.keys(getDefaultTier(row).prices || {}).length
               "
             >
-              <span
+              <ODimensionChip
                 v-for="(price, key) in getVisiblePrices(row)"
                 :key="key"
-                class="dimension-badge"
-                :class="getPriceKeyColorClass(key as string)"
-              >
-                <span class="tw:font-medium">{{
-                  formatPriceKey(key as string)
-                }}</span
-                >=<span>{{ formatPerMillion(price as number) }}</span>
-              </span>
-              <span
+                :dim-key="key as string"
+                :key-label="formatPriceKey(key as string)"
+                :value="formatPerMillion(price as number)"
+              />
+              <OTag
                 v-if="getOverflowCount(row) > 0"
-                class="dimension-badge badge-more tw:cursor-pointer"
+                variant="default-soft"
+                clickable
                 @click.stop="openPricingDialog(row)"
               >
                 +{{ getOverflowCount(row) }}
@@ -254,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                 </OTooltip>
-              </span>
+              </OTag>
             </template>
             <span v-else class="tw:text-text-primary">&mdash;</span>
           </div>
@@ -495,6 +492,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -679,29 +678,6 @@ const shadowingParentNames = computed(() => {
 /** Shorten usage key for display: replace underscores with hyphens, drop trailing "_tokens". */
 function formatPriceKey(key: string): string {
   return key.replace(/_tokens$/, "").replace(/_/g, "-");
-}
-
-function getPriceKeyColorClass(key: string): string {
-  const k = key.toLowerCase();
-  if (k.includes("input")) return "badge-blue";
-  if (k.includes("output")) return "badge-green";
-  const palette = [
-    "badge-cyan",
-    "badge-purple",
-    "badge-pink",
-    "badge-orange",
-    "badge-amber",
-    "badge-violet",
-    "badge-rose",
-    "badge-teal",
-    "badge-indigo",
-  ];
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash << 5) - hash + key.charCodeAt(i);
-    hash = hash & hash;
-  }
-  return palette[Math.abs(hash) % palette.length];
 }
 
 function formatPerMillion(pricePerToken: number | undefined | null): string {
@@ -1016,32 +992,6 @@ body.body--dark .pattern-code {
   overflow-y: auto;
 }
 
-/* ── Dimension badges (pricing) ─────────────────────── */
-.dimension-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 400;
-  white-space: nowrap;
-  border: 1px solid #d1d5db;
-  color: inherit;
-}
-
-.badge-more {
-  background: #e5e7eb;
-  color: #6b7280;
-  font-weight: 500;
-  border: none;
-}
-
-body.body--dark .badge-more {
-  background: #4b5563;
-  color: #d1d5db;
-}
-
 /* ── Pricing detail side panel ────────────────────── */
 .pricing-dialog-panel {
   width: 30vw !important;
@@ -1155,13 +1105,6 @@ body.body--dark .badge-more {
 
   tr:last-child td {
     border-bottom: none;
-  }
-}
-
-body.body--dark {
-  .dimension-badge {
-    color: #ffffff;
-    border-color: #4b5563;
   }
 }
 

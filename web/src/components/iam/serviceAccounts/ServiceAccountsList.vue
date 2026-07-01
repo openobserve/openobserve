@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-email="{ row }">
               <template v-if="row.is_system">
                 <span data-test="service-accounts-system-account-label" class="text-weight-medium">AI SRE Agent</span>
-                <OBadge data-test="service-accounts-system-badge" variant="primary-outline" size="sm" class="tw:ml-2">system</OBadge>
+                <OTag data-test="service-accounts-system-badge" type="serviceAccountKind" value="system" class="tw:ml-2">system</OTag>
               </template>
               <template v-else>
                 <span :data-test="`service-accounts-email-${row.email}`">
@@ -109,10 +109,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-actions="{ row }">
               <template v-if="row.is_system">
-                <OBadge data-test="service-accounts-system-managed-badge" variant="default-outline">
+                <OTag data-test="service-accounts-system-managed-badge" type="serviceAccountKind" value="managed">
                     {{ t('serviceAccounts.systemManaged', 'System Managed') }}
                   <OTooltip v-if="row.description" :content="row.description" />
-                </OBadge>
+                </OTag>
               </template>
               <template v-else>
                 <OButton
@@ -254,7 +254,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { useStore } from "vuex";
@@ -287,7 +287,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { OEmptyState, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge, OCodeCell, OUserCell, OSearchInput },
+  components: { OEmptyState, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OTag, OCodeCell, OUserCell, OSearchInput },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();

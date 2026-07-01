@@ -37,10 +37,7 @@
         :data-test="`quality-sidebar-item-${row.name}`"
         @click="$emit('select', row)"
       >
-        <span class="qcs-item__status" :class="`qcs-item__status--${row.status}`">
-          <template v-if="row.status === 'unhealthy'">▲</template>
-          <template v-else>●</template>
-        </span>
+        <OTag type="qualityStatus" :value="row.status" label="" :aria-label="row.status" />
 
         <div class="qcs-item__main">
           <div class="qcs-item__row">
@@ -93,6 +90,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";
 
 const props = defineProps<{
@@ -259,20 +257,6 @@ function sparkPoints(series: number[]): string {
 .qcs-item--selected .qcs-item__name {
   color: var(--color-primary-600, #3F7994);
 }
-
-.qcs-item__status {
-  flex: 0 0 14px;
-  display: inline-flex;
-  align-items: flex-start;
-  padding-top: 2px;
-  font-size: 13px;
-  line-height: 1;
-}
-
-.qcs-item__status--unhealthy { color: var(--o2-status-warning-text, #b25400); }
-.qcs-item__status--warn { color: var(--o2-status-warning-text, #b25400); opacity: 0.75; }
-.qcs-item__status--healthy { color: var(--o2-status-success-text, #2e7d32); }
-.qcs-item__status--noThreshold { color: var(--color-text-secondary, var(--o2-text-secondary)); }
 
 .qcs-item__main {
   flex: 1;

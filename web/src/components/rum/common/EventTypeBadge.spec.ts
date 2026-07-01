@@ -74,8 +74,10 @@ describe("EventTypeBadge", () => {
         props: { type: "error", dataTest: "rum-event-type-badge" },
       });
 
-      // Assert
-      expect(wrapper.attributes("data-test")).toBe("rum-event-type-badge");
+      // Assert — data-test forwards through OTag/OBadge onto the rendered badge.
+      expect(
+        wrapper.find('[data-test="rum-event-type-badge"]').exists(),
+      ).toBe(true);
     });
 
     it("leaves data-test empty or absent when not provided", () => {

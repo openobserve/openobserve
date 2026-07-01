@@ -58,9 +58,7 @@
         </template>
 
         <template #cell-type="{ row }">
-          <OBadge :variant="dataTypeBadgeVariant(dataTypeOf(row))" size="sm">
-            {{ dataTypeOf(row) }}
-          </OBadge>
+          <OTag type="evalDataType" :value="dataTypeOf(row)" />
         </template>
 
         <template #cell-rangeValues="{ row }">
@@ -140,7 +138,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -185,16 +183,6 @@ function handleBulkExport() {
   const ids = [...selectedIds.value];
   selectedIds.value = [];
   emit("export-bulk", ids);
-}
-
-// Map a score-config data type to a neutral design-system OBadge soft variant
-// (numeric → blue, categorical → purple, boolean → teal). Data types are just
-// labels, so use neutral palette colors rather than semantic success/warning
-// variants that would imply a good/bad meaning.
-function dataTypeBadgeVariant(type: DataType | string) {
-  if (type === "categorical") return "purple-soft" as const;
-  if (type === "boolean") return "teal-soft" as const;
-  return "blue-soft" as const; // numeric
 }
 
 const typeOptions = computed(() => [

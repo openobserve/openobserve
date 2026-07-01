@@ -19,12 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div data-test="tag-input-wrapper" class="tag-input-wrapper" :class="{ 'has-content': hasContent }">
       <label v-if="label" data-test="tag-input-label" class="tag-input-label">{{ label }}</label>
       <div data-test="tags-and-input" class="tags-and-input">
-        <OBadge
+        <OTag
           v-for="(tag, index) in modelValue"
           :key="index"
           :data-test="`tag-chip-${index}`"
-          variant="default"
-          size="sm"
+          type="selectionChip"
           class="tag-chip"
         >
           {{ tag }}
@@ -38,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="close" size="xs" />
             </button>
           </template>
-        </OBadge>
+        </OTag>
         <input
           data-test="tag-input-field"
           ref="inputRef"
@@ -58,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Props {

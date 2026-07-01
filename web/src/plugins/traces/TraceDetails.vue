@@ -140,32 +140,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
               />
               <!-- Span Count Badge -->
-              <div
+              <OTag
+                type="logsResultChip"
+                value="neutral"
                 data-test="trace-details-spans-count"
-                class="tw:flex tw:items-center tw:ml-[0rem] tw:space-x-1 tw:px-[0.625rem] tw:py-[0.1rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-text-4)] tw:bg-[var(--o2-tag-grey-1)]"
               >
                 <span data-test="span-count-text">
                   {{ formatLargeNumber(effectiveSpanList.length) }}
                   {{ t("traces.spansLabel") }}
                   <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
                 </span>
-              </div>
+              </OTag>
 
               <div
                 class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
               />
 
               <!-- Error Count Badge -->
-              <div
+              <OTag
+                type="logsResultChip"
+                value="error"
                 data-test="trace-details-error-spans-count"
-                class="tw:flex tw:items-center tw:space-x-1 tw:px-[0.625rem] tw:py-[0.1rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)] tw:bg-[var(--o2-error-tag-bg)] tw:mr-[0.85rem]"
+                class="tw:mr-[0.85rem]"
               >
                 <span
                   >{{ formatLargeNumber(errorSpansCount) }}
                   {{ t("traces.errorsLabel") }}</span
                 >
                 <OTooltip :content="errorSpansCount + ' ' + t('traces.errorsLabel')" />
-              </div>
+              </OTag>
             </div>
           </div>
 
@@ -797,6 +800,7 @@ import {
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import useTraces from "@/composables/useTraces";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
@@ -958,6 +962,7 @@ export default defineComponent({
   },
   components: {
     ShareButton,
+    OTag,
     TraceDetailsSidebar,
     TraceTree,
     TraceDAG,

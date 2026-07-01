@@ -96,18 +96,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="incidentStatus"
             :value="row.status"
-            :label="getStatusLabel(row.status)"
-            size="sm"
             data-test="incident-status-badge"
           />
         </template>
         <template #cell-severity="{ row }">
-          <OBadge
-            :variant="getSeverityVariant(row.severity)"
-            dot
+          <OTag
+            type="severity"
+            :value="row.severity"
             size="sm"
             data-test="incident-severity-badge"
-          >{{ row.severity }}</OBadge>
+          >{{ row.severity }}</OTag>
         </template>
         <template #cell-title="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1">
@@ -118,20 +116,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-dimensions="{ row }">
           <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-1 tw:min-w-0 tw:overflow-hidden">
-            <span
+            <ODimensionChip
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
-              class="tw:inline-flex tw:min-w-0"
-            >
-              <OBadge :variant="getDimensionVariant(key)" size="sm" class="tw:min-w-0 tw:!p-0 tw:overflow-hidden">
-                <span class="tw:inline-flex tw:items-stretch tw:min-w-0">
-                  <span class="tw:ps-2.5 tw:pe-1 tw:py-1.5 tw:shrink-0 tw:whitespace-nowrap tw:bg-current/8 tw:opacity-90">{{ key }}</span>
-                  <span class="tw:ps-1 tw:pe-2.5 tw:py-1.5 tw:truncate tw:min-w-0 tw:font-semibold">{{ value }}</span>
-                </span>
-              </OBadge>
-              <OTooltip :delay="300" :content="key + '=' + value" />
-            </span>
-            <OBadge
+              :dim-key="key"
+              :value="value"
+              class="tw:min-w-0"
+            />
+            <OTag
               v-if="getSortedDimensions(row.group_values).length > 2"
               variant="default-soft"
               size="sm"
@@ -150,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </OTooltip>
-            </OBadge>
+            </OTag>
           </div>
         </template>
         <template #cell-last_alert_at="{ row }">
@@ -239,13 +231,11 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import { dimensionVariant } from "@/lib/core/Badge/badgeGroups";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
@@ -262,7 +252,7 @@ export default defineComponent({
     OIcon,
     OTable,
     OTag,
-    OBadge,
+    ODimensionChip,
     OTimeCell,
     OToggleGroup,
     OToggleGroupItem,
@@ -319,7 +309,7 @@ export default defineComponent({
         accessorKey: "status",
         resizable: true,
         hideable: true,
-        size: 120,
+        size: 130,
         meta: { align: "left" },
       },
       {
@@ -509,26 +499,6 @@ export default defineComponent({
       }
     };
 
-    const getSeverityVariant = (severity: string): BadgeVariant => {
-      switch (severity) {
-        case "P1": return "error-soft";
-        case "P2": return "orange-soft";
-        case "P3": return "amber-soft";
-        case "P4": return "blue-soft";
-        default: return "default-soft";
-      }
-    };
-
-    const getSeverityColorClass = (severity: string) => {
-      switch (severity) {
-        case "P1": return "severity-p1";
-        case "P2": return "severity-p2";
-        case "P3": return "severity-p3";
-        case "P4": return "severity-p4";
-        default: return "severity-default";
-      }
-    };
-
     const formatTimestamp = (timestamp: number) => {
       return formatToReadable(timestamp);
     };
@@ -582,10 +552,6 @@ export default defineComponent({
       }
       return classes[Math.abs(hash) % classes.length];
     };
-
-    // Shared with the correlation "Correlated by:" chips so the same dimension
-    // key renders in the same colour in both places. See badgeGroups.ts.
-    const getDimensionVariant = dimensionVariant;
 
     const restoreStateFromStore = (): boolean => {
       const savedState = store.state.incidents.incidents;
@@ -675,13 +641,10 @@ export default defineComponent({
       reopenIncident,
       getStatusColorClass,
       getStatusLabel,
-      getSeverityVariant,
-      getSeverityColorClass,
       formatTimestamp,
       formatDimensions,
       getSortedDimensions,
       getDimensionColorClass,
-      getDimensionVariant,
       qTableRef,
       store,
     };
@@ -737,37 +700,12 @@ export default defineComponent({
   font-weight: 600;
 }
 
-.severity-p1 {
-  border: 1px solid #991b1b;
-}
-
-.severity-p2 {
-  border: 1px solid #c2410c;
-}
-
-.severity-p3 {
-  border: 1px solid #92400e;
-}
-
-.severity-p4 {
-  border: 1px solid #6b7280;
-}
-
-.severity-default {
-  border: 1px solid #6b7280;
-}
-
-/* Dark mode adjustments for status and severity badges */
+/* Dark mode adjustments for status badges */
 body.body--dark {
   .status-open { border: 1px solid #fca5a5; }
   .status-acknowledged { border: 1px solid #fbbf24; }
   .status-resolved { border: 1px solid #6ee7b7; }
   .status-default { border: 1px solid #d1d5db; }
-  .severity-p1 { border: 1px solid #fca5a5; }
-  .severity-p2 { border: 1px solid #fdba74; }
-  .severity-p3 { border: 1px solid #fcd34d; }
-  .severity-p4 { border: 1px solid #d1d5db; }
-  .severity-default { border: 1px solid #d1d5db; }
 }
 
 /* Dimension badge base styling */

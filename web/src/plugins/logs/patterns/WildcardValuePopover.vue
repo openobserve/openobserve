@@ -28,9 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ── Header ── -->
     <div class="wcp__header">
       <div class="wcp__header-left">
-        <OBadge variant="default-soft" size="sm" class="wcp__type-badge">
-          {{ tokenType }}
-        </OBadge>
+        <OTag type="fieldType" :value="tokenType" :label="tokenType" class="wcp__type-badge" />
         <span class="wcp__title">Variable slot · {{ tokenType }}</span>
       </div>
       <div class="wcp__header-right">
@@ -86,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { wildcardChipColor, wildcardLabel } from "@/composables/useLogs/useTemplateTokenizer";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { WildcardDisplayValue } from "./useWildcardHover";
 
 const props = defineProps<{

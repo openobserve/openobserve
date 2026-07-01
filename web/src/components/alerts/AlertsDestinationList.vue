@@ -131,12 +131,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:truncate tw:min-w-0"
                 :title="row.template"
               >{{ row.template }}</span>
-              <OBadge
+              <OTag
                 v-if="isDefaultPrebuiltTemplate(row)"
                 :data-test="`destination-template-default-badge-${row.name}`"
-                variant="default"
-                class="tw:text-xs tw:flex-shrink-0"
-              >{{ t('alert_destinations.templateDefaultBadge') }}</OBadge>
+                type="templateDefaultFlag"
+                value="default"
+                class="tw:flex-shrink-0"
+              >{{ t('alert_destinations.templateDefaultBadge') }}</OTag>
             </div>
             <span v-else class="tw:text-text-primary">—</span>
           </template>
@@ -144,11 +145,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-type="{ row }">
             <div class="tw:flex tw:items-center tw:gap-2">
               <template v-if="getPrebuiltTypeName(row)">
-                <OBadge
+                <OTag
                   :data-test="`destination-type-badge-${getPrebuiltTypeName(row)?.toLowerCase()}`"
-                  variant="primary"
+                  type="destinationKind"
+                  value="prebuilt"
                   class="tw:text-xs"
-                >{{ getPrebuiltTypeName(row) }}</OBadge>
+                >{{ getPrebuiltTypeName(row) }}</OTag>
                 <OIcon
                   name="auto-awesome"
                   size="sm"
@@ -156,11 +158,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template v-else>
-                <OBadge
+                <OTag
                   data-test="destination-type-badge-custom"
-                  variant="default"
+                  type="destinationKind"
+                  value="custom"
                   class="tw:text-xs"
-                >{{ getCustomDestinationLabel(row) }}</OBadge>
+                >{{ getCustomDestinationLabel(row) }}</OTag>
                 <OIcon
                   name="settings"
                   size="sm"
@@ -270,7 +273,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
-import OBadge from '@/lib/core/Badge/OBadge.vue';
+import OTag from '@/lib/core/Badge/OTag.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -294,7 +297,7 @@ export default defineComponent({
     OButton,
     OSearchInput,
     OCheckbox,
-    OBadge,
+    OTag,
     OTable,
     OToggleGroup,
     OToggleGroupItem,
