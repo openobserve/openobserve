@@ -27,7 +27,7 @@ jobs:
       GIT_HASH: ${{ steps.set-git-tag.outputs.GIT_HASH }}
     steps:
       - name: Clone the current repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository }}
           ref: ${{ inputs.branch }}
@@ -82,7 +82,7 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
       - name: Clone the current repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository }}
           ref: ${{ inputs.branch }}
@@ -171,7 +171,7 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
       - name: Clone the current repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository }}
           ref: ${{ inputs.branch }}

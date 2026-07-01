@@ -27,7 +27,7 @@ jobs:
       has_backend_changes: ${{ steps.check.outputs.has_backend_changes }}
       has_ui_changes: ${{ steps.check.outputs.has_ui_changes }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -67,7 +67,7 @@ jobs:
 
     steps:
       - name: Clone the current repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -147,7 +147,7 @@ jobs:
 
     steps:
       - name: Clone the current repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

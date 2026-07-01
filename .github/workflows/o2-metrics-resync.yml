@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Clone the current repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
       - name: Re-sync recent runs to OpenObserve
         continue-on-error: true
         env:

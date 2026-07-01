@@ -37,7 +37,7 @@ jobs:
     outputs:
       has_changes: ${{ steps.check.outputs.has_changes }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -68,7 +68,7 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
       - name: Checkout git repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -190,7 +190,7 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
       - name: Checkout git repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -307,7 +307,7 @@ jobs:
           sudo rm -rf "/usr/local/share/boost"
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
 
       - name: Setup Rust Toolchain
@@ -407,7 +407,7 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
       - name: Checkout git repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -538,7 +538,7 @@ jobs:
       contents: read
     steps:
       - name: Clone the current repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
       # Pull every per-shard junit. NO merge-multiple: each artifact lands in its
       # own subdir (api-junit__<category>__<leg>) so the parser can read the test
       # CATEGORY from the dir name. Missing artifacts are non-fatal.

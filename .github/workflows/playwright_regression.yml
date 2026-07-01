@@ -62,7 +62,7 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
       - name: Clone the current repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -193,7 +193,7 @@ jobs:
           sudo flock --wait 30 /var/lib/dpkg/lock-frontend true 2>/dev/null || true
 
       - name: Clone the current repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -560,7 +560,7 @@ jobs:
 
     steps:
       - name: Clone the current repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -694,7 +694,7 @@ jobs:
       actions: read  # download-artifact fetches the merged-report artifact
     steps:
       - name: Clone the current repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -804,7 +804,7 @@ jobs:
       actions: read  # reads run/job timings from the Actions API
     steps:
       - name: Clone the current repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Report run metrics to OpenObserve
         continue-on-error: true
