@@ -525,8 +525,11 @@ async fn init_common_grpc_server(
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    // remove gzip because arrow flight already have zstd compression
+    // Batches are already ZSTD-compressed (Arrow IPC); gzip is dropped client-side only.
+    // Server keeps compression so old clients still work during a rolling upgrade.
     let flight_svc = FlightServiceServer::new(FlightServiceImpl)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let node_svc = NodeServiceServer::new(NodeService)
