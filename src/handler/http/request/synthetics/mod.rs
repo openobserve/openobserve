@@ -252,7 +252,7 @@ pub async fn list_synthetics(
                     {
                         for item in &mut resp.monitors {
                             if let Some(s) = summaries.get(&item.id) {
-                                item.status = s.status.clone();
+                                // status comes from DB (last_check_status) — do not overwrite
                                 item.last_check_at = s.last_check_at;
                                 item.last_response_ms = s.last_response_ms;
                             }
