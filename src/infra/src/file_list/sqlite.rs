@@ -906,12 +906,13 @@ GROUP BY stream;
         stream_type: StreamType,
         stream_name: &str,
     ) -> Result<()> {
-        let sql = format!(
-            "DELETE FROM stream_stats WHERE stream = '{org_id}/{stream_type}/{stream_name}';"
-        );
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        sqlx::query(&sql).execute(&*client).await?;
+        sqlx::query("DELETE FROM stream_stats WHERE stream = ?;")
+            .bind(&stream_key)
+            .execute(&*client)
+            .await?;
         Ok(())
     }
 

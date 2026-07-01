@@ -28,7 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }
     "
     @mouseleave="
-      () => {
+      (e) => {
+        if (e?.relatedTarget?.closest?.('.o2-echarts-tooltip')) return;
         // if hoveredSeriesState is not null then set -1
         if (hoveredSeriesState) hoveredSeriesState.setIndex(-1, -1, -1, null);
       }
@@ -652,9 +653,13 @@ export default defineComponent({
           options.tooltip.textStyle &&
           (options.tooltip.textStyle.color =
             theme === "dark" ? "#fff" : "#000");
-        options.tooltip &&
-          (options.tooltip.backgroundColor =
-            theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)");
+        if (options.tooltip) {
+          options.tooltip.backgroundColor =
+            theme === "dark" ? "rgba(22,23,25,0.97)" : "rgba(255,255,255,0.97)";
+          options.tooltip.borderColor =
+            theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)";
+          options.tooltip.borderWidth = 1;
+        }
         options.animation = false;
         try {
           // Use notMerge flag from data prop if available, otherwise default to true

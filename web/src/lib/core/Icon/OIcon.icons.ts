@@ -79,6 +79,8 @@ import Schema from "~icons/material-symbols/schema-outline";
 import Wifi from "~icons/material-symbols/wifi";
 import Window from "~icons/material-symbols/window-outline";
 import Javascript from "~icons/material-symbols/javascript";
+import Keep from "~icons/material-symbols/keep";
+import KeepOutline from "~icons/material-symbols/keep-outline";
 import KeyboardArrowDown from "~icons/material-symbols/keyboard-arrow-down";
 import KeyboardDoubleArrowLeft from "~icons/material-symbols/keyboard-double-arrow-left";
 import KeyboardDoubleArrowRight from "~icons/material-symbols/keyboard-double-arrow-right";
@@ -393,6 +395,8 @@ export const iconRegistry = {
   "wifi": Wifi,
   "window": Window,
   "javascript": Javascript,
+  "keep": Keep,
+  "keep-outline": KeepOutline,
   "keyboard-arrow-down": KeyboardArrowDown,
   "keyboard-double-arrow-left": KeyboardDoubleArrowLeft,
   "keyboard-double-arrow-right": KeyboardDoubleArrowRight,

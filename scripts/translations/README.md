@@ -129,11 +129,14 @@ The workflow uses **IAM Role with OIDC** for secure, credential-less authenticat
 
 #### IAM Role Configuration
 
-The workflow is already configured to use:
-- **IAM Role**: `arn:aws:iam::058694856476:role/GitHubActionsRole`
+The workflow assumes an IAM role via OIDC. The role ARN is **not hardcoded** — it
+is read from the `AWS_TRANSLATE_ROLE_ARN` repository secret so the AWS account ID
+is not exposed in source control:
+- **IAM Role**: stored in the `AWS_TRANSLATE_ROLE_ARN` secret
 - **Region**: `us-east-1`
 
-This is the same role used by other OpenObserve workflows (e.g., `build-pr-image.yml`).
+You can point this secret at the same role used by other OpenObserve workflows
+(e.g., `build-pr-image.yml`).
 
 #### Required IAM Permissions
 
@@ -158,9 +161,17 @@ Ensure the `GitHubActionsRole` has the following permission for AWS Translate:
 
 #### GitHub Repository Setup
 
-**No additional secrets required!** The workflow uses the existing OIDC configuration.
+Add one repository secret so the workflow can authenticate via OIDC without
+exposing the AWS account ID:
 
-The role is already configured in the workflow file and will automatically authenticate via GitHub's OIDC provider.
+| Secret | Value |
+|--------|-------|
+| `AWS_TRANSLATE_ROLE_ARN` | `arn:aws:iam::<ACCOUNT_ID>:role/<RoleName>` |
+
+Set it under **Settings → Secrets and variables → Actions → New repository secret**
+(or via `gh secret set AWS_TRANSLATE_ROLE_ARN`). The workflow fails fast with a
+clear error if this secret is missing. No long-lived AWS keys are stored — only
+the role ARN, which is assumed via GitHub's OIDC provider.
 
 ### Workflow Behavior
 
@@ -271,7 +282,7 @@ ERROR: No credentials for the translation service.
 ```
 **Solution**: IAM role should be automatically assumed via OIDC. Check:
 1. Workflow has `permissions: id-token: write`
-2. Role ARN is correct: `arn:aws:iam::058694856476:role/GitHubActionsRole`
+2. The `AWS_TRANSLATE_ROLE_ARN` secret is set and points to a valid role
 3. Role has `translate:TranslateText` permission
 
 ### Import Error
@@ -309,30 +320,50 @@ ModuleNotFoundError: No module named 'boto3'
    }
    ```
 
-2. **Push to branch:**
+2. **Merge the `en.json` change to `main`:**
    ```bash
    git add web/src/locales/languages/en.json
    git commit -m "feat: add new dashboard feature text"
-   git push origin feat/new-dashboard-feature
+   # open a PR and merge to main
    ```
 
-3. **Workflow automatically:**
-   - Detects `en.json` change
+3. **Workflow automatically (on `main` only):**
+   - Triggers because `web/src/locales/languages/en.json` changed
    - Runs translation script
-   - Translates `newFeature` to all 10 languages
-   - Commits updated `fr.json`, `es.json`, etc. to the same branch
+   - Translates only the **new or modified** keys to all 10 languages
+   - Commits updated `fr.json`, `es.json`, etc. plus `.translation_state.json`
 
 4. **Build workflows:**
    - Use the newly updated translation files
    - No additional steps needed
 
+> **Why `main` only?** Running on every feature branch made AWS Translate bill for
+> the same strings repeatedly (per branch, per rebase, again on merge). Gating to
+> `main` translates each string once, when it actually lands.
+
+## Change detection (`.translation_state.json`)
+
+`scripts/translations/.translation_state.json` records, per locale, a hash of the
+English source each translated value was derived from. On every run the script:
+
+- **Translates** a key only when it is new, missing in a target file, or its English
+  source text changed since the last run (so editing an existing label re-translates it).
+- **Keeps** already-translated text whose source is unchanged — it is never re-sent to
+  AWS, and English is never "translated" to English.
+- **Prunes** keys that were removed from `en.json`.
+- **Bootstraps** safely: the first run after this file is introduced adopts existing
+  translations as-is (no costly full re-translation, no overwriting manual fixes).
+
+Commit `.translation_state.json` together with the translation files — it is the
+source of truth that keeps subsequent runs incremental.
+
 ## Best Practices
 
 1. **Review Commits**: Check auto-generated translation commits for accuracy
 2. **Test in UI**: Verify translations display correctly in the application
-3. **Manual Fixes**: Edit translations manually if needed - they won't be overwritten
+3. **Manual Fixes**: Manual edits to a key are preserved until its English source changes
 4. **Context Matters**: Some terms may need manual translation for proper context
-5. **Feature Branches**: Translations happen on your branch before merging
+5. **Land on `main`**: Translations are generated when `en.json` is merged to `main`
 
 ## Cost Considerations
 
@@ -363,9 +394,11 @@ AWS Translate pricing (as of 2024):
 **First-time full translation:** ~$9 (one-time)
 
 ### Cost Optimization:
-- ✅ Only new keys are translated (existing translations preserved)
-- ✅ Only runs when `en.json` actually changes
-- ✅ Works on feature branches (consolidates before merge)
+- ✅ Only **new or modified** keys are translated (unchanged text is never re-sent)
+- ✅ Runs on **`main` only**, and only when `en.json` changes (no per-branch re-billing)
+- ✅ Superseded runs are cancelled (`concurrency` with `cancel-in-progress`)
+- ✅ Safety cap (`TRANSLATION_MAX_KEYS`, default 5000) blocks accidental mass re-translation
+- ✅ Failed AWS calls are retried next run, not silently billed as English
 - ✅ Typical monthly cost: **Under $2**
 
 ## Alternative Translation Services

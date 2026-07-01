@@ -45,6 +45,8 @@ vi.mock("./TracesAnalysisDashboard.vue", () => ({
 const mockMetricsRangeFilters = new Map();
 const mockSearchObj = reactive({
   data: {
+    editorValue: "",
+    datetime: { startTime: 1_000_000, endTime: 2_000_000 },
     stream: {
       selectedStream: { value: "default" },
       selectedStreamFields: [],
@@ -121,7 +123,6 @@ const mockStore = createStore({
 // ---------------------------------------------------------------------------
 const defaultProps = {
   streamName: "my_traces_stream",
-  timeRange: { startTime: 1_000_000, endTime: 2_000_000 },
   show: true,
 };
 
@@ -171,6 +172,7 @@ describe("TracesMetricsDashboard", () => {
   beforeEach(async () => {
     // Reset all shared state before every test
     mockMetricsRangeFilters.clear();
+    mockSearchObj.data.editorValue = "";
     mockSearchObj.meta.showHistogram = true;
     mockSearchObj.meta.searchMode = "traces";
     mockSearchObj.data.stream.selectedStream.value = "default";
@@ -309,7 +311,8 @@ describe("TracesMetricsDashboard", () => {
   describe("loadDashboard — WHERE clause from filter prop", () => {
     it("should include the filter prop in the Rate panel WHERE clause", async () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "service_name = 'api'" });
+      mockSearchObj.data.editorValue = "service_name = 'api'";
+      wrapper = mountComponent();
       await flushPromises();
       await wrapper.vm.loadDashboard();
       await flushPromises();
@@ -319,7 +322,8 @@ describe("TracesMetricsDashboard", () => {
 
     it("should include the filter prop in the Duration panel WHERE clause", async () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "service_name = 'api'" });
+      mockSearchObj.data.editorValue = "service_name = 'api'";
+      wrapper = mountComponent();
       await flushPromises();
       await wrapper.vm.loadDashboard();
       await flushPromises();
@@ -329,7 +333,8 @@ describe("TracesMetricsDashboard", () => {
 
     it("should include the filter prop in the Errors panel WHERE clause", async () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "service_name = 'api'" });
+      mockSearchObj.data.editorValue = "service_name = 'api'";
+      wrapper = mountComponent();
       await flushPromises();
       await wrapper.vm.loadDashboard();
       await flushPromises();
@@ -349,7 +354,8 @@ describe("TracesMetricsDashboard", () => {
 
     it("should convert span_kind='Server' label to '2' in the Rate panel WHERE clause", async () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "span_kind='Server'" });
+      mockSearchObj.data.editorValue = "span_kind='Server'";
+      wrapper = mountComponent();
       await flushPromises();
       await wrapper.vm.loadDashboard();
       await flushPromises();
@@ -360,7 +366,8 @@ describe("TracesMetricsDashboard", () => {
 
     it("should convert span_kind='Server' label to '2' in the Errors panel WHERE clause", async () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "span_kind='Server'" });
+      mockSearchObj.data.editorValue = "span_kind='Server'";
+      wrapper = mountComponent();
       await flushPromises();
       await wrapper.vm.loadDashboard();
       await flushPromises();
@@ -371,7 +378,8 @@ describe("TracesMetricsDashboard", () => {
 
     it("should convert span_kind='Client' label to '3' in both Rate and Errors panels", async () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "span_kind='Client'" });
+      mockSearchObj.data.editorValue = "span_kind='Client'";
+      wrapper = mountComponent();
       await flushPromises();
       await wrapper.vm.loadDashboard();
       await flushPromises();
@@ -385,7 +393,8 @@ describe("TracesMetricsDashboard", () => {
 
     it("should leave non-span_kind filter unchanged in the Errors panel WHERE clause", async () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "service_name = 'api'" });
+      mockSearchObj.data.editorValue = "service_name = 'api'";
+      wrapper = mountComponent();
       await flushPromises();
       await wrapper.vm.loadDashboard();
       await flushPromises();
@@ -395,7 +404,8 @@ describe("TracesMetricsDashboard", () => {
 
     it("should leave non-span_kind filter unchanged in the Duration panel WHERE clause", async () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "service_name = 'api'" });
+      mockSearchObj.data.editorValue = "service_name = 'api'";
+      wrapper = mountComponent();
       await flushPromises();
       await wrapper.vm.loadDashboard();
       await flushPromises();
@@ -405,7 +415,8 @@ describe("TracesMetricsDashboard", () => {
 
     it("should convert span_kind label case-insensitively in the Errors panel", async () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "span_kind='CONSUMER'" });
+      mockSearchObj.data.editorValue = "span_kind='CONSUMER'";
+      wrapper = mountComponent();
       await flushPromises();
       await wrapper.vm.loadDashboard();
       await flushPromises();
@@ -423,7 +434,8 @@ describe("TracesMetricsDashboard", () => {
         timeEnd: null,
       });
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "env = 'prod'" });
+      mockSearchObj.data.editorValue = "env = 'prod'";
+      wrapper = mountComponent();
       await flushPromises();
       await wrapper.vm.loadDashboard();
       await flushPromises();
@@ -479,9 +491,8 @@ describe("TracesMetricsDashboard", () => {
   // Props reactivity — timeRange change triggers re-load
   // -------------------------------------------------------------------------
   describe("props reactivity", () => {
-    it("should update currentTimeObj when timeRange prop changes", async () => {
-      const newTimeRange = { startTime: 5_000_000, endTime: 6_000_000 };
-      await wrapper.setProps({ timeRange: newTimeRange });
+    it("should update currentTimeObj when timeRange changes", async () => {
+      mockSearchObj.data.datetime = { startTime: 5_000_000, endTime: 6_000_000 };
       // Directly calling loadDashboard (watch triggers it; call explicitly to avoid timing)
       await wrapper.vm.loadDashboard();
       await flushPromises();
@@ -491,8 +502,7 @@ describe("TracesMetricsDashboard", () => {
     });
 
     it("should set dashboardData after loadDashboard is called with new timeRange", async () => {
-      const newTimeRange = { startTime: 7_000_000, endTime: 8_000_000 };
-      await wrapper.setProps({ timeRange: newTimeRange });
+      mockSearchObj.data.datetime = { startTime: 7_000_000, endTime: 8_000_000 };
       await wrapper.vm.loadDashboard();
       await flushPromises();
       expect(wrapper.vm.dashboardData).not.toBeNull();
@@ -640,7 +650,8 @@ describe("TracesMetricsDashboard", () => {
 
     it("should include span_status = 'ERROR' when filter prop contains it", () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "span_status = 'ERROR'" });
+      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
+      wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toContain("span_status = 'ERROR'");
     });
@@ -652,28 +663,32 @@ describe("TracesMetricsDashboard", () => {
 
     it("should include the filter prop string when filter is a non-empty string", () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "http_method = 'GET'" });
+      mockSearchObj.data.editorValue = "http_method = 'GET'";
+      wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toContain("http_method = 'GET'");
     });
 
     it("should not include a filter entry when filter prop is an empty string", () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "" });
+      mockSearchObj.data.editorValue = "";
+      wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toEqual([]);
     });
 
     it("should not include a filter entry when filter prop is only whitespace", () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "   " });
+      mockSearchObj.data.editorValue = "   ";
+      wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toEqual([]);
     });
 
     it("should convert span_kind='Server' label to numeric key '2' in the base filter", () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "span_kind='Server'" });
+      mockSearchObj.data.editorValue = "span_kind='Server'";
+      wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toContain("span_kind='2'");
       expect(filters.join(" ")).not.toContain("span_kind='Server'");
@@ -681,7 +696,8 @@ describe("TracesMetricsDashboard", () => {
 
     it("should convert span_kind='Client' label to numeric key '3' in the base filter", () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "span_kind='Client'" });
+      mockSearchObj.data.editorValue = "span_kind='Client'";
+      wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toContain("span_kind='3'");
       expect(filters.join(" ")).not.toContain("span_kind='Client'");
@@ -689,14 +705,16 @@ describe("TracesMetricsDashboard", () => {
 
     it("should convert span_kind label case-insensitively in the base filter", () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "span_kind='SERVER'" });
+      mockSearchObj.data.editorValue = "span_kind='SERVER'";
+      wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toContain("span_kind='2'");
     });
 
     it("should leave non-span_kind filters unchanged in the base filter", () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "service_name = 'api'" });
+      mockSearchObj.data.editorValue = "service_name = 'api'";
+      wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toContain("service_name = 'api'");
     });
@@ -710,7 +728,8 @@ describe("TracesMetricsDashboard", () => {
         timeEnd: null,
       });
       wrapper.unmount();
-      wrapper = mountComponent({ filter: "span_kind='Internal'" });
+      mockSearchObj.data.editorValue = "span_kind='Internal'";
+      wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toContain("duration >= 100 and duration <= 500");
       expect(filters).toContain("span_kind='1'");
@@ -826,7 +845,7 @@ describe("TracesMetricsDashboard", () => {
 
     it("should mount without error when filter prop is undefined", async () => {
       wrapper.unmount();
-      wrapper = mountComponent({ filter: undefined });
+      wrapper = mountComponent();
       await flushPromises();
       expect(wrapper.exists()).toBe(true);
     });

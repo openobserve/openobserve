@@ -28,6 +28,26 @@ use crate::{
     service::anomaly_detection as anomaly_service,
 };
 
+/// Anomaly detection can be turned off at runtime via O2_ANOMALY_DETECTION_DISABLED.
+/// When off, every endpoint in this module returns 403. Returns the short-circuit
+/// response to bail with, or `None` when the feature is live.
+fn disabled_response() -> Option<Response> {
+    if o2_enterprise::enterprise::common::config::get_config()
+        .anomaly_detection
+        .disabled
+    {
+        Some(
+            MetaHttpResponse::error(
+                StatusCode::FORBIDDEN.as_u16(),
+                "Anomaly detection is disabled".to_string(),
+            )
+            .into_response(),
+        )
+    } else {
+        None
+    }
+}
+
 /// List all anomaly detection configurations for an organization
 #[utoipa::path(
     get,
@@ -48,6 +68,9 @@ use crate::{
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn list_configs(Path(org_id): Path<String>) -> Response {
+    if let Some(resp) = disabled_response() {
+        return resp;
+    }
     match anomaly_service::list_configs(&org_id, None, None).await {
         Ok(configs) => MetaHttpResponse::json(configs),
         Err(e) => {
@@ -80,6 +103,9 @@ pub async fn list_configs(Path(org_id): Path<String>) -> Response {
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn get_config(Path((org_id, anomaly_id)): Path<(String, String)>) -> Response {
+    if let Some(resp) = disabled_response() {
+        return resp;
+    }
     match anomaly_service::get_config(&org_id, &anomaly_id).await {
         Ok(Some(config)) => MetaHttpResponse::json(config),
         Ok(None) => MetaHttpResponse::error(
@@ -92,6 +118,15 @@ pub async fn get_config(Path((org_id, anomaly_id)): Path<(String, String)>) -> R
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                 .into_response()
         }
+    }
+}
+
+/// Falls back to `fallback` when `owner` is absent or empty.
+fn resolve_owner(owner: Option<String>, fallback: &str) -> Option<String> {
+    if owner.as_deref().unwrap_or("").is_empty() {
+        Some(fallback.to_string())
+    } else {
+        owner
     }
 }
 
@@ -119,21 +154,15 @@ pub async fn get_config(Path((org_id, anomaly_id)): Path<(String, String)>) -> R
         content_type = "application/json",
     ),
 )]
-/// Falls back to `fallback` when `owner` is absent or empty.
-fn resolve_owner(owner: Option<String>, fallback: &str) -> Option<String> {
-    if owner.as_deref().unwrap_or("").is_empty() {
-        Some(fallback.to_string())
-    } else {
-        owner
-    }
-}
-
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn create_config(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
     Json(mut req): Json<CreateAnomalyConfigRequest>,
 ) -> Response {
+    if let Some(resp) = disabled_response() {
+        return resp;
+    }
     req.owner = resolve_owner(req.owner, &user_email.user_id);
     match anomaly_service::create_config(&org_id, req).await {
         Ok(config) => MetaHttpResponse::json(config),
@@ -181,6 +210,9 @@ pub async fn update_config(
     Headers(user_email): Headers<UserEmail>,
     Json(mut req): Json<UpdateAnomalyConfigRequest>,
 ) -> Response {
+    if let Some(resp) = disabled_response() {
+        return resp;
+    }
     // Sanitize empty owner string: treat "" same as omitted on create — fall back to requester.
     req.owner = req.owner.map(|o| {
         if o.is_empty() {
@@ -228,6 +260,9 @@ pub async fn update_config(
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn delete_config(Path((org_id, anomaly_id)): Path<(String, String)>) -> Response {
+    if let Some(resp) = disabled_response() {
+        return resp;
+    }
     match anomaly_service::delete_config(&org_id, &anomaly_id).await {
         Ok(_) => MetaHttpResponse::message(
             StatusCode::OK.as_u16(),
@@ -267,6 +302,9 @@ pub async fn delete_config(Path((org_id, anomaly_id)): Path<(String, String)>) -
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn train_model(Path((org_id, anomaly_id)): Path<(String, String)>) -> Response {
+    if let Some(resp) = disabled_response() {
+        return resp;
+    }
     match anomaly_service::train_model(&org_id, &anomaly_id).await {
         Ok(result) => MetaHttpResponse::json(result),
         Err(e) if e.to_string().contains("not found") => {
@@ -302,6 +340,9 @@ pub async fn train_model(Path((org_id, anomaly_id)): Path<(String, String)>) -> 
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn cancel_training(Path((org_id, anomaly_id)): Path<(String, String)>) -> Response {
+    if let Some(resp) = disabled_response() {
+        return resp;
+    }
     match anomaly_service::cancel_training(&org_id, &anomaly_id).await {
         Ok(()) => MetaHttpResponse::ok("Training cancelled"),
         Err(e) if e.to_string().contains("not found") => {
@@ -336,6 +377,9 @@ pub async fn cancel_training(Path((org_id, anomaly_id)): Path<(String, String)>)
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn detect_anomalies(Path((org_id, anomaly_id)): Path<(String, String)>) -> Response {
+    if let Some(resp) = disabled_response() {
+        return resp;
+    }
     match anomaly_service::detect_anomalies(&org_id, &anomaly_id).await {
         Ok(result) => MetaHttpResponse::json(result),
         Err(e) if e.to_string().contains("not found") || e.to_string().contains("disabled") => {
@@ -374,6 +418,9 @@ pub async fn get_detection_history(
     Path((org_id, anomaly_id)): Path<(String, String)>,
     Query(query): Query<HistoryQuery>,
 ) -> Response {
+    if let Some(resp) = disabled_response() {
+        return resp;
+    }
     let limit = query.limit.unwrap_or(100);
 
     match anomaly_service::get_detection_history(&org_id, &anomaly_id, limit).await {

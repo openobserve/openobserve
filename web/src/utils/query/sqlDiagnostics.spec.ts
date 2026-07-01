@@ -124,7 +124,10 @@ const mutations: Mutation[] = [
   {
     name: "truncate_after_GROUP",
     apply: (sql) => {
-      const m = sql.match(/\bGROUP\b/i);
+      // Match an incomplete top-level GROUP keyword, not the "WITHIN GROUP"
+      // ordered-set aggregate syntax (e.g. PERCENTILE_CONT(...) WITHIN GROUP),
+      // which is a different construct the suppression model intentionally skips.
+      const m = sql.match(/(?<!WITHIN\s)\bGROUP\b/i);
       if (!m) return null;
       return { broken: sql.substring(0, (m.index ?? 0) + 5), expectedFragment: "GROUP" };
     },
@@ -385,7 +388,10 @@ describe("validateSql — colOffset/lineOffset", () => {
 // ─── Suite 3: mutation detection rate ────────────────────────────────────────
 
 describe("validateSql — mutation detection on broken queries", () => {
-  const SPECIFIC_MSG_THRESHOLD = 0.93; // ≥93% of broken queries get a specific message
+  // Re-tuned after #12576 switched validateSql to an allow-list suppression model
+  // (unrecognised error fingerprints are suppressed to avoid false positives) and
+  // added lower-detection complex-construct mutations to the pool.
+  const SPECIFIC_MSG_THRESHOLD = 0.92; // ≥92% of broken queries get a specific message
 
   it(`detects ≥ ${SPECIFIC_MSG_THRESHOLD * 100}% of broken queries with a specific message`, { timeout: 30000 }, async () => {
     const broken = generateBrokenQueries();

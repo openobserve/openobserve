@@ -152,6 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount } from "vue";
+import { useStore } from "vuex";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -318,6 +319,8 @@ const hiddenChipCount = computed(() => hiddenChips.value.length);
 
 // ── Source event banner helpers ───────────────────────────────────────────────
 
+const store = useStore();
+
 const TS_NS_MIN = 1e17;
 const TS_US_MIN = 1e14;
 const TS_MS_MIN = 1e11;
@@ -335,7 +338,8 @@ const formatEventTimestamp = (ts: number | string | undefined): string => {
   else if (n >= TS_S_MIN) ms = n * 1000;
   else ms = n;
   try {
-    return `${timestampToTimezoneDate(ms, "UTC", "yyyy-MM-dd HH:mm:ss.SSS")} UTC`;
+    const timezone = store.state.timezone || "UTC";
+    return `${timestampToTimezoneDate(ms, timezone, "yyyy-MM-dd HH:mm:ss.SSS")} ${timezone}`;
   } catch {
     return String(ts);
   }

@@ -528,10 +528,21 @@ describe("Advanced.vue", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should have tooltips for info buttons", () => {
-      // OIcon SVG-based rendering — check for info-outline OIcon components
+    it("should expose 'Learn more' help triggers that open the help drawer", () => {
+      // The ambiguous dual-behavior (i) icons were replaced with clearly
+      // clickable, labeled 'Learn more' links (help icon). Verify the help
+      // affordance is present for each documented control.
       const icons = wrapper.findAllComponents({ name: "OIcon" });
-      expect(icons.some((i) => i.props("name") === "info-outline")).toBe(true);
+      expect(icons.some((i) => i.props("name") === "help")).toBe(true);
+      expect(
+        wrapper.find('[data-test="advanced-template-info-btn"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="advanced-variables-info-btn"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="add-alert-row-input-info-btn"]').exists(),
+      ).toBe(true);
     });
   });
 

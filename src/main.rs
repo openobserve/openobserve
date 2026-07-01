@@ -29,6 +29,7 @@ use config::{
     meta::triggers::{Trigger, TriggerModule, TriggerStatus},
     utils::size::bytes_to_human_readable,
 };
+use infra::runtime::{create_grpc_runtime, create_job_runtime};
 use openobserve::{
     cli::basic::cli,
     common::{
@@ -205,15 +206,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let (job_shutudown_tx, job_shutdown_rx) = oneshot::channel();
     let (job_stopped_tx, job_stopped_rx) = oneshot::channel();
     let job_rt_handle = std::thread::spawn(move || {
-        let cfg = get_config();
-        let Ok(rt) = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(cfg.limit.job_runtime_worker_num)
-            .enable_all()
-            .thread_name("job_runtime")
-            .thread_stack_size(16 * 1024 * 1024)
-            .max_blocking_threads(cfg.limit.job_runtime_blocking_worker_num)
-            .build()
-        else {
+        let Ok(rt) = create_job_runtime() else {
             job_init_tx.send(false).ok();
             panic!("job runtime init failed")
         };
@@ -303,14 +296,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
     let grpc_rt_handle = std::thread::spawn(move || {
-        let cfg = get_config();
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(cfg.limit.grpc_runtime_worker_num)
-            .enable_all()
-            .thread_name("grpc_runtime")
-            .max_blocking_threads(cfg.limit.grpc_runtime_blocking_worker_num)
-            .build()
-            .expect("grpc runtime init failed");
+        let Ok(rt) = create_grpc_runtime() else {
+            grpc_init_tx.send(()).ok();
+            panic!("grpc runtime init failed");
+        };
 
         // Register gRPC runtime for metrics collection
         openobserve::service::runtime_metrics::register_runtime(
@@ -536,6 +525,8 @@ async fn init_common_grpc_server(
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+    // Batches are already ZSTD-compressed (Arrow IPC); gzip is dropped client-side only.
+    // Server keeps compression so old clients still work during a rolling upgrade.
     let flight_svc = FlightServiceServer::new(FlightServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -567,6 +558,11 @@ async fn init_common_grpc_server(
     } else {
         tonic::transport::Server::builder()
     };
+    let builder = builder
+        .initial_stream_window_size(config::GRPC_HTTP2_STREAM_WINDOW_SIZE)
+        .initial_connection_window_size(config::GRPC_HTTP2_CONNECTION_WINDOW_SIZE)
+        .http2_adaptive_window(Some(cfg.grpc.http2_adaptive_window))
+        .tcp_nodelay(true);
     let ret = builder
         .layer(tonic::service::InterceptorLayer::new(check_auth))
         .add_service(event_svc)
@@ -632,6 +628,11 @@ async fn init_router_grpc_server(
     } else {
         tonic::transport::Server::builder()
     };
+    let builder = builder
+        .initial_stream_window_size(config::GRPC_HTTP2_STREAM_WINDOW_SIZE)
+        .initial_connection_window_size(config::GRPC_HTTP2_CONNECTION_WINDOW_SIZE)
+        .http2_adaptive_window(Some(cfg.grpc.http2_adaptive_window))
+        .tcp_nodelay(true);
     let ret = builder
         .layer(tonic::service::InterceptorLayer::new(check_auth))
         .add_service(logs_svc)

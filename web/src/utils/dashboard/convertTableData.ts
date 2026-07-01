@@ -13,10 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  formatUnitValue,
-  getUnitValue,
-} from "./convertDataIntoUnitValue";
 import { getDataValue } from "./aliasUtils";
 import {
   buildValueMappingCache,
@@ -24,6 +20,9 @@ import {
   parseOverrideConfigs,
   parseTimestampValue,
   detectTimestampFields,
+  applyColumnOverrides,
+  formatNumericValue,
+  resolveIsNumber,
 } from "./tableConfigUtils";
 
 /**
@@ -62,9 +61,8 @@ export const convertTableData = (
   // Build value mapping cache once for all cells
   const valueMappingCache = buildValueMappingCache(panelSchema.config?.mappings);
 
-  const { colorConfigMap, unitConfigMap } = parseOverrideConfigs(
-    panelSchema.config.override_config,
-  );
+  const overrideMaps = parseOverrideConfigs(panelSchema.config.override_config);
+  const { unitConfigMap, fieldTypeMap } = overrideMaps;
   const fieldNameCache: Record<string, string> = {}; // Cache for case-insensitive lookups
 
   // Cache timezone to avoid repeated store lookups
@@ -129,21 +127,23 @@ export const convertTableData = (
   if (!isTransposeEnabled) {
     columns = columnData.map((it: any) => {
       let obj: any = {};
-      const isNumber = isSampleValuesNumbers(tableRows, it.alias, 20);
       // Use cached field name lookup
       const aliasLower = it.alias.toLowerCase();
+      const isNumber = resolveIsNumber(
+        isSampleValuesNumbers(tableRows, it.alias, 20),
+        fieldTypeMap[aliasLower],
+      );
       const actualField = fieldNameCache[aliasLower] || it.alias;
 
       obj["name"] = it.label || it.alias;
       obj["field"] = actualField;
       obj["label"] = it.label || it.alias;
-      obj["align"] = !isNumber ? "left" : "right";
+      // override_config is keyed by alias; the TanStack column id is the data field.
+      obj["alias"] = it.alias;
+      obj["isNumeric"] = isNumber;
       obj["sortable"] = true;
 
-      // pass color mode info for renderer - use pre-lowercased lookup
-      if (colorConfigMap?.[aliasLower]?.autoColor) {
-        obj["colorMode"] = "auto";
-      }
+      applyColumnOverrides(obj, aliasLower, overrideMaps, !isNumber ? "left" : "right");
 
       // pass showFieldAsJson flag to renderer
       if (it.showFieldAsJson) {
@@ -177,28 +177,15 @@ export const convertTableData = (
         }
         const decimals = panelSchema.config?.decimals ?? 2;
 
-        obj["format"] = (val: any) => {
-          if (val === null || val === undefined || val === "") return missingValue;
-          // value mapping - use cached lookup
-          const valueMapping = lookupValueMapping(val, valueMappingCache);
-
-          if (valueMapping != null) {
-            return valueMapping;
-          }
-
-          return !Number.isNaN(val)
-            ? `${
-                formatUnitValue(
-                  getUnitValue(
-                    val,
-                    unitToUse,
-                    customUnitToUse,
-                    decimals,
-                  ),
-                ) ?? 0
-              }`
-            : val;
-        };
+        obj["format"] = (val: any) =>
+          formatNumericValue(
+            val,
+            valueMappingCache,
+            unitToUse,
+            customUnitToUse,
+            decimals,
+            missingValue,
+          );
       }
 
       // if current field is histogram field, timestamps are pre-formatted in rows
@@ -285,7 +272,10 @@ export const convertTableData = (
       }, // Add label column with the first column's label
       ...uniqueTransposeColumns.map((it: any) => {
         let obj: any = {};
-        const isNumber = isSampleValuesNumbers(tableRows, it, 20);
+        const isNumber = resolveIsNumber(
+          isSampleValuesNumbers(tableRows, it, 20),
+          fieldTypeMap[String(it).toLowerCase()],
+        );
 
         // String(null) = "null", String(undefined) = "undefined" — always non-empty,
         // so the TanStack filter never strips this column. The label is blank for
@@ -293,12 +283,14 @@ export const convertTableData = (
         obj["name"] = String(it);
         obj["field"] = String(it);
         obj["label"] = it != null && it !== "" ? String(it) : "";
-        obj["align"] = !isNumber ? "left" : "right";
         obj["sortable"] = true;
-        // pass color mode info for renderer
-        if (colorConfigMap?.[it]?.autoColor) {
-          obj["colorMode"] = "auto";
-        }
+        // Overrides keyed by the lower-cased transposed value (transpose path).
+        applyColumnOverrides(
+          obj,
+          String(it).toLowerCase(),
+          overrideMaps,
+          !isNumber ? "left" : "right",
+        );
 
         obj["format"] = (val: any) => {
           if (val === null || val === undefined || val === "") return missingValue;
@@ -318,28 +310,15 @@ export const convertTableData = (
           const unitCustom = panelSchema.config?.unit_custom;
           const decimals = panelSchema.config?.decimals ?? 2;
 
-          obj["format"] = (val: any) => {
-            if (val === null || val === undefined || val === "") return missingValue;
-            // value mapping - use cached lookup
-            const valueMapping = lookupValueMapping(val, valueMappingCache);
-
-            if (valueMapping != null) {
-              return valueMapping;
-            }
-
-            return !Number.isNaN(val)
-              ? `${
-                  formatUnitValue(
-                    getUnitValue(
-                      val,
-                      unit,
-                      unitCustom,
-                      decimals,
-                    ),
-                  ) ?? 0
-                }`
-              : val;
-          };
+          obj["format"] = (val: any) =>
+            formatNumericValue(
+              val,
+              valueMappingCache,
+              unit,
+              unitCustom,
+              decimals,
+              missingValue,
+            );
         }
 
         // Check if it's a histogram field
@@ -442,11 +421,11 @@ export const convertMultiQueryTableData = (
     panelSchema.config?.mappings,
   );
 
-  const { colorConfigMap, unitConfigMap } = parseOverrideConfigs(
-    panelSchema.config.override_config,
-  );
+  const overrideMaps = parseOverrideConfigs(panelSchema.config.override_config);
+  const { unitConfigMap, fieldTypeMap } = overrideMaps;
 
   const timezone = store.state.timezone;
+  const missingValue = String(panelSchema.config?.no_value_replacement ?? "");
 
   // Build ordered column list:
   // Columns are grouped by axis ACROSS queries (not per-query): all queries'
@@ -578,17 +557,22 @@ export const convertMultiQueryTableData = (
         align: "left" as const,
       },
       ...uniqueTransposeColumns.map((it: any) => {
-        const isNumber = isSampleValuesNumbers(allRows, it, 20);
+        const isNumber = resolveIsNumber(
+          isSampleValuesNumbers(allRows, it, 20),
+          fieldTypeMap[String(it).toLowerCase()],
+        );
         const col: any = {
           name: it,
           field: it,
           label: it,
-          align: isNumber ? "right" : "left",
           sortable: true,
         };
-        if (colorConfigMap?.[it]?.autoColor) {
-          col["colorMode"] = "auto";
-        }
+        applyColumnOverrides(
+          col,
+          String(it).toLowerCase(),
+          overrideMaps,
+          isNumber ? "right" : "left",
+        );
 
         col["format"] = (val: any) => {
           const valueMapping = lookupValueMapping(val, valueMappingCache);
@@ -602,17 +586,15 @@ export const convertMultiQueryTableData = (
           const unitCustom = panelSchema.config?.unit_custom;
           const decimals = panelSchema.config?.decimals ?? 2;
 
-          col["format"] = (val: any) => {
-            const valueMapping = lookupValueMapping(val, valueMappingCache);
-            if (valueMapping != null) return valueMapping;
-            return !Number.isNaN(val)
-              ? `${
-                  formatUnitValue(
-                    getUnitValue(val, unit, unitCustom, decimals),
-                  ) ?? 0
-                }`
-              : val;
-          };
+          col["format"] = (val: any) =>
+            formatNumericValue(
+              val,
+              valueMappingCache,
+              unit,
+              unitCustom,
+              decimals,
+              missingValue,
+            );
         }
 
         if (detectedTimestampAliases.has(it)) {
@@ -650,20 +632,25 @@ export const convertMultiQueryTableData = (
   orderedColumnNames.forEach((colName) => {
     const fieldConfig = knownAliases.get(colName);
     const colNameLower = colName.toLowerCase();
-    const isNumber = isSampleValuesNumbers(allRows, colName, 20);
+    const isNumber = resolveIsNumber(
+      isSampleValuesNumbers(allRows, colName, 20),
+      fieldTypeMap[colNameLower],
+    );
     const isTimestamp = detectedTimestampAliases.has(colName);
 
     const col: any = {
       name: colName,
       field: colName,
       label: fieldConfig?.label || colName,
-      align: isNumber || fieldConfig?.aggregationFunction ? "right" : "left",
       sortable: true,
     };
 
-    if (colorConfigMap?.[colNameLower]?.autoColor) {
-      col["colorMode"] = "auto";
-    }
+    applyColumnOverrides(
+      col,
+      colNameLower,
+      overrideMaps,
+      isNumber || fieldConfig?.aggregationFunction ? "right" : "left",
+    );
 
     if (isTimestamp) {
       col["format"] = (val: any) => {
@@ -686,17 +673,15 @@ export const convertMultiQueryTableData = (
       }
       const decimals = panelSchema.config?.decimals ?? 2;
 
-      col["format"] = (val: any) => {
-        const valueMapping = lookupValueMapping(val, valueMappingCache);
-        if (valueMapping != null) return valueMapping;
-        return !Number.isNaN(val)
-          ? `${
-              formatUnitValue(
-                getUnitValue(val, unitToUse, customUnitToUse, decimals),
-              ) ?? 0
-            }`
-          : val;
-      };
+      col["format"] = (val: any) =>
+        formatNumericValue(
+          val,
+          valueMappingCache,
+          unitToUse,
+          customUnitToUse,
+          decimals,
+          missingValue,
+        );
     } else {
       col["format"] = (val: any) => {
         const valueMapping = lookupValueMapping(val, valueMappingCache);

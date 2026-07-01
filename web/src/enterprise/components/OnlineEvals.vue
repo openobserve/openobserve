@@ -151,7 +151,7 @@ the Free Software Foundation, either version 3 of the License, or
             data-test="quality-refresh-btn"
             @click="onQualityRefresh"
           >
-            Refresh
+            {{ t('common.refresh') }}
           </OButton>
         </template>
       </AppPageHeader>
