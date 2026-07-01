@@ -158,7 +158,7 @@ test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {
         await pm.iamFormValidation.fillGroupName('group with spaces');
         await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toContainText(
-            "Use alphanumeric and '_' characters only, without spaces."
+            "Use letters, numbers and underscores only, without spaces."
         );
         await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeDisabled();
 
@@ -173,7 +173,7 @@ test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {
         await pm.iamFormValidation.openGroupForm();
         await pm.iamFormValidation.fillGroupName('group@name!');
         await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toContainText("Use alphanumeric and '_' characters only, without spaces.");
+        await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toContainText("Use letters, numbers and underscores only, without spaces.");
         await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeDisabled();
 
         testLogger.info('Group special-char error correctly shown');
@@ -239,7 +239,7 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
         await pm.iamFormValidation.fillRoleName('role with spaces');
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toContainText(
-            "Use alphanumeric and '_' characters only, without spaces."
+            "Use letters, numbers and underscores only, without spaces."
         );
         await expect(pm.iamFormValidation.getRoleSubmitBtnLocator()).toBeDisabled();
 
@@ -254,7 +254,7 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
         await pm.iamFormValidation.openRoleForm();
         await pm.iamFormValidation.fillRoleName('bad role name!');
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toContainText("Use alphanumeric and '_' characters only, without spaces.");
+        await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toContainText("Use letters, numbers and underscores only, without spaces.");
 
         await pm.iamFormValidation.fillRoleName('valid_role_name');
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).not.toBeVisible();
