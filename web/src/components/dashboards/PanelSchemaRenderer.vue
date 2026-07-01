@@ -355,9 +355,10 @@ const MarkdownRenderer = defineAsyncComponent(() => {
 const AddAnnotation = defineAsyncComponent(() => {
   return import("./addPanel/AddAnnotation.vue");
 });
-const CustomChartRenderer = defineAsyncComponent(() => {
-  return import("./panels/CustomChartRenderer.vue");
-});
+// Statically imported by several route-level components, so it cannot be
+// code-split into its own chunk — import it statically to avoid the mixed
+// dynamic/static import build warning.
+import CustomChartRenderer from "./panels/CustomChartRenderer.vue";
 
 const AlertContextMenu = defineAsyncComponent(() => {
   return import("./AlertContextMenu.vue");
