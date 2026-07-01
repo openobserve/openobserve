@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="key"
               :dim-key="key"
               :value="value"
+              :tooltip="true"
               class="tw:min-w-0"
             />
             <OTag

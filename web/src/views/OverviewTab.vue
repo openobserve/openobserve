@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :dim-key="key"
                   :key-label="shortDimKey(key)"
                   :value="val"
+                  :tooltip="true"
                 />
               </template>
             </div>
