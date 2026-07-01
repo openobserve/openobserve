@@ -198,6 +198,14 @@ export const getDefaultTheme = (): PredefinedTheme =>
 export const themeNameSlug = (name: string): string =>
   name.toLowerCase().replace(/\s+/g, "-");
 
+/**
+ * User-facing label for a theme. The stored `name` is the persisted selection key
+ * and must never change, but the "O2 " prefix is dropped for display on every
+ * theme except the signature theme ("O2 Signature" stays branded).
+ */
+export const themeDisplayName = (name: string): string =>
+  name === DEFAULT_THEME_NAME ? name : name.replace(/^O2\s+/, "");
+
 export type ThemeSource = "preview" | "predefined" | "custom" | "default";
 
 export interface ResolveThemeInput {
