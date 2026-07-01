@@ -94,7 +94,7 @@ impl FlightEncoderStreamBuilder {
         // its own encoder only for custom messages.
         let cap = (partitions.len() * 2).max(2);
         let mut handles = Vec::with_capacity(partitions.len());
-        let (tx, rx) = mpsc::channel(cap);
+        let (tx, rx) = mpsc::channel::<Result<Vec<FlightData>, FlightError>>(cap);
         for inner in partitions {
             let tx = tx.clone();
             let mut stream =
@@ -133,8 +133,8 @@ impl FlightEncoderStreamBuilder {
 }
 
 pub struct FlightEncoderStream {
-    /// Encoded FlightData merged from all per-partition encoder tasks.
-    rx: mpsc::Receiver<Result<FlightData, FlightError>>,
+    /// Encoded FlightData from the per-partition tasks, one group (chunk) per item.
+    rx: mpsc::Receiver<Result<Vec<FlightData>, FlightError>>,
     /// Only used to encode custom messages (scan stats, peak memory, ...).
     encoder: FlightDataEncoder,
     queue: VecDeque<FlightData>,
@@ -262,7 +262,7 @@ impl Stream for FlightEncoderStream {
 
             // 3. pull the next encoded FlightData from the partition tasks
             match this.rx.poll_recv(cx) {
-                Poll::Ready(Some(Ok(fd))) => {
+                Poll::Ready(Some(Ok(group))) => {
                     // before the first data, emit early-emit custom messages
                     if this.first_data {
                         this.first_data = false;
@@ -272,7 +272,8 @@ impl Stream for FlightEncoderStream {
                             return this.fail(e);
                         }
                     }
-                    this.queue.push_back(fd);
+                    // enqueue the whole group so the chunk's dictionary and records stay contiguous
+                    this.queue.extend(group);
                     continue;
                 }
                 Poll::Ready(Some(Err(e))) => {
@@ -479,6 +480,156 @@ mod tests {
             decoded,
             (0..total).collect::<Vec<_>>(),
             "no rows may be lost across partitions"
+        );
+    }
+
+    /// Decode in stream order like the leader's `FlightDataDecoder`: one shared dict-id -> values
+    /// map, updated by each DictionaryBatch and read by each RecordBatch.
+    fn decode_in_order(fds: &[FlightData], schema: Arc<Schema>) -> Vec<RecordBatch> {
+        use std::collections::HashMap;
+
+        use arrow::{
+            array::ArrayRef,
+            buffer::Buffer,
+            ipc::{MessageHeader, reader::read_dictionary, root_as_message},
+        };
+
+        let mut dictionaries: HashMap<i64, ArrayRef> = HashMap::new();
+        let mut out = Vec::new();
+        for data in fds {
+            let message = root_as_message(&data.data_header[..]).unwrap();
+            match message.header_type() {
+                MessageHeader::DictionaryBatch => {
+                    let buffer = Buffer::from(data.data_body.as_ref());
+                    let dict_batch = message.header_as_dictionary_batch().unwrap();
+                    read_dictionary(
+                        &buffer,
+                        dict_batch,
+                        &schema,
+                        &mut dictionaries,
+                        &message.version(),
+                    )
+                    .unwrap();
+                }
+                MessageHeader::RecordBatch => {
+                    out.push(
+                        arrow_flight::utils::flight_data_to_arrow_batch(
+                            data,
+                            schema.clone(),
+                            &dictionaries,
+                        )
+                        .unwrap(),
+                    );
+                }
+                _ => {}
+            }
+        }
+        out
+    }
+
+    // Two partitions with DISTINCT dictionaries under the shared dict-id 0. Group-atomic merge
+    // keeps each chunk's dictionary next to its records, so the leader's shared-map decoder
+    // never binds a record to another partition's dictionary. Decode like the leader and check
+    // every label.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_multi_partition_dictionary_no_mixup() {
+        use arrow::array::{ArrayRef, DictionaryArray, StringArray, types::Int32Type};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new(
+                "label",
+                DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8)),
+                false,
+            ),
+        ]));
+
+        let chunk = 8192i32;
+        let chunks_per_partition = 3i32;
+        let n_per_partition = chunk * chunks_per_partition;
+        // Distinct dictionaries (different values AND lengths) so a mixup would corrupt the label.
+        let labels: [Vec<&str>; 2] = [
+            vec!["p0v0", "p0v1", "p0v2"],
+            vec!["p1v0", "p1v1", "p1v2", "p1v3"],
+        ];
+
+        let make_partition = |p: usize, id_base: i32| -> SendableRecordBatchStream {
+            let schema = schema.clone();
+            let values: ArrayRef = Arc::new(StringArray::from(labels[p].clone()));
+            let dict_len = labels[p].len() as i32;
+            let batches: Vec<RecordBatch> = (0..chunks_per_partition)
+                .map(|c| {
+                    let start = c * chunk;
+                    let ids = Int32Array::from(
+                        (0..chunk).map(|i| id_base + start + i).collect::<Vec<_>>(),
+                    );
+                    let keys = Int32Array::from(
+                        (0..chunk)
+                            .map(|i| (start + i) % dict_len)
+                            .collect::<Vec<_>>(),
+                    );
+                    let label =
+                        DictionaryArray::<Int32Type>::try_new(keys, values.clone()).unwrap();
+                    RecordBatch::try_new(schema.clone(), vec![Arc::new(ids), Arc::new(label)])
+                        .unwrap()
+                })
+                .collect();
+            Box::pin(RecordBatchStreamAdapter::new(
+                schema.clone(),
+                futures::stream::iter(batches.into_iter().map(Ok)),
+            ))
+        };
+
+        let id_base_1 = n_per_partition;
+        let partitions = vec![make_partition(0, 0), make_partition(1, id_base_1)];
+
+        let options = IpcWriteOptions::default()
+            .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
+            .unwrap();
+        let stream = FlightEncoderStreamBuilder::new(options, 33554432)
+            .build(partitions, tracing::Span::none());
+        let fds: Vec<FlightData> = stream.try_collect().await.unwrap();
+
+        let decoded = decode_in_order(&fds, schema.clone());
+
+        let expected_label = |id: i32| -> &'static str {
+            let (set, base) = if id < id_base_1 {
+                (0usize, 0)
+            } else {
+                (1usize, id_base_1)
+            };
+            let k = ((id - base) % labels[set].len() as i32) as usize;
+            labels[set][k]
+        };
+
+        let mut seen = 0usize;
+        for batch in &decoded {
+            let ids = batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<Int32Array>()
+                .unwrap();
+            let label_col = batch
+                .column(1)
+                .as_any()
+                .downcast_ref::<DictionaryArray<Int32Type>>()
+                .unwrap();
+            let dict_vals = label_col
+                .values()
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap();
+            for row in 0..batch.num_rows() {
+                let id = ids.value(row);
+                let got = dict_vals.value(label_col.keys().value(row) as usize);
+                assert_eq!(got, expected_label(id), "label mixed up for id {id}");
+                seen += 1;
+            }
+        }
+        assert_eq!(
+            seen,
+            2 * n_per_partition as usize,
+            "every row must survive with its own dictionary"
         );
     }
 }

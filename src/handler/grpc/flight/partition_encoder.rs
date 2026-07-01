@@ -23,14 +23,18 @@ use datafusion::execution::SendableRecordBatchStream;
 use flight::encoder::{ChunkCoalescer, FlightDataEncoder};
 use futures::{Stream, StreamExt};
 
-/// Coalesces and ZSTD-encodes one datafusion output partition into FlightData. do_get runs one
-/// per partition on its own tokio task, so partitions execute and encode in parallel.
+/// Coalesces and ZSTD-encodes one datafusion output partition into FlightData. do_get runs one per
+/// partition on its own tokio task, so partitions execute and encode in parallel.
+///
+/// Yields one group (`Vec<FlightData>`) per coalesced chunk. A group must stay intact when
+/// partitions merge onto one stream: they share a dict-id namespace, so splitting a chunk's
+/// dictionary from its records could let another partition's dictionary decode them.
 pub(super) struct PartitionEncoderStream {
     inner: SendableRecordBatchStream,
     coalescer: ChunkCoalescer,
     encoder: FlightDataEncoder,
-    /// Encoded FlightData awaiting yield.
-    out: VecDeque<FlightData>,
+    /// Completed chunk groups awaiting yield; each is one `encode_chunk` output, kept intact.
+    out: VecDeque<Vec<FlightData>>,
     inner_done: bool,
 }
 
@@ -49,18 +53,21 @@ impl PartitionEncoderStream {
         }
     }
 
-    /// Encode each coalesced chunk and queue the resulting FlightData for yield.
+    /// Encode each coalesced chunk into one self-contained group (never split).
     fn encode_chunks(&mut self, chunks: Vec<RecordBatch>) -> Result<(), FlightError> {
         for chunk in chunks {
-            let fds = self.encoder.encode_chunk(chunk)?;
-            self.out.extend(fds);
+            let group = self.encoder.encode_chunk(chunk)?;
+            if !group.is_empty() {
+                self.out.push_back(group);
+            }
         }
         Ok(())
     }
 }
 
 impl Stream for PartitionEncoderStream {
-    type Item = Result<FlightData, FlightError>;
+    /// One group per coalesced chunk: all of that chunk's FlightData, kept together.
+    type Item = Result<Vec<FlightData>, FlightError>;
 
     fn poll_next(
         self: Pin<&mut Self>,
@@ -68,8 +75,8 @@ impl Stream for PartitionEncoderStream {
     ) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
         loop {
-            if let Some(fd) = this.out.pop_front() {
-                return Poll::Ready(Some(Ok(fd)));
+            if let Some(group) = this.out.pop_front() {
+                return Poll::Ready(Some(Ok(group)));
             }
             if this.inner_done {
                 return Poll::Ready(None);
