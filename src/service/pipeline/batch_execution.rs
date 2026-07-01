@@ -2098,6 +2098,7 @@ mod tests {
         let pipeline = ExecutablePipeline {
             id: "pipe-1".to_string(),
             name: "__eval__job".to_string(),
+            is_realtime: false,
             source_node_id: "input".to_string(),
             sorted_nodes: vec!["eval".to_string()],
             function_map: HashMap::new(),

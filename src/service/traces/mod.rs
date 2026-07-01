@@ -232,20 +232,13 @@ fn restore_canonical_agent_fields(
     }
 }
 
+#[cfg(feature = "enterprise")]
 async fn queue_gen_ai_agent_observations(org_id: &str, observations: AgentObservationBuffer) {
-    #[cfg(feature = "enterprise")]
-    {
-        o2_enterprise::enterprise::llm_evaluations::agent_registry::queue_observations(
-            org_id.to_string(),
-            observations,
-        )
-        .await;
-    }
-
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, observations);
-    }
+    o2_enterprise::enterprise::llm_evaluations::agent_registry::queue_observations(
+        org_id.to_string(),
+        observations,
+    )
+    .await;
 }
 
 fn normalized_trace_key(key: &str) -> String {
@@ -898,6 +891,7 @@ pub async fn handle_otlp_request(
             .into_response());
     }
 
+    #[cfg(feature = "enterprise")]
     queue_gen_ai_agent_observations(org_id, agent_observations).await;
 
     // mark llm stream if needed
@@ -1190,6 +1184,7 @@ pub async fn ingest_json(
             .into_response());
     }
 
+    #[cfg(feature = "enterprise")]
     queue_gen_ai_agent_observations(org_id, agent_observations).await;
 
     // mark llm stream if needed
