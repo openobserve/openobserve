@@ -1,0 +1,7 @@
+{
+  "90001": {
+    "fixture": "bug-001-fixed.json",
+    "expected_status": "FIXED",
+    "expected_confidence": "HIGH"
+  }
+}
