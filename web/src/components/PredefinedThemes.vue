@@ -67,12 +67,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="theme-row"
             :class="{ 'theme-row--applied': isThemeApplied(theme, mode) }"
             :aria-pressed="isThemeApplied(theme, mode)"
-            :aria-label="`Apply ${theme.name} theme`"
+            :aria-label="`Apply ${themeDisplayName(theme.name)} theme`"
             @click="applyTheme(theme, mode)"
           >
             <span class="color-preview-small" :style="swatchStyle(theme[mode])" />
             <span class="tw:ml-2 tw:min-w-0 tw:flex-1 tw:text-left">
-              <span class="tw:block tw:text-sm tw:font-medium tw:truncate">{{ theme.name }}</span>
+              <span class="tw:block tw:text-sm tw:font-medium tw:truncate">{{ themeDisplayName(theme.name) }}</span>
               <span class="tw:block tw:text-xs tw:text-gray-400 tw:truncate">{{ theme[mode].themeColor }}</span>
             </span>
             <OTag
@@ -175,6 +175,7 @@ import {
   THEME_STORAGE_KEYS,
   getDefaultTheme,
   themeNameSlug,
+  themeDisplayName,
   type PredefinedTheme,
   type ThemeModeColors,
 } from "@/constants/themes";
@@ -394,7 +395,7 @@ const applyTheme = (theme: PredefinedTheme, themeMode: "light" | "dark") => {
 
   toast({
     variant: "success",
-    message: `${theme.name} applied to ${themeMode} mode successfully!`,
+    message: `${themeDisplayName(theme.name)} applied to ${themeMode} mode successfully!`,
   });
 };
 

@@ -30,8 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             v-if="!beingUpdated"
             v-model="formData.email"
-            :label="t('user.email') + ' *'"
-            data-test="iam-add-service-account-email-input"
+            :label="t('serviceAccounts.form.identifier.label') + ' *'"
+            :placeholder="t('serviceAccounts.form.identifier.placeholder')"
+            :help-text="t('serviceAccounts.form.identifier.help')"
+            data-test="iam-add-service-account-identifier-input"
             class="showLabelOnTop tw:mt-2"
             :error="!!emailError"
             :error-message="emailError"

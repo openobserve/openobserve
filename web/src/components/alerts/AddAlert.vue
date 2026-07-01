@@ -252,6 +252,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div v-show="activeTab === 'advanced'" class="tw:flex tw:flex-col tw:gap-4">
 
+            <!-- Additional Settings (first) -->
+            <div>
+              <Advanced
+                :template="formData.template"
+                :templates="templates"
+                :contextAttributes="formData.context_attributes"
+                :description="formData.description"
+                :rowTemplate="formData.row_template"
+                :rowTemplateType="formData.row_template_type"
+                :destinations="destinations"
+                :selectedDestinations="formData.destinations"
+                :alertName="formData.name"
+                :streamName="formData.stream_name"
+                :streamType="formData.stream_type"
+                :triggerCondition="formData.trigger_condition"
+                :streamFields="filteredColumns"
+                @update:template="(val) => (formData.template = val)"
+                @refresh:templates="refreshTemplates"
+                @update:contextAttributes="(val) => (formData.context_attributes = val)"
+                @update:description="(val) => (formData.description = val)"
+                @update:rowTemplate="(val) => (formData.row_template = val)"
+                @update:rowTemplateType="(val) => (formData.row_template_type = val)"
+              />
+            </div>
+
             <!-- Compare with Past (scheduled only) -->
             <div v-if="formData.is_real_time === 'false'">
               <CompareWithPast
@@ -272,24 +297,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :deduplication="formData.deduplication"
                 :columns="filteredColumns"
                 @update:deduplication="(val) => (formData.deduplication = val)"
-              />
-            </div>
-
-            <!-- Advanced settings -->
-            <div>
-              <Advanced
-                :template="formData.template"
-                :templates="templates"
-                :contextAttributes="formData.context_attributes"
-                :description="formData.description"
-                :rowTemplate="formData.row_template"
-                :rowTemplateType="formData.row_template_type"
-                @update:template="(val) => (formData.template = val)"
-                @refresh:templates="refreshTemplates"
-                @update:contextAttributes="(val) => (formData.context_attributes = val)"
-                @update:description="(val) => (formData.description = val)"
-                @update:rowTemplate="(val) => (formData.row_template = val)"
-                @update:rowTemplateType="(val) => (formData.row_template_type = val)"
               />
             </div>
           </div>

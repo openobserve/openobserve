@@ -606,6 +606,56 @@ describe("FieldList.vue Comprehensive Coverage", () => {
     });
   });
 
+  describe("Null Value Filter Round-trip", () => {
+    // Regression: selecting a `null` value must build `IS NULL` and the parsed
+    // active filter must round-trip back to the "null" key the value list uses,
+    // so the null row's checkbox shows as selected.
+    it("builds IS NULL when including the null value", () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+
+      expect(vm.buildExpression("brand", "null", "include")).toBe(
+        "brand IS NULL",
+      );
+    });
+
+    it("builds IS NOT NULL when excluding the null value", () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+
+      expect(vm.buildExpression("brand", "null", "exclude")).toBe(
+        "brand IS NOT NULL",
+      );
+    });
+
+    it("parses IS NULL back to the 'null' key for include filters", () => {
+      wrapper = createWrapper({ query: "brand IS NULL" });
+      const vm = wrapper.vm as any;
+
+      expect(vm.activeIncludeFilterValues["brand"]).toEqual(["null"]);
+    });
+
+    it("parses IS NOT NULL back to the 'null' key for exclude filters", () => {
+      wrapper = createWrapper({ query: "brand IS NOT NULL" });
+      const vm = wrapper.vm as any;
+
+      expect(vm.activeExcludeFilterValues["brand"]).toEqual(["null"]);
+    });
+
+    it("round-trips a value-list null selection back to a selected key", () => {
+      // Selecting "null" → IS NULL → parsing IS NULL → "null" (same key as the
+      // value-list row), so the checkbox reflects the selection.
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+
+      const expression = vm.buildExpression("brand", "null", "include");
+      wrapper = createWrapper({ query: expression });
+      const reparsed = wrapper.vm as any;
+
+      expect(reparsed.activeIncludeFilterValues["brand"]).toEqual(["null"]);
+    });
+  });
+
   describe("CopyContentValue Function Tests", () => {
     it("should copy value to clipboard successfully", async () => {
       wrapper = createWrapper();

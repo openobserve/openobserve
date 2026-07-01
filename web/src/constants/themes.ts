@@ -80,11 +80,11 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
     id: 10,
     name: "O2 Signature",
     light: {
-      themeColor: "#575FC5",
+      themeColor: "#6B76E3",
       themeColorOpacity: 10,
     },
     dark: {
-      themeColor: "#6069D3",
+      themeColor: "#8B8DF0",
       themeColorOpacity: 10,
     },
   },
@@ -197,6 +197,14 @@ export const getDefaultTheme = (): PredefinedTheme =>
 /** Slugify a theme name into kebab-case for data-test attributes ("O2 Pulse" -> "o2-pulse"). */
 export const themeNameSlug = (name: string): string =>
   name.toLowerCase().replace(/\s+/g, "-");
+
+/**
+ * User-facing label for a theme. The stored `name` is the persisted selection key
+ * and must never change, but the "O2 " prefix is dropped for display on every
+ * theme except the signature theme ("O2 Signature" stays branded).
+ */
+export const themeDisplayName = (name: string): string =>
+  name === DEFAULT_THEME_NAME ? name : name.replace(/^O2\s+/, "");
 
 export type ThemeSource = "preview" | "predefined" | "custom" | "default";
 
