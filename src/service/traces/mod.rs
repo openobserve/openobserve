@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     io::Error,
     sync::Arc,
     time::Instant,
@@ -135,8 +135,10 @@ const GEN_AI_FLOAT64_FIELDS: [&str; 9] = [
 ];
 
 #[cfg(feature = "enterprise")]
-type AgentObservationBuffer =
-    BTreeMap<String, o2_enterprise::enterprise::llm_evaluations::agent_registry::AgentObservation>;
+type AgentObservationBuffer = std::collections::BTreeMap<
+    String,
+    o2_enterprise::enterprise::llm_evaluations::agent_registry::AgentObservation,
+>;
 
 #[cfg(not(feature = "enterprise"))]
 type AgentObservationBuffer = ();
@@ -931,6 +933,7 @@ pub async fn handle_otlp_request(
 /// and push it into `json_data_by_stream`.
 ///
 /// Returns `true` on success, `false` when the span should be skipped.
+#[allow(clippy::too_many_arguments)]
 fn finalize_and_buffer_trace_span(
     mut value: json::Value,
     org_id: &str,

@@ -134,7 +134,7 @@ pub async fn get_agent_mapping(
 
         let config =
             crate::service::db::system_settings::get_gen_ai_agent_mapping_config(&org_id).await;
-        return MetaHttpResponse::json(config);
+        MetaHttpResponse::json(config)
     }
 
     #[cfg(not(feature = "enterprise"))]
@@ -322,12 +322,12 @@ pub async fn clear_agent_registry(
                 }
             };
 
-        return MetaHttpResponse::json(ClearAgentRegistryResponse {
+        MetaHttpResponse::json(ClearAgentRegistryResponse {
             source_stream: query.source_stream,
             source_stream_type: query.source_stream_type,
             deleted_count,
             cleared_buffer_count,
-        });
+        })
     }
 
     #[cfg(not(feature = "enterprise"))]
