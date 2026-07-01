@@ -44,12 +44,65 @@ echo "12452
 11700
 12647" > /tmp/batch.txt
 
-# 2. Dispatch in parallel
+# 2. Dispatch (parallel with a bounded worker pool; use --dry-run first to preview)
+./scripts/test-assist-ci-batch.sh --dry-run < /tmp/batch.txt
 ./scripts/test-assist-ci-batch.sh < /tmp/batch.txt
 
 # 3. Watch progress at:
 #    https://github.com/openobserve/o2-enterprise/actions/workflows/test-assist.yml
 ```
+
+## How to update the sweep table after a batch completes
+
+Once all dispatched runs finish (check the Actions tab; each run is ~10-15 min):
+
+```bash
+# Get every recent test-assist run + its verdict from the artifact.
+gh run list --repo openobserve/o2-enterprise --workflow=test-assist.yml \
+  --limit 100 --json databaseId,conclusion,createdAt,displayTitle \
+  > /tmp/runs.json
+
+# For each run, pull the verdict-index.json from the artifact:
+for run_id in $(jq -r '.[] | .databaseId' /tmp/runs.json); do
+  mkdir -p "/tmp/artifacts/$run_id"
+  gh run download "$run_id" --repo openobserve/o2-enterprise \
+    -n "test-assist-ci-evidence-$run_id" \
+    -D "/tmp/artifacts/$run_id" 2>/dev/null || continue
+  # verdicts-index.json has [{issue_number, status, confidence}, ...]
+done
+
+# Append rows to the table between the BATCH_TABLE_START/END markers.
+# (A future scripts/collect-verdicts.py can automate this. For now, manual paste.)
+```
+
+Fields to populate per row: `#`, `Issue` (linked), `Verdict`, `Confidence`, `Elapsed`, `Run` (link), `Evidence` (screenshot link in the run's artifact).
+
+## Recovery — cancelling a batch mid-dispatch
+
+If you fired a batch by mistake (wrong issues, wrong mode, wrong repo target):
+
+1. **Stop dispatching more:** kill the local script with `Ctrl+C` — already-fired runs remain, but new ones stop.
+2. **Cancel running engine runs:**
+   ```bash
+   # List active test-assist runs
+   gh run list --repo openobserve/o2-enterprise --workflow=test-assist.yml \
+     --status in_progress --status queued --limit 100 \
+     --json databaseId,createdAt \
+     --jq '.[] | .databaseId'
+   # Pipe that list to gh run cancel
+   gh run list --repo openobserve/o2-enterprise --workflow=test-assist.yml \
+     --status in_progress --status queued --limit 100 --json databaseId \
+     --jq '.[] | .databaseId' \
+     | xargs -n1 -I{} gh run cancel {} --repo openobserve/o2-enterprise
+   ```
+3. **Un-apply the label** (if the run already reached the label step):
+   ```bash
+   # For each affected issue:
+   gh issue edit N --repo openobserve/openobserve --remove-label "Test-Assist-CI-Verified"
+   ```
+4. **Post-mortem:** note the batch cause in this file's "Historical sweeps" section so the mistake isn't repeated.
+
+Note: `write_mode=false` is the default — so a mis-dispatched batch produces artifacts + labels, but **no verdict comments on real issues**. That's the primary safety net.
 
 Tier queries used to build the 100-priority list:
 
