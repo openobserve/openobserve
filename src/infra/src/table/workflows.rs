@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::pipeline::components::{Edge, Node};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -42,7 +42,7 @@ pub struct WorkflowError {
     pub error: Vec<String>,
 }
 
-#[derive(Deserialize,Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct WorkflowRunErrors {
     pub id: i32,
     pub org_id: String,
@@ -219,4 +219,45 @@ pub async fn delete_workflow(id: &str) -> Result<(), anyhow::Error> {
     // we do not handler workflow errors here, as background job will take care of them eventually,
     // and will also handle input data file deletion
     Ok(())
+}
+
+pub async fn delete_all_errors_older_than(
+    ts: i64,
+) -> Result<Vec<WorkflowRunErrors>, anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    // ideally this could be delete returning, but sqlite does not 
+    // support that with seaorm, so transaction instead, which is still not
+    // the same, but should be ok
+    let txn = client.begin().await?;
+
+    let errors = match workflow_errors::Entity::find()
+        .filter(workflow_errors::Column::RanAt.lte(ts))
+        .all(&txn)
+        .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("db error in getting workflow errors : {e}");
+            txn.rollback().await?;
+            return Err(e.into());
+        }
+    };
+
+    if let Err(e) = workflow_errors::Entity::delete_many()
+        .filter(workflow_errors::Column::RanAt.lte(ts))
+        .exec(&txn)
+        .await
+    {
+        log::error!("db error in deleting workflow errors : {e}");
+        txn.rollback().await?;
+        return Err(e.into());
+    };
+
+    txn.commit().await?;
+
+    let ret: Result<Vec<_>, anyhow::Error> = errors.into_iter().map(|v| v.try_into()).collect();
+
+    Ok(ret?)
 }

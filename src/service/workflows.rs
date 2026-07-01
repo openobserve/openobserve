@@ -12,7 +12,7 @@ pub struct InputMap {
     node_map: HashMap<String, Vec<Value>>,
 }
 
-fn get_inputs_file_path(org_id: &str, workflow_id: &str, run_id: &str) -> String {
+pub fn get_inputs_file_path(org_id: &str, workflow_id: &str, run_id: &str) -> String {
     format!("files/{org_id}/workflow_inputs/{workflow_id}-{run_id}.json")
 }
 
