@@ -28,55 +28,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="emits('update:open', false)"
   >
     <div class="tw:w-full">
-      <OForm id="add-stream-form" :default-values="streamInputsDefault" @submit="submitForm">
+      <OForm
+        id="add-stream-form"
+        :form="addStreamForm"
+      >
         <div class="tw:mt-2">
-          <OInput
+          <OFormInput
             data-test="add-stream-name-input"
-            v-model="streamInputs.name"
-            :label="t('common.name') + ' *'"
+            name="name"
+            :label="t('common.name')"
+            required
             class="showLabelOnTop"
-            :error="!!nameError"
-            :error-message="nameError"
-            :help-text="!nameError ? streamNameHelpText : undefined"
-            @update:model-value="validateStreamName"
+            :help-text="streamNameHelpText"
             tabindex="0"
           />
         </div>
 
         <div class="tw:mt-2">
-          <OSelect
+          <OFormSelect
             data-test="add-stream-type-input"
-            v-model="streamInputs.stream_type"
+            name="stream_type"
             :options="filteredStreamTypes"
-            :label="t('alerts.streamType') + ' *'"
+            :label="t('alerts.streamType')"
+            required
             labelKey="label"
             valueKey="value"
             class="showLabelOnTop"
-            :error="!!streamTypeError"
-            :error-message="streamTypeError"
-            @update:model-value="streamTypeError = ''"
           />
         </div>
 
         <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="tw:mt-2">
-          <OInput
+          <OFormInput
             data-test="add-stream-data-retention"
-            v-model="streamInputs.dataRetentionDays"
-            :label="t('logStream.dataRetention') + ' *'"
+            name="dataRetentionDays"
+            :label="t('logStream.dataRetention')"
+            required
             class="showLabelOnTop"
             type="number"
-            :error="!!dataRetentionError"
-            :error-message="dataRetentionError"
-            @update:model-value="dataRetentionError = ''"
           />
         </div>
 
         <StreamFieldInputs
-          ref="fieldInputsRef"
           class="tw:mt-4"
-          :fields="fields"
-          @add="addField"
-          @remove="removeField"
+          form-field-name="fields"
         />
       </OForm>
     </div>
@@ -84,55 +78,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Inline form for pipeline usage (no drawer wrapper) -->
     <div v-else class="tw:p-4 tw:w-full">
-      <OForm :default-values="streamInputsDefault" @submit="submitForm">
+      <OForm
+        :form="addStreamForm"
+        v-slot="{ isSubmitting }"
+      >
         <div class="tw:mt-2">
-          <OInput
+          <OFormInput
             data-test="add-stream-name-input"
-            v-model="streamInputs.name"
-            :label="t('common.name') + ' *'"
+            name="name"
+            :label="t('common.name')"
+            required
             class="showLabelOnTop"
-            :error="!!nameError"
-            :error-message="nameError"
-            :help-text="!nameError ? streamNameHelpText : undefined"
-            @update:model-value="validateStreamName"
+            :help-text="streamNameHelpText"
             tabindex="0"
           />
         </div>
 
         <div class="tw:mt-2">
-          <OSelect
+          <OFormSelect
             data-test="add-stream-type-input"
-            v-model="streamInputs.stream_type"
+            name="stream_type"
             :options="filteredStreamTypes"
-            :label="t('alerts.streamType') + ' *'"
+            :label="t('alerts.streamType')"
+            required
             labelKey="label"
             valueKey="value"
             class="showLabelOnTop"
-            :error="!!streamTypeError"
-            :error-message="streamTypeError"
-            @update:model-value="streamTypeError = ''"
           />
         </div>
 
         <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="tw:mt-2">
-          <OInput
+          <OFormInput
             data-test="add-stream-data-retention"
-            v-model="streamInputs.dataRetentionDays"
-            :label="t('logStream.dataRetention') + ' *'"
+            name="dataRetentionDays"
+            :label="t('logStream.dataRetention')"
+            required
             class="showLabelOnTop"
             type="number"
-            :error="!!dataRetentionError"
-            :error-message="dataRetentionError"
-            @update:model-value="dataRetentionError = ''"
           />
         </div>
 
         <StreamFieldInputs
-          ref="fieldInputsRef"
           class="tw:mt-4"
-          :fields="fields"
-          @add="addField"
-          @remove="removeField"
+          form-field-name="fields"
         />
 
         <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
@@ -140,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-stream-cancel-btn"
             variant="outline"
             size="sm-action"
+            :disabled="isSubmitting"
             @click="emits('close')"
           >{{ t('logStream.cancel') }}</OButton>
           <OButton
@@ -147,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="primary"
             size="sm-action"
             type="submit"
+            :loading="isSubmitting"
           >{{ t('common.save') }}</OButton>
         </div>
       </OForm>
@@ -154,21 +144,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import StreamFieldInputs from "./StreamFieldInputs.vue";
-import type { Ref } from "vue";
 import streamService from "@/services/stream";
 import { useStore } from "vuex";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeAddStreamSchema,
+  addStreamDefaults,
+  streamNameHelpText,
+  type AddStreamForm,
+} from "./AddStream.schema";
 
 const { t } = useI18n();
 
@@ -188,56 +184,52 @@ const props = defineProps<{
 
 const { addStream, getStream } = useStreams();
 
-const fields: Ref<any[]> = ref([]);
-const addStreamFormRef = ref<any>(null);
-const fieldInputsRef = ref<any>(null);
-const nameError = ref('');
-const streamTypeError = ref('');
-const dataRetentionError = ref('');
-
-// Allowed characters mirror the backend `format_stream_name` regex
-// (src/config/src/utils/schema.rs): alphanumeric, underscore and colon only.
-const streamNameRegex = /^[a-zA-Z0-9_:]+$/;
-const streamNameHelpText = "Use alphanumeric characters, underscore and colon only.";
-
-const validateStreamName = () => {
-  if (streamInputs.value.name && !streamNameRegex.test(streamInputs.value.name)) {
-    nameError.value = streamNameHelpText;
-  } else {
-    nameError.value = '';
-  }
-};
-
-const submitForm = () => {
-  if (!validateStream()) return;
-  saveStream();
-};
-
 const store = useStore();
 
+// Scalar validation now lives in the co-located Zod schema. The retention rule
+// is conditional on org config (`data_retention_days`), captured here; the
+// stream-type half of the condition is read from the form in superRefine.
+const addStreamSchema = makeAddStreamSchema(
+  !!(store.state.zoConfig.data_retention_days || false),
+);
+
+// Rule ③ OWNER pattern: this component OWNS <OForm> and must read form state
+// (stream_type) to drive the parent-side `v-if="showDataRetention"`. So create
+// the ONE form here with useOForm, hand it to <OForm :form="addStreamForm">, and
+// read it reactively with form.useStore — single source of truth, NO mirror.
+// The save is wired through useOForm({ onSubmit }), not @submit.
+// onSubmit fires only when the WHOLE schema passes — scalars AND the dynamic
+// `fields` rows (StreamFieldInputs is now form-mode, so an empty/invalid row
+// blocks submit and shows per-row errors). No separate validate() bridge.
+const addStreamForm = useOForm<AddStreamForm>({
+  defaultValues: addStreamDefaults(),
+  schema: addStreamSchema,
+  onSubmit: (value) => saveStream(value),
+});
 
 const { track } = useReo();
 
-const streamInputsDefault = {
-  name: "",
-  stream_type: "",
-  index_type: [],
-  dataRetentionDays: 14,
-};
+// Reactive READ of the form-owned stream_type (single source of truth) so
+// `showDataRetention` — which also depends on org config the schema can't read —
+// re-evaluates when the user changes the type. form.useStore tracks changes
+// (a `form.state.values` read inside a computed would not).
+const formStreamType = addStreamForm.useStore(
+  (s: any) => (s.values.stream_type as string) ?? "",
+);
 
-const streamInputs = ref({
-  ...streamInputsDefault,
-});
-
-const getDefaultField = () => {
-  return {
-    uuid: crypto.randomUUID(),
-    name: "",
-    type: undefined,
-    index_type: [],
-  };
-};
-
+// The form lives in this component's setup (owner pattern), so — unlike the old
+// in-dialog-body form — it is NOT recreated when the reka-ui overlay unmounts/
+// remounts its body on close→open. Reset to fresh defaults whenever the dialog
+// opens so each reopen starts blank (the equivalent of the old
+// `:default-values`-on-remount behavior). reset() also zeroes submissionAttempts
+// → no stale "required" errors flash. Dialog mode only; the inline pipeline form
+// has no `open` toggle.
+watch(
+  () => props.open,
+  (isOpen, wasOpen) => {
+    if (isOpen && !wasOpen) addStreamForm.reset();
+  },
+);
 
 const isSchemaUDSEnabled = computed(() => {
   return store.state.zoConfig.user_defined_schemas_enabled;
@@ -253,50 +245,18 @@ const filteredStreamTypes = computed(() => {
 const showDataRetention = computed(
   () =>
     !!(store.state.zoConfig.data_retention_days || false) &&
-    streamInputs.value.stream_type !== "enrichment_tables"
+    formStreamType.value !== "enrichment_tables"
 );
 
-const validateStream = () => {
-  let valid = true;
-  if (!streamInputs.value.name.trim()) {
-    nameError.value = 'Field is required!';
-    valid = false;
-  } else if (!streamNameRegex.test(streamInputs.value.name)) {
-    nameError.value = streamNameHelpText;
-    valid = false;
-  }
-  if (!streamInputs.value.stream_type) {
-    streamTypeError.value = 'Field is required!';
-    valid = false;
-  }
-  if (showDataRetention.value && !(streamInputs.value.dataRetentionDays > 0)) {
-    dataRetentionError.value = 'Field is required!';
-    valid = false;
-  }
-  // Fields are optional, but any field that has been added must pass the
-  // name/data-type validation in the child before the stream can be saved.
-  if (
-    fieldInputsRef.value &&
-    typeof fieldInputsRef.value.validate === "function" &&
-    !fieldInputsRef.value.validate()
-  ) {
-    valid = false;
-  }
-  return valid;
-};
-
-const saveStream = async () => {
-  if (!validateStream()) return;
+// `value` is the fully-validated @submit payload — scalars AND the `fields`
+// rows (StreamFieldInputs is form-mode now) — and the single source of truth.
+const saveStream = async (value: AddStreamForm) => {
   let isStreamPresent = false;
 
-  await getStream(
-    streamInputs.value.name,
-    streamInputs.value.stream_type,
-    false
-  )
+  await getStream(value.name, value.stream_type, false)
     .then(() => {
       toast({
-        message: `Stream "${streamInputs.value.name}" of type "${streamInputs.value.stream_type}" is already present.`,
+        message: `Stream "${value.name}" of type "${value.stream_type}" is already present.`,
         variant: "warning",
       });
       isStreamPresent = true;
@@ -305,12 +265,17 @@ const saveStream = async () => {
 
   if (isStreamPresent) return;
 
-  const payload = getStreamPayload();
-  streamService
+  const payload = getStreamPayload(
+    Number(value.dataRetentionDays),
+    value.fields ?? [],
+  );
+  if (!payload) return;
+
+  await streamService
     .createStream(
       store.state.selectedOrganization.identifier,
-      streamInputs.value.name,
-      streamInputs.value.stream_type,
+      value.name,
+      value.stream_type,
       payload
     )
     .then(() => {
@@ -319,17 +284,17 @@ const saveStream = async () => {
         variant: "success",
       });
 
-      streamService
+      return streamService
         .schema(
           store.state.selectedOrganization.identifier,
-          streamInputs.value.name,
-          streamInputs.value.stream_type
+          value.name,
+          value.stream_type
         )
         .then((streamRes: any) => {
           addStream(streamRes.data);
           emits("streamAdded");
           emits("close");
-          emits("added:stream-added", streamInputs.value);
+          emits("added:stream-added", value);
         });
     })
     .catch((err) => {
@@ -347,7 +312,7 @@ const saveStream = async () => {
 
 };
 
-const getStreamPayload = () => {
+const getStreamPayload = (dataRetentionDays: number, rows: any[]) => {
   let stream: {
     fields: any[];
     settings: {
@@ -369,7 +334,7 @@ const getStreamPayload = () => {
     }
   };
 
-  if (showDataRetention.value && streamInputs.value.dataRetentionDays < 1) {
+  if (showDataRetention.value && dataRetentionDays < 1) {
     toast({
       message:
         "Invalid Data Retention Period: Retention period must be at least 1 day.",
@@ -379,10 +344,10 @@ const getStreamPayload = () => {
   }
 
   if (showDataRetention.value) {
-    stream.settings["data_retention"] = Number(streamInputs.value.dataRetentionDays);
+    stream.settings["data_retention"] = Number(dataRetentionDays);
   }
 
-  fields.value.forEach((field) => {
+  rows.forEach((field) => {
 
     field.name = field.name
       .trim()
@@ -437,14 +402,6 @@ const getStreamPayload = () => {
   });
 
   return stream;
-};
-
-const addField = () => {
-  fields.value.push(getDefaultField());
-};
-
-const removeField = (field: any, index: number) => {
-  fields.value.splice(index, 1);
 };
 </script>
 

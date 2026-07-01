@@ -468,17 +468,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           margin-bottom: 2px;
                         "
                       >
-                        <StreamFieldsInputs
-                          :fields="newSchemaFields"
-                          :showHeader="false"
-                          :visibleInputs="{
-                            name: true,
-                            data_type: true,
-                            index_type: false,
-                          }"
-                          @add="addSchemaField"
-                          @remove="removeSchemaField"
-                        />
+                        <OForm :form="newSchemaFieldsForm">
+                          <StreamFieldsInputs
+                            form-field-name="newSchemaFields"
+                            :showHeader="false"
+                            :visibleInputs="{
+                              name: true,
+                              data_type: true,
+                              index_type: false,
+                            }"
+                          />
+                        </OForm>
                       </OCardSection>
                     </OCard>
                   </div>
@@ -995,6 +995,9 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { schemaFieldsSchema } from "./Schema.schema";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
@@ -1047,6 +1050,7 @@ export default defineComponent({
     OCheckbox,
     OCard,
     OCardSection,
+    OForm,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -1084,7 +1088,16 @@ export default defineComponent({
 
     const patternIdToApplyAtMap = new Map();
 
-    const newSchemaFields = ref([]);
+    // The "Add Field(s)" rows are owned by a small TanStack form (StreamFieldInputs
+    // is form-only now). Writes go through the form (push/remove/reset); reads use
+    // the reactive `newSchemaFields` view below — single source of truth, no mirror.
+    const newSchemaFieldsForm = useOForm<{ newSchemaFields: any[] }>({
+      defaultValues: { newSchemaFields: [] },
+      schema: schemaFieldsSchema,
+    });
+    const newSchemaFields = newSchemaFieldsForm.useStore(
+      (s: any) => s.values.newSchemaFields ?? [],
+    );
     const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
@@ -1567,6 +1580,10 @@ export default defineComponent({
     };
 
     const onSubmit = async () => {
+      // NOTE: schema.vue intentionally does NOT gate the save on the field rows
+      // (matches pre-migration behavior — it never validated them). The rows use
+      // a permissive schema (Schema.schema.ts) and field names are normalized
+      // below at save time, exactly as before.
       patternAssociations.value = ungroupPatternAssociations(
         patternAssociations.value,
       );
@@ -1710,7 +1727,7 @@ export default defineComponent({
       }
       loadingState.value = true;
 
-      newSchemaFields.value = [];
+      newSchemaFieldsForm.reset({ newSchemaFields: [] });
 
       redDaysList.value = [];
 
@@ -2015,7 +2032,7 @@ export default defineComponent({
     ];
 
     const addSchemaField = () => {
-      newSchemaFields.value.push({
+      newSchemaFieldsForm.pushFieldValue("newSchemaFields", {
         name: "",
         type: "",
         index_type: [],
@@ -2023,11 +2040,10 @@ export default defineComponent({
       formDirtyFlag.value = true;
     };
 
-    const removeSchemaField = (field: any, index: number) => {
-      newSchemaFields.value.splice(index, 1);
-      if (newSchemaFields.value.length === 0) {
+    const removeSchemaField = (_field: any, index: number) => {
+      newSchemaFieldsForm.removeFieldValue("newSchemaFields", index);
+      if ((newSchemaFieldsForm.state.values.newSchemaFields ?? []).length === 0) {
         isDialogOpen.value = false;
-        newSchemaFields.value = [];
       }
     };
 
@@ -2288,19 +2304,22 @@ export default defineComponent({
 
     const closeDialog = () => {
       isDialogOpen.value = false;
-      newSchemaFields.value = [];
+      // reset() clears the rows AND submit-state → no stale "required" flash.
+      newSchemaFieldsForm.reset({ newSchemaFields: [] });
     };
 
     const openDialog = () => {
       isDialogOpen.value = true;
       formDirtyFlag.value = true;
-      newSchemaFields.value = [
-        {
-          name: "",
-          type: "",
-          index_type: [],
-        },
-      ];
+      newSchemaFieldsForm.reset({
+        newSchemaFields: [
+          {
+            name: "",
+            type: "",
+            index_type: [],
+          },
+        ],
+      });
     };
     const updateResultTotal = (streamResponse) => {
       if (activeTab.value === "schemaFields") {
@@ -2640,6 +2659,7 @@ export default defineComponent({
       addSchemaField,
       removeSchemaField,
       newSchemaFields,
+      newSchemaFieldsForm,
       scrollToAddFields,
       tabs,
       activeTab,

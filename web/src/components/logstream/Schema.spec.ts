@@ -263,11 +263,13 @@ describe("Schema Component Tests", () => {
     });
 
     // Test 6: openDialog function
-    it("should open dialog and initialize fields", () => {
+    it("should open dialog and initialize fields", async () => {
       wrapper.vm.openDialog();
-      
+      await wrapper.vm.$nextTick();
+
       expect(wrapper.vm.isDialogOpen).toBe(true);
       expect(wrapper.vm.formDirtyFlag).toBe(true);
+      // Rows are form-owned now (read via the reactive newSchemaFields view).
       expect(wrapper.vm.newSchemaFields.length).toBe(1);
       expect(wrapper.vm.newSchemaFields[0]).toEqual({
         name: "",
@@ -277,12 +279,17 @@ describe("Schema Component Tests", () => {
     });
 
     // Test 7: closeDialog function
-    it("should close dialog and reset fields", () => {
+    it("should close dialog and reset fields", async () => {
       wrapper.vm.isDialogOpen = true;
-      wrapper.vm.newSchemaFields = [{ name: "test", type: "string", index_type: [] }];
-      
+      // Seed rows through the form (single source of truth), not a local ref.
+      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
+        { name: "test", type: "string", index_type: [] },
+      ]);
+      await wrapper.vm.$nextTick();
+
       wrapper.vm.closeDialog();
-      
+      await wrapper.vm.$nextTick();
+
       expect(wrapper.vm.isDialogOpen).toBe(false);
       expect(wrapper.vm.newSchemaFields).toEqual([]);
     });
@@ -1979,27 +1986,34 @@ describe("Schema Component Tests", () => {
       expect(wrapper.vm.getConfigIcon.length).toBeGreaterThan(0);
     });
 
-    it("should add and remove schema fields", () => {
+    it("should add and remove schema fields", async () => {
       expect(wrapper.vm.newSchemaFields.length).toBe(0);
 
       wrapper.vm.addSchemaField();
+      await wrapper.vm.$nextTick();
       expect(wrapper.vm.newSchemaFields.length).toBe(1);
       expect(wrapper.vm.newSchemaFields[0].name).toBe("");
       expect(wrapper.vm.newSchemaFields[0].type).toBe("");
       expect(wrapper.vm.formDirtyFlag).toBe(true);
 
       wrapper.vm.addSchemaField();
+      await wrapper.vm.$nextTick();
       expect(wrapper.vm.newSchemaFields.length).toBe(2);
 
       wrapper.vm.removeSchemaField(wrapper.vm.newSchemaFields[0], 0);
+      await wrapper.vm.$nextTick();
       expect(wrapper.vm.newSchemaFields.length).toBe(1);
     });
 
-    it("should close dialog when last schema field is removed", () => {
+    it("should close dialog when last schema field is removed", async () => {
       wrapper.vm.isDialogOpen = true;
-      wrapper.vm.newSchemaFields = [{ name: "test", type: "string", index_type: [] }];
+      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
+        { name: "test", type: "string", index_type: [] },
+      ]);
+      await wrapper.vm.$nextTick();
 
       wrapper.vm.removeSchemaField(wrapper.vm.newSchemaFields[0], 0);
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.isDialogOpen).toBe(false);
       expect(wrapper.vm.newSchemaFields).toEqual([]);
@@ -3580,9 +3594,13 @@ describe("Schema Component Tests", () => {
     });
 
     it("should exercise onSubmit with non-empty newSchemaFields (maps)", async () => {
-      // Func 55, 56: newSchemaFields map callbacks in onSubmit
-      wrapper.vm.addSchemaField();
-      wrapper.vm.newSchemaFields[0] = { name: "test-field", type: "Utf8", index_type: [] };
+      // Func 55, 56: newSchemaFields map callbacks in onSubmit. schema.vue does
+      // NOT validate rows (permissive schema), so a loose name with a dash is
+      // accepted and normalized at save — the pre-migration behavior.
+      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
+        { name: "test-field", type: "Utf8", index_type: [] },
+      ]);
+      await wrapper.vm.$nextTick();
 
       mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
 
