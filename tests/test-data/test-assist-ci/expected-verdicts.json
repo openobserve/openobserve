@@ -3,5 +3,16 @@
     "fixture": "bug-001-fixed.json",
     "expected_status": "FIXED",
     "expected_confidence": "HIGH"
+  },
+  "90002": {
+    "fixture": "bug-002-image-attachment.json",
+    "expected_pipeline_signals": {
+      "attachments_summary_exists": true,
+      "attachments_summary_non_empty": true,
+      "analyst_area": "Streams",
+      "analyst_testability_at_least": "MEDIUM"
+    },
+    "notes": "Fixture exercises the vision preprocessor. Success = vision preprocessor produced a non-empty attachments.md AND the Analyst used it to classify area=Streams AND didn't SKIP for 'no repro steps'. Verdict itself may vary (visual layout bugs are hard to auto-verify) but the pipeline should NOT skip due to text-only 'no repro'."
   }
 }
+
