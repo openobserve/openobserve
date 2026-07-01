@@ -549,17 +549,16 @@ impl Scheduler {
             log::error!("[SCHEDULER] Error waiting for puller to complete: {e}");
         }
 
-        // When shutting down: drop every lane's sender so its workers see the channel close.
-        for p in &self.lanes {
-            drop(p.tx.clone());
-        }
-
-        // Wait for workers to complete
+        // Reaching here means every lane's puller returned, which normally only happens on
+        // channel close / error — the scheduler otherwise runs for the process lifetime. We
+        // deliberately do NOT try to force-close the worker channels here: the senders live in
+        // `self.lanes` (and in each puller clone) behind `&self`, so we can't drop the originals,
+        // and dropping a clone is a no-op. We just wait for in-flight workers to drain. A real
+        // shutdown path would own those senders and drop them to signal the workers.
         if let Err(e) = futures::future::try_join_all(worker_handles).await {
             log::error!("[SCHEDULER] Error waiting for workers to complete: {e}");
         }
 
-        // Ideally should never reach here
         log::info!("[SCHEDULER] Shutdown complete");
         Ok(())
     }
@@ -569,6 +568,11 @@ impl Scheduler {
 /// interval of `0` inherits the shared default (alert concurrency / alert interval), except
 /// derived_stream's cadence which falls back to `ZO_DERIVED_STREAM_SCHEDULE_INTERVAL`. Every
 /// `TriggerModule` variant gets a lane so no module's rows are ever left unclaimed.
+///
+/// Cadence overrides are intentionally offered for only the two modules that benefit from a
+/// distinct poll rate: `Backfill` (bulk/background, polls slower) and `DerivedStream`. Alert,
+/// Report, AnomalyDetection and QueryRecommendations always poll at the shared
+/// `ZO_ALERT_SCHEDULE_INTERVAL`; add a dedicated interval env var here if one ever needs its own.
 fn resolve_module_configs(
     cfg: &config::Config,
     base: &SchedulerConfig,
