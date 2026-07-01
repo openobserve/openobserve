@@ -89,6 +89,7 @@ impl TryFrom<synthetics_monitors::Model> for Synthetic {
             next_run_at: m.next_run_at,
             last_triggered_at: m.last_triggered_at,
             last_check_status,
+            owner: m.owner,
             created_at: m.created_at,
             updated_at: m.updated_at,
         })
@@ -150,6 +151,7 @@ pub async fn create<C: TransactionTrait>(
     am.created_at = Set(now);
     am.updated_at = Set(now);
     am.next_run_at = Set(monitor.start.unwrap_or(0));
+    am.owner = Set(monitor.owner.clone());
 
     let model = am.insert(&txn).await?.try_into_model()?;
     let result = Synthetic::try_from(model)?;
@@ -547,6 +549,7 @@ mod tests {
             next_run_at: 0,
             last_triggered_at: 0,
             last_check_status: 0,
+            owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
         }

@@ -155,6 +155,11 @@ fn create_synthetics_table() -> TableCreateStatement {
                 .default(0i32),
         )
         .col(
+            ColumnDef::new(Synthetics::Owner)
+                .string_len(256)
+                .null(),
+        )
+        .col(
             ColumnDef::new(Synthetics::CreatedAt)
                 .big_integer()
                 .not_null(),
@@ -225,6 +230,7 @@ enum Synthetics {
     NextRunAt,
     LastTriggeredAt,
     LastCheckStatus,
+    Owner,
     CreatedAt,
     UpdatedAt,
 }
@@ -260,6 +266,7 @@ mod tests {
                 "next_run_at" bigint NOT NULL DEFAULT 0,
                 "last_triggered_at" bigint NOT NULL DEFAULT 0,
                 "last_check_status" integer NOT NULL DEFAULT 0,
+                "owner" varchar(256) NULL,
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL,
                 CONSTRAINT "synthetics_folder_fk" FOREIGN KEY ("folder_id") REFERENCES "folders" ("id")
@@ -303,6 +310,7 @@ mod tests {
                 "next_run_at" bigint NOT NULL DEFAULT 0,
                 "last_triggered_at" bigint NOT NULL DEFAULT 0,
                 "last_check_status" integer NOT NULL DEFAULT 0,
+                "owner" varchar(256) NULL,
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL,
                 FOREIGN KEY ("folder_id") REFERENCES "folders" ("id")

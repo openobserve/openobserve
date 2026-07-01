@@ -33,6 +33,7 @@ pub struct Model {
     /// Denormalised status from the most recent completed check.
     /// 0=Unknown, 1=Up, 2=Warning, 3=Down
     pub last_check_status: i32,
+    pub owner: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -68,6 +69,7 @@ mod tests {
             next_run_at: 0,
             last_triggered_at: 0,
             last_check_status: 0,
+            owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
         };

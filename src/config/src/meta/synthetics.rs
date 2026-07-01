@@ -177,6 +177,10 @@ pub struct Synthetic {
     #[serde(default)]
     pub last_check_status: SyntheticStatus,
 
+    /// Email of the user who created this synthetic. Set on create, never updated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+
     #[serde(default)]
     pub created_at: i64,
     #[serde(default)]
