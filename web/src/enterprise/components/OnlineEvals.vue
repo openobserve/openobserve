@@ -724,10 +724,20 @@ function onQualityRefresh() {
   void reloadQuality();
 }
 
-// Trigger 3 — date-time change. DateTimePickerDashboard emits
-// `update:modelValue` (→ qualitySelectedDate) only on an actual commit, so
-// this fires once per user change, never on mount.
+// Trigger 3 — date-time change. DateTimePickerDashboard's inner DateTime emits
+// `update:modelValue` ONCE on mount (its onMounted calls saveDate → on:date-change),
+// re-anchoring qualitySelectedDate to the same window it already holds. That echo
+// would fire a second full reloadQuality on top of the @ready one, double-hitting
+// every quality API. The picker remounts every time the quality tab is (re-)entered
+// (it lives in the tab-scoped header slot), so this echo recurs on each entry — not
+// just first load. `qualityDateEchoPending` is armed on entry (see watch(activeTab))
+// and here swallows exactly the next (mount) change; genuine user date changes reload.
+let qualityDateEchoPending = true;
 watch(qualitySelectedDate, () => {
+  if (qualityDateEchoPending) {
+    qualityDateEchoPending = false;
+    return;
+  }
   void reloadQuality();
 });
 
@@ -778,6 +788,10 @@ const pendingDeleteLabel = computed(() => {
 
 watch(activeTab, (next) => {
   filterQuery.value = "";
+  // Re-arm the date-picker mount-echo guard: entering quality remounts the
+  // picker, which emits `update:modelValue` once on mount. @ready already owns
+  // the entry reload, so that echo must be swallowed to avoid a double fetch.
+  if (next === "quality") qualityDateEchoPending = true;
   if (route.query.tab !== next) {
     router.replace({ query: { ...route.query, tab: next } }).catch(() => {});
   }
