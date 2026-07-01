@@ -1376,7 +1376,7 @@ pub struct Common {
     pub regex_patterns_source_url: String,
     #[env_config(
         name = "ZO_MODEL_PRICING_ENABLED",
-        default = false,
+        default = true,
         help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
     )]
     pub model_pricing_enabled: bool,
