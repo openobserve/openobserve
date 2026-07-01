@@ -1329,7 +1329,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
                 'Unknown'
               "
-              class="tw:px-2"
             >
               {{ dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0 }}
               unique values

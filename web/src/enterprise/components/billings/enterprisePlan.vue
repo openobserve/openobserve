@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         type="billingTag"
         value="discount"
-        class="tw:mt-2 tw:px-2 tw:py-3"
+        class="tw:mt-2"
       >
         {{ t("billing.discountTag") }}
       </OTag>

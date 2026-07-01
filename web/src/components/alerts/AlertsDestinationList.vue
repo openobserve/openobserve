@@ -149,7 +149,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`destination-type-badge-${getPrebuiltTypeName(row)?.toLowerCase()}`"
                   type="destinationKind"
                   value="prebuilt"
-                  class="tw:text-xs"
                 >{{ getPrebuiltTypeName(row) }}</OTag>
                 <OIcon
                   name="auto-awesome"
@@ -162,7 +161,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="destination-type-badge-custom"
                   type="destinationKind"
                   value="custom"
-                  class="tw:text-xs"
                 >{{ getCustomDestinationLabel(row) }}</OTag>
                 <OIcon
                   name="settings"

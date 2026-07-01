@@ -78,7 +78,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="row.destination_type_name"
             type="fieldTag"
             value="soft"
-            class="tw:text-xs"
           >{{ row.destination_type_name }}</OTag>
           <span v-else class="tw:text-text-primary">—</span>
         </template>
@@ -88,7 +87,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="row.output_format"
             type="fieldTag"
             value="soft"
-            class="tw:text-xs"
           >{{ formatOutputFormat(row.output_format) }}</OTag>
           <span v-else class="tw:text-text-primary">—</span>
         </template>

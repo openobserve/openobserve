@@ -64,6 +64,10 @@ export interface BadgeGroupConfig {
   values: Record<string, BadgeValueConfig>;
   /** Rendered when a value isn't in `values`. Defaults to a neutral plain badge. */
   fallback?: BadgeValueConfig;
+  /** Extra utility classes merged onto every badge in this group — for group-wide
+   *  tweaks that aren't captured by variant/size/shape (e.g. tighter vertical
+   *  padding so the chip sits shorter than its row's action buttons). */
+  class?: string;
 }
 
 /** Lower-case + strip separators so realTime / real_time / Real-Time collapse. */
@@ -285,7 +289,7 @@ export const BADGE_GROUPS = {
   // Schema field data types — plain.
   fieldType: {
     mode: "plain",
-    shape: "pill",
+    shape: "rounded",
     values: {
       utf8: { variant: "blue-soft", label: "String" },
       string: { variant: "blue-soft" },
@@ -400,6 +404,7 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     size: "md",
+    class: "tw:px-2 tw:py-3",
     values: {
       discount: { variant: "primary-soft" },
       subscribed: { variant: "primary-soft" },
@@ -529,6 +534,7 @@ export const BADGE_GROUPS = {
       softsm: { variant: "default-soft", size: "sm" },
       primarysm: { variant: "primary", size: "sm" },
       primarysoft: { variant: "primary-soft" },
+      primarysoftsm: { variant: "primary-soft", size: "sm" },
       primary: { variant: "primary" },
     },
     fallback: { variant: "default" },
@@ -591,7 +597,8 @@ export const BADGE_GROUPS = {
   variableScope: {
     mode: "plain",
     shape: "pill",
-    size: "md",
+    size: "sm",
+    class: "tw:!py-0.5",
     values: {
       global: { variant: "primary-soft" },
       tabs: { variant: "primary-outline" },
@@ -605,7 +612,7 @@ export const BADGE_GROUPS = {
   // comes from the registry. pill + sm.
   warningNote: {
     mode: "icon",
-    shape: "pill",
+    shape: "rounded",
     size: "sm",
     values: {},
     fallback: { variant: "warning-soft", icon: "info-outline" },
@@ -720,11 +727,22 @@ export const BADGE_GROUPS = {
   destinationKind: {
     mode: "plain",
     shape: "pill",
+    class: "tw:text-xs",
     values: {
       prebuilt: { variant: "primary" },
       custom: { variant: "default" },
     },
     fallback: { variant: "default" },
+  },
+
+  // LLM provider type (LlmProvidersSettings) — anthropic/openai/… all share one
+  // info-tint colour. rounded + sm; the (lowercased) type string is the slot.
+  providerType: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {},
+    fallback: { variant: "blue-soft" },
   },
 
   // Enrichment table source — icon.
@@ -800,6 +818,7 @@ export const BADGE_GROUPS = {
   spanKind: {
     mode: "plain",
     shape: "rounded",
+    size: "xs",
     values: {
       client: { variant: "blue-soft", label: "Client" },
       server: { variant: "purple-soft", label: "Server" },
@@ -1208,6 +1227,7 @@ export const BADGE_GROUPS = {
   billingManagement: {
     mode: "plain",
     shape: "pill",
+    class: "tw:px-3 tw:py-2",
     values: {
       aws: { variant: "success-soft", label: "AWS Marketplace" },
       azure: { variant: "success-soft", label: "Azure Marketplace" },
@@ -1259,6 +1279,8 @@ export interface ResolvedBadge {
   /** Group-declared shape (pill | rounded | square). May be undefined → the
    *  caller falls back to its own default ("pill"). */
   shape?: BadgeShape;
+  /** Group-declared extra utility classes, merged onto the badge by `OTag`. */
+  class?: string;
 }
 
 /**
@@ -1301,6 +1323,7 @@ export function resolveBadge(
     // Per-value size wins over group size; both may be undefined → caller default.
     size: entry.size ?? cfg.size,
     shape: cfg.shape,
+    class: cfg.class,
   };
 }
 

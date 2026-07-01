@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="feature-name">
                   {{ feature.name }}
                   <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
-                  <OTag v-if="feature.beta" type="featureFlag" value="beta" />
+                  <OTag v-if="feature.beta" type="featureFlag" value="beta" data-test="feature-beta-badge" />
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
               </div>
@@ -197,8 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="feature-name">
                   {{ feature.name }}
                   <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
-                  <OTag v-if="feature.beta" type="featureFlag" value="beta" />
-                  <OTag v-if="feature.requiresHA" type="featureFlag" value="ha">
+                  <OTag v-if="feature.beta" type="featureFlag" value="beta" data-test="feature-beta-badge" />
+                  <OTag v-if="feature.requiresHA" type="featureFlag" value="ha" data-test="feature-ha-badge">
                     HA
                     <OTooltip side="top" align="center" :sideOffset="8" :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')" />
                   </OTag>

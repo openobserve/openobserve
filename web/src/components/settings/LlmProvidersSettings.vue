@@ -92,7 +92,7 @@
             />
           </template>
           <template #cell-type="{ row }">
-            <span class="llmp-type-chip">{{ providerTypeOf(row) || "—" }}</span>
+            <OTag type="providerType" class="tw:lowercase">{{ providerTypeOf(row) || "—" }}</OTag>
           </template>
 
           <template #cell-endpoint="{ row }">

@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           v-if="multiQueryWarning"
           type="warningNote"
-          class="dashboard-multi-query-warning tw:h-8 tw:mr-2 tw:ring-1 tw:ring-inset tw:ring-current"
+          class="dashboard-multi-query-warning tw:h-8 tw:mr-2"
         >
           {{ multiQueryWarning }}
         </OTag>

@@ -68,13 +68,21 @@ describe("OTag shape", () => {
     const html = mount(OTag, { props: { type: "alertStatus", value: "active" } }).html();
     expect(html.includes("tw:rounded-full")).toBe(true);
   });
-  it("typed group with no explicit shape defaults to pill (rounded-full)", () => {
-    const html = mount(OTag, { props: { type: "fieldType", value: "string" } }).html();
+  it("group declaring shape 'pill' renders rounded-full", () => {
+    const html = mount(OTag, { props: { type: "alertStatus", value: "active" } }).html();
     expect(html.includes("tw:rounded-full")).toBe(true);
+  });
+  it("fieldType (dtype chip) renders rounded, matching the wildcard pattern chip", () => {
+    const html = mount(OTag, { props: { type: "fieldType", value: "string" } }).html();
+    expect(html.includes("tw:rounded-md")).toBe(true);
   });
   it("groups that opt into rounded render rounded-md", () => {
     const html = mount(OTag, { props: { type: "logsResultChip", value: "neutral" } }).html();
     expect(html.includes("tw:rounded-md")).toBe(true);
+  });
+  it("group-declared class is merged onto the badge (variableScope tighter padding)", () => {
+    const html = mount(OTag, { props: { type: "variableScope", value: "global" } }).html();
+    expect(html.includes("tw:!py-0.5")).toBe(true);
   });
   it("manual badge defaults to pill", () => {
     const html = mount(OTag, { props: { variant: "default-soft" }, slots: { default: "5" } }).html();

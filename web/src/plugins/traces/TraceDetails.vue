@@ -140,35 +140,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
               />
               <!-- Span Count Badge -->
-              <OTag
-                type="logsResultChip"
-                value="neutral"
-                data-test="trace-details-spans-count"
-              >
-                <span data-test="span-count-text">
-                  {{ formatLargeNumber(effectiveSpanList.length) }}
-                  {{ t("traces.spansLabel") }}
-                  <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
-                </span>
-              </OTag>
+              <span class="tw:inline-flex">
+                <OTag
+                  type="logsResultChip"
+                  value="neutral"
+                  data-test="trace-details-spans-count"
+                >
+                  <span data-test="span-count-text">
+                    {{ formatLargeNumber(effectiveSpanList.length) }}
+                    {{ t("traces.spansLabel") }}
+                  </span>
+                </OTag>
+                <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
+              </span>
 
               <div
                 class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
               />
 
               <!-- Error Count Badge -->
-              <OTag
-                type="logsResultChip"
-                value="error"
-                data-test="trace-details-error-spans-count"
-                class="tw:mr-[0.85rem]"
-              >
-                <span
-                  >{{ formatLargeNumber(errorSpansCount) }}
-                  {{ t("traces.errorsLabel") }}</span
+              <span class="tw:inline-flex tw:mr-[0.85rem]">
+                <OTag
+                  type="logsResultChip"
+                  value="error"
+                  data-test="trace-details-error-spans-count"
                 >
+                  <span
+                    >{{ formatLargeNumber(errorSpansCount) }}
+                    {{ t("traces.errorsLabel") }}</span
+                  >
+                </OTag>
                 <OTooltip :content="errorSpansCount + ' ' + t('traces.errorsLabel')" />
-              </OTag>
+              </span>
             </div>
           </div>
 

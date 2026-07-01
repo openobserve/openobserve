@@ -108,7 +108,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag
                     type="variableScope"
                     value="global"
-                    class="tw:ring-1 tw:ring-inset tw:ring-current"
                     v-if="getScopeType(variable) === 'global'"
                   >
                     Global

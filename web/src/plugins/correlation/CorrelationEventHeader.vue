@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="sourceEvent.severity"
       type="logLevel"
       :value="sourceEvent.severity"
-      class="tw:px-2 tw:shrink-0"
+      class="tw:shrink-0"
     >{{ sourceEvent.severity }}</OTag>
     <span class="tw:text-xs tw:font-mono tw:text-typography-meta tw:shrink-0">
       {{ formatEventTimestamp(sourceEvent.timestamp) }}

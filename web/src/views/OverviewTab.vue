@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="ov-section-header">
         <div class="ov-section-label">
           {{ t('overview.activeIncidents') }}
-          <OTag type="fieldTag" value="soft">{{ incidentsTotal }}</OTag>
+          <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
           <span v-if="incidentsTotal > incidents.length" class="ov-showing-hint">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
         </div>
         <button class="ov-view-all" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="ov-section-header">
         <div class="ov-section-label">
           {{ t('overview.services') }}
-          <OTag type="fieldTag" value="soft">{{ services.length }}</OTag>
+          <OTag type="countChip" value="warning">{{ services.length }}</OTag>
           <span v-if="servicePanelVisible && selectedService" class="ov-panel-context">
             — viewing <strong>{{ selectedService.label ?? selectedService.id }}</strong>
           </span>
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="ov-section-header">
         <div class="ov-section-label">
           {{ t('overview.activeAnomalies') }}
-          <OTag type="fieldTag" value="soft">{{ anomalies.length }}</OTag>
+          <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
         </div>
         <button class="ov-view-all" @click="goToAnomalies">{{ t('overview.viewAll') }} →</button>
       </div>
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="ov-section-header">
         <div class="ov-section-label">
           {{ t('overview.recentEvents') }}
-          <OTag type="fieldTag" value="soft">{{ recentEvents.length }}</OTag>
+          <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
         </div>
         <button class="ov-view-all" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
       </div>

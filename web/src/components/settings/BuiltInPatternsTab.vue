@@ -108,12 +108,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="tag in pattern.tags.slice(0, 3)"
                   :key="tag"
                   type="fieldTag"
-                  value="primarysoft"
-                  class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current"
+                  value="primarysoftsm"
                 >
                   {{ tag }}
                 </OTag>
-                <OTag v-if="pattern.tags.length > 3" size="md" variant="default-soft" class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current">
+                <OTag v-if="pattern.tags.length > 3" type="fieldTag" value="softsm">
                   +{{ pattern.tags.length - 3 }}
                 </OTag>
               </div>
@@ -187,8 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="tag in previewedPattern?.tags"
               :key="tag"
               type="fieldTag"
-              value="primarysoft"
-              class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current"
+              value="primarysoftsm"
             >
               {{ tag }}
             </OTag>

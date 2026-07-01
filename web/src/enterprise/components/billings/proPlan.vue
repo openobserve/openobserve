@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="planType == planName"
         type="billingTag"
         value="subscribed"
-        class="tw:mt-2 tw:px-2 tw:py-3"
+        class="tw:mt-2"
       >
         {{ t("billing.subscribed") }}
       </OTag>
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           type="billingManagement"
           value="aws"
-          class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1"
+          class="tw:inline-flex tw:items-center tw:gap-1"
         >
           <template #icon>
             <OIcon name="check-circle" size="xs" />
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           type="billingManagement"
           value="azure"
-          class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1"
+          class="tw:inline-flex tw:items-center tw:gap-1"
         >
           <template #icon>
             <OIcon name="check-circle" size="xs" />
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           type="billingManagement"
           value="contract"
-          class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1"
+          class="tw:inline-flex tw:items-center tw:gap-1"
         >
           <template #icon>
             <OIcon name="description" size="xs" />

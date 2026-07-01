@@ -111,10 +111,10 @@ export class EditionFeaturesPage {
     await expect(item, `Feature card "${name}" should be visible`).toBeVisible();
     await expect(item.locator('.external-link-icon'), `"${name}" should show external link icon`).toBeVisible();
     if (beta) {
-      await expect(item.locator('.beta-badge'), `"${name}" should show BETA badge`).toBeVisible();
+      await expect(item.locator('[data-test="feature-beta-badge"]'), `"${name}" should show BETA badge`).toBeVisible();
     }
     if (ha) {
-      await expect(item.locator('.ha-badge'), `"${name}" should show HA badge`).toBeVisible();
+      await expect(item.locator('[data-test="feature-ha-badge"]'), `"${name}" should show HA badge`).toBeVisible();
     }
   }
 

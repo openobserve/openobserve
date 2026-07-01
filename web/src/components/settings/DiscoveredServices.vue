@@ -200,14 +200,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-service_name="{ row }">
               <div v-if="row.__type === 'group'" class="tw:flex tw:items-center tw:gap-2">
                 <span class="tw:font-semibold">{{ row.service_name }}</span>
-                <span class="instance-count-badge">
+                <OTag type="countChip" value="neutral">
                   {{ row.instances.length }}
                   {{
                     row.instances.length === 1
                       ? t("settings.correlation.instanceSingular")
                       : t("settings.correlation.instancePlural")
                   }}
-                </span>
+                </OTag>
               </div>
               <div v-else class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
                 <span class="set-id-badge">{{ row.set_id }}</span>
@@ -248,55 +248,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-else class="telemetry-slot-empty"></span>
               </div>
               <div v-else class="instance-telemetry-grid">
-                <OTag
+                <span
                   v-if="row.logs_streams.length > 0"
-                  type="streamType"
-                  :value="'logs'"
+                  class="tw:inline-flex tw:min-w-0"
                 >
+                  <OTag type="streamType" :value="'logs'">
+                    {{
+                      t("settings.correlation.logsWithCount", {
+                        count: row.logs_streams.length,
+                      })
+                    }}
+                  </OTag>
                   <OTooltip
                     :content="row.logs_streams.join(', ')"
                     content-class="tw:text-xs"
                   />
-                  {{
-                    t("settings.correlation.logsWithCount", {
-                      count: row.logs_streams.length,
-                    })
-                  }}
-                </OTag>
+                </span>
                 <span v-else class="telemetry-slot-empty"></span>
 
-                <OTag
+                <span
                   v-if="row.traces_streams.length > 0"
-                  type="streamType"
-                  :value="'traces'"
+                  class="tw:inline-flex tw:min-w-0"
                 >
+                  <OTag type="streamType" :value="'traces'">
+                    {{
+                      t("settings.correlation.tracesWithCount", {
+                        count: row.traces_streams.length,
+                      })
+                    }}
+                  </OTag>
                   <OTooltip
                     :content="row.traces_streams.join(', ')"
                     content-class="tw:text-xs"
                   />
-                  {{
-                    t("settings.correlation.tracesWithCount", {
-                      count: row.traces_streams.length,
-                    })
-                  }}
-                </OTag>
+                </span>
                 <span v-else class="telemetry-slot-empty"></span>
 
-                <OTag
+                <span
                   v-if="row.metrics_streams.length > 0"
-                  type="streamType"
-                  :value="'metrics'"
+                  class="tw:inline-flex tw:min-w-0"
                 >
+                  <OTag type="streamType" :value="'metrics'">
+                    {{
+                      t("settings.correlation.metricsWithCount", {
+                        count: row.metrics_streams.length,
+                      })
+                    }}
+                  </OTag>
                   <OTooltip
                     :content="row.metrics_streams.join(', ')"
                     content-class="tw:text-xs"
                   />
-                  {{
-                    t("settings.correlation.metricsWithCount", {
-                      count: row.metrics_streams.length,
-                    })
-                  }}
-                </OTag>
+                </span>
                 <span v-else class="telemetry-slot-empty"></span>
               </div>
             </template>

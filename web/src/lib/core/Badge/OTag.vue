@@ -136,6 +136,7 @@ const dot = computed(() =>
     :variant="variant"
     :size="size"
     :shape="shape"
+    :class="resolved.class"
     :dot="dot"
     :icon="icon"
     :count="count"
