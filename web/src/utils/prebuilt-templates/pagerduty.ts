@@ -35,7 +35,7 @@ export const pagerdutyTemplate = {
         "alert_count": "{alert_count}",
         "alert_operator": "{alert_operator}",
         "alert_threshold": "{alert_threshold}",
-        "alert_time": "{alert_time}",
+        "alert_time": "{alert_trigger_time_str}",
         "alert_url": "{alert_url}"
       }
     },
