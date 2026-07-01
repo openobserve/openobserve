@@ -1,7 +1,7 @@
 on:
   push:
-    tags:
-      - "v*.*.*"
+    # tags:
+    #   - "v*.*.*"
 name: Release
 env:
   RUST_TOOLCHAIN: nightly-2026-05-20
@@ -67,6 +67,7 @@ jobs:
       - name: Build UI
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
+        shell: "bash"
         run: |
           cd web/
           npm ci
@@ -156,130 +157,130 @@ jobs:
           7z a -tzip ${{ matrix.file_name }}.zip openobserve.exe
           certutil.exe -hashfile ${{ matrix.file_name }}.zip sha256|head -n 2|tail -n 1 > ${{ matrix.file_name }}.zip.sha256sum
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.file_name }}
-          path: target/${{ matrix.arch }}/release-prod/${{ matrix.file_name }}${{ matrix.file_ext }}
+      # - name: Upload artifacts
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: ${{ matrix.file_name }}
+      #     path: target/${{ matrix.arch }}/release-prod/${{ matrix.file_name }}${{ matrix.file_ext }}
 
-      - name: Upload checksum of artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.file_name }}.sha256sum
-          path: target/${{ matrix.arch }}/release-prod/${{ matrix.file_name }}${{ matrix.file_ext }}.sha256sum
-  release:
-    name: Release artifacts
-    needs: [build]
-    runs-on: eks-openobserve-standard-4
-    permissions:
-      id-token: write
-      contents: write
+      # - name: Upload checksum of artifacts
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: ${{ matrix.file_name }}.sha256sum
+      #     path: target/${{ matrix.arch }}/release-prod/${{ matrix.file_name }}${{ matrix.file_ext }}.sha256sum
+  # release:
+  #   name: Release artifacts
+  #   needs: [build]
+  #   runs-on: eks-openobserve-standard-4
+  #   permissions:
+  #     id-token: write
+  #     contents: write
 
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
+  #   steps:
+  #     - name: Checkout sources
+  #       uses: actions/checkout@v5
+  #       with:
+  #         fetch-depth: 0
 
-      - name: Download artifacts
-        uses: actions/download-artifact@v5
+  #     - name: Download artifacts
+  #       uses: actions/download-artifact@v5
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::325553860333:role/github-actions-s3-uploader
-          role-session-name: GithubActionsSession
-          aws-region: us-east-2
+  #     - name: Configure AWS credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         role-to-assume: arn:aws:iam::325553860333:role/github-actions-s3-uploader
+  #         role-session-name: GithubActionsSession
+  #         aws-region: us-east-2
 
-      - name: Upload to S3
-        env:
-          BUCKET: ${{ vars.AWS_S3_BUCKET_NAME }}
-        run: |
-          if ! command -v aws &> /dev/null; then
-            echo "AWS CLI not found. Installing..."
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            unzip awscliv2.zip
-            sudo ./aws/install
-          else
-            echo "AWS CLI already installed."
-          fi
+  #     - name: Upload to S3
+  #       env:
+  #         BUCKET: ${{ vars.AWS_S3_BUCKET_NAME }}
+  #       run: |
+  #         if ! command -v aws &> /dev/null; then
+  #           echo "AWS CLI not found. Installing..."
+  #           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+  #           unzip awscliv2.zip
+  #           sudo ./aws/install
+  #         else
+  #           echo "AWS CLI already installed."
+  #         fi
 
-          echo "Uploading artifacts to S3..."
-          for file in $(find . -type f \( -name "openobserve*.tar.gz" -o -name "*.zip" -o -name "openobserve*.sha256sum" \)); do
-            echo "Uploading $file to s3://${BUCKET}/releases/openobserve/${GITHUB_REF_NAME}/"
-            aws s3 cp "$file" "s3://${BUCKET}/releases/openobserve/${GITHUB_REF_NAME}/$(basename "$file")"
-          done
+  #         echo "Uploading artifacts to S3..."
+  #         for file in $(find . -type f \( -name "openobserve*.tar.gz" -o -name "*.zip" -o -name "openobserve*.sha256sum" \)); do
+  #           echo "Uploading $file to s3://${BUCKET}/releases/openobserve/${GITHUB_REF_NAME}/"
+  #           aws s3 cp "$file" "s3://${BUCKET}/releases/openobserve/${GITHUB_REF_NAME}/$(basename "$file")"
+  #         done
 
-      - name: Generate release body with Download Url
-        id: generate-body
-        run: |
-          echo "📦 Download Binaries from https://openobserve.ai/downloads" > release_body.md
-          echo "body<<EOF" >> $GITHUB_OUTPUT
-          cat release_body.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+  #     - name: Generate release body with Download Url
+  #       id: generate-body
+  #       run: |
+  #         echo "📦 Download Binaries from https://openobserve.ai/downloads" > release_body.md
+  #         echo "body<<EOF" >> $GITHUB_OUTPUT
+  #         cat release_body.md >> $GITHUB_OUTPUT
+  #         echo "EOF" >> $GITHUB_OUTPUT
   
-      - name: Publish release
-        uses: softprops/action-gh-release@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          name: "Release ${{ github.ref_name }}"
-          generate_release_notes: true
-          body: ${{ steps.generate-body.outputs.body }}
+  #     - name: Publish release
+  #       uses: softprops/action-gh-release@v3
+  #       with:
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         name: "Release ${{ github.ref_name }}"
+  #         generate_release_notes: true
+  #         body: ${{ steps.generate-body.outputs.body }}
 
-      - name: Send release notification to Strapi
-        uses: actions/github-script@v9
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            // Get release info from workflow dispatch inputs
-            const tag = context.ref.replace("refs/tags/", "");
-            const { data: release } = await github.rest.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag: tag
-            });      
-            function cleanChangelog(changelog) {
-                    if (!changelog) return '';
-                    const lines = changelog.split(/\r?\n/);
-                    const result = [];
-                    for (const line of lines) {
-                      if (line.toLowerCase().includes('new contributors')) break;
-                      if (line.toLowerCase().includes('full changelog')) continue;
-                      if (line.toLowerCase().includes('download binaries from')) continue;
-                      const cleanedLine = line.replace(/by\s+@[\w-]+.*$/i, '').replace(/@\w+/g, '').replace(/\bhttps?:\/\/\S+/gi, '').trim();
-                      if (cleanedLine.length > 0) result.push(cleanedLine);
-                    }
-                    return result.join('\n');
-                  }
+  #     - name: Send release notification to Strapi
+  #       uses: actions/github-script@v9
+  #       with:
+  #         github-token: ${{ secrets.GITHUB_TOKEN }}
+  #         script: |
+  #           // Get release info from workflow dispatch inputs
+  #           const tag = context.ref.replace("refs/tags/", "");
+  #           const { data: release } = await github.rest.repos.getReleaseByTag({
+  #             owner: context.repo.owner,
+  #             repo: context.repo.repo,
+  #             tag: tag
+  #           });      
+  #           function cleanChangelog(changelog) {
+  #                   if (!changelog) return '';
+  #                   const lines = changelog.split(/\r?\n/);
+  #                   const result = [];
+  #                   for (const line of lines) {
+  #                     if (line.toLowerCase().includes('new contributors')) break;
+  #                     if (line.toLowerCase().includes('full changelog')) continue;
+  #                     if (line.toLowerCase().includes('download binaries from')) continue;
+  #                     const cleanedLine = line.replace(/by\s+@[\w-]+.*$/i, '').replace(/@\w+/g, '').replace(/\bhttps?:\/\/\S+/gi, '').trim();
+  #                     if (cleanedLine.length > 0) result.push(cleanedLine);
+  #                   }
+  #                   return result.join('\n');
+  #                 }
 
-            const cleanedBody = cleanChangelog(release.body);
-            const payload = {
-              version: release.tag_name,
-              release_name: release.name,
-              release_url: release.html_url,
-              changelog: cleanedBody || 'No release notes provided',
-              type: 'PUBLIC',
-              date: release.published_at
-            };
-            try {
-              const response = await fetch(`${process.env.STRAPI_WEBHOOK_URL}/api/github-releases?status=published`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${process.env.STRAPI_API_TOKEN}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({data: payload})
-              });
+  #           const cleanedBody = cleanChangelog(release.body);
+  #           const payload = {
+  #             version: release.tag_name,
+  #             release_name: release.name,
+  #             release_url: release.html_url,
+  #             changelog: cleanedBody || 'No release notes provided',
+  #             type: 'PUBLIC',
+  #             date: release.published_at
+  #           };
+  #           try {
+  #             const response = await fetch(`${process.env.STRAPI_WEBHOOK_URL}/api/github-releases?status=published`, {
+  #               method: 'POST',
+  #               headers: {
+  #                 'Authorization': `Bearer ${process.env.STRAPI_API_TOKEN}`,
+  #                 'Content-Type': 'application/json'
+  #               },
+  #               body: JSON.stringify({data: payload})
+  #             });
 
-              if (!response.ok) {
-                throw new Error(`Webhook request failed: ${response.status} ${response.statusText}`);
-              }
+  #             if (!response.ok) {
+  #               throw new Error(`Webhook request failed: ${response.status} ${response.statusText}`);
+  #             }
 
-              console.log('Response status:', response.status);
-            } catch (error) {
-              console.error('Failed to send webhook notification:', error);
-              core.setFailed(error.message);
-            }
-        env:
-          STRAPI_WEBHOOK_URL: ${{ secrets.STRAPI_WEBHOOK_URL }}
-          STRAPI_API_TOKEN: ${{ secrets.STRAPI_API_TOKEN }}
+  #             console.log('Response status:', response.status);
+  #           } catch (error) {
+  #             console.error('Failed to send webhook notification:', error);
+  #             core.setFailed(error.message);
+  #           }
+  #       env:
+  #         STRAPI_WEBHOOK_URL: ${{ secrets.STRAPI_WEBHOOK_URL }}
+  #         STRAPI_API_TOKEN: ${{ secrets.STRAPI_API_TOKEN }}
