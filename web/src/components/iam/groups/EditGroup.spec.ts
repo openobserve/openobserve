@@ -560,4 +560,48 @@ describe("EditGroup Component", () => {
       });
     });
   });
+
+  describe("Per-tab dirty state", () => {
+    it("is not dirty on initial load", () => {
+      expect(wrapper.vm.isAnyDirty).toBe(false);
+      const rolesTab = wrapper.vm.tabs.find((t: any) => t.value === "roles");
+      expect(rolesTab.dirty).toBe(false);
+    });
+
+    it("marks only the Roles tab dirty on a role change", async () => {
+      wrapper.vm.addedRoles.add("admin");
+      await wrapper.vm.$nextTick();
+      const rolesTab = wrapper.vm.tabs.find((t: any) => t.value === "roles");
+      const usersTab = wrapper.vm.tabs.find((t: any) => t.value === "users");
+      expect(rolesTab.dirty).toBe(true);
+      expect(usersTab.dirty).toBe(false);
+      expect(wrapper.vm.isAnyDirty).toBe(true);
+    });
+
+    it("tracks Users and Service Accounts dirty state independently", async () => {
+      wrapper.vm.addedServiceAccounts.add("svc@o2.ai");
+      await wrapper.vm.$nextTick();
+      const usersTab = wrapper.vm.tabs.find((t: any) => t.value === "users");
+      const saTab = wrapper.vm.tabs.find(
+        (t: any) => t.value === "serviceAccounts",
+      );
+      expect(saTab?.dirty).toBe(true);
+      expect(usersTab.dirty).toBe(false);
+    });
+
+    it("merges users and service accounts into the save payload", async () => {
+      const { updateGroup } = await import("@/services/iam");
+      vi.mocked(updateGroup).mockResolvedValue({ data: {} } as any);
+      wrapper.vm.addedUsers.add("user@o2.ai");
+      wrapper.vm.addedServiceAccounts.add("svc@o2.ai");
+      await wrapper.vm.saveGroupChanges();
+      expect(updateGroup).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            add_users: expect.arrayContaining(["user@o2.ai", "svc@o2.ai"]),
+          }),
+        }),
+      );
+    });
+  });
 });
