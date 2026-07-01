@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="row.severity"
             size="sm"
             data-test="incident-severity-badge"
-          >{{ row.severity }}</OTag>
+          />
         </template>
         <template #cell-title="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1">

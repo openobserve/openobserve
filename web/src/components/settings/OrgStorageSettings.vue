@@ -184,10 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:text-base tw:font-medium" style="font-weight: 700; line-height: 1.3;">
                 {{ configuredProviderLabel }}
               </div>
-              <OTag
-                type="activeFlag"
-                style="font-size: 11px; padding: 2px 8px; margin-top: 4px;"
-              >
+              <OTag type="activeFlag" class="tw:mt-1">
                 {{ t("storage_settings.active") }}
               </OTag>
             </div>

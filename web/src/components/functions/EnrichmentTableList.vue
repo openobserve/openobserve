@@ -320,9 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test-value="job.status"
                     type="enrichmentJobStatus"
                     :value="job.status"
-                  >
-                    {{ job.status }}
-                  </OTag>
+                  />
                 </span>
                 <span v-if="job.status === 'completed'" class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
