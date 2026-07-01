@@ -312,22 +312,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw:text-xs tw:text-text-secondary">{{ tokenNextStepHint }}</span>
           </div>
 
-          <div v-if="showGroupLink" class="tw:flex tw:items-center tw:gap-4 tw:mt-3">
+          <div v-if="showGroupLink" class="tw:flex tw:flex-wrap tw:items-center tw:justify-center tw:gap-3 tw:mt-3">
             <router-link
               data-test="service-accounts-list-token-add-to-role"
               :to="roleLinkTarget"
-              class="tw:text-xs tw:text-primary tw:font-medium"
+              class="tw:group tw:inline-flex tw:items-center tw:gap-1.5 tw:rounded-md tw:border tw:border-border-default tw:px-2.5 tw:py-1.5 tw:text-xs tw:text-text-primary tw:transition-colors tw:hover:border-primary tw:hover:bg-primary/5"
               @click="isShowToken = false"
             >
-              {{ t('serviceAccounts.tokenReveal.addToRole') }} →
+              <OIcon name="shield" size="sm" class="tw:text-primary tw:shrink-0" />
+              <span class="tw:font-medium">{{ t('serviceAccounts.tokenReveal.addToRole') }}</span>
+              <OIcon
+                name="arrow-right"
+                size="sm"
+                class="tw:text-text-secondary tw:shrink-0 tw:transition-transform tw:group-hover:translate-x-0.5"
+              />
             </router-link>
             <router-link
               data-test="service-accounts-list-token-add-to-group"
               :to="groupLinkTarget"
-              class="tw:text-xs tw:text-primary tw:font-medium"
+              class="tw:group tw:inline-flex tw:items-center tw:gap-1.5 tw:rounded-md tw:border tw:border-border-default tw:px-2.5 tw:py-1.5 tw:text-xs tw:text-text-primary tw:transition-colors tw:hover:border-primary tw:hover:bg-primary/5"
               @click="isShowToken = false"
             >
-              {{ t('serviceAccounts.tokenReveal.addToGroup') }} →
+              <OIcon name="group" size="sm" class="tw:text-primary tw:shrink-0" />
+              <span class="tw:font-medium">{{ t('serviceAccounts.tokenReveal.addToGroup') }}</span>
+              <OIcon
+                name="arrow-right"
+                size="sm"
+                class="tw:text-text-secondary tw:shrink-0 tw:transition-transform tw:group-hover:translate-x-0.5"
+              />
             </router-link>
           </div>
 

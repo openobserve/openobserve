@@ -48,6 +48,8 @@ export class IngestionTokensPage {
         // ============================================================
         // Revealed token dialog
         // ============================================================
+        // The <code> block now shows the ready-to-use "Basic base64(name:token)"
+        // credential (not the raw token).
         this.revealedTokenCode = page.locator('[role="dialog"] code');
     }
 
@@ -95,8 +97,16 @@ export class IngestionTokensPage {
         await this.page.waitForTimeout(500);
     }
 
+    // Copies the ready-to-use "Basic base64(name:token)" credential (primary btn).
     async clickCopyToken() {
-        await this.page.getByRole('button', { name: 'Copy' }).last().click();
+        await this.page
+            .getByRole('button', { name: 'Copy Authorization header' })
+            .click();
+    }
+
+    // Copies the raw o2oi_ token (secondary btn).
+    async clickCopyRawToken() {
+        await this.page.getByRole('button', { name: 'Copy raw token' }).click();
     }
 
     // ----- toggle -----
