@@ -33,6 +33,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           {{ t('search.syntaxGuideLabel') }}
         </OButton>
+        <!-- Toolbar style: outline button matching sibling toolbar buttons (e.g. Reset) -->
+        <OButton
+          v-else-if="toolbar"
+          data-cy="syntax-guide-button"
+          variant="outline"
+          size="xs"
+          :class="[sqlmode ? 'sql-mode' : 'normal-mode']"
+        >
+          <OIcon name="help" size="sm" />
+          <span v-if="label">{{ label }}</span>
+          <OTooltip :content="t('search.syntaxGuideLabel')" />
+        </OButton>
         <!-- Default style: compact inline button for toolbar use -->
         <OButton
           v-else
@@ -238,6 +250,10 @@ export default defineComponent({
       default: "",
     },
     menuItem: {
+      type: Boolean,
+      default: false,
+    },
+    toolbar: {
       type: Boolean,
       default: false,
     },

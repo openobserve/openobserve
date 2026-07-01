@@ -69,12 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? 'tw:border-(--o2-primary-color) tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] tw:shadow-[inset_0_0_0_1px_var(--o2-primary-color)]'
               : 'tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:hover:border-(--o2-primary-color) tw:hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))]'"
             :aria-pressed="isThemeApplied(theme, mode)"
-            :aria-label="`Apply ${theme.name} theme`"
+            :aria-label="`Apply ${themeDisplayName(theme.name)} theme`"
             @click="applyTheme(theme, mode)"
           >
             <span class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative" :style="swatchStyle(theme[mode])" />
             <span class="tw:ml-2 tw:min-w-0 tw:flex-1 tw:text-left">
-              <span class="tw:block tw:text-sm tw:font-medium tw:truncate">{{ theme.name }}</span>
+              <span class="tw:block tw:text-sm tw:font-medium tw:truncate">{{ themeDisplayName(theme.name) }}</span>
               <span class="tw:block tw:text-xs tw:text-gray-400 tw:truncate">{{ theme[mode].themeColor }}</span>
             </span>
             <OBadge
@@ -181,6 +181,7 @@ import {
   THEME_STORAGE_KEYS,
   getDefaultTheme,
   themeNameSlug,
+  themeDisplayName,
   type PredefinedTheme,
   type ThemeModeColors,
 } from "@/constants/themes";
@@ -400,7 +401,7 @@ const applyTheme = (theme: PredefinedTheme, themeMode: "light" | "dark") => {
 
   toast({
     variant: "success",
-    message: `${theme.name} applied to ${themeMode} mode successfully!`,
+    message: `${themeDisplayName(theme.name)} applied to ${themeMode} mode successfully!`,
   });
 };
 

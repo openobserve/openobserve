@@ -725,7 +725,6 @@ export default defineComponent({
 
     const setCustomDate = (dateType, dateobj) => {
       // Parent-invoked setter (e.g. metrics-brush time range) — programmatic.
-      markProgrammaticDateChange();
       var start_date = new Date(Math.floor(dateobj.start));
       const startObj = formatDate(start_date);
 
@@ -738,6 +737,7 @@ export default defineComponent({
       selectedTime.value.endTime = endObj.time;
 
       selectedType.value = dateType;
+      markProgrammaticDateChange();
     };
 
     const onBeforeShow = () => {
