@@ -224,10 +224,32 @@ pub enum SyntheticAuth {
     Bearer {
         token: String,
     },
+    /// Browser cookies injected via context.addCookies() before any steps run.
+    Cookie {
+        cookies: Vec<SyntheticCookie>,
+    },
     /// Reference to a secret stored in OO secrets manager.
     Secret {
         secret_name: String,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
+pub struct SyntheticCookie {
+    pub name: String,
+    /// Cookie value — encrypted at rest with org DEK.
+    pub value: String,
+    pub domain: String,
+    #[serde(default = "default_cookie_path")]
+    pub path: String,
+    #[serde(default)]
+    pub http_only: bool,
+    #[serde(default)]
+    pub secure: bool,
+}
+
+fn default_cookie_path() -> String {
+    "/".to_string()
 }
 
 // ── Variables ─────────────────────────────────────────────────────────────────
