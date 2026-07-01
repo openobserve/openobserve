@@ -65,13 +65,10 @@ jobs:
           cache: "npm"
           cache-dependency-path: web/package-lock.json
       - name: Build UI
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
         shell: "bash"
         run: |
           cd web/
-          npm ci
-          npm run build
+          npm ci && npm run build
 
       - name: Install Protoc for linux
         if: contains(matrix.arch, 'x86_64-unknown-linux')
