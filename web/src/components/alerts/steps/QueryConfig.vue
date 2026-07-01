@@ -92,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :options="numericColumns"
                       searchable
                       :placeholder="t('alerts.placeholders.selectColumn')"
+                      :error="columnSelectError"
                       :class="['tw:min-w-[140px] tw:max-w-[200px]']"
                       @update:model-value="columnSelectError = false; onLogMeasureColumnChange($event)"
                     />
@@ -240,6 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
+                        :error="columnSelectError"
                         :readonly="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
                         :disable="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
                         @update:model-value="columnSelectError = false; emitAggregationUpdate()"
