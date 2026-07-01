@@ -776,7 +776,6 @@ import ThreadToolCalls from "./ThreadToolCalls.vue";
 import {
   splitNumberWithUnit,
   splitDuration,
-  splitCost,
 } from "./llmInsightsDashboard.utils";
 import { renderMarkdown } from "./markdown";
 
@@ -895,8 +894,8 @@ interface TurnChip {
 
 // Session-level KPI tiles. Each sub-line is split into `subLead` text, optional
 // `subTurns` chips (hoverable turn references), and `subTail` text so individual
-// turn numbers can carry the TurnPreviewCard tooltip. Value/unit use the same
-// split helpers as the LLM Insights dashboard for identical formatting.
+// turn numbers can carry the TurnPreviewCard tooltip. Session costs stay at
+// four decimal places because LLM sessions are usually sub-cent values.
 const kpiCards = computed<
   {
     key: string;
@@ -920,7 +919,7 @@ const kpiCards = computed<
 
   const dur = splitDuration(d.durationNanos / 1000);
   const lat = splitDuration(s.avgLat / 1000);
-  const cost = splitCost(d.cost);
+  const cost = { value: usd4(d.cost), unit: "" };
   const tokens = splitNumberWithUnit(d.tokens);
   const turnWord = t("traces.sessionDetail.turnLabel");
 
@@ -1468,7 +1467,7 @@ function secondaryLine(trace: SessionTraceRow): string {
   return trace.model || t("traces.sessionDetail.expandToView");
 }
 
-// Turn-row chrome: colored left accent by status + a transient ring on jump.
+// Turn-row chrome: status surface tint + a transient ring on jump.
 function turnRowClass(trace: SessionTraceRow): string {
   const n = originalTurnIndex(trace.traceId) + 1;
   // Status is conveyed by a subtle surface tint (red for errors) instead of a

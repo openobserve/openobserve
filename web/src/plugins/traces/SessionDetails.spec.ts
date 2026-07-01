@@ -396,6 +396,19 @@ describe("SessionDetails — KPI strip", () => {
     expect(costKpi.text()).toContain("traces.sessionDetail.kpi.cost");
   });
 
+  it("renders session cost KPI with four decimal places", async () => {
+    mockFetchSession.mockResolvedValue({
+      detail: makeDetail({ cost: 0.0069 }),
+      traces: [makeTrace({ cost: 0.0069 })],
+    });
+
+    const wrapper = await mountComponent();
+    const costKpi = wrapper.find("[data-test='session-detail-kpi-cost']");
+
+    expect(costKpi.text()).toContain("$0.0069");
+    expect(costKpi.text()).not.toContain("$0.01");
+  });
+
   it("renders net cache impact with cost breakdown from session cache fields", async () => {
     mockFetchSession.mockResolvedValue({
       detail: makeDetail({
@@ -482,7 +495,7 @@ describe("SessionDetails — turn rows", () => {
     expect(wrapper.find(turnRowSelector(traceId)).exists()).toBe(true);
   });
 
-  it("turn row uses critical accent for error traces", async () => {
+  it("turn row uses critical surface tint for error traces", async () => {
     mockFetchSession.mockResolvedValue({
       detail: makeDetail(),
       traces: [makeTrace({ traceId: "err-trace", status: "error", errorCount: 1 })],
@@ -490,10 +503,12 @@ describe("SessionDetails — turn rows", () => {
 
     const wrapper = await mountComponent();
     const row = wrapper.find(turnRowSelector("err-trace"));
-    expect(row.classes()).toContain("tw:border-l-[var(--o2-service-health-critical)]");
+    expect(row.classes()).toContain(
+      "tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_5%,var(--o2-card-bg))]",
+    );
   });
 
-  it("turn row uses healthy accent for ok traces", async () => {
+  it("turn row uses default surface for ok traces", async () => {
     mockFetchSession.mockResolvedValue({
       detail: makeDetail(),
       traces: [makeTrace({ traceId: "ok-trace", status: "ok" })],
@@ -501,7 +516,7 @@ describe("SessionDetails — turn rows", () => {
 
     const wrapper = await mountComponent();
     const row = wrapper.find(turnRowSelector("ok-trace"));
-    expect(row.classes()).toContain("tw:border-l-[var(--o2-service-health-healthy)]");
+    expect(row.classes()).toContain("tw:bg-[var(--o2-card-bg)]");
   });
 
   it("status badge in turn header uses critical class for error traces", async () => {
