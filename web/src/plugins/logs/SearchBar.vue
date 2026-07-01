@@ -137,6 +137,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="searchObj.meta.showHistogram ? t('search.hideHistogram') : t('search.showHistogramLabel')" />
         </OButton>
 
+        <!-- ── Pinned toolbar controls ──────────────────────────────────
+             Items pinned out of the More menu render here in fixed order.
+             They collapse back into the menu on narrow widths (see
+             showPinned*/pin* computeds). -->
+
+        <!-- SQL Mode (pinned) -->
+        <OButton
+          v-if="showPinnedSqlMode"
+          data-test="logs-search-bar-sql-mode-pinned-btn"
+          size="xs"
+          variant="outline"
+          class="tw:gap-1.5"
+          @click="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
+        >
+          <OSwitch
+            :model-value="searchObj.meta.sqlMode"
+            :disabled="isSqlModeDisabled"
+            size="md"
+            @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
+          />
+          <OIcon name="code" size="sm" class="tw:shrink-0" />
+          <OTooltip :content="t('search.sqlModeLabel')" />
+        </OButton>
+
+        <!-- Quick Mode (pinned) -->
+        <OButton
+          v-if="showPinnedQuickMode"
+          data-test="logs-search-bar-quick-mode-pinned-btn"
+          size="xs"
+          variant="outline"
+          class="tw:gap-1.5"
+          @click="handleQuickMode"
+        >
+          <OSwitch
+            :model-value="searchObj.meta.quickMode"
+            size="md"
+            @click.stop="handleQuickMode"
+          />
+          <OIcon name="bolt" size="sm" class="tw:shrink-0" />
+          <OTooltip :content="t('search.quickModeLabel')" />
+        </OButton>
+
+        <!-- Saved Views (pinned) — split button: create + open list dialog -->
+        <div
+          v-if="showPinnedSavedViews"
+          data-test="logs-search-bar-saved-views-pinned"
+          class="tw:inline-flex tw:items-center element-box-shadow tw:rounded-md tw:overflow-hidden"
+        >
+          <OButton
+            data-test="logs-search-bar-saved-views-pinned-create-btn"
+            size="xs"
+            variant="outline"
+            class="tw:rounded-none"
+            @click="fnSavedView"
+          >
+            <OIcon name="save" size="sm" />
+            <OTooltip :content="t('search.createSavedView')" />
+          </OButton>
+          <OButton
+            data-test="logs-search-bar-saved-views-pinned-list-btn"
+            size="xs"
+            variant="outline"
+            class="tw:rounded-none"
+            @click="openSavedViewsList"
+          >
+            <OIcon name="saved-search" size="sm" />
+            <OIcon name="expand-more" size="sm" />
+            <OTooltip :content="t('search.listSavedViews')" />
+          </OButton>
+        </div>
+
+        <!-- Syntax Guide (pinned) — icon+label, becomes icon-only at narrow widths -->
+        <SyntaxGuide
+          v-if="showPinnedSyntaxGuide"
+          :sqlmode="searchObj.meta.sqlMode"
+          :toolbar="true"
+          :label="pinSyntaxGuideIconOnly ? '' : t('search.syntaxGuideLabel')"
+          data-test="logs-search-bar-syntax-guide-pinned-btn"
+        />
+
         <!-- this is the button group responsible for showing all the utilities -->
         <ODropdown side="bottom" align="start">
           <template #trigger>
@@ -165,14 +245,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               {{ t("search.sqlModeLabel") }}
               <template #icon-right>
-                <OSwitch
-                  :model-value="searchObj.meta.sqlMode"
-                  :disabled="isSqlModeDisabled"
-                  size="md"
-                  data-test="logs-search-bar-sql-mode-toggle"
-                  class="tw:ml-auto"
-                  @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
-                />
+                <span class="tw:ml-auto tw:flex tw:items-center tw:gap-1">
+                  <OSwitch
+                    :model-value="searchObj.meta.sqlMode"
+                    :disabled="isSqlModeDisabled"
+                    size="md"
+                    data-test="logs-search-bar-sql-mode-toggle"
+                    @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
+                  />
+                  <OButton
+                    data-test="logs-search-bar-menu-pin-sql-mode-btn"
+                    variant="ghost-neutral"
+                    size="icon-sm"
+                    :title="isPinned('sqlMode') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                    @click.stop="togglePin('sqlMode')"
+                  >
+                    <OIcon :name="isPinned('sqlMode') ? 'keep' : 'keep-outline'" size="sm" />
+                  </OButton>
+                </span>
               </template>
             </ODropdownItem>
 
@@ -225,13 +315,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               {{ t("search.quickModeLabel") }}
               <template #icon-right>
-                <OSwitch
-                  :model-value="searchObj.meta.quickMode"
-                  size="md"
-                  data-test="logs-search-bar-quick-mode-switch"
-                  class="tw:ml-auto"
-                  @click.stop="handleQuickMode"
-                />
+                <span class="tw:ml-auto tw:flex tw:items-center tw:gap-1">
+                  <OSwitch
+                    :model-value="searchObj.meta.quickMode"
+                    size="md"
+                    data-test="logs-search-bar-quick-mode-switch"
+                    @click.stop="handleQuickMode"
+                  />
+                  <OButton
+                    data-test="logs-search-bar-menu-pin-quick-mode-btn"
+                    variant="ghost-neutral"
+                    size="icon-sm"
+                    :title="isPinned('quickMode') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                    @click.stop="togglePin('quickMode')"
+                  >
+                    <OIcon :name="isPinned('quickMode') ? 'keep' : 'keep-outline'" size="sm" />
+                  </OButton>
+                </span>
               </template>
             </ODropdownItem>
 
@@ -245,13 +345,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               {{ t('search.functionEditorLabel') }}
               <template #icon-right>
-                <OSwitch
-                  data-test="logs-search-bar-show-query-toggle-btn"
-                  v-model="searchObj.meta.showTransformEditor"
-                  size="md"
-                  class="tw:ml-auto"
-                  @click.stop
-                />
+                <span class="tw:ml-auto tw:flex tw:items-center tw:gap-1">
+                  <OSwitch
+                    data-test="logs-search-bar-show-query-toggle-btn"
+                    v-model="searchObj.meta.showTransformEditor"
+                    size="md"
+                    @click.stop
+                  />
+                  <OButton
+                    data-test="logs-search-bar-menu-pin-function-editor-btn"
+                    variant="ghost-neutral"
+                    size="icon-sm"
+                    :title="isPinned('functionEditor') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                    @click.stop="togglePin('functionEditor')"
+                  >
+                    <OIcon :name="isPinned('functionEditor') ? 'keep' : 'keep-outline'" size="sm" />
+                  </OButton>
+                </span>
               </template>
             </ODropdownItem>
           </ODropdownGroup>
@@ -260,6 +370,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- SAVED VIEWS -->
           <ODropdownGroup :label="t('search.menuGroupSavedViews')">
+            <template #label-action>
+              <OButton
+                data-test="logs-search-bar-menu-pin-saved-views-btn"
+                variant="ghost-neutral"
+                size="icon-sm"
+                :title="isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                @click.stop="togglePin('savedViews')"
+              >
+                <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
+              </OButton>
+            </template>
             <ODropdownItem
               data-test="logs-search-bar-menu-list-saved-views-btn"
               @select="openSavedViewsList"
@@ -288,12 +409,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownSeparator />
 
           <!-- SYNTAX GUIDE -->
-          <SyntaxGuide
-            :sqlmode="searchObj.meta.sqlMode"
-            :menuItem="true"
-            ref="syntaxGuideRef"
-            data-test="logs-search-bar-syntax-guide-btn"
-          />
+          <div class="tw:flex tw:items-center tw:w-full tw:pr-2">
+            <SyntaxGuide
+              :sqlmode="searchObj.meta.sqlMode"
+              :menuItem="true"
+              ref="syntaxGuideRef"
+              class="tw:min-w-0"
+              data-test="logs-search-bar-syntax-guide-btn"
+            />
+            <OButton
+              data-test="logs-search-bar-menu-pin-syntax-guide-btn"
+              variant="ghost-neutral"
+              size="icon-sm"
+              class="tw:ml-auto"
+              :title="isPinned('syntaxGuide') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+              @click.stop="togglePin('syntaxGuide')"
+            >
+              <OIcon :name="isPinned('syntaxGuide') ? 'keep' : 'keep-outline'" size="sm" />
+            </OButton>
+          </div>
         </ODropdown>
       </div>
 
@@ -520,6 +654,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-toolbar"
           class="tw:order-3"
         />
+        <!-- Function Editor (pinned) — sits to the left of the date picker -->
+        <OButton
+          v-if="showPinnedFunctionEditor"
+          data-test="logs-search-bar-function-editor-pinned-btn"
+          size="xs"
+          variant="outline"
+          class="tw:gap-1.5 tw:mr-1 tw:order-1 element-box-shadow"
+          @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
+        >
+          <OSwitch
+            v-model="searchObj.meta.showTransformEditor"
+            size="md"
+            @click.stop
+          />
+          <span class="more-menu-icon-badge--mono tw:text-xs tw:shrink-0">fx</span>
+          <OTooltip :content="t('search.functionEditorLabel')" />
+        </OButton>
+
         <div class="tw:mr-1 tw:order-1">
           <date-time
             ref="dateTimeRef"
@@ -544,6 +696,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="element-box-shadow"
           />
         </div>
+
         <div class="search-time tw:order-2">
           <div class="tw:flex">
             <OButtonGroup
@@ -1656,6 +1809,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import useLogs from "@/composables/useLogs";
 import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
+import { useToolbarPins } from "@/composables/useToolbarPins";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
@@ -2217,6 +2371,31 @@ export default defineComponent({
     const shouldMoveButtonsToMenu     = computed(() => availableLeftWidth.value < 328);
     const toolbarMoveResetToMenu      = computed(() => availableLeftWidth.value < 248);
     const toolbarToggleAsDropdown     = computed(() => availableLeftWidth.value < 176);
+
+    // ── Pinned toolbar items ──────────────────────────────────────────────
+    // Items pinned out of the "More" menu render as fixed-position toolbar
+    // controls (order defined in useToolbarPins). On narrow widths they collapse
+    // back into the menu in a fixed priority: syntax guide (label→icon→hidden)
+    // first, then saved views → function editor → quick mode → sql mode.
+    const { isPinned, togglePin } = useToolbarPins();
+
+    // Collapse thresholds for pinned controls. Each hidden pinned item still
+    // remains accessible inside the More menu.
+    // Left-section collapse thresholds (first to hide → last): syntax guide →
+    // saved views → quick mode → sql mode. Function editor lives on the right
+    // toolbar (next to the date picker) so it is not part of this chain.
+    const pinSyntaxGuideIconOnly = computed(() => availableLeftWidth.value < 640);
+    const pinHideSyntaxGuide     = computed(() => availableLeftWidth.value < 560);
+    const pinHideSavedViews      = computed(() => availableLeftWidth.value < 480);
+    const pinHideQuickMode       = computed(() => availableLeftWidth.value < 360);
+    const pinHideSqlMode         = computed(() => availableLeftWidth.value < 300);
+
+    // Whether a pinned item is currently shown outside the menu (pinned AND fits).
+    const showPinnedSqlMode        = computed(() => isPinned("sqlMode") && !pinHideSqlMode.value);
+    const showPinnedQuickMode      = computed(() => isPinned("quickMode") && !pinHideQuickMode.value);
+    const showPinnedFunctionEditor = computed(() => isPinned("functionEditor"));
+    const showPinnedSavedViews     = computed(() => isPinned("savedViews") && !pinHideSavedViews.value);
+    const showPinnedSyntaxGuide    = computed(() => isPinned("syntaxGuide") && !pinHideSyntaxGuide.value);
 
     // Computed label/icon for the toggle-group-as-dropdown trigger
     const toggleViewOptions = computed(() => [
@@ -4953,6 +5132,14 @@ export default defineComponent({
       shouldMoveButtonsToMenu,
       toolbarMoveResetToMenu,
       toolbarToggleAsDropdown,
+      isPinned,
+      togglePin,
+      pinSyntaxGuideIconOnly,
+      showPinnedSqlMode,
+      showPinnedQuickMode,
+      showPinnedFunctionEditor,
+      showPinnedSavedViews,
+      showPinnedSyntaxGuide,
       toggleViewOptions,
       currentToggleOption,
       toggleLiveMode,
