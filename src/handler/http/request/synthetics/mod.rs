@@ -858,9 +858,13 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
                         _timestamp: checked_at,
                         org: resp.org_id.clone(),
                         module: config::meta::self_reporting::usage::TriggerDataType::Synthetics,
-                        key: resp.monitor_id.clone(),
+                        key: format!("{}/{}", resp.monitor_name, resp.monitor_id),
                         start_time: checked_at,
                         end_time: checked_at,
+                        status: config::meta::self_reporting::usage::TriggerDataStatus::Completed,
+                        success_response: Some(status.clone()),
+                        error: error.clone(),
+                        evaluation_took_in_secs: Some(response_time_ms as f64 / 1000.0),
                         ..Default::default()
                     },
                 );
