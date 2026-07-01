@@ -151,9 +151,9 @@ fn create_synthetics_table() -> TableCreateStatement {
         )
         .col(
             ColumnDef::new(Synthetics::LastCheckStatus)
-                .string_len(16)
+                .integer()
                 .not_null()
-                .default("unknown"),
+                .default(0i32),
         )
         .col(
             ColumnDef::new(Synthetics::CreatedAt)
@@ -262,7 +262,7 @@ mod tests {
                 "auth" text NOT NULL DEFAULT '',
                 "next_run_at" bigint NOT NULL DEFAULT 0,
                 "last_triggered_at" bigint NOT NULL DEFAULT 0,
-                "last_check_status" varchar(16) NOT NULL DEFAULT 'unknown',
+                "last_check_status" integer NOT NULL DEFAULT 0,
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL,
                 CONSTRAINT "synthetics_folder_fk" FOREIGN KEY ("folder_id") REFERENCES "folders" ("id")
@@ -305,7 +305,7 @@ mod tests {
                 "settings" json_text NOT NULL,
                 "next_run_at" bigint NOT NULL DEFAULT 0,
                 "last_triggered_at" bigint NOT NULL DEFAULT 0,
-                "last_check_status" varchar(16) NOT NULL DEFAULT 'unknown',
+                "last_check_status" integer NOT NULL DEFAULT 0,
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL,
                 FOREIGN KEY ("folder_id") REFERENCES "folders" ("id")

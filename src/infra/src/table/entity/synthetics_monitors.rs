@@ -32,7 +32,8 @@ pub struct Model {
     /// When the scheduler last fanned out this monitor (microseconds).
     pub last_triggered_at: i64,
     /// Denormalised status from the most recent completed check.
-    pub last_check_status: String,
+    /// 0=Unknown, 1=Up, 2=Warning, 3=Down
+    pub last_check_status: i32,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -68,7 +69,7 @@ mod tests {
             auth: String::new(),
             next_run_at: 0,
             last_triggered_at: 0,
-            last_check_status: "unknown".to_string(),
+            last_check_status: 0,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
         };

@@ -204,12 +204,42 @@ pub enum SyntheticType {
 #[serde(rename_all = "snake_case")]
 pub enum SyntheticStatus {
     Up,
-    Degraded,
+    /// Reached target but threshold breached or partial flow failure.
+    Warning,
     Down,
-    /// Check dispatched but no result received yet.
-    Pending,
     #[default]
     Unknown,
+}
+
+impl SyntheticStatus {
+    /// Deserialize from `last_check_status` integer stored in DB.
+    pub fn from_db(i: i32) -> Self {
+        match i {
+            1 => Self::Up,
+            2 => Self::Warning,
+            3 => Self::Down,
+            _ => Self::Unknown,
+        }
+    }
+
+    /// Serialize to `last_check_status` integer for DB storage.
+    pub fn to_db(&self) -> i32 {
+        match self {
+            Self::Up => 1,
+            Self::Warning => 2,
+            Self::Down => 3,
+            Self::Unknown => 0,
+        }
+    }
+
+    /// Convert a raw probe status string to `SyntheticStatus`.
+    pub fn from_probe_str(s: &str) -> Self {
+        match s {
+            "up" => Self::Up,
+            "warning" => Self::Warning,
+            _ => Self::Down, // "down", "error", or anything unrecognised → Down
+        }
+    }
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -343,7 +373,8 @@ pub struct StatusBucket {
 #[serde(rename_all = "snake_case")]
 pub enum BucketStatus {
     Up,
-    Degraded,
+    /// Some checks in the bucket failed — partial health.
+    Warning,
     Down,
     NoData,
 }
@@ -388,7 +419,8 @@ pub struct CheckResult {
 #[serde(rename_all = "snake_case")]
 pub enum CheckStatus {
     Up,
-    Degraded,
+    /// Partial failure: reached target but ≥1 step/threshold failed.
+    Warning,
     Down,
     Error,
 }
@@ -664,6 +696,41 @@ mod tests {
     #[test]
     fn test_monitor_status_default() {
         assert_eq!(SyntheticStatus::default(), SyntheticStatus::Unknown);
+    }
+
+    #[test]
+    fn test_synthetic_status_db_roundtrip() {
+        assert_eq!(SyntheticStatus::from_db(0), SyntheticStatus::Unknown);
+        assert_eq!(SyntheticStatus::from_db(1), SyntheticStatus::Up);
+        assert_eq!(SyntheticStatus::from_db(2), SyntheticStatus::Warning);
+        assert_eq!(SyntheticStatus::from_db(3), SyntheticStatus::Down);
+        assert_eq!(SyntheticStatus::from_db(99), SyntheticStatus::Unknown);
+
+        assert_eq!(SyntheticStatus::Unknown.to_db(), 0);
+        assert_eq!(SyntheticStatus::Up.to_db(), 1);
+        assert_eq!(SyntheticStatus::Warning.to_db(), 2);
+        assert_eq!(SyntheticStatus::Down.to_db(), 3);
+    }
+
+    #[test]
+    fn test_synthetic_status_from_probe_str() {
+        assert_eq!(SyntheticStatus::from_probe_str("up"), SyntheticStatus::Up);
+        assert_eq!(
+            SyntheticStatus::from_probe_str("warning"),
+            SyntheticStatus::Warning
+        );
+        assert_eq!(
+            SyntheticStatus::from_probe_str("down"),
+            SyntheticStatus::Down
+        );
+        assert_eq!(
+            SyntheticStatus::from_probe_str("error"),
+            SyntheticStatus::Down
+        );
+        assert_eq!(
+            SyntheticStatus::from_probe_str("unknown_garbage"),
+            SyntheticStatus::Down
+        );
     }
 
     #[test]

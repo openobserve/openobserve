@@ -80,7 +80,7 @@ fn parse_result(h: &serde_json::Value) -> Option<CheckResult> {
             .to_string(),
         status: match h.get("status").and_then(|v| v.as_str()).unwrap_or("error") {
             "up" => CheckStatus::Up,
-            "degraded" => CheckStatus::Degraded,
+            "warning" => CheckStatus::Warning,
             "down" => CheckStatus::Down,
             _ => CheckStatus::Error,
         },
@@ -264,7 +264,7 @@ pub async fn get_summary(
         .and_then(|v| v.as_str())
     {
         Some("up") => SyntheticStatus::Up,
-        Some("degraded") => SyntheticStatus::Degraded,
+        Some("warning") => SyntheticStatus::Warning,
         Some("down") => SyntheticStatus::Down,
         _ => SyntheticStatus::Unknown,
     };
@@ -293,7 +293,7 @@ pub async fn get_summary(
                 Some((_, 0)) => BucketStatus::NoData,
                 Some((up, tot)) if up == tot => BucketStatus::Up,
                 Some((0, _)) => BucketStatus::Down,
-                _ => BucketStatus::Degraded,
+                _ => BucketStatus::Warning,
             };
             StatusBucket {
                 ts,
@@ -399,7 +399,7 @@ pub async fn batch_synthetic_summary(
                 Some((s, ms)) => (
                     match s.as_str() {
                         "up" => SyntheticStatus::Up,
-                        "degraded" => SyntheticStatus::Degraded,
+                        "warning" => SyntheticStatus::Warning,
                         "down" => SyntheticStatus::Down,
                         _ => SyntheticStatus::Unknown,
                     },

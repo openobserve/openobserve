@@ -65,9 +65,7 @@ impl TryFrom<synthetics_monitors::Model> for Synthetic {
             serde_json::from_str(&m.auth).ok()
         };
 
-        let last_check_status: SyntheticStatus =
-            serde_json::from_value(serde_json::Value::String(m.last_check_status))
-                .unwrap_or_default();
+        let last_check_status = SyntheticStatus::from_db(m.last_check_status);
 
         Ok(Synthetic {
             id: m.id,
@@ -373,10 +371,10 @@ pub async fn advance_schedule<C: ConnectionTrait>(
 pub async fn update_last_check_status<C: ConnectionTrait>(
     conn: &C,
     id: &str,
-    status: &str,
+    status: i32,
 ) -> Result<(), errors::Error> {
     Entity::update_many()
-        .col_expr(Column::LastCheckStatus, Expr::value(status.to_owned()))
+        .col_expr(Column::LastCheckStatus, Expr::value(status))
         .filter(Column::Id.eq(id))
         .exec(conn)
         .await?;
@@ -551,7 +549,7 @@ mod tests {
             auth: String::new(),
             next_run_at: 0,
             last_triggered_at: 0,
-            last_check_status: "unknown".to_string(),
+            last_check_status: 0,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
         }
@@ -595,7 +593,7 @@ mod tests {
         let mut m = make_model();
         m.next_run_at = 1750000001000000;
         m.last_triggered_at = 1750000000500000;
-        m.last_check_status = "up".to_string();
+        m.last_check_status = 1;
         let monitor = Synthetic::try_from(m).unwrap();
         assert_eq!(monitor.next_run_at, 1750000001000000);
         assert_eq!(monitor.last_triggered_at, 1750000000500000);
