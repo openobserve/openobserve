@@ -858,7 +858,7 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
                         _timestamp: checked_at,
                         org: resp.org_id.clone(),
                         module: config::meta::self_reporting::usage::TriggerDataType::Synthetics,
-                        key: format!("{}/{}", resp.monitor_name, resp.monitor_id),
+                        key: format!("{}/{}", resp.synthetics_name, resp.synthetics_id),
                         start_time: checked_at,
                         end_time: checked_at,
                         status: config::meta::self_reporting::usage::TriggerDataStatus::Completed,
@@ -871,8 +871,8 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
 
                 if !resp.destinations.is_empty() {
                     let org_id = resp.org_id.clone();
-                    let monitor_name = resp.monitor_name.clone();
-                    let monitor_id = resp.monitor_id.clone();
+                    let monitor_name = resp.synthetics_name.clone();
+                    let monitor_id = resp.synthetics_id.clone();
                     let monitor_type = resp.monitor_type.clone();
                     let target = resp.target.clone();
                     let destinations = resp.destinations.clone();

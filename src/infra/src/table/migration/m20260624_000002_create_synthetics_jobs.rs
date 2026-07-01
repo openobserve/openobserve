@@ -76,9 +76,15 @@ fn create_synthetics_jobs_table() -> TableCreateStatement {
                 .primary_key(),
         )
         .col(
-            ColumnDef::new(SyntheticsJobs::MonitorId)
+            ColumnDef::new(SyntheticsJobs::SyntheticsId)
                 .string_len(256)
                 .not_null(),
+        )
+        .col(
+            ColumnDef::new(SyntheticsJobs::SyntheticsName)
+                .string_len(256)
+                .not_null()
+                .default(""),
         )
         .col(
             ColumnDef::new(SyntheticsJobs::OrgId)
@@ -158,7 +164,7 @@ fn create_monitor_idx() -> IndexCreateStatement {
         .if_not_exists()
         .name(SYNTHETICS_PENDING_CHECKS_MONITOR_IDX)
         .table(SyntheticsJobs::Table)
-        .col(SyntheticsJobs::MonitorId)
+        .col(SyntheticsJobs::SyntheticsId)
         .to_owned()
 }
 
@@ -167,7 +173,7 @@ fn create_dedup_uq() -> IndexCreateStatement {
         .if_not_exists()
         .name(SYNTHETICS_PENDING_CHECKS_DEDUP_UQ)
         .table(SyntheticsJobs::Table)
-        .col(SyntheticsJobs::MonitorId)
+        .col(SyntheticsJobs::SyntheticsId)
         .col(SyntheticsJobs::Location)
         .col(SyntheticsJobs::Pool)
         .col(SyntheticsJobs::Device)
@@ -180,7 +186,8 @@ fn create_dedup_uq() -> IndexCreateStatement {
 enum SyntheticsJobs {
     Table,
     Id,
-    MonitorId,
+    SyntheticsId,
+    SyntheticsName,
     OrgId,
     Location,
     Pool,
@@ -208,7 +215,8 @@ mod tests {
             r#"
                 CREATE TABLE IF NOT EXISTS "synthetics_jobs" (
                 "id" bigint NOT NULL PRIMARY KEY AUTO_INCREMENT,
-                "monitor_id" varchar(256) NOT NULL,
+                "synthetics_id" varchar(256) NOT NULL,
+                "synthetics_name" varchar(256) NOT NULL DEFAULT '',
                 "org_id" varchar(100) NOT NULL,
                 "location" varchar(256) NOT NULL,
                 "pool" varchar(256) NOT NULL,
@@ -228,11 +236,11 @@ mod tests {
         );
         assert_eq!(
             &create_monitor_idx().to_string(PostgresQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "synthetics_jobs_monitor_idx" ON "synthetics_jobs" ("monitor_id")"#
+            r#"CREATE INDEX IF NOT EXISTS "synthetics_jobs_monitor_idx" ON "synthetics_jobs" ("synthetics_id")"#
         );
         assert_eq!(
             &create_dedup_uq().to_string(PostgresQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "synthetics_jobs_dedup_uq" ON "synthetics_jobs" ("monitor_id", "location", "pool", "device", "scheduled_ts")"#
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "synthetics_jobs_dedup_uq" ON "synthetics_jobs" ("synthetics_id", "location", "pool", "device", "scheduled_ts")"#
         );
     }
 
@@ -243,7 +251,8 @@ mod tests {
             r#"
                 CREATE TABLE IF NOT EXISTS "synthetics_jobs" (
                 "id" bigint NOT NULL PRIMARY KEY AUTOINCREMENT,
-                "monitor_id" varchar(256) NOT NULL,
+                "synthetics_id" varchar(256) NOT NULL,
+                "synthetics_name" varchar(256) NOT NULL DEFAULT '',
                 "org_id" varchar(100) NOT NULL,
                 "location" varchar(256) NOT NULL,
                 "pool" varchar(256) NOT NULL,

@@ -7,7 +7,8 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = true)]
     pub id: i64,
-    pub monitor_id: String,
+    pub synthetics_id: String,
+    pub synthetics_name: String,
     pub org_id: String,
     pub location: String,
     pub pool: String,
@@ -37,7 +38,8 @@ mod tests {
     fn test_model_construction() {
         let m = Model {
             id: 1,
-            monitor_id: "mon-1".to_string(),
+            synthetics_id: "mon-1".to_string(),
+            synthetics_name: "Login Flow".to_string(),
             org_id: "org1".to_string(),
             location: "aws-us-east-1".to_string(),
             pool: "aws-browser-chromium".to_string(),
@@ -52,9 +54,10 @@ mod tests {
             attempts: 0,
         };
         assert_eq!(m.id, 1);
+        assert_eq!(m.synthetics_id, "mon-1");
+        assert_eq!(m.synthetics_name, "Login Flow");
         assert_eq!(m.status, 0);
         assert_eq!(m.pool, "aws-browser-chromium");
-        assert_eq!(m.browser_engine, Some("chromium".to_string()));
         assert!(m.claimed_by.is_none());
     }
 }

@@ -280,6 +280,7 @@ pub async fn set_enabled<C: ConnectionTrait>(
 /// Scheduler's fan-out data — the subset of Synthetic fields the scheduler needs.
 pub struct DueMonitor {
     pub id: String,
+    pub name: String,
     pub org_id: String,
     pub monitor_type: SyntheticType,
     pub locations: Vec<String>,
@@ -337,6 +338,7 @@ pub async fn fetch_due<C: ConnectionTrait>(
 
             Ok(DueMonitor {
                 id: m.id,
+                name: m.name,
                 org_id: m.org_id,
                 monitor_type,
                 locations,
