@@ -28,8 +28,8 @@ export class IamPage {
         // open at a time, so we target by the common slug rather than the
         // (different) parent slugs of delete vs. refresh dialogs.
         this.addServiceAccountButton = page.locator('[data-test="service-accounts-add-btn"]');
-        this.emailInput = page.locator('[data-test="iam-add-service-account-email-input-field"]');
-        this.emailInputError = page.locator('[data-test="iam-add-service-account-email-input-error"]');
+        this.identifierInput = page.locator('[data-test="iam-add-service-account-identifier-input-field"]');
+        this.identifierInputError = page.locator('[data-test="iam-add-service-account-identifier-input-error"]');
         this.descriptionInput = page.locator('[data-test="iam-add-service-account-description-input-field"]');
         // Add/Edit service account dialog footer uses ODialog's built-in
         // primary/secondary buttons; scope to the dialog to avoid colliding
@@ -37,10 +37,12 @@ export class IamPage {
         this.saveButton = page.locator('[data-test="add-service-account-dialog"] [data-test="o-dialog-primary-btn"]');
         this.cancelButton = page.locator('[data-test="add-service-account-dialog"] [data-test="o-dialog-secondary-btn"]');
 
-        // Token dialog (post-creation popup with Copy / Download / Close)
+        // Token dialog (post-creation popup with tabs for curl/header/env)
         this.tokenDialog = page.locator('[data-test="service-accounts-list-token-dialog"]');
         this.tokenCopyButton = page.locator('[data-test="service-accounts-list-token-copy-btn"]');
-        this.tokenDownloadButton = page.locator('[data-test="service-accounts-list-token-download-btn"]');
+        this.tokenTabCurl = this.tokenDialog.locator('[data-test="o-tab"]', { hasText: 'cURL' });
+        this.tokenTabHeader = this.tokenDialog.locator('[data-test="o-tab"]', { hasText: 'Header' });
+        this.tokenTabEnv = this.tokenDialog.locator('[data-test="o-tab"]', { hasText: 'Environment Variable' });
         this.tokenDialogCloseButton = this.tokenDialog.locator('[data-test="o-dialog-close-btn"]');
 
         // Confirmation dialog (delete + refresh share the same ODialog primary / secondary buttons)
@@ -50,6 +52,11 @@ export class IamPage {
         // System SRE Agent row markers (used for SRE Agent System Account Protection test)
         this.systemAccountLabel = page.locator('[data-test="service-accounts-system-account-label"]');
         this.systemManagedBadge = page.locator('[data-test="service-accounts-system-managed-badge"]');
+
+        // Column headers (new identifier + created columns)
+        this.identifierColumnHeader = page.locator('[data-test="o2-table-header-email"]');
+        this.createdColumnHeader = page.locator('[data-test="o2-table-header-created_at"]');
+        this.createdByColumnHeader = page.locator('[data-test="o2-table-header-created_by"]');
 
         // Toast notifications (OToast renders [data-test="o-toast-<variant>"] with
         // [data-test="o-toast-message"] inside).
@@ -125,25 +132,24 @@ export class IamPage {
 
         await this.saveButton.click();
 
-        // OInput error message renders with data-test="<parent>-error" and the
-        // expected copy is "Please enter a valid email address".
-        await expect(this.emailInputError).toBeVisible({ timeout: 10000 });
-        await expect(this.emailInputError).toHaveText('Please enter a valid email address');
+        // OInput error message renders with data-test="<parent>-error"
+        await expect(this.identifierInputError).toBeVisible({ timeout: 10000 });
+        await expect(this.identifierInputError).toHaveText('Please enter a valid email address');
 
 
     }
 
     async enterEmailServiceAccount(emailName) {
 
-        await this.emailInput.click();
-        await this.emailInput.fill(emailName);
+        await this.identifierInput.click();
+        await this.identifierInput.fill(emailName);
 
     }
 
     async enterSameEmailServiceAccount() {
 
-        await this.emailInput.click();
-        await this.emailInput.fill(process.env["ZO_ROOT_USER_EMAIL"] || process.env["ALPHA1_USER_EMAIL"]);
+        await this.identifierInput.click();
+        await this.identifierInput.fill(process.env["ZO_ROOT_USER_EMAIL"] || process.env["ALPHA1_USER_EMAIL"]);
 
     }
 
@@ -205,14 +211,6 @@ export class IamPage {
     }
 
 
-
-    async clickDownloadToken() {
-
-        const downloadPromise = this.page.waitForEvent('download');
-
-        await this.tokenDownloadButton.click();
-
-    }
 
     async clickServiceAccountPopUpClosed() {
 

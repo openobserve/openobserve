@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:whitespace-nowrap"
               >
-                <span>{{ formatTimestamp(traceStartTime) }}</span>
+                <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
                 <div
                   class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
                 />
@@ -245,19 +245,19 @@ size="xs"
                 <template #icon-left
                   ><OIcon name="align-left" size="sm" class="tw:shrink-0"
                 /></template>
-                Waterfall
+                {{ t('traces.waterfall') }}
               </OToggleGroupItem>
               <OToggleGroupItem value="flame-graph" size="sm">
                 <template #icon-left>
                   <OIcon name="flame" size="sm" />
                 </template>
-                Flame Graph
+                {{ t('traces.flameGraph') }}
               </OToggleGroupItem>
               <OToggleGroupItem value="map" size="sm">
                 <template #icon-left
                   ><OIcon name="account-tree" size="sm" class="tw:shrink-0"
                 /></template>
-                Trace Graph
+                {{ t('traces.traceGraph') }}
               </OToggleGroupItem>
               <OToggleGroupItem v-if="hasLLMSpans"
 value="dag"
@@ -265,7 +265,7 @@ size="sm">
                 <template #icon-left>
                   <OIcon name="git-branch" size="sm" />
                 </template>
-                DAG
+                {{ t('traces.dag') }}
               </OToggleGroupItem>
               <!--
                 Thread tab gated on:
@@ -284,7 +284,7 @@ size="sm">
                 <template #icon-left
                   ><OIcon name="chat" size="xs" class="tw:shrink-0"
                 /></template>
-                Thread
+                {{ t('traces.thread') }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>

@@ -1323,6 +1323,43 @@ pub static PIPELINE_EXPORTED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// Realtime pipeline batch execution time (milliseconds). Observed by ingesters per
+// `process_batch` call so the realtime pipeline's share of ingestion latency is
+// visible. Cardinality is bounded by number of pipelines.
+pub static PIPELINE_EXEC_TIME_MS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "pipeline_exec_time_ms",
+            "Realtime pipeline batch execution time in milliseconds".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            0.1, 0.25, 0.5, 1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0,
+            5000.0, 10000.0, 30000.0,
+        ])
+        .const_labels(create_const_labels()),
+        &["organization", "pipeline_id"],
+    )
+    .expect("Metric created")
+});
+
+// Realtime pipeline batch size (record count per `process_batch` call).
+pub static PIPELINE_EXEC_BATCH_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "pipeline_exec_batch_size",
+            "Realtime pipeline batch size (records per execution)".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            1.0, 10.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0, 50000.0, 100000.0,
+        ])
+        .const_labels(create_const_labels()),
+        &["organization", "pipeline_id"],
+    )
+    .expect("Metric created")
+});
+
 pub static QUERY_AGGREGATION_CACHE_ITEMS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -2140,6 +2177,12 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(PIPELINE_EXPORTED_BYTES.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(PIPELINE_EXEC_TIME_MS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_EXEC_BATCH_SIZE.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(QUERY_AGGREGATION_CACHE_ITEMS.clone()))
         .expect("Metric registered");
     registry
@@ -2524,6 +2567,8 @@ mod tests {
         let _ = PIPELINE_WAL_FILES.clone();
         let _ = PIPELINE_WAL_INGESTION_BYTES.clone();
         let _ = PIPELINE_EXPORTED_BYTES.clone();
+        let _ = PIPELINE_EXEC_TIME_MS.clone();
+        let _ = PIPELINE_EXEC_BATCH_SIZE.clone();
     }
 
     #[test]

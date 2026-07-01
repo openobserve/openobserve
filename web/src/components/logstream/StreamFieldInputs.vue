@@ -169,7 +169,7 @@ const fieldDataTypeErrors = ref<string[]>([]);
 // Allowed characters mirror the backend `format_stream_name` regex
 // (src/config/src/utils/schema.rs): alphanumeric, underscore and colon only.
 const fieldNameRegex = /^[a-zA-Z0-9_:]+$/;
-const fieldNameHelpText = "Use alphanumeric characters, underscore and colon only.";
+const fieldNameHelpText = t("logStream.streamNameHelpText");
 
 const validateFieldName = (index: number) => {
   const field = (props.fields as any[])[index];

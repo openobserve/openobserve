@@ -41,6 +41,7 @@ export interface MetricGroupDefinition {
   label: string;
   icon: string | {};
   defaultMetrics?: DefaultMetricConfig[];
+  children?: MetricGroupDefinition[];
 }
 
 export interface MetricGroupConfig {
@@ -80,6 +81,11 @@ export const NETWORK_PATTERNS: RegExp[] = [
   /^udp_/,
   /^dns_/,
   /^net_/,
+  // HTTP and gRPC application-level network metrics
+  /^http_/,
+  /^grpc_/,
+  /\bhttp\b/i,
+  /\bgrpc\b/i,
   // Network-specific byte flows (receive / transmit are network-specific terms)
   /receive_bytes/,
   /transmit_bytes/,
@@ -147,21 +153,97 @@ const INFRA_PATTERNS: RegExp[] = [
 ];
 
 /**
+ * CPU and processing patterns — classify as "Compute"
+ */
+export const COMPUTE_PATTERNS: RegExp[] = [
+  /\bcpu\b/i,
+  /\bprocessor\b/i,
+  /^node_cpu/,
+  /^container_cpu/,
+  /^system_cpu/,
+  /^k8s_.*_cpu/,
+  /throttl/,
+  /load_average/,
+  // Process-level compute (process_cpu_seconds_total, process_open_fds, etc.)
+  /^process_cpu/,
+  /^process_open_fds/,
+  /^process_virtual_memory/,
+  /^process_resident_memory/,
+  // Goroutines / threads = concurrency = compute
+  /goroutine/i,
+  /\bthread/i,
+];
+
+/**
+ * RAM / heap / GC patterns — classify as "Memory"
+ */
+export const MEMORY_PATTERNS: RegExp[] = [
+  /\bmemory\b/i,
+  /\bmem\b/,
+  /\bram\b/i,
+  /\bheap\b/i,
+  /\bgc\b/,
+  /^container_memory/,
+  /^node_memory/,
+  /^system_memory/,
+  /^k8s_.*_memory/,
+  /oom/i,
+  /page_fault/,
+  /swap/i,
+  // Go runtime memory stats (go_memstats_*)
+  /^go_memstats/,
+  // JVM memory
+  /^jvm_memory/,
+  /^jvm_gc/,
+  // Generic GC duration/pause metrics
+  /gc_duration/,
+  /gc_collection/,
+  // container spec memory limits
+  /^container_spec_memory/,
+  // alloc patterns
+  /\balloc\b/i,
+];
+
+/**
+ * Disk, filesystem, object-storage patterns — classify as "Storage"
+ */
+export const STORAGE_PATTERNS: RegExp[] = [
+  /\bdisk\b/i,
+  /_disk_/i,         // e.g. system_disk_io, system_disk_operations
+  /\bfilesystem\b/i,
+  /\b_fs\b/,
+  /\bfs_/,
+  /\bstorage\b/i,
+  /^node_disk/,
+  /^container_fs/,
+  /^node_filesystem/,
+  /^system_disk/,    // system_disk_io, system_disk_operations
+  /^system_filesystem/, // system_filesystem_usage
+  /^k8s_.*_storage/,
+  /^k8s_.*_filesystem/,
+  /inode/,
+  /volume/i,
+  /\bdisk_io\b/i,    // explicit disk_io compound
+  /_disk_io/i,       // system_disk_io
+];
+
+/**
  * Patterns for Pod metric classification.
  * Covers Kubernetes pod-level metrics from Prometheus and OTel conventions.
  */
-const POD_PATTERNS: RegExp[] = [/^kube_pod/, /^k8s_pod/, /\bpod\b/];
+export const POD_PATTERNS: RegExp[] = [/^kube_pod/, /^k8s_pod/, /\bpod\b/];
 
 /**
  * Patterns for Node metric classification.
  * Covers Kubernetes node-level and host/machine metrics.
  */
-const NODE_PATTERNS: RegExp[] = [
+export const NODE_PATTERNS: RegExp[] = [
   /^kube_node/,
   /^k8s_node/,
   /^node_/,
   /^host_/,
   /^machine_/,
+  /^system_/,
 ];
 
 /**
@@ -175,6 +257,9 @@ const NODE_PATTERNS: RegExp[] = [
  */
 const METRIC_GROUP_PATTERNS: Record<string, RegExp[]> = {
   network: NETWORK_PATTERNS,
+  compute: COMPUTE_PATTERNS,
+  memory: MEMORY_PATTERNS,
+  storage: STORAGE_PATTERNS,
   infra: INFRA_PATTERNS,
   pods: POD_PATTERNS,
   nodes: NODE_PATTERNS,
@@ -185,8 +270,10 @@ const METRIC_GROUP_PATTERNS: Record<string, RegExp[]> = {
  * Ordering matters — classifyMetric checks groups in this order (first match wins).
  */
 export const DEFAULT_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
-  { id: "network", label: "Network", icon: "wifi" },
-  { id: "infra", label: "Infra", icon: "dns" },
+  { id: "compute", label: "Compute", icon: "insights" },
+  { id: "memory", label: "Memory", icon: "memory" },
+  { id: "network", label: "Network", icon: "lan" },
+  { id: "storage", label: "Storage", icon: "storage" },
   { id: "others", label: "Others", icon: "category" },
 ];
 
@@ -202,29 +289,82 @@ export const K8S_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
   {
     id: "pods",
     label: "Pods",
-    icon: "view-in-ar",
-    defaultMetrics: [
-      { streamName: "k8s_pod_cpu_usage" },
-      { streamName: "k8s_pod_memory_usage" },
-      { streamName: "k8s_pod_cpu_request_utilization" },
-      { streamName: "k8s_pod_memory_request_utilization" },
-      { streamName: "k8s_pod_cpu_limit_utilization" },
-      { streamName: "k8s_pod_memory_limit_utilization" },
-      { streamName: "k8s_pod_network_io" },
+    icon: "widgets",
+    children: [
+      {
+        id: "compute",
+        label: "Compute",
+        icon: "insights",
+        defaultMetrics: [
+          { streamName: "k8s_pod_cpu_usage" },
+          { streamName: "k8s_pod_cpu_request_utilization" },
+          { streamName: "k8s_pod_cpu_limit_utilization" },
+        ],
+      },
+      {
+        id: "memory",
+        label: "Memory",
+        icon: "memory",
+        defaultMetrics: [
+          { streamName: "k8s_pod_memory_usage" },
+          { streamName: "k8s_pod_memory_request_utilization" },
+          { streamName: "k8s_pod_memory_limit_utilization" },
+        ],
+      },
+      {
+        id: "network",
+        label: "Network",
+        icon: "lan",
+        defaultMetrics: [{ streamName: "k8s_pod_network_io" }],
+      },
+      {
+        id: "storage",
+        label: "Storage",
+        icon: "storage",
+        defaultMetrics: [
+          { streamName: "k8s_pod_filesystem_usage" },
+          { streamName: "k8s_pod_filesystem_capacity" },
+        ],
+      },
+      { id: "others", label: "Others", icon: "category" },
     ],
   },
   {
     id: "nodes",
     label: "Nodes",
-    icon: "computer",
-    defaultMetrics: [
-      { streamName: "k8s_node_cpu_usage" },
-      { streamName: "k8s_node_memory_rss" },
-      { streamName: "k8s_node_network_io" },
+    icon: "dns",
+    children: [
+      {
+        id: "compute",
+        label: "Compute",
+        icon: "insights",
+        defaultMetrics: [{ streamName: "k8s_node_cpu_usage" }],
+      },
+      {
+        id: "memory",
+        label: "Memory",
+        icon: "memory",
+        defaultMetrics: [{ streamName: "k8s_node_memory_rss" }],
+      },
+      {
+        id: "network",
+        label: "Network",
+        icon: "lan",
+        defaultMetrics: [{ streamName: "k8s_node_network_io" }],
+      },
+      {
+        id: "storage",
+        label: "Storage",
+        icon: "storage",
+        defaultMetrics: [
+          { streamName: "system_disk_io" },
+          { streamName: "system_disk_operations" },
+          { streamName: "system_filesystem_usage" },
+        ],
+      },
+      { id: "others", label: "Others", icon: "category" },
     ],
   },
-  { id: "network", label: "Network", icon: "wifi" },
-  { id: "others", label: "Others", icon: "category" },
 ];
 
 /**
@@ -244,17 +384,20 @@ export function getDefaultMetricSelections(
 ): StreamInfo[] {
   const results: StreamInfo[] = [];
   for (const group of groupDefs) {
-    if (!group.defaultMetrics?.length) continue;
-    for (const def of group.defaultMetrics) {
-      const match = availableStreams.find(
-        (s) =>
-          s.stream_name === def.streamName &&
-          (!def.filters ||
-            Object.entries(def.filters).every(
-              ([k, v]) => s.filters?.[k] === v,
-            )),
-      );
-      if (match) results.push(match);
+    const defsToCheck = group.children?.length ? group.children : [group];
+    for (const def of defsToCheck) {
+      if (!def.defaultMetrics?.length) continue;
+      for (const metric of def.defaultMetrics) {
+        const match = availableStreams.find(
+          (s) =>
+            s.stream_name === metric.streamName &&
+            (!metric.filters ||
+              Object.entries(metric.filters).every(
+                ([k, v]) => s.filters?.[k] === v,
+              )),
+        );
+        if (match) results.push(match);
+      }
     }
   }
   return results;

@@ -49,7 +49,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 45;
+pub const DB_SCHEMA_VERSION: u64 = 46;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -65,6 +65,10 @@ pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
 pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
 pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
+/// Initial HTTP/2 flow-control windows (bytes) for internal gRPC channels. Apply when
+/// `ZO_GRPC_HTTP2_ADAPTIVE_WINDOW=false` (default); adaptive resets to 64 KB and grows via BDP.
+pub const GRPC_HTTP2_STREAM_WINDOW_SIZE: u32 = 8 * 1024 * 1024; // 8 MB
+pub const GRPC_HTTP2_CONNECTION_WINDOW_SIZE: u32 = 16 * 1024 * 1024; // 16 MB
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 // The current value is recorded in each tantivy index file (puffin `row_group_size`
 // property) so it can be changed safely without breaking row_id → row_group mapping
@@ -781,6 +785,14 @@ pub struct Grpc {
     pub connect_timeout: u64,
     #[env_config(name = "ZO_GRPC_CHANNEL_CACHE_DISABLED", default = false)]
     pub channel_cache_disabled: bool,
+    #[env_config(
+        name = "ZO_GRPC_HTTP2_ADAPTIVE_WINDOW",
+        default = false,
+        help = "Enable HTTP/2 adaptive (BDP-based) flow-control window growth for inter-node \
+                gRPC. Off by default (fixed stream/connection windows apply). Turn on for \
+                high-latency links; costs more memory under many concurrent streams."
+    )]
+    pub http2_adaptive_window: bool,
     #[env_config(name = "ZO_GRPC_TLS_ENABLED", default = false)]
     pub tls_enabled: bool,
     #[env_config(name = "ZO_GRPC_TLS_CERT_DOMAIN", default = "")]
@@ -1495,10 +1507,10 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 512)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 512)]
     pub max_file_size_in_memory: usize,
     #[deprecated(
         since = "0.14.1",
@@ -1537,7 +1549,7 @@ pub struct Limit {
     pub wal_write_buffer_size: usize,
     #[env_config(name = "ZO_WAL_WRITE_QUEUE_SIZE", default = 10000)] // 10k messages
     pub wal_write_queue_size: usize,
-    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
+    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 2)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
     pub file_push_limit: usize,
@@ -2638,11 +2650,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
-        if cfg.common.local_mode {
-            cfg.limit.file_move_thread_num = std::cmp::max(1, cpu_num / 2);
-        } else {
-            cfg.limit.file_move_thread_num = cpu_num;
-        }
+        cfg.limit.file_move_thread_num = cpu_num;
     }
     // HACK for file_merge_thread_num equal to CPU core
     if cfg.limit.file_merge_thread_num == 0 {
@@ -2771,13 +2779,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check max_file_size_on_disk to MB
     if cfg.limit.max_file_size_on_disk == 0 {
-        cfg.limit.max_file_size_on_disk = 256 * 1024 * 1024; // 256MB
+        cfg.limit.max_file_size_on_disk = 512 * 1024 * 1024; // 512MB
     } else {
         cfg.limit.max_file_size_on_disk *= 1024 * 1024;
     }
     // check max_file_size_in_memory to MB
     if cfg.limit.max_file_size_in_memory == 0 {
-        cfg.limit.max_file_size_in_memory = 256 * 1024 * 1024; // 256MB
+        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024; // 512MB
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
     }

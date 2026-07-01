@@ -74,11 +74,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-destination_type="{ row }">
-          {{ row.destination_type_name || "N/A" }}
+          <OBadge
+            v-if="row.destination_type_name"
+            variant="default-soft"
+            class="tw:text-xs"
+          >{{ row.destination_type_name }}</OBadge>
+          <span v-else class="tw:text-text-primary">—</span>
         </template>
 
         <template #cell-output_format="{ row }">
-          {{ formatOutputFormat(row.output_format) }}
+          <OBadge
+            v-if="row.output_format"
+            variant="default-soft"
+            class="tw:text-xs"
+          >{{ formatOutputFormat(row.output_format) }}</OBadge>
+          <span v-else class="tw:text-text-primary">—</span>
         </template>
 
         <template #cell-actions="{ row }">
@@ -173,6 +183,7 @@ import type { Template } from "@/ts/interfaces/index";
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -202,6 +213,7 @@ export default defineComponent({
     ConfirmDialog,
     OButton,
     OIcon,
+    OBadge,
     OSearchInput,
     OTable,
   },

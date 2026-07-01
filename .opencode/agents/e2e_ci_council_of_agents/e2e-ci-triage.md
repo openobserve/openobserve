@@ -82,6 +82,14 @@ Set `skip: true` with a clear `skip_reason` if **any** of these hold:
 > `existing_tests_in_diff: true` (route = *enhance*) and **continue**; the Architect reads those
 > tests and decides whether to extend, append to, or complement them.
 >
+> **`existing_tests_in_diff` counts ONLY Playwright E2E specs** under
+> `tests/ui-testing/playwright-tests/**/*.spec.js`. **Vitest unit tests** (`web/src/**/*.spec.ts`,
+> `*.spec.js` under `web/`) and **Rust tests** are NOT E2E coverage — they do **not** set this flag
+> and the Architect never extends them. (A deterministic workflow step in `.github/workflows/e2e-council.yml`
+> — "Scope existing_tests_in_diff to E2E specs" — recomputes this flag from the diff and overrides your
+> value, so don't guess — but keep your `existing_tests` rationale consistent:
+> a changed Vitest/unit test is dev test-maintenance, irrelevant to E2E coverage.)
+>
 > **Priority when both apply:** an **explicit** opt-out (condition 2 — `tests-added` label or a
 > "skip" comment) always wins → skip, even if the diff also adds tests. The "don't auto-skip" rule
 > only overrides the *automatic* detection of test files, never an explicit human opt-out.
@@ -146,8 +154,22 @@ For an OSS change that needs E2E, derive:
 }
 ```
 
-`docs/test_generator/ci/triage.json` — the same fields plus a human-readable `rationale`
-string explaining the decision (this is what the workflow posts as the dry-run PR comment).
+`docs/test_generator/ci/triage.json` — the same fields **plus a structured `rationale` OBJECT**
+(the workflow renders it into the PR comment in a FIXED format — you supply only the prose per
+field, never the layout). Emit exactly these keys, each a concise 1–3 sentence explanation:
+```json
+"rationale": {
+  "edition": "why OSS vs ENT — the file PATHS you checked + any enterprise keywords (or their absence)",
+  "skip":    "why skip / why not — is the change user-facing? any skip marker/label/comment?",
+  "e2e":     "why E2E is or isn't warranted — what user-facing behavior needs verifying",
+  "area":    "why this area — where the bulk of the UI changes live + where sibling specs are",
+  "group":   "why this playwright_group (matrix shard)",
+  "existing_tests": "ONLY about Playwright E2E specs (tests/ui-testing/playwright-tests/) changed in the diff and whether they cover the NEW feature. A changed Vitest/unit (web/src/**/*.spec.ts) or Rust test is NOT E2E coverage — say 'no E2E specs in the diff' (don't cite unit tests as existing coverage)."
+}
+```
+Write **every** key (use a short note like "n/a — skipped" if a field doesn't apply). Keep each
+value plain prose — do NOT add your own bold labels or headers; the workflow adds those. The
+`rationale` object only needs to be in `triage.json` (not `run-context.json`).
 
 ## Decision discipline
 

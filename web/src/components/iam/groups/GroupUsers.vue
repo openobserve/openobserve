@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-email="{ row }">
           <div class="tw:flex tw:items-center">
-            <span>{{ row.email }}</span>
+            <OUserCell :value="row.email" />
             <OTooltip v-if="shouldShowWarning(row)" side="right">
               <OIcon
                 name="info"
@@ -140,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OTable from "@/lib/core/Table/OTable.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";

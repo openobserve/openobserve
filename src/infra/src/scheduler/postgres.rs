@@ -81,6 +81,19 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
         // drop created_at column for old version <= 0.40.0
         drop_column("scheduled_jobs", "created_at").await?;
 
+        // `scheduled_jobs` is a high-churn table: every job cycle issues several UPDATEs to the
+        // same row (pull -> Processing, keep_alive, completion, timeout). Lowering fillfactor
+        // leaves free space in each heap page so updates that don't touch an indexed column can be
+        // applied HOT (Heap-Only Tuple) — no new index entries, on-page dead-tuple pruning —
+        // cutting index/MVCC bloat from the churn. This pays off only because the pull index is
+        // keyed on `next_run_at` alone (see create_table_index): pull, keep_alive, watch_timeout
+        // and status-only completion updates all stay HOT; just the reschedule path (which
+        // rewrites the indexed `next_run_at`) drops out, which is irreducible. Idempotent metadata
+        // change; it governs future page writes and does not rewrite existing pages.
+        sqlx::query("ALTER TABLE scheduled_jobs SET (fillfactor = 80);")
+            .execute(&pool)
+            .await?;
+
         Ok(())
     }
 
@@ -105,6 +118,31 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
             true,
             &["org", "module", "module_key"],
         ))
+        .await?;
+
+        // Index for the hot pull predicate: `WHERE status = Waiting AND next_run_at <= now
+        // ORDER BY next_run_at`. Without it the puller does a seq scan + sort that grows with the
+        // table (and with multi-tenancy), and every autovacuum has more to do.
+        //
+        // Keyed on `next_run_at` ALONE (no `status`), deliberately:
+        //   * `status` is non-selective here — between runs a job sits in Waiting, so Waiting is
+        //     the dominant state; a partial `WHERE status = 0` index would be ~the same size as
+        //     this one while buying nothing.
+        //   * Leaving `status` out of the key/predicate/INCLUDE keeps HOT updates alive (see the
+        //     fillfactor note in create_table). The pull, watch_timeout and status-only completion
+        //     updates flip `status` but NOT `next_run_at`, so they stay HOT. Only the reschedule
+        //     path (which rewrites `next_run_at`) drops HOT — unavoidable, since the pull needs
+        //     `next_run_at` indexed. Putting `status` in the index (key, partial predicate, or
+        //     INCLUDE) would block HOT on every status flip and defeat the fillfactor change.
+        //
+        // The pull pays a few extra heap visits to filter `status` (bounded by the due +
+        // Processing set) — cheap next to the seq-scan + sort it replaces. Raw SQL since
+        // `create_index` can't emit it; `IF NOT EXISTS` keeps it idempotent across restarts.
+        let pool = CLIENT_DDL.clone();
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS scheduled_jobs_pull_idx ON scheduled_jobs (next_run_at);",
+        )
+        .execute(&pool)
         .await?;
 
         Ok(())
@@ -576,12 +614,19 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
     /// Returns the Trigger jobs with "Waiting" status.
     /// Steps:
-    /// - Read the records with status "Waiting", oldest createdAt, next_run_at <= now and limit =
-    ///   `concurrency`
-    /// - Skip locked rows and lock the read rows with "FOR UPDATE SKIP LOCKED"
+    /// - Take a global `pg_advisory_xact_lock` so only one puller across all nodes claims jobs at a
+    ///   time. This serializes the pull cluster-wide; the query itself does **not** use `FOR UPDATE
+    ///   SKIP LOCKED`.
+    /// - Read the records with status "Waiting", next_run_at <= now, ordered by next_run_at and
+    ///   limited to `concurrency`
     /// - Changes their statuses from "Waiting" to "Processing"
     /// - Commits as a single transaction
     /// - Returns the Trigger jobs
+    ///
+    /// Lock semantics: `pg_advisory_xact_lock` is **transaction-scoped** — it is released
+    /// automatically on COMMIT/ROLLBACK, never outliving the transaction. This is the safe variant
+    /// on pooled sqlx connections; a session-scoped lock (`pg_advisory_lock`) could leak onto a
+    /// connection returned to the pool and is deliberately avoided here.
     async fn pull(
         &self,
         concurrency: i64,
@@ -618,7 +663,8 @@ RETURNING *;"#;
 
         let mut tx = pool.begin().await?;
 
-        // Lock the table for the duration of the transaction
+        // Take a transaction-scoped advisory lock (not a table lock) for the duration of the
+        // transaction; auto-released on commit/rollback. Serializes the pull across all nodes.
         let lock_key = "scheduler_pull_lock";
         let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
         let lock_id = if lock_id > i64::MAX as u64 {
