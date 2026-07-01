@@ -96,6 +96,12 @@ vi.mock("./colorPalette", () => ({
   getSeriesColor: vi.fn(() => "#ff0000"),
   getSQLMinMaxValue: vi.fn(() => [0, 100]),
   getColorPalette: vi.fn(() => ["#ff0000", "#00ff00", "#0000ff"]),
+  getSeriesHash: vi.fn(() => 0),
+  getAreaGradientColor: vi.fn(() => ({ type: "linear", colorStops: [] })),
+  getGridLineStyle: vi.fn(() => ({ type: "dashed", width: 1, color: "rgba(0,0,0,0.08)" })),
+  getAreaStyleOverride: vi.fn((_type, base) =>
+    base ? { areaStyle: { ...base, color: { type: "linear", colorStops: [] } } } : {},
+  ),
 }));
 
 vi.mock("@/utils/zincutils", () => ({

@@ -56,10 +56,11 @@
         </template>
 
         <template #cell-status="{ row }">
-          <span class="ej-status-chip" :class="`ej-status-chip--${statusOf(row)}`">
-            <span class="ej-status-chip__dot" />
-            {{ statusLabel(statusOf(row)) }}
-          </span>
+          <OTag
+            type="evalStatus"
+            :value="statusOf(row)"
+            :label="statusLabel(statusOf(row))"
+          />
         </template>
 
         <template #cell-stream="{ row }">
@@ -126,6 +127,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -218,7 +220,7 @@ const columns = computed(() => [
     accessorFn: (row: EvalJob) => (row.scorers || []).length,
     sortable: true,
     size: COL.count,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "created",

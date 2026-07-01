@@ -104,13 +104,13 @@
           </template>
 
           <template #cell-isDefault="{ row }">
-            <span
+            <OTag
               v-if="booleanOf(row, 'isDefault', 'is_default')"
-              class="llmp-default-chip"
-            >
-              {{ t("llmProviders.defaultBadge") }}
-            </span>
-            <span v-else class="llmp-muted">—</span>
+              type="booleanState"
+              value="yes"
+              :label="t('llmProviders.defaultBadge')"
+            />
+            <span v-else class="tw:text-text-primary">—</span>
           </template>
 
           <template #cell-actions="{ row }">
@@ -155,6 +155,7 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

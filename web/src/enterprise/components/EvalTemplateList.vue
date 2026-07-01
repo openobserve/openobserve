@@ -245,7 +245,7 @@ const columns = ref<OTableColumnDef<Template>[]>([
     resizable: true,
     hideable: true,
     size: COL.version,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "updated_at",

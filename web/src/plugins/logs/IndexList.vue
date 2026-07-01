@@ -845,6 +845,9 @@ export default defineComponent({
     };
 
     function clickFieldFn(row: { name: never }) {
+      // Explicit user action — clear the system-pick marker so this selection
+      // persists to logFilterField.
+      searchObj.meta.isFtsDefaultColumn = false;
       let selectedFields = reorderSelectedFields();
 
       if (selectedFields.includes(row.name)) {
@@ -865,6 +868,7 @@ export default defineComponent({
     }
 
     function resetSelectedFileds() {
+      searchObj.meta.isFtsDefaultColumn = false;
       searchObj.data.stream.selectedFields = [];
       updatedLocalLogFilterField();
     }

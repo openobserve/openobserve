@@ -173,15 +173,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- User -->
         <template #cell-userId="{ row }">
-          <span
-            v-if="row.userId"
-            class="tw:text-[0.75rem] tw:text-[var(--o2-text-primary)] tw:truncate tw:max-w-[100px] tw:block"
-          >
-            {{ row.userId }}
-          </span>
-          <span v-else class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">
-            {{ t('traces.sessionsList.unknownUser') }}
-          </span>
+          <OUserCell
+            :value="row.userId"
+            :empty-label="t('traces.sessionsList.unknownUser')"
+          />
         </template>
 
         <!-- First user message -->
@@ -247,6 +242,7 @@ import { useStore } from "vuex";
 import { formatDate } from "@/utils/date";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import useStreams from "@/composables/useStreams";
 import { useSessions, type SessionRow } from "./composables/useSessions";
 import EvalEmptyState from "@/components/EvalEmptyState.vue";
@@ -435,7 +431,7 @@ const tableColumns = computed(() => [
     size: 50,
     sortable: false,
     hideable: true,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "durationNanos",
@@ -454,7 +450,7 @@ const tableColumns = computed(() => [
     minSize: 150,
     sortable: false,
     hideable: true,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "cost",
@@ -463,7 +459,7 @@ const tableColumns = computed(() => [
     size: 100,
     sortable: false,
     hideable: true,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "status",

@@ -257,8 +257,8 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.activeVersion"),
     accessorKey: "version",
     sortable: true,
-    size: 60,
-    meta: { align: "left" },
+    size: COL.version,
+    meta: { align: "right" },
   },
   {
     id: "usedBy",
@@ -266,7 +266,7 @@ const columns = computed(() => [
     accessorFn: (row: ScoreConfig) => usedByCount(row),
     sortable: true,
     size: COL.count,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "created",

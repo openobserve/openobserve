@@ -84,16 +84,18 @@ const ODialogStub = {
 // OInput: renders a real <input> so setValue() works and emits update:modelValue.
 const OInputStub = {
   name: "OInput",
-  props: ["modelValue", "label", "error", "errorMessage", "disabled"],
+  props: ["modelValue", "label", "placeholder", "helpText", "error", "errorMessage", "disabled"],
   emits: ["update:modelValue"],
   inheritAttrs: false,
   template: `
     <div v-bind="$attrs">
-      <label v-if="label">{{ label }}</label>
+      <label v-if="label" data-test="o-input-label">{{ label }}</label>
       <input
         :value="modelValue"
+        :placeholder="placeholder"
         @input="$emit('update:modelValue', $event.target.value)"
       />
+      <span v-if="helpText" data-test="o-input-help">{{ helpText }}</span>
       <span v-if="error && errorMessage" role="alert">{{ errorMessage }}</span>
     </div>
   `,
@@ -140,8 +142,8 @@ function getCancelButton(wrapper: VueWrapper) {
   return wrapper.find('[data-test="o-dialog-secondary-btn"]');
 }
 
-function getEmailInput(wrapper: VueWrapper) {
-  return wrapper.find('[data-test="iam-add-service-account-email-input"] input');
+function getIdentifierInput(wrapper: VueWrapper) {
+  return wrapper.find('[data-test="iam-add-service-account-identifier-input"] input');
 }
 
 function getDescriptionInput(wrapper: VueWrapper) {
@@ -194,7 +196,7 @@ describe("AddServiceAccount", () => {
 
     it("shows both email and description inputs in add mode", () => {
       // Email input is only shown when not beingUpdated
-      expect(getEmailInput(wrapper).exists()).toBe(true);
+      expect(getIdentifierInput(wrapper).exists()).toBe(true);
       expect(getDescriptionInput(wrapper).exists()).toBe(true);
     });
 
@@ -213,7 +215,7 @@ describe("AddServiceAccount", () => {
       // Assert
       expect(
         updateWrapper.find(
-          '[data-test="iam-add-service-account-email-input"]',
+          '[data-test="iam-add-service-account-identifier-input"]',
         ).exists(),
       ).toBe(false);
       expect(getDescriptionInput(updateWrapper).exists()).toBe(true);
@@ -274,7 +276,7 @@ describe("AddServiceAccount", () => {
 
     it("does not call create when email format is invalid", async () => {
       // Arrange
-      await getEmailInput(wrapper).setValue("not-an-email");
+      await getIdentifierInput(wrapper).setValue("not-an-email");
 
       // Act
       await getSaveButton(wrapper).trigger("click");
@@ -285,7 +287,7 @@ describe("AddServiceAccount", () => {
 
     it("shows an error message when email format is invalid", async () => {
       // Arrange
-      await getEmailInput(wrapper).setValue("bad-format");
+      await getIdentifierInput(wrapper).setValue("bad-format");
 
       // Act
       await getSaveButton(wrapper).trigger("click");
@@ -302,7 +304,7 @@ describe("AddServiceAccount", () => {
       expect(wrapper.find('[role="alert"]').exists()).toBe(true);
 
       // Act — user corrects the input
-      await getEmailInput(wrapper).setValue("fix@example.com");
+      await getIdentifierInput(wrapper).setValue("fix@example.com");
       await nextTick();
 
       // Assert — error is cleared
@@ -316,7 +318,7 @@ describe("AddServiceAccount", () => {
     it("calls create with correct payload on valid submit", async () => {
       // Arrange
       vi.mocked(service_accounts.create).mockResolvedValue({ data: {} });
-      await getEmailInput(wrapper).setValue("new@example.com");
+      await getIdentifierInput(wrapper).setValue("new@example.com");
       await getDescriptionInput(wrapper).setValue("My Service Account");
 
       // Act
@@ -337,7 +339,7 @@ describe("AddServiceAccount", () => {
     it("emits 'updated' and 'update:open' false after successful creation", async () => {
       // Arrange
       vi.mocked(service_accounts.create).mockResolvedValue({ data: {} });
-      await getEmailInput(wrapper).setValue("new@example.com");
+      await getIdentifierInput(wrapper).setValue("new@example.com");
 
       // Act
       await getSaveButton(wrapper).trigger("click");
@@ -354,7 +356,7 @@ describe("AddServiceAccount", () => {
       vi.mocked(service_accounts.create).mockRejectedValue({
         response: { status: 500, data: { message: "Server error" } },
       });
-      await getEmailInput(wrapper).setValue("fail@example.com");
+      await getIdentifierInput(wrapper).setValue("fail@example.com");
 
       // Act
       await getSaveButton(wrapper).trigger("click");
@@ -370,7 +372,7 @@ describe("AddServiceAccount", () => {
       vi.mocked(service_accounts.create).mockRejectedValue({
         response: { status: 403 },
       });
-      await getEmailInput(wrapper).setValue("forbidden@example.com");
+      await getIdentifierInput(wrapper).setValue("forbidden@example.com");
 
       // Act & Assert — must not throw
       await expect(
@@ -501,7 +503,7 @@ describe("AddServiceAccount", () => {
   describe("props reactivity", () => {
     it("switches to update mode when modelValue with email is set", async () => {
       // Arrange — start in add mode, email field visible
-      expect(getEmailInput(wrapper).exists()).toBe(true);
+      expect(getIdentifierInput(wrapper).exists()).toBe(true);
 
       // Act — simulate parent providing an existing user
       await wrapper.setProps({
@@ -515,7 +517,7 @@ describe("AddServiceAccount", () => {
 
       // Assert — email field hidden in update mode
       expect(
-        wrapper.find('[data-test="iam-add-service-account-email-input"]').exists(),
+        wrapper.find('[data-test="iam-add-service-account-identifier-input"]').exists(),
       ).toBe(false);
     });
 
@@ -532,7 +534,7 @@ describe("AddServiceAccount", () => {
       await nextTick();
       expect(
         updateWrapper.find(
-          '[data-test="iam-add-service-account-email-input"]',
+          '[data-test="iam-add-service-account-identifier-input"]',
         ).exists(),
       ).toBe(false);
 
@@ -554,7 +556,7 @@ describe("AddServiceAccount", () => {
       // Assert — email field re-appears
       expect(
         updateWrapper.find(
-          '[data-test="iam-add-service-account-email-input"]',
+          '[data-test="iam-add-service-account-identifier-input"]',
         ).exists(),
       ).toBe(true);
 
@@ -576,7 +578,7 @@ describe("AddServiceAccount", () => {
 
     it("treats email with leading/trailing whitespace as invalid", async () => {
       // Arrange
-      await getEmailInput(wrapper).setValue("   invalid   ");
+      await getIdentifierInput(wrapper).setValue("   invalid   ");
 
       // Act
       await getSaveButton(wrapper).trigger("click");
@@ -588,7 +590,7 @@ describe("AddServiceAccount", () => {
     it("accepts a valid email with subdomains", async () => {
       // Arrange
       vi.mocked(service_accounts.create).mockResolvedValue({ data: {} });
-      await getEmailInput(wrapper).setValue("user@sub.example.com");
+      await getIdentifierInput(wrapper).setValue("user@sub.example.com");
 
       // Act
       await getSaveButton(wrapper).trigger("click");
@@ -614,7 +616,7 @@ describe("AddServiceAccount", () => {
       // (no public API to set this; set via vm — only way to reach this branch)
       otherWrapper.vm.formData.other_organization = "my custom org";
 
-      await getEmailInput(otherWrapper).setValue("test@example.com");
+      await getIdentifierInput(otherWrapper).setValue("test@example.com");
 
       // Act
       await getSaveButton(otherWrapper).trigger("click");
@@ -631,6 +633,54 @@ describe("AddServiceAccount", () => {
       });
 
       otherWrapper.unmount();
+    });
+  });
+
+  // ── Identifier field labeling ──────────────────────────────────────────────
+
+  describe("identifier field", () => {
+    it("renders the identifier input with the correct data-test id", () => {
+      expect(wrapper.find('[data-test="iam-add-service-account-identifier-input"]').exists()).toBe(true);
+    });
+
+    it("renders identifier label from i18n", () => {
+      const identifierDiv = wrapper.find('[data-test="iam-add-service-account-identifier-input"]');
+      const label = identifierDiv.find('[data-test="o-input-label"]');
+      expect(label.exists()).toBe(true);
+      expect(label.text()).toBe("Identifier *");
+    });
+
+    it("passes placeholder from i18n to the identifier input", () => {
+      const input = getIdentifierInput(wrapper);
+      expect(input.attributes("placeholder")).toBe("Enter email address");
+    });
+
+    it("renders help text from i18n", () => {
+      const identifierDiv = wrapper.find('[data-test="iam-add-service-account-identifier-input"]');
+      const help = identifierDiv.find('[data-test="o-input-help"]');
+      expect(help.exists()).toBe(true);
+      expect(help.text()).toBe("Email address used as the service account identifier");
+    });
+
+    it("validates email format using the same regex after identifier rename", async () => {
+      // The validation logic (email regex) is unchanged even though the label says "Identifier"
+      await getIdentifierInput(wrapper).setValue("not-an-email");
+
+      await getSaveButton(wrapper).trigger("click");
+      await nextTick();
+
+      // Error should still appear for invalid email format
+      expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+    });
+
+    it("accepts a valid email when identifier is filled correctly", async () => {
+      vi.mocked(service_accounts.create).mockResolvedValue({ data: {} });
+      await getIdentifierInput(wrapper).setValue("valid@example.com");
+
+      await getSaveButton(wrapper).trigger("click");
+      await flushPromises();
+
+      expect(service_accounts.create).toHaveBeenCalled();
     });
   });
 });
