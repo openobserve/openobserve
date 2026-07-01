@@ -1992,6 +1992,12 @@ pub struct Compact {
     )]
     pub retention_allowed_hours: String,
     #[env_config(
+        name = "ZO_FILE_LIST_MAINTENANCE_HOUR",
+        default = 4,
+        help = "UTC hour (0-23) when the daily file_list partition maintenance (pre-create, drop empty, reindex) runs. Ideally set after the retention window."
+    )]
+    pub file_list_maintenance_hour: u32,
+    #[env_config(
         name = "ZO_COMPACT_TANTIVY_BUILDER_THREAD_NUM",
         default = 2,
         help = "Per-file concurrent row_group workers for tantivy index generation during compaction. less than or equal to 1 disables (single-threaded)"

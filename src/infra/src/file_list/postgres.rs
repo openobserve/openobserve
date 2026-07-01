@@ -16,7 +16,7 @@
 use std::{collections::HashMap as stdHashMap, sync::LazyLock as Lazy};
 
 use async_trait::async_trait;
-use chrono::{DateTime, Duration, NaiveDate, TimeZone, Timelike, Utc};
+use chrono::{DateTime, Duration, NaiveDate, TimeZone, Utc};
 use config::{
     RwHashSet, get_config,
     meta::stream::{
@@ -2261,13 +2261,16 @@ async fn precreate_partitions(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     let start_date = today - Duration::days(past_days);
     let end_date = today + Duration::days(FILE_LIST_POST_PARTITION_DAYS);
 
-    let mut tables = vec!["file_list", "file_list_dump_stats"];
+    let mut tables = vec!["file_list"];
     if cfg
         .compact
         .file_list_deleted_mode
         .eq(&FileListBookKeepMode::History.to_string())
     {
         tables.push("file_list_history");
+    }
+    if cfg.compact.file_list_dump_enabled {
+        tables.push("file_list_dump_stats");
     }
     let mut date = start_date;
     while date <= end_date {
@@ -2730,8 +2733,11 @@ async fn apply_column_width_compat(pool: &sqlx::Pool<Postgres>) -> Result<()> {
 async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     let cfg = get_config();
 
-    // Handle file_list, file_list_history, and file_list_dump_stats
-    let tables = ["file_list", "file_list_history", "file_list_dump_stats"];
+    // Handle file_list, file_list_history, and (only when enabled) file_list_dump_stats
+    let mut tables = vec!["file_list", "file_list_history"];
+    if cfg.compact.file_list_dump_enabled {
+        tables.push("file_list_dump_stats");
+    }
     for table in &tables {
         let relkind = get_table_relkind(pool, table).await?;
         match relkind.as_deref() {
@@ -3126,24 +3132,68 @@ pub async fn create_table_index() -> Result<()> {
     Ok(())
 }
 
+/// Distributed lock key held for the duration of a maintenance run.
+const MAINTENANCE_LOCK_KEY: &str = "/file_list/maintenance";
+/// Coordinator KV key storing the micros timestamp of the last successful run.
+const MAINTENANCE_LAST_RUN_KEY: &str = "/file_list/maintenance/last_run";
+
+/// Return the std::time::Duration until the next occurrence of `hour` (UTC).
+fn duration_until_next_utc_hour(hour: u32) -> std::time::Duration {
+    let hour = hour.min(23);
+    let now = Utc::now();
+    let today_at = now
+        .date_naive()
+        .and_hms_opt(hour, 0, 0)
+        .unwrap_or_default()
+        .and_utc();
+    let next = if today_at > now {
+        today_at
+    } else {
+        today_at + Duration::days(1)
+    };
+    (next - now).to_std().unwrap_or(std::time::Duration::ZERO)
+}
+
+/// Whether two micros timestamps fall on the same UTC calendar day.
+fn same_utc_day(a_micros: i64, b_micros: i64) -> bool {
+    match (
+        DateTime::from_timestamp_micros(a_micros),
+        DateTime::from_timestamp_micros(b_micros),
+    ) {
+        (Some(a), Some(b)) => a.date_naive() == b.date_naive(),
+        _ => false,
+    }
+}
+
 /// Background maintenance task for PostgreSQL partition management.
-/// Only runs when meta_store == "postgres".
+///
+/// Runs once per day at a fixed UTC hour (`ZO_FILE_LIST_MAINTENANCE_HOUR`), only
+/// on compactor nodes. Across a region, a distributed lock plus a "last run"
+/// marker in the coordinator KV ensure the work runs exactly once per day even if
+/// nodes wake at slightly different times, with automatic failover if the node
+/// that ran it previously is down.
 pub async fn spawn_maintenance_task() -> std::result::Result<(), anyhow::Error> {
+    let cfg = get_config();
+    if cfg.common.meta_store != "postgres" || cfg.common.meta_partition_mode == "manual" {
+        return Ok(());
+    }
+    // Only compactor nodes perform ongoing partition housekeeping.
+    if !config::cluster::LOCAL_NODE.is_compactor() {
+        return Ok(());
+    }
+
     tokio::task::spawn(async move {
-        let cfg = get_config();
-        if cfg.common.meta_store != "postgres" || cfg.common.meta_partition_mode == "manual" {
-            return;
-        }
-
-        // Wait 5 minutes before first run to let the system stabilize
-        tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
-
         loop {
+            let wait = duration_until_next_utc_hour(get_config().compact.file_list_maintenance_hour);
+            log::info!(
+                "[POSTGRES] maintenance: next run in {} minutes",
+                wait.as_secs() / 60
+            );
+            tokio::time::sleep(wait).await;
+
             if let Err(e) = run_maintenance().await {
                 log::error!("[POSTGRES] maintenance task error: {e}");
             }
-            // Sleep 24 hours between maintenance runs
-            tokio::time::sleep(tokio::time::Duration::from_secs(86400)).await;
         }
     });
     Ok(())
@@ -3152,39 +3202,49 @@ pub async fn spawn_maintenance_task() -> std::result::Result<(), anyhow::Error> 
 async fn run_maintenance() -> Result<()> {
     let pool = CLIENT.clone();
 
-    // Acquire advisory lock
-    let lock_key = "file_list_maintenance";
-    let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
-    let lock_id = if lock_id > (i64::MAX as u64) {
-        (lock_id >> 1) as i64
-    } else {
-        lock_id as i64
+    // Acquire the distributed lock; another node acquiring it first will run (or
+    // has run) this cycle. wait_ttl=0 waits for the current holder to finish.
+    let locker = match crate::dist_lock::lock(MAINTENANCE_LOCK_KEY, 0).await {
+        Ok(locker) => locker,
+        Err(e) => {
+            log::warn!("[POSTGRES] maintenance: failed to acquire dist lock: {e}");
+            return Ok(());
+        }
     };
 
-    // Use a dedicated connection so lock and unlock happen on the same session
-    let mut conn = pool.acquire().await?;
-
-    let locked: bool = sqlx::query_scalar("SELECT pg_try_advisory_lock($1)")
-        .bind(lock_id)
-        .fetch_one(&mut *conn)
+    // Under the lock, skip if another node already ran maintenance today.
+    let db = crate::db::get_db().await;
+    let last_run = db
+        .get(MAINTENANCE_LAST_RUN_KEY)
         .await
-        .unwrap_or(false);
-
-    if !locked {
-        log::info!("[POSTGRES] maintenance: another node holds the lock, skipping");
+        .ok()
+        .and_then(|b| String::from_utf8_lossy(&b).parse::<i64>().ok());
+    if let Some(ts) = last_run
+        && same_utc_day(ts, now_micros())
+    {
+        log::info!("[POSTGRES] maintenance: already ran today, skipping");
+        let _ = crate::dist_lock::unlock(&locker).await;
         return Ok(());
     }
 
-    // Always release the advisory lock on exit
     let result = run_maintenance_inner(&pool).await;
 
-    // Release advisory lock on the same connection that acquired it
-    if let Err(e) = sqlx::query("SELECT pg_advisory_unlock($1)")
-        .bind(lock_id)
-        .execute(&mut *conn)
-        .await
+    // Record the run only on success so a failed run is retried next cycle.
+    if result.is_ok()
+        && let Err(e) = db
+            .put(
+                MAINTENANCE_LAST_RUN_KEY,
+                now_micros().to_string().into(),
+                crate::db::NO_NEED_WATCH,
+                None,
+            )
+            .await
     {
-        log::warn!("[POSTGRES] maintenance: failed to release advisory lock: {e}");
+        log::warn!("[POSTGRES] maintenance: failed to record last_run marker: {e}");
+    }
+
+    if let Err(e) = crate::dist_lock::unlock(&locker).await {
+        log::warn!("[POSTGRES] maintenance: failed to release dist lock: {e}");
     }
 
     result
@@ -3193,29 +3253,14 @@ async fn run_maintenance() -> Result<()> {
 async fn run_maintenance_inner(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     log::info!("[POSTGRES] maintenance: starting");
 
-    // 6a: Pre-create partitions
+    // Pre-create upcoming partitions
     precreate_partitions(pool).await?;
 
-    // 6b: Check if we should run DROP + REINDEX (respects retention_allowed_hours)
-    let cfg = get_config();
-    let should_run_heavy = if cfg.compact.retention_allowed_hours.is_empty() {
-        true
-    } else {
-        let current_hour = Utc::now().hour();
-        cfg.compact
-            .retention_allowed_hours
-            .split(',')
-            .filter_map(|h| h.trim().parse::<u32>().ok())
-            .any(|h| h == current_hour)
-    };
+    // DROP empty partitions past the retention window
+    drop_empty_partitions(pool).await?;
 
-    if should_run_heavy {
-        // DROP empty partitions
-        drop_empty_partitions(pool).await?;
-
-        // REINDEX non-partitioned tables
-        reindex_non_partitioned_tables(pool).await?;
-    }
+    // REINDEX non-partitioned tables
+    reindex_non_partitioned_tables(pool).await?;
 
     log::info!("[POSTGRES] maintenance: completed");
     Ok(())
@@ -4347,5 +4392,35 @@ mod tests {
         assert!(result.is_ok());
         let ids = result.unwrap();
         assert!(!ids.is_empty());
+    }
+
+    #[test]
+    fn test_same_utc_day() {
+        let day = |s: &str| {
+            DateTime::parse_from_rfc3339(s)
+                .unwrap()
+                .timestamp_micros()
+        };
+        // Same day, different times.
+        assert!(same_utc_day(
+            day("2026-07-01T00:00:00Z"),
+            day("2026-07-01T23:59:59Z")
+        ));
+        // Different days.
+        assert!(!same_utc_day(
+            day("2026-07-01T23:59:59Z"),
+            day("2026-07-02T00:00:00Z")
+        ));
+    }
+
+    #[test]
+    fn test_duration_until_next_utc_hour() {
+        // Always within the next 24h, and never zero-length for a valid hour.
+        for h in 0..24u32 {
+            let d = duration_until_next_utc_hour(h);
+            assert!(d <= std::time::Duration::from_secs(24 * 3600));
+        }
+        // Out-of-range hours are clamped to 23 rather than panicking.
+        let _ = duration_until_next_utc_hour(99);
     }
 }
