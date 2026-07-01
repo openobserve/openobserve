@@ -52,7 +52,7 @@ beforeEach(() => {
 });
 
 /**
- * Helper — drive a single (current-window) KPI fetchKPIInto callback.
+ * Helper — drive a single-row response into a query's callbacks.
  * Matches the shape returned by the real streaming endpoint.
  */
 function driveKpiHits(callbacks: any, row: Record<string, number>) {
@@ -70,6 +70,7 @@ describe("useLLMInsights — return shape", () => {
     expect(isRef(api.kpi)).toBe(true);
     expect(isRef(api.sparklines)).toBe(true);
     expect(isRef(api.loading)).toBe(true);
+    expect(isRef(api.p95Loading)).toBe(true);
     expect(isRef(api.error)).toBe(true);
     expect(isRef(api.hasLoadedOnce)).toBe(true);
     expect(isRef(api.availableStreams)).toBe(true);
@@ -88,7 +89,6 @@ describe("useLLMInsights — return shape", () => {
       errorCount: 0,
       totalTokens: 0,
       totalCost: 0,
-      avgDurationMicros: 0,
       p95DurationMicros: 0,
     });
     expect(sparklines.value).toEqual({
@@ -153,19 +153,18 @@ describe("useLLMInsights — fetchAll early returns", () => {
 // ---------------------------------------------------------------------------
 
 describe("useLLMInsights — fetchAll fires 2 parallel queries", () => {
-  it("kicks off KPI(current) + sparklines in parallel", () => {
+  it("kicks off histogram summary + P95 in parallel", () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
-    // KPI cur, sparklines = 2 calls
+    // histogram (summary + sparklines), whole-window P95 = 2 calls
     expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2);
   });
 
-  // The sparkline query references `histogram(_timestamp, '<interval>')`
-  // — the interval must be picked from the window duration.
-  it("chooses the histogram interval based on window duration", () => {
+  // The histogram interval is intentionally NOT passed — the backend
+  // picks an appropriate bucket width for the query window. We assert
+  // `histogram(_timestamp)` with no second argument.
+  it("does not pass an explicit interval to histogram()", () => {
     const { fetchAll } = useLLMInsights();
-    // 12 hour window → "15 minutes" per pickInterval table.
-    // Start must be non-zero — fetchAll's guard treats 0 as falsy.
     const start = 1_000_000;
     const end = start + 12 * 60 * 60 * 1_000_000;
     fetchAll("default", start, end);
@@ -175,12 +174,18 @@ describe("useLLMInsights — fetchAll fires 2 parallel queries", () => {
       p.queryReq.query.sql.includes("GROUP BY ts"),
     );
     expect(sparklineCall).toBeTruthy();
-    expect(sparklineCall![0].queryReq.query.sql).toContain("'15 minutes'");
+    const sql: string = sparklineCall![0].queryReq.query.sql;
+    expect(sql).toContain("histogram(_timestamp)");
+    // No interval literal like histogram(_timestamp, '15 minutes').
+    expect(sql).not.toMatch(/histogram\(_timestamp,/);
   });
 });
 
 describe("useLLMInsights — fetchAll resolves and populates KPI on success", () => {
-  it("populates kpi (current window) from the first KPI response", async () => {
+  // The additive KPI totals (requests/traces/errors/tokens/cost) are
+  // SUMMED across the histogram buckets; P95 comes from its own
+  // whole-window query. call 0 = histogram, call 1 = P95.
+  it("sums histogram buckets for totals and takes P95 from its own query", async () => {
     const { fetchAll, kpi, hasLoadedOnce, error } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
 
@@ -189,19 +194,21 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
       ([, cbs]: any) => cbs,
     );
 
-    // KPI(current)
-    driveKpiHits(allCallbacks[0], {
-      request_count: 100,
-      trace_count: 25,
-      error_count: 3,
-      total_tokens: 50_000,
-      total_cost: 1.23,
-      avg_duration: 4_000,
-      p95_duration: 9_000,
+    // Histogram — two buckets that sum to the whole-window totals.
+    allCallbacks[0].data(null, {
+      content: {
+        results: {
+          hits: [
+            { ts: "1970-01-01T00:00:00", request_count: 60, trace_count: 15, error_count: 2, total_tokens: 30_000, total_cost: 0.73, p95_duration: 8_000 },
+            { ts: "1970-01-01T00:00:10", request_count: 40, trace_count: 10, error_count: 1, total_tokens: 20_000, total_cost: 0.5, p95_duration: 9_000 },
+          ],
+        },
+      },
     });
     allCallbacks[0].complete();
 
-    // Sparklines — no rows
+    // P95 — the one whole-window aggregate.
+    driveKpiHits(allCallbacks[1], { p95_duration: 9_000 });
     allCallbacks[1].complete();
 
     await promise;
@@ -212,15 +219,90 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
       errorCount: 3,
       totalTokens: 50_000,
       totalCost: 1.23,
-      avgDurationMicros: 4_000,
       p95DurationMicros: 9_000,
     });
     expect(hasLoadedOnce.value).toBe(true);
     expect(error.value).toBeNull();
   });
 
+  // The strip must NOT wait on the (slower) P95 query. `loading` clears the
+  // moment the histogram lands, while `p95Loading` stays true until P95 does.
+  it("clears `loading` when the histogram lands but keeps `p95Loading` until P95 resolves", async () => {
+    const { fetchAll, loading, p95Loading, kpi, hasLoadedOnce } =
+      useLLMInsights();
+    const promise = fetchAll("default", 100, 200);
+
+    expect(loading.value).toBe(true);
+    expect(p95Loading.value).toBe(true);
+
+    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(
+      ([, cbs]: any) => cbs,
+    );
+
+    // Histogram lands first — strip is ready, P95 still in flight.
+    allCallbacks[0].data(null, {
+      content: {
+        results: {
+          hits: [
+            { ts: "1970-01-01T00:00:00", request_count: 5, trace_count: 3, error_count: 0, total_tokens: 100, total_cost: 0.5, p95_duration: 0 },
+          ],
+        },
+      },
+    });
+    allCallbacks[0].complete();
+    // Flush the summary promise chain (executeQuery → .then → .finally).
+    await new Promise((r) => setTimeout(r));
+
+    expect(loading.value).toBe(false);
+    expect(hasLoadedOnce.value).toBe(true);
+    expect(kpi.value.totalCost).toBe(0.5);
+    // P95 hasn't resolved yet → its loader is still up.
+    expect(p95Loading.value).toBe(true);
+
+    // Now P95 resolves.
+    driveKpiHits(allCallbacks[1], { p95_duration: 7_000 });
+    allCallbacks[1].complete();
+    await promise;
+
+    expect(p95Loading.value).toBe(false);
+    expect(kpi.value.p95DurationMicros).toBe(7_000);
+  });
+
+  // A P95 failure degrades that card to 0 without failing the whole strip.
+  it("degrades P95 to 0 and leaves the strip intact when the P95 query fails", async () => {
+    const { fetchAll, kpi, error, p95Loading, hasLoadedOnce } =
+      useLLMInsights();
+    const promise = fetchAll("default", 100, 200);
+
+    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(
+      ([, cbs]: any) => cbs,
+    );
+
+    // Histogram succeeds.
+    allCallbacks[0].data(null, {
+      content: {
+        results: {
+          hits: [
+            { ts: "1970-01-01T00:00:00", request_count: 5, trace_count: 3, error_count: 0, total_tokens: 100, total_cost: 0.5, p95_duration: 0 },
+          ],
+        },
+      },
+    });
+    allCallbacks[0].complete();
+    // P95 fails.
+    allCallbacks[1].error({ message: "boom" });
+    await promise;
+
+    expect(kpi.value.totalCost).toBe(0.5);
+    expect(kpi.value.p95DurationMicros).toBe(0);
+    expect(p95Loading.value).toBe(false);
+    expect(hasLoadedOnce.value).toBe(true);
+    // Strip survives — the P95 failure is not surfaced as a page error.
+    expect(error.value).toBeNull();
+  });
+
   // Defensive: a row with missing/garbage numeric fields shouldn't crash
-  // the page — the helper coerces with `Number(x) || 0`.
+  // the page — every field coerces with `Number(x) || 0`.
   it("coerces missing / NaN numeric fields to 0", async () => {
     const { fetchAll, kpi } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
@@ -228,13 +310,17 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
     const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(
       ([, cbs]: any) => cbs,
     );
-    driveKpiHits(allCallbacks[0], { request_count: "not-a-number" });
+    // Histogram bucket with garbage.
+    driveKpiHits(allCallbacks[0], { request_count: "not-a-number" } as any);
     allCallbacks[0].complete();
+    // P95 with garbage.
+    driveKpiHits(allCallbacks[1], { p95_duration: "nope" } as any);
     allCallbacks[1].complete();
 
     await promise;
     expect(kpi.value.requestCount).toBe(0);
     expect(kpi.value.totalCost).toBe(0);
+    expect(kpi.value.p95DurationMicros).toBe(0);
   });
 });
 
@@ -313,9 +399,8 @@ describe("useLLMInsights — sparklines accumulation", () => {
     const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(
       ([, cbs]: any) => cbs,
     );
-    allCallbacks[0].complete();
-    // Sparkline row
-    allCallbacks[1].data(null, {
+    // Sparkline row (histogram = call 0)
+    allCallbacks[0].data(null, {
       content: {
         results: {
           hits: [
@@ -332,6 +417,8 @@ describe("useLLMInsights — sparklines accumulation", () => {
         },
       },
     });
+    allCallbacks[0].complete();
+    // P95 = call 1
     allCallbacks[1].complete();
 
     await promise;
@@ -354,8 +441,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(
       ([, c]: any) => c,
     );
-    cbs[0].complete();
-    cbs[1].data(null, {
+    cbs[0].data(null, {
       content: {
         results: {
           hits: [
@@ -365,6 +451,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
         },
       },
     });
+    cbs[0].complete();
     cbs[1].complete();
 
     await promise;
@@ -383,8 +470,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(
       ([, c]: any) => c,
     );
-    cbs[0].complete();
-    cbs[1].data(null, {
+    cbs[0].data(null, {
       content: {
         results: {
           hits: [
@@ -394,6 +480,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
         },
       },
     });
+    cbs[0].complete();
     cbs[1].complete();
 
     await promise;
@@ -418,8 +505,7 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     const promise = fetchAll("default", 100, 200);
 
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
-    cbs[0].complete();
-    cbs[1].data(null, {
+    cbs[0].data(null, {
       content: {
         results: {
           hits: [
@@ -429,6 +515,7 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
         },
       },
     });
+    cbs[0].complete();
     cbs[1].complete();
 
     await promise;
@@ -440,8 +527,7 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     const promise = fetchAll("default", 100, 200);
 
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
-    cbs[0].complete();
-    cbs[1].data(null, {
+    cbs[0].data(null, {
       content: {
         results: {
           hits: [
@@ -450,6 +536,7 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
         },
       },
     });
+    cbs[0].complete();
     cbs[1].complete();
 
     await promise;
@@ -485,24 +572,27 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     expect(sql).toMatch(/approx_distinct\(trace_id\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
   });
 
-  it("KPI SQL scopes p95/avg latency to LLM calls via per-aggregate FILTER", () => {
+  it("whole-window P95 SQL is a lean, LLM-scoped query (no histogram)", () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
 
-    const kpiCall = mockFetchQueryDataWithHttpStream.mock.calls.find(([p]: any) =>
-      p.queryReq.query.sql.includes("approx_percentile_cont(duration, 0.95)"),
+    // The P95 card comes from its own whole-window query — the one that
+    // has approx_percentile but is NOT the bucketed histogram.
+    const p95Call = mockFetchQueryDataWithHttpStream.mock.calls.find(([p]: any) =>
+      p.queryReq.query.sql.includes("approx_percentile_cont(duration, 0.95)") &&
+      !p.queryReq.query.sql.includes("GROUP BY ts"),
     );
-    const sql: string = (kpiCall as any)[0].queryReq.query.sql;
+    expect(p95Call).toBeTruthy();
+    const sql: string = (p95Call as any)[0].queryReq.query.sql;
 
     // Latency must be LLM-only — otherwise fast child/tool spans drag the tail
-    // down. Scoped via FILTER (not a top-level WHERE) so the trace-level error
-    // count, which depends on non-LLM child error spans, is untouched.
+    // down. Scoped via FILTER (not a top-level WHERE).
     expect(sql).toMatch(
       /approx_percentile_cont\(duration, 0\.95\)\s+FILTER\s*\(WHERE\s+gen_ai_operation_name\s+IS\s+NOT\s+NULL\)/,
     );
-    expect(sql).toMatch(
-      /AVG\(duration\)\s+FILTER\s*\(WHERE\s+gen_ai_operation_name\s+IS\s+NOT\s+NULL\)/,
-    );
+    // It's a dedicated query — no bucketing, no token/cost rollups.
+    expect(sql).not.toContain("histogram(");
+    expect(sql).not.toContain("gen_ai_usage_cost");
   });
 
   it("sparkline SQL scopes p95 latency to LLM calls via per-aggregate FILTER", () => {
@@ -613,10 +703,10 @@ describe("useLLMInsights — SQL surface", () => {
     expect(sql).toMatch(/approx_distinct\(trace_id\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
   });
 
-  // Sparkline query bins by `histogram(_timestamp, ...)` and groups+orders
-  // by ts. Verify both invariants — without ORDER BY, the chart x-axis
-  // is arbitrary.
-  it("sparkline query buckets by histogram(_timestamp) and orders by ts", () => {
+  // Sparkline query bins by `histogram(_timestamp)` (no explicit interval —
+  // the backend picks the bucket width) and groups+orders by ts. Without
+  // ORDER BY, the chart x-axis is arbitrary.
+  it("sparkline query buckets by histogram(_timestamp) with no interval and orders by ts", () => {
     const { fetchAll } = useLLMInsights();
     fetchAll("default", 100, 200);
 
@@ -625,7 +715,9 @@ describe("useLLMInsights — SQL surface", () => {
     );
     expect(sparkCall).toBeTruthy();
     const sql: string = (sparkCall as any)[0].queryReq.query.sql;
-    expect(sql).toMatch(/histogram\(_timestamp,\s*'[^']+'\)/);
+    expect(sql).toContain("histogram(_timestamp)");
+    // No interval literal — backend handles bucket width.
+    expect(sql).not.toMatch(/histogram\(_timestamp,/);
     expect(sql).toContain("ORDER BY ts");
   });
 

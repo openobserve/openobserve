@@ -45,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <SkeletonBox width="60%" height="12px" rounded />
         <SkeletonBox width="55%" height="22px" rounded />
-        <SkeletonBox width="40%" height="10px" rounded />
         <div class="kpi-tile__spark">
           <SkeletonBox
             v-for="bar in 16"

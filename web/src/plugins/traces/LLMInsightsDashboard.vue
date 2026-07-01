@@ -172,29 +172,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="card.label"
           class="kpi-card card-container tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem]"
         >
-          <div class="tw:flex tw:flex-col tw:gap-[0.25rem]">
-            <div class="kpi-label tw:text-[0.7rem] tw:leading-normal tw:font-semibold tw:mb-[0.25rem]">
-              {{ card.label }}
+          <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
+               it loads, matching the initial strip skeleton tile (see
+               LLMInsightsSkeleton). Its sparkline comes from the histogram, but
+               showing a chart before the number reads as ready, so we hold both. -->
+          <template v-if="card.loading">
+            <div class="tw:flex tw:flex-col tw:gap-[0.25rem]">
+              <SkeletonBox width="60%" height="12px" rounded />
+              <SkeletonBox width="55%" height="22px" rounded />
             </div>
-            <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
-              <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]">
-                {{ card.value }}
-              </span>
-              <span
-                v-if="card.unit"
-                class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
-              >
-                {{ card.unit }}
-              </span>
+            <div class="tw:flex tw:items-end tw:gap-[0.15rem] tw:h-[32px] tw:mt-auto">
+              <SkeletonBox
+                v-for="bar in 16"
+                :key="bar"
+                width="100%"
+                :height="`${30 + ((bar * 23) % 65)}%`"
+                rounded
+              />
             </div>
-          </div>
-          <KpiSparkline
-            v-if="card.sparkData && card.sparkData.length > 1"
-            :data="card.sparkData"
-            :color="card.sparkColor"
-            :height="32"
-            class="tw:mt-auto"
-          />
+          </template>
+          <template v-else>
+            <div class="tw:flex tw:flex-col tw:gap-[0.25rem]">
+              <div class="kpi-label tw:text-[0.7rem] tw:leading-normal tw:font-semibold tw:mb-[0.25rem]">
+                {{ card.label }}
+              </div>
+              <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
+                <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]">
+                  {{ card.value }}
+                </span>
+                <span
+                  v-if="card.unit"
+                  class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
+                >
+                  {{ card.unit }}
+                </span>
+              </div>
+            </div>
+            <KpiSparkline
+              v-if="card.sparkData && card.sparkData.length > 1"
+              :data="card.sparkData"
+              :color="card.sparkColor"
+              :height="32"
+              class="tw:mt-auto"
+            />
+          </template>
         </div>
       </div>
 
@@ -303,6 +324,7 @@ const {
   kpi,
   sparklines,
   loading,
+  p95Loading,
   error,
   fetchAll,
   cancelAll,
@@ -609,6 +631,9 @@ interface KpiCard {
   unit?: string;
   sparkData?: number[];
   sparkColor?: string;
+  // True while this card's own value is still loading (P95 only — it rides a
+  // separate query). The histogram-backed cards are ready when the strip is.
+  loading?: boolean;
 }
 
 const kpiCards = computed<KpiCard[]>(() => {
@@ -652,6 +677,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       unit: p95.unit,
       sparkData: sparklines.value.p95Micros,
       sparkColor: "#f97316",
+      loading: p95Loading.value,
     },
     {
       label: "Error Rate",

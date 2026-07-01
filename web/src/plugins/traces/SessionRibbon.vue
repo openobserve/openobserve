@@ -47,10 +47,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OToggleGroup>
     </div>
 
-    <!-- Plot fills the remaining panel height so the chart uses the space rather
-         than leaving a gap below it. The chart region (y-axis + bars) grows; the
-         x-axis row sits beneath it, offset by the y-axis width so the turn
-         numbers stay aligned under their bars. -->
+    <!-- Detail ribbon fills the remaining panel height. The chart region
+         (y-axis + bars) grows; the x-axis row sits beneath it, offset by the
+         y-axis width so the turn numbers stay aligned under their bars. Shows the
+         whole session when it fits, otherwise just the selected window. -->
     <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
       <!-- chart region: y-axis labels + bars, sharing the grown height -->
       <div class="tw:flex tw:gap-[0.5rem] tw:flex-1 tw:min-h-0">
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:absolute tw:inset-x-0 tw:top-1/2 tw:border-t tw:border-[var(--o2-border-color)] tw:opacity-40" />
 
           <TurnPreviewCard
-            v-for="bar in bars"
+            v-for="bar in detailBars"
             :key="bar.index"
             :turn="bar.turn"
             :index="bar.index"
@@ -87,19 +87,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- x-axis + title, offset by the y-axis column width so the numbers stay
-           aligned under their bars. Every bar keeps a spacer span, but once there
-           are many turns we only print a label on round milestones (see
-           labeledTurns) to avoid the numbers cramming together. -->
+           aligned under their bars. With the window capped at WINDOW turns, every
+           visible bar is wide enough to print its turn number. -->
       <div class="tw:flex tw:gap-[0.5rem] tw:flex-shrink-0">
         <div class="tw:w-[2.75rem] tw:flex-shrink-0" />
         <div class="tw:flex-1 tw:min-w-0">
           <div class="tw:flex tw:gap-[3px] tw:mt-[0.25rem]">
             <span
-              v-for="bar in bars"
+              v-for="bar in detailBars"
               :key="bar.index"
               class="tw:flex-1 tw:min-w-0 tw:text-center tw:text-[0.6rem] tw:text-[var(--o2-text-muted)] tw:tabular-nums"
             >
-              {{ labeledTurns.has(bar.index + 1) ? bar.index + 1 : "" }}
+              {{ detailLabeled.has(bar.index + 1) ? bar.index + 1 : "" }}
             </span>
           </div>
 
@@ -113,11 +112,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+
+    <!-- Overview (focus + context): the whole session as a thin minimap, sitting
+         below the chart's Turn axis. Drag the highlighted window to pan, click
+         anywhere to jump it there, or drag an edge to resize. The detailed,
+         labelled ribbon above shows just that window. Only rendered when there
+         are more turns than fit. Offset by the y-axis width so the minimap lines
+         up with the bars above. -->
+    <div
+      v-if="windowed"
+      class="tw:flex tw:gap-[0.5rem] tw:flex-shrink-0 tw:mt-[0.625rem]"
+    >
+      <div class="tw:w-[2.75rem] tw:flex-shrink-0" />
+      <div
+        ref="overviewTrackRef"
+        class="tw:relative tw:flex-1 tw:min-w-0 tw:h-[26px] tw:flex tw:items-end tw:gap-[1px] tw:select-none tw:touch-none"
+        :class="dragging ? 'tw:cursor-grabbing' : 'tw:cursor-grab'"
+        @pointerdown="onTrackPointerDown"
+        data-test="session-ribbon-overview"
+      >
+        <div
+          v-for="bar in bars"
+          :key="bar.index"
+          class="tw:flex-1 tw:min-w-0 tw:rounded-t-[1px] tw:transition-opacity"
+          :style="{
+            height: Math.max(2, bar.pct) + '%',
+            background: bar.color,
+            opacity: bar.index >= windowStart && bar.index < windowEnd ? 1 : 0.3,
+          }"
+        />
+        <!-- selected window: drag the body to pan, or either edge to resize -->
+        <div
+          class="tw:absolute tw:top-0 tw:bottom-0 tw:rounded-[2px] tw:border tw:border-[color-mix(in_srgb,var(--o2-text-primary)_45%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)]"
+          :class="dragging ? 'tw:cursor-grabbing' : 'tw:cursor-grab'"
+          :style="{ left: brushLeftPct + '%', width: brushWidthPct + '%' }"
+          @pointerdown.stop="(e) => beginDrag('pan', e)"
+        >
+          <!-- left resize handle (overhangs the edge so it's easy to grab) -->
+          <div
+            class="tw:absolute tw:top-0 tw:bottom-0 tw:-left-[4px] tw:w-[9px] tw:cursor-ew-resize tw:flex tw:items-center tw:justify-center"
+            @pointerdown.stop="(e) => beginDrag('resize-left', e)"
+          >
+            <div class="tw:w-[2px] tw:h-[55%] tw:rounded tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_60%,transparent)]" />
+          </div>
+          <!-- right resize handle -->
+          <div
+            class="tw:absolute tw:top-0 tw:bottom-0 tw:-right-[4px] tw:w-[9px] tw:cursor-ew-resize tw:flex tw:items-center tw:justify-center"
+            @pointerdown.stop="(e) => beginDrag('resize-right', e)"
+          >
+            <div class="tw:w-[2px] tw:h-[55%] tw:rounded tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_60%,transparent)]" />
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed } from "vue";
+import { ref, computed, watch, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -193,35 +245,187 @@ const bars = computed(() =>
   }),
 );
 
-// X-axis labels get crowded once there are many turns (59 bars → 59 numbers
-// jammed together). At or below this count we label every turn; above it we
-// thin to a handful of round milestones.
-const ALL_LABELS_MAX = 10;
+// ── Focus + context (brush-to-zoom) ─────────────────────────────────────────
+// A many-turn session won't fit as readable, labelled bars in one strip. Rather
+// than page through it, we keep a thin OVERVIEW of the whole session on top with
+// a draggable, RESIZABLE window, and render just that window as the detailed
+// ribbon below — so you get the whole-session shape AND legible turns at once.
+const DEFAULT_WINDOW = 20;
+const MIN_WINDOW = 5;
+// Hard cap on how wide the window can be resized — past this the detail bars get
+// too thin to read, which is the very thing the window is meant to avoid.
+const MAX_WINDOW = 40;
+const total = computed(() => bars.value.length);
+// Overview + window mode kicks in only when there are more turns than the
+// default window; at or below it the detail ribbon just shows them all.
+const windowed = computed(() => total.value > DEFAULT_WINDOW);
 
-// Round the raw step (total / ~target labels) up to a "nice" number — 1, 2, 5
-// or 10 × a power of ten — so labels land on readable milestones (…10, 20, 30
-// or …25, 50, 75) instead of arbitrary turns.
-function niceStep(total: number, targetCount: number): number {
-  const raw = total / targetCount;
+// How many turns the window spans (user-resizable, MIN_WINDOW..MAX_WINDOW) and
+// where it starts.
+const windowSize = ref(DEFAULT_WINDOW);
+const windowStart = ref(0);
+// Largest window this session allows: never more than MAX_WINDOW, nor more turns
+// than exist.
+const sizeCap = computed(() =>
+  Math.max(MIN_WINDOW, Math.min(MAX_WINDOW, total.value || MIN_WINDOW)),
+);
+// Clamp the desired size to [MIN_WINDOW, sizeCap].
+const effectiveWindow = computed(() =>
+  Math.min(Math.max(windowSize.value, MIN_WINDOW), sizeCap.value),
+);
+const maxStart = computed(() => Math.max(0, total.value - effectiveWindow.value));
+const windowEnd = computed(() => windowStart.value + effectiveWindow.value); // exclusive
+
+// Reset to the default window at the start whenever the session changes.
+watch(total, () => {
+  windowStart.value = 0;
+  windowSize.value = DEFAULT_WINDOW;
+});
+
+// Turns rendered in the detailed ribbon: the whole session when it fits,
+// otherwise just the selected window.
+const detailBars = computed(() =>
+  bars.value.slice(windowStart.value, windowEnd.value),
+);
+
+// Brush rectangle geometry, as percentages of the overview width.
+const brushLeftPct = computed(() =>
+  total.value ? (windowStart.value / total.value) * 100 : 0,
+);
+const brushWidthPct = computed(() =>
+  total.value ? (effectiveWindow.value / total.value) * 100 : 100,
+);
+
+const clamp = (v: number, lo: number, hi: number) =>
+  Math.min(hi, Math.max(lo, v));
+
+// ── Drag the window: pan the body, or resize from either edge ───────────────
+const overviewTrackRef = ref<HTMLElement | null>(null);
+const dragging = ref(false);
+type DragMode = "pan" | "resize-left" | "resize-right";
+let dragState:
+  | {
+      mode: DragMode;
+      startX: number;
+      startStart: number;
+      startSize: number;
+      trackLeft: number;
+      trackWidth: number;
+    }
+  | null = null;
+
+// Turn index under the given client X (fractional), using the geometry captured
+// at drag start.
+function turnAtClientX(clientX: number): number {
+  if (!dragState) return 0;
+  return ((clientX - dragState.trackLeft) / dragState.trackWidth) * total.value;
+}
+
+function beginDrag(mode: DragMode, e: PointerEvent) {
+  const el = overviewTrackRef.value;
+  if (!el || total.value === 0) return;
+  e.preventDefault();
+  const rect = el.getBoundingClientRect();
+  dragState = {
+    mode,
+    startX: e.clientX,
+    startStart: windowStart.value,
+    startSize: effectiveWindow.value,
+    trackLeft: rect.left,
+    trackWidth: rect.width,
+  };
+  dragging.value = true;
+  document.body.style.cursor = mode === "pan" ? "grabbing" : "ew-resize";
+  document.body.style.userSelect = "none";
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", onPointerUp);
+}
+
+// Click on the bare track recenters the window there, then pans from the grab.
+function onTrackPointerDown(e: PointerEvent) {
+  const el = overviewTrackRef.value;
+  if (!el || total.value === 0) return;
+  const rect = el.getBoundingClientRect();
+  const center = ((e.clientX - rect.left) / rect.width) * total.value;
+  windowStart.value = clamp(
+    Math.round(center - effectiveWindow.value / 2),
+    0,
+    maxStart.value,
+  );
+  beginDrag("pan", e);
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (!dragState) return;
+  const { mode, startX, startStart, startSize, trackWidth } = dragState;
+  if (mode === "pan") {
+    const deltaTurns = Math.round(
+      ((e.clientX - startX) / trackWidth) * total.value,
+    );
+    windowStart.value = clamp(
+      startStart + deltaTurns,
+      0,
+      total.value - effectiveWindow.value,
+    );
+  } else if (mode === "resize-right") {
+    // Left edge fixed; the right edge follows the pointer → grows/shrinks size,
+    // bounded by MIN_WINDOW and MAX_WINDOW (and the end of the session).
+    const newEnd = clamp(
+      Math.round(turnAtClientX(e.clientX)),
+      startStart + MIN_WINDOW,
+      Math.min(total.value, startStart + MAX_WINDOW),
+    );
+    windowSize.value = newEnd - startStart;
+  } else {
+    // resize-left: right edge fixed; the left edge follows the pointer, bounded
+    // so the window stays within MIN_WINDOW..MAX_WINDOW.
+    const fixedEnd = startStart + startSize;
+    const newStart = clamp(
+      Math.round(turnAtClientX(e.clientX)),
+      Math.max(0, fixedEnd - MAX_WINDOW),
+      fixedEnd - MIN_WINDOW,
+    );
+    windowStart.value = newStart;
+    windowSize.value = fixedEnd - newStart;
+  }
+}
+
+function onPointerUp() {
+  dragState = null;
+  dragging.value = false;
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+  window.removeEventListener("pointermove", onPointerMove);
+  window.removeEventListener("pointerup", onPointerUp);
+}
+
+onUnmounted(() => {
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+  window.removeEventListener("pointermove", onPointerMove);
+  window.removeEventListener("pointerup", onPointerUp);
+});
+
+// ── Detail x-axis labels ────────────────────────────────────────────────────
+// Up to the default window every visible bar is labelled; if the window is
+// resized larger, thin to evenly-spaced milestones so numbers don't cram.
+function niceStep(n: number, target: number): number {
+  const raw = n / target;
   const pow = Math.pow(10, Math.floor(Math.log10(raw)));
   const norm = raw / pow;
   const nice = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
   return Math.max(1, nice * pow);
 }
-
-// The set of 1-based turn numbers that should print an x-axis label: every turn
-// when there are few, otherwise turn 1 plus each round step (e.g. 1, 10, 20, 30…
-// for 59 turns). Bars without a label still render an empty spacer span.
-const labeledTurns = computed<Set<number>>(() => {
-  const total = bars.value.length;
+const detailLabeled = computed<Set<number>>(() => {
+  const vis = detailBars.value;
   const set = new Set<number>();
-  if (total <= ALL_LABELS_MAX) {
-    for (let n = 1; n <= total; n++) set.add(n);
+  if (vis.length <= DEFAULT_WINDOW) {
+    for (const b of vis) set.add(b.index + 1);
     return set;
   }
-  const step = niceStep(total, 8);
-  set.add(1);
-  for (let n = step; n <= total; n += step) set.add(n);
+  const step = niceStep(vis.length, 10);
+  set.add(vis[0].index + 1);
+  for (let i = step; i < vis.length; i += step) set.add(vis[i].index + 1);
   return set;
 });
 </script>

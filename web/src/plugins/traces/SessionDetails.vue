@@ -237,7 +237,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="card.filterErrors"
               variant="outline-destructive"
               size="xs"
-              icon-left="filter-alt"
               data-test="session-detail-filter-errors"
               @click="filterToErrors"
             >

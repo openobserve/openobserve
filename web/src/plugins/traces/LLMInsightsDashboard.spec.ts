@@ -47,7 +47,6 @@ const mockKpi = ref({
   errorCount: 0,
   totalTokens: 0,
   totalCost: 0,
-  avgDurationMicros: 0,
   p95DurationMicros: 0,
 });
 const mockSparklines = ref({
@@ -58,6 +57,7 @@ const mockSparklines = ref({
   errorRate: [],
 });
 const mockLoading = ref(false);
+const mockP95Loading = ref(false);
 const mockError = ref<string | null>(null);
 const mockHasLoadedOnce = ref(false);
 const mockAvailableStreams = ref<string[]>([]);
@@ -68,6 +68,7 @@ vi.mock("./composables/useLLMInsights", () => ({
     kpi: mockKpi,
     sparklines: mockSparklines,
     loading: mockLoading,
+    p95Loading: mockP95Loading,
     error: mockError,
     hasLoadedOnce: mockHasLoadedOnce,
     availableStreams: mockAvailableStreams,
@@ -167,7 +168,6 @@ beforeEach(() => {
     errorCount: 0,
     totalTokens: 0,
     totalCost: 0,
-    avgDurationMicros: 0,
     p95DurationMicros: 0,
   };
   mockSparklines.value = {
@@ -178,6 +178,7 @@ beforeEach(() => {
     errorRate: [],
   };
   mockLoading.value = false;
+  mockP95Loading.value = false;
   mockError.value = null;
   mockHasLoadedOnce.value = false;
   mockAvailableStreams.value = [];
