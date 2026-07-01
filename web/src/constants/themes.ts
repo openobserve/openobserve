@@ -80,11 +80,11 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
     id: 10,
     name: "O2 Signature",
     light: {
-      themeColor: "#575FC5",
+      themeColor: "#6B76E3",
       themeColorOpacity: 10,
     },
     dark: {
-      themeColor: "#6069D3",
+      themeColor: "#8B8DF0",
       themeColorOpacity: 10,
     },
   },
