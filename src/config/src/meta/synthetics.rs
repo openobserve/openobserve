@@ -217,6 +217,10 @@ pub enum SyntheticStatus {
     Down,
     #[default]
     Unknown,
+    /// O2 infra could not dispatch or complete the check (Lambda missing, creds expired, etc.).
+    /// Distinct from Down: the target service health is unknown — it's a probe infrastructure
+    /// issue.
+    Failed,
 }
 
 impl SyntheticStatus {
@@ -226,6 +230,7 @@ impl SyntheticStatus {
             1 => Self::Up,
             2 => Self::Warning,
             3 => Self::Down,
+            4 => Self::Failed,
             _ => Self::Unknown,
         }
     }
@@ -236,6 +241,7 @@ impl SyntheticStatus {
             Self::Up => 1,
             Self::Warning => 2,
             Self::Down => 3,
+            Self::Failed => 4,
             Self::Unknown => 0,
         }
     }
@@ -708,12 +714,14 @@ mod tests {
         assert_eq!(SyntheticStatus::from_db(1), SyntheticStatus::Up);
         assert_eq!(SyntheticStatus::from_db(2), SyntheticStatus::Warning);
         assert_eq!(SyntheticStatus::from_db(3), SyntheticStatus::Down);
+        assert_eq!(SyntheticStatus::from_db(4), SyntheticStatus::Failed);
         assert_eq!(SyntheticStatus::from_db(99), SyntheticStatus::Unknown);
 
         assert_eq!(SyntheticStatus::Unknown.to_db(), 0);
         assert_eq!(SyntheticStatus::Up.to_db(), 1);
         assert_eq!(SyntheticStatus::Warning.to_db(), 2);
         assert_eq!(SyntheticStatus::Down.to_db(), 3);
+        assert_eq!(SyntheticStatus::Failed.to_db(), 4);
     }
 
     #[test]
