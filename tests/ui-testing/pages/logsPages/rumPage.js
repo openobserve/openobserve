@@ -64,8 +64,9 @@ export class RumPage {
     }
 
     async selectPastOneHour() {
-        const pastHourOption = this.page.locator('text=Past 1 Hour').or(this.page.locator('text=Past 1 hour'));
-        await pastHourOption.click();
+        // Shared DateTime component relative-range button (pattern:
+        // date-time-relative-{value}-{unit}-btn) — label text is not stable.
+        await this.page.locator('[data-test="date-time-relative-1-h-btn"]').click();
         await this.page.waitForTimeout(1000);
     }
 
