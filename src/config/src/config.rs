@@ -125,12 +125,15 @@ const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 10] = [
     "llm_output",
 ];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    let cfg = get_config();
+    let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {
+        &_DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS
+    } else {
+        &[]
+    };
     let mut fields = chain(
-        _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS
-            .iter()
-            .map(|s| s.to_string()),
-        get_config()
-            .common
+        default_fields.iter().map(|s| s.to_string()),
+        cfg.common
             .feature_fulltext_extra_fields
             .split(',')
             .filter_map(|s| {
@@ -151,12 +154,15 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
 const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 3] =
     ["trace_id", "service_name", "operation_name"];
 pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    let cfg = get_config();
+    let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {
+        &_DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS
+    } else {
+        &[]
+    };
     let mut fields = chain(
-        _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS
-            .iter()
-            .map(|s| s.to_string()),
-        get_config()
-            .common
+        default_fields.iter().map(|s| s.to_string()),
+        cfg.common
             .feature_secondary_index_extra_fields
             .split(',')
             .filter_map(|s| {
@@ -195,10 +201,15 @@ pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
 
 const _DEFAULT_DISTINCT_FIELDS: [&str; 2] = ["service_name", "operation_name"];
 pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    let cfg = get_config();
+    let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {
+        &_DEFAULT_DISTINCT_FIELDS
+    } else {
+        &[]
+    };
     let mut fields = chain(
-        _DEFAULT_DISTINCT_FIELDS.iter().map(|s| s.to_string()),
-        get_config()
-            .common
+        default_fields.iter().map(|s| s.to_string()),
+        cfg.common
             .feature_distinct_extra_fields
             .split(',')
             .filter_map(|s| {
@@ -219,7 +230,7 @@ pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
 pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = get_config()
         .common
-        .bloom_filter_default_fields
+        .feature_bloom_filter_extra_fields
         .split(',')
         .filter_map(|s| {
             let s = s.trim();
@@ -982,10 +993,18 @@ pub struct Common {
         help = "Show field values dropdown for full text search fields in the logs page field list"
     )]
     pub show_fts_field_values: bool,
+    #[env_config(
+        name = "ZO_FEATURE_DEFAULT_INDEX_FIELDS_ENABLED",
+        default = true,
+        help = "When false, the built-in default fields for full text search, secondary index and distinct values are disabled; only the fields from the *_EXTRA_FIELDS ENVs and per-stream settings are used"
+    )]
+    pub feature_default_index_fields_enabled: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_INDEX_EXTRA_FIELDS", default = "")]
     pub feature_secondary_index_extra_fields: String,
+    #[env_config(name = "ZO_FEATURE_BLOOM_FILTER_EXTRA_FIELDS", default = "")]
+    pub feature_bloom_filter_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
     pub feature_distinct_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
@@ -1098,6 +1117,10 @@ pub struct Common {
         help = "Enable bloom filter for parquet files"
     )]
     pub bloom_filter_parquet_enabled: bool,
+    #[deprecated(
+        since = "0.92.0",
+        note = "Please use `ZO_FEATURE_BLOOM_FILTER_EXTRA_FIELDS` instead. This ENV will be removed in v1.0.0"
+    )]
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
     #[env_config(
@@ -2922,6 +2945,25 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
+    // migrate deprecated ZO_BLOOM_FILTER_DEFAULT_FIELDS into
+    // ZO_FEATURE_BLOOM_FILTER_EXTRA_FIELDS for backward compatibility
+    #[allow(deprecated)]
+    if !cfg.common.bloom_filter_default_fields.is_empty() {
+        log::warn!(
+            "ZO_BLOOM_FILTER_DEFAULT_FIELDS is deprecated and will be removed in v1.0.0, please use ZO_FEATURE_BLOOM_FILTER_EXTRA_FIELDS instead"
+        );
+        if cfg.common.feature_bloom_filter_extra_fields.is_empty() {
+            cfg.common.feature_bloom_filter_extra_fields =
+                cfg.common.bloom_filter_default_fields.clone();
+        } else {
+            cfg.common.feature_bloom_filter_extra_fields = format!(
+                "{},{}",
+                cfg.common.feature_bloom_filter_extra_fields,
+                cfg.common.bloom_filter_default_fields
+            );
+        }
+    }
+
     // check bloom filter fpp: must be a probability in (0, 1)
     if cfg.common.bloom_filter_fpp <= 0.0 || cfg.common.bloom_filter_fpp >= 1.0 {
         log::warn!(
@@ -4128,6 +4170,44 @@ mod tests {
         cfg.limit.logs_query_retention = "weekly".to_string();
         check_limit_config(&mut cfg).unwrap();
         assert_eq!(cfg.limit.logs_query_retention, "weekly");
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_check_common_config_bloom_filter_fields_migration() {
+        let mut cfg = Config::init().unwrap();
+        // deprecated ZO_BLOOM_FILTER_DEFAULT_FIELDS should migrate to the new ENV
+        cfg.common.bloom_filter_default_fields = "trace_id,span_id".to_string();
+        cfg.common.feature_bloom_filter_extra_fields = "".to_string();
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(
+            cfg.common.feature_bloom_filter_extra_fields,
+            "trace_id,span_id"
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_check_common_config_bloom_filter_fields_merge() {
+        let mut cfg = Config::init().unwrap();
+        // when both ENVs are set, the deprecated one is merged into the new one
+        cfg.common.bloom_filter_default_fields = "span_id".to_string();
+        cfg.common.feature_bloom_filter_extra_fields = "trace_id".to_string();
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(
+            cfg.common.feature_bloom_filter_extra_fields,
+            "trace_id,span_id"
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_check_common_config_bloom_filter_fields_no_migration() {
+        let mut cfg = Config::init().unwrap();
+        cfg.common.bloom_filter_default_fields = "".to_string();
+        cfg.common.feature_bloom_filter_extra_fields = "trace_id".to_string();
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.common.feature_bloom_filter_extra_fields, "trace_id");
     }
 
     #[test]
