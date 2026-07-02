@@ -29,6 +29,20 @@ const MIME = {
 };
 
 /**
+ * Rewrite the CDN bundle version segment in browsersdk.openobserve.ai URLs,
+ * e.g. .../0.3.3/openobserve-rum.js -> .../<version>/openobserve-rum.js.
+ * Lets the suite test any RELEASED SDK version (the CDN has no "latest"
+ * alias) without editing the sample app. No-op when version is falsy.
+ */
+function templateSdkVersion(source, version) {
+  if (!version) return source;
+  return source.replace(
+    /(browsersdk\.openobserve\.ai\/)[^/'"]+(\/)/g,
+    `$1${version}$2`,
+  );
+}
+
+/**
  * Rewrite the OO_CONFIG values inside the sample's oo-rum.js. We replace values
  * by key with a targeted regex so the rest of the sample code is untouched.
  */
@@ -49,6 +63,9 @@ function templateOoRum(source, cfg) {
   out = set(out, 'version', cfg.version);
   // insecureHTTP is a boolean, not a quoted string.
   out = out.replace(/(insecureHTTP\s*:\s*)(true|false)/, `$1${cfg.insecureHTTP}`);
+  // Test-only: force-enable profiling (default sample rate is 0) so the e2e
+  // suite exercises the lazy profiler chunk download from the CDN.
+  out = out.replace(/(\n(\s*)sessionSampleRate\s*:)/, '\n$2profilingSampleRate: 100,$1');
   return out;
 }
 
@@ -63,6 +80,9 @@ function templateOoRum(source, cfg) {
  * @param {string} [opts.env="e2e"]
  * @param {string} [opts.version="1.0.0"]
  * @param {string} [opts.applicationId="e2e-rum-app"]
+ * @param {string} [opts.sdkVersion] override the CDN bundle version in the
+ *   sample's <script> URLs (must be a released version, e.g. "0.3.4");
+ *   omit to test the version pinned in the sample HTML
  * @param {number} [opts.port=0] 0 = random free port
  * @returns {Promise<{url:string, origin:string, port:number, close:()=>Promise<void>}>}
  */
@@ -76,6 +96,7 @@ function startFixtureServer(opts) {
     env: opts.env || 'e2e',
     version: opts.version || '1.0.0',
     applicationId: opts.applicationId || 'e2e-rum-app',
+    sdkVersion: opts.sdkVersion || null,
   };
 
   const server = http.createServer((req, res) => {
@@ -99,6 +120,14 @@ function startFixtureServer(opts) {
       if (path.basename(filePath) === 'oo-rum.js') {
         const templated = templateOoRum(fs.readFileSync(filePath, 'utf8'), cfg);
         res.writeHead(200, headers).end(templated);
+        return;
+      }
+
+      // Every sample page carries the CDN async loader — rewrite the bundle
+      // version on all of them so post-navigation pages load the same SDK.
+      if (ext === '.html' && cfg.sdkVersion) {
+        const html = templateSdkVersion(fs.readFileSync(filePath, 'utf8'), cfg.sdkVersion);
+        res.writeHead(200, headers).end(html);
         return;
       }
 
@@ -241,6 +270,7 @@ module.exports = {
   startFixtureServer,
   startNpmFixtureServer,
   templateOoRum,
+  templateSdkVersion,
   rewriteHtmlForNpm,
   SAMPLE_DIR,
 };

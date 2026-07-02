@@ -5,6 +5,9 @@
  *   1. Create / read a RUM token from the token API (mirrors the Ingestion UI).
  *   2. Serve the existing `examples/cdn-rum-sample` app, templated with that
  *      token, loading the LIVE CDN bundles from browsersdk.openobserve.ai.
+ *      The bundle version tracks the latest release published in the
+ *      browser-sdk README (fallback: RUM_SDK_VERSION env, then the version
+ *      pinned in the sample HTML) — see utils/rum-sdk-version.js.
  *   3. Load it in a real browser, drive deterministic interactions, and let the
  *      SDK emit genuine beacons.
  *   4. Verify data flow in THREE layers:
@@ -27,6 +30,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { startFixtureServer } = require('../../fixtures/rum/serve.js');
 const { getOrCreateRumToken } = require('../utils/rum-token-api.js');
+const { resolveCdnSdkVersion } = require('../utils/rum-sdk-version.js');
 const { waitForStreamRows } = require('../utils/rum-stream-verify.js');
 const { driveRumSampleInteractions } = require('../utils/rum-traffic.js');
 
@@ -41,8 +45,17 @@ const RUN_ID = Date.now();
 const SERVICE = `e2e-rum-cdn-${RUN_ID}`;
 let server;
 let rumToken;
+// Resolved in beforeAll: latest release from the browser-sdk README, else the
+// RUM_SDK_VERSION env var, else null (version pinned in the sample HTML).
+let sdkVersion = null;
 // Beacon tallies captured during generation (Layer 0).
 const beacons = { rum: 0, logs: 0, replay: 0 };
+// CDN sub-resources (main bundles + lazy recorder/profiler chunks) observed
+// during generation, and any that failed to load.
+const cdnAssets = [];
+const cdnFailures = [];
+// SDK session generated in Layer 0 — used to verify the replay recording.
+let sessionId = null;
 
 test.describe('RUM CDN Data Flow', { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
@@ -50,6 +63,7 @@ test.describe('RUM CDN Data Flow', { tag: '@enterprise' }, () => {
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
     rumToken = await getOrCreateRumToken(page);
+    sdkVersion = await resolveCdnSdkVersion(page);
     await page.close();
     expect(rumToken, 'RUM token should be available').toBeTruthy();
 
@@ -62,8 +76,13 @@ test.describe('RUM CDN Data Flow', { tag: '@enterprise' }, () => {
       env: 'e2e',
       version: '1.0.0',
       applicationId: `e2e-rum-app-${RUN_ID}`,
+      sdkVersion,
     });
-    testLogger.info('RUM fixture server started', { url: server.url, service: SERVICE });
+    testLogger.info('RUM fixture server started', {
+      url: server.url,
+      service: SERVICE,
+      sdkVersion: sdkVersion || 'pinned in sample HTML',
+    });
   });
 
   test.afterAll(async () => {
@@ -79,6 +98,11 @@ test.describe('RUM CDN Data Flow', { tag: '@enterprise' }, () => {
     const app = await context.newPage();
 
     // Capture ingestion beacons before any navigation. Categorise by endpoint.
+    // NOTE: this counts request INITIATIONS, not deliveries — in-flight fetches
+    // can be net::ERR_ABORTED by the flush navigation, and when the instance
+    // sends no CORS headers for this origin the browser hides responses even
+    // for delivered beacons. Delivery is therefore verified against the
+    // streams below, BEFORE the app closes (closing kills the SDK's retries).
     app.on('request', (req) => {
       const url = req.url();
       if (!url.includes(`/rum/v1/${ORG}/`)) return;
@@ -87,14 +111,35 @@ test.describe('RUM CDN Data Flow', { tag: '@enterprise' }, () => {
       else if (url.includes('/rum')) beacons.rum += 1;
     });
 
-    // Load the fixture and wait for the live CDN bundle to arrive.
+    // Track every CDN asset the SDK pulls at runtime. Session replay and
+    // profiling are lazy webpack chunks (chunks/{recorder,profiler}-<hash>-
+    // openobserve-rum.js) downloaded AFTER init — a missing/broken chunk
+    // silently kills recording, so each one must be observed with a 2xx.
+    app.on('response', (res) => {
+      if (!res.url().includes('browsersdk.openobserve.ai')) return;
+      cdnAssets.push({ url: res.url(), status: res.status() });
+    });
+    app.on('requestfailed', (req) => {
+      if (!req.url().includes('browsersdk.openobserve.ai')) return;
+      cdnFailures.push({ url: req.url(), error: (req.failure() || {}).errorText });
+    });
+
+    // Load the fixture and wait for the live CDN bundle to arrive. When an
+    // explicit SDK version was requested, a missing bundle (CDN 403s unknown
+    // versions) must fail loudly instead of degrading into a beacon timeout.
     await app.goto(server.url, { waitUntil: 'domcontentloaded' });
-    await app
+    const bundleRes = await app
       .waitForResponse(
         (r) => r.url().includes('browsersdk.openobserve.ai') && r.url().includes('openobserve-rum'),
         { timeout: 30000 },
       )
-      .catch(() => testLogger.warn('CDN rum bundle response not observed'));
+      .catch(() => null);
+    if (!bundleRes) testLogger.warn('CDN rum bundle response not observed');
+    if (sdkVersion) {
+      expect(bundleRes, `CDN bundle response for requested version ${sdkVersion}`).toBeTruthy();
+      expect(bundleRes.url(), 'bundle URL carries the requested version').toContain(`/${sdkVersion}/`);
+      expect(bundleRes.status(), `CDN served version ${sdkVersion} (is it released?)`).toBe(200);
+    }
     // Let onReady() init + session replay start.
     await app.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -105,11 +150,26 @@ test.describe('RUM CDN Data Flow', { tag: '@enterprise' }, () => {
       .poll(() => beacons.rum + beacons.logs, { timeout: 20000, intervals: [1000, 2000, 3000] })
       .toBeGreaterThan(0);
 
+    // Hold the app open until rows are actually queryable in BOTH streams —
+    // the SDK (still live on the fixture pages) retries aborted batches.
+    const dataRows = await waitForStreamRows(app, {
+      sql: `SELECT * FROM "_rumdata" WHERE service = '${SERVICE}'`,
+      minRows: 1,
+      timeoutMs: 60000,
+    });
+    const logRows = await waitForStreamRows(app, {
+      sql: `SELECT * FROM "_rumlog" WHERE service = '${SERVICE}'`,
+      minRows: 1,
+      timeoutMs: 30000,
+    });
+
     await app.close();
 
     testLogger.info('Beacon tallies', beacons);
     expect(beacons.rum, '_rumdata beacons fired').toBeGreaterThan(0);
     expect(beacons.logs, '_rumlog beacons fired').toBeGreaterThan(0);
+    expect(dataRows.length, `_rumdata delivery confirmed for ${SERVICE}`).toBeGreaterThan(0);
+    expect(logRows.length, `_rumlog delivery confirmed for ${SERVICE}`).toBeGreaterThan(0);
   });
 
   // ==========================================================================

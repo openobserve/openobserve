@@ -25,6 +25,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { startNpmFixtureServer } = require('../../fixtures/rum/serve.js');
 const { getOrCreateRumToken } = require('../utils/rum-token-api.js');
+const { resolveNpmSdkVersion } = require('../utils/rum-sdk-version.js');
 const { waitForStreamRows } = require('../utils/rum-stream-verify.js');
 const { driveRumSampleInteractions } = require('../utils/rum-traffic.js');
 
@@ -42,12 +43,39 @@ let server;
 let rumToken;
 const beacons = { rum: 0, logs: 0, replay: 0 };
 
-/** Build the esbuild bundle once (installs deps if node_modules is missing). */
-function ensureBundleBuilt() {
-  if (fs.existsSync(BUNDLE_PATH)) return;
-  if (!fs.existsSync(path.join(NPM_APP_DIR, 'node_modules'))) {
-    testLogger.info('Installing npm fixture deps…');
-    execSync('npm ci || npm install', { cwd: NPM_APP_DIR, stdio: 'inherit', timeout: 300000 });
+/** Version of @openobserve/browser-rum currently installed in the fixture. */
+function installedSdkVersion() {
+  try {
+    const pkg = path.join(NPM_APP_DIR, 'node_modules', '@openobserve', 'browser-rum', 'package.json');
+    return JSON.parse(fs.readFileSync(pkg, 'utf8')).version || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build the esbuild bundle, tracking the latest published SDK.
+ * When the registry's `latest` (or the RUM_SDK_VERSION fallback) differs from
+ * the installed packages, reinstall at that version and rebuild — so the suite
+ * always tests new releases without manual bumps. If no target version could
+ * be resolved (offline), an existing bundle is reused as-is.
+ */
+function ensureBundleBuilt(targetVersion) {
+  const installed = installedSdkVersion();
+  const stale = targetVersion && installed !== targetVersion;
+
+  if (fs.existsSync(BUNDLE_PATH) && !stale) {
+    testLogger.info('Reusing npm fixture bundle', { installed });
+    return;
+  }
+
+  if (stale || !fs.existsSync(path.join(NPM_APP_DIR, 'node_modules'))) {
+    testLogger.info('Installing npm fixture deps…', { installed, targetVersion });
+    const spec = targetVersion || 'latest';
+    execSync(
+      `npm install @openobserve/browser-rum@${spec} @openobserve/browser-logs@${spec}`,
+      { cwd: NPM_APP_DIR, stdio: 'inherit', timeout: 300000 },
+    );
   }
   testLogger.info('Building npm fixture bundle…');
   execSync('npm run build', { cwd: NPM_APP_DIR, stdio: 'inherit', timeout: 120000 });
@@ -57,8 +85,13 @@ test.describe('RUM NPM Data Flow', { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeAll(async ({ browser }) => {
-    ensureBundleBuilt();
+    const targetVersion = resolveNpmSdkVersion();
+    ensureBundleBuilt(targetVersion);
     expect(fs.existsSync(BUNDLE_PATH), 'npm bundle should be built').toBe(true);
+    if (targetVersion) {
+      expect(installedSdkVersion(), 'bundled SDK matches the latest published version')
+        .toBe(targetVersion);
+    }
 
     const page = await browser.newPage();
     rumToken = await getOrCreateRumToken(page);
@@ -88,6 +121,9 @@ test.describe('RUM NPM Data Flow', { tag: '@enterprise' }, () => {
   }, async ({ context }) => {
     const app = await context.newPage();
 
+    // Capture ingestion beacons before any navigation. Categorise by endpoint.
+    // NOTE: counts request INITIATIONS — delivery is verified against the
+    // streams below, before the app closes (see rum-cdn-dataflow.spec.js).
     app.on('request', (req) => {
       const url = req.url();
       if (!url.includes(`/rum/v1/${ORG}/`)) return;
@@ -109,11 +145,26 @@ test.describe('RUM NPM Data Flow', { tag: '@enterprise' }, () => {
       .poll(() => beacons.rum + beacons.logs, { timeout: 20000, intervals: [1000, 2000, 3000] })
       .toBeGreaterThan(0);
 
+    // Hold the app open until rows are actually queryable in BOTH streams —
+    // the SDK (still live on the fixture pages) retries aborted batches.
+    const dataRows = await waitForStreamRows(app, {
+      sql: `SELECT * FROM "_rumdata" WHERE service = '${SERVICE}'`,
+      minRows: 1,
+      timeoutMs: 60000,
+    });
+    const logRows = await waitForStreamRows(app, {
+      sql: `SELECT * FROM "_rumlog" WHERE service = '${SERVICE}'`,
+      minRows: 1,
+      timeoutMs: 30000,
+    });
+
     await app.close();
 
     testLogger.info('Beacon tallies', beacons);
     expect(beacons.rum, '_rumdata beacons fired').toBeGreaterThan(0);
     expect(beacons.logs, '_rumlog beacons fired').toBeGreaterThan(0);
+    expect(dataRows.length, `_rumdata delivery confirmed for ${SERVICE}`).toBeGreaterThan(0);
+    expect(logRows.length, `_rumlog delivery confirmed for ${SERVICE}`).toBeGreaterThan(0);
   });
 
   test('_rumdata stream receives events for this run', {
