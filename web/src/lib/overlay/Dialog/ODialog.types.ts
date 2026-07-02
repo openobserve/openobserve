@@ -44,6 +44,13 @@ export interface DialogProps {
    */
   width?: number;
 
+  /**
+   * Dialog panel max-height as a percentage of the viewport height (1–100).
+   * Translates directly to a `vh` unit, e.g. `maxHeight={60}` → `60vh`.
+   * When omitted, defaults to 90vh.
+   */
+  maxHeight?: number;
+
   // ── Header subtitle ────────────────────────────────────────────────────
 
   /**

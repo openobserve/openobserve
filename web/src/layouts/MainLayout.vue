@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @navigate-to-docs="navigateToDocs"
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
+        @open-shortcuts="openShortcutsList"
         @signout="signout"
       />
     </header>
@@ -144,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
     <CommunitySlackInvite />
     <PredefinedThemes />
+    <ShortcutCheatsheet v-model:open="showShortcuts" />
   </div>
 </template>
 
@@ -200,6 +202,9 @@ import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useShortcut } from "@/lib/vue-shortcut-manager";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -222,6 +227,7 @@ export default defineComponent({
     ThemeSwitcher,
     PredefinedThemes,
     O2AIChat,
+    ShortcutCheatsheet,
     GetStarted,
     CommunitySlackInvite,
     ODialog,
@@ -1155,6 +1161,12 @@ export default defineComponent({
       { immediate: true },
     );
 
+    const showShortcuts = ref(false);
+    const openShortcutsList = () => { showShortcuts.value = true; };
+
+    // ── Global shortcuts: AI Chat ─────────────────────────────────────────
+    useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
+
     return {
       t,
       router,
@@ -1199,6 +1211,8 @@ export default defineComponent({
       getConfig,
       setRumUser,
       openPredefinedThemes,
+      showShortcuts,
+      openShortcutsList,
       isPredefinedThemesOpen,
       handleMenuHover,
     };

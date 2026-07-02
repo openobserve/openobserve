@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-panel-data-view-query-inspector-btn"
               icon-left="info-outline"
             >
-              <OTooltip side="left" align="center" content="Query Inspector" />
+              <OTooltip side="left" align="center" content="Query Inspector" shortcut-id="panelEditorQueryInspector" />
             </OButton>
             <DateTimePickerDashboard
               v-if="selectedDate"
@@ -243,6 +243,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 
@@ -1719,6 +1721,29 @@ export default defineComponent({
     ) => {
       isCachedDataDifferWithCurrentTimeRange.value = data;
     };
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "panelEditorRun",
+        handler: () => runQuery(false),
+      },
+      {
+        id: "panelEditorSave",
+        handler: () => savePanelData.execute(),
+      },
+      {
+        id: "panelEditorBack",
+        handler: () => goBack(),
+      },
+      {
+        id: "panelEditorQueryInspector",
+        handler: () => {
+          if (isInputFocused()) return;
+          showViewPanel.value = true;
+        },
+      },
+    ]);
 
     // Breadcrumb root crumb → dashboards list (module root).
     const goToDashboardList = () => {

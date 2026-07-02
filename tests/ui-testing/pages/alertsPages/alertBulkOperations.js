@@ -380,15 +380,17 @@ export class AlertBulkOperations {
         await kebabButton.waitFor({ state: 'visible', timeout: 5000 });
         await kebabButton.click();
 
+        const deleteOption = this.page.locator(`[data-test="alert-list-${alertName}-delete-alert"]`);
+
         try {
-            await this.page.getByText('Delete', { exact: true }).waitFor({ state: 'visible', timeout: 3000 });
+            await deleteOption.waitFor({ state: 'visible', timeout: 3000 });
         } catch (e) {
             testLogger.warn('Delete option not visible after first kebab click, retrying', { alertName });
             await kebabButton.click();
-            await this.page.getByText('Delete', { exact: true }).waitFor({ state: 'visible', timeout: 5000 });
+            await deleteOption.waitFor({ state: 'visible', timeout: 5000 });
         }
 
-        await this.page.getByText('Delete', { exact: true }).click();
+        await deleteOption.click();
         await this.page.locator(this.locators.confirmButton).click();
         await expect(this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.alertDeletedMessage })).toBeVisible();
         await this.page.waitForTimeout(1000);

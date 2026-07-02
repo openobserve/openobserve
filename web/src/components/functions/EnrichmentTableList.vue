@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -202,6 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     @click="exploreEnrichmentTable(row)"
                     icon-left="search"
+                    data-row-action="view"
                   />
 
                   <!-- Schema Settings button - show for uploaded tables or completed URL jobs -->
@@ -213,6 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     @click="listSchema(row)"
                     icon-left="format-list-bulleted"
+                    data-row-action="view"
                   />
 
                   <!-- Edit button - show for uploaded tables, completed URL jobs, or failed URL jobs (to add more URLs) -->
@@ -224,6 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     @click="showAddUpdateFn(row)"
                     icon-left="edit"
+                    data-row-action="edit"
                   />
 
                   <!-- Delete button - always visible -->
@@ -234,6 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     @click="showDeleteDialogFn(row)"
                     icon-left="delete"
+                    data-row-action="delete"
                   />
                 </div>
               </template>
@@ -455,7 +459,7 @@ export default defineComponent({
     onBeforeMount(() => {
       getLookupTables();
     });
-    //here we need to check if the action is there or not 
+    //here we need to check if the action is there or not
     //because if action is there user before refresh the page user was there in add / update page
     //so to maitain consistency we are checking the action and if action is there we are showing the add / update page
     //else we are showing the list of enrichment tables
