@@ -183,7 +183,15 @@ async function onDateChange(value: any) {
   }
   writeToUrl();
   await nextTick();
-  sessionsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
+  // `userChangedValue` distinguishes a genuine user date pick from the
+  // programmatic window replay DateTime fires on every mount. Only the former
+  // forces a re-fetch; the mount replay lets SessionsList restore its cached
+  // list (so returning from a session detail doesn't re-hit the API).
+  sessionsRef.value?.refresh?.(
+    timeRange.value.startTime,
+    timeRange.value.endTime,
+    value?.userChangedValue === true,
+  );
 }
 
 async function refresh() {
