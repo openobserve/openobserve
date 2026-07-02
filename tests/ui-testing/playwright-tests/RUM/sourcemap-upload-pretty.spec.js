@@ -356,9 +356,17 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
     expect(uploadRes.ok(), `delete-flow group upload should succeed (HTTP ${uploadRes.status()})`).toBe(true);
     await ingestFixtureErrors(page, [fixtureErrorEvent('typeError', DELMAP_SERVICE)], DELMAP_SERVICE);
 
-    // Delete the group through the real UI flow.
-    await page.goto(`${BASE}/web/rum/source-maps?org_identifier=${ORG}`);
+    // Delete the group through the real UI flow. Wait for DOM readiness only —
+    // the full "load" event is flaky on slow runners and the row assertion
+    // below is the real readiness signal.
+    await page.goto(`${BASE}/web/rum/source-maps?org_identifier=${ORG}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60000,
+    });
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await expect(
+      page.locator('[data-test^="o2-table-row-"]', { hasText: DELMAP_SERVICE }).first(),
+    ).toBeVisible({ timeout: 15000 });
 
     await page.locator(`[data-test="source-maps-${DELMAP_SERVICE}-delete"]`).click();
     await expect(page.locator('[data-test="delete-source-maps-dialog"]')).toBeVisible({ timeout: 10000 });
