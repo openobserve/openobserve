@@ -1722,7 +1722,10 @@ export class AlertCreationWizard {
             // Exact match — operators overlap as substrings (">" ⊂ ">="), so anchor the
             // regex (operator chars are regex-special and must be escaped).
             const operatorExact = new RegExp(`^\\s*${operator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
-            await promqlOptionsByText.filter({ hasText: operatorExact }).first().click();
+            const promqlOperatorMatch = promqlOptionsByText.filter({ hasText: operatorExact });
+            // Fail fast with a clear locator error instead of a 30s click timeout if nothing matches.
+            await expect(promqlOperatorMatch.first()).toBeVisible({ timeout: 5000 });
+            await promqlOperatorMatch.first().click();
         }
         await this.page.waitForTimeout(300);
         testLogger.info('Set PromQL condition operator', { operator });
