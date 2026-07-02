@@ -15,7 +15,10 @@ export class RumPage {
         this.appTableContainer = '[data-test="rum-app-errors-table"]';
         this.tableBody = '[data-test="o2-table-body"]';
         this.tableRow = '[data-test^="o2-table-row-"]';
-        this.errorViewerContainer = '.error-viewer-container';
+        // Comma-OR selector: the container's class was replaced by a data-test
+        // attribute on main (da867fb16a) — match both so the tests work
+        // against binaries built before AND after that change.
+        this.errorViewerContainer = '[data-test="error-viewer-container"], .error-viewer-container';
         this.errorStacksSection = '.error-stacks';
 
         // Store first error data from query response
@@ -145,9 +148,12 @@ export class RumPage {
     }
 
     async expectTagsSectionVisible() {
-        // Use first() to avoid strict mode violation (multiple .tags-title elements exist)
-        const tagsSection = this.page.locator('.tags-title').first();
-        await expect(tagsSection).toBeVisible({ timeout: 5000 });
+        // The .tags-title class was removed on main (da867fb16a). The OS icon's
+        // alt text is stable across builds before and after that change, with
+        // the legacy class kept as a fallback for older embedded frontends.
+        const tagsSection = this.page.getByAltText('OS').first()
+            .or(this.page.locator('.tags-title').first());
+        await expect(tagsSection.first()).toBeVisible({ timeout: 5000 });
     }
 
     async getErrorViewerContainerText() {
