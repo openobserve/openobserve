@@ -21,6 +21,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
     "
   >
+    <!-- Toolbar: Stream/Agent toggle + picker. Only in the full-page skeleton
+         when the real toolbar is hidden (initial !streamsLoaded). On a mid-session
+         switch the real toolbar is already shown, so `hideToolbar` drops this to
+         avoid a duplicate toggle/picker row. The kpiOnly variant never shows it. -->
+    <div
+      v-if="!kpiOnly && !hideToolbar"
+      class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:py-[0.5rem]"
+    >
+      <SkeletonBox width="116px" height="32px" rounded />
+      <SkeletonBox width="14rem" height="36px" rounded />
+    </div>
+
     <!-- Row 1: 5 KPI cards -->
     <div class="tw:grid tw:grid-cols-5 tw:gap-[0.625rem]">
       <div
@@ -33,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <SkeletonBox width="60%" height="12px" rounded />
         <SkeletonBox width="55%" height="22px" rounded />
-        <SkeletonBox width="40%" height="10px" rounded />
         <div class="kpi-tile__spark">
           <SkeletonBox
             v-for="bar in 16"
@@ -47,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Row 2 & 3: 2-column trend panel grid -->
-    <div class="tw:grid tw:grid-cols-2 tw:gap-[0.625rem]">
+    <div v-if="!kpiOnly" class="tw:grid tw:grid-cols-2 tw:gap-[0.625rem]">
       <div
         v-for="n in 4"
         :key="n"
@@ -81,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Row 4: tw:w-full recent errors table -->
     <div
+      v-if="!kpiOnly"
       class="panel-tile"
       :class="
         store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
@@ -106,12 +118,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useStore } from "vuex";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 
+// kpiOnly: render just the KPI tiles row. Used when the trend/table panels
+// render live underneath (firing their own queries) while only the KPI strip
+// is still loading — so the panels aren't blocked behind the KPI fetch.
+defineProps<{ kpiOnly?: boolean; hideToolbar?: boolean }>();
+
 const store = useStore();
 </script>
 
 <style scoped lang="scss">
 .llm-insights-skeleton {
-  padding-top: 0.625rem;
+  // No padding-top: the real content spaces its first row with mt-[0.625rem]
+  // (live KPI grid + the kpiOnly call-site class), and the full-page skeleton's
+  // toolbar row sits flush like the real toolbar. Adding pt here would
+  // double-count and shift every row down on the skeleton→content swap.
 }
 
 .kpi-tile,
@@ -138,7 +158,7 @@ const store = useStore();
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  height: 130px;
+  height: 134px;
 
   &__spark {
     display: flex;

@@ -1,32 +1,44 @@
 <template>
   <aside class="eval-form-page__side eval-form-page__side--test">
-    <section class="eval-test-panel">
-      <h3>
-        <OIcon name="play-arrow" size="xs" />
-        {{ t("onlineEvals.scorer.testPanel.title") }}
-      </h3>
-      <p>{{ t("onlineEvals.scorer.testPanel.hint") }}</p>
+    <div class="ts">
+      <!-- Header -->
+      <div class="ts__head">
+        <h3 class="ts__title">{{ t("onlineEvals.scorer.testPanel.title") }}</h3>
+        <p class="ts__subtitle">{{ t("onlineEvals.scorer.testPanel.hint") }}</p>
+      </div>
 
-      <div v-if="variables.length" class="eval-test-panel__fields">
-        <label v-for="variable in variables" :key="variable">
-          <code v-text="formatTemplateVariable(variable)" />
+      <!-- Variable inputs -->
+      <div v-if="variables.length" class="ts__fields">
+        <div v-for="variable in variables" :key="variable" class="ts__field">
+          <label class="ts__label">{{ formatTemplateVariable(variable) }}</label>
           <textarea
+            class="ts__textarea"
             :value="inputs[variable]"
             :rows="variable === 'metadata' ? 2 : 3"
-            :placeholder="t('onlineEvals.scorer.testPanel.valuePlaceholder', { variable: formatTemplateVariable(variable) })"
-            @input="updateInput(variable, ($event.target as HTMLTextAreaElement).value)"
+            :placeholder="
+              t('onlineEvals.scorer.testPanel.valuePlaceholder', {
+                variable: formatTemplateVariable(variable),
+              })
+            "
+            :data-test="`scorer-test-input-${variable}`"
+            @input="
+              updateInput(variable, ($event.target as HTMLTextAreaElement).value)
+            "
           />
-        </label>
+        </div>
+      </div>
+      <div v-else class="ts__empty">
+        {{ t("onlineEvals.scorer.testPanel.emptyPrefix")
+        }}<code v-text="'{{ input }}'" />{{
+          t("onlineEvals.scorer.testPanel.emptySuffix")
+        }}
       </div>
 
-      <div v-else class="eval-test-panel__empty">
-        {{ t("onlineEvals.scorer.testPanel.emptyPrefix") }}<code v-text="'{{ input }}'" />{{ t("onlineEvals.scorer.testPanel.emptySuffix") }}
-      </div>
-
-      <div class="eval-test-panel__actions">
+      <!-- Run -->
+      <div class="ts__actions">
         <OButton
-          type="button"
-          icon-left="play-arrow"
+          variant="primary"
+          size="sm-action"
           :loading="state === 'running'"
           :disabled="state === 'running' || !canRun"
           :title="canRun ? undefined : t('onlineEvals.scorer.testPanel.disabledHint')"
@@ -35,31 +47,36 @@
         >
           {{ t("onlineEvals.scorer.testPanel.runButton") }}
         </OButton>
+        <span
+          v-if="!canRun && state !== 'running'"
+          class="ts__disabled-hint"
+          data-test="scorer-test-disabled-hint"
+        >
+          {{ t("onlineEvals.scorer.testPanel.disabledHint") }}
+        </span>
       </div>
 
-      <p
-        v-if="!canRun && state !== 'running'"
-        class="eval-test-panel__disabled-hint"
-        data-test="scorer-test-disabled-hint"
+      <!-- Result — only shown once a test has run (no idle placeholder box). -->
+      <div
+        v-if="state !== 'idle'"
+        class="ts__result"
+        :class="`is-${state}`"
+        data-test="scorer-test-result"
       >
-        {{ t("onlineEvals.scorer.testPanel.disabledHint") }}
-      </p>
-
-      <div class="eval-test-panel__result" :class="`is-${state}`" data-test="scorer-test-result">
-        <template v-if="state === 'idle'">
-          {{ t("onlineEvals.scorer.testPanel.stateIdle") }}
-        </template>
-
-        <template v-else-if="state === 'running'">
-          {{ t("onlineEvals.scorer.testPanel.stateRunning") }}
+        <template v-if="state === 'running'">
+          <span class="ts__result-running">{{
+            t("onlineEvals.scorer.testPanel.stateRunning")
+          }}</span>
         </template>
 
         <template v-else-if="state === 'success' && result">
-          <strong>{{ t("onlineEvals.scorer.testPanel.successHeader") }}</strong>
-          <dl class="eval-test-panel__result-grid">
+          <strong class="ts__result-head">{{
+            t("onlineEvals.scorer.testPanel.successHeader")
+          }}</strong>
+          <dl class="ts__grid">
             <template v-if="displayValue !== null">
               <dt>{{ t("onlineEvals.scorer.testPanel.resultScore") }}</dt>
-              <dd class="eval-test-panel__result-score">{{ displayValue }}</dd>
+              <dd class="ts__grid-score">{{ displayValue }}</dd>
             </template>
             <template v-if="latencyLabel">
               <dt>{{ t("onlineEvals.scorer.testPanel.resultLatency") }}</dt>
@@ -67,32 +84,34 @@
             </template>
             <template v-if="modelLabel">
               <dt>{{ t("onlineEvals.scorer.testPanel.resultModel") }}</dt>
-              <dd class="eval-test-panel__result-mono">{{ modelLabel }}</dd>
+              <dd class="ts__grid-mono">{{ modelLabel }}</dd>
             </template>
             <template v-if="tokensLabel">
               <dt>{{ t("onlineEvals.scorer.testPanel.resultTokens") }}</dt>
               <dd>{{ tokensLabel }}</dd>
             </template>
           </dl>
-          <details v-if="reasoningText" class="eval-test-panel__details">
+          <details v-if="reasoningText" class="ts__details">
             <summary>{{ t("onlineEvals.scorer.testPanel.resultReasoning") }}</summary>
             <p>{{ reasoningText }}</p>
           </details>
-          <details v-if="rawResponseText" class="eval-test-panel__details">
+          <details v-if="rawResponseText" class="ts__details">
             <summary>{{ t("onlineEvals.scorer.testPanel.resultRaw") }}</summary>
             <pre>{{ rawResponseText }}</pre>
           </details>
         </template>
 
         <template v-else>
-          <strong>{{ t("onlineEvals.scorer.testPanel.errorHeader") }}</strong>
-          <p class="eval-test-panel__error-message">{{ errorText }}</p>
-          <p v-if="latencyLabel" class="eval-test-panel__error-meta">
+          <strong class="ts__result-head">{{
+            t("onlineEvals.scorer.testPanel.errorHeader")
+          }}</strong>
+          <p class="ts__error-message">{{ errorText }}</p>
+          <p v-if="latencyLabel" class="ts__error-meta">
             {{ t("onlineEvals.scorer.testPanel.resultLatency") }}: {{ latencyLabel }}
           </p>
         </template>
       </div>
-    </section>
+    </div>
   </aside>
 </template>
 
@@ -100,7 +119,6 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { ScorerTestResult } from "@/services/online-evals.service";
 import { formatTemplateVariable } from "../../utils/evalFormat";
 
@@ -184,179 +202,227 @@ const tokensLabel = computed(() => {
   const parts: string[] = [];
   if (promptTokens.value != null) parts.push(`p:${promptTokens.value}`);
   if (completionTokens.value != null) parts.push(`c:${completionTokens.value}`);
-  return parts.length ? `${totalTokens.value} (${parts.join(", ")})` : String(totalTokens.value);
+  return parts.length
+    ? `${totalTokens.value} (${parts.join(", ")})`
+    : String(totalTokens.value);
 });
 
 const errorText = computed(
-  () => props.errorMessage || props.result?.error || t("onlineEvals.scorer.testPanel.errorFallback"),
+  () =>
+    props.errorMessage ||
+    props.result?.error ||
+    t("onlineEvals.scorer.testPanel.errorFallback"),
 );
 </script>
 
 <style lang="scss" scoped>
+// Right rail (AddAlert pattern): a left-border divider separates it from the
+// form column. No floating-card bg/shadow.
 .eval-form-page__side--test {
-  padding: 0;
+  flex: 3.5;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  border-left: 1px solid var(--color-border-default, var(--o2-border));
+  padding: 8px 10px;
 }
 
-.eval-test-panel {
-  min-height: 100%;
-  padding: 20px;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
-}
-
-.eval-test-panel h3 {
+.ts {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 6px;
-  color: var(--o2-text);
-  font-size: 14px;
-  font-weight: 700;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px;
 }
 
-.eval-test-panel p,
-.eval-test-panel__empty,
-.eval-test-panel__result {
-  color: var(--o2-text-muted);
+/* — Header — */
+.ts__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ts__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary, currentColor);
+}
+
+.ts__subtitle {
+  margin: 0;
   font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.eval-test-panel p {
-  margin: 0 0 16px;
-}
-
-.eval-test-panel__fields {
+/* — Inputs — */
+.ts__fields {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.eval-test-panel label {
+.ts__field {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.eval-test-panel code {
-  color: var(--o2-text);
-  font: 700 12px var(--o2-font-mono);
+.ts__label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary, currentColor);
 }
 
-.eval-test-panel textarea,
-.eval-test-panel select {
-  border: 1px solid var(--o2-border-input);
-  border-radius: 4px;
-  background: var(--o2-card-bg-solid);
-  color: var(--o2-text);
-  font: 400 12px var(--o2-font);
-}
-
-.eval-test-panel textarea {
+.ts__textarea {
+  width: 100%;
+  box-sizing: border-box;
   padding: 8px 9px;
+  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border-radius: 4px;
+  background: var(--color-card-bg);
+  color: var(--color-text-primary, currentColor);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.5;
   resize: vertical;
   max-height: 160px;
   overflow-y: auto;
 }
 
-.eval-test-panel__empty {
+.ts__textarea::placeholder {
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.ts__textarea:focus {
+  outline: none;
+  border-color: var(--color-primary-600, #3f7994);
+}
+
+.ts__empty {
   padding: 10px 12px;
-  border: 1px solid var(--o2-border);
+  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
   border-radius: 6px;
-  background: var(--o2-card-bg-solid);
+  background: var(--color-card-bg);
+  font-size: 12px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.eval-test-panel__actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 150px;
-  gap: 8px;
-  margin-top: 14px;
+.ts__empty code {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-text-primary, currentColor);
 }
 
-.eval-test-panel__disabled-hint {
-  margin: 6px 0 0;
+/* — Run — */
+.ts__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.ts__disabled-hint {
   font-size: 11px;
   font-style: italic;
-  color: var(--o2-text-muted);
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.eval-test-panel__result {
+/* — Result — */
+.ts__result {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-height: 84px;
-  margin-top: 16px;
   padding: 12px;
-  border: 1px solid var(--o2-border);
+  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
   border-radius: 6px;
-  background: var(--o2-card-bg-solid);
+  background: var(--color-card-bg);
+  font-size: 12px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.eval-test-panel__result.is-success {
-  border-color: color-mix(in srgb, var(--o2-status-success-text) 35%, var(--o2-border));
-  color: var(--o2-status-success-text);
+.ts__result.is-success {
+  border-color: color-mix(
+    in srgb,
+    var(--o2-status-success-text) 35%,
+    var(--o2-border)
+  );
 }
 
-.eval-test-panel__result.is-error {
-  border-color: color-mix(in srgb, var(--o2-status-error-text) 35%, var(--o2-border));
+.ts__result.is-error {
+  border-color: color-mix(
+    in srgb,
+    var(--o2-status-error-text) 35%,
+    var(--o2-border)
+  );
+}
+
+.ts__result-running {
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.ts__result-head {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary, currentColor);
+}
+
+.ts__result.is-error .ts__result-head {
   color: var(--o2-status-error-text);
 }
 
-.eval-test-panel__result strong {
-  color: var(--o2-text);
-  font-size: 13px;
-}
-
-.eval-test-panel__result-grid {
+.ts__grid {
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 4px 12px;
   margin: 0;
-  color: var(--o2-text-secondary);
-  font-size: 12px;
 }
 
-.eval-test-panel__result-grid dt {
-  color: var(--o2-text-muted);
+.ts__grid dt {
+  color: var(--color-text-secondary, var(--o2-text-secondary));
   font-weight: 500;
 }
 
-.eval-test-panel__result-grid dd {
+.ts__grid dd {
   margin: 0;
-  color: var(--o2-text);
+  color: var(--color-text-primary, currentColor);
 }
 
-.eval-test-panel__result-score {
-  font: 700 13px var(--o2-font-mono);
+.ts__grid-score {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
 }
 
-.eval-test-panel__result-mono {
-  font: 500 12px var(--o2-font-mono);
+.ts__grid-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
-.eval-test-panel__details {
-  border-top: 1px solid var(--o2-border);
+.ts__details {
+  border-top: 1px solid var(--color-dialog-header-border, var(--o2-border));
   padding-top: 8px;
-  color: var(--o2-text-secondary);
 }
 
-.eval-test-panel__details summary {
+.ts__details summary {
   cursor: pointer;
-  color: var(--o2-text);
+  color: var(--color-text-primary, currentColor);
   font-size: 12px;
   font-weight: 600;
 }
 
-.eval-test-panel__details p,
-.eval-test-panel__details pre {
+.ts__details p,
+.ts__details pre {
   margin: 6px 0 0;
-  color: var(--o2-text-secondary);
-  font: 400 11.5px var(--o2-font-mono);
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  font-family: var(--font-mono);
+  font-size: 11.5px;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-.eval-test-panel__error-message {
+.ts__error-message {
   margin: 0;
   color: var(--o2-status-error-text);
   font-size: 12px;
@@ -364,9 +430,9 @@ const errorText = computed(
   word-break: break-word;
 }
 
-.eval-test-panel__error-meta {
+.ts__error-meta {
   margin: 0;
-  color: var(--o2-text-muted);
+  color: var(--color-text-secondary, var(--o2-text-secondary));
   font-size: 11.5px;
 }
 </style>

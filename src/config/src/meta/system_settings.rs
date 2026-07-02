@@ -139,6 +139,8 @@ impl std::str::FromStr for SettingCategory {
 pub mod keys {
     /// Semantic field groups for dimension extraction
     pub const SEMANTIC_FIELD_GROUPS: &str = "semantic_field_groups";
+    /// Gen-AI agent name/id fallback mapping
+    pub const GEN_AI_AGENT_MAPPING: &str = "gen_ai_agent_mapping";
     /// UI theme preference
     pub const THEME: &str = "theme";
     /// Scrape interval for metrics

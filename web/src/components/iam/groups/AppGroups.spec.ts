@@ -24,6 +24,12 @@ import router from "@/test/unit/helpers/router";
 vi.mock("@/services/iam", () => ({
   getGroups: vi.fn(),
   deleteGroup: vi.fn(),
+  bulkDeleteGroups: vi.fn(async () => ({
+    data: { successful: [], unsuccessful: [] },
+  })),
+  getGroup: vi.fn(async () => ({
+    data: { name: "dev", users: ["u1@o2.ai", "u2@o2.ai"], roles: ["admin"] },
+  })),
 }));
 
 vi.mock("@/services/reodotdev_analytics", () => ({
@@ -326,11 +332,76 @@ describe("AppGroups Component", () => {
 
     it("shows confirm dialog when delete icon is clicked", async () => {
       const testGroup = { group_name: "test-group" };
-      
+
       wrapper.vm.showConfirmDialog(testGroup);
-      
+
       expect(wrapper.vm.deleteConformDialog.show).toBe(true);
       expect(wrapper.vm.deleteConformDialog.data).toEqual(testGroup);
+    });
+  });
+
+  describe("Create flow auto-route", () => {
+    it("routes to editGroup on the roles tab after create", async () => {
+      const routerPushSpy = vi
+        .spyOn(router, "push")
+        .mockResolvedValue(undefined as any);
+      await wrapper.vm.onGroupAdded({ group_name: "NewGroup" });
+      expect(routerPushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "editGroup",
+          params: { group_name: "NewGroup" },
+          query: expect.objectContaining({ tab: "roles" }),
+        }),
+      );
+    });
+
+    it("falls back to refreshing the list when no group_name is provided", async () => {
+      const { getGroups } = await import("@/services/iam");
+      const routerPushSpy = vi
+        .spyOn(router, "push")
+        .mockResolvedValue(undefined as any);
+      routerPushSpy.mockClear();
+      vi.mocked(getGroups).mockClear();
+      vi.mocked(getGroups).mockResolvedValue(
+        createMockAxiosResponse([]) as any,
+      );
+      await wrapper.vm.onGroupAdded({});
+      expect(routerPushSpy).not.toHaveBeenCalled();
+      expect(getGroups).toHaveBeenCalled();
+    });
+  });
+
+  describe("Delete blast-radius warning", () => {
+    it("builds a single-delete warning with the live member count", async () => {
+      const { getGroup } = await import("@/services/iam");
+      await wrapper.vm.showConfirmDialog({ group_name: "dev" });
+      await flushPromises();
+      expect(getGroup).toHaveBeenCalledWith(
+        "dev",
+        store.state.selectedOrganization.identifier,
+      );
+      // Two mocked members → message mentions "2".
+      expect(wrapper.vm.deleteImpactMessage).toContain("2");
+    });
+
+    it("shows the live member count when exactly one group is bulk-selected", async () => {
+      wrapper.vm.selectedGroups = [{ group_name: "dev" }];
+      await wrapper.vm.openBulkDeleteDialog();
+      await flushPromises();
+      expect(wrapper.vm.bulkDeleteImpactMessage).toContain("2");
+    });
+
+    it("uses static copy (no fetch) when multiple groups are bulk-selected", async () => {
+      const { getGroup } = await import("@/services/iam");
+      vi.mocked(getGroup).mockClear();
+      wrapper.vm.selectedGroups = [
+        { group_name: "dev" },
+        { group_name: "ops" },
+      ];
+      await wrapper.vm.openBulkDeleteDialog();
+      await flushPromises();
+      expect(getGroup).not.toHaveBeenCalled();
+      expect(wrapper.vm.bulkDeleteImpactMessage).toBeTruthy();
     });
   });
 

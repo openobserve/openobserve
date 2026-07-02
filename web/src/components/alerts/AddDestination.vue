@@ -892,6 +892,10 @@ const setupDestinationData = () => {
             if (key.startsWith("credential_")) {
               const credentialKey = key.replace("credential_", "");
               credentials[credentialKey] = value;
+            } else if (key === "routing_key") {
+              // PagerDuty stores the integration key as the bare `routing_key`
+              // metadata variable (substituted into the request body).
+              credentials.integrationKey = value;
             }
           });
         } catch (e) {
@@ -917,9 +921,12 @@ const setupDestinationData = () => {
           : props.destination.emails;
       }
 
-      // For PagerDuty, integrationKey is in headers (if present)
+      // For PagerDuty, integrationKey is restored from the routing_key metadata
+      // above. Fall back to the legacy X-Routing-Key header for destinations
+      // saved before the key was moved into the request body.
       if (
         typeId === "pagerduty" &&
+        !credentials.integrationKey &&
         props.destination.headers?.["X-Routing-Key"]
       ) {
         credentials.integrationKey = props.destination.headers["X-Routing-Key"];

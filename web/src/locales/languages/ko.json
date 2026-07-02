@@ -3123,6 +3123,25 @@
     "aiToolsets": "AI 툴셋",
     "llmModelPricing": "LLM 모델 가격 책정",
     "ingestionTokens": "인제스트 토큰",
+    "genAiAgentMapping": {
+      "tabLabel": "젠아이 에이전트 매핑",
+      "title": "젠아이 에이전트 매핑",
+      "description": "LLM 추적 및 평가를 위한 에이전트 ID를 정규화하는 데 사용되는 폴백 텔레메트리 속성을 구성합니다.",
+      "howItWorksTitle": "매핑 작동 방식",
+      "howItWorksDescription": "OpenObserve는 먼저 표준 gen_ai.agent.name 및 gen_ai.agent.id 속성을 보존합니다.이러한 목록은 표준 속성이 없거나 비어 있는 경우에만 검사됩니다.수신 텔레메트리 속성을 한 줄에 하나씩 추가합니다.",
+      "agentNameFields": "상담원 이름 폴백 필드",
+      "agentNameHelp": "gen_ai.agent.name의 폴백으로 사용할 들어오는 속성입니다.",
+      "agentIdFields": "에이전트 ID 폴백 필드",
+      "agentIdHelp": "gen_ai.agent.id의 폴백으로 사용할 수신 속성입니다.",
+      "fieldsPlaceholder": "에이전트 이름\nllm.agent.name",
+      "applyDefaults": "기본값 적용",
+      "resetToEmpty": "빈 상태로 재설정",
+      "defaultsSource": "기본값은 openobserve/sdr_patterns 에서 로드되며 이 조직에 저장하기 전에 수정할 수 있습니다.",
+      "saved": "GenAI 에이전트 매핑이 성공적으로 저장되었습니다.",
+      "loadFailed": "GenAI 에이전트 매핑을 로드하지 못했습니다.",
+      "saveFailed": "GenAI 에이전트 매핑을 저장하지 못했습니다.",
+      "defaultsLoadFailed": "GenAI 에이전트 매핑 기본값을 로드하지 못했습니다."
+    },
     "groupGeneral": "일반",
     "groupAccessSecurity": "접근 및 보안",
     "groupDestinationsTemplates": "대상 및 템플릿",
@@ -5756,6 +5775,14 @@
         "title": "최근 오류",
         "subtitle": "지난 10개의 실패한 스팬"
       }
+    },
+    "subtitle": {
+      "llmInsights": "LLM 트래픽 전반에서 지연 시간, 오류, 토큰 및 비용을 추적할 수 있습니다.",
+      "sessions": "상담원 세션을 차례대로 찾아보고 살펴보세요",
+      "quality": "LLM 응답의 품질 평가 및 추적",
+      "evalJobs": "세션 전반에서 평가 작업 실행 및 모니터링",
+      "scorers": "LLM 결과를 채점하는 채점자 생성 및 관리",
+      "scoreConfigs": "평가에 사용되는 채점 루브릭을 구성합니다."
     }
   },
   "logs": {

@@ -30,8 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="thread-view tw:flex tw:flex-col tw:w-full tw:h-full"
     :class="{ 'thread-view--dark': isDark }"
   >
-    <!-- Summary toolbar — sidebar-style badge chips. -->
-    <div class="thread-summary">
+    <!-- Summary toolbar — sidebar-style badge chips. Hidden in the Session
+         Detail Pretty view (those metrics already show in the KPI cards). -->
+    <div v-if="props.showSummary" class="thread-summary">
       <OTag
         type="metricChip"
         class="thread-chip thread-chip--steps"
@@ -131,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <template v-for="group in traceGroups" :key="group.traceId">
+      <template v-for="group in displayGroups" :key="group.traceId">
         <!-- Hint about historical user messages from prior traces in the
              same session — these are answered in earlier traces. -->
         <div
@@ -187,91 +188,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ u.content }}
           </div>
 
-          <!-- Assistant text. -->
+          <!-- Tool calls — between the user input and the assistant output
+               (the model calls tools, then answers). Shared component, also
+               used by the Session Detail collapsed turn body. -->
+          <ThreadToolCalls
+            :tool-calls="turn.toolCalls"
+            @span-selected="emit('span-selected', $event)"
+          />
+
+          <!-- Assistant text (the final answer, after any tool calls). Rendered
+               as markdown — headings, tables, code, bold. v-html is sanitized in
+               renderMarkdown(). -->
           <div
             v-for="(msg, mIdx) in turn.assistant"
             :key="`a-${mIdx}`"
-            class="thread-bubble thread-bubble--assistant"
-          >
-            {{ msg.content }}
-          </div>
+            class="thread-bubble thread-bubble--assistant markdown-body"
+            v-html="renderMarkdown(msg.content)"
+          />
 
-          <!-- Tool calls — one grouped card. -->
-          <div v-if="turn.toolCalls.length > 0" class="thread-tools-card">
-            <div class="thread-tools-card__header">
-              <span class="thread-tools-card__count">
-                {{ turn.toolCalls.length }}
-                {{ turn.toolCalls.length === 1 ? "Tool call" : "Tool calls" }}
-              </span>
-              <span class="thread-tools-card__total">
-                Σ {{ formatDuration(totalToolDuration(turn.toolCalls)) }}
-              </span>
-            </div>
-            <div
-              v-for="t in turn.toolCalls"
-              :key="t.span_id"
-              class="thread-tool"
-              :class="{ 'thread-tool--open': expandedTools.has(t.span_id) }"
-            >
-              <div class="thread-tool-row" @click="toggleTool(t.span_id)">
-                <span class="thread-tool-row__caret">{{
-                  expandedTools.has(t.span_id) ? "▾" : "▸"
-                }}</span>
-                <span class="thread-tool-row__icon">{{
-                  toolGlyph(
-                    t.tool_name || t.gen_ai_tool_name || t.operation_name,
-                  )
-                }}</span>
-                <span class="thread-tool-row__name">{{
-                  t.tool_name || t.gen_ai_tool_name || t.operation_name
-                }}</span>
-                <span class="tw:flex-1" />
-                <span
-                  class="thread-pill"
-                  :class="
-                    t.span_status === 'ERROR'
-                      ? 'thread-pill--error'
-                      : 'thread-pill--ok'
-                  "
-                >
-                  {{ t.span_status === "ERROR" ? "ERROR" : "OK" }}
-                  · {{ formatDuration(t.duration) }}
-                </span>
-                <button
-                  class="thread-tool-row__view"
-                  @click.stop="emit('span-selected', t.span_id)"
-                  title="Open span details"
-                >
-                  <OIcon name="open-in-new" size="xs" />
-                </button>
-              </div>
-
-              <div v-if="expandedTools.has(t.span_id)" class="thread-tool-body">
-                <div class="thread-tool-body__section">
-                  <div class="thread-tool-body__label">Arguments</div>
-                  <pre class="thread-tool-body__pre">{{
-                    formatToolPayload(getInputRaw(t) || t.tool_args)
-                  }}</pre>
-                </div>
-                <div class="thread-tool-body__section">
-                  <div class="thread-tool-body__label">
-                    Result
-                    <span
-                      v-if="t.span_status === 'ERROR'"
-                      class="tw:text-[#dc2626]"
-                    >
-                      · ERROR
-                    </span>
-                  </div>
-                  <pre class="thread-tool-body__pre">{{
-                    formatToolPayload(getOutputRaw(t)) ||
-                    t.status_message ||
-                    "(empty)"
-                  }}</pre>
-                </div>
-              </div>
-            </div>
-          </div>
 
           <!-- Footer. -->
           <div class="thread-turn__footer">
@@ -325,8 +259,24 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export interface Props {
   spans: any[];
   selectedSpanId?: string;
+  /**
+   * Show the summary chip strip (Steps / Tools / Duration / Cost / Model).
+   * Defaults to true for the trace explorer; the Session Detail Pretty view
+   * passes false because the same metrics already live in its KPI cards.
+   */
+  showSummary?: boolean;
+  /**
+   * Condense each trace's many LLM steps into a single bubble: the user query +
+   * all tool calls merged + only the FINAL assistant answer. Defaults to false
+   * (the trace explorer wants the full step-by-step). The Session Detail Pretty
+   * view passes true so it reads like the Collapsed summary.
+   */
+  condenseTurns?: boolean;
 }
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  showSummary: true,
+  condenseTurns: false,
+});
 const emit = defineEmits<{
   (e: "span-selected", spanId: string): void;
 }>();
@@ -334,8 +284,6 @@ const emit = defineEmits<{
 import { useStore } from "vuex";
 import {
   getModel,
-  getInputRaw,
-  getOutputRaw,
   getCost,
   getTokens,
   classify,
@@ -346,6 +294,8 @@ import {
 } from "./threadView.utils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import ThreadToolCalls from "./ThreadToolCalls.vue";
+import { renderMarkdown } from "./markdown";
 
 const store = useStore();
 
@@ -377,6 +327,52 @@ const traceGroups = computed<TraceGroup[]>(() => {
   return groups.sort((a, b) => a.rootStartTime - b.rootStartTime);
 });
 
+// What the template renders. When `condenseTurns` is on, each trace's many LLM
+// steps collapse into one synthetic turn: all tool calls merged (chronological)
+// + only the final non-empty assistant message. The footer span carries the
+// trace-level aggregates (duration / tokens / cost) so the metrics stay honest.
+const displayGroups = computed<TraceGroup[]>(() => {
+  if (!props.condenseTurns) return traceGroups.value;
+  return traceGroups.value.map((g) => {
+    if (g.turns.length <= 1) return g;
+
+    const allTools = g.turns
+      .flatMap((t) => t.toolCalls)
+      .sort((a, b) => Number(a.start_time) - Number(b.start_time));
+
+    let assistant: Message[] = [];
+    for (let i = g.turns.length - 1; i >= 0; i--) {
+      const msgs = g.turns[i].assistant.filter(
+        (m) => m.role === "assistant" && m.content,
+      );
+      if (msgs.length) {
+        assistant = msgs;
+        break;
+      }
+    }
+
+    const followupUsers = g.turns.flatMap((t) => t.followupUsers);
+    const first = g.turns[0].span;
+    const last = g.turns[g.turns.length - 1].span;
+    const totalTokens = g.turns.reduce((n, t) => n + getTokens(t.span), 0);
+    const anyError = g.turns.some((t) => t.span.span_status === "ERROR");
+
+    const mergedSpan = {
+      ...last,
+      start_time: first.start_time,
+      duration: g.totalDurationNs,
+      gen_ai_usage_cost: g.totalCost,
+      gen_ai_usage_total_tokens: totalTokens,
+      span_status: anyError ? "ERROR" : last.span_status,
+    };
+
+    return {
+      ...g,
+      turns: [{ span: mergedSpan, toolCalls: allTools, assistant, followupUsers }],
+    };
+  });
+});
+
 /** Single-trace shortcuts for the existing template (back-compat). */
 const turns = computed<Turn[]>(() =>
   traceGroups.value.length ? traceGroups.value[0].turns : [],
@@ -395,22 +391,6 @@ const historicalUserCount = computed(() =>
 
 const showSystemFull = ref(false);
 
-/* ─── tool row expansion ──────────────────────────────────────────────── */
-const expandedTools = ref<Set<string>>(new Set());
-
-function totalToolDuration(tools: any[]): number {
-  let sum = 0;
-  for (const t of tools) sum += Number(t.duration) || 0;
-  return sum;
-}
-
-function toggleTool(spanId: string) {
-  const next = new Set(expandedTools.value);
-  if (next.has(spanId)) next.delete(spanId);
-  else next.add(spanId);
-  expandedTools.value = next;
-}
-
 /* ─── visual helpers ──────────────────────────────────────────────────── */
 
 /** Model "family" glyph + accent color for the avatar. */
@@ -426,50 +406,6 @@ function modelBadge(model: string | null | undefined): {
   if (m.includes("deepseek")) return { glyph: "D", color: "#5a67d8" };
   if (m.includes("mistral")) return { glyph: "M", color: "#f97316" };
   return { glyph: "✦", color: "#10b981" };
-}
-
-/** Pick a glyph for a tool span based on its name. */
-function toolGlyph(name: string | null | undefined): string {
-  const n = String(name || "").toLowerCase();
-  if (n.includes("schema")) return "🗄";
-  if (n.includes("list") || n.includes("history")) return "📋";
-  if (n.includes("search") || n.includes("query") || n.includes("sql"))
-    return "🔍";
-  if (n.includes("read") || n.includes("get") || n.includes("fetch"))
-    return "📖";
-  if (n.includes("write") || n.includes("edit") || n.includes("create"))
-    return "✏";
-  if (n.includes("delete") || n.includes("remove")) return "🗑";
-  if (n.includes("tool") || n.includes("call")) return "⚙";
-  if (n.includes("nav")) return "🧭";
-  if (n.includes("time") || n.includes("range")) return "⏱";
-  if (n.includes("merged")) return "∑";
-  if (n.includes("skill") || n.includes("plan")) return "🧩";
-  return "▸";
-}
-
-function formatToolPayload(value: unknown): string {
-  if (value == null) return "";
-  if (typeof value === "string") {
-    // Try to pretty-print JSON, fall back to raw string.
-    const trimmed = value.trim();
-    if (
-      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-      (trimmed.startsWith("[") && trimmed.endsWith("]"))
-    ) {
-      try {
-        return JSON.stringify(JSON.parse(trimmed), null, 2);
-      } catch {
-        // not JSON
-      }
-    }
-    return trimmed;
-  }
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
 }
 
 /* ─── summary aggregates ──────────────────────────────────────────────── */
@@ -874,134 +810,6 @@ function formatTime(ns: number): string {
 }
 }
 
-/* ─── grouped tool card (secondary weight) ───────────────────────────── */
-.thread-tools-card {
-  border: 1px solid rgba(76, 175, 80, 0.18);
-  border-radius: 0.4rem;
-  background: rgba(76, 175, 80, 0.06);
-  overflow: hidden;
-
-  &__header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.3rem 0.625rem;
-    border-bottom: 1px solid rgba(76, 175, 80, 0.15);
-    font-size: 0.68rem;
-    color: #4a5568;
-  }
-
-  &__count {
-    font-weight: 600;
-    color: #4a5568;
-    letter-spacing: 0;
-    font-size: 0.72rem;
-  }
-
-  &__total {
-    margin-left: auto;
-    font-family: monospace;
-  }
-}
-
-.thread-tool {
-  border-bottom: 1px solid rgba(76, 175, 80, 0.15);
-  background: rgba(76, 175, 80, 0.04);
-  transition: background 120ms ease;
-
-  &:last-child {
-    border-bottom: none;
-  }
-
-  &--open {
-    background: rgba(76, 175, 80, 0.1);
-  }
-}
-
-.thread-tool-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.45rem 0.5rem 0.45rem 0.75rem;
-  font-size: 0.78rem;
-  cursor: pointer;
-  color: #4a5568;
-  transition: background 120ms ease;
-
-  &:hover {
-    background: rgba(76, 175, 80, 0.12);
-  }
-
-  &__caret {
-    color: #4a5568;
-    font-size: 0.7rem;
-    width: 12px;
-    text-align: center;
-  }
-
-  &__icon {
-    width: 18px;
-    height: 18px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.95rem;
-  }
-
-  &__name {
-    font-family: monospace;
-    color: #2f7a31;
-    font-weight: 500;
-  }
-
-  &__view {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 0.25rem;
-    background: transparent;
-    border: none;
-    color: var(--o2-text-3);
-    cursor: pointer;
-    line-height: 1;
-    flex-shrink: 0;
-    transition: all 120ms ease;
-
-    &:hover {
-      background: rgba(76, 175, 80, 0.18);
-      color: #2f7a31;
-    }
-  }
-}
-
-/* ─── status pills ────────────────────────────────────────────────────── */
-.thread-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.03rem;
-  font-family: monospace;
-  white-space: nowrap;
-
-  &--ok {
-    background: rgba(22, 163, 74, 0.1);
-    color: #16a34a;
-    border: 1px solid rgba(22, 163, 74, 0.25);
-  }
-
-  &--error {
-    background: rgba(220, 38, 38, 0.1);
-    color: #dc2626;
-    border: 1px solid rgba(220, 38, 38, 0.25);
-  }
-}
-
 /* ─── dark mode overrides ─────────────────────────────────────────────── */
 .thread-view--dark {
   .thread-bubble--user {
@@ -1028,63 +836,6 @@ function formatTime(ns: number): string {
     color: #c4b5fd;
     border-color: rgba(139, 92, 246, 0.4);
     box-shadow: 0 0 0 4px var(--o2-card-bg);
-  }
-
-  .thread-tools-card {
-    background: rgba(76, 175, 80, 0.08);
-    border-color: rgba(76, 175, 80, 0.22);
-
-    &__header {
-      border-bottom-color: rgba(76, 175, 80, 0.2);
-      color: #a0aec0;
-    }
-
-    &__count {
-      color: #a0aec0;
-    }
-  }
-
-  .thread-tool {
-    background: rgba(76, 175, 80, 0.06);
-    border-bottom-color: rgba(76, 175, 80, 0.2);
-    color: #a0aec0;
-
-    &--open {
-      background: rgba(76, 175, 80, 0.14);
-    }
-  }
-
-  .thread-tool-row {
-    color: #a0aec0;
-
-    &:hover {
-      background: rgba(76, 175, 80, 0.16);
-    }
-
-    &__caret {
-      color: #a0aec0;
-    }
-
-    &__name {
-      color: #6dd170;
-    }
-
-    &__view:hover {
-      background: rgba(76, 175, 80, 0.22);
-      color: #6dd170;
-    }
-  }
-
-  .thread-pill--ok {
-    background: rgba(34, 197, 94, 0.14);
-    color: #4ade80;
-    border-color: rgba(34, 197, 94, 0.3);
-  }
-
-  .thread-pill--error {
-    background: rgba(248, 113, 113, 0.14);
-    color: #f87171;
-    border-color: rgba(248, 113, 113, 0.3);
   }
 
   .thread-metric {
@@ -1127,41 +878,104 @@ function formatTime(ns: number): string {
   }
 }
 
-.thread-tool-body {
-  padding: 0.5rem 0.75rem 0.75rem;
-  background: var(--o2-bg-2, var(--o2-card-bg));
-  border-top: 1px dashed var(--o2-border-color);
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-
-  &__section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
+/* ─── markdown rendering (assistant bubble v-html) ─────────────────────────
+   Element styling for the sanitized markdown HTML. Scoped :deep is the one
+   sanctioned case for innerHTML content; colours map to --o2-* tokens. The
+   bubble's pre-wrap is reset so rendered block elements don't get extra gaps. */
+.thread-bubble--assistant.markdown-body {
+  white-space: normal;
+}
+.markdown-body {
+  :deep(> *:first-child) {
+    margin-top: 0;
   }
-
-  &__label {
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.06rem;
-    color: var(--o2-text-3);
+  :deep(> *:last-child) {
+    margin-bottom: 0;
   }
+  :deep(p) {
+    margin: 0 0 0.5rem;
+  }
+  :deep(h1),
+  :deep(h2),
+  :deep(h3),
+  :deep(h4) {
+    font-weight: 650;
+    margin: 0.75rem 0 0.35rem;
+    line-height: 1.3;
+  }
+  :deep(h1) {
+    font-size: 1.05rem;
+  }
+  :deep(h2) {
+    font-size: 0.95rem;
+  }
+  :deep(h3) {
+    font-size: 0.9rem;
+  }
+  :deep(h4) {
+    font-size: 0.85rem;
+  }
+  :deep(ul),
+  :deep(ol) {
+    margin: 0.4rem 0;
+    padding-left: 1.25rem;
+  }
+  :deep(li) {
+    margin: 0.15rem 0;
+  }
+  :deep(a) {
+    color: var(--o2-interactive-primary, #3b82f6);
+    text-decoration: none;
 
-  &__pre {
-    margin: 0;
-    padding: 0.5rem 0.625rem;
-    background: var(--o2-card-bg);
-    border: 1px solid var(--o2-border-color);
-    border-radius: 0.25rem;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  :deep(code) {
     font-family: monospace;
-    font-size: 0.72rem;
-    color: var(--o2-text-1);
-    line-height: 1.45;
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 280px;
-    overflow: auto;
+    font-size: 0.78rem;
+    background: color-mix(in srgb, var(--o2-text-primary) 8%, transparent);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+  }
+  :deep(pre) {
+    background: color-mix(in srgb, var(--o2-text-primary) 5%, transparent);
+    border: 1px solid var(--o2-border-color);
+    padding: 0.5rem 0.625rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 0.5rem 0;
+  }
+  :deep(pre code) {
+    background: transparent;
+    padding: 0;
+  }
+  :deep(blockquote) {
+    border-left: 3px solid var(--o2-border-color);
+    margin: 0.5rem 0;
+    padding-left: 0.75rem;
+    color: var(--o2-text-secondary);
+  }
+  :deep(table) {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.5rem 0;
+    font-size: 0.78rem;
+  }
+  :deep(th),
+  :deep(td) {
+    border: 1px solid var(--o2-border-color);
+    padding: 0.3rem 0.5rem;
+    text-align: left;
+  }
+  :deep(th) {
+    background: color-mix(in srgb, var(--o2-text-primary) 6%, transparent);
+    font-weight: 600;
+  }
+  :deep(hr) {
+    border: none;
+    border-top: 1px solid var(--o2-border-color);
+    margin: 0.625rem 0;
   }
 }
 </style>

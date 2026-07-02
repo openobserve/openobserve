@@ -77,6 +77,9 @@ const { track } = useReo();
 const store = useStore();
 
 const isValidGroupName = computed(() => {
+  // Keep in sync with the backend, which strips everything except
+  // [a-zA-Z0-9_] via format_role_name_only() (jwt.rs). Hyphens are NOT
+  // allowed: the backend would silently rewrite "my-group" → "my_group".
   const roleNameRegex = /^[a-zA-Z0-9_]+$/;
   return roleNameRegex.test(name.value);
 });
@@ -93,14 +96,16 @@ watch(
   }
 );
 const nameErrorMessage = computed(() =>
-  !name.value ? t('common.nameRequired') : t('iam.nameHelpText')
+  !name.value
+    ? t("iam.group.name.required")
+    : t("iam.group.name.invalidChars")
 );
 
 const saveGroup = () => {
   if (!name.value || !isValidGroupName.value) return;
   createGroup(name.value, store.state.selectedOrganization.identifier)
     .then((res) => {
-      emits("added:group", res.data);
+      emits("added:group", { group_name: name.value, data: res.data });
       emits("update:open", false);
 
       toast({
