@@ -2643,7 +2643,9 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     let cpu_num = if mem_total == 0 {
         cfg.limit.real_cpu_num
     } else {
-        cfg.limit.real_cpu_num.min(max(1, mem_total / (1024 * 1024 * 1024)))
+        cfg.limit
+            .real_cpu_num
+            .min(max(1, mem_total / (1024 * 1024 * 1024)))
     };
     // set at least 2 threads
     let cpu_num = max(2, cpu_num);
