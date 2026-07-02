@@ -91,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-sm"
           :title="t('alerts.edit')"
+          data-row-action="edit"
           @click="editConfig(row)"
           />
           <!-- Pause / Resume — tw:hidden while training or failed -->
@@ -100,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-sm"
           :title="row.enabled ? 'Pause' : 'Resume'"
+          :data-row-action="row.enabled ? 'pause' : 'resume'"
           @click="toggleEnabled(row)"
           />
           <!-- Stop Training — only shown while training -->
@@ -110,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           title="Stop Training"
           :loading="cancellingId === row.anomaly_id"
+          data-row-action="pause"
           @click="confirmCancelTraining(row)"
           />
           <!-- Retrain / Retry -->
@@ -119,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-sm"
             :title="row.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining')"
             :loading="retrainingId === row.anomaly_id"
+            data-row-action="resume"
             @click="confirmRetrain(row)"
           >
             <OIcon name="brain-circuit" size="sm" />
@@ -129,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-destructive"
           size="icon-sm"
           :title="t('alerts.delete')"
+          data-row-action="delete"
           @click="confirmDelete(row)"
           />
         </div>

@@ -134,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="search"
                 :title="t('logStream.explore')"
                 data-test="log-stream-explore-btn"
+                data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
                 @click="exploreStream({ row })"
@@ -142,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="description"
                 :title="t('logStream.schemaHeader')"
                 data-test="log-stream-schema-btn"
+                data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
                 @click="listSchema({ row })"
@@ -150,6 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="delete"
                 :title="t('logStream.delete')"
                 data-test="log-stream-delete-btn"
+                data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
                 @click="confirmDeleteAction({ row })"
@@ -297,6 +300,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -829,6 +834,26 @@ export default defineComponent({
       streamActiveTab.value = tab;
       onChangeStreamFilter(tab);
     };
+
+
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "streamsAdd",
+        handler: () => { if (!isInputFocused()) addStream(); },
+      },
+      {
+        id: "streamsRefresh",
+        handler: () => { if (!isInputFocused()) getLogStream(true); },
+      },
+      {
+        id: "streamsFocusSearch",
+        handler: () => {
+          focusSearchInput("streams-search-stream-input");
+        },
+      },
+    ]);
     return {
       t,
       router,

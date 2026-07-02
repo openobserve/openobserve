@@ -410,6 +410,8 @@ import {
   saveLogsStreamType,
   restoreLogsStreamType,
 } from "@/utils/streamPersist";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageSearch",
@@ -3215,6 +3217,76 @@ export default defineComponent({
         updateColumnsTimeout.value = null;
       }
     };
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "logsRunQuery",
+        handler: () => {
+          // In normal logs mode `handleRunQueryFn` only handles
+          // visualize/patterns/build — trigger the logs search the same way the
+          // refresh shortcut and the run button do (via the runQuery watcher).
+          const mode = searchObj.meta.logsVisualizeToggle;
+          if (!mode || mode === "logs") {
+            if (searchObj.loading) return;
+            searchObj.loading = true;
+            searchObj.runQuery = true;
+          } else {
+            handleRunQueryFn();
+          }
+        },
+      },
+      {
+        id: "logsSearchHistory",
+        handler: () => showSearchHistoryfn(),
+      },
+      {
+        id: "logsFocusQuery",
+        handler: () => {
+          // The logs query editor is Monaco — focus its inner textarea
+          // (`.monaco-editor textarea`), not a CodeMirror `.cm-editor`.
+          const el = document.querySelector<HTMLElement>(
+            '[data-test="logs-search-bar-query-editor"] textarea, [data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] .cm-editor',
+          );
+          el?.focus();
+        },
+      },
+      {
+        id: "logsRefresh",
+        handler: () => {
+          if (isInputFocused()) return;
+          if (searchObj.loading) return;
+          searchObj.loading = true;
+          searchObj.runQuery = true;
+        },
+      },
+      {
+        id: "logsToggleHistogram",
+        handler: () => {
+          if (isInputFocused()) return;
+          searchObj.meta.showHistogram = !searchObj.meta.showHistogram;
+        },
+      },
+      {
+        id: "logsToggleSidebar",
+        handler: () => {
+          searchObj.meta.showFields = !searchObj.meta.showFields;
+        },
+      },
+      {
+        id: "logsSaveView",
+        handler: () => {
+          if (isInputFocused()) return;
+          (searchBarRef.value as any)?.fnSavedView?.();
+        },
+      },
+      {
+        id: "logsExport",
+        handler: () => {
+          (searchBarRef.value as any)?.downloadLogs?.(searchObj.data?.queryResults?.hits ?? [], "csv");
+        },
+      },
+    ]);
 
     return {
       t,

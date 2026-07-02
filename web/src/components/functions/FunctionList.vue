@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -92,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     :title="t('function.updateTitle')"
                     data-test="function-list-edit-function-btn"
+                    data-row-action="edit"
                     @click="showAddUpdateFn({ row })"
                     icon-left="edit"
                   />
@@ -100,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     :title="t('function.delete')"
                     data-test="function-list-delete-function-btn"
+                    data-row-action="delete"
                     @click="showDeleteDialogFn({ row })"
                     icon-left="delete"
                   />
@@ -108,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     icon-left="account-tree"
                     :title="'Associated Pipelines'"
+                    data-row-action="view"
                     @click="getAssociatedPipelines({ row })"
                   />
                 </div>
@@ -204,6 +207,7 @@ import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
 import NoData from "../shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -220,7 +224,8 @@ import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "functionList",
@@ -666,6 +671,25 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
+
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "functionsAdd",
+        handler: () => { if (!isInputFocused()) showAddUpdateFn({}); },
+      },
+      {
+        id: "functionsRefresh",
+        handler: () => { if (!isInputFocused()) getJSTransforms(); },
+      },
+      {
+        id: "functionsFocusSearch",
+        handler: () => {
+          focusSearchInput("functions-list-search-input");
+        },
+      },
+    ]);
     return {
       t,
       store,

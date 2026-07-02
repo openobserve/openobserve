@@ -29,7 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTooltip v-if="isWebUrlNotConfigured">
       <template #content><OIcon name="warning" size="sm" class="tw:mr-1" />{{ t("search.webUrlNotConfigured") }}</template>
     </OTooltip>
-    <OTooltip v-else-if="tooltip || !showLabel" :content="tooltip || t('search.shareLink')" />
+    <OTooltip
+      v-else-if="tooltip || !showLabel"
+      :content="tooltip || t('search.shareLink')"
+      :shortcut="shortcut || undefined"
+      :shortcut-id="shortcutId || undefined"
+    />
   </OButton>
 </template>
 
@@ -75,6 +80,17 @@ export default defineComponent({
     },
     // Custom tooltip text
     tooltip: {
+      type: String,
+      default: "",
+    },
+    // Optional keyboard-shortcut hint shown in the tooltip (raw key, e.g. "ctrl+shift+c")
+    shortcut: {
+      type: String,
+      default: "",
+    },
+    // Registry shortcut id — resolves the hint key from shortcutRegistry.ts so a
+    // key change there updates this tooltip too. Prefer this over `shortcut`.
+    shortcutId: {
       type: String,
       default: "",
     },

@@ -115,6 +115,7 @@
             <div class="tw:flex tw:items-center actions-container">
               <OButton
                 :data-test="`llm-providers-${row.name}-edit-btn`"
+                data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('onlineEvals.actions.edit')"
@@ -123,6 +124,7 @@
               />
               <OButton
                 :data-test="`llm-providers-${row.name}-delete-btn`"
+                data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
                 :title="t('onlineEvals.actions.delete')"

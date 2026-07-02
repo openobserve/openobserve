@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop
           />
           <OIcon name="bar-chart" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="tw:shrink-0" />
-          <OTooltip :content="searchObj.meta.showHistogram ? t('search.hideHistogram') : t('search.showHistogramLabel')" />
+          <OTooltip :content="searchObj.meta.showHistogram ? t('search.hideHistogram') : t('search.showHistogramLabel')" shortcut-id="logsToggleHistogram" />
         </OButton>
 
         <!-- ── Pinned toolbar controls ──────────────────────────────────
@@ -406,6 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <ODropdownItem
               data-test="logs-search-bar-menu-create-saved-view-btn"
+              shortcut-id="logsSaveView"
               @select="fnSavedView"
             >
               <template #icon-left>
@@ -493,6 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownGroup :label="t('search.menuGroupHistory')">
             <ODropdownItem
               data-test="search-history-item-btn"
+              shortcut-id="logsSearchHistory"
               @select="showSearchHistoryfn"
             >
               <template #icon-left>

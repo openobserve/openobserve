@@ -9,6 +9,7 @@ import {
   TooltipArrow,
 } from "reka-ui";
 import { ref, computed, onMounted, onUnmounted, useSlots } from "vue";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 
 const props = withDefaults(defineProps<TooltipProps>(), {
   side: "top",
@@ -144,7 +145,14 @@ const contentClasses = computed(() => [
           :style="contentStyle"
           :class="contentClasses"
         >
-          <slot name="content">{{ content }}</slot>
+          <span class="tw:inline-flex tw:items-center tw:gap-1.5">
+            <slot name="content">{{ content }}</slot>
+            <OShortcut
+              v-if="shortcut || shortcutId"
+              :keys="shortcut"
+              :id="shortcutId"
+            />
+          </span>
           <TooltipArrow
             :width="10"
             :height="5"
@@ -180,7 +188,14 @@ const contentClasses = computed(() => [
             :style="contentStyle"
             :class="contentClasses"
           >
-            <slot name="content">{{ content }}</slot>
+            <span class="tw:inline-flex tw:items-center tw:gap-1.5">
+              <slot name="content">{{ content }}</slot>
+              <OShortcut
+              v-if="shortcut || shortcutId"
+              :keys="shortcut"
+              :id="shortcutId"
+            />
+            </span>
             <TooltipArrow
               :width="10"
               :height="5"
