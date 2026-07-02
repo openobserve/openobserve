@@ -33,6 +33,12 @@ import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { getRoles } from "@/services/iam";
 import segment from "@/services/segment_analytics";
+import { VueQueryPlugin, QueryClient } from "@tanstack/vue-query";
+
+// Fresh QueryClient per suite: no retries and no cache carry-over between tests.
+const testQueryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false, gcTime: 0 } },
+});
 
 
 // Create i18n instance with comprehensive translations for CI/CD compatibility
@@ -177,7 +183,12 @@ const mountUser = () =>
   mount(User, {
     global: {
       provide: { store },
-      plugins: [i18n, router, store],
+      plugins: [
+        i18n,
+        router,
+        store,
+        [VueQueryPlugin, { queryClient: testQueryClient }],
+      ],
       stubs: {
         ODialog: ODialogStub,
         UpdateUserRole: UpdateUserRoleStub,
@@ -608,9 +619,16 @@ describe("User Component", () => {
       expect(wrapper.vm.isCurrentUserInternal).toBe(true);
     });
 
-    it("should handle getOrgMembers error", async () => {
+    it("should handle getOrgMembers error without throwing", async () => {
       mockUsersService.orgUsers.mockRejectedValue(new Error("Fetch error"));
-      await expect(wrapper.vm.getOrgMembers()).rejects.toBe(false);
+      // With TanStack Query, refetch() resolves even when the fetch fails — the
+      // error is surfaced via the query's error state (and an error toast via
+      // the watch), not a rejected promise. The list is left untouched.
+      await expect(wrapper.vm.getOrgMembers()).resolves.toBeUndefined();
+      await flushPromises();
+      expect(mockUsersService.orgUsers).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+      );
     });
   });
 

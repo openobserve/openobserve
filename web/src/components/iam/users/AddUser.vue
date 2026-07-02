@@ -224,6 +224,7 @@ import {
 } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
+import useUsers from "@/composables/iam/useUsers";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -296,6 +297,14 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18n();
     const { track } = useReo();
+    // TanStack Query mutations — create/update/add-existing route through these
+    // so the users list cache is invalidated (and refetched) automatically.
+    const {
+      createUserMutation,
+      updateUserMutation,
+      updateExistingUserMutation,
+      ensureAllUserRoles,
+    } = useUsers();
     const formData: any = ref(defaultValue());
     const existingUser = ref(true);
     const beingUpdated: any = ref(false);
@@ -366,10 +375,26 @@ export default defineComponent({
         };
         if (config.isEnterprise == "true" || config.isCloud == true) {
           const orgId = store.state.selectedOrganization.identifier;
-          userServiece
-            .getUserRoles(orgId, newVal.email)
-            .then((response: any) => {
-              formData.value.custom_role = response.data;
+          // Cache-first: the users list already fetched every user's roles in a
+          // single batched request. Reuse that cached map (keyed by raw email)
+          // instead of firing a per-user API call. If the map is fresh, no
+          // request is made; if it's stale/missing, ensureAllUserRoles refetches
+          // it once. Only when this specific user isn't present in the map do we
+          // fall back to the single getUserRoles call.
+          const lookupEmail = newVal.rawEmail || newVal.email;
+          ensureAllUserRoles()
+            .then((rolesMap: Record<string, any>) => {
+              const cached =
+                rolesMap?.[lookupEmail] ?? rolesMap?.[newVal.email];
+              if (cached !== undefined) {
+                formData.value.custom_role = cached;
+                return;
+              }
+              return userServiece
+                .getUserRoles(orgId, lookupEmail)
+                .then((response: any) => {
+                  formData.value.custom_role = response.data;
+                });
             })
             .catch((error: any) => {
               console.error("Error fetching user roles:", error);
@@ -437,6 +462,9 @@ export default defineComponent({
       config,
       isStrongPassword,
       PASSWORD_POLICY_HINT,
+      createUserMutation,
+      updateUserMutation,
+      updateExistingUserMutation,
       filterFn(val: any, update: any) {
         if (val === "") {
           update(() => {
@@ -543,8 +571,12 @@ export default defineComponent({
           delete this.formData.old_password;
           delete this.formData.new_password;
         }
-        userServiece
-          .update(this.formData, selectedOrg, userEmail)
+        this.updateUserMutation
+          .mutateAsync({
+            payload: this.formData,
+            org: selectedOrg,
+            email: userEmail,
+          })
           .then((res: any) => {
             if (
               this.formData.change_password == true &&
@@ -574,15 +606,15 @@ export default defineComponent({
         if (this.existingUser) {
           const userEmail = this.formData.email;
 
-          userServiece
-            .updateexistinguser(
-              {
+          this.updateExistingUserMutation
+            .mutateAsync({
+              payload: {
                 role: this.formData.role,
                 custom_role: this.formData.custom_role,
               },
-              selectedOrg,
-              userEmail,
-            )
+              org: selectedOrg,
+              email: userEmail,
+            })
             .then((res: any) => {
               dismiss();
               this.formData.email = userEmail;
@@ -616,8 +648,8 @@ export default defineComponent({
               page: "Add User"
             });
         } else {
-          userServiece
-            .create(this.formData, selectedOrg)
+          this.createUserMutation
+            .mutateAsync({ payload: this.formData, org: selectedOrg })
             .then((res: any) => {
               dismiss();
               this.$emit("updated", res.data, this.formData, "created");

@@ -6,6 +6,11 @@ import User from "./User.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import config from "@/aws-exports";
+import { VueQueryPlugin, QueryClient } from "@tanstack/vue-query";
+
+const testQueryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false, gcTime: 0 } },
+});
 
 // Mock the services
 vi.mock("@/services/users", () => ({
@@ -15,7 +20,10 @@ vi.mock("@/services/users", () => ({
     getRoles: vi.fn(),
     getUserGroups: vi.fn(),
     getUserRoles: vi.fn(),
-    delete: vi.fn()
+    // Called by applyUsers() in enterprise/cloud mode to batch-fetch roles.
+    getAllUserRoles: vi.fn().mockResolvedValue({ data: {} }),
+    delete: vi.fn(),
+    bulkDelete: vi.fn(),
   },
 }));
 
@@ -129,7 +137,7 @@ describe("User Component", () => {
     // Mount component
     wrapper = mount(User, {
       global: {
-        plugins: [i18n],
+        plugins: [i18n, [VueQueryPlugin, { queryClient: testQueryClient }]],
         provide: {
           store: mockStore,
         },
@@ -260,11 +268,12 @@ describe("User Component", () => {
       }
       await flushPromises();
 
-      // Verify both the initial loading notification and error notification
+      // The list is now fetched via TanStack Query; a failed fetch surfaces an
+      // error toast (the loading state is shown on the table itself).
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          variant: "loading",
-          message: "Please wait while loading users..."
+          variant: "error",
+          message: "Failed to load users: Network error"
         })
       );
     });
@@ -360,7 +369,7 @@ describe("User Component", () => {
       config.isCloud = "true";
       wrapper = mount(User, {
         global: {
-          plugins: [i18n],
+          plugins: [i18n, [VueQueryPlugin, { queryClient: testQueryClient }]],
           provide: {
             store: mockStore,
           },

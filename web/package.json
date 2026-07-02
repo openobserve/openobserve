@@ -34,6 +34,7 @@
     "@openobserve/rrweb-player": "^0.2.1",
     "@rudderstack/analytics-js": "3.6.0",
     "@tanstack/vue-form": "^1.29.1",
+    "@tanstack/vue-query": "^5.101.2",
     "@tanstack/vue-table": "^8.21.3",
     "@tanstack/vue-virtual": "^3.13.16",
     "@types/js-yaml": "^4.0.9",
@@ -52,7 +53,6 @@
     "echarts-gl": "^2.0.9",
     "escodegen": "^2.1.0",
     "flag-icons": "^7.5.0",
-
     "gridstack": "^12.4.2",
     "highlight.js": "^11.11.1",
     "js-beautify": "^1.15.4",
@@ -96,6 +96,7 @@
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/vue-query-devtools": "^6.1.36",
     "@types/d3-force": "^3.0.10",
     "@types/d3-scale": "^4.0.9",
     "@types/fs-extra": "^11.0.4",

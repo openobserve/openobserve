@@ -24,6 +24,9 @@ vi.mock("@/services/users", () => ({
     update: vi.fn(),
     updateexistinguser: vi.fn(),
     getUserRoles: vi.fn().mockResolvedValue({ data: [] }),
+    // Batched roles map used by the cache-first edit path. Empty by default so
+    // the edit dialog falls back to the per-user getUserRoles call in tests.
+    getAllUserRoles: vi.fn().mockResolvedValue({ data: {} }),
   },
 }));
 
@@ -121,6 +124,11 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import userService from "@/services/users";
+import { VueQueryPlugin, QueryClient } from "@tanstack/vue-query";
+
+const testQueryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false, gcTime: 0 } },
+});
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -216,7 +224,12 @@ describe("AddUser Component", () => {
     mount(AddUser, {
       props: { ...defaultProps, ...overrides },
       global: {
-        plugins: [[{ platform }], i18n, router],
+        plugins: [
+          [{ platform }],
+          i18n,
+          router,
+          [VueQueryPlugin, { queryClient: testQueryClient }],
+        ],
         provide: { store, platform },
         stubs: {
           ODialog: ODialogStub,

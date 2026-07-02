@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { createApp } from "vue";
+import { VueQueryPlugin, QueryClient } from "@tanstack/vue-query";
 import store from "./stores";
 import App from "./App.vue";
 import createRouter from "./router";
@@ -40,10 +41,25 @@ bootstrapTheme();
 const app = createApp(App);
 const router = createRouter(store);
 
+// Single shared TanStack Query client for the whole app. Queries stay "fresh"
+// for 5 minutes (no refetch), unused entries are garbage-collected after 10.
+// Exported so non-component code (e.g. org switch handlers) can invalidate/clear.
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 10,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 app.use(i18n);
 
 // const router = createRouter(store);
 app.use(store).use(router);
+app.use(VueQueryPlugin, { queryClient });
 
 // Initialize default context provider globally
 const defaultProvider = createDefaultContextProvider(router, store);

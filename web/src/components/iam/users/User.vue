@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="addRoutePush({})"
           data-test="add-basic-user"
         >
-          {{ t('user.add') }}
+          {{ t("user.add") }}
         </OButton>
       </template>
     </AppPageHeader>
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-roles="{ row }">
             <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-1">
               <OTag
-                v-for="(roleName, idx) in (row.roles || [])"
+                v-for="(roleName, idx) in row.roles || []"
                 :key="`${roleName}-${idx}`"
                 :type="isBuiltinRole(roleName) ? 'userRole' : undefined"
                 :value="roleName"
@@ -117,7 +117,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw:inline-flex tw:items-center tw:gap-1">
               <OTag
                 type="userRole"
-                :value="String(row.role || '').replace(/\s*\(Invited\)\s*$/i, '')"
+                :value="
+                  String(row.role || '').replace(/\s*\(Invited\)\s*$/i, '')
+                "
               />
               <OTag
                 v-if="row.status === 'pending'"
@@ -163,7 +165,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title tw:text-text-primary">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || 'Organization Members') : t('iam.basicUsers') }}</span>
+            <span class="o2-table-footer-title tw:text-text-primary"
+              >{{ rows.length }}
+              {{
+                isEnterpriseOrCloud
+                  ? t("iam.organizationMembers") || "Organization Members"
+                  : t("iam.basicUsers")
+              }}</span
+            >
             <OButton
               v-if="selectedUsers.length > 0"
               data-test="users-list-delete-users-btn"
@@ -176,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
         </OTable>
-        </div>
+      </div>
     </div>
 
     <update-user-role
@@ -197,7 +206,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @updated="addMember"
     />
 
-    <ODialog data-test="user-delete-dialog"
+    <ODialog
+      data-test="user-delete-dialog"
       v-model:open="confirmDelete"
       size="sm"
       :title="t('user.confirmDeleteHead')"
@@ -206,10 +216,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmDelete = false"
       @click:primary="deleteUser"
     >
-      <p>{{ t('user.confirmDeleteMsg') }}</p>
+      <p>{{ t("user.confirmDeleteMsg") }}</p>
     </ODialog>
 
-    <ODialog data-test="user-revoke-dialog"
+    <ODialog
+      data-test="user-revoke-dialog"
       v-model:open="confirmRevoke"
       size="xs"
       :title="t('user.revokeInvitationTitle')"
@@ -218,10 +229,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmRevoke = false"
       @click:primary="revokeInvite"
     >
-      <p>{{ t('user.revokeInvitationMsg', { email: revokeInviteEmail }) }}</p>
+      <p>{{ t("user.revokeInvitationMsg", { email: revokeInviteEmail }) }}</p>
     </ODialog>
 
-    <ODialog data-test="user-bulk-delete-dialog"
+    <ODialog
+      data-test="user-bulk-delete-dialog"
       v-model:open="confirmBulkDelete"
       size="sm"
       :title="t('user.deleteUsersTitle')"
@@ -230,13 +242,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmBulkDelete = false"
       @click:primary="bulkDeleteUsers"
     >
-      <p>{{ t('user.deleteUsersMsg', { count: selectedUsers.length }) }}</p>
+      <p>{{ t("user.deleteUsersMsg", { count: selectedUsers.length }) }}</p>
     </ODialog>
   </div>
 </template>
 
 <script lang="ts">
-
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -265,6 +276,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
+import useUsers from "@/composables/iam/useUsers";
 import { computed, nextTick } from "vue";
 import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -287,11 +299,7 @@ export default defineComponent({
     OEmptyState,
     OSearchInput,
   },
-  emits: [
-    "updated:fields",
-    "deleted:fields",
-    "updated:dates",
-  ],
+  emits: ["updated:fields", "deleted:fields", "updated:dates"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
@@ -304,6 +312,18 @@ export default defineComponent({
     const orgData: any = ref(store.state.selectedOrganization);
     const isUpdated: any = ref(false);
     const { usersState } = usePermissions();
+
+    // TanStack Query: the org users list + CRUD mutations. The list is cached
+    // and refetched automatically after any mutation (see useUsers).
+    const {
+      usersQuery,
+      ensureAllUserRoles,
+      deleteUserMutation,
+      bulkDeleteUserMutation,
+    } = useUsers();
+    // Drive the table's loading indicator off the query's fetch state.
+    const loading = usersQuery.isFetching;
+
     const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
     const filterQuery = ref("");
@@ -330,18 +350,19 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
-      await getOrgMembers();
+      // The org users list auto-fetches via useUsers()'s query; the watch on
+      // usersQuery.data normalises the rows once it resolves.
       updateUserActions();
       await getRoles();
       await getCustomRoles();
 
       // if (config.isCloud == "true") {
-        // columns.value.push({
-        //   name: "status",
-        //   field: "status",
-        //   label: t("user.status"),
-        //   align: "left",
-        // });
+      // columns.value.push({
+      //   name: "status",
+      //   field: "status",
+      //   label: t("user.status"),
+      //   align: "left",
+      // });
       // }
 
       // if (
@@ -504,8 +525,7 @@ export default defineComponent({
           toast({
             variant: "error",
             message:
-              err?.response?.data?.message ||
-              "Failed to load custom roles.",
+              err?.response?.data?.message || "Failed to load custom roles.",
           });
         }
       }
@@ -515,14 +535,14 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading users...",
-              timeout: 0,
-});
+        timeout: 0,
+      });
 
       return new Promise((resolve, reject) => {
         usersService
           .invitedUsers(store.state.selectedOrganization.identifier)
           .then((res) => {
-            if(res.status == 200) {
+            if (res.status == 200) {
               dismiss();
               resolve(res.data);
             } else {
@@ -535,7 +555,7 @@ export default defineComponent({
             reject([]);
           });
       });
-    }
+    };
 
     let hydrateGeneration = 0;
 
@@ -579,7 +599,10 @@ export default defineComponent({
         const results = await Promise.all(
           roleNames.map((role) =>
             getRoleUsers(role, orgId)
-              .then((r) => ({ role, emails: Array.isArray(r.data) ? r.data : [] }))
+              .then((r) => ({
+                role,
+                emails: Array.isArray(r.data) ? r.data : [],
+              }))
               .catch(() => ({ role, emails: [] as string[] })),
           ),
         );
@@ -602,142 +625,125 @@ export default defineComponent({
       }
     };
 
-    const loading = ref(false);
-    const getOrgMembers = () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: "Please wait while loading users...",
-              timeout: 0,
-});
+    const getOrgMembers = async () => {
+      // Refetch through TanStack Query; the watch on usersQuery.data below
+      // re-normalises the rows. Kept as a thin wrapper so the existing callers
+      // (shortcuts, invite/revoke, add/update handlers) stay unchanged.
+      await usersQuery.refetch();
+    };
 
-      loading.value = true;
-      return new Promise((resolve, reject) => {
-        usersService
-          .orgUsers(store.state.selectedOrganization.identifier)
-          .then(async (res) => {
-            let users = [...res.data.data];
+    // Deep-link auto-open (?action=update&email=…) must only fire on the FIRST
+    // list load. Without this guard, every post-mutation refetch re-runs the
+    // normalisation while the route still points at the just-saved user, which
+    // reopens the edit dialog right after Save closed it (needing a second Save).
+    let didDeepLinkAutoOpen = false;
 
-            if (config.isCloud == "true") {
-              const invitedMembers: any = await getInvitedMembers();
-              users = [...res.data.data, ...invitedMembers];
-            }
+    // Normalise the raw org-members payload into table rows. Extracted from the
+    // old getOrgMembers so it can run whenever the cached query data changes
+    // (initial load, manual refetch, or post-mutation invalidation).
+    const applyUsers = (users: any[]) => {
+      let counter = 1;
+      currentUserRole.value = "";
+      usersState.users = users.map((data: any) => {
+        if (
+          store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()
+        ) {
+          currentUserRole.value = data.role?.toLowerCase();
+          isCurrentUserInternal.value = !data.is_external;
+        }
 
-            let counter = 1;
-            currentUserRole.value = "";
-            usersState.users = users.map((data: any) => {
-              if (store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()) {
-                currentUserRole.value = data.role?.toLowerCase();
-                isCurrentUserInternal.value = !data.is_external;
-              }
+        if (
+          !didDeepLinkAutoOpen &&
+          data.email?.toLowerCase() ==
+            router.currentRoute.value.query.email?.toString().toLowerCase()
+        ) {
+          addUser({ row: data }, true);
+        }
 
-              if (data.email?.toLowerCase() == router.currentRoute.value.query.email?.toString().toLowerCase()) {
-                addUser({ row: data }, true);
-              }
+        // Normalise roles to an array. Enterprise APIs surface roles in
+        // various shapes — pull from every plausible field and dedupe.
+        const rolesSet = new Set<string>();
+        if (data?.role) rolesSet.add(String(data.role));
+        if (Array.isArray(data?.roles)) {
+          data.roles.forEach((r: any) => r && rolesSet.add(String(r)));
+        }
+        if (Array.isArray(data?.custom_roles)) {
+          data.custom_roles.forEach((r: any) => r && rolesSet.add(String(r)));
+        }
+        if (Array.isArray(data?.assigned_roles)) {
+          data.assigned_roles.forEach((r: any) => r && rolesSet.add(String(r)));
+        }
+        const rolesArr: string[] = Array.from(rolesSet).filter(Boolean);
 
-              // Normalise roles to an array. Enterprise APIs surface roles in
-              // various shapes — pull from every plausible field and dedupe.
-              const rolesSet = new Set<string>();
-              if (data?.role) rolesSet.add(String(data.role));
-              if (Array.isArray(data?.roles)) {
-                data.roles.forEach((r: any) => r && rolesSet.add(String(r)));
-              }
-              if (Array.isArray(data?.custom_roles)) {
-                data.custom_roles.forEach(
-                  (r: any) => r && rolesSet.add(String(r)),
-                );
-              }
-              if (Array.isArray(data?.assigned_roles)) {
-                data.assigned_roles.forEach(
-                  (r: any) => r && rolesSet.add(String(r)),
-                );
-              }
-              const rolesArr: string[] = Array.from(rolesSet).filter(Boolean);
-
-
-              return {
-                "#": counter <= 9 ? `0${counter++}` : counter++,
-                email: maskText(data.email),
-                rawEmail: data.email,
-                first_name: data.first_name,
-                last_name: data.last_name,
-                role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
-                roles: rolesArr,
-                auth_type: data?.auth_type
-                  ? data.auth_type
-                  : data?.is_external
-                    ? "SSO"
-                    : "Native",
-                is_external: !!data?.is_external,
-                enableEdit: store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase() ? true : false,
-                enableChangeRole: false,
-                enableDelete: config.isCloud == "true" ? true : false,
-                status: data?.status,
-                token: data?.token || null,
-              };
-            });
-            rows.value = usersState.users;
-            tableKey.value++;
-            dismiss();
-
-            // Resolve immediately so the caller (onBeforeMount) can run
-            // updateUserActions() and surface the row action buttons without
-            // waiting on the per-user role fetch below.
-            resolve(true);
-
-            // Enterprise/cloud: the org-members API only returns a single
-            // `role` per user, so users with multiple role assignments
-            // (e.g. Viewer + custom "nmcdev") look incomplete. Fetch the
-            // full role list for *all* users in a single request — fire-and-
-            // forget — and re-render the rows when it resolves. This replaces
-            // the previous one-request-per-user pattern (N auth checks + N
-            // OpenFGA reads) with a single batched call, and keeps the table
-            // responsive instead of blocking the whole UI on the role API.
-            if (isEnterpriseOrCloud) {
-              const orgId = store.state.selectedOrganization.identifier;
-              // Don't await — let the batched role fetch run in the background.
-              usersService
-                .getAllUserRoles(orgId)
-                .then((resp: any) => {
-                  // Response is a map of user email -> role list.
-                  const roleMap: Record<string, any> = resp?.data || {};
-                  usersState.users.forEach((u: any) => {
-                    if (u.status === "pending") return;
-                    const fetched: string[] = Array.isArray(
-                      roleMap[u.rawEmail],
-                    )
-                      ? roleMap[u.rawEmail].filter(Boolean).map(String)
-                      : [];
-                    if (fetched.length) {
-                      const merged = new Set<string>([
-                        ...(u.roles || []),
-                        ...fetched,
-                      ]);
-                      u.roles = Array.from(merged);
-                    }
-                  });
-                  rows.value = [...usersState.users];
-                  tableKey.value++;
-                })
-                .catch(() => {
-                  // Batched role fetch failures are non-fatal — fall back to
-                  // whatever role string came with the org-members rows.
-                });
-            }
-          })
-          .catch((err: any) => {
-            console.error("Failed to fetch org members:", err);
-            dismiss();
-            toast({
-              variant: "error",
-              message: "Failed to load users: " + (err?.response?.data?.message || err?.message || "Unknown error"),
-              timeout: 5000,
-            });
-            reject(false);
-          })
-          .finally(() => {
-            loading.value = false;
-          });
+        return {
+          "#": counter <= 9 ? `0${counter++}` : counter++,
+          email: maskText(data.email),
+          rawEmail: data.email,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          role:
+            data?.status == "pending"
+              ? toCamelCase(data.role) + " (Invited)"
+              : toCamelCase(data.role),
+          roles: rolesArr,
+          auth_type: data?.auth_type
+            ? data.auth_type
+            : data?.is_external
+              ? "SSO"
+              : "Native",
+          is_external: !!data?.is_external,
+          enableEdit:
+            store.state.userInfo.email?.toLowerCase() ==
+            data.email?.toLowerCase()
+              ? true
+              : false,
+          enableChangeRole: false,
+          enableDelete: config.isCloud == "true" ? true : false,
+          status: data?.status,
+          token: data?.token || null,
+        };
       });
+      rows.value = usersState.users;
+      tableKey.value++;
+      updateUserActions();
+      // From here on, only explicit user actions (edit button, deep-link
+      // navigation) open the dialog — never a background list refetch.
+      didDeepLinkAutoOpen = true;
+
+      // Enterprise/cloud: the org-members API only returns a single `role` per
+      // user, so users with multiple role assignments (e.g. Viewer + custom
+      // "nmcdev") look incomplete. Fetch the full role list for *all* users in
+      // a single request — fire-and-forget — and re-render the rows when it
+      // resolves. This replaces the previous one-request-per-user pattern (N
+      // auth checks + N OpenFGA reads) with a single batched call, and keeps the
+      // table responsive instead of blocking the whole UI on the role API.
+      if (isEnterpriseOrCloud) {
+        // Don't await — let the batched role fetch run in the background.
+        // Routed through the shared cache: served from cache when fresh, and the
+        // edit dialog reuses the very same entry (no duplicate request).
+        ensureAllUserRoles()
+          .then((roleMap: Record<string, any>) => {
+            usersState.users.forEach((u: any) => {
+              if (u.status === "pending") return;
+              const fetched: string[] = Array.isArray(roleMap[u.rawEmail])
+                ? roleMap[u.rawEmail].filter(Boolean).map(String)
+                : [];
+              if (fetched.length) {
+                const merged = new Set<string>([
+                  ...(u.roles || []),
+                  ...fetched,
+                ]);
+                u.roles = Array.from(merged);
+              }
+            });
+            rows.value = [...usersState.users];
+            tableKey.value++;
+          })
+          .catch(() => {
+            // Batched role fetch failures are non-fatal — fall back to
+            // whatever role string came with the org-members rows.
+          });
+      }
     };
 
     // const showAddUserBtn = computed(() => {
@@ -804,7 +810,8 @@ export default defineComponent({
         );
       } else {
         return (
-          ((currentUserRole.value == "admin" && user.role?.toLowerCase() !== "root") ||
+          ((currentUserRole.value == "admin" &&
+            user.role?.toLowerCase() !== "root") ||
             currentUserRole.value == "root") &&
           !user.isLoggedinUser
         );
@@ -812,18 +819,17 @@ export default defineComponent({
     };
 
     const shouldAllowDelete = (user: any) => {
-
       if (isEnterprise.value) {
-      //for cloud
-      //should allow delete for all users when it is root and also when the row user is not root
-      //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
-        if(config.isCloud == 'true'){
+        //for cloud
+        //should allow delete for all users when it is root and also when the row user is not root
+        //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
+        if (config.isCloud == "true") {
           return (
             user.role?.toLowerCase() !== "root" &&
             (currentUserRole.value == "root" ||
               currentUserRole.value == "admin") &&
-              store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase()
-
+            store.state.userInfo.email.toLowerCase() !==
+              user.email.toLowerCase()
           );
         }
         return (
@@ -1039,26 +1045,24 @@ export default defineComponent({
 
     const deleteUser = async () => {
       confirmDelete.value = false;
-      usersService
-        .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
-        .then(async (res: any) => {
-          if (res.data.code == 200) {
-            toast({
-              message: "User deleted successfully.",
-              variant: "success",
-            });
-            await getOrgMembers();
-            updateUserActions();
-          }
-        })
-        .catch((err: any) => {
-          if (err.response.status != 403) {
-            toast({
-              message: "Error while deleting user.",
-              variant: "error",
-            });
-          }
-        });
+      try {
+        // Mutation invalidates the users query on success, which refetches and
+        // re-normalises the table via the watch above — no manual reload needed.
+        const res: any = await deleteUserMutation.mutateAsync(deleteUserEmail);
+        if (res.data.code == 200) {
+          toast({
+            message: "User deleted successfully.",
+            variant: "success",
+          });
+        }
+      } catch (err: any) {
+        if (err.response?.status != 403) {
+          toast({
+            message: "Error while deleting user.",
+            variant: "error",
+          });
+        }
+      }
     };
 
     const confirmRevokeAction = (row: any) => {
@@ -1076,7 +1080,10 @@ export default defineComponent({
       });
 
       organizationsService
-        .revoke_invite(store.state.selectedOrganization.identifier, revokeInviteToken)
+        .revoke_invite(
+          store.state.selectedOrganization.identifier,
+          revokeInviteToken,
+        )
         .then(async (res: any) => {
           dismiss();
           toast({
@@ -1096,7 +1103,9 @@ export default defineComponent({
         .catch((err: any) => {
           dismiss();
           toast({
-            message: err?.response?.data?.message || "Error while revoking invitation.",
+            message:
+              err?.response?.data?.message ||
+              "Error while revoking invitation.",
             variant: "error",
           });
         });
@@ -1115,10 +1124,9 @@ export default defineComponent({
       const userEmails = selectedUsers.value.map((user: any) => user.email);
 
       try {
-        const res = await usersService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          { ids: userEmails }
-        );
+        // Mutation invalidates the users query on success (auto refetch + rows
+        // re-normalise via the watch above).
+        const res: any = await bulkDeleteUserMutation.mutateAsync(userEmails);
         const { successful, unsuccessful } = res.data;
 
         if (successful.length > 0 && unsuccessful.length === 0) {
@@ -1140,12 +1148,13 @@ export default defineComponent({
 
         selectedUsers.value = [];
         confirmBulkDelete.value = false;
-        await getOrgMembers();
-        updateUserActions();
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
           toast({
-            message: err.response?.data?.message || err?.message || "Error while deleting users",
+            message:
+              err.response?.data?.message ||
+              err?.message ||
+              "Error while deleting users",
             variant: "error",
           });
         }
@@ -1214,23 +1223,55 @@ export default defineComponent({
 
     // Watch selectedUsers to filter out disabled rows
     watch(selectedUsers, (newSelectedUsers) => {
-      const onlyEnabledSelected = newSelectedUsers.filter((user: any) => user.enableDelete);
+      const onlyEnabledSelected = newSelectedUsers.filter(
+        (user: any) => user.enableDelete,
+      );
       if (onlyEnabledSelected.length !== newSelectedUsers.length) {
-
         selectedUsers.value = onlyEnabledSelected;
       }
     });
 
+    // Surface query fetch errors the same way the old promise chain did.
+    watch(
+      () => usersQuery.error.value,
+      (err: any) => {
+        if (!err) return;
+        console.error("Failed to fetch org members:", err);
+        toast({
+          variant: "error",
+          message:
+            "Failed to load users: " +
+            (err?.response?.data?.message || err?.message || "Unknown error"),
+          timeout: 5000,
+        });
+      },
+    );
+
+    // Re-normalise rows whenever the cached users list changes (initial load,
+    // cached-data remount, manual refetch, or post-mutation invalidation).
+    // Registered after updateUserActions/addUser are declared so the immediate
+    // run is free of temporal-dead-zone issues.
+    watch(
+      () => usersQuery.data.value,
+      (users) => {
+        if (Array.isArray(users)) applyUsers(users);
+      },
+      { immediate: true },
+    );
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcuts([
       {
         id: "iamUsersAdd",
-        handler: () => { if (!isInputFocused()) addRoutePush({}); },
+        handler: () => {
+          if (!isInputFocused()) addRoutePush({});
+        },
       },
       {
         id: "iamUsersRefresh",
-        handler: () => { if (!isInputFocused()) getOrgMembers(); },
+        handler: () => {
+          if (!isInputFocused()) getOrgMembers();
+        },
       },
       {
         id: "iamUsersFocusSearch",

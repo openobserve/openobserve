@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   ></router-view>
   <OToastProvider />
   <ConfirmDialogProvider />
+
+  <!-- TanStack Query cache inspector — dev builds only -->
+  <VueQueryDevtools v-if="showQueryDevtools" />
 </template>
 
 <script lang="ts">
@@ -30,11 +33,15 @@ import config from "@/aws-exports";
 import { applyCurrentTheme } from "@/utils/themeManager";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
+import { VueQueryDevtools } from "@tanstack/vue-query-devtools";
 
 export default {
-  components: { OToastProvider, ConfirmDialogProvider },
+  components: { OToastProvider, ConfirmDialogProvider, VueQueryDevtools },
   setup() {
     const store = useStore();
+
+    // Keep the TanStack Query debugger visible in dev; stripped from prod builds.
+    const showQueryDevtools = import.meta.env.DEV;
     const router = useRouter();
     const creds = localStorage.getItem("creds");
     if (creds) {
@@ -75,6 +82,7 @@ export default {
 
     return {
       store,
+      showQueryDevtools,
     }
   },
 };
