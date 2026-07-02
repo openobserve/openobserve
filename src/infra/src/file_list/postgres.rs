@@ -3154,6 +3154,19 @@ fn duration_until_next_utc_hour(hour: u32) -> std::time::Duration {
     (next - now).to_std().unwrap_or(std::time::Duration::ZERO)
 }
 
+/// UTC hour at which daily maintenance fires, derived from the retention
+/// allow-list (`ZO_COMPACT_RETENTION_ALLOWED_HOURS`). Uses the earliest allowed
+/// hour so maintenance runs at the start of the retention window; falls back to
+/// hour 0 (midnight UTC) when the list is empty.
+fn maintenance_hour(retention_allowed_hours: &str) -> u32 {
+    retention_allowed_hours
+        .split(',')
+        .filter_map(|h| h.trim().parse::<u32>().ok())
+        .filter(|h| *h <= 23)
+        .min()
+        .unwrap_or(0)
+}
+
 /// Whether two micros timestamps fall on the same UTC calendar day.
 fn same_utc_day(a_micros: i64, b_micros: i64) -> bool {
     match (
@@ -3167,8 +3180,9 @@ fn same_utc_day(a_micros: i64, b_micros: i64) -> bool {
 
 /// Background maintenance task for PostgreSQL partition management.
 ///
-/// Runs once per day at a fixed UTC hour (`ZO_FILE_LIST_MAINTENANCE_HOUR`), only
-/// on compactor nodes. Across a region, a distributed lock plus a "last run"
+/// Runs once per day at a fixed UTC hour derived from
+/// `ZO_COMPACT_RETENTION_ALLOWED_HOURS` (the earliest allowed hour, or midnight
+/// when unset), only on compactor nodes. Across a region, a distributed lock plus a "last run"
 /// marker in the coordinator KV ensure the work runs exactly once per day even if
 /// nodes wake at slightly different times, with automatic failover if the node
 /// that ran it previously is down.
@@ -3184,8 +3198,9 @@ pub async fn spawn_maintenance_task() -> std::result::Result<(), anyhow::Error> 
 
     tokio::task::spawn(async move {
         loop {
-            let wait =
-                duration_until_next_utc_hour(get_config().compact.file_list_maintenance_hour);
+            let wait = duration_until_next_utc_hour(maintenance_hour(
+                &get_config().compact.retention_allowed_hours,
+            ));
             log::info!(
                 "[POSTGRES] maintenance: next run in {} minutes",
                 wait.as_secs() / 60
@@ -4419,5 +4434,19 @@ mod tests {
         }
         // Out-of-range hours are clamped to 23 rather than panicking.
         let _ = duration_until_next_utc_hour(99);
+    }
+
+    #[test]
+    fn test_maintenance_hour() {
+        // Earliest allowed hour is chosen.
+        assert_eq!(maintenance_hour("5,6,8"), 5);
+        assert_eq!(maintenance_hour("8,6,5"), 5);
+        // Whitespace is tolerated.
+        assert_eq!(maintenance_hour(" 7 , 3 "), 3);
+        // Empty / invalid falls back to midnight UTC.
+        assert_eq!(maintenance_hour(""), 0);
+        assert_eq!(maintenance_hour("foo,bar"), 0);
+        // Out-of-range values are ignored.
+        assert_eq!(maintenance_hour("24,25,9"), 9);
     }
 }
