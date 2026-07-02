@@ -23,9 +23,9 @@
  * Error Tracking display with globally-ingested errors.
  */
 
+const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
 const { waitForStreamRows } = require('../utils/rum-stream-verify.js');
 
 const ORG = process.env.ORGNAME || 'default';
@@ -41,6 +41,13 @@ const RUN_ID = Date.now();
 // service name would break reruns against the same instance.
 const SERVICE = `e2e-smap-${RUN_ID}`;
 const NOMAP_SERVICE = `e2e-smap-nomap-${RUN_ID}`;
+// Dedicated group for the delete-flow test. Its stack trace must NEVER be
+// translated before the group is deleted: the backend memoizes translations
+// in an in-process LRU keyed by the exact (service, version, env) params of
+// each request, and delete_group only evicts exact-key matches — a pre-delete
+// translation under a different param combination keeps resolving from stale
+// cache forever (see CACHE in src/service/db/sourcemaps.rs).
+const DELMAP_SERVICE = `e2e-smap-del-${RUN_ID}`;
 const VERSION = '1.0.0-e2e';
 const ENV = 'e2e';
 
@@ -140,14 +147,16 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
   test.describe.configure({ mode: 'serial' });
 
   test.afterAll(async ({ browser }) => {
-    // Remove the uploaded group so local reruns and shared instances stay clean.
+    // Remove the uploaded groups so local reruns and shared instances stay clean.
     const page = await browser.newPage();
-    await page.request
-      .delete(
-        `${BASE}/api/${ORG}/sourcemaps?service=${SERVICE}&version=${VERSION}&env=${ENV}`,
-        { headers: { Authorization: authHeader() } },
-      )
-      .catch(() => {});
+    for (const service of [SERVICE, DELMAP_SERVICE]) {
+      await page.request
+        .delete(
+          `${BASE}/api/${ORG}/sourcemaps?service=${service}&version=${VERSION}&env=${ENV}`,
+          { headers: { Authorization: authHeader() } },
+        )
+        .catch(() => {});
+    }
     await page.close();
   });
 
@@ -326,10 +335,32 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
   test('deletes the sourcemaps group and Pretty tab falls back to unavailable', {
     tag: ['@rum', '@sourcemap', '@upload', '@pretty', '@ui', '@P1'],
   }, async ({ page }) => {
+    // Arrange a DEDICATED group + error for this scenario (see DELMAP_SERVICE
+    // note above): translating this stack before the delete would poison the
+    // backend's translation cache and keep resolving after the group is gone,
+    // making the fallback assertion flaky-by-design. Upload via API — the
+    // Upload UI itself is already covered by the earlier tests.
+    const uploadRes = await page.request.post(`${BASE}/api/${ORG}/sourcemaps`, {
+      headers: { Authorization: authHeader() },
+      multipart: {
+        service: DELMAP_SERVICE,
+        version: VERSION,
+        env: ENV,
+        file: {
+          name: manifest.zip,
+          mimeType: 'application/zip',
+          buffer: fs.readFileSync(ZIP_PATH),
+        },
+      },
+    });
+    expect(uploadRes.ok(), `delete-flow group upload should succeed (HTTP ${uploadRes.status()})`).toBe(true);
+    await ingestFixtureErrors(page, [fixtureErrorEvent('typeError', DELMAP_SERVICE)], DELMAP_SERVICE);
+
+    // Delete the group through the real UI flow.
     await page.goto(`${BASE}/web/rum/source-maps?org_identifier=${ORG}`);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-    await page.locator(`[data-test="source-maps-${SERVICE}-delete"]`).click();
+    await page.locator(`[data-test="source-maps-${DELMAP_SERVICE}-delete"]`).click();
     await expect(page.locator('[data-test="delete-source-maps-dialog"]')).toBeVisible({ timeout: 10000 });
 
     // Confirming fires the DELETE request asynchronously and closes the dialog
@@ -347,7 +378,7 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
     expect((await deleteResponse).status(), 'sourcemaps DELETE should succeed').toBe(200);
 
     await expect(
-      page.locator('[data-test^="o2-table-row-"]', { hasText: SERVICE }),
+      page.locator('[data-test^="o2-table-row-"]', { hasText: DELMAP_SERVICE }),
     ).toHaveCount(0, { timeout: 15000 });
 
     // Prove the deletion server-side before touching the UI again: the group
@@ -356,7 +387,7 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
     await expect
       .poll(async () => {
         const res = await page.request.get(
-          `${BASE}/api/${ORG}/sourcemaps?service=${SERVICE}&version=${VERSION}&env=${ENV}`,
+          `${BASE}/api/${ORG}/sourcemaps?service=${DELMAP_SERVICE}&version=${VERSION}&env=${ENV}`,
           { headers: { Authorization: authHeader() } },
         );
         if (!res.ok()) return -res.status();
@@ -364,24 +395,19 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
       }, { timeout: 15000, intervals: [500, 1000, 2000] })
       .toBe(0);
 
-    // Fresh page load -> in-memory translation cache is empty, so the Pretty
-    // tab re-translates and must now report sourcemaps as unavailable.
-    // Register the response watcher BEFORE navigating so the translate call is
-    // captured no matter when the tab component fires it.
-    const translatePromise = page
-      .waitForResponse((r) => r.url().includes('/sourcemaps/stacktrace'), { timeout: 120000 })
-      .catch(() => null);
-    await openErrorDetail(page, SERVICE);
-    await page.getByRole('tab', { name: 'Pretty' }).click();
-
-    const translateRes = await translatePromise;
-    expect(translateRes, 'Pretty tab should fire a translate request').toBeTruthy();
-    const translateBody = await translateRes.json().catch(() => null);
-    testLogger.info('Translate response after sourcemaps delete', {
-      status: translateRes.status(),
-      body: translateBody,
+    // After deletion the translate API must not resolve any frame to original
+    // source (this group was never translated, so no cache can serve it).
+    const translateRes = await page.request.post(`${BASE}/api/${ORG}/sourcemaps/stacktrace`, {
+      headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
+      data: {
+        stacktrace: fixtureStack('typeError'),
+        service: DELMAP_SERVICE,
+        version: VERSION,
+        env: ENV,
+      },
     });
-    // After deletion the backend must not resolve any frame to original source.
+    expect(translateRes.ok(), `translate after delete should still respond (HTTP ${translateRes.status()})`).toBe(true);
+    const translateBody = await translateRes.json();
     const traces = Array.isArray(translateBody?.stacktrace)
       ? translateBody.stacktrace
       : [translateBody?.stacktrace].filter(Boolean);
@@ -391,13 +417,17 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
       `no frame may carry source_info after delete, got: ${JSON.stringify(frames)}`,
     ).toBe(true);
 
+    // UI: the Pretty tab now reports sourcemaps as unavailable — and must not
+    // hang in the loading state.
+    await openErrorDetail(page, DELMAP_SERVICE);
+    await page.getByRole('tab', { name: 'Pretty' }).click();
+
     await expect(
       page
         .locator('[data-test="rum-pretty-stack-trace-unavailable"]')
         .or(page.locator('[data-test="rum-pretty-stack-trace-error"]'))
-        .or(page.getByText('Source Maps Not Available'))
-        .or(page.getByText(/Unable to translate stack trace/i))
         .first(),
     ).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('Translating stack trace with source maps...')).toHaveCount(0);
   });
 });
