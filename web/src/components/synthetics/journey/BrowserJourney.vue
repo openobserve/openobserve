@@ -276,23 +276,31 @@ function addStep() {
 function duplicateCapturedStep(index: number, step: BrowserStep) {
   capturedSteps.value.splice(index + 1, 0, { ...step, id: getUUIDv7(true) })
 }
+
+function openChromeExtensions() {
+  const url = 'chrome://extensions'
+  try { window.open(url, '_blank')?.focus() } catch { /* ignore */ }
+  navigator.clipboard.writeText(url).catch(() => {})
+}
 </script>
 
 <template>
   <div class="tw:flex tw:flex-col tw:min-h-0 tw:w-full tw:p-2">
 
     <!-- Toolbar — no-layout-shift design: fluid search + fixed w-80 action area -->
-    <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3 tw:pl-3">
+    <div class="tw:flex tw:items-center tw:gap-4 tw:mb-3 tw:pl-3">
       <!-- Select-all — visibility:hidden during replay to preserve layout -->
       <OCheckbox
         :model-value="selectAllModel"
         size="xs"
-        :class="{ 'tw:invisible': isRecording || readonly || isReplayActive }"
+        :class="{ 'tw:invisible': isRecording || readonly }"
         data-test="synthetics-journey-select-all"
         @update:model-value="toggleSelectAll"
       />
-      <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:mr-0">Steps</h3>
-      <OBadge variant="default" size="sm">{{ modelValue.length }}</OBadge>
+      <div class="tw:flex">
+        <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:mr-0">Steps</h3>
+        <OBadge variant="default" size="sm" class="tw:ml-1">{{ modelValue.length }}</OBadge>
+      </div>
       <OInput
         v-model="filterQuery"
         placeholder="Filter steps..."
@@ -300,7 +308,7 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
         data-test="synthetics-journey-filter-input"
       />
       <!-- Fixed-width action area — buttons right-aligned, widest set (Add Step + Record + Replay/Stop) fits in 320px -->
-      <div class="tw:w-80 tw:flex tw:items-center tw:gap-2 tw:justify-end">
+      <div class="tw:w-100 tw:flex tw:items-center tw:gap-2 tw:justify-end">
         <OButton
           v-if="!isRecording && !isReplayRunning"
           variant="outline"
@@ -384,6 +392,56 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
       </div>
     </div>
 
+    <!-- Incognito blocked warning card (pre-flight failure) -->
+    <div
+      v-if="blockedReason === 'incognito'"
+      class="tw:flex tw:flex-col tw:gap-3 tw:px-3 tw:py-3 tw:mb-3 tw:rounded-lg tw:border tw:border-[var(--o2-warning-300)] tw:bg-[var(--o2-warning-50)]"
+      role="alert"
+      data-test="synthetics-journey-incognito-warning"
+    >
+      <div class="tw:flex tw:items-center tw:gap-2">
+        <OIcon name="visibility-off" size="sm" class="tw:text-[var(--o2-warning-600)]" aria-hidden="true" />
+        <span class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)]">Can't open the Incognito window</span>
+      </div>
+      <p class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:m-0">
+        Replays run in a clean Incognito session. The OpenObserve Recorder extension needs permission to run in Incognito mode.
+      </p>
+      <ol class="tw:list-decimal tw:pl-4 tw:text-xs tw:text-[var(--o2-text-body)] tw:flex tw:flex-col tw:gap-1 tw:m-0">
+        <li>Open <code class="tw:font-mono tw:text-[var(--o2-text-code)]">chrome://extensions</code></li>
+        <li>Find the <strong>OpenObserve Recorder</strong> extension</li>
+        <li>Click <strong>Details</strong></li>
+        <li>Enable <strong>Allow in Incognito</strong></li>
+        <li>Return here and click <strong>Retry</strong></li>
+      </ol>
+      <div class="tw:flex tw:items-center tw:gap-2">
+        <OButton
+          variant="primary"
+          size="sm"
+          data-test="synthetics-journey-incognito-retry-btn"
+          @click="emit('replay')"
+        >
+          Retry
+        </OButton>
+        <OButton
+          variant="ghost"
+          size="sm"
+          data-test="synthetics-journey-incognito-dismiss-btn"
+          @click="emit('clear-results')"
+        >
+          Dismiss
+        </OButton>
+        <span class="tw:flex-1" />
+        <OButton
+          variant="outline"
+          size="sm"
+          data-test="synthetics-journey-incognito-extensions-btn"
+          @click="openChromeExtensions"
+        >
+          Open chrome://extensions
+        </OButton>
+      </div>
+    </div>
+
     <!-- Replay running banner -->
     <div
       v-if="replayPhase === 'running'"
@@ -406,12 +464,12 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
     <!-- Replay passed banner -->
     <div
       v-else-if="replayPhase === 'passed'"
-      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--o2-bg-success-subtle)] tw:border tw:border-[var(--o2-status-success)]"
+      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--color-badge-success-soft-bg)] tw:border tw:border-badge-success-ol-border/50"
       role="status"
       data-test="synthetics-journey-passed-banner"
     >
-      <OIcon name="check-circle" size="sm" class="tw:text-[var(--o2-status-success)]" aria-hidden="true" />
-      <span class="tw:text-sm tw:text-[var(--o2-text-heading)]">Replay passed — all {{ modelValue.length }} steps completed successfully</span>
+      <OIcon name="check-circle" size="sm" class="tw:text-[var(--color-timeline-dot-success)]" aria-hidden="true" />
+      <span class="tw:text-sm tw:text-badge-success-ol-text tw:font-semi-bold">Replay passed — all {{ modelValue.length }} steps completed successfully</span>
       <span class="tw:flex-1" />
       <OButton variant="ghost" size="xs" data-test="synthetics-journey-clear-results-btn" @click="emit('clear-results')">
         <OIcon name="close" size="sm" />
@@ -421,17 +479,15 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
     <!-- Replay failed banner -->
     <div
       v-else-if="replayPhase === 'failed'"
-      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--o2-bg-error-subtle)] tw:border tw:border-[var(--o2-status-error)]"
+      class="tw:flex tw:items-start tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--color-badge-error-soft-bg)] tw:border tw:border-badge-error-ol-border/50"
       role="alert"
       data-test="synthetics-journey-failed-banner"
     >
-      <OIcon name="error" size="sm" class="tw:text-[var(--o2-status-error)]" aria-hidden="true" />
-      <span class="tw:text-sm tw:text-[var(--o2-text-heading)]">Replay failed — stopped at step {{ firstFailedIndex + 1 }} of {{ modelValue.length }}</span>
-      <span v-if="failedStepResult?.stepName" class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:truncate">({{ failedStepResult.stepName }})</span>
-      <span class="tw:flex-1" />
-      <OButton variant="outline-destructive" size="xs" data-test="synthetics-journey-failed-retry-btn" @click="emit('replay')">
-        Re-run
-      </OButton>
+      <OIcon name="error" size="sm" class="tw:mt-0.5 tw:text-badge-error-ol-text" aria-hidden="true" />
+      <div class="tw:flex tw:flex-col tw:gap-0.5 tw:flex-1 tw:min-w-0">
+        <span class="tw:text-sm tw:text-badge-error-ol-text tw:font-semibold">Replay failed — stopped at step {{ firstFailedIndex + 1 }} of {{ modelValue.length }}</span>
+        <span v-if="failedStepResult?.stepName" class="tw:text-xs tw:truncate tw:text-badge-error-ol-text tw:pt-1">{{ failedStepResult.stepName }}</span>
+      </div>
       <OButton variant="ghost" size="xs" data-test="synthetics-journey-clear-results-btn" @click="emit('clear-results')">
         <OIcon name="close" size="sm" />
       </OButton>

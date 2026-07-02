@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { copyToClipboard } from '@/utils/clipboard'
 import type { BrowserStep, StepAction, SelectorType, StepReplayResult, WireStep } from '@/types/synthetics'
 import type { IconName } from '@/lib/core/Icon/OIcon.icons'
 
@@ -155,15 +156,15 @@ const stepNumberClass = computed(() => {
   if (!props.replayDotState) return 'tw:w-6! tw:text-center tw:text-sm tw:tabular-nums tw:text-[var(--o2-text-muted)]'
   switch (props.replayDotState) {
     case 'active':
-      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-timeline-dot-primary)] tw:text-white tw:text-xs tw:font-bold'
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-timeline-dot-primary)] tw:text-[var(--color-badge-primary-soft-text)] tw:border tw:border-[var(--color-badge-primary-soft-text)] tw:text-white tw:text-xs tw:font-bold'
     case 'pass':
-      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-timeline-dot-success)] tw:text-white tw:text-xs tw:font-bold'
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-badge-success-soft-bg)] tw:text-[var(--color-badge-success-soft-text)] tw:border tw:border-[var(--color-badge-success-soft-text)] tw:text-xs tw:font-bold'
     case 'fail':
-      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-timeline-dot-destructive)] tw:text-white tw:text-xs tw:font-bold'
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-badge-error-soft-bg)] tw:text-[var(--color-badge-error-soft-text)] tw:border tw:border-[var(--color-badge-error-soft-text)]  tw:text-xs tw:font-bold'
     case 'skip':
-      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:text-[var(--o2-text-muted)] tw:text-xs tw:font-bold'
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-badge-default-soft-bg)] tw:text-[var(--color-badge-default-soft-text)] tw:border tw:border-[var(--color-badge-default-soft-text)]  tw:text-xs tw:font-bold'
     default:
-      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:border tw:border-[var(--o2-border)] tw:text-[var(--o2-text-muted)] tw:text-xs tw:font-bold'
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:border tw:border-[var(--o2-border)] tw:text-[var(--o2-text-muted)] tw:border tw:border-[var(--o2-text-muted)]  tw:text-xs tw:font-bold'
   }
 })
 
@@ -194,7 +195,7 @@ const errorIconName = computed<string>(() => {
 /** Map structuredError.name to human label. */
 const errorLabel = computed<string>(() => {
   switch (se.value?.name) {
-    case 'TimeoutError': return 'Timeout'
+    case 'TimeoutError': return 'Timeout Error'
     case 'TargetClosedError': return 'Tab closed'
     default: return 'Error'
   }
@@ -214,6 +215,17 @@ const errorDurationFormatted = computed<string>(() => {
   return `${(ms / 1000).toFixed(1)} s`
 })
 
+const showStackTrace = ref(false)
+
+function toggleStackTrace() {
+  showStackTrace.value = !showStackTrace.value
+}
+
+function copyStackTrace() {
+  const stack = se.value?.stack
+  if (stack) copyToClipboard(stack)
+}
+
 function toggleExpanded() {
   emit('update:expanded', !props.expanded)
 }
@@ -224,9 +236,9 @@ function toggleExpanded() {
     <!-- Compact row -->
     <div
       class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:h-9 tw:min-h-9 tw:group tw:relative"
-      :class="[rowOpacityClass, { 'tw:border-b tw:border-[var(--o2-border-color)]': expanded }]"
+      :class="[rowOpacityClass, { 'tw:border-b tw:border-[var(--o2-border-color)]': expanded }, showErrorCard && 'tw:bg-[var(--color-badge-error-soft-bg)]']"
+      
     >
-
       <!-- Drag handle — visibility:hidden during replay to preserve layout -->
       <span
         class="tw:cursor-grab tw:text-[var(--o2-text-muted)] tw:opacity-0 tw:group-hover:opacity-100 tw:transition-opacity tw:shrink-0 tw:absolute tw:left-[-0.1rem]"
@@ -334,11 +346,11 @@ function toggleExpanded() {
     <!-- Inline error card (shown when a step fails during replay) -->
     <div
       v-if="showErrorCard"
-      class="tw:border tw:border-[var(--o2-error-300)] tw:rounded-lg tw:mx-2 tw:mb-2 tw:overflow-hidden"
+      class="tw:border tw:border-badge-error-ol-border/30 tw:rounded-lg tw:mx-6 tw:my-2 tw:overflow-hidden"
       data-test="synthetics-journey-step-error-card"
     >
       <!-- Header -->
-      <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:bg-[var(--o2-status-error-subtle)]">
+      <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:bg-[var(--color-badge-error-soft-bg)]">
         <OIcon :name="errorIconName" size="sm" class="tw:text-[var(--o2-status-error)]" aria-hidden="true" />
         <span class="tw:text-xs tw:font-semibold tw:text-[var(--o2-text-heading)] tw:flex-1">{{ errorLabel }}</span>
         <span class="tw:text-xs tw:font-mono tw:text-[var(--o2-text-secondary)]">{{ exitReasonTag }} · {{ errorDurationFormatted }}</span>
@@ -347,15 +359,43 @@ function toggleExpanded() {
       <!-- Error message -->
       <div class="tw:px-3 tw:py-3">
         <p class="tw:text-[12.5px] tw:text-[var(--o2-text-body)] tw:m-0">
-          {{ se.value?.message || props.replayResult?.error }}
+          {{ se?.message || props.replayResult?.error }}
         </p>
       </div>
 
+      <!-- Stack trace (collapsible) -->
+      <div v-if="se?.stack && false" class="tw:px-3 tw:pb-3">
+        <button
+          type="button"
+          class="tw:text-xs tw:text-[var(--o2-text-link)] tw:bg-transparent tw:border-0 tw:cursor-pointer tw:p-0 tw:flex tw:items-center tw:gap-1"
+          @click="toggleStackTrace"
+          data-test="synthetics-journey-step-stack-toggle"
+        >
+          <OIcon :name="showStackTrace ? 'expand-less' : 'expand-more'" size="xs" />
+          {{ showStackTrace ? 'Hide' : 'Show' }} stack trace
+          <OButton
+            v-if="showStackTrace"
+            variant="ghost"
+            size="xs"
+            class="tw:ml-1"
+            data-test="synthetics-journey-step-stack-copy"
+            @click.stop="copyStackTrace"
+          >
+            <OIcon name="content-copy" size="xs" />
+          </OButton>
+        </button>
+        <pre
+          v-if="showStackTrace"
+          class="tw:mt-2 tw:bg-[var(--o2-code-bg)] tw:rounded tw:p-3 tw:overflow-x-auto tw:max-h-[300px] tw:overflow-y-auto tw:text-xs tw:font-mono tw:leading-relaxed tw:m-0"
+          data-test="synthetics-journey-step-stack-content"
+        >{{ se.stack }}</pre>
+      </div>
+
       <!-- Info boxes -->
-      <div v-if="se.value?.selector" class="tw:flex tw:gap-4 tw:px-3 tw:pb-3">
+      <div v-if="se?.selector" class="tw:flex tw:gap-4 tw:px-3 tw:pb-3">
         <div class="tw:flex tw:flex-col tw:gap-1">
           <span class="tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-label)]">Selector (Test ID)</span>
-          <span class="tw:text-xs tw:font-mono tw:text-[var(--o2-status-error)]">{{ se.value.selector }}</span>
+          <span class="tw:text-xs tw:font-mono tw:text-[var(--o2-status-error)]">{{ se.selector }}</span>
         </div>
         <div class="tw:flex tw:flex-col tw:gap-1">
           <span class="tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-label)]">Waited</span>
@@ -365,11 +405,14 @@ function toggleExpanded() {
 
       <!-- Error card actions -->
       <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:pb-3">
-        <OButton variant="primary" size="sm" data-test="synthetics-journey-error-retry-btn" @click="emit('retry-replay')">
-          Retry replay
-        </OButton>
-        <OButton variant="ghost" size="sm" disabled title="Coming soon">
-          Re-record from here
+        <OButton
+          variant="outline"
+          size="xs"
+          data-test="synthetics-journey-error-retry-btn"
+          @click="emit('retry-replay')"
+          icon-left="replay"
+        >
+          Re-run
         </OButton>
       </div>
     </div>
