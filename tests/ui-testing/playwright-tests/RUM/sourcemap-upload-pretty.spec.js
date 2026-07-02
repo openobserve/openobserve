@@ -331,13 +331,23 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
 
     await page.locator(`[data-test="source-maps-${SERVICE}-delete"]`).click();
     await expect(page.locator('[data-test="delete-source-maps-dialog"]')).toBeVisible({ timeout: 10000 });
+
+    // Confirming fires the DELETE request asynchronously and closes the dialog
+    // immediately — navigating away before the request lands ABORTS it and the
+    // group survives. Wait for the API response, then for the row removal (the
+    // UI drops the row only after the API succeeds) before moving on.
+    const deleteResponse = page.waitForResponse(
+      (r) => r.request().method() === 'DELETE' && r.url().includes('/sourcemaps'),
+      { timeout: 15000 },
+    );
     await page
       .locator('[data-test="delete-source-maps-dialog"]')
       .getByRole('button', { name: /delete|confirm|ok/i })
       .click();
+    expect((await deleteResponse).status(), 'sourcemaps DELETE should succeed').toBe(200);
 
     await expect(
-      page.locator(`[data-test="source-maps-file-item"]`, { hasText: SERVICE }),
+      page.locator('[data-test^="o2-table-row-"]', { hasText: SERVICE }),
     ).toHaveCount(0, { timeout: 15000 });
 
     // Fresh page load -> in-memory translation cache is empty, so the Pretty
