@@ -42,8 +42,17 @@ const syntheticsService = {
   summary: (orgIdentifier: string, id: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/${id}/summary`),
 
-  results: (orgIdentifier: string, id: string) =>
-    http().get(`/api/${orgIdentifier}/synthetics/${id}/results`),
+  results: (orgIdentifier: string, id: string, params?: Record<string, string | number>) =>
+    http().get(`/api/${orgIdentifier}/synthetics/${id}/results`, { params }),
+
+  getResult: (orgIdentifier: string, id: string, jobId: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/${id}/results/${jobId}`),
+
+  artifactUrl: (orgIdentifier: string, id: string, jobId: string, type: 'screenshot' | 'trace', step?: string) => {
+    const params = new URLSearchParams({ type })
+    if (step) params.set('step', step)
+    return `/api/${orgIdentifier}/synthetics/${id}/results/${jobId}/artifact?${params}`
+  },
 
   getLocations: (orgIdentifier: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/locations`),
