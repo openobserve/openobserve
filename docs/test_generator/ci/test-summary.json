@@ -1,0 +1,3 @@
+[
+  { "title": "should persist live mode / auto-run toggle across navigation", "action": "extend", "verifies": "live-mode toggle state-guard added before navigation to catch silent no-op when auto_query_enabled is false" }
+]

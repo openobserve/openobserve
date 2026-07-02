@@ -1,0 +1,18 @@
+{
+  "feature_slug": "logs-visualize-persistence",
+  "feature_title": "Logs Visualization State Persistence",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logsVisualizePersistence.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/logsVisualizePersistence.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/Index.vue",
+    "web/src/plugins/logs/SearchBar.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

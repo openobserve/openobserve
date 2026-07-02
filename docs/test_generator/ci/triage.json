@@ -1,0 +1,26 @@
+{
+  "feature_slug": "logs-visualize-persistence",
+  "feature_title": "Logs Visualization State Persistence",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logsVisualizePersistence.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/logsVisualizePersistence.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/Index.vue",
+    "web/src/plugins/logs/SearchBar.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All changed paths are under web/src/ (web/src/components/dashboards/panels/PromQLTableChart.spec.ts, web/src/plugins/logs/Index.vue, web/src/plugins/logs/SearchBar.vue). No enterprise-owned paths (enterprise/, o2_enterprise/, src/enterprise/) are touched; no enterprise keywords (SSO, SAML, RBAC, SDR, cipher, logo-management) appear in the changed paths or symbol names. Classified as OSS.",
+    "skip": "The diff modifies Index.vue and SearchBar.vue in the Logs plugin — both are user-facing UI components that users interact with directly. No skip label or explicit opt-out comment was provided (trigger_comment.txt and feature_hint.txt are both empty). The changes are not docs-only, CI-only, or comment-only. Not skipped.",
+    "e2e": "The change introduces several new user-facing behaviors that warrant E2E verification: (1) visualization config is now saved to searchObj.meta.savedVisualizationConfig before navigating away and restored as a fallback when the URL has no config, (2) a query-matching check (normalizeSQL) prevents stale cached search results from being reused when the user has edited the query in Build mode, and (3) SearchBar now suppresses query runs and search events when the logs page is in visualize mode. These interactions span the visualize toggle, navigation, query editing, and time-range changes — all UI flows a user exercises.",
+    "area": "All frontend changes live in web/src/plugins/logs/ — the Logs area. The Index.vue and SearchBar.vue components are the core of the logs page. Existing E2E specs for the Logs area reside under tests/ui-testing/playwright-tests/Logs/.",
+    "group": "The Logs-Core matrix group in .github/workflows/playwright.yml contains the foundational logs page specs: logspage.spec.js, logstable.spec.js, logsqueries.spec.js, shareLink.spec.js, and others. These exercise the main logs page and search bar — the exact components changed here. Visualization toggle behavior is a core page interaction, not a standalone feature, so Logs-Core is the best fit.",
+    "existing_tests": "No Playwright E2E specs under tests/ui-testing/playwright-tests/ are changed in the diff. The only test file modified is web/src/components/dashboards/panels/PromQLTableChart.spec.ts, which is a Vitest unit test — it does not constitute E2E coverage and does not set existing_tests_in_diff."
+  }
+}
