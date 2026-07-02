@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { synthetics } from '@/constants/config'
 import { mapWireSteps } from '@/utils/synthetics/mapRecordedStep'
 import type {
@@ -13,6 +13,8 @@ import type {
   RecorderStatus,
   RecorderStopResponse,
   ReplayResponse,
+  ReplayPhase,
+  StepReplayResult,
   WireStep,
 } from '@/types/synthetics'
 
@@ -41,6 +43,8 @@ const useSyntheticsRecorder = () => {
   const error = ref('')
   const isReplaying = ref(false)
   const replayResult = ref<ReplayResponse | null>(null)
+  const replayPhase = ref<ReplayPhase>('idle')
+  const stepResults = reactive<Map<string, StepReplayResult>>(new Map())
 
   let port: ChromePort | null = null
 
@@ -82,6 +86,7 @@ const useSyntheticsRecorder = () => {
 
   function teardownPort() {
     if (port) {
+      console.log("terdown---");
       port.onMessage.removeListener(handlePortMessage)
       port.disconnect()
       port = null
@@ -93,9 +98,8 @@ const useSyntheticsRecorder = () => {
   // command acks over the port. We consume the data events; acks are ignored
   // since commands use the one-shot sendMessage request/response path.
   function handlePortMessage(message: unknown) {
-    const msg = message as RecorderPortInbound
+    const msg = message as RecorderPortInbound;
     if (msg.type !== 'synthetics-recorder') return
-
     const { payload } = msg
     switch (payload.method) {
       case 'setActions':
@@ -113,7 +117,18 @@ const useSyntheticsRecorder = () => {
       case 'setMode':
         mode.value = payload.mode
         break
-      // setSources / elementPicked / stepReplayResult: not consumed yet
+      case 'stepReplayResult':
+        stepResults.set(payload.stepId, {
+          stepId: payload.stepId,
+          stepName: payload.stepName ?? '',
+          passed: payload.passed,
+          durationMs: payload.duration_ms,
+          error: payload.error,
+          structuredError: payload.structuredError,
+        })
+        console.log("Step Results ----", stepResults, stepResults.size)
+        break
+      // setSources / elementPicked: not consumed yet
     }
   }
 
@@ -196,9 +211,9 @@ const useSyntheticsRecorder = () => {
   }
 
   /**
-   * Replay a journey in the extension's recording window. One-shot command (no
-   * port needed): the promise resolves only when replay finishes, fails at a
-   * step, or is stopped. Returns the overall {@link ReplayResponse}.
+   * Replay a journey in the extension's recording window. `stepReplayResult`
+   * events stream over the port and are accumulated in `stepResults`. The final
+   * `ReplayResponse` arrives via the sendCommand promise.
    */
   async function replay(steps: WireStep[], targetUrl?: string): Promise<ReplayResponse | null> {
     if (steps.length === 0) {
@@ -207,11 +222,30 @@ const useSyntheticsRecorder = () => {
     }
     error.value = ''
     replayResult.value = null
+    stepResults.clear()
+    replayPhase.value = 'running'
     isReplaying.value = true
+
+    // Ensure port is open so stepReplayResult events flow through handlePortMessage.
+    teardownPort() // discard any previous port (recording)
+    if (!connectPort()) {
+      error.value = 'Could not connect to the recorder extension.'
+      replayPhase.value = 'idle'
+      isReplaying.value = false
+      return null
+    }
+
     const res = await sendCommand<ReplayResponse>({ action: 'replay', steps, targetUrl })
-    console.log("replay Res ----", res);
     isReplaying.value = false
     replayResult.value = res
+    if (res) {
+      if (res.stopped) replayPhase.value = 'stopped'
+      else if (res.passed) replayPhase.value = 'passed'
+      else if (stepResults.size === 0) replayPhase.value = 'idle' // pre-flight failure (e.g. incognito)
+      else replayPhase.value = 'failed'
+    } else {
+      replayPhase.value = 'idle'
+    }
     return res
   }
 
@@ -241,6 +275,8 @@ const useSyntheticsRecorder = () => {
     error,
     isReplaying,
     replayResult,
+    replayPhase,
+    stepResults,
     detectExtension,
     startRecording,
     stopRecording,

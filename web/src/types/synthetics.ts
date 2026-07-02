@@ -2,6 +2,28 @@
 
 export type SelectorType = 'CSS' | 'XPath' | 'Text' | 'TestID' | 'Role'
 
+// ── Replay state machine ──────────────────────────────────────────────────────
+export type ReplayPhase = 'idle' | 'running' | 'passed' | 'failed' | 'stopped'
+
+/** Machine-readable error from the extension's replay pipeline. */
+export interface StructuredError {
+  message: string
+  name?: string        // "TimeoutError" | "TargetClosedError" | "Error"
+  stack?: string
+  actionName?: string
+  selector?: string
+}
+
+/** Per-step outcome pushed by the extension via stepReplayResult. */
+export interface StepReplayResult {
+  stepId: string
+  stepName: string
+  passed: boolean
+  durationMs: number
+  error?: string
+  structuredError?: StructuredError
+}
+
 export type StepAction =
   | 'navigate'
   | 'click'
@@ -122,7 +144,7 @@ export type RecorderPushPayload =
   | { method: 'elementPicked'; elementInfo: unknown; userGesture?: boolean }
   | { method: 'recordingStarted'; tabId: number; url: string }
   | { method: 'recordingStopped'; totalSteps: number }
-  | { method: 'stepReplayResult'; stepId: string; passed: boolean; duration_ms: number; error?: string }
+  | { method: 'stepReplayResult'; stepId: string; stepName?: string; passed: boolean; duration_ms: number; error?: string; structuredError?: StructuredError }
 
 /** Live data push: `{ type:'synthetics-recorder', recordingId, payload }`. */
 export interface RecorderPortMessage {

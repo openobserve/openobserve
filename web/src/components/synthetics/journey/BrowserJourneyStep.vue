@@ -3,6 +3,13 @@
 import { computed } from 'vue'
 import type { BrowserStep, StepAction, SelectorType, WireStep } from '@/types/synthetics'
 import type { IconName } from '@/lib/core/Icon/OIcon.icons'
+
+/**
+ * Replay status dot states.
+ * - When replay is active, each step shows a dot instead of a checkbox.
+ * - `undefined` / omitted → normal edit mode (checkbox).
+ */
+export type StepDotState = 'pending' | 'active' | 'pass' | 'fail' | 'skip'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
@@ -16,6 +23,10 @@ const props = defineProps<{
   expanded?: boolean
   selected?: boolean
   selectionEnabled?: boolean
+  /** Replay status dot state. When set, replaces the checkbox column. */
+  replayDotState?: StepDotState
+  /** When true, hide row actions (delete, duplicate, insert) during replay. */
+  replayLocked?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -135,6 +146,32 @@ const timeoutComputed = computed({
   set: (v: string) => update({ timeout: v ? Number(v) : undefined }),
 })
 
+// ── Status dot visual mapping (combines with step number during replay) ─────
+/** Tailwind classes for the step number badge (replay = colored circle). */
+const stepNumberClass = computed(() => {
+  if (!props.replayDotState) return 'tw:w-6! tw:text-center tw:text-sm tw:tabular-nums tw:text-[var(--o2-text-muted)]'
+  switch (props.replayDotState) {
+    case 'active':
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-timeline-dot-primary)] tw:text-white tw:text-xs tw:font-bold'
+    case 'pass':
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-timeline-dot-success)] tw:text-white tw:text-xs tw:font-bold'
+    case 'fail':
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-timeline-dot-destructive)] tw:text-white tw:text-xs tw:font-bold'
+    case 'skip':
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:text-[var(--o2-text-muted)] tw:text-xs tw:font-bold'
+    default:
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:border tw:border-[var(--o2-border)] tw:text-[var(--o2-text-muted)] tw:text-xs tw:font-bold'
+  }
+})
+
+/** Show spinner indicator on the step number when active. */
+const stepNumberSpinning = computed(() => props.replayDotState === 'active')
+
+/** opacity for the whole row when skipped. */
+const rowOpacityClass = computed(() =>
+  props.replayDotState === 'skip' ? 'tw:opacity-50' : ''
+)
+
 function toggleExpanded() {
   emit('update:expanded', !props.expanded)
 }
@@ -145,30 +182,39 @@ function toggleExpanded() {
     <!-- Compact row -->
     <div
       class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:h-9 tw:min-h-9 tw:group tw:relative"
-      :class="{ 'tw:border-b tw:border-[var(--o2-border-color)]': expanded }"
+      :class="[rowOpacityClass, { 'tw:border-b tw:border-[var(--o2-border-color)]': expanded }]"
     >
 
-      <!-- Drag handle -->
+      <!-- Drag handle — visibility:hidden during replay to preserve layout -->
       <span
         class="tw:cursor-grab tw:text-[var(--o2-text-muted)] tw:opacity-0 tw:group-hover:opacity-100 tw:transition-opacity tw:shrink-0 tw:absolute tw:left-[-0.1rem]"
+        :class="{ 'tw:invisible': replayDotState }"
         data-test="synthetics-journey-step-drag-handle"
         aria-hidden="true"
       >
         <OIcon name="drag-indicator" size="sm" aria-hidden="true" />
       </span>
-      <!-- Selection checkbox -->
-      <OCheckbox
-        v-if="selectionEnabled"
-        :model-value="selected ? true : false"
-        size="xs"
-        class="tw:pl-1"
-        :data-test="`synthetics-journey-step-checkbox-${index}`"
-        @update:model-value="emit('toggle-select')"
-      />
 
-      <!-- Step number -->
-      <span class="tw:w-6 tw:text-left tw:text-sm tw:tabular-nums tw:text-[var(--o2-text-muted)] tw:shrink-0">
-        {{ index + 1 }}
+      <!-- Leading slot: checkbox (edit) + step number — fixed combined width for no shift -->
+      <span class="tw:flex tw:items-center tw:gap-1 tw:w-12 tw:shrink-0">
+        <OCheckbox
+          :model-value="selected ? true : false"
+          size="xs"
+          class="tw:pl-1"
+          :data-test="`synthetics-journey-step-checkbox-${index}`"
+          @update:model-value="emit('toggle-select')"
+        />
+
+        <!-- Step number (colored status circle during replay) -->
+        <span
+          :class="stepNumberClass"
+          class="tw:ml-1"
+          :data-test="replayDotState ? `synthetics-journey-step-dot-${index}` : undefined"
+          :aria-label="replayDotState ? `Step ${index + 1} ${replayDotState}` : undefined"
+        >
+          <span v-if="stepNumberSpinning" class="tw:animate-spin tw:inline-block" aria-hidden="true">⟳</span>
+          <template v-else>{{ index + 1 }}</template>
+        </span>
       </span>
 
       <!-- Action icon chip -->
@@ -192,8 +238,11 @@ function toggleExpanded() {
         {{ selectorPreview }}
       </span>
 
-      <!-- Row actions -->
-      <div class="tw:flex tw:items-center tw:gap-0.5 tw:shrink-0">
+      <!-- Row actions — hidden during replay (space reserved via visibility) -->
+      <div
+        class="tw:flex tw:items-center tw:gap-0.5 tw:shrink-0"
+        :class="{ 'tw:invisible': replayLocked }"
+      >
         <OButton
           variant="ghost"
           size="xs"
@@ -209,6 +258,7 @@ function toggleExpanded() {
           size="xs"
           aria-label="Insert step below"
           data-test="synthetics-journey-step-insert-btn"
+          :disabled="replayLocked"
           @click="emit('insert-below')"
         >
           <OIcon name="add" size="sm" aria-hidden="true" />
@@ -219,6 +269,7 @@ function toggleExpanded() {
           size="xs"
           aria-label="Duplicate step"
           data-test="synthetics-journey-step-duplicate-btn"
+          :disabled="replayLocked"
           @click="emit('duplicate')"
         >
           <OIcon name="content-copy" size="sm" aria-hidden="true" />
@@ -229,6 +280,7 @@ function toggleExpanded() {
           size="xs"
           aria-label="Delete step"
           data-test="synthetics-journey-step-delete-btn"
+          :disabled="replayLocked"
           class="tw:hover:text-[var(--o2-status-error)]"
           @click="emit('delete')"
         >

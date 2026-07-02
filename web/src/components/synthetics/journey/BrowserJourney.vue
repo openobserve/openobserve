@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import type { BrowserStep } from '@/types/synthetics'
+import type { BrowserStep, ReplayPhase, StepReplayResult } from '@/types/synthetics'
+import type { StepDotState } from './BrowserJourneyStep.vue'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
 import { getUUIDv7 } from '@/utils/zincutils'
 import { VueDraggableNext } from 'vue-draggable-next'
@@ -18,7 +19,12 @@ const props = defineProps<{
   startUrl?: string        // URL shown in the recording banner
   extensionReady?: boolean // when false, Record button triggers need-extension-setup
   autoRecord?: boolean     // if true, start recording immediately on mount
-  isReplaying?: boolean
+  /** Owned by the parent (CreateBrowserTest). */
+  replayPhase?: ReplayPhase
+  /** Per-step replay results, keyed by step id. Owned by the parent. */
+  stepResults?: Map<string, StepReplayResult>
+  /** When true, show the incognito blocked warning in the toolbar area. */
+  blockedReason?: 'incognito' | null
 }>()
 
 const emit = defineEmits<{
@@ -45,8 +51,36 @@ watch(() => props.modelValue, (val) => {
   stepsModel.value = [...val]
 })
 
+// ── Replay helpers ──────────────────────────────────────────────────────────
+const isReplayRunning = computed(() => props.replayPhase === 'running')
+const isReplayActive = computed(() => props.replayPhase && props.replayPhase !== 'idle')
+const isReplayTerminal = computed(() =>
+  props.replayPhase === 'passed' || props.replayPhase === 'failed' || props.replayPhase === 'stopped'
+)
+const isReplayLocked = computed(() => isReplayRunning.value) // editing suppressed during running
+
+/** Derive the status dot state for a step based on replay results. */
+function stepDotState(stepId: string): StepDotState | undefined {
+  if (!isReplayActive.value || !props.replayPhase) return undefined
+  const result = props.stepResults?.get(stepId)
+  if (result) {
+    return result.passed ? 'pass' : 'fail'
+  }
+  // No result yet — is this step before or after the failed step?
+  // Find the first failing step in journey order
+  const firstFailedIndex = props.modelValue.findIndex((s) => {
+    const r = props.stepResults?.get(s.id)
+    return r && !r.passed
+  })
+  const stepIndex = props.modelValue.findIndex((s) => s.id === stepId)
+
+  if (firstFailedIndex >= 0 && stepIndex > firstFailedIndex) return 'skip'
+  if (props.replayPhase === 'running') return 'pending'
+  return 'pending'
+}
+
 const dragDisabled = computed(() =>
-  isRecording.value || props.isReplaying || props.readonly || !!filterQuery.value.trim()
+  isRecording.value || isReplayActive.value || props.readonly || !!filterQuery.value.trim()
 )
 
 function onDragStart() {
@@ -95,9 +129,16 @@ function deleteSelectedSteps() {
   selectedStepIds.value = new Set()
 }
 
-// Clear selection when the step list changes externally or filter changes
+// Clear selection when the step list changes, filter changes, or replay starts
 watch(() => props.modelValue.length, () => { selectedStepIds.value = new Set() })
 watch(filterQuery, () => { selectedStepIds.value = new Set() })
+watch(() => props.replayPhase, (phase) => {
+  if (phase === 'running') selectedStepIds.value = new Set()
+})
+
+const multiSelectEnabled = computed(() =>
+  !isRecording.value && !props.readonly && !isReplayRunning.value
+)
 
 
 // ── Recording state ────────────────────────────────────────────────────────
@@ -222,13 +263,13 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
 <template>
   <div class="tw:flex tw:flex-col tw:min-h-0 tw:w-full tw:p-2">
 
-    <!-- Toolbar — adapts in-place to recording state, no layout shift -->
+    <!-- Toolbar — no-layout-shift design: fluid search + fixed w-80 action area -->
     <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3 tw:pl-3">
-      <!-- Normal: label + filter + step actions -->
+      <!-- Select-all — visibility:hidden during replay to preserve layout -->
       <OCheckbox
-        v-if="!isRecording && !readonly"
         :model-value="selectAllModel"
         size="xs"
+        :class="{ 'tw:invisible': isRecording || readonly || isReplayActive }"
         data-test="synthetics-journey-select-all"
         @update:model-value="toggleSelectAll"
       />
@@ -237,82 +278,111 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
       <OInput
         v-model="filterQuery"
         placeholder="Filter steps..."
-        class="tw:w-48 tw:ml-2!"
+        class="tw:flex-1 tw:min-w-[8rem]!"
         data-test="synthetics-journey-filter-input"
       />
-      <span class="tw:flex-1" aria-hidden="true" />
-      <OButton
-        variant="outline"
-        size="sm"
-        :disabled="readonly"
-        data-test="synthetics-journey-add-step-btn"
-        @click="addStep"
-        icon-left="add"
-      >
-        Add Step
-      </OButton>
+      <!-- Fixed-width action area — buttons right-aligned, widest set (Add Step + Record + Replay/Stop) fits in 320px -->
+      <div class="tw:w-80 tw:flex tw:items-center tw:gap-2 tw:justify-end">
+        <OButton
+          v-if="!isRecording && !isReplayRunning"
+          variant="outline"
+          size="sm"
+          :disabled="readonly || isRecording"
+          data-test="synthetics-journey-add-step-btn"
+          @click="addStep"
+          icon-left="add"
+        >
+          Add Step
+        </OButton>
 
-      <OButton
-        v-if="isRecording"
-        variant="outline"
-        size="sm"
-        data-test="synthetics-journey-cancel-btn"
-        @click="cancelRecording"
-      >
-        Cancel
-      </OButton>
-      <OButton
-        v-else-if="!isReplaying"
-        variant="outline"
-        size="sm"
-        :disabled="readonly || isRecording || modelValue.length === 0"
-        data-test="synthetics-journey-replay-btn"
-        @click="emit('replay')"
-        icon-left="replay"
-      >
-        Replay
-      </OButton>
-      <OButton
-        v-else
-        variant="destructive"
-        size="sm"
-        data-test="synthetics-journey-stop-replay-btn"
-        @click="emit('stop-replay')"
-        icon-left="stop"
-      >
-        Stop Replay
-      </OButton>
+        <!-- Run replay / Stop / Re-run — positionally stable, same slot -->
+        <template v-if="!isRecording">
+          <OButton
+            v-if="replayPhase === 'idle'"
+            variant="outline"
+            size="sm"
+            :disabled="readonly || modelValue.length === 0"
+            data-test="synthetics-journey-replay-btn"
+            @click="emit('replay')"
+            icon-left="replay"
+          >
+            Run replay
+          </OButton>
+          <OButton
+            v-else-if="replayPhase === 'running'"
+            variant="destructive"
+            size="sm"
+            data-test="synthetics-journey-stop-replay-btn"
+            @click="emit('stop-replay')"
+            icon-left="stop"
+          >
+            Stop
+          </OButton>
+          <OButton
+            v-else-if="isReplayTerminal"
+            variant="outline"
+            size="sm"
+            data-test="synthetics-journey-replay-btn"
+            @click="emit('replay')"
+            icon-left="replay"
+          >
+            Re-run
+          </OButton>
+        </template>
 
+        <OButton
+          v-if="isRecording"
+          variant="outline"
+          size="sm"
+          data-test="synthetics-journey-cancel-btn"
+          @click="cancelRecording"
+        >
+          Cancel
+        </OButton>
 
-      <OButton
-        v-if="isRecording"
-        variant="destructive"
-        size="sm"
-        data-test="synthetics-journey-stop-btn"
-        @click="stopRecording"
-        icon-left="stop"
-        class="tw:w-24!"
+        <OButton
+          v-if="isRecording"
+          variant="destructive"
+          size="sm"
+          data-test="synthetics-journey-stop-btn"
+          @click="stopRecording"
+          icon-left="stop"
+          class="tw:w-24!"
+        >
+          Stop
+        </OButton>
+        <OButton
+          v-else
+          variant="primary"
+          size="sm"
+          :disabled="readonly || isRecording || isReplayRunning"
+          data-test="synthetics-journey-record-btn"
+          @click="onRecordButtonClick"
+          icon-left="smart-display"
+          class="tw:w-24!"
+        >
+          Record
+        </OButton>
+      </div>
+    </div>
+
+    <!-- Replay running banner -->
+    <div
+      v-if="replayPhase === 'running' || true"
+      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--o2-primary-50)] tw:border tw:border-[var(--o2-primary-200)]"
+      role="status"
+      data-test="synthetics-journey-replay-banner"
+    >
+      <OIcon name="sync" size="sm" class="tw:animate-spin tw:text-[var(--o2-primary-color)]" aria-hidden="true" />
+      <span
+        class="tw:text-sm tw:text-[var(--o2-text-heading)]"
+        data-test="synthetics-journey-replay-banner-text"
       >
-        Stop
-      </OButton>
-      <OButton
-      v-else
-        variant="primary"
-        size="sm"
-        :disabled="readonly || isRecording"
-        data-test="synthetics-journey-record-btn"
-        @click="onRecordButtonClick"
-        icon-left="smart-display"
-        class="tw:w-24!"
-      >
-        Record
-      </OButton>
-
-
-              <!-- <OButton variant="ghost" size="sm" data-test="synthetics-journey-cancel-btn" @click="cancelRecording">Cancel</OButton>
-        <OButton variant="primary" size="sm" data-test="synthetics-journey-stop-btn" @click="stopRecording">
-          Stop &amp; Review
-        </OButton> -->
+        Replaying…
+      </span>
+      <span class="tw:text-sm tw:text-[var(--o2-text-secondary)]">
+        {{ stepResults?.size ?? 0 }} of {{ modelValue.length }} steps
+      </span>
     </div>
 
     <!-- Recorder error (extension missing / failed to start) -->
@@ -398,7 +468,9 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
         :index="index"
         :expanded="isStepExpanded(step.id)"
         :selected="selectedStepIds.has(step.id)"
-        :selection-enabled="!isRecording && !readonly"
+        :selection-enabled="multiSelectEnabled"
+        :replay-dot-state="stepDotState(step.id)"
+        :replay-locked="isReplayLocked"
         @update:step="updateStep(index, $event)"
         @update:expanded="setStepExpanded(step.id, $event)"
         @delete="deleteStep(index)"
@@ -417,7 +489,9 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
         :index="originalIndex"
         :expanded="isStepExpanded(step.id)"
         :selected="selectedStepIds.has(step.id)"
-        :selection-enabled="!isRecording && !readonly"
+        :selection-enabled="multiSelectEnabled"
+        :replay-dot-state="stepDotState(step.id)"
+        :replay-locked="isReplayLocked"
         @update:step="updateStep(originalIndex, $event)"
         @update:expanded="setStepExpanded(step.id, $event)"
         @delete="deleteStep(originalIndex)"

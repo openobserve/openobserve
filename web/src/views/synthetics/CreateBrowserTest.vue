@@ -246,14 +246,22 @@ function onDeleteSelected() {
   showBulkDeleteDialog.value = false
 }
 
-// ── Replay ──────────────────────────────────────────────────────────────────
-const isReplaying = recorder.isReplaying
-const replayResult = recorder.replayResult
-const skippedSteps = ref(0)
+// ── Replay — uses the composable's phase-based state machine ────────────────
+/** Local unwraps so the template can read these without `.value`. */
+const replayPhase = computed(() => recorder.replayPhase.value)
+const stepResults = computed(() => recorder.stepResults)
+const blockedReason = computed<'incognito' | null>(() =>
+  recorder.replayPhase.value === 'idle' &&
+  recorder.replayResult.value != null &&
+  !recorder.replayResult.value.success &&
+  !recorder.replayResult.value.stopped &&
+  recorder.stepResults.size === 0
+    ? 'incognito'
+    : null
+)
 
 function onReplay() {
   const steps = journeyToWireSteps(check.value.journey)
-  skippedSteps.value = check.value.journey.length - steps.length
   if (steps.length === 0) return
   recorder.replay(steps, check.value.url).catch((err) => {
     recorder.error.value = err instanceof Error ? err.message : String(err)
@@ -261,18 +269,8 @@ function onReplay() {
 }
 
 function onStopReplay() {
-  recorder.stopReplay()
+  recorder.stopReplay().catch(() => {})
 }
-
-// Inline footer status reflecting the overall replay outcome.
-const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error' } | null>(() => {
-  if (isReplaying.value) return { text: 'Replaying…', tone: 'muted' }
-  const r = replayResult.value
-  if (!r) return null
-  if (r.stopped) return { text: 'Replay stopped', tone: 'muted' }
-  if (r.passed) return { text: 'Replay passed', tone: 'success' }
-  return { text: `Replay failed: ${r.error ?? 'a step did not pass'}`, tone: 'error' }
-})
 </script>
 
 <template>
@@ -496,7 +494,9 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
             :start-url="check.url"
             :extension-ready="extensionReady"
             :auto-record="autoRecord"
-            :is-replaying="isReplaying"
+            :replay-phase="replayPhase"
+            :step-results="stepResults"
+            :blocked-reason="blockedReason"
             class="tw:h-full! tw:border-t! tw:border-border-default!"
             @need-extension-setup="onNeedExtensionSetup"
             @replay="onReplay"
@@ -541,23 +541,6 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
             </OButton>
           </template>
           <span class="tw:flex-1" aria-hidden="true" />
-          <span
-            v-if="replayStatus"
-            class="tw:text-xs tw:flex tw:items-center tw:gap-2"
-            role="status"
-            data-test="synthetics-create-replay-status"
-          >
-            <span
-              :class="{
-                'tw:text-[var(--o2-text-muted)]': replayStatus.tone === 'muted',
-                'tw:text-[var(--o2-status-success)]': replayStatus.tone === 'success',
-                'tw:text-[var(--o2-status-error)]': replayStatus.tone === 'error',
-              }"
-            >{{ replayStatus.text }}</span>
-            <span v-if="skippedSteps > 0" class="tw:text-[var(--o2-text-muted)]">
-              ({{ skippedSteps }} step{{ skippedSteps === 1 ? '' : 's' }} skipped)
-            </span>
-          </span>
 
           <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
             Cancel
