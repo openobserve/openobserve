@@ -2637,8 +2637,16 @@ pub fn init() -> Config {
 fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // set real cpu num
     cfg.limit.real_cpu_num = max(1, sysinfo::get_cpu_limit());
+    // limit cpu num by memory, 1 core per 1GB, in case the user only set memory
+    // limit on k8s and we detect the whole node's cpu cores
+    let mem_total = sysinfo::get_memory_limit();
+    let cpu_num = if mem_total == 0 {
+        cfg.limit.real_cpu_num
+    } else {
+        cfg.limit.real_cpu_num.min(mem_total / (1024 * 1024 * 1024))
+    };
     // set at least 2 threads
-    let cpu_num = max(2, cfg.limit.real_cpu_num);
+    let cpu_num = max(2, cpu_num);
     cfg.limit.cpu_num = cpu_num;
     if cfg.limit.http_worker_num == 0 {
         cfg.limit.http_worker_num = cpu_num;
