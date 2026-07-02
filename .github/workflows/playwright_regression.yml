@@ -118,7 +118,7 @@ jobs:
     name: e2e / ${{ matrix.testfolder }}
     needs: [build_binary]
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
     strategy:
@@ -688,7 +688,7 @@ jobs:
     needs: [ui_integration_tests, merge_reports]
     if: ${{ !cancelled() && needs.ui_integration_tests.result == 'failure' && needs.merge_reports.result == 'success' }}
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
       actions: read  # download-artifact fetches the merged-report artifact
@@ -798,7 +798,7 @@ jobs:
     needs: [build_binary, ui_integration_tests, merge_reports]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
       actions: read  # reads run/job timings from the Actions API
@@ -980,7 +980,7 @@ jobs:
   playwright_summary:
     timeout-minutes: 5
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions: {}
     needs: [build_binary, ui_integration_tests, merge_reports]
     if: always()
