@@ -57,14 +57,7 @@ async fn run_search(org_id: &str, req: &Request) -> anyhow::Result<SearchRespons
     let trace_id = ider::generate_trace_id();
     match crate::service::search::search(&trace_id, org_id, StreamType::Logs, None, req).await {
         Ok(resp) => Ok(resp),
-        Err(e) => {
-            let msg = e.to_string();
-            if msg.contains("not found") || msg.contains("stream not found") {
-                Ok(SearchResponse::default())
-            } else {
-                Err(anyhow::anyhow!("{msg}"))
-            }
-        }
+        Err(e) => Err(anyhow::anyhow!(e)),
     }
 }
 
@@ -138,115 +131,6 @@ fn safe_ident(s: &str) -> String {
         .collect()
 }
 
-#[derive(serde::Serialize)]
-pub struct ScreenshotArtifact {
-    pub step_id: String,
-    pub url: String,
-}
-
-#[derive(serde::Serialize)]
-pub struct ArtifactsResponse {
-    pub screenshots: Vec<ScreenshotArtifact>,
-    pub trace: Option<String>,
-}
-
-pub async fn get_artifacts(
-    org_id: &str,
-    synthetics_id: &str,
-    job_id: &str,
-) -> anyhow::Result<Option<ArtifactsResponse>> {
-    let now = config::utils::time::now_micros();
-    let sid = safe_ident(synthetics_id);
-    let jid = safe_ident(job_id);
-    let sql = format!(
-        "SELECT screenshot_refs, trace_ref FROM \"{STREAM}\" \
-         WHERE synthetics_id = '{sid}' AND job_id = '{jid}' LIMIT 1"
-    );
-    let req = build_req(sql, 0, now, 1, 0);
-    let resp = run_search(org_id, &req).await?;
-    let Some(hit) = resp.hits.first() else {
-        return Ok(None);
-    };
-
-    let screenshot_refs: Vec<ScreenshotRef> = hit
-        .get("screenshot_refs")
-        .and_then(|v| {
-            if v.is_array() {
-                serde_json::from_value(v.clone()).ok()
-            } else {
-                v.as_str().and_then(|s| serde_json::from_str(s).ok())
-            }
-        })
-        .unwrap_or_default();
-
-    let has_trace = hit
-        .get("trace_ref")
-        .and_then(|v| v.as_str())
-        .is_some_and(|s| !s.is_empty());
-
-    let screenshots = screenshot_refs
-        .into_iter()
-        .map(|r| ScreenshotArtifact {
-            url: format!(
-                "/api/{org_id}/synthetics/{synthetics_id}/results/{job_id}/artifact\
-                 ?type=screenshot&step={}",
-                r.step_id
-            ),
-            step_id: r.step_id,
-        })
-        .collect();
-
-    let trace = has_trace.then(|| {
-        format!("/api/{org_id}/synthetics/{synthetics_id}/results/{job_id}/artifact?type=trace")
-    });
-
-    Ok(Some(ArtifactsResponse { screenshots, trace }))
-}
-
-pub async fn get_artifact_key(
-    org_id: &str,
-    synthetics_id: &str,
-    job_id: &str,
-    artifact_type: &str,   // "screenshot" or "trace"
-    step_id: Option<&str>, // required for screenshot
-) -> anyhow::Result<Option<String>> {
-    let now = config::utils::time::now_micros();
-    let sid = safe_ident(synthetics_id);
-    let jid = safe_ident(job_id);
-    let sql = format!(
-        "SELECT screenshot_refs, trace_ref FROM \"{STREAM}\" \
-         WHERE synthetics_id = '{sid}' AND job_id = '{jid}' LIMIT 1"
-    );
-    let req = build_req(sql, 0, now, 1, 0);
-    let resp = run_search(org_id, &req).await?;
-    let Some(hit) = resp.hits.first() else {
-        return Ok(None);
-    };
-    match artifact_type {
-        "trace" => Ok(hit
-            .get("trace_ref")
-            .and_then(|v| v.as_str())
-            .filter(|s| !s.is_empty())
-            .map(String::from)),
-        "screenshot" => {
-            let Some(step) = step_id else {
-                return Ok(None);
-            };
-            let refs: Vec<ScreenshotRef> = hit
-                .get("screenshot_refs")
-                .and_then(|v| {
-                    if v.is_array() {
-                        serde_json::from_value(v.clone()).ok()
-                    } else {
-                        v.as_str().and_then(|s| serde_json::from_str(s).ok())
-                    }
-                })
-                .unwrap_or_default();
-            Ok(refs.into_iter().find(|r| r.step_id == step).map(|r| r.key))
-        }
-        _ => Ok(None),
-    }
-}
 
 pub async fn list_results(
     org_id: &str,

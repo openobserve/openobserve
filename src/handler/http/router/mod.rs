@@ -983,7 +983,6 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
             .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
             .route("/{org_id}/synthetics/{id}/results", get(synthetics::list_results))
-            .route("/{org_id}/synthetics/{id}/results/{job_id}/artifacts", get(synthetics::get_artifacts))
             .route("/{org_id}/synthetics/{id}/results/{job_id}/artifact", get(synthetics::get_artifact_url))
             .route("/{org_id}/synthetics/{id}/summary", get(synthetics::get_summary))
             .route("/{org_id}/synthetics/locations", get(synthetics::list_locations))

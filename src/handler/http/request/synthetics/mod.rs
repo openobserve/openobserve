@@ -75,17 +75,6 @@ pub struct MoveSyntheticsRequestBody {
 
 // ── Results API ───────────────────────────────────────────────────────────────
 
-pub async fn get_artifacts(Path((org_id, id, job_id)): Path<(String, String, String)>) -> Response {
-    match crate::service::synthetics::get_artifacts(&org_id, &id, &job_id).await {
-        Ok(Some(r)) => MetaHttpResponse::json(r),
-        Ok(None) => MetaHttpResponse::not_found("artifacts not found"),
-        Err(e) => {
-            tracing::error!("[synthetics] get_artifacts: {e}");
-            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                .into_response()
-        }
-    }
-}
 
 #[utoipa::path(
     get,
@@ -125,64 +114,19 @@ pub async fn list_results(
 
 #[derive(Debug, Deserialize)]
 pub struct ArtifactQuery {
-    #[serde(rename = "type")]
-    pub artifact_type: String,
-    pub step: Option<String>,
+    pub key: String,
 }
 
-#[utoipa::path(
-    get,
-    path = "/{org_id}/synthetics/{id}/results/{job_id}/artifact",
-    context_path = "/api",
-    tag = "Synthetics",
-    operation_id = "GetSyntheticsArtifactUrl",
-    summary = "Get presigned URL for check artifact (screenshot/trace)",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("id" = String, Path, description = "Monitor ID"),
-        ("job_id" = i64, Path, description = "Job ID"),
-        ("type" = String, Query, description = "Artifact type: screenshot or trace"),
-        ("step" = Option<String>, Query, description = "Step ID (required for screenshot)"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 302, description = "Redirect to presigned URL"),
-        (status = 404, description = "Not found"),
-        (status = 500, description = "Error", content_type = "application/json", body = Object),
-    ),
-)]
 pub async fn get_artifact_url(
-    Path((org_id, id, job_id)): Path<(String, String, String)>,
+    Path((_org_id, _id, _job_id)): Path<(String, String, String)>,
     Query(query): Query<ArtifactQuery>,
 ) -> Response {
-    let key = match crate::service::synthetics::get_artifact_key(
-        &org_id,
-        &id,
-        &job_id,
-        &query.artifact_type,
-        query.step.as_deref(),
-    )
-    .await
-    {
-        Ok(Some(k)) => k,
-        Ok(None) => return MetaHttpResponse::not_found("artifact not found"),
-        Err(e) => {
-            tracing::error!("[synthetics] get_artifact_key: {e}");
-            return MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                e.to_string(),
-            )
-            .into_response();
-        }
-    };
-
-    let content_type = if query.artifact_type == "screenshot" {
+    let content_type = if query.key.ends_with(".png") {
         "image/png"
     } else {
         "application/zip"
     };
-    match infra::storage::get_bytes("default", &key).await {
+    match infra::storage::get_bytes("default", &query.key).await {
         Ok(bytes) => (
             StatusCode::OK,
             [(axum::http::header::CONTENT_TYPE, content_type)],

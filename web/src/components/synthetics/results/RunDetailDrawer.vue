@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { ref, watch, computed } from 'vue'
+import { computed } from 'vue'
 import { useStore } from 'vuex'
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
@@ -17,11 +17,8 @@ interface RunSummary {
   browser_engine?: string
   device?: string
   checked_at: number
-}
-
-interface ArtifactUrls {
-  screenshots: { step_id: string; url: string }[]
-  trace: string | null
+  screenshot_refs: { step_id: string; key: string }[]
+  trace_ref?: string
 }
 
 const props = defineProps<{
@@ -34,32 +31,24 @@ const emit = defineEmits<{ close: [] }>()
 
 const store = useStore()
 
-const artifacts = ref<ArtifactUrls | null>(null)
-const isLoading = ref(false)
-const noRecord = ref(false)
-
-watch(
-  () => [props.open, props.run?.job_id] as const,
-  async ([open, jobId]) => {
-    if (!open || !jobId) return
-    artifacts.value = null
-    noRecord.value = false
-    isLoading.value = true
-    try {
-      const org = store.state.selectedOrganization.identifier
-      const res = await syntheticsService.getArtifacts(org, props.checkId, jobId)
-      artifacts.value = res.data as ArtifactUrls
-    } catch (err: any) {
-      if (err?.response?.status === 404) noRecord.value = true
-    } finally {
-      isLoading.value = false
-    }
-  },
-  { immediate: true },
+const screenshots = computed(() =>
+  props.run.screenshot_refs.map((r) => ({
+    step_id: r.step_id,
+    url: syntheticsService.artifactUrl(
+      store.state.selectedOrganization.identifier,
+      r.key,
+    ),
+  })),
 )
 
-const screenshots = computed(() => artifacts.value?.screenshots ?? [])
-const traceUrl = computed(() => artifacts.value?.trace ?? null)
+const traceUrl = computed(() =>
+  props.run.trace_ref
+    ? syntheticsService.artifactUrl(
+        store.state.selectedOrganization.identifier,
+        props.run.trace_ref,
+      )
+    : null,
+)
 
 const statusVariant = computed(() =>
   props.run.status === 'up' ? 'success' : 'error',
@@ -137,15 +126,7 @@ function fmtTime(tsMicros: number) {
       <div>
         <p class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)] tw:mb-3">Screenshots</p>
 
-        <div
-          v-if="isLoading"
-          class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:py-12 tw:rounded-lg tw:border tw:border-dashed tw:border-[var(--o2-border-color)] tw:text-[var(--o2-text-muted)]"
-        >
-          <OIcon name="refresh" size="md" class="tw:animate-spin" />
-          <span class="tw:text-sm">Loading…</span>
-        </div>
-
-        <div v-else-if="screenshots.length" class="tw:flex tw:flex-col tw:gap-4">
+        <div v-if="screenshots.length" class="tw:flex tw:flex-col tw:gap-4">
           <div
             v-for="shot in screenshots"
             :key="shot.step_id"
@@ -161,15 +142,6 @@ function fmtTime(tsMicros: number) {
               loading="lazy"
             >
           </div>
-        </div>
-
-        <div
-          v-else-if="noRecord"
-          class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-12 tw:rounded-lg tw:border tw:border-dashed tw:border-[var(--o2-border-color)] tw:text-[var(--o2-text-muted)]"
-        >
-          <OIcon name="error_outline" size="xl" />
-          <p class="tw:text-sm tw:text-center">Probe did not run — no check data recorded</p>
-          <p class="tw:text-xs tw:text-center tw:opacity-70">Lambda dispatch failure: the probe never started</p>
         </div>
 
         <div

@@ -45,13 +45,12 @@ const syntheticsService = {
   results: (orgIdentifier: string, id: string, params?: Record<string, string | number>) =>
     http().get(`/api/${orgIdentifier}/synthetics/${id}/results`, { params }),
 
-  getArtifacts: (orgIdentifier: string, id: string, jobId: string) =>
-    http().get(`/api/${orgIdentifier}/synthetics/${id}/results/${jobId}/artifacts`),
-
-  artifactUrl: (orgIdentifier: string, id: string, jobId: string, type: 'screenshot' | 'trace', step?: string) => {
-    const params = new URLSearchParams({ type })
-    if (step) params.set('step', step)
-    return `/api/${orgIdentifier}/synthetics/${id}/results/${jobId}/artifact?${params}`
+  artifactUrl: (orgIdentifier: string, key: string) => {
+    // key format: synthetics/{org}/{synthetics_id}/{year}/{month}/{day}/{job_id}/{filename}
+    const parts = key.split('/')
+    const synthetics_id = parts[2] ?? '_'
+    const job_id = parts[6] ?? '_'
+    return `/api/${orgIdentifier}/synthetics/${synthetics_id}/results/${job_id}/artifact?key=${encodeURIComponent(key)}`
   },
 
   getLocations: (orgIdentifier: string) =>
