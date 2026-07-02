@@ -205,28 +205,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-service_name="{ row }">
               <div v-if="row.__type === 'group'" class="tw:flex tw:items-center tw:gap-2 tw:ml-2">
                 <span class="tw:font-semibold">{{ row.service_name }}</span>
-                <span class="instance-count-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-2 tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-medium" :class="store.state.theme === 'dark' ? 'tw:bg-[#4b5563] tw:text-[#d1d5db]' : 'tw:bg-[#e5e7eb] tw:text-[#6b7280]'">
+                <OTag type="countChip" value="neutral">
                   {{ row.instances.length }}
                   {{
                     row.instances.length === 1
                       ? t("settings.correlation.instanceSingular")
                       : t("settings.correlation.instancePlural")
                   }}
-                </span>
+                </OTag>
               </div>
               <div v-else class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
                 <span class="set-id-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-2 tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-semibold tw:border tw:whitespace-nowrap tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(109,40,217,0.2)] tw:text-[#c4b5fd] tw:border-[#7c3aed]' : 'tw:bg-[#ede9fe] tw:text-[#5b21b6] tw:border-[#a78bfa]'">{{ row.set_id }}</span>
-                <span
+                <ODimensionChip
                   v-for="[key, value] in Object.entries(
                     row.disambiguation,
                   ).sort(([a], [b]) => a.localeCompare(b))"
                   :key="`${key}=${value}`"
-                  class="dimension-badge tw:inline-flex tw:items-center tw:gap-[0.125rem] tw:py-[0.1875rem] tw:px-[0.625rem] tw:rounded-md tw:text-xs tw:font-semibold tw:whitespace-nowrap"
-                  :class="getDimensionColorClass(key)"
-                >
-                  <span class="tw:font-medium">{{ key }}</span
-                  >=<span>{{ value }}</span>
-                </span>
+                  :dim-key="key"
+                  :value="value"
+                />
                 <span
                   v-if="Object.keys(row.disambiguation).length === 0"
                   class="tw:text-xs tw:italic no-dimensions-text tw:text-[#9ca3af]"
@@ -237,77 +234,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-telemetry="{ row }">
               <div v-if="row.__type === 'group'" class="instance-telemetry-grid tw:inline-grid tw:grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] tw:gap-1 tw:items-center tw:justify-items-start">
-                <span
+                <OTag
                   v-if="row.totalLogs > 0"
-                  class="telemetry-badge telemetry-logs tw:inline-flex tw:items-center tw:py-1 tw:px-3 tw:rounded-md tw:text-[0.8125rem] tw:font-semibold tw:whitespace-nowrap tw:border tw:border-[#1d4ed8]"
-                  :class="store.state.theme === 'dark' ? 'tw:border-[#93c5fd]' : ''"
-                  >{{ t("settings.correlation.logs") }}</span
-                >
+                  type="streamType"
+                  :value="'logs'"
+                />
                 <span v-else class="telemetry-slot-empty tw:inline-block"></span>
-                <span
+                <OTag
                   v-if="row.totalTraces > 0"
-                  class="telemetry-badge telemetry-traces tw:inline-flex tw:items-center tw:py-1 tw:px-3 tw:rounded-md tw:text-[0.8125rem] tw:font-semibold tw:whitespace-nowrap tw:border tw:border-[#c2410c]"
-                  :class="store.state.theme === 'dark' ? 'tw:border-[#fdba74]' : ''"
-                  >{{ t("settings.correlation.traces") }}</span
-                >
+                  type="streamType"
+                  :value="'traces'"
+                />
                 <span v-else class="telemetry-slot-empty tw:inline-block"></span>
-                <span
+                <OTag
                   v-if="row.totalMetrics > 0"
-                  class="telemetry-badge telemetry-metrics tw:inline-flex tw:items-center tw:py-1 tw:px-3 tw:rounded-md tw:text-[0.8125rem] tw:font-semibold tw:whitespace-nowrap tw:border tw:border-[#065f46]"
-                  :class="store.state.theme === 'dark' ? 'tw:border-[#6ee7b7]' : ''"
-                  >{{ t("settings.correlation.metrics") }}</span
-                >
+                  type="streamType"
+                  :value="'metrics'"
+                />
                 <span v-else class="telemetry-slot-empty tw:inline-block"></span>
               </div>
               <div v-else class="instance-telemetry-grid tw:inline-grid tw:grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] tw:gap-1 tw:items-center tw:justify-items-start">
                 <span
                   v-if="row.logs_streams.length > 0"
-                  class="telemetry-badge telemetry-sm telemetry-logs tw:inline-flex tw:items-center tw:py-[0.1875rem] tw:px-[0.625rem] tw:rounded-md tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:border tw:border-[#1d4ed8]"
-                  :class="store.state.theme === 'dark' ? 'tw:border-[#93c5fd]' : ''"
+                  class="tw:inline-flex tw:min-w-0"
                 >
+                  <OTag type="streamType" :value="'logs'">
+                    {{
+                      t("settings.correlation.logsWithCount", {
+                        count: row.logs_streams.length,
+                      })
+                    }}
+                  </OTag>
                   <OTooltip
                     :content="row.logs_streams.join(', ')"
                     content-class="tw:text-xs"
                   />
-                  {{
-                    t("settings.correlation.logsWithCount", {
-                      count: row.logs_streams.length,
-                    })
-                  }}
                 </span>
                 <span v-else class="telemetry-slot-empty tw:inline-block"></span>
 
                 <span
                   v-if="row.traces_streams.length > 0"
-                  class="telemetry-badge telemetry-sm telemetry-traces tw:inline-flex tw:items-center tw:py-[0.1875rem] tw:px-[0.625rem] tw:rounded-md tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:border tw:border-[#c2410c]"
-                  :class="store.state.theme === 'dark' ? 'tw:border-[#fdba74]' : ''"
+                  class="tw:inline-flex tw:min-w-0"
                 >
+                  <OTag type="streamType" :value="'traces'">
+                    {{
+                      t("settings.correlation.tracesWithCount", {
+                        count: row.traces_streams.length,
+                      })
+                    }}
+                  </OTag>
                   <OTooltip
                     :content="row.traces_streams.join(', ')"
                     content-class="tw:text-xs"
                   />
-                  {{
-                    t("settings.correlation.tracesWithCount", {
-                      count: row.traces_streams.length,
-                    })
-                  }}
                 </span>
                 <span v-else class="telemetry-slot-empty tw:inline-block"></span>
 
                 <span
                   v-if="row.metrics_streams.length > 0"
-                  class="telemetry-badge telemetry-sm telemetry-metrics tw:inline-flex tw:items-center tw:py-[0.1875rem] tw:px-[0.625rem] tw:rounded-md tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:border tw:border-[#065f46]"
-                  :class="store.state.theme === 'dark' ? 'tw:border-[#6ee7b7]' : ''"
+                  class="tw:inline-flex tw:min-w-0"
                 >
+                  <OTag type="streamType" :value="'metrics'">
+                    {{
+                      t("settings.correlation.metricsWithCount", {
+                        count: row.metrics_streams.length,
+                      })
+                    }}
+                  </OTag>
                   <OTooltip
                     :content="row.metrics_streams.join(', ')"
                     content-class="tw:text-xs"
                   />
-                  {{
-                    t("settings.correlation.metricsWithCount", {
-                      count: row.metrics_streams.length,
-                    })
-                  }}
                 </span>
                 <span v-else class="telemetry-slot-empty tw:inline-block"></span>
               </div>
@@ -396,17 +393,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="tw:flex tw:flex-wrap tw:gap-1.5"
           >
-            <span
+            <ODimensionChip
               v-for="[key, value] in Object.entries(
                 selectedService.disambiguation,
               ).sort(([a], [b]) => a.localeCompare(b))"
               :key="`${key}=${value}`"
-              class="dimension-badge tw:inline-flex tw:items-center tw:gap-[0.125rem] tw:py-[0.1875rem] tw:px-[0.625rem] tw:rounded-md tw:text-xs tw:font-semibold tw:whitespace-nowrap"
-              :class="getDimensionColorClass(key)"
-            >
-              <span class="tw:font-medium">{{ key }}</span
-              >=<span>{{ value }}</span>
-            </span>
+              :dim-key="key"
+              :value="value"
+            />
           </div>
           <div v-else class="panel-empty-text tw:text-[0.8125rem] tw:text-[#9ca3af] tw:italic" :class="store.state.theme === 'dark' ? 'tw:text-[#6b7280]' : ''">
             {{ t("settings.correlation.noDimensionsCatchAll") }}
@@ -424,11 +418,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="selectedService && selectedService.logs_streams.length > 0"
             >
               <div class="panel-signal-row tw:flex tw:items-start tw:gap-3">
-                <span
-                  class="telemetry-badge telemetry-logs panel-signal-type tw:inline-flex tw:items-center tw:py-1 tw:px-3 tw:rounded-md tw:text-[0.8125rem] tw:font-semibold tw:whitespace-nowrap tw:border tw:border-[#1d4ed8] tw:shrink-0 tw:min-w-[3.75rem] tw:justify-center tw:mt-[0.0625rem]"
-                  :class="store.state.theme === 'dark' ? 'tw:border-[#93c5fd]' : ''"
-                  >{{ t("settings.correlation.logs") }}</span
-                >
+                <OTag
+                  type="streamType"
+                  :value="'logs'"
+                  class="panel-signal-type"
+                />
                 <div class="tw:flex tw:flex-wrap tw:gap-1.5">
                   <span
                     v-for="stream in selectedService.logs_streams"
@@ -448,11 +442,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <div class="panel-signal-row tw:flex tw:items-start tw:gap-3">
-                <span
-                  class="telemetry-badge telemetry-traces panel-signal-type tw:inline-flex tw:items-center tw:py-1 tw:px-3 tw:rounded-md tw:text-[0.8125rem] tw:font-semibold tw:whitespace-nowrap tw:border tw:border-[#c2410c] tw:shrink-0 tw:min-w-[3.75rem] tw:justify-center tw:mt-[0.0625rem]"
-                  :class="store.state.theme === 'dark' ? 'tw:border-[#fdba74]' : ''"
-                  >{{ t("settings.correlation.traces") }}</span
-                >
+                <OTag
+                  type="streamType"
+                  :value="'traces'"
+                  class="panel-signal-type"
+                />
                 <div class="tw:flex tw:flex-wrap tw:gap-1.5">
                   <span
                     v-for="stream in selectedService.traces_streams"
@@ -472,11 +466,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <div class="panel-signal-row tw:flex tw:items-start tw:gap-3">
-                <span
-                  class="telemetry-badge telemetry-metrics panel-signal-type tw:inline-flex tw:items-center tw:py-1 tw:px-3 tw:rounded-md tw:text-[0.8125rem] tw:font-semibold tw:whitespace-nowrap tw:border tw:border-[#065f46] tw:shrink-0 tw:min-w-[3.75rem] tw:justify-center tw:mt-[0.0625rem]"
-                  :class="store.state.theme === 'dark' ? 'tw:border-[#6ee7b7]' : ''"
-                  >{{ t("settings.correlation.metrics") }}</span
-                >
+                <OTag
+                  type="streamType"
+                  :value="'metrics'"
+                  class="panel-signal-type"
+                />
                 <div class="tw:flex tw:flex-wrap tw:gap-1.5">
                   <span
                     v-for="stream in selectedService.metrics_streams"
@@ -548,6 +542,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -878,70 +874,6 @@ const filteredGroupCount = computed(() =>
 const totalInstances = computed(() =>
   filteredGroups.value.filter((r: any) => r.__type === 'group').reduce((sum: number, g: any) => sum + g.instances.length, 0),
 );
-
-// Badge color classes — each entry: [light border, dark border]
-const BADGE_COLOR_MAP: Record<string, [string, string]> = {
-  blue:   ["tw:border-[#1d4ed8]", "tw:dark:border-[#93c5fd]"],
-  green:  ["tw:border-[#065f46]", "tw:dark:border-[#6ee7b7]"],
-  yellow: ["tw:border-[#a16207]", "tw:dark:border-[#fcd34d]"],
-  pink:   ["tw:border-[#9d174d]", "tw:dark:border-[#f9a8d4]"],
-  purple: ["tw:border-[#5b21b6]", "tw:dark:border-[#c4b5fd]"],
-  orange: ["tw:border-[#c2410c]", "tw:dark:border-[#fdba74]"],
-  cyan:   ["tw:border-[#0e7490]", "tw:dark:border-[#67e8f9]"],
-  indigo: ["tw:border-[#3730a3]", "tw:dark:border-[#a5b4fc]"],
-  teal:   ["tw:border-[#0f766e]", "tw:dark:border-[#5eead4]"],
-  red:    ["tw:border-[#b91c1c]", "tw:dark:border-[#fca5a5]"],
-  gray:   ["tw:border-[#6b7280]", "tw:dark:border-[#d1d5db]"],
-  amber:  ["tw:border-[#b45309]", "tw:dark:border-[#fbbf24]"],
-  violet: ["tw:border-[#6d28d9]", "tw:dark:border-[#c4b5fd]"],
-  rose:   ["tw:border-[#be185d]", "tw:dark:border-[#fda4af]"],
-};
-
-const KEY_COLOR_LOOKUP: Record<string, string> = {
-  "k8s-deployment": "blue",
-  "k8s-namespace": "orange",
-  "k8s-cluster": "indigo",
-  deployment: "blue",
-  namespace: "orange",
-  cluster: "indigo",
-  env: "green",
-  environment: "green",
-  host: "purple",
-  hostname: "purple",
-  service: "cyan",
-  service_name: "cyan",
-  region: "pink",
-  zone: "pink",
-  pod: "teal",
-  container: "red",
-  app: "yellow",
-  application: "yellow",
-};
-
-const FALLBACK_COLORS = ["gray", "amber", "violet", "rose"];
-
-const getDimensionColorClass = (key: string): string => {
-  let colorName = KEY_COLOR_LOOKUP[key];
-
-  if (!colorName) {
-    const lowerKey = key.toLowerCase();
-    for (const [pattern, name] of Object.entries(KEY_COLOR_LOOKUP)) {
-      if (lowerKey.includes(pattern)) { colorName = name; break; }
-    }
-  }
-
-  if (!colorName) {
-    let hash = 0;
-    for (let i = 0; i < key.length; i++) {
-      hash = (hash << 5) - hash + key.charCodeAt(i);
-      hash = hash & hash;
-    }
-    colorName = FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length];
-  }
-
-  const [light, dark] = BADGE_COLOR_MAP[colorName];
-  return `${light} ${dark}`;
-};
 
 const loadServices = async (isRefresh = false) => {
   if (isRefresh) {

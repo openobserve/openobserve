@@ -19,7 +19,7 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 import useIngestion from "@/composables/useIngestion";
 import { b64EncodeStandard } from "@/utils/zincutils";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { parseCard } from "./parseCard";
@@ -75,12 +75,12 @@ const renderedSections = computed(() =>
           <h2 class="tw:text-xl tw:font-semibold tw:m-0 tw:leading-tight">
             {{ metadata.displayName }}
           </h2>
-          <OBadge v-if="metadata.category" variant="primary-soft" size="sm">
+          <OTag v-if="metadata.category" type="integrationMeta" value="category">
             {{ metadata.category }}
-          </OBadge>
-          <OBadge v-if="metadata.runtime" variant="default" size="sm">
+          </OTag>
+          <OTag v-if="metadata.runtime" type="integrationMeta" value="runtime">
             {{ metadata.runtime }}
-          </OBadge>
+          </OTag>
         </div>
         <p
           v-if="metadata.tagline"

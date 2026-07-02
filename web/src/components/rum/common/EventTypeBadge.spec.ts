@@ -31,7 +31,7 @@ describe("EventTypeBadge", () => {
       wrapper = mount(EventTypeBadge, { props: { type: "error" } });
 
       // Assert
-      expect(wrapper.text()).toBe("error");
+      expect(wrapper.text()).toBe("Error");
     });
 
     it("displays the type text for action", () => {
@@ -39,7 +39,7 @@ describe("EventTypeBadge", () => {
       wrapper = mount(EventTypeBadge, { props: { type: "action" } });
 
       // Assert
-      expect(wrapper.text()).toBe("action");
+      expect(wrapper.text()).toBe("Action");
     });
 
     it("displays the type text for view", () => {
@@ -47,7 +47,7 @@ describe("EventTypeBadge", () => {
       wrapper = mount(EventTypeBadge, { props: { type: "view" } });
 
       // Assert
-      expect(wrapper.text()).toBe("view");
+      expect(wrapper.text()).toBe("View");
     });
 
     it("displays the type text for resource", () => {
@@ -55,15 +55,15 @@ describe("EventTypeBadge", () => {
       wrapper = mount(EventTypeBadge, { props: { type: "resource" } });
 
       // Assert
-      expect(wrapper.text()).toBe("resource");
+      expect(wrapper.text()).toBe("Resource");
     });
 
-    it("displays the raw type string for unknown types", () => {
+    it("humanises the value for unknown types (registry fallback)", () => {
       // Arrange
       wrapper = mount(EventTypeBadge, { props: { type: "custom" } });
 
       // Assert
-      expect(wrapper.text()).toBe("custom");
+      expect(wrapper.text()).toBe("Custom");
     });
   });
 
@@ -74,8 +74,10 @@ describe("EventTypeBadge", () => {
         props: { type: "error", dataTest: "rum-event-type-badge" },
       });
 
-      // Assert
-      expect(wrapper.attributes("data-test")).toBe("rum-event-type-badge");
+      // Assert — data-test forwards through OTag/OBadge onto the rendered badge.
+      expect(
+        wrapper.find('[data-test="rum-event-type-badge"]').exists(),
+      ).toBe(true);
     });
 
     it("leaves data-test empty or absent when not provided", () => {

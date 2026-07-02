@@ -69,15 +69,11 @@
           :data-test="`score-config-detail-tab-${tab.id}`"
         >
           <span>{{ tab.label }}</span>
-          <span
+          <OTag
             v-if="tab.count != null"
-            class="tw:inline-flex tw:items-center tw:justify-center tw:px-1.5 tw:min-w-[1.125rem] tw:h-4 tw:rounded-full tw:text-[10px] tw:font-semibold tw:leading-none"
-            :class="
-              activeTab === tab.id
-                ? 'tw:bg-[color-mix(in_srgb,var(--color-primary-600,#3f7994)_18%,transparent)] tw:text-[var(--color-primary-600,#3f7994)]'
-                : 'tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] tw:text-[var(--color-text-secondary)]'
-            "
-            >{{ tab.count }}</span
+            type="countChip"
+            :value="activeTab === tab.id ? 'primary' : 'neutral'"
+            >{{ tab.count }}</OTag
           >
         </OTab>
       </OTabs>
@@ -95,13 +91,7 @@
             <dl class="scd-kv tw:grid tw:gap-x-3.5 tw:gap-y-1.5 tw:m-0" style="grid-template-columns: 120px 1fr;">
               <dt>{{ t("onlineEvals.scoreConfig.detail.dataTypeLabel") }}</dt>
               <dd>
-                <span
-                  class="tw:inline-flex tw:py-px tw:px-1.5 tw:rounded tw:text-[11px] tw:font-semibold tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]"
-                  :class="{
-                    'tw:bg-[color-mix(in_srgb,#9333ea_14%,transparent)]! tw:text-[#7c3aed]!': dataType === 'categorical',
-                    'tw:bg-[color-mix(in_srgb,#16a34a_14%,transparent)]! tw:text-[#15803d]!': dataType === 'boolean',
-                  }"
-                >{{ dataType }}</span>
+                <OTag type="evalDataType" :value="dataType" />
               </dd>
 
               <template v-if="dataType === 'numeric' && numericRange">
@@ -112,11 +102,7 @@
               <template v-if="dataType === 'categorical' && categories.length">
                 <dt>{{ t("onlineEvals.scoreConfig.detail.categoriesLabel") }}</dt>
                 <dd>
-                  <span
-                    v-for="cat in categories"
-                    :key="cat"
-                    class="tw:inline-flex tw:mr-1.5 tw:mb-1 tw:py-px tw:px-2 tw:rounded-full tw:font-semibold tw:text-[11px] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] tw:text-(--color-text-primary)"
-                  >{{ cat }}</span>
+                  <OTag v-for="cat in categories" :key="cat" type="fieldTag" value="soft">{{ cat }}</OTag>
                 </dd>
               </template>
 
@@ -130,12 +116,7 @@
           <section class="tw:flex tw:flex-col tw:gap-2">
             <h4 class="scd-section__title tw:m-0 tw:font-semibold tw:text-[13px] tw:leading-normal tw:text-(--color-text-primary) tw:pb-1.5 tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-1.5">
               {{ t("onlineEvals.scoreConfig.detail.thresholdSection") }}
-              <span
-                v-if="!healthyLabel"
-                class="tw:inline-flex tw:items-center tw:px-[5px] tw:py-0 tw:rounded tw:font-semibold tw:text-[10px] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary)"
-              >
-                {{ t("onlineEvals.scoreConfig.detail.noThreshold") }}
-              </span>
+              <OTag v-if="!healthyLabel" type="thresholdFlag" value="notdeclared" />
             </h4>
             <div
               v-if="healthyLabel"
@@ -155,15 +136,11 @@
             <dl class="scd-kv tw:grid tw:gap-x-3.5 tw:gap-y-1.5 tw:m-0" style="grid-template-columns: 120px 1fr;">
               <dt>{{ t("onlineEvals.scoreConfig.detail.statusLabel") }}</dt>
               <dd>
-                <span
-                  class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-(--o2-status-success-text) tw:font-semibold"
-                  :class="{ 'tw:text-(--color-text-secondary)!': !isActive }"
-                >
-                  <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-current" />
+                <OTag type="booleanState" :value="isActive ? 'enabled' : 'disabled'">
                   {{ isActive
                     ? t("onlineEvals.scoreConfig.detail.statusActive")
                     : t("onlineEvals.scoreConfig.detail.statusInactive") }}
-                </span>
+                </OTag>
               </dd>
               <dt>{{ t("onlineEvals.scoreConfig.detail.versionLabel") }}</dt>
               <dd class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">v{{ row.version }}</dd>
@@ -184,7 +161,7 @@
             >
               <div class="tw:flex tw:items-center tw:gap-2">
                 <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:font-bold tw:text-[13px] tw:text-(--color-text-primary)">v{{ row.version }}</span>
-                <span class="tw:inline-flex tw:py-px tw:px-[7px] tw:rounded tw:font-semibold tw:text-[10px] tw:leading-none tw:bg-[color-mix(in_srgb,var(--o2-status-success-text,#2e7d32)_14%,transparent)] tw:text-(--o2-status-success-text)">{{ t("onlineEvals.scoreConfig.detail.activeVersionChip") }}</span>
+                <OTag type="activeVersionFlag" value="active" />
               </div>
               <div v-if="updatedAt" class="tw:mt-1.5 tw:text-[11.5px] tw:text-(--color-text-secondary)">
                 {{ t("onlineEvals.scoreConfig.detail.lastUpdated") }}
@@ -215,12 +192,7 @@
                 <div class="tw:flex-1 tw:min-w-0">
                   <div class="tw:flex tw:items-center tw:gap-2">
                     <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:font-bold tw:text-[13px] tw:text-(--color-text-primary)">{{ scorer.name }}</span>
-                    <span
-                      class="tw:inline-flex tw:py-px tw:px-[7px] tw:rounded tw:font-semibold tw:text-[10px] tw:leading-none tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]"
-                      :class="`scd-used-card__type--${scorerTypeOf(scorer)}`"
-                    >
-                      {{ scorerTypeLabel(scorerTypeOf(scorer)) }}
-                    </span>
+                    <OTag type="scorerType" :value="scorerTypeOf(scorer)" />
                     <span class="tw:text-[11px] tw:text-(--color-text-secondary) tw:[font-variant-numeric:tabular-nums]">v{{ scorer.version }}</span>
                   </div>
                 </div>
@@ -239,6 +211,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -362,12 +335,6 @@ const tabs = computed(() => [
 function scorerTypeOf(s: Scorer): "llm_judge" | "remote" {
   const raw = valueOf<string>(s, "scorerType", "scorer_type") ?? "llm_judge";
   return raw === "remote" ? "remote" : "llm_judge";
-}
-
-function scorerTypeLabel(type: "llm_judge" | "remote"): string {
-  return type === "remote"
-    ? t("onlineEvals.scoreConfig.detail.scorerTypeRemote")
-    : t("onlineEvals.scoreConfig.detail.scorerTypeLlmJudge");
 }
 
 function formatTimestamp(microsOrMs: number): string {

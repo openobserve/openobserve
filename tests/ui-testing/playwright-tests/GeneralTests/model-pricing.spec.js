@@ -449,11 +449,11 @@ test.describe("Model Pricing — Toggle", () => {
             await expect(pm.modelPricingPage.toggleBtnForModel(name))
                 .toHaveAttribute('data-o2-variant', 'ghost-destructive', { timeout: 5000 });
 
-            // Toggle off → disabled state
+            // Toggle off → disabled state (Enable action shows green play, ghost-success)
             await pm.modelPricingPage.toggleBtnForModel(name).click();
             await pm.modelPricingPage.verifyModelInList(name);
             await expect(pm.modelPricingPage.toggleBtnForModel(name))
-                .toHaveAttribute('data-o2-variant', 'ghost', { timeout: 5000 });
+                .toHaveAttribute('data-o2-variant', 'ghost-success', { timeout: 5000 });
 
             // Toggle on → enabled state restored
             await pm.modelPricingPage.toggleBtnForModel(name).click();

@@ -90,7 +90,7 @@
             />
           </template>
           <template #cell-type="{ row }">
-            <span class="tw:inline-flex tw:items-center tw:gap-1 tw:py-[1px] tw:px-[7px] tw:rounded-[3px] tw:font-semibold tw:text-[11px] tw:leading-[1.5] tw:bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)] tw:text-(--o2-status-info-text) tw:lowercase">{{ providerTypeOf(row) || "—" }}</span>
+            <OTag type="providerType" class="tw:lowercase">{{ providerTypeOf(row) || "—" }}</OTag>
           </template>
 
           <template #cell-endpoint="{ row }">
@@ -104,9 +104,8 @@
           <template #cell-isDefault="{ row }">
             <OTag
               v-if="booleanOf(row, 'isDefault', 'is_default')"
-              type="booleanState"
-              value="yes"
-              :label="t('llmProviders.defaultBadge')"
+              type="providerDefaultFlag"
+              value="default"
             />
             <span v-else class="tw:text-text-primary">—</span>
           </template>
