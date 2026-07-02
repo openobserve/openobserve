@@ -216,9 +216,9 @@ describe("PatternCard", () => {
   });
 
   describe("Hover Effect", () => {
-    it("should have table-row-hover class for hover effect", () => {
+    it("should have hover transition class for hover effect", () => {
       const card = wrapper.find('[data-test="pattern-card-0"]');
-      expect(card.classes()).toContain("table-row-hover");
+      expect(card.classes()).toContain("tw:transition-colors");
     });
 
     it("should have cursor-pointer class", () => {
@@ -237,9 +237,9 @@ describe("PatternCard", () => {
       const card = wrapper.find('[data-test="pattern-card-0"]');
       // Check that the component has the hover styles applied
       expect(card.exists()).toBe(true);
-      // The actual transition is defined in scoped SCSS
-      // We verify the element exists and has the class
-      expect(card.classes()).toContain("table-row-hover");
+      // The transition is defined via Tailwind utility classes.
+      expect(card.classes()).toContain("tw:transition-colors");
+      expect(card.classes()).toContain("tw:duration-150");
     });
   });
 
