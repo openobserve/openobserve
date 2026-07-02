@@ -1,9 +1,9 @@
 <template>
-  <div v-if="show" class="correlation-panel">
-    <div class="correlation-header">
-      <div class="header-content">
+  <div v-if="show" class="tw:flex tw:flex-col tw:h-full tw:bg-(--q-background) tw:border-l tw:border-(--q-border-color)">
+    <div class="correlation-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:border-b tw:border-(--q-border-color) tw:bg-(--q-header-bg)">
+      <div class="header-content tw:flex tw:items-center tw:gap-2">
         <OIcon name="link" size="sm" />
-        <span class="header-title">Related Telemetry</span>
+        <span class="header-title tw:font-semibold tw:text-sm">Related Telemetry</span>
       </div>
       <OButton
         variant="ghost"
@@ -13,30 +13,30 @@
       />
     </div>
 
-    <div class="correlation-body">
+    <div class="correlation-body tw:flex-1 tw:overflow-y-auto tw:p-4">
       <!-- Loading State -->
-      <div v-if="loading" class="correlation-loading">
+      <div v-if="loading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:py-8 tw:px-4 tw:text-center">
         <OSpinner size="sm" />
-        <span class="loading-text">Finding related data...</span>
+        <span class="tw:text-[13px] tw:text-(--q-text-secondary)">Finding related data...</span>
       </div>
 
       <!-- Error State -->
-      <div v-else-if="error" class="correlation-error">
+      <div v-else-if="error" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:py-8 tw:px-4 tw:text-center">
         <OIcon name="error-outline" size="md" />
-        <span class="error-text">{{ error }}</span>
+        <span class="tw:text-[13px] tw:text-(--q-negative)">{{ error }}</span>
       </div>
 
       <!-- No Correlation Available -->
-      <div v-else-if="!correlationResult" class="correlation-empty">
+      <div v-else-if="!correlationResult" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:py-8 tw:px-4 tw:text-center">
         <OIcon name="info-outline" size="md" />
-        <span class="empty-text">No related telemetry found</span>
+        <span class="tw:text-[13px] tw:text-(--q-text-secondary)">No related telemetry found</span>
       </div>
 
       <!-- Correlation Results -->
-      <div v-else class="correlation-results">
+      <div v-else class="correlation-results tw:flex tw:flex-col tw:gap-4">
         <!-- Service Info -->
-        <div class="service-info">
-          <div class="service-name">
+        <div class="service-info tw:flex tw:flex-col tw:gap-3">
+          <div class="service-name tw:flex tw:items-center tw:gap-[6px] tw:font-semibold tw:text-sm">
             <OIcon name="cloud" size="xs" />
             {{ correlationResult.service.service_name }}
           </div>
@@ -45,22 +45,22 @@
           <div
             v-if="correlationResult.correlationData?.matched_dimensions &&
                   Object.keys(correlationResult.correlationData.matched_dimensions).length > 0"
-            class="dimension-section"
+            class="dimension-section tw:flex tw:flex-col tw:gap-[6px]"
           >
-            <div class="dimension-section-header">
+            <div class="dimension-section-header tw:flex tw:items-center tw:gap-[6px] tw:text-[11px] tw:font-semibold tw:uppercase tw:text-[var(--q-text-secondary)] tw:[letter-spacing:0.5px]">
               <OIcon name="link" size="xs" />
-              <span class="dimension-section-title">Matched Dimensions</span>
+              <span class="dimension-section-title tw:cursor-help">Matched Dimensions</span>
               <OTooltip content="These stable dimensions were used to find related telemetry" />
             </div>
-            <div class="service-dimensions">
+            <div class="service-dimensions tw:flex tw:flex-wrap tw:gap-[6px]">
               <OBadge
                 v-for="(value, key) in correlationResult.correlationData.matched_dimensions"
                 :key="`matched-${key}`"
                 size="sm"
                 variant="success"
               >
-                <span class="dimension-key">{{ key }}:</span>
-                <span class="dimension-value">{{ value }}</span>
+                <span class="dimension-key tw:font-medium tw:mr-1">{{ key }}:</span>
+                <span class="dimension-value tw:opacity-90">{{ value }}</span>
               </OBadge>
             </div>
           </div>
@@ -69,22 +69,22 @@
           <div
             v-if="correlationResult.correlationData?.additional_dimensions &&
                   Object.keys(correlationResult.correlationData.additional_dimensions).length > 0"
-            class="dimension-section"
+            class="dimension-section tw:flex tw:flex-col tw:gap-[6px]"
           >
-            <div class="dimension-section-header">
+            <div class="dimension-section-header tw:flex tw:items-center tw:gap-[6px] tw:text-[11px] tw:font-semibold tw:uppercase tw:text-[var(--q-text-secondary)] tw:[letter-spacing:0.5px]">
               <OIcon name="tune" size="xs" />
-              <span class="dimension-section-title">Additional Filters Available</span>
+              <span class="dimension-section-title tw:cursor-help">Additional Filters Available</span>
               <OTooltip content="These additional dimensions can be used for more specific filtering" />
             </div>
-            <div class="service-dimensions">
+            <div class="service-dimensions tw:flex tw:flex-wrap tw:gap-[6px]">
               <OBadge
                 v-for="(value, key) in correlationResult.correlationData.additional_dimensions"
                 :key="`additional-${key}`"
                 size="sm"
                 variant="default-outline"
               >
-                <span class="dimension-key">{{ key }}:</span>
-                <span class="dimension-value">{{ value }}</span>
+                <span class="dimension-key tw:font-medium tw:mr-1">{{ key }}:</span>
+                <span class="dimension-value tw:opacity-90">{{ value }}</span>
               </OBadge>
             </div>
           </div>
@@ -92,15 +92,15 @@
           <!-- Fallback: show all dimensions if correlationData not available -->
           <div
             v-if="!correlationResult.correlationData"
-            class="service-dimensions"
+            class="service-dimensions tw:flex tw:flex-wrap tw:gap-[6px]"
           >
             <OBadge
               v-for="(value, key) in correlationResult.service.dimensions"
               :key="key"
               size="sm"
             >
-              <span class="dimension-key">{{ key }}:</span>
-              <span class="dimension-value">{{ value }}</span>
+              <span class="dimension-key tw:font-medium tw:mr-1">{{ key }}:</span>
+              <span class="dimension-value tw:opacity-90">{{ value }}</span>
             </OBadge>
           </div>
         </div>
@@ -108,23 +108,23 @@
         <OSeparator />
 
         <!-- Correlation Queries -->
-        <div class="correlation-queries">
+        <div class="correlation-queries tw:flex tw:flex-col tw:gap-4">
           <!-- Traces -->
           <div
             v-if="traceQueries.length > 0"
-            class="query-section"
+            class="query-section tw:flex tw:flex-col tw:gap-2"
           >
-            <div class="section-header">
+            <div class="section-header tw:flex tw:items-center tw:gap-[6px] tw:font-semibold tw:text-[13px]">
               <OIcon name="timeline" size="sm" />
               <span class="section-title">Traces ({{ traceQueries.length }})</span>
             </div>
-            <div class="query-items">
+            <div class="query-items tw:flex tw:flex-col tw:gap-[6px] tw:pl-6">
               <div
                 v-for="(query, idx) in traceQueries"
                 :key="`trace-${idx}`"
-                class="query-item"
+                class="query-item tw:flex tw:items-center tw:justify-between tw:py-2 tw:px-3 tw:bg-[var(--q-item-bg)] tw:rounded tw:border tw:border-[var(--q-border-color)]"
               >
-                <div class="query-stream">{{ query.stream }}</div>
+                <div class="query-stream tw:text-xs tw:[font-family:monospace] tw:text-[var(--q-text-secondary)]">{{ query.stream }}</div>
                 <OButton
                   variant="outline"
                   size="sm"
@@ -137,19 +137,19 @@
           <!-- Metrics -->
           <div
             v-if="metricQueries.length > 0"
-            class="query-section"
+            class="query-section tw:flex tw:flex-col tw:gap-2"
           >
-            <div class="section-header">
+            <div class="section-header tw:flex tw:items-center tw:gap-[6px] tw:font-semibold tw:text-[13px]">
               <OIcon name="show-chart" size="sm" />
               <span class="section-title">Metrics ({{ metricQueries.length }})</span>
             </div>
-            <div class="query-items">
+            <div class="query-items tw:flex tw:flex-col tw:gap-[6px] tw:pl-6">
               <div
                 v-for="(query, idx) in metricQueries"
                 :key="`metric-${idx}`"
-                class="query-item"
+                class="query-item tw:flex tw:items-center tw:justify-between tw:py-2 tw:px-3 tw:bg-[var(--q-item-bg)] tw:rounded tw:border tw:border-[var(--q-border-color)]"
               >
-                <div class="query-stream">{{ query.stream }}</div>
+                <div class="query-stream tw:text-xs tw:[font-family:monospace] tw:text-[var(--q-text-secondary)]">{{ query.stream }}</div>
                 <OButton
                   variant="outline"
                   size="sm"
@@ -162,19 +162,19 @@
           <!-- Logs -->
           <div
             v-if="logQueries.length > 0"
-            class="query-section"
+            class="query-section tw:flex tw:flex-col tw:gap-2"
           >
-            <div class="section-header">
+            <div class="section-header tw:flex tw:items-center tw:gap-[6px] tw:font-semibold tw:text-[13px]">
               <OIcon name="article" size="sm" />
               <span class="section-title">Logs ({{ logQueries.length }})</span>
             </div>
-            <div class="query-items">
+            <div class="query-items tw:flex tw:flex-col tw:gap-[6px] tw:pl-6">
               <div
                 v-for="(query, idx) in logQueries"
                 :key="`log-${idx}`"
-                class="query-item"
+                class="query-item tw:flex tw:items-center tw:justify-between tw:py-2 tw:px-3 tw:bg-[var(--q-item-bg)] tw:rounded tw:border tw:border-[var(--q-border-color)]"
               >
-                <div class="query-stream">{{ query.stream }}</div>
+                <div class="query-stream tw:text-xs tw:[font-family:monospace] tw:text-[var(--q-text-secondary)]">{{ query.stream }}</div>
                 <OButton
                   variant="outline"
                   size="sm"
@@ -297,164 +297,8 @@ function navigateToQuery(query: CorrelationQuery, type: "logs" | "traces" | "met
 }
 </script>
 
-<style scoped lang="scss">
-.correlation-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: var(--q-background);
-  border-left: 1px solid var(--q-border-color);
-}
-
-.correlation-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--q-border-color);
-  background: var(--q-header-bg);
-
-  .header-content {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .header-title {
-    font-weight: 600;
-    font-size: 14px;
-  }
-}
-
-.correlation-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-}
-
-.correlation-loading,
-.correlation-error,
-.correlation-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 32px 16px;
-  text-align: center;
-}
-
-.loading-text,
-.error-text,
-.empty-text {
-  font-size: 13px;
-  color: var(--q-text-secondary);
-}
-
-.error-text {
-  color: var(--q-negative);
-}
-
-.correlation-results {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.service-info {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-
-  .service-name {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: 600;
-    font-size: 14px;
-  }
-
-  .dimension-section {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-
-    .dimension-section-header {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      color: var(--q-text-secondary);
-      letter-spacing: 0.5px;
-
-      .dimension-section-title {
-        cursor: help;
-      }
-    }
-  }
-
-  .service-dimensions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-
-    .dimension-key {
-      font-weight: 500;
-      margin-right: 4px;
-    }
-
-    .dimension-value {
-      opacity: 0.9;
-    }
-  }
-}
-
-.correlation-queries {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.query-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-
-  .section-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: 600;
-    font-size: 13px;
-  }
-
-  .query-items {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding-left: 24px;
-  }
-
-  .query-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    background: var(--q-item-bg);
-    border-radius: 4px;
-    border: 1px solid var(--q-border-color);
-
-    &:hover {
-      background: var(--q-item-hover-bg);
-    }
-
-    .query-stream {
-      font-size: 12px;
-      font-family: monospace;
-      color: var(--q-text-secondary);
-    }
-  }
+<style>
+.query-section .query-item:hover {
+  background: var(--q-item-hover-bg);
 }
 </style>

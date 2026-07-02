@@ -119,7 +119,7 @@ describe('SsoLogin.vue', () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      const link = wrapper.find('a.login-internal-link');
+      const link = wrapper.find('[data-test="sso-login-internal-link"]');
       await link.trigger('click');
 
       expect(vm.showLoginInput).toBe(true);
@@ -129,7 +129,7 @@ describe('SsoLogin.vue', () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      const link = wrapper.find('a.login-internal-link');
+      const link = wrapper.find('[data-test="sso-login-internal-link"]');
       await link.trigger('click');
       expect(vm.showLoginInput).toBe(true);
 
@@ -139,7 +139,7 @@ describe('SsoLogin.vue', () => {
 
     it('should render "Sign in with an internal user" link', () => {
       wrapper = createWrapper();
-      const link = wrapper.find('a.login-internal-link');
+      const link = wrapper.find('[data-test="sso-login-internal-link"]');
       expect(link.exists()).toBe(true);
       expect(link.text()).toContain('Sign in with an internal user');
     });

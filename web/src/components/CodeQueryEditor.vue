@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="code-query-editor-container" v-bind="$attrs">
+  <div class="tw:relative tw:w-full tw:h-full tw:flex tw:flex-col" v-bind="$attrs">
     <div
       data-test="query-editor"
-      class="logs-query-editor"
+      class="logs-query-editor tw:flex-1 tw:min-h-0 tw:bg-(--o2-card-bg)"
       ref="editorRef"
       :id="editorId"
     />
@@ -27,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showAiIcon && !disableAi"
       variant="sidebar-toggle"
       size="icon-toolbar"
-      class="ai-icon-button"
-      :class="nlpMode ? 'ai-icon-active' : ''"
+      class="tw:absolute! tw:top-2 tw:right-2 tw:z-10 tw:bg-(--o2-bg-primary) tw:border tw:border-(--o2-border-color) tw:transition-all tw:duration-200 tw:hover:bg-(--color-button-outline-hover-bg) tw:hover:border-[var(--o2-color-primary)]"
+      :class="nlpMode ? 'tw:bg-[var(--o2-color-primary-light)] tw:border-[var(--o2-color-primary)]' : ''"
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >
       <OIcon size="md">
-        <img :src="aiIcon" alt="AI" class="ai-icon-img" />
+        <img :src="aiIcon" alt="AI" class="tw:w-4.5 tw:h-4.5" />
       </OIcon>
       <OTooltip side="top" align="center">
         <template #content>{{ disableAiReason || t(nlpMode ? 'search.nlpModeEnabled' : 'search.nlpModeLabel') }}</template>
@@ -122,6 +122,15 @@ export default defineComponent({
       default: true,
     },
     stickyScroll: {
+      type: Boolean,
+      default: true,
+    },
+    // When true (the app-wide default), the editor releases the mouse wheel to
+    // the page once its own content has nothing left to scroll — Monaco
+    // otherwise always consumes the wheel, trapping page scroll on hover. It
+    // still scrolls internally when its content overflows. Set to false for a
+    // full-page editor that should own the wheel even when not overflowing.
+    releaseWheelToPage: {
       type: Boolean,
       default: true,
     },
@@ -706,7 +715,12 @@ export default defineComponent({
         smoothScrolling: true,
         mouseWheelScrollSensitivity: 1,
         fastScrollSensitivity: 1,
-        scrollbar: { horizontal: "auto", vertical: "visible" },
+        scrollbar: {
+          horizontal: "auto",
+          vertical: "visible",
+          // Let the page scroll when this editor has nothing left to scroll.
+          alwaysConsumeMouseWheel: !props.releaseWheelToPage,
+        },
         find: {
           addExtraSpaceOnTop: false,
           autoFindInSelection: "never",
@@ -1222,50 +1236,7 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-#editor {
-  width: 100%;
-  height: 78%;
-  border-radius: 5px;
-}
-
-.code-query-editor-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-/* AI Icon Button Styling */
-.ai-icon-button {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 10;
-  background-color: var(--o2-bg-primary);
-  border: 1px solid var(--o2-border-color);
-  transition: all 0.2s ease;
-}
-
-.ai-icon-button:hover {
-  background-color: var(--o2-hover-accent);
-  border-color: var(--o2-color-primary);
-}
-
-.ai-icon-button.ai-icon-active {
-  background-color: var(--o2-color-primary-light);
-  border-color: var(--o2-color-primary);
-}
-
-.ai-icon-img {
-  width: 18px;
-  height: 18px;
-}
-
-.q-dark .ai-icon-img {
-  filter: brightness(1.2);
-}
+<style>
 .monaco-editor,
 .monaco-diff-editor .synthetic-focus,
 .monaco-editor,
@@ -1289,17 +1260,17 @@ export default defineComponent({
   outline-width: 0px;
 }
 
-/* Generate SQL button - O2 AI Assistant gradient style (matches send-button) */
-.generate-sql-button {
-  position: absolute;
-  bottom: 0.5rem;
-  right: 0.5rem;
-  z-index: 100;
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-  color: white !important;
-  box-shadow: 0 0.25rem 0.9375rem 0 rgba(139, 92, 246, 0.3) !important;
-  transition: all 0.3s ease !important;
-  border: none !important;
+.logs-query-editor .monaco-editor,
+.logs-query-editor .monaco-editor .monaco-editor {
+  padding: 0px 0px 0px 0px !important;
+  --vscode-focusBorder: transparent !important;
+}
+
+.logs-query-editor .monaco-editor .editor-widget .suggest-widget,
+.logs-query-editor .monaco-editor .monaco-editor .editor-widget .suggest-widget {
+  z-index: 9999;
+  display: flex !important;
+  visibility: visible !important;
 }
 
 .generate-sql-button:hover:not(.disabled):not([disabled]):not(:disabled) {
@@ -1470,25 +1441,7 @@ export default defineComponent({
     opacity: 0.85;
   }
 }
-</style>
 
-<style lang="scss">
-.logs-query-editor {
-  flex: 1;
-  min-height: 0;
-  background-color: var(--o2-card-bg);
-  .monaco-editor,
-  .monaco-editor .monaco-editor {
-    padding: 0px 0px 0px 0px !important;
-
-    .editor-widget .suggest-widget {
-      z-index: 9999;
-      display: flex !important;
-      visibility: visible !important;
-    }
-    --vscode-focusBorder: transparent !important;
-  }
-}
 
 .highlight-error {
   background-color: rgba(255, 0, 0, 0.1);

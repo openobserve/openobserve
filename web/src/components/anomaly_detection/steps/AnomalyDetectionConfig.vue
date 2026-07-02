@@ -16,10 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-anomaly-config"
+    class="step-anomaly-config tw:h-full"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div class="step-content tw:px-3 tw:py-4">
+    <div
+      class="step-content tw:px-3 tw:py-4 tw:rounded-lg tw:h-full tw:overflow-y-auto tw:overflow-x-hidden tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]"
+    >
       <OForm ref="formRef">
         <!-- Query Mode Tabs -->
         <div class="tw:mb-4">
@@ -44,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Filters mode -->
         <div
           v-if="config.query_mode === 'filters'"
-          class="tw:flex tw:items-start alert-settings-row"
+          class="tw:flex tw:items-start tw:mb-4! tw:pb-0!"
         >
           <div
             class="tw:font-semibold tw:flex tw:items-center"
@@ -112,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Custom SQL mode -->
         <div
           v-if="config.query_mode === 'custom_sql'"
-          class="tw:flex tw:items-start alert-settings-row"
+          class="tw:flex tw:items-start tw:mb-4! tw:pb-0!"
         >
           <div
             class="tw:font-semibold tw:flex tw:items-center"
@@ -122,9 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div style="width: calc(100% - 190px)">
             <div
-              class="custom-sql-editor-wrapper"
+              class="custom-sql-editor-wrapper tw:h-[140px] tw:rounded tw:overflow-hidden"
               :class="
-                store.state.theme === 'dark' ? 'dark-editor' : 'light-editor'
+                store.state.theme === 'dark'
+                  ? 'tw:border tw:border-white/[0.18]'
+                  : 'tw:border tw:border-black/[0.12]'
               "
             >
               <QueryEditor
@@ -177,11 +181,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Row: Detection Function + Detection Resolution (filters mode) -->
         <div
           v-if="config.query_mode === 'filters'"
-          class="alert-settings-row paired-row"
+          class="tw:grid tw:grid-cols-2 tw:gap-3 tw:items-start tw:mb-4! tw:pb-0!"
         >
           <!-- Detection Function -->
-          <div class="paired-col">
-            <div class="paired-col-label tw:font-semibold">
+          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
+            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
               {{ t("alerts.detectionFunction") }}
               <span class="tw:text-red-500 tw:ml-1">*</span>
             </div>
@@ -224,8 +228,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Detection Resolution -->
-          <div class="paired-col">
-            <div class="paired-col-label tw:font-semibold">
+          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
+            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
               {{ t("alerts.anomaly.detectionResolution") }}
               <span class="tw:text-red-500 tw:ml-1">*</span>
               <OIcon
@@ -276,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Detection Resolution alone (custom_sql mode) -->
-        <div v-else class="tw:flex tw:items-start alert-settings-row">
+        <div v-else class="tw:flex tw:items-start tw:mb-4! tw:pb-0!">
           <div
             class="tw:font-semibold tw:flex tw:items-center"
             style="width: 190px; height: 36px"
@@ -329,10 +333,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Row: Check Every + Look Back Window -->
-        <div class="alert-settings-row paired-row">
+        <div class="tw:grid tw:grid-cols-2 tw:gap-3 tw:items-start tw:mb-4! tw:pb-0!">
           <!-- Check Every -->
-          <div class="paired-col">
-            <div class="paired-col-label tw:font-semibold">
+          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
+            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
               {{ t("alerts.anomaly.checkEvery") }}
               <span class="tw:text-red-500 tw:ml-1">*</span>
               <OIcon
@@ -381,8 +385,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Look Back Window -->
-          <div class="paired-col">
-            <div class="paired-col-label tw:font-semibold">
+          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
+            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
               {{ t("alerts.anomaly.lookBackWindow") }}
               <span class="tw:text-red-500 tw:ml-1">*</span>
               <OIcon
@@ -434,10 +438,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Row: Training Window + Retrain Every -->
-        <div class="alert-settings-row paired-row">
+        <div class="tw:grid tw:grid-cols-2 tw:gap-3 tw:items-start tw:mb-4! tw:pb-0!">
           <!-- Training Window -->
-          <div class="paired-col">
-            <div class="paired-col-label tw:font-semibold">
+          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
+            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
               {{ t("alerts.trainingWindow") }}
               <span class="tw:text-red-500 tw:ml-1">*</span>
               <OIcon
@@ -479,8 +483,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Retrain Every -->
-          <div class="paired-col">
-            <div class="paired-col-label tw:font-semibold">
+          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
+            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
               {{ t("alerts.anomaly.retrainEvery") }}
               <OIcon
                 name="info"
@@ -508,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Threshold / Sensitivity -->
-        <div class="tw:flex tw:items-start alert-settings-row">
+        <div class="tw:flex tw:items-start tw:mb-4! tw:pb-0!">
           <div
             class="tw:font-semibold tw:flex tw:items-center"
             style="width: 190px; padding-top: 4px"
@@ -529,7 +533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div style="width: calc(100% - 190px)">
             <!-- Chart + Slider container -->
-            <div class="sensitivity-chart-container">
+            <div class="tw:w-full">
               <!-- Header row: range labels + load button -->
               <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
                 <div class="tw:flex tw:items-center tw:gap-2">
@@ -565,10 +569,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Chart + Vertical Slider row -->
               <div class="tw:flex tw:gap-3">
                 <!-- Time series chart -->
-                <div class="sensitivity-chart-wrapper tw:flex-1">
+                <div class="tw:min-h-45 tw:relative tw:flex-1">
                   <div
                     v-if="!previewActive"
-                    class="sensitivity-empty-state"
+                    class="tw:w-full tw:h-45 tw:flex tw:flex-col tw:items-center tw:justify-center tw:rounded tw:border tw:border-dashed tw:border-(--o2-border)"
                     :class="
                       store.state.theme === 'dark'
                         ? 'tw:text-gray-400'
@@ -603,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Vertical dual-handle range slider -->
                 <div
-                  class="sensitivity-slider-col tw:flex tw:flex-col tw:items-center"
+                  class="tw:flex tw:flex-col tw:items-center tw:w-15 tw:shrink-0"
                 >
                   <ORange
                     v-model="thresholdRange"
@@ -621,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       { value: 75, label: '75' },
                       { value: 100, label: '100' },
                     ]"
-                    class="sensitivity-range-slider"
+                    class="sensitivity-range-slider tw:mt-[14px] tw:h-[145px]! tw:[--color-slider-track-fill:var(--o2-primary-color)] tw:[--color-slider-thumb:var(--o2-primary-color)] tw:[--color-slider-thumb-border:white] tw:[--color-slider-value:var(--o2-text-secondary)]"
                     data-test="anomaly-threshold-range"
                     @update:model-value="onThresholdRangeChange"
                   />
@@ -1257,174 +1261,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.step-anomaly-config {
-  height: 100%;
-
-  .step-content {
-    border-radius: 8px;
-    height: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
-  }
-
-  &.dark-mode {
-    .step-content {
-      background-color: #212121;
-      border: 1px solid #343434;
-    }
-  }
-
-  &.light-mode {
-    .step-content {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
-    }
-  }
-}
-
-.alert-settings-row {
-  margin-bottom: 16px !important;
-  padding-bottom: 0 !important;
-}
-
-.filter-field-select {
-  :deep(.q-field__native span) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  :deep(.q-field__input) {
-    text-overflow: ellipsis;
-  }
-}
-
-.paired-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  align-items: start;
-}
-
-.paired-col {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.paired-col-label {
-  width: 170px;
-  min-width: 170px;
-  min-height: 32px;
-  line-height: 1.4;
-  font-size: inherit;
-}
-
-// Monaco SQL editor wrapper
-.custom-sql-editor-wrapper {
-  height: 140px;
-  border-radius: 0.25rem;
-  overflow: hidden;
-
-  &.light-editor {
-    border: 1px solid rgba(0, 0, 0, 0.12);
-  }
-
-  &.dark-editor {
-    border: 1px solid rgba(255, 255, 255, 0.18);
-  }
-}
-
-// Sensitivity chart
-.sensitivity-chart-container {
-  width: 100%;
-}
-
-.sensitivity-chart-wrapper {
-  min-height: 180px;
-  position: relative;
-}
-
-.sensitivity-empty-state {
-  width: 100%;
-  height: 180px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.25rem;
-  border: 1px dashed var(--o2-border);
-}
-
-.sensitivity-slider-col {
-  width: 60px;
-  flex-shrink: 0;
-}
-
-.sensitivity-range-slider {
-  // Chart is 180px. With containLabel:true and top/bottom 3% margins (~5px
-  // each), the y-axis label at top takes ~15px and the x-axis time labels at
-  // bottom take ~25px, leaving the data area at ~top:20px, height:130px.
-  margin-top: 14px;
-  height: 145px !important;
-
-  // Override ORange design tokens with the primary action color
-  --color-slider-track-fill: var(--o2-primary-color);
-  --color-slider-thumb: var(--o2-primary-color);
-  --color-slider-thumb-border: white;
-  --color-slider-value: var(--o2-text-secondary);
-}
-
-// Reuse alerts wizard frequency toggle button styles
-.frequency-toggle-group {
-  display: flex;
-  width: fit-content;
-}
-
-.frequency-toggle-btn {
-  border: 1px solid !important;
-  border-radius: 0 !important;
-  transition: all 0.2s ease;
-  margin: 0 !important;
-
-  &.active {
-    border-color: var(--q-primary) !important;
-    background-color: var(--q-primary) !important;
-    color: white !important;
-    z-index: 1;
-  }
-
-  &.inactive {
-    border-color: #d0d0d0 !important;
-    background-color: transparent !important;
-  }
-}
-
-.frequency-toggle-left {
-  border-radius: 4px 0 0 4px !important;
-}
-
-.frequency-toggle-right {
-  border-left: none !important;
-  border-radius: 0 4px 4px 0 !important;
-}
-
-.dark-mode {
-  .frequency-toggle-btn {
-    &.inactive {
-      border-color: #404040 !important;
-      color: #bdbdbd !important;
-    }
-  }
-}
-
-.light-mode {
-  .frequency-toggle-btn {
-    &.inactive {
-      color: #5c5c5c !important;
-    }
-  }
-}
-</style>

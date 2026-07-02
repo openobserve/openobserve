@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen', 'tw:h-screen', 'tw:flex', 'tw:flex-col']"
   >
-    <header class="o2-app-header tw:shrink-0">
+    <header class="o2-app-header tw:shrink-0" :class="store.state.printMode === true ? 'tw:hidden' : ''">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
       <div
         v-if="config.isCloud === 'true'"
@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @navigate-to-docs="navigateToDocs"
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
+        @open-shortcuts="openShortcutsList"
         @signout="signout"
       />
     </header>
@@ -142,7 +143,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog data-test="main-layout-get-started-dialog" v-model:open="showGetStarted" size="full" :show-close="false">
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </ODialog>
+    <CommunitySlackInvite />
     <PredefinedThemes />
+    <ShortcutCheatsheet v-model:open="showShortcuts" />
   </div>
 </template>
 
@@ -186,6 +189,7 @@ import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import GetStarted from "@/components/login/GetStarted.vue";
+import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -198,6 +202,9 @@ import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useShortcut } from "@/lib/vue-shortcut-manager";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -220,7 +227,9 @@ export default defineComponent({
     ThemeSwitcher,
     PredefinedThemes,
     O2AIChat,
+    ShortcutCheatsheet,
     GetStarted,
+    CommunitySlackInvite,
     ODialog,
   },
   methods: {
@@ -1152,6 +1161,12 @@ export default defineComponent({
       { immediate: true },
     );
 
+    const showShortcuts = ref(false);
+    const openShortcutsList = () => { showShortcuts.value = true; };
+
+    // ── Global shortcuts: AI Chat ─────────────────────────────────────────
+    useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
+
     return {
       t,
       router,
@@ -1196,6 +1211,8 @@ export default defineComponent({
       getConfig,
       setRumUser,
       openPredefinedThemes,
+      showShortcuts,
+      openShortcutsList,
       isPredefinedThemesOpen,
       handleMenuHover,
     };
@@ -1254,19 +1271,10 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-@import "../styles/app.scss";
-</style>
 
-<style lang="scss" scoped>
-// Print mode — hide header + sidebar, show body overflow
-.printMode {
-  :global(body) {
-    overflow: auto !important;
-  }
-
-  .o2-app-header {
-    display: none;
-  }
+<style>
+/* Print mode — hide header + sidebar, show body overflow */
+.printMode body {
+  overflow: auto !important;
 }
 </style>

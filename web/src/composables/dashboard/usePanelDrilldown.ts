@@ -1119,7 +1119,10 @@ export function usePanelDrilldown({
               );
             }
           });
-
+          url.searchParams.set(
+            "org_identifier",
+            store.state.selectedOrganization.identifier,
+          );
           url.searchParams.set("dashboard", dashboardData.dashboardId);
           url.searchParams.set("folder", folderId);
           url.searchParams.set("tab", tabId);

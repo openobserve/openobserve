@@ -35,13 +35,13 @@ the Free Software Foundation, either version 3 of the License, or
         </div>
         <OSeparator class="tw:mx-4 tw:mt-4" />
 
-        <div class="error-report-container">
-          <div v-if="errors.length" class="error-section">
+        <div class="tw:overflow-auto">
+          <div v-if="errors.length" class="tw:p-2.5 tw:mb-2.5">
             <div class="error-list">
               <div
                 v-for="(err, errIdx) in errors"
                 :key="`${err.itemIndex}-${err.field}-${errIdx}`"
-                class="error-item"
+                class="tw:py-1.25 tw:px-0 tw:text-sm"
                 :data-test="`scorer-import-error-${err.itemIndex}-${err.field}`"
               >
                 <span
@@ -132,8 +132,8 @@ the Free Software Foundation, either version 3 of the License, or
             </div>
           </div>
 
-          <div v-if="creators.length" class="error-section">
-            <div class="section-title text-primary" data-test="scorer-import-creation-title">
+          <div v-if="creators.length" class="tw:p-2.5 tw:mb-2.5">
+            <div class="section-title text-primary tw:text-base tw:mb-2.5 tw:uppercase" data-test="scorer-import-creation-title">
               {{ t("onlineEvals.scorer.import.creation") }}
             </div>
             <div
@@ -144,14 +144,14 @@ the Free Software Foundation, either version 3 of the License, or
             >
               <div
                 :class="{
-                  'error-item tw:font-bold': true,
+                  'tw:py-1.25 tw:px-0 tw:text-sm tw:font-bold': true,
                   'text-green': c.status === 'success',
                   'text-red': c.status === 'error',
                   'text-secondary': c.status === 'exists',
                 }"
                 :data-test="`scorer-import-creation-${i}-message`"
               >
-                <pre class="creators-message">{{ c.message }}</pre>
+                <pre class="tw:whitespace-pre-wrap tw:font-[inherit] tw:m-0">{{ c.message }}</pre>
               </div>
             </div>
           </div>
@@ -426,31 +426,3 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
   }
 }
 </script>
-
-<style scoped lang="scss">
-.error-report-container {
-  overflow: auto;
-}
-
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-
-.error-item {
-  padding: 5px 0;
-  font-size: 14px;
-}
-
-.creators-message {
-  white-space: pre-wrap;
-  font-family: inherit;
-  margin: 0;
-}
-</style>

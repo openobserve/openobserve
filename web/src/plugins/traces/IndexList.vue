@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col index-menu tw:p-[0.375rem]! tw:bg-surface-panel!">
+  <div class="tw:flex tw:flex-col tw:w-full index-menu tw:p-1.5! tw:bg-surface-panel!">
     <OSelect
       data-test="log-search-index-list-select-stream"
       :model-value="searchObj.data.stream.selectedStream?.value ?? null"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
     </OSelect>
     <div
-      class="index-table tw:h-[calc(100%-2rem)]!"
+      class="index-table tw:h-[calc(100%-2rem)]! tw:w-full"
       data-test="log-search-index-list-fields-table"
     >
       <GroupedFieldList
@@ -620,181 +620,95 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.index-menu {
+<style>
+
+.index-menu .index-table table {
+  display: table;
+  table-layout: fixed !important;
+}
+
+.index-menu .index-table thead {
+  display: none;
+}
+
+.index-menu .index-table tr {
+  margin-bottom: 1px;
+}
+
+.index-menu .index-table tbody,
+.index-menu .index-table tr,
+.index-menu .index-table td {
   width: 100%;
-
-  .q-field {
-    &__control {
-      height: 35px;
-      padding: 0px 5px;
-      min-height: auto !important;
-
-      &-container {
-        padding-top: 0px !important;
-      }
-    }
-    &__native :first-of-type {
-      padding-top: 0.25rem;
-    }
-  }
-
-  .index-table {
-    width: 100%;
-
-    :deep(table) {
-      display: table;
-      table-layout: fixed !important;
-    }
-
-    :deep(thead) {
-      display: none;
-    }
-
-    :deep(tr) {
-      margin-bottom: 1px;
-    }
-
-    :deep(tbody),
-    :deep(tr),
-    :deep(td) {
-      width: 100%;
-      display: block;
-      height: fit-content;
-      overflow: hidden;
-    }
-
-    :deep(.q-table__control),
-    label.q-field {
-      width: 100%;
-    }
-
-    :deep(thead tr),
-    :deep(tbody td) {
-      height: auto;
-    }
-  }
-
-  .field_list {
-    padding: 0px;
-    margin-bottom: 0.125rem;
-    position: relative;
-    overflow: visible;
-    cursor: default;
-
-    &.field-group-header {
-      font-weight: 600;
-      font-size: 0.75rem;
-      padding: 0.25rem 0.325rem;
-    }
-
-    .field_label {
-      pointer-events: none;
-      font-size: 0.825rem;
-      position: relative;
-      display: inline;
-      z-index: 2;
-      left: 0;
-      // text-transform: capitalize;
-    }
-
-    .field-container {
-      height: 25px;
-    }
-
-    .field_overlay {
-      position: absolute;
-      height: 100%;
-      right: 0;
-      top: 0;
-      z-index: 5;
-      padding: 0 6px;
-      visibility: hidden;
-      display: flex;
-      align-items: center;
+  display: block;
+  height: fit-content;
+  overflow: hidden;
 }
 
-    &.selected {
-      .field_overlay {
-        background-color: var(--o2-hover-accent);
 
-        .field_icons {
-          opacity: 0;
-        }
-      }
-    }
-    // &:hover {
-    //   .field-container {
-    //     background-color: #e8e8e8;
-    //   }
-    //   body.body--dark {
-    //     .field-container {
-    //       background-color: #424242;
-    //     }
-    //   }
-    // }
-  }
-}
-
-.q-field--dense .q-field__before,
-.q-field--dense .q-field__prepend {
-  padding: 0px 0px 0px 0px;
+.index-menu .index-table thead tr,
+.index-menu .index-table tbody td {
   height: auto;
-  line-height: auto;
-}
-.q-field__native,
-.q-field__input {
-  padding: 0px 0px 0px 0px;
 }
 
-.q-field--dense .q-field__label {
-  top: 5px;
+.index-menu .field_list {
+  padding: 0px;
+  margin-bottom: 0.125rem;
+  position: relative;
+  overflow: visible;
+  cursor: default;
 }
-.q-field--dense .q-field__control,
-.q-field--dense .q-field__marginal {
-  height: 34px;
+
+.index-menu .field_list.field-group-header {
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.325rem;
 }
-</style>
 
-<style lang="scss">
-.index-table {
-  table {
-    width: 100%;
-    table-layout: fixed;
-
-    .q-expansion-item {
-      .q-item-type {
-        &:hover {
-          .field_overlay {
-            visibility: visible;
+.index-menu .field_list .field_label {
+  pointer-events: none;
+  font-size: 0.825rem;
+  position: relative;
+  display: inline;
+  z-index: 2;
+  left: 0;
 }
-        }
-      }
-      .field-expansion-icon {
-        img {
-          width: 12px;
-          height: 12px;
-        }
-      }
-    }
 
-    .field-container {
-      &:hover {
-        .field_overlay {
-          visibility: visible;
+.index-menu .field_list .field-container {
+  height: 25px;
 }
-      }
-    }
 
-    .field_list {
-      &.selected {
-        background-color: var(--o2-hover-accent);
+.index-menu .field_list .field_overlay {
+  position: absolute;
+  height: 100%;
+  right: 0;
+  top: 0;
+  z-index: 5;
+  padding: 0 6px;
+  visibility: hidden;
+  display: flex;
+  align-items: center;
+}
 
-        .field_overlay {
-          // background-color: #ffffff;
-        }
-      }
-    }
-  }
+.index-menu .field_list.selected .field_overlay {
+  background-color: var(--color-interactive-hover-bg);
+}
+
+.index-menu .field_list.selected .field_overlay .field_icons {
+  opacity: 0;
+}
+
+
+.index-table table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+
+.index-table table .field-container:hover .field_overlay {
+  visibility: visible;
+}
+
+.index-table table .field_list.selected {
+  background-color: var(--color-interactive-hover-bg);
 }
 </style>

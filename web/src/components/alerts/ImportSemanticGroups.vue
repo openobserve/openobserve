@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Full-width content for diff view -->
     <template #full-width-content>
-      <div class="import-semantic-groups-container">
+      <div class="tw:w-full tw:p-2 tw:h-[calc(100vh-140px)] tw:flex tw:flex-col tw:overflow-hidden">
         <!-- Compact Header with File Upload -->
         <div class="card-container tw:p-2 tw:mb-2">
           <div class="tw:flex tw:items-center">
@@ -74,24 +74,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Diff Preview Section with Scrollable Content -->
-        <div v-if="diffData" class="diff-container">
+        <div v-if="diffData" class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
           <!-- Compact Summary Bar -->
           <div class="card-container tw:p-2 tw:mb-2">
             <div class="tw:flex tw:items-center tw:gap-2">
               <div class="col-auto">
-                <OBadge variant="success" class="summary-chip">
-                  <strong>{{ diffData.additions.length }}</strong
+                <OBadge variant="success" class="tw:text-sm!">
+                  <strong class="tw:text-[15px]">{{ diffData.additions.length }}</strong
                   >&nbsp;New
                 </OBadge>
               </div>
               <div class="col-auto">
-                <OBadge variant="warning" class="summary-chip">
-                  <strong>{{ diffData.modifications.length }}</strong
+                <OBadge variant="warning" class="tw:text-sm!">
+                  <strong class="tw:text-[15px]">{{ diffData.modifications.length }}</strong
                   >&nbsp;Modified
                 </OBadge>
               </div>
               <div class="col-auto">
-                <OBadge variant="default" class="summary-chip">
+                <OBadge variant="default" class="tw:text-sm!">
                   {{ diffData.unchanged.length }} Unchanged
                 </OBadge>
               </div>
@@ -118,21 +118,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Scrollable Groups Container -->
-          <div class="card-container groups-scroll-container">
+          <div class="card-container groups-scroll-container tw:flex-1 tw:overflow-y-auto tw:overflow-x-hidden tw:p-2">
             <!-- Additions -->
             <div v-if="diffData.additions.length > 0" class="tw:mb-2">
-              <div class="section-header tw:text-green-500 tw:p-1">
+              <div class="tw:text-sm tw:font-semibold tw:border-b tw:border-[var(--color-separator)] tw:mb-1 tw:text-green-500 tw:p-1">
                 <OIcon name="add-circle" size="sm" />
                 New ({{ selectedAdditions.length }}/{{
                   diffData.additions.length
                 }})
               </div>
-              <ul class="compact-list tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+              <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md tw:mb-0">
                 <li
                   v-for="group in diffData.additions"
                   :key="group.id"
                   data-test="semantic-groups-addition-item"
-                  class="compact-item tw:flex tw:items-start tw:gap-2 tw:px-2 tw:py-1 tw:min-h-[44px] tw:cursor-pointer hover:tw:bg-muted/50"
+                  class="compact-item tw:flex tw:items-start tw:gap-2 tw:px-2 tw:py-1 tw:min-h-[44px] tw:cursor-pointer tw:hover:bg-muted/50"
                   @click="toggleAddition(group.id)"
                 >
                   <div class="tw:flex tw:items-start tw:shrink-0 tw:pt-1">
@@ -163,18 +163,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Modifications -->
             <div v-if="diffData.modifications.length > 0" class="tw:mb-2">
-              <div class="section-header tw:text-amber-500 tw:p-1">
+              <div class="tw:text-sm tw:font-semibold tw:border-b tw:border-[var(--color-separator)] tw:mb-1 tw:text-amber-500 tw:p-1">
                 <OIcon name="edit" size="sm" />
                 Modified ({{ selectedModifications.length }}/{{
                   diffData.modifications.length
                 }})
               </div>
-              <ul class="compact-list tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+              <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md tw:mb-0">
                 <li
                   v-for="mod in diffData.modifications"
                   :key="mod.proposed.id"
                   data-test="semantic-groups-modification-item"
-                  class="compact-item tw:flex tw:items-start tw:gap-2 tw:px-2 tw:py-1 tw:min-h-[44px] tw:cursor-pointer hover:tw:bg-muted/50"
+                  class="compact-item tw:flex tw:items-start tw:gap-2 tw:px-2 tw:py-1 tw:min-h-[44px] tw:cursor-pointer tw:hover:bg-muted/50"
                   @click="toggleModification(mod.proposed.id)"
                 >
                   <div class="tw:flex tw:items-start tw:shrink-0 tw:pt-1">
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="`Unchanged (${diffData.unchanged.length})`"
                 icon="check-circle"
               >
-                <ul class="compact-list tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+                <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md tw:mb-0">
                   <li
                     v-for="group in diffData.unchanged"
                     :key="group.id"
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-xs tw:mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="field-chips-container">
+        <div class="field-chips-container tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--o2-primary-background)] tw:rounded">
           <OBadge
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-xs tw:mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="field-chips-container">
+        <div class="field-chips-container tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--o2-primary-background)] tw:rounded">
           <OBadge
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
@@ -579,103 +579,35 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 };
 </script>
 
-<style lang="scss" scoped>
-.import-semantic-groups-container {
-  width: 100%;
-  padding: 8px;
-  height: calc(100vh - 140px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+<style>
+.groups-scroll-container::-webkit-scrollbar {
+  width: 8px;
 }
 
-.compact-file-input {
-  :deep(.q-field__control) {
-    min-height: 40px;
-  }
+.groups-scroll-container::-webkit-scrollbar-track {
+  background: var(--o2-primary-background);
 }
 
-.diff-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-.groups-scroll-container {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 8px;
-
-  /* Custom scrollbar */
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: var(--q-dark-page);
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--q-primary);
-    border-radius: 4px;
-  }
-
-  &::-webkit-scrollbar-thumb:hover {
-    background: var(--q-primary-dark);
-  }
-}
-
-.section-header {
-  font-size: 14px;
-  font-weight: 600;
-  border-bottom: 1px solid var(--color-separator);
-  margin-bottom: 4px;
-}
-
-.compact-list {
-  margin-bottom: 0;
-}
-
-.compact-item {
-  min-height: 44px;
-  padding: 4px 8px;
-}
-
-.field-chips-container {
-  max-height: 250px;
-  overflow-y: auto;
-  padding: 8px;
-  background: var(--q-dark);
+.groups-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--o2-primary-color);
   border-radius: 4px;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: var(--q-dark-page);
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--q-primary);
-    border-radius: 3px;
-  }
 }
 
-.summary-chip {
-  font-size: 14px !important;
-
-  :deep(strong) {
-    font-size: 15px;
-  }
+.groups-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--o2-primary-dark, var(--o2-primary-color));
 }
 
-.action-btn {
-  font-size: 13px !important;
-  min-height: 34px;
-  padding: 6px 14px;
-  font-weight: 500;
+.field-chips-container::-webkit-scrollbar {
+  width: 6px;
 }
+
+.field-chips-container::-webkit-scrollbar-track {
+  background: var(--o2-primary-background);
+}
+
+.field-chips-container::-webkit-scrollbar-thumb {
+  background: var(--o2-primary-color);
+  border-radius: 3px;
+}
+
 </style>

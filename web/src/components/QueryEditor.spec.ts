@@ -133,7 +133,7 @@ describe("QueryEditor", () => {
 
     it("should hide the AI input bar when not in AI mode", () => {
       wrapper = mountQueryEditor();
-      expect(wrapper.find(".ai-input-bar").exists()).toBe(false);
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(false);
     });
   });
 
@@ -154,7 +154,7 @@ describe("QueryEditor", () => {
       await toggleBtn.trigger("click");
       await nextTick();
 
-      expect(wrapper.find(".ai-input-bar").exists()).toBe(true);
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(true);
 
       // Restore config
       store.commit("setConfig", {
@@ -169,14 +169,14 @@ describe("QueryEditor", () => {
       wrapper = mountQueryEditor({ nlpMode: true });
       await nextTick();
 
-      expect(wrapper.find(".ai-input-bar").exists()).toBe(true);
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(true);
     });
 
     it("should hide AI input bar when nlpMode prop is false", async () => {
       wrapper = mountQueryEditor({ nlpMode: false });
       await nextTick();
 
-      expect(wrapper.find(".ai-input-bar").exists()).toBe(false);
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(false);
     });
   });
 
@@ -216,12 +216,12 @@ describe("QueryEditor", () => {
       (wrapper.vm as any).internalNlpMode = true;
       await nextTick();
 
-      expect(wrapper.find(".ai-input-bar").exists()).toBe(true);
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(true);
 
       (wrapper.vm as any).dismissAIMode();
       await nextTick();
 
-      expect(wrapper.find(".ai-input-bar").exists()).toBe(false);
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(false);
     });
 
     it("should clear aiInputText after dismissAIMode is called", async () => {

@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="semantic-field-groups-config">
-    <div class="section-header tw:mb-3">
+  <div class="tw:w-full">
+    <div class="tw:border-b tw:border-separator tw:pb-3 tw:mb-3">
       <div class="tw:text-xl tw:font-semibold">
         {{ t("settings.correlation.semanticFieldGroupsTitle") }}
       </div>
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Filtered Semantic Groups List -->
-    <div v-if="filteredGroups.length > 0" class="groups-list tw:mb-3">
+    <div v-if="filteredGroups.length > 0" class="tw:w-full tw:overflow-x-hidden tw:mb-3">
       <SemanticGroupItem
         v-for="(group, index) in filteredGroups"
         :key="`${group.id}-${index}`"
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Fingerprint Fields Selection (only for per-alert, not org-level) -->
     <div
       v-if="localGroups.length > 0 && showFingerprintFields"
-      class="fingerprint-section tw:mt-4"
+      class="tw:border-t tw:border-separator tw:pt-4 tw:mt-4"
     >
       <div class="tw:text-base tw:font-medium tw:mb-2">
         {{ t("correlation.deduplicateFields") }} *
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:text-xs tw:text-gray-400 tw:mb-3">
         {{ t("correlation.alertDeduplicationMessage") }}
       </div>
-      <div class="fingerprint-checkboxes">
+      <div class="tw:flex tw:flex-wrap tw:gap-3">
         <OCheckbox
           :data-test="`fingerprint-field-checkbox-${group.id}`"
           v-for="group in localGroups"
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="localFingerprintFields"
           :value="group.id"
           :label="group.display"
-          class="fingerprint-checkbox"
+          class="tw:min-w-50"
           @update:model-value="emitUpdate"
         />
       </div>
@@ -412,23 +412,9 @@ onMounted(async () => {
 });
 </script>
 
-<style lang="scss" scoped>
-.semantic-field-groups-config {
-  width: 100%;
-}
-
-.section-header {
-  border-bottom: 1px solid var(--color-separator);
-  padding-bottom: 12px;
-}
-
-.groups-list {
-  width: 100%;
-  overflow-x: hidden;
-}
-
-// Applied via JS to the target group item; :deep ensures it reaches child components
-:deep(.group-highlight) {
+<style>
+/* Applied via JS to the target group item */
+.group-highlight {
   animation: group-border-blink 0.4s ease-in-out 3;
 }
 
@@ -441,26 +427,5 @@ onMounted(async () => {
     outline: 2px solid var(--q-primary);
     border-radius: 4px;
   }
-}
-
-.fingerprint-section {
-  border-top: 1px solid var(--color-separator);
-  padding-top: 16px;
-}
-
-.fingerprint-checkboxes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.fingerprint-checkbox {
-  min-width: 200px;
-}
-
-.import-dialog-card {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
 }
 </style>

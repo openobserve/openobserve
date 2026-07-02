@@ -18,7 +18,8 @@
     <!-- Group header -->
     <template #group-header="{ row, groupName }">
       <div
-        class="field-group-header tw:h-full tw:w-full tw:flex! tw:justify-between tw:items-center tw:rounded-[0.25rem]"
+        :data-test="`logs-page-field-list-group-header-${row.group}`"
+        class="tw:font-semibold tw:text-xs tw:py-0.5 tw:px-[0.325rem] tw:cursor-pointer tw:text-field-list-group-text tw:bg-surface-subtle tw:h-full tw:w-full tw:flex! tw:justify-between tw:items-center tw:rounded-[0.25rem]"
         @click="$emit('toggle-group', row.group)"
       >
         <div class="tw:flex-1 tw:min-w-0 tw:flex tw:items-center tw:gap-1">
@@ -345,13 +346,3 @@ defineExpose({
 });
 </script>
 
-<style scoped lang="scss">
-.field-group-header {
-  font-weight: 600;
-  font-size: 0.75rem;
-  padding: 0.125rem 0.325rem;
-  cursor: pointer;
-  color: var(--color-field-list-group-text);
-  background-color: var(--color-surface-subtle);
-}
-</style>

@@ -3,6 +3,7 @@ import type {
   Shortcut,
   ShortcutManagerOptions,
 } from "./types";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 // ---------------------------------------------------------------------------
 // Lazy singleton — no plugin or main.ts setup needed.
@@ -92,10 +93,12 @@ export class ShortcutManager {
   // ---------- Register / Unregister ----------
 
   register(shortcut: Shortcut): string {
-    const id = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
-    });
+    const id =
+      shortcut.id ??
+      "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+      });
     const key = shortcut.key.toLowerCase();
     const existing = this.shortcuts.get(key) ?? [];
 
@@ -149,6 +152,15 @@ export class ShortcutManager {
 
   getByScope(scope: string): RegisteredShortcut[] {
     return this.getAll().filter((s) => (s.scope ?? "global") === scope);
+  }
+
+  /** Find a registered shortcut by its id (for tests / programmatic triggers). */
+  getById(id: string): RegisteredShortcut | undefined {
+    for (const list of this.shortcuts.values()) {
+      const found = list.find((s) => s.id === id);
+      if (found) return found;
+    }
+    return undefined;
   }
 
   // ---------- Key Parsing ----------
@@ -239,10 +251,30 @@ export class ShortcutManager {
     );
   }
 
+  /**
+   * Returns true when the shortcut key string contains at least one modifier
+   * (ctrl, meta, alt, shift). Pure single-letter keys have no modifier.
+   */
+  private static hasModifier(key: string): boolean {
+    return (
+      key.startsWith("ctrl+") ||
+      key.startsWith("meta+") ||
+      key.startsWith("alt+") ||
+      key.startsWith("shift+")
+    );
+  }
+
   private triggerShortcut(
     shortcut: RegisteredShortcut,
     e: KeyboardEvent,
   ): void {
+    // Guard: never intercept single-letter shortcuts while the user is typing
+    // in an input/textarea/contenteditable. Modifier-key shortcuts (Ctrl+S,
+    // ⌘+Enter, etc.) are always allowed through regardless of focus.
+    if (!ShortcutManager.hasModifier(shortcut.key) && isInputFocused()) {
+      return;
+    }
+
     if (shortcut.whenFocused !== undefined && shortcut.whenFocused !== null) {
       const isRef =
         shortcut.whenFocused !== null &&

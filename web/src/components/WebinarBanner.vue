@@ -18,14 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Header variant: tw:w-full top bar above the toolbar -->
   <div
     v-if="webinarData && !isExpired && !isDismissed && variant === 'header'"
-    class="webinar-top-bar"
+    class="webinar-top-bar tw:w-full tw:bg-amber-400 tw:text-[#1a1a1a]"
     data-test="webinar-header-banner"
     role="banner"
   >
-    <div class="webinar-top-bar-content">
-      <span class="webinar-top-bar-text">
+    <div class="webinar-top-bar-content tw:flex tw:items-center tw:justify-center tw:gap-2 tw:py-[0.2rem] tw:px-4 tw:flex-wrap tw:relative">
+      <span class="webinar-top-bar-text tw:text-[0.8125rem] tw:font-bold tw:text-[#1a1a1a] tw:text-center">
         <strong>{{ webinarData.tag }}:</strong> {{ webinarData.title }}
-        <span v-if="webinarData.date" class="webinar-top-bar-date">
+        <span v-if="webinarData.date" class="webinar-top-bar-date tw:font-medium">
           {{ formattedDate }}
         </span>
       </span>
@@ -35,13 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :href="webinarData.primaryButton.link"
         target="_blank"
         rel="noopener noreferrer"
-        class="webinar-top-bar-link"
+        class="webinar-top-bar-link tw:text-[0.8125rem] tw:font-bold tw:text-[#1e3a8a] tw:underline tw:whitespace-nowrap tw:hover:text-[#1e40af]"
         data-test="webinar-top-bar-register-link"
       >
         {{ webinarData.primaryButton.text }}
       </a>
 
-      <span class="webinar-top-bar-sep" aria-hidden="true">|</span>
+      <span class="webinar-top-bar-sep tw:text-[#374151] tw:font-normal tw:opacity-60 tw:select-none" aria-hidden="true">|</span>
 
       <OButton
         variant="webinar-dismiss"
@@ -57,27 +57,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Home variant: larger banner -->
   <div
     v-else-if="webinarData && !isExpired && variant === 'home'"
-    class="webinar-home-banner tw:mb-3"
+    class="webinar-home-banner tw:mb-3 tw:relative tw:overflow-hidden tw:rounded-[0.625rem] tw:border tw:border-[color-mix(in_srgb,var(--q-secondary)_35%,transparent)] tw:bg-[linear-gradient(120deg,color-mix(in_srgb,var(--q-secondary)_14%,var(--o2-primary-background))_0%,var(--o2-primary-background)_55%,color-mix(in_srgb,var(--q-secondary)_7%,var(--o2-primary-background))_100%)]"
     data-test="webinar-home-banner"
   >
     <!-- Decorative blobs -->
-    <div class="webinar-home-blob webinar-home-blob--1" aria-hidden="true" />
-    <div class="webinar-home-blob webinar-home-blob--2" aria-hidden="true" />
+    <div class="tw:absolute tw:rounded-full tw:pointer-events-none tw:opacity-[0.18] tw:bg-(--q-secondary) tw:blur-[2.5rem] tw:w-[10rem] tw:h-[10rem] tw:top-[-3rem] tw:left-[-2rem]" aria-hidden="true" />
+    <div class="tw:absolute tw:rounded-full tw:pointer-events-none tw:opacity-[0.18] tw:bg-(--q-secondary) tw:blur-[2.5rem] tw:w-[8rem] tw:h-[8rem] tw:bottom-[-2.5rem] tw:right-[6rem]" aria-hidden="true" />
 
     <!-- Content row -->
-    <div class="webinar-home-content">
-      <div class="webinar-home-left">
+    <div class="webinar-home-content tw:relative tw:z-[1] tw:flex tw:items-center tw:justify-between tw:flex-wrap tw:gap-3 tw:p-4 tw:pr-[1.375rem]">
+      <div class="webinar-home-left tw:flex tw:flex-col tw:gap-[0.3rem]">
         <!-- Live badge -->
-        <div class="webinar-home-badge">
-          <span class="webinar-home-badge-dot" />
+        <div class="webinar-home-badge tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.7rem] tw:font-bold tw:uppercase tw:tracking-[0.06em] tw:text-[var(--q-secondary)]">
+          <span class="webinar-home-badge-dot tw:w-[0.5rem] tw:h-[0.5rem] tw:rounded-full tw:bg-(--q-secondary) tw:shrink-0 tw:[animation:badge-pulse_1.8s_ease-in-out_infinite]" />
           {{ webinarData.tag }}
         </div>
 
-        <div class="webinar-home-title">{{ webinarData.title }}</div>
+        <div class="webinar-home-title tw:text-base tw:font-bold tw:text-[var(--o2-text-primary)] tw:leading-[1.35] tw:max-w-[36rem]">{{ webinarData.title }}</div>
 
-        <div v-if="webinarData.date" class="webinar-home-meta">
+        <div v-if="webinarData.date" class="webinar-home-meta tw:flex tw:items-center tw:gap-[0.3rem] tw:text-[0.8125rem] tw:leading-none tw:text-[var(--o2-text-secondary)]">
           <OIcon name="schedule" size="xs" />
-          <span>{{ formattedDate }}</span>
+          <span class="tw:[line-height:1]">{{ formattedDate }}</span>
         </div>
       </div>
 
@@ -179,142 +179,7 @@ onMounted(async () => {
 });
 </script>
 
-<style scoped lang="scss">
-/* ── Top bar (header variant) ───────────────────────────── */
-.webinar-top-bar {
-  width: 100%;
-  background: #fbbf24;
-  color: #1a1a1a;
-}
-
-.webinar-top-bar-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.2rem 1rem;
-  flex-wrap: wrap;
-  position: relative;
-}
-
-.webinar-top-bar-text {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: #1a1a1a;
-  text-align: center;
-
-  strong {
-    font-weight: 700;
-  }
-}
-
-.webinar-top-bar-date {
-  font-weight: 500;
-}
-
-.webinar-top-bar-sep {
-  color: #374151;
-  font-weight: 400;
-  opacity: 0.6;
-  user-select: none;
-}
-
-.webinar-top-bar-link {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: #1e3a8a;
-  text-decoration: underline;
-  white-space: nowrap;
-
-  &:hover {
-    color: #1e40af;
-  }
-}
-
-.webinar-top-bar-dismiss {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
-
-/* ── Home variant ───────────────────────────────────────── */
-.webinar-home-banner {
-  position: relative;
-  overflow: hidden;
-  border-radius: 0.625rem;
-  border: 1px solid color-mix(in srgb, var(--q-secondary) 35%, transparent);
-  background: linear-gradient(
-    120deg,
-    color-mix(in srgb, var(--q-secondary) 14%, var(--o2-primary-background)) 0%,
-    var(--o2-primary-background) 55%,
-    color-mix(in srgb, var(--q-secondary) 7%, var(--o2-primary-background)) 100%
-  );
-}
-
-/* Decorative background blobs */
-.webinar-home-blob {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  opacity: 0.18;
-  background: var(--q-secondary);
-  filter: blur(2.5rem);
-}
-
-.webinar-home-blob--1 {
-  width: 10rem;
-  height: 10rem;
-  top: -3rem;
-  left: -2rem;
-}
-
-.webinar-home-blob--2 {
-  width: 8rem;
-  height: 8rem;
-  bottom: -2.5rem;
-  right: 6rem;
-}
-
-/* Inner content sits above blobs */
-.webinar-home-content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  padding: 1rem 1.375rem;
-}
-
-.webinar-home-left {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-/* Animated "live" badge */
-.webinar-home-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--q-secondary);
-}
-
-.webinar-home-badge-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  background: var(--q-secondary);
-  flex-shrink: 0;
-  animation: badge-pulse 1.8s ease-in-out infinite;
-}
-
+<style>
 @keyframes badge-pulse {
   0%,
   100% {
@@ -325,26 +190,6 @@ onMounted(async () => {
   50% {
     transform: scale(1.5);
     opacity: 0.5;
-  }
-}
-
-.webinar-home-title {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--o2-text-primary);
-  line-height: 1.35;
-  max-width: 36rem;
-}
-
-.webinar-home-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.8125rem;
-  line-height: 1;
-  color: var(--o2-text-secondary);
-span {
-    line-height: 1;
   }
 }
 </style>

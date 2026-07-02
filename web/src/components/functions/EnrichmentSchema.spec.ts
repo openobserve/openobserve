@@ -381,7 +381,7 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
       await wrapper.setProps({ open: true });
       await flushPromises();
 
-      const totalFields = wrapper.find('.display-total-fields');
+      const totalFields = wrapper.find('[data-test="enrichment-schema-total-fields"]');
       expect(totalFields.exists()).toBe(true);
       expect(totalFields.text()).toContain('2');
     });

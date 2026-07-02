@@ -232,5 +232,3 @@ const savePipeline = () => {
   emit("save", formData.value);
 };
 </script>
-
-<style lang="scss" scoped></style>

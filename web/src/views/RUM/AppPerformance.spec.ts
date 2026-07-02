@@ -203,7 +203,7 @@ describe("AppPerformance.vue", () => {
 
   describe("Component Rendering", () => {
     it("should render the component with correct structure", () => {
-      expect(wrapper.find(".performance_title").exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-performance-title"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="date-time-picker"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="auto-refresh-interval"]').exists()).toBe(true);
       expect(wrapper.find(".o-tabs-stub").exists()).toBe(true);
@@ -211,7 +211,7 @@ describe("AppPerformance.vue", () => {
     });
 
     it("should display the correct title", () => {
-      const title = wrapper.find(".performance_title");
+      const title = wrapper.find('[data-test="rum-performance-title"]');
       expect(title.text()).toBe("Performance Summary");
     });
 

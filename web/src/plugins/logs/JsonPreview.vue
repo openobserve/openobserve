@@ -55,12 +55,16 @@
     <div v-show="activeTab === 'unflattened'" class="tw:pl-3">
       <OSpinner size="md" />
       <div v-if="!loading">
+        <!-- Editor sizing is inlined here because it was originally scoped to this
+             component via <style scoped>; keeping it inline prevents it from
+             leaking onto every .monaco-editor app-wide. (The focus-border is left
+             off so this editor stays borderless like the others.) -->
         <code-query-editor
           v-model:query="unflattendData"
           ref="queryEditorRef"
           :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
-          class="monaco-editor"
-          :class="mode"
+          class="tw:w-[calc(100%-16px)]!"
+          :class="[mode, mode === 'expanded' ? 'tw:h-[300px]! tw:max-w-[1024px]!' : 'tw:h-[calc(100vh-250px)]!']"
           language="json"
         />
       </div>
@@ -963,8 +967,3 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
-@import "@/styles/logs/json-preview.scss";
-
-// No custom cross-link CSS needed — cross-links render as q-items inside existing q-btn-dropdown
-</style>

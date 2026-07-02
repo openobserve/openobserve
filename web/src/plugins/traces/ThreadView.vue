@@ -27,39 +27,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="thread-view tw:flex tw:flex-col tw:w-full tw:h-full"
+    class="thread-view tw:flex tw:flex-col tw:w-full tw:h-full tw:bg-(--o2-card-bg)"
     :class="{ 'thread-view--dark': isDark }"
   >
-    <!-- Summary toolbar — sidebar-style badge chips. -->
-    <div class="thread-summary">
+    <!-- Summary toolbar — sidebar-style badge chips. Hidden in the Session
+         Detail Pretty view (those metrics already show in the KPI cards). -->
+    <div v-if="props.showSummary" class="thread-summary tw:flex tw:flex-wrap tw:items-center tw:gap-[0.4rem] tw:py-2 tw:px-4 tw:bg-(--o2-bg-2,transparent) tw:border-b tw:border-(--o2-border-color)">
       <OBadge
         size="sm"
-        class="thread-chip thread-chip--steps"
+        class="thread-chip thread-chip--steps tw:h-[26px]! tw:px-[0.625rem]! tw:py-0! tw:bg-(--o2-card-bg)! tw:border tw:border-(--o2-border-color) tw:rounded! tw:text-xs! tw:text-(--o2-text-primary)! tw:border-l-[3px]! tw:border-l-[#cc785c]!"
         :title="`${summary.turnCount} LLM step${summary.turnCount === 1 ? '' : 's'}`"
       >
         <template #icon><OIcon name="auto-awesome" size="xs" /></template>
-        <span class="thread-chip__label">Steps</span>
-        <span class="thread-chip__value">{{ summary.turnCount }}</span>
+        <span class="thread-chip__label tw:text-(--o2-text-muted) tw:font-medium tw:mr-[5px] tw:tracking-normal tw:text-[11.5px]">Steps</span>
+        <span class="thread-chip__value tw:text-(--o2-text-primary) tw:font-semibold tw:text-xs">{{ summary.turnCount }}</span>
       </OBadge>
 
-      <OBadge size="sm" class="thread-chip thread-chip--tools">
+      <OBadge size="sm" class="thread-chip thread-chip--tools tw:h-[26px]! tw:px-[0.625rem]! tw:py-0! tw:bg-(--o2-card-bg)! tw:border tw:border-(--o2-border-color) tw:rounded! tw:text-xs! tw:text-(--o2-text-primary)! tw:border-l-[3px]! tw:border-l-[#0ea5e9]!">
         <template #icon><OIcon name="build" size="xs" /></template>
-        <span class="thread-chip__label">Tools</span>
-        <span class="thread-chip__value">{{ summary.toolCallCount }}</span>
+        <span class="thread-chip__label tw:text-(--o2-text-muted) tw:font-medium tw:mr-[5px] tw:tracking-normal tw:text-[11.5px]">Tools</span>
+        <span class="thread-chip__value tw:text-(--o2-text-primary) tw:font-semibold tw:text-xs">{{ summary.toolCallCount }}</span>
       </OBadge>
 
-      <OBadge size="sm" class="thread-chip thread-chip--duration">
+      <OBadge size="sm" class="thread-chip thread-chip--duration tw:h-[26px]! tw:px-[0.625rem]! tw:py-0! tw:bg-(--o2-card-bg)! tw:border tw:border-(--o2-border-color) tw:rounded! tw:text-xs! tw:text-(--o2-text-primary)! tw:border-l-[3px]! tw:border-l-[#64748b]!">
         <template #icon><OIcon name="schedule" size="xs" /></template>
-        <span class="thread-chip__label">Duration</span>
-        <span class="thread-chip__value">
+        <span class="thread-chip__label tw:text-(--o2-text-muted) tw:font-medium tw:mr-[5px] tw:tracking-normal tw:text-[11.5px]">Duration</span>
+        <span class="thread-chip__value tw:text-(--o2-text-primary) tw:font-semibold tw:text-xs">
           {{ formatDuration(summary.totalDurationNs) }}
         </span>
       </OBadge>
 
-      <OBadge size="sm" class="thread-chip thread-chip--cost">
+      <OBadge size="sm" class="thread-chip thread-chip--cost tw:h-[26px]! tw:px-[0.625rem]! tw:py-0! tw:bg-(--o2-card-bg)! tw:border tw:border-(--o2-border-color) tw:rounded! tw:text-xs! tw:text-(--o2-text-primary)! tw:border-l-[3px]! tw:border-l-[#16a34a]!">
         <template #icon><OIcon name="payments" size="xs" /></template>
-        <span class="thread-chip__label">Cost</span>
-        <span class="thread-chip__value">
+        <span class="thread-chip__label tw:text-(--o2-text-muted) tw:font-medium tw:mr-[5px] tw:tracking-normal tw:text-[11.5px]">Cost</span>
+        <span class="thread-chip__value tw:text-(--o2-text-primary) tw:font-semibold tw:text-xs">
           {{ formatCost(summary.totalCost) }}
         </span>
       </OBadge>
@@ -67,22 +68,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OBadge
         v-if="summary.dominantModel"
         size="sm"
-        class="thread-chip thread-chip--model"
+        class="thread-chip thread-chip--model tw:h-[26px]! tw:px-[0.625rem]! tw:py-0! tw:bg-(--o2-card-bg)! tw:border tw:border-(--o2-border-color) tw:rounded! tw:text-xs! tw:text-(--o2-text-primary)! tw:border-l-[3px]! tw:border-l-[#8b5cf6]!"
         :title="summary.dominantModel"
       >
         <template #icon><OIcon name="bolt" size="xs" /></template>
-        <span class="thread-chip__label">Model</span>
-        <span class="thread-chip__value">{{ summary.dominantModel }}</span>
+        <span class="thread-chip__label tw:text-(--o2-text-muted) tw:font-medium tw:mr-[5px] tw:tracking-normal tw:text-[11.5px]">Model</span>
+        <span class="thread-chip__value tw:text-(--o2-text-primary) tw:font-semibold tw:text-xs">{{ summary.dominantModel }}</span>
       </OBadge>
 
       <OBadge
         v-if="summary.errorCount > 0"
         size="sm"
-        class="thread-chip thread-chip--error"
+        class="thread-chip thread-chip--error tw:h-[26px]! tw:px-[0.625rem]! tw:py-0! tw:bg-(--o2-card-bg)! tw:border tw:border-(--o2-border-color) tw:rounded! tw:text-xs! tw:text-(--o2-text-primary)! tw:border-l-[3px]! tw:border-l-[var(--o2-status-error-text)]!"
       >
         <template #icon><OIcon name="error-outline" size="xs" /></template>
-        <span class="thread-chip__label">Errors</span>
-        <span class="thread-chip__value">{{ summary.errorCount }}</span>
+        <span class="thread-chip__label tw:text-(--o2-text-muted) tw:font-medium tw:mr-[5px] tw:tracking-normal tw:text-[11.5px]">Errors</span>
+        <span class="thread-chip__value thread-chip__value--error tw:font-semibold tw:text-xs tw:text-(--o2-status-error-text)">{{ summary.errorCount }}</span>
       </OBadge>
 
     </div>
@@ -101,37 +102,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       No LLM turns detected. The trace doesn't contain spans with
       <code>gen_ai.operation.name = chat</code>.
     </div>
-    <div v-else class="tw:flex-1 tw:overflow-auto tw:px-[1rem] tw:py-[0.75rem]">
+    <div v-else class="thread-scroll-body tw:flex-1 tw:overflow-auto tw:px-[1rem] tw:py-[0.75rem] tw:bg-(--o2-bg-2,var(--o2-card-bg))">
       <!-- System prompt (global — identical across traces in a session). -->
-      <div v-if="head.systemPrompt" class="thread-system">
+      <div
+        v-if="head.systemPrompt"
+        class="thread-system tw:mb-4 tw:border tw:border-(--o2-border-color) tw:border-l-[3px] tw:border-l-[#8b5cf6] tw:rounded-[0.4rem] tw:bg-(--o2-card-bg) tw:overflow-hidden"
+      >
         <div
-          class="thread-system__head"
+          class="thread-system__head tw:flex tw:items-center tw:gap-[0.625rem] tw:py-2 tw:px-3 tw:cursor-pointer tw:transition-all tw:duration-[120ms]"
           @click="showSystemFull = !showSystemFull"
         >
-          <span class="thread-system__badge">
+          <span class="thread-system__badge tw:inline-flex tw:items-center tw:py-[0.15rem] tw:px-2 tw:bg-[rgba(139,92,246,0.1)] tw:text-[#8b5cf6] tw:rounded tw:text-[0.7rem] tw:font-semibold tw:tracking-[0.02rem] tw:shrink-0">
             <OIcon name="settings" size="xs" class="tw:mr-1" />
             System
           </span>
           <span
             v-if="!showSystemFull"
-            class="thread-system__preview"
+            class="thread-system__preview tw:flex-1 tw:min-w-0 tw:text-[0.8rem] tw:text-(--o2-text-2) tw:truncate"
           >
             {{ truncate(head.systemPrompt, 160) }}
           </span>
           <span v-else class="tw:flex-1" />
-          <span class="thread-system__toggle">
+          <span class="thread-system__toggle tw:inline-flex tw:items-center tw:gap-[0.15rem] tw:text-(--q-primary) tw:text-[0.72rem] tw:font-medium tw:shrink-0">
             <OIcon
               :name="showSystemFull ? 'expand-less' : 'expand-more'"
               size="sm"
             />
           </span>
         </div>
-        <div v-if="showSystemFull" class="thread-system__content">
+        <div
+          v-if="showSystemFull"
+          class="thread-system__content tw:py-3 tw:px-[0.875rem] tw:border-t tw:border-(--o2-border-color) tw:bg-(--o2-bg-2,var(--o2-card-bg)) tw:text-[0.82rem] tw:leading-[1.55] tw:text-(--o2-text-1) tw:whitespace-pre-wrap tw:break-words tw:max-h-[360px] tw:overflow-auto"
+        >
           {{ head.systemPrompt }}
         </div>
       </div>
 
-      <template v-for="group in traceGroups" :key="group.traceId">
+      <template v-for="group in displayGroups" :key="group.traceId">
         <!-- Hint about historical user messages from prior traces in the
              same session — these are answered in earlier traces. -->
         <div
@@ -149,10 +156,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- This group's user query. -->
         <div
           v-if="group.userQuery"
-          class="thread-bubble thread-bubble--user thread-user-row"
+          class="thread-bubble thread-bubble--user thread-user-row tw:flex tw:items-start tw:gap-[0.625rem] tw:mb-4 tw:ml-auto tw:max-w-[40%] tw:w-fit tw:py-[0.625rem] tw:px-[0.875rem] tw:rounded-lg tw:text-[0.85rem] tw:leading-normal tw:whitespace-pre-wrap tw:break-words tw:bg-[linear-gradient(135deg,#f8f9ff_0%,#e8edff_100%)] tw:border tw:border-[#e0e6ff] tw:text-[#2c3e50] tw:shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
         >
           <div
-            class="thread-user-avatar"
+            class="thread-user-avatar tw:w-6 tw:h-6 tw:rounded-full tw:bg-[linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)] tw:text-white tw:inline-flex tw:items-center tw:justify-content-center tw:text-[0.7rem] tw:font-bold tw:shrink-0 tw:cursor-default"
             :title="group.userId || 'User'"
           >
             <OIcon name="person" size="sm" />
@@ -164,146 +171,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :side-offset="6"
             />
           </div>
-          <div class="thread-user-row__text">{{ group.userQuery }}</div>
+          <div class="thread-user-row__text tw:flex-1 tw:min-w-0 tw:self-center">{{ group.userQuery }}</div>
         </div>
 
         <!-- Timeline rail of turns. -->
-        <div class="thread-rail">
+        <div class="thread-rail tw:relative tw:pl-0">
           <div
             v-for="turn in group.turns"
             :key="turn.span.span_id"
-            class="thread-turn"
+            class="thread-turn tw:relative tw:flex tw:gap-[0.875rem] tw:pb-4"
           >
-          <div class="thread-turn__avatar">
+          <div class="thread-turn__avatar tw:shrink-0 tw:relative tw:z-[1] tw:w-7 tw:h-7 tw:rounded-full tw:bg-[#f3eaff] tw:text-[#8b5cf6] tw:flex tw:items-center tw:justify-center tw:border tw:border-[rgba(139,92,246,0.25)] tw:shadow-[0_0_0_4px_var(--o2-card-bg)]">
             <OIcon name="auto-awesome" size="xs" />
           </div>
-          <div class="thread-turn__body">
+          <div class="thread-turn__body tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-2">
           <!-- Genuine follow-up user message(s). -->
           <div
             v-for="(u, uIdx) in turn.followupUsers"
             :key="`u-${uIdx}`"
-            class="thread-bubble thread-bubble--user thread-bubble--user-followup"
+            class="thread-bubble thread-bubble--user thread-bubble--user-followup tw:py-[0.625rem] tw:px-[0.875rem] tw:rounded-lg tw:text-[0.85rem] tw:leading-normal tw:whitespace-pre-wrap tw:break-words tw:max-w-[min(640px,75%)] tw:bg-[linear-gradient(135deg,#f8f9ff_0%,#e8edff_100%)] tw:border tw:border-[#e0e6ff] tw:text-[#2c3e50] tw:shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
           >
             {{ u.content }}
           </div>
 
-          <!-- Assistant text. -->
+          <!-- Tool calls — between the user input and the assistant output
+               (the model calls tools, then answers). Shared component, also
+               used by the Session Detail collapsed turn body. -->
+          <ThreadToolCalls
+            :tool-calls="turn.toolCalls"
+            @span-selected="emit('span-selected', $event)"
+          />
+
+          <!-- Assistant text (the final answer, after any tool calls). Rendered
+               as markdown — headings, tables, code, bold. v-html is sanitized in
+               renderMarkdown(). -->
           <div
             v-for="(msg, mIdx) in turn.assistant"
             :key="`a-${mIdx}`"
-            class="thread-bubble thread-bubble--assistant"
-          >
-            {{ msg.content }}
-          </div>
+            class="thread-bubble thread-bubble--assistant markdown-body tw:self-start tw:bg-white tw:border tw:border-[#e5e7eb] tw:text-[#2c3e50] tw:max-w-full tw:shadow-[0_1px_2px_rgba(0,0,0,0.06)] tw:py-[0.625rem] tw:px-[0.875rem] tw:rounded-lg tw:text-[0.85rem] tw:leading-normal tw:break-words"
+            v-html="renderMarkdown(msg.content)"
+          />
 
-          <!-- Tool calls — one grouped card. -->
-          <div v-if="turn.toolCalls.length > 0" class="thread-tools-card">
-            <div class="thread-tools-card__header">
-              <span class="thread-tools-card__count">
-                {{ turn.toolCalls.length }}
-                {{ turn.toolCalls.length === 1 ? "Tool call" : "Tool calls" }}
-              </span>
-              <span class="thread-tools-card__total">
-                Σ {{ formatDuration(totalToolDuration(turn.toolCalls)) }}
-              </span>
-            </div>
-            <div
-              v-for="t in turn.toolCalls"
-              :key="t.span_id"
-              class="thread-tool"
-              :class="{ 'thread-tool--open': expandedTools.has(t.span_id) }"
-            >
-              <div class="thread-tool-row" @click="toggleTool(t.span_id)">
-                <span class="thread-tool-row__caret">{{
-                  expandedTools.has(t.span_id) ? "▾" : "▸"
-                }}</span>
-                <span class="thread-tool-row__icon">{{
-                  toolGlyph(
-                    t.tool_name || t.gen_ai_tool_name || t.operation_name,
-                  )
-                }}</span>
-                <span class="thread-tool-row__name">{{
-                  t.tool_name || t.gen_ai_tool_name || t.operation_name
-                }}</span>
-                <span class="tw:flex-1" />
-                <span
-                  class="thread-pill"
-                  :class="
-                    t.span_status === 'ERROR'
-                      ? 'thread-pill--error'
-                      : 'thread-pill--ok'
-                  "
-                >
-                  {{ t.span_status === "ERROR" ? "ERROR" : "OK" }}
-                  · {{ formatDuration(t.duration) }}
-                </span>
-                <button
-                  class="thread-tool-row__view"
-                  @click.stop="emit('span-selected', t.span_id)"
-                  title="Open span details"
-                >
-                  <OIcon name="open-in-new" size="xs" />
-                </button>
-              </div>
-
-              <div v-if="expandedTools.has(t.span_id)" class="thread-tool-body">
-                <div class="thread-tool-body__section">
-                  <div class="thread-tool-body__label">Arguments</div>
-                  <pre class="thread-tool-body__pre">{{
-                    formatToolPayload(getInputRaw(t) || t.tool_args)
-                  }}</pre>
-                </div>
-                <div class="thread-tool-body__section">
-                  <div class="thread-tool-body__label">
-                    Result
-                    <span
-                      v-if="t.span_status === 'ERROR'"
-                      class="tw:text-[#dc2626]"
-                    >
-                      · ERROR
-                    </span>
-                  </div>
-                  <pre class="thread-tool-body__pre">{{
-                    formatToolPayload(getOutputRaw(t)) ||
-                    t.status_message ||
-                    "(empty)"
-                  }}</pre>
-                </div>
-              </div>
-            </div>
-          </div>
 
           <!-- Footer. -->
-          <div class="thread-turn__footer">
-            <span class="thread-metric" :title="`Started at ${formatTime(turn.span.start_time)}`">
+          <div class="thread-turn__footer tw:flex tw:items-center tw:flex-wrap tw:gap-[0.35rem] tw:mt-2 tw:pt-2 tw:border-t tw:border-dashed tw:border-(--o2-border-color) tw:text-[0.72rem] tw:text-(--o2-text-2)">
+            <span class="thread-metric tw:inline-flex tw:items-center tw:gap-1 tw:py-[0.18rem] tw:px-2 tw:rounded-[0.3rem] tw:bg-(--o2-bg-2,rgba(0,0,0,0.03)) tw:border tw:border-(--o2-border-color) tw:text-(--o2-text-2) tw:text-[0.7rem] tw:leading-none tw:whitespace-nowrap tw:shrink-0" :title="`Started at ${formatTime(turn.span.start_time)}`">
               <OIcon name="schedule" size="xs" />
               {{ formatTime(turn.span.start_time) }}
             </span>
-            <span class="thread-metric thread-metric--model" :title="getModel(turn.span)">
+            <span class="thread-metric thread-metric--model tw:inline-flex tw:items-center tw:gap-1 tw:py-[0.18rem] tw:px-2 tw:rounded-[0.3rem] tw:text-[#8b5cf6] tw:bg-[rgba(139,92,246,0.06)] tw:border tw:border-[rgba(139,92,246,0.2)] tw:font-medium tw:max-w-[200px] tw:overflow-hidden tw:text-ellipsis tw:text-[0.7rem] tw:leading-none tw:whitespace-nowrap tw:shrink-0" :title="getModel(turn.span)">
               <OIcon name="bolt" size="xs" />
               {{ getModel(turn.span) || "unknown" }}
             </span>
-            <span class="thread-metric" title="Duration">
+            <span class="thread-metric tw:inline-flex tw:items-center tw:gap-1 tw:py-[0.18rem] tw:px-2 tw:rounded-[0.3rem] tw:bg-(--o2-bg-2,rgba(0,0,0,0.03)) tw:border tw:border-(--o2-border-color) tw:text-(--o2-text-2) tw:text-[0.7rem] tw:leading-none tw:whitespace-nowrap tw:shrink-0" title="Duration">
               <OIcon name="timer" size="xs" />
               {{ formatDuration(turn.span.duration) }}
             </span>
-            <span class="thread-metric" title="Tokens">
+            <span class="thread-metric tw:inline-flex tw:items-center tw:gap-1 tw:py-[0.18rem] tw:px-2 tw:rounded-[0.3rem] tw:bg-(--o2-bg-2,rgba(0,0,0,0.03)) tw:border tw:border-(--o2-border-color) tw:text-(--o2-text-2) tw:text-[0.7rem] tw:leading-none tw:whitespace-nowrap tw:shrink-0" title="Tokens">
               <OIcon name="data-usage" size="xs" />
               {{ formatNumber(getTokens(turn.span)) }} tokens
             </span>
-            <span class="thread-metric" title="Cost">
+            <span class="thread-metric tw:inline-flex tw:items-center tw:gap-1 tw:py-[0.18rem] tw:px-2 tw:rounded-[0.3rem] tw:bg-(--o2-bg-2,rgba(0,0,0,0.03)) tw:border tw:border-(--o2-border-color) tw:text-(--o2-text-2) tw:text-[0.7rem] tw:leading-none tw:whitespace-nowrap tw:shrink-0" title="Cost">
               <OIcon name="payments" size="xs" />
               {{ formatCost(getCost(turn.span)) }}
             </span>
             <span
               v-if="turn.span.span_status === 'ERROR'"
-              class="thread-metric thread-metric--error"
+              class="thread-metric thread-metric--error tw:inline-flex tw:items-center tw:gap-1 tw:py-[0.18rem] tw:px-2 tw:rounded-[0.3rem] tw:text-[#dc2626] tw:bg-[rgba(220,38,38,0.08)] tw:border tw:border-[rgba(220,38,38,0.25)] tw:font-medium tw:text-[0.7rem] tw:leading-none tw:whitespace-nowrap tw:shrink-0"
             >
               <OIcon name="error-outline" size="xs" />
               Error
             </span>
             <button
-              class="thread-turn__view-span"
+              class="thread-turn__view-span tw:ml-auto tw:inline-flex tw:items-center tw:gap-[0.2rem] tw:py-[0.2rem] tw:px-[0.55rem] tw:rounded-[0.3rem] tw:text-(--q-primary) tw:text-[0.72rem] tw:font-medium tw:bg-transparent tw:border tw:border-transparent tw:cursor-pointer tw:transition-all tw:duration-[120ms] tw:shrink-0"
               @click="emit('span-selected', turn.span.span_id)"
             >
               View span
@@ -325,8 +265,24 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export interface Props {
   spans: any[];
   selectedSpanId?: string;
+  /**
+   * Show the summary chip strip (Steps / Tools / Duration / Cost / Model).
+   * Defaults to true for the trace explorer; the Session Detail Pretty view
+   * passes false because the same metrics already live in its KPI cards.
+   */
+  showSummary?: boolean;
+  /**
+   * Condense each trace's many LLM steps into a single bubble: the user query +
+   * all tool calls merged + only the FINAL assistant answer. Defaults to false
+   * (the trace explorer wants the full step-by-step). The Session Detail Pretty
+   * view passes true so it reads like the Collapsed summary.
+   */
+  condenseTurns?: boolean;
 }
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  showSummary: true,
+  condenseTurns: false,
+});
 const emit = defineEmits<{
   (e: "span-selected", spanId: string): void;
 }>();
@@ -334,8 +290,6 @@ const emit = defineEmits<{
 import { useStore } from "vuex";
 import {
   getModel,
-  getInputRaw,
-  getOutputRaw,
   getCost,
   getTokens,
   classify,
@@ -346,6 +300,8 @@ import {
 } from "./threadView.utils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import ThreadToolCalls from "./ThreadToolCalls.vue";
+import { renderMarkdown } from "./markdown";
 
 const store = useStore();
 
@@ -377,6 +333,52 @@ const traceGroups = computed<TraceGroup[]>(() => {
   return groups.sort((a, b) => a.rootStartTime - b.rootStartTime);
 });
 
+// What the template renders. When `condenseTurns` is on, each trace's many LLM
+// steps collapse into one synthetic turn: all tool calls merged (chronological)
+// + only the final non-empty assistant message. The footer span carries the
+// trace-level aggregates (duration / tokens / cost) so the metrics stay honest.
+const displayGroups = computed<TraceGroup[]>(() => {
+  if (!props.condenseTurns) return traceGroups.value;
+  return traceGroups.value.map((g) => {
+    if (g.turns.length <= 1) return g;
+
+    const allTools = g.turns
+      .flatMap((t) => t.toolCalls)
+      .sort((a, b) => Number(a.start_time) - Number(b.start_time));
+
+    let assistant: Message[] = [];
+    for (let i = g.turns.length - 1; i >= 0; i--) {
+      const msgs = g.turns[i].assistant.filter(
+        (m) => m.role === "assistant" && m.content,
+      );
+      if (msgs.length) {
+        assistant = msgs;
+        break;
+      }
+    }
+
+    const followupUsers = g.turns.flatMap((t) => t.followupUsers);
+    const first = g.turns[0].span;
+    const last = g.turns[g.turns.length - 1].span;
+    const totalTokens = g.turns.reduce((n, t) => n + getTokens(t.span), 0);
+    const anyError = g.turns.some((t) => t.span.span_status === "ERROR");
+
+    const mergedSpan = {
+      ...last,
+      start_time: first.start_time,
+      duration: g.totalDurationNs,
+      gen_ai_usage_cost: g.totalCost,
+      gen_ai_usage_total_tokens: totalTokens,
+      span_status: anyError ? "ERROR" : last.span_status,
+    };
+
+    return {
+      ...g,
+      turns: [{ span: mergedSpan, toolCalls: allTools, assistant, followupUsers }],
+    };
+  });
+});
+
 /** Single-trace shortcuts for the existing template (back-compat). */
 const turns = computed<Turn[]>(() =>
   traceGroups.value.length ? traceGroups.value[0].turns : [],
@@ -395,22 +397,6 @@ const historicalUserCount = computed(() =>
 
 const showSystemFull = ref(false);
 
-/* ─── tool row expansion ──────────────────────────────────────────────── */
-const expandedTools = ref<Set<string>>(new Set());
-
-function totalToolDuration(tools: any[]): number {
-  let sum = 0;
-  for (const t of tools) sum += Number(t.duration) || 0;
-  return sum;
-}
-
-function toggleTool(spanId: string) {
-  const next = new Set(expandedTools.value);
-  if (next.has(spanId)) next.delete(spanId);
-  else next.add(spanId);
-  expandedTools.value = next;
-}
-
 /* ─── visual helpers ──────────────────────────────────────────────────── */
 
 /** Model "family" glyph + accent color for the avatar. */
@@ -426,50 +412,6 @@ function modelBadge(model: string | null | undefined): {
   if (m.includes("deepseek")) return { glyph: "D", color: "#5a67d8" };
   if (m.includes("mistral")) return { glyph: "M", color: "#f97316" };
   return { glyph: "✦", color: "#10b981" };
-}
-
-/** Pick a glyph for a tool span based on its name. */
-function toolGlyph(name: string | null | undefined): string {
-  const n = String(name || "").toLowerCase();
-  if (n.includes("schema")) return "🗄";
-  if (n.includes("list") || n.includes("history")) return "📋";
-  if (n.includes("search") || n.includes("query") || n.includes("sql"))
-    return "🔍";
-  if (n.includes("read") || n.includes("get") || n.includes("fetch"))
-    return "📖";
-  if (n.includes("write") || n.includes("edit") || n.includes("create"))
-    return "✏";
-  if (n.includes("delete") || n.includes("remove")) return "🗑";
-  if (n.includes("tool") || n.includes("call")) return "⚙";
-  if (n.includes("nav")) return "🧭";
-  if (n.includes("time") || n.includes("range")) return "⏱";
-  if (n.includes("merged")) return "∑";
-  if (n.includes("skill") || n.includes("plan")) return "🧩";
-  return "▸";
-}
-
-function formatToolPayload(value: unknown): string {
-  if (value == null) return "";
-  if (typeof value === "string") {
-    // Try to pretty-print JSON, fall back to raw string.
-    const trimmed = value.trim();
-    if (
-      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-      (trimmed.startsWith("[") && trimmed.endsWith("]"))
-    ) {
-      try {
-        return JSON.stringify(JSON.parse(trimmed), null, 2);
-      } catch {
-        // not JSON
-      }
-    }
-    return trimmed;
-  }
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
 }
 
 /* ─── summary aggregates ──────────────────────────────────────────────── */
@@ -556,612 +498,213 @@ function formatTime(ns: number): string {
 }
 </script>
 
-<style scoped lang="scss">
-.thread-view {
-  background: var(--o2-card-bg);
+<style>
+/* OIcon color inside chip — descendant selector, cannot inline. */
+.thread-chip .OIcon {
+  color: var(--o2-text-secondary);
 }
 
-/* Subtle off-white background for the scroll body, like the design. */
-.thread-view > div.tw\:flex-1.tw\:overflow-auto {
-  background: var(--o2-bg-2, var(--o2-card-bg));
+/* Error chip value color — descendant selector. */
+.thread-chip--error .thread-chip__value--error {
+  color: var(--o2-status-error-text);
 }
 
-.thread-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 1rem;
-  background: var(--o2-bg-2, transparent);
-  border-bottom: 1px solid var(--o2-border-color);
+/* ::before connector line on timeline turn — pseudo-element, cannot inline. */
+.thread-turn::before {
+  content: "";
+  position: absolute;
+  top: 30px;
+  bottom: 0;
+  left: 14px; /* avatar width / 2 */
+  width: 2px;
+  background: var(--o2-border-color);
+  border-radius: 1px;
 }
 
-.thread-chip {
-  height: 26px !important;
-  padding: 0 0.625rem !important;
-  background: var(--o2-card-bg) !important;
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.25rem !important;
-  font-size: 12px !important;
-  font-feature-settings: "tnum";
-  color: var(--o2-text-primary) !important;
-
-  :deep(.OIcon) {
-    color: var(--o2-text-secondary);
-  }
-
-  &__label {
-    color: var(--o2-text-muted);
-    font-weight: 500;
-    margin-right: 5px;
-    letter-spacing: 0;
-    font-size: 11.5px;
-  }
-
-  &__value {
-    color: var(--o2-text-primary);
-    font-weight: 600;
-    font-size: 12px;
-  }
-
-  &--turns { border-left: 3px solid #6366f1; }
-  &--steps { border-left: 3px solid #cc785c; }
-  &--tools { border-left: 3px solid #0ea5e9; }
-  &--duration { border-left: 3px solid #64748b; }
-  &--cost { border-left: 3px solid #16a34a; }
-  &--model { border-left: 3px solid #8b5cf6; }
-  &--error {
-    // Error tint uses the theme-aware error token so the number "1"
-    // (or whatever count) is readable in dark mode. Previously we
-    // hardcoded #dc2626 which is too dark against the dark card bg.
-    border-left: 3px solid var(--o2-status-error-text);
-    .thread-chip__value {
-      color: var(--o2-status-error-text);
-    }
-  }
+.thread-turn:last-child::before {
+  display: none;
 }
 
-.thread-system {
-  margin-bottom: 1rem;
-  border: 1px solid var(--o2-border-color);
-  border-left: 3px solid #8b5cf6;
-  border-radius: 0.4rem;
-  background: var(--o2-card-bg);
-  overflow: hidden;
-
-  &__head {
-    display: flex;
-    align-items: center;
-    gap: 0.625rem;
-    padding: 0.5rem 0.75rem;
-    cursor: pointer;
-    transition: background 120ms ease;
-
-    &:hover {
-      background: rgba(139, 92, 246, 0.04);
-    }
-  }
-
-  &__badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.15rem 0.5rem;
-    background: rgba(139, 92, 246, 0.1);
-    color: #8b5cf6;
-    border-radius: 0.25rem;
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.02rem;
-    flex-shrink: 0;
-  }
-
-  &__preview {
-    flex: 1;
-    min-width: 0;
-    font-size: 0.8rem;
-    color: var(--o2-text-2);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  &__toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.15rem;
-    color: var(--q-primary);
-    font-size: 0.72rem;
-    font-weight: 500;
-    flex-shrink: 0;
-  }
-
-  &__content {
-    padding: 0.75rem 0.875rem;
-    border-top: 1px solid var(--o2-border-color);
-    background: var(--o2-bg-2, var(--o2-card-bg));
-    font-size: 0.82rem;
-    line-height: 1.55;
-    color: var(--o2-text-1);
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 360px;
-    overflow: auto;
-  }
+/* Hover states — cannot inline. */
+.thread-system__head:hover {
+  background: rgba(139, 92, 246, 0.04);
 }
 
-.thread-bubble {
-  padding: 0.625rem 0.875rem;
-  border-radius: 0.5rem;
-  font-size: 0.85rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-
-  &--user {
-    background: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
-    border: 1px solid #e0e6ff;
-    color: #2c3e50;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-
-    &-followup {
-      max-width: min(640px, 75%);
-    }
-  }
-
-  &--assistant {
-    align-self: flex-start;
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    color: #2c3e50;
-    max-width: 100%;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-  }
-
-  &--muted {
-    background: transparent;
-    border-style: dashed;
-    color: var(--o2-text-3);
-  }
+.thread-turn__view-span:hover {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.25);
 }
 
-.thread-user-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.625rem;
-  margin-bottom: 1rem;
-  margin-left: auto;
-  max-width: 40%;
-  width: fit-content;
-
-  &__text {
-    flex: 1;
-    min-width: 0;
-    align-self: center;
-  }
+/* ─── dark mode overrides — all descendant selectors, cannot inline ───── */
+.thread-view--dark .thread-bubble--user {
+  background: linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
+  border-color: #3a3d5c;
+  color: #e2e8f0;
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.08);
 }
 
-.thread-user-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+.thread-view--dark .thread-bubble--assistant {
+  background: #1a1a1a;
+  border-color: #333333;
+  color: #e2e2e2;
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.08);
+}
+
+.thread-view--dark .thread-user-avatar {
+  background: linear-gradient(135deg, #4c63d2 0%, #5a67d8 100%);
   color: #ffffff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.7rem;
-  font-weight: 700;
-  flex-shrink: 0;
-  cursor: default;
 }
 
-/* ─── timeline rail ───────────────────────────────────────────────────── */
-.thread-rail {
-  position: relative;
-  padding-left: 0;
+.thread-view--dark .thread-turn__avatar {
+  background: rgba(139, 92, 246, 0.16);
+  color: #c4b5fd;
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 0 0 4px var(--o2-card-bg);
 }
 
-.thread-turn {
-  position: relative;
-  display: flex;
-  gap: 0.875rem;
-  padding-bottom: 1rem;
-
-  /* Connector line drawn through the avatar column. */
-  &::before {
-    content: "";
-    position: absolute;
-    top: 30px;
-    bottom: 0;
-    left: 14px; /* avatar width / 2 */
-    width: 2px;
-    background: var(--o2-border-color);
-    border-radius: 1px;
-  }
-
-  &:last-child::before {
-    display: none;
-  }
-
-  &__avatar {
-    flex-shrink: 0;
-    position: relative;
-    z-index: 1;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: #f3eaff; /* light purple wash */
-    color: #8b5cf6;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(139, 92, 246, 0.25);
-    box-shadow: 0 0 0 4px var(--o2-card-bg);
-  }
-
-  &__body {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  &__footer {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    margin-top: 0.5rem;
-    padding-top: 0.5rem;
-    border-top: 1px dashed var(--o2-border-color);
-    font-size: 0.72rem;
-    color: var(--o2-text-2);
-  }
-
-  &__view-span {
-    margin-left: auto;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.2rem;
-    padding: 0.2rem 0.55rem;
-    border-radius: 0.3rem;
-    color: var(--q-primary);
-    font-size: 0.72rem;
-    font-weight: 500;
-    background: transparent;
-    border: 1px solid transparent;
-    cursor: pointer;
-    transition: all 120ms ease;
-    flex-shrink: 0;
-
-    &:hover {
-      background: rgba(59, 130, 246, 0.08);
-      border-color: rgba(59, 130, 246, 0.25);
-    }
-  }
+.thread-view--dark .thread-metric {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
-/* ─── footer metric chips ─────────────────────────────────────────────── */
-.thread-metric {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.18rem 0.5rem;
-  border-radius: 0.3rem;
-  background: var(--o2-bg-2, rgba(0, 0, 0, 0.03));
-  border: 1px solid var(--o2-border-color);
-  color: var(--o2-text-2);
-  font-size: 0.7rem;
-  line-height: 1;
-  white-space: nowrap;
-  flex-shrink: 0;
-&--model {
-    color: #8b5cf6;
-    background: rgba(139, 92, 246, 0.06);
-    border-color: rgba(139, 92, 246, 0.2);
-    font-weight: 500;
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.thread-view--dark .thread-metric--model {
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.3);
 }
 
-  &--error {
-    color: #dc2626;
-    background: rgba(220, 38, 38, 0.08);
-    border-color: rgba(220, 38, 38, 0.25);
-    font-weight: 500;
-}
+.thread-view--dark .thread-metric--error {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.3);
 }
 
-/* ─── grouped tool card (secondary weight) ───────────────────────────── */
-.thread-tools-card {
-  border: 1px solid rgba(76, 175, 80, 0.18);
-  border-radius: 0.4rem;
-  background: rgba(76, 175, 80, 0.06);
-  overflow: hidden;
-
-  &__header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.3rem 0.625rem;
-    border-bottom: 1px solid rgba(76, 175, 80, 0.15);
-    font-size: 0.68rem;
-    color: #4a5568;
-  }
-
-  &__count {
-    font-weight: 600;
-    color: #4a5568;
-    letter-spacing: 0;
-    font-size: 0.72rem;
-  }
-
-  &__total {
-    margin-left: auto;
-    font-family: monospace;
-  }
+.thread-view--dark .thread-turn__footer {
+  border-top-color: rgba(255, 255, 255, 0.08);
 }
 
-.thread-tool {
-  border-bottom: 1px solid rgba(76, 175, 80, 0.15);
-  background: rgba(76, 175, 80, 0.04);
-  transition: background 120ms ease;
-
-  &:last-child {
-    border-bottom: none;
-  }
-
-  &--open {
-    background: rgba(76, 175, 80, 0.1);
-  }
+.thread-view--dark .thread-turn__view-span:hover {
+  background: rgba(96, 165, 250, 0.12);
+  border-color: rgba(96, 165, 250, 0.3);
 }
 
-.thread-tool-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.45rem 0.5rem 0.45rem 0.75rem;
-  font-size: 0.78rem;
-  cursor: pointer;
-  color: #4a5568;
-  transition: background 120ms ease;
+.thread-view--dark .thread-system {
+  border-left-color: #a78bfa;
+}
 
-  &:hover {
-    background: rgba(76, 175, 80, 0.12);
+.thread-view--dark .thread-system__head:hover {
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.thread-view--dark .thread-system__badge {
+  background: rgba(139, 92, 246, 0.18);
+  color: #c4b5fd;
+}
+</style>
+
+<!-- Scoped block: the markdown-body :deep() selectors + SCSS nesting require a
+     scoped lang="scss" style. :deep is the one sanctioned case for v-html
+     (innerHTML) content, so these rules stay in a style block rather than
+     inlined as tw: utilities. -->
+<style scoped lang="scss">
+/* ─── markdown rendering (assistant bubble v-html) ─────────────────────────
+   Element styling for the sanitized markdown HTML. Scoped :deep is the one
+   sanctioned case for innerHTML content; colours map to --o2-* tokens. The
+   bubble's pre-wrap is reset so rendered block elements don't get extra gaps. */
+.thread-bubble--assistant.markdown-body {
+  white-space: normal;
+}
+.markdown-body {
+  :deep(> *:first-child) {
+    margin-top: 0;
   }
-
-  &__caret {
-    color: #4a5568;
-    font-size: 0.7rem;
-    width: 12px;
-    text-align: center;
+  :deep(> *:last-child) {
+    margin-bottom: 0;
   }
-
-  &__icon {
-    width: 18px;
-    height: 18px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+  :deep(p) {
+    margin: 0 0 0.5rem;
+  }
+  :deep(h1),
+  :deep(h2),
+  :deep(h3),
+  :deep(h4) {
+    font-weight: 650;
+    margin: 0.75rem 0 0.35rem;
+    line-height: 1.3;
+  }
+  :deep(h1) {
+    font-size: 1.05rem;
+  }
+  :deep(h2) {
     font-size: 0.95rem;
   }
+  :deep(h3) {
+    font-size: 0.9rem;
+  }
+  :deep(h4) {
+    font-size: 0.85rem;
+  }
+  :deep(ul),
+  :deep(ol) {
+    margin: 0.4rem 0;
+    padding-left: 1.25rem;
+  }
+  :deep(li) {
+    margin: 0.15rem 0;
+  }
+  :deep(a) {
+    color: var(--o2-interactive-primary, #3b82f6);
+    text-decoration: none;
 
-  &__name {
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  :deep(code) {
     font-family: monospace;
-    color: #2f7a31;
-    font-weight: 500;
+    font-size: 0.78rem;
+    background: color-mix(in srgb, var(--o2-text-primary) 8%, transparent);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
   }
-
-  &__view {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 0.25rem;
-    background: transparent;
-    border: none;
-    color: var(--o2-text-3);
-    cursor: pointer;
-    line-height: 1;
-    flex-shrink: 0;
-    transition: all 120ms ease;
-
-    &:hover {
-      background: rgba(76, 175, 80, 0.18);
-      color: #2f7a31;
-    }
-  }
-}
-
-/* ─── status pills ────────────────────────────────────────────────────── */
-.thread-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.03rem;
-  font-family: monospace;
-  white-space: nowrap;
-
-  &--ok {
-    background: rgba(22, 163, 74, 0.1);
-    color: #16a34a;
-    border: 1px solid rgba(22, 163, 74, 0.25);
-  }
-
-  &--error {
-    background: rgba(220, 38, 38, 0.1);
-    color: #dc2626;
-    border: 1px solid rgba(220, 38, 38, 0.25);
-  }
-}
-
-/* ─── dark mode overrides ─────────────────────────────────────────────── */
-.thread-view--dark {
-  .thread-bubble--user {
-    background: linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
-    border-color: #3a3d5c;
-    color: #e2e8f0;
-    box-shadow: 0 1px 2px rgba(255, 255, 255, 0.08);
-  }
-
-  .thread-bubble--assistant {
-    background: #1a1a1a;
-    border-color: #333333;
-    color: #e2e2e2;
-    box-shadow: 0 1px 2px rgba(255, 255, 255, 0.08);
-  }
-
-  .thread-user-avatar {
-    background: linear-gradient(135deg, #4c63d2 0%, #5a67d8 100%);
-    color: #ffffff;
-  }
-
-  .thread-turn__avatar {
-    background: rgba(139, 92, 246, 0.16);
-    color: #c4b5fd;
-    border-color: rgba(139, 92, 246, 0.4);
-    box-shadow: 0 0 0 4px var(--o2-card-bg);
-  }
-
-  .thread-tools-card {
-    background: rgba(76, 175, 80, 0.08);
-    border-color: rgba(76, 175, 80, 0.22);
-
-    &__header {
-      border-bottom-color: rgba(76, 175, 80, 0.2);
-      color: #a0aec0;
-    }
-
-    &__count {
-      color: #a0aec0;
-    }
-  }
-
-  .thread-tool {
-    background: rgba(76, 175, 80, 0.06);
-    border-bottom-color: rgba(76, 175, 80, 0.2);
-    color: #a0aec0;
-
-    &--open {
-      background: rgba(76, 175, 80, 0.14);
-    }
-  }
-
-  .thread-tool-row {
-    color: #a0aec0;
-
-    &:hover {
-      background: rgba(76, 175, 80, 0.16);
-    }
-
-    &__caret {
-      color: #a0aec0;
-    }
-
-    &__name {
-      color: #6dd170;
-    }
-
-    &__view:hover {
-      background: rgba(76, 175, 80, 0.22);
-      color: #6dd170;
-    }
-  }
-
-  .thread-pill--ok {
-    background: rgba(34, 197, 94, 0.14);
-    color: #4ade80;
-    border-color: rgba(34, 197, 94, 0.3);
-  }
-
-  .thread-pill--error {
-    background: rgba(248, 113, 113, 0.14);
-    color: #f87171;
-    border-color: rgba(248, 113, 113, 0.3);
-  }
-
-  .thread-metric {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.08);
-
-    &--model {
-      color: #c4b5fd;
-      background: rgba(139, 92, 246, 0.12);
-      border-color: rgba(139, 92, 246, 0.3);
-}
-
-    &--error {
-      color: #f87171;
-      background: rgba(248, 113, 113, 0.12);
-      border-color: rgba(248, 113, 113, 0.3);
-}
-  }
-
-  .thread-turn__footer {
-    border-top-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .thread-turn__view-span:hover {
-    background: rgba(96, 165, 250, 0.12);
-    border-color: rgba(96, 165, 250, 0.3);
-  }
-
-  .thread-system {
-    border-left-color: #a78bfa;
-
-    &__head:hover {
-      background: rgba(139, 92, 246, 0.08);
-    }
-
-    &__badge {
-      background: rgba(139, 92, 246, 0.18);
-      color: #c4b5fd;
-    }
-  }
-}
-
-.thread-tool-body {
-  padding: 0.5rem 0.75rem 0.75rem;
-  background: var(--o2-bg-2, var(--o2-card-bg));
-  border-top: 1px dashed var(--o2-border-color);
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-
-  &__section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-  }
-
-  &__label {
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.06rem;
-    color: var(--o2-text-3);
-  }
-
-  &__pre {
-    margin: 0;
-    padding: 0.5rem 0.625rem;
-    background: var(--o2-card-bg);
+  :deep(pre) {
+    background: color-mix(in srgb, var(--o2-text-primary) 5%, transparent);
     border: 1px solid var(--o2-border-color);
-    border-radius: 0.25rem;
-    font-family: monospace;
-    font-size: 0.72rem;
-    color: var(--o2-text-1);
-    line-height: 1.45;
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 280px;
-    overflow: auto;
+    padding: 0.5rem 0.625rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 0.5rem 0;
+  }
+  :deep(pre code) {
+    background: transparent;
+    padding: 0;
+  }
+  :deep(blockquote) {
+    border-left: 3px solid var(--o2-border-color);
+    margin: 0.5rem 0;
+    padding-left: 0.75rem;
+    color: var(--o2-text-secondary);
+  }
+  :deep(table) {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.5rem 0;
+    font-size: 0.78rem;
+  }
+  :deep(th),
+  :deep(td) {
+    border: 1px solid var(--o2-border-color);
+    padding: 0.3rem 0.5rem;
+    text-align: left;
+  }
+  :deep(th) {
+    background: color-mix(in srgb, var(--o2-text-primary) 6%, transparent);
+    font-weight: 600;
+  }
+  :deep(hr) {
+    border: none;
+    border-top: 1px solid var(--o2-border-color);
+    margin: 0.625rem 0;
   }
 }
 </style>

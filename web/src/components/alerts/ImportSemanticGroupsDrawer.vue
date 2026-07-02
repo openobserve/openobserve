@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -107,10 +107,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Groups List -->
-        <div class="groups-list">
+        <div class="tw:max-h-[calc(100vh-400px)] tw:overflow-y-auto">
           <!-- Additions -->
           <div v-if="diffData.additions.length > 0" class="tw:mb-3">
-            <div class="section-header tw:text-green-500 tw:p-2">
+            <div class="tw:text-sm tw:font-semibold tw:border-b tw:border-[var(--color-separator)] tw:text-green-500 tw:p-2">
               <OIcon name="add-circle" size="sm" />
               New ({{ selectedAdditions.length }}/{{
                 diffData.additions.length
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="group in diffData.additions"
                 :key="group.id"
                 data-test="semantic-groups-drawer-addition-item"
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
                 @click="toggleAddition(group.id)"
               >
                 <div class="tw:flex tw:items-center tw:shrink-0">
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Modifications -->
           <div v-if="diffData.modifications.length > 0" class="tw:mb-3">
-            <div class="section-header tw:text-amber-500 tw:p-2">
+            <div class="tw:text-sm tw:font-semibold tw:border-b tw:border-[var(--color-separator)] tw:text-amber-500 tw:p-2">
               <OIcon name="edit" size="sm" />
               Modified ({{ selectedModifications.length }}/{{
                 diffData.modifications.length
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="mod in diffData.modifications"
                 :key="mod.proposed.id"
                 data-test="semantic-groups-drawer-modification-item"
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
                 @click="toggleModification(mod.proposed.id)"
               >
                 <div class="tw:flex tw:items-center tw:shrink-0">
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-xs tw:mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="field-chips-container">
+        <div class="tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--q-dark)] tw:rounded">
           <OBadge
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-xs tw:mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="field-chips-container">
+        <div class="tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--q-dark)] tw:rounded">
           <OBadge
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
@@ -546,24 +546,3 @@ const handleClose = () => {
   handleOpenChange(false);
 };
 </script>
-
-<style lang="scss" scoped>
-.section-header {
-  font-size: 14px;
-  font-weight: 600;
-  border-bottom: 1px solid var(--color-separator);
-}
-
-.groups-list {
-  max-height: calc(100vh - 400px);
-  overflow-y: auto;
-}
-
-.field-chips-container {
-  max-height: 250px;
-  overflow-y: auto;
-  padding: 8px;
-  background: var(--q-dark);
-  border-radius: 4px;
-}
-</style>

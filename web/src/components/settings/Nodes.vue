@@ -40,9 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="overflow: hidden"
     >
       <template #before>
-        <div class="tw:pt-6 tw:flex tw:flex-col tw:border-r4 tw:border-border-default" style="height: 100%">
-          <div class="sticky-header tw:px-2 tw:shrink-0">
-            <div class="tw:flex tw:items-center tw:justify-between tw:p-2" style="font-size: 18px">
+        <div class="tw:flex tw:flex-col tw:border-r4 tw:border-r tw:border-border-default " style="height: 100%">
+          <div class="tw:sticky tw:top-0 tw:px-2 tw:shrink-0">
+            <div class="tw:flex tw:items-center tw:justify-between tw:p-2 " style="font-size: 18px">
               <span class="tw:flex tw:items-center tw:gap-1">
                 {{ t("nodes.filter_header") }}
                 <OIcon name="filter-list" size="sm" />
@@ -471,11 +471,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="store.state.zoConfig.super_cluster_enabled"
             #cell-region="{ row }"
           >
-            <OBadge variant="default" class="badge-region tw:mr-1"
+            <OBadge variant="default" class="tw:bg-[#ede9fe] tw:leading-[23px] tw:px-[7px] tw:text-[#6d28d9] tw:mr-1"
               >{{ row.region }}
               <OTooltip :content="t('nodes.region')" />
             </OBadge>
-            <OBadge variant="default" class="badge-cluster"
+            <OBadge variant="default" class="tw:bg-[#fff2d4] tw:leading-[23px] tw:px-[7px] tw:text-[#374151]"
               >{{ row.cluster }}
               <OTooltip :content="t('nodes.cluster')" />
             </OBadge>
@@ -490,7 +490,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-cpu="{ row }">
             <OProgressBar
               size="sm"
-              class="progresbar tw:w-[80%]! tw:max-w-[80%] tw:inline-block"
+              class="tw:bg-[lightgrey] tw:w-[80%]! tw:max-w-[80%] tw:inline-block"
               :value="row.cpu_usage / 100"
               :variant="row.cpu_usage > 85 ? 'danger' : 'default'"
             />
@@ -500,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-memory="{ row }">
             <OProgressBar
               size="sm"
-              class="progresbar tw:w-[80%]! tw:max-w-[80%] tw:inline-block"
+              class="tw:bg-[lightgrey] tw:w-[80%]! tw:max-w-[80%] tw:inline-block"
               :value="row.percentage_memory_usage / 100"
               :variant="row.percentage_memory_usage > 85 ? 'danger' : 'default'"
             />
@@ -1090,69 +1090,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.badge-region {
-  background-color: #ede9fe;
-  line-height: 23px;
-  padding-left: 7px;
-  padding-right: 7px;
-  color: #6d28d9;
-}
-
-.badge-cluster {
-  background-color: #fff2d4;
-  line-height: 23px;
-  padding-left: 7px;
-  padding-right: 7px;
-  color: #374151;
-}
-
-.progresbar {
-  background-color: lightgrey;
-}
-
-.tcp-cell {
-  letter-spacing: 1.5px;
-}
-
-.pagination-align {
-  margin-top: -10px;
-}
-
-.nodes-list-table {
-  tr th {
-    background-color: light-grey !important;
-  }
-}
-
-/* Ensure the container fills the height */
-.full-height {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-/* Sticky Header */
-.sticky-header {
-  position: sticky;
-  top: 0;
-}
-
-/* Scrollable Content */
-.content {
-  flex-grow: 1;
-  overflow-y: auto;
-  padding: 10px;
-}
-
-/* Sticky Footer */
-.sticky-footer {
-  position: sticky;
-  bottom: 0;
-}
-</style>
-
-<style lang="scss">
+<style>
 tr.status-row > td:first-child {
   position: relative;
 }
@@ -1184,5 +1122,4 @@ span.status-offline {
 span.status-prepare {
   border-left: 5px solid #ffab00 !important;
 }
-
 </style>

@@ -16,6 +16,10 @@ const mockError = ref<string | null>(null);
 const mockHasLoadedOnce = ref(false);
 const mockFetchPage = vi.fn();
 const mockCancelAll = vi.fn();
+const mockListAgents = vi.fn();
+const mockRouterPush = vi.fn();
+const mockRouterReplace = vi.fn(() => Promise.resolve());
+let mockRouteQuery: Record<string, any> = {};
 
 vi.mock("./composables/useSessions", () => ({
   useSessions: vi.fn(() => ({
@@ -36,10 +40,18 @@ vi.mock("@/composables/useStreams", () => ({
   })),
 }));
 
+vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
+  default: {
+    listAgents: (...args: any[]) => mockListAgents(...args),
+  },
+}));
+
 vi.mock("vue-router", () => ({
   useRouter: vi.fn(() => ({
-    push: vi.fn(),
+    push: mockRouterPush,
+    replace: mockRouterReplace,
   })),
+  useRoute: vi.fn(() => ({ query: mockRouteQuery })),
 }));
 
 vi.mock("vuex", () => ({
@@ -82,6 +94,9 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
     // surfaces the server-side total (the old count pill now lives here).
     template: `
       <div class="otable-mock">
+        <div data-test="sessions-list-toolbar">
+          <slot name="toolbar" />
+        </div>
         <div v-if="loading" data-test="sessions-list-loading" class="otable-loading" />
         <template v-else>
           <div
@@ -95,7 +110,9 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
             <slot name="cell-firstSeenNanos" :row="row">{{ row.firstSeenNanos }}</slot>
             <slot name="cell-turns" :row="row">{{ row.turns }}</slot>
             <slot name="cell-durationNanos" :row="row">{{ row.durationNanos }}</slot>
-            <slot name="cell-tokens" :row="row">{{ row.inputTokens }} → {{ row.outputTokens }} (Σ {{ row.tokens }})</slot>
+            <span data-test="sessions-list-token-cell">
+              <slot name="cell-tokens" :row="row">{{ row.inputTokens }} → {{ row.outputTokens }} = {{ row.tokens }}</slot>
+            </span>
             <slot name="cell-cost" :row="row">{{ row.cost }}</slot>
             <slot name="cell-status" :row="row">{{ row.status }}</slot>
           </div>
@@ -108,6 +125,44 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
         </div>
       </div>
     `,
+  },
+}));
+
+vi.mock("@/lib/forms/Select/OSelect.vue", () => ({
+  default: {
+    name: "OSelect",
+    props: ["modelValue", "options", "label"],
+    emits: ["update:model-value"],
+    template: `
+      <div class="o-select" :data-label="label">
+        <button
+          v-for="option in options"
+          :key="option.value || option"
+          type="button"
+          class="o-select-option"
+          @click="$emit('update:model-value', option.value ?? option)"
+        >
+          {{ option.label ?? option }}
+        </button>
+      </div>
+    `,
+  },
+}));
+
+vi.mock("@/lib/core/ToggleGroup/OToggleGroup.vue", () => ({
+  default: {
+    name: "OToggleGroup",
+    props: ["modelValue"],
+    emits: ["update:model-value"],
+    template: `<div data-test="sessions-list-filter-mode" :data-value="modelValue"><slot /></div>`,
+  },
+}));
+
+vi.mock("@/lib/core/ToggleGroup/OToggleGroupItem.vue", () => ({
+  default: {
+    name: "OToggleGroupItem",
+    props: ["value"],
+    template: `<button type="button" :data-test="'sessions-list-filter-mode-' + value"><slot /></button>`,
   },
 }));
 
@@ -149,6 +204,13 @@ function makeSession(overrides: Record<string, any> = {}) {
     outputTokens: 200,
     tokens: 300,
     cost: 0.0042,
+    cacheReadInputTokens: 0,
+    cacheCreationInputTokens: 0,
+    cacheReadInputCost: 0,
+    cacheCreationInputCost: 0,
+    estimatedCostWithoutCache: 0,
+    cacheReadSavings: 0,
+    netCacheImpact: 0,
     errorCount: 0,
     status: "ok" as const,
     ...overrides,
@@ -157,11 +219,13 @@ function makeSession(overrides: Record<string, any> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   mockSessions.value = [];
   mockTotal.value = 0;
   mockLoading.value = false;
   mockError.value = null;
   mockHasLoadedOnce.value = false;
+  mockRouteQuery = {};
 
   // Default: streams load fine
   mockGetStreams.mockResolvedValue({
@@ -169,7 +233,11 @@ beforeEach(() => {
       { name: "test-stream", settings: { is_llm_stream: true } },
     ],
   });
-  mockFetchPage.mockResolvedValue(undefined);
+  mockListAgents.mockResolvedValue({ agents: [] });
+  mockFetchPage.mockImplementation(async () => {
+    mockHasLoadedOnce.value = true;
+    mockLoading.value = false;
+  });
 });
 
 async function mountComponent(props = defaultProps) {
@@ -188,6 +256,11 @@ async function mountComponent(props = defaultProps) {
   });
   await flushPromises();
   return wrapper;
+}
+
+async function refreshComponent(wrapper: any, startTime?: number, endTime?: number) {
+  await wrapper.vm.refresh(startTime, endTime);
+  await flushPromises();
 }
 
 // ---------------------------------------------------------------------------
@@ -261,6 +334,27 @@ describe("SessionsList — loading state", () => {
 });
 
 describe("SessionsList — sessions table", () => {
+  it("fetches stream sessions with no agent filter by default", async () => {
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+
+    expect(mockFetchPage).toHaveBeenCalledWith(
+      "test-stream",
+      1000,
+      2000,
+      0,
+      20,
+      "",
+    );
+  });
+
+  it("does not load agents while refreshing in stream mode", async () => {
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+
+    expect(mockListAgents).not.toHaveBeenCalled();
+  });
+
   it("renders session rows when sessions data is present", async () => {
     mockHasLoadedOnce.value = true;
     mockSessions.value = [
@@ -331,11 +425,81 @@ describe("SessionsList — sessions table", () => {
 
     const wrapper = await mountComponent();
     // Find the tokens cell slot content
-    const tokensCell = wrapper.find(".tw\\:tabular-nums");
+    const tokensCell = wrapper.find("[data-test='sessions-list-token-cell']");
     expect(tokensCell.exists()).toBe(true);
     const text = tokensCell.text();
     expect(text).toContain("→");
-    expect(text).toContain("Σ");
+    expect(text).toContain("=");
+  });
+});
+
+describe("SessionsList — agent filter", () => {
+  const supportAgent = {
+    name: "support-agent",
+    id: "agent-1",
+    source_stream: "agent-stream",
+    source_stream_type: "traces",
+  };
+
+  it("resolves a URL agent and fetches sessions from the agent source stream", async () => {
+    mockRouteQuery = { type: "agent", agent: "support-agent" };
+    mockGetStreams.mockResolvedValue({
+      list: [{ name: "agent-stream", settings: { is_llm_stream: true } }],
+    });
+    mockListAgents.mockResolvedValue({ agents: [supportAgent] });
+
+    const wrapper = await mountComponent({ streamName: "", startTime: 1000, endTime: 2000 });
+    await refreshComponent(wrapper);
+
+    expect(mockFetchPage).toHaveBeenCalledWith(
+      "agent-stream",
+      1000,
+      2000,
+      0,
+      20,
+      `gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM "agent-stream" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND gen_ai_agent_id = 'agent-1' GROUP BY gen_ai_conversation_id)`,
+    );
+  });
+
+  it("shows the no-agents state and skips session fetch when Agent mode has no agents", async () => {
+    mockRouteQuery = { type: "agent" };
+    mockGetStreams.mockResolvedValue({
+      list: [{ name: "test-stream", settings: { is_llm_stream: true } }],
+    });
+    mockListAgents.mockResolvedValue({ agents: [] });
+
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+
+    expect(mockFetchPage).not.toHaveBeenCalled();
+    expect(wrapper.find("[data-test='sessions-empty-no-agents']").exists()).toBe(true);
+  });
+
+  it("routes session details with the selected agent source stream", async () => {
+    mockRouteQuery = { type: "agent", agent: "support-agent" };
+    mockGetStreams.mockResolvedValue({
+      list: [{ name: "agent-stream", settings: { is_llm_stream: true } }],
+    });
+    mockListAgents.mockResolvedValue({ agents: [supportAgent] });
+    mockHasLoadedOnce.value = true;
+    mockSessions.value = [makeSession({ sessionId: "sess-agent", userId: "u-1" })];
+    mockTotal.value = 1;
+
+    const wrapper = await mountComponent({ streamName: "", startTime: 1000, endTime: 2000 });
+    await refreshComponent(wrapper);
+    await wrapper.find(".table-row").trigger("click");
+
+    expect(mockRouterPush).toHaveBeenCalledWith({
+      name: "sessionDetails",
+      query: expect.objectContaining({
+        stream: "agent-stream",
+        session_id: "sess-agent",
+        from: 1000,
+        to: 2000,
+        org_identifier: "test-org",
+        user_id: "u-1",
+      }),
+    });
   });
 });
 

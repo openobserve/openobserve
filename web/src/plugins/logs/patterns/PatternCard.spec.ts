@@ -219,7 +219,8 @@ describe("PatternCard", () => {
   describe("Hover Effect", () => {
     it("should have table-row-hover class for hover effect", () => {
       const card = wrapper.find('[data-test="pattern-card-0"]');
-      expect(card.classes()).toContain("table-row-hover");
+      // table-row-hover scoped class replaced by a Tailwind hover utility
+      expect(card.classes()).toContain("tw:hover:bg-[var(--o2-hover-gray)]");
     });
 
     it("should have cursor-pointer class", () => {
@@ -238,9 +239,9 @@ describe("PatternCard", () => {
       const card = wrapper.find('[data-test="pattern-card-0"]');
       // Check that the component has the hover styles applied
       expect(card.exists()).toBe(true);
-      // The actual transition is defined in scoped SCSS
-      // We verify the element exists and has the class
-      expect(card.classes()).toContain("table-row-hover");
+      // Transition is now a Tailwind utility rather than scoped SCSS
+      expect(card.classes()).toContain("tw:transition-colors");
+      expect(card.classes()).toContain("tw:duration-150");
     });
   });
 
@@ -270,7 +271,9 @@ describe("PatternCard", () => {
 
   describe("Wildcard chip hover interactions", () => {
     it("should render wildcard chips for each wildcard in the template", () => {
-      const chips = wrapper.findAll(".wildcard-chip");
+      // Wildcard chips are now OBadge components inside the template cell
+      const template = wrapper.find('[data-test="pattern-card-0-template"]');
+      const chips = template.findAll('[data-test-stub="o-badge"]');
       expect(chips.length).toBeGreaterThan(0);
     });
 

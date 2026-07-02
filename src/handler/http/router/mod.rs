@@ -651,6 +651,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/traces/latest", get(traces::get_latest_traces))
         .route("/{org_id}/{stream_name}/traces/latest_stream", get(traces::get_latest_traces_stream))
         .route("/{org_id}/{stream_name}/traces/session", get(traces::session::get_latest_sessions))
+        .route("/{org_id}/{stream_name}/traces/session/details", get(traces::session::get_session_details))
         .route("/{org_id}/{stream_name}/traces/user", get(traces::user::get_latest_users))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
@@ -855,6 +856,12 @@ pub fn service_routes() -> Router {
 
     #[cfg(feature = "enterprise")]
     {
+        router = router
+            // Gen-AI agent mapping and registry are enterprise features, independent of Online Evaluations.
+            .route("/{org_id}/settings/gen_ai/agent_mapping", get(gen_ai::get_agent_mapping).put(gen_ai::save_agent_mapping))
+            .route("/{org_id}/settings/gen_ai/agent_registry", delete(gen_ai::clear_agent_registry))
+            .route("/{org_id}/gen_ai/agents", get(gen_ai::list_scored_agents));
+
         if get_o2_config().common.online_evals_enabled {
             router = router
                 // LLM Providers (Online Eval Phase 2)

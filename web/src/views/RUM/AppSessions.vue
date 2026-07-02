@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <query-editor
                 ref="sessionQueryEditorRef"
                 editor-id="session-replay-query-editor"
-                :class="['monaco-editor', 'tw:border', 'tw:solid', 'tw:border-[var(--o2-border-color)]', 'tw:p-[0.25rem]', 'tw:rounded-[0.375rem]', 'tw:overflow-y-auto', queryEditorHeight]"
+                :class="['tw:border', 'tw:solid', 'tw:border-[var(--o2-border-color)]', 'tw:p-[0.25rem]', 'tw:rounded-[0.375rem]', 'tw:overflow-y-auto', queryEditorHeight]"
                 v-model:query="sessionState.data.editorValue"
                 :debounce-time="300"
                 :keywords="effectiveKeywords"
@@ -36,9 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="!sessionState.data.editorValue && !editorFocused"
-                class="query-editor-placeholder-overlay"
+                class="tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:pt-0.75 tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
               >
-                <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
+                <span class="tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:dark:text-[#718096] tw:whitespace-nowrap tw:overflow-hidden tw:[text-overflow:ellipsis]">{{ editorPlaceholder }}</span>
               </div>
             </div>
 
@@ -89,6 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 endTime: dateTime.endTime,
               }"
               :stream-name="rumSessionStreamName"
+              stream-type="logs"
+              :enable-grouping="true"
               :query="completeQuery"
               :show-count="false"
               @event-emitted="handleSidebarEvent"
@@ -122,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="play-circle-filled"
                       size="md"
-                      class="tw:cursor-pointer session-play-icon tw:text-[var(--o2-icon-color)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+                      class="tw:cursor-pointer session-play-icon tw:text-[var(--o2-icon-color)] tw:hover:text-[var(--o2-primary-btn-bg)]"
                     />
                   </template>
                   <template #cell-error_count="{ row }">
@@ -833,24 +835,8 @@ const getStarted = () => {
   });
 };
 </script>
-<style scoped lang="scss">
+<style>
 .sessions_page {
-}
-</style>
-<style lang="scss">
-.sessions_page {
-  .index-menu .field_list .field_overlay .field_label,
-  .q-field__native,
-  .q-field__input,
-  .q-table tbody td {
-    font-size: 0.75rem !important;
-  }
-
-  .q-splitter__after {
-    overflow: hidden;
-    height: 100%;
-  }
-
   .index-table :hover::-webkit-scrollbar,
   #tracesSearchGridComponent:hover::-webkit-scrollbar {
     height: 0.8125rem;
@@ -867,71 +853,6 @@ const getStarted = () => {
   #tracesSearchGridComponent::-webkit-scrollbar-thumb {
     border-radius: 0.625rem;
     -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-  }
-
-  .q-table__top {
-    padding: 0 !important;
-  }
-
-  .q-table__control {
-    width: 100%;
-  }
-
-  .q-field__control-container {
-    padding-top: 0 !important;
-  }
-
-  .search-button {
-    width: 6rem;
-    line-height: 1.8125rem;
-    font-weight: bold;
-    text-transform: initial;
-    font-size: 0.6875rem;
-    color: white;
-
-    .q-btn__content {
-      border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
-}
-  }
-
-  .app-table-container {
-    .session-play-icon {
-      .OIcon {
-        &:hover {
-          color: var(--q-primary);
-        }
-      }
-    }
-  }
-}
-
-.query-editor-placeholder-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-start;
-  padding: 0.1875rem 0.5rem 0 2.15rem;
-  pointer-events: none;
-  z-index: 1;
-  user-select: none;
-
-  .query-editor-placeholder-typewriter {
-    font-family: monospace;
-    font-size: var(--text-base);
-    line-height: 1.3125rem;
-    color: #a0aec0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-
-.body--dark .query-editor-placeholder-overlay {
-  .query-editor-placeholder-typewriter {
-    color: #718096;
   }
 }
 </style>

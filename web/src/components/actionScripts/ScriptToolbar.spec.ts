@@ -365,7 +365,7 @@ describe('ScriptToolbar.vue', () => {
   describe('Component Structure', () => {
     it('has correct main structure', () => {
       wrapper = createWrapper();
-      const toolbar = wrapper.find('.action-scripts-toolbar');
+      const toolbar = wrapper.find('[data-test="add-script-toolbar"]');
       
       expect(toolbar.exists()).toBe(true);
       expect(toolbar.classes()).toContain('tw:pb-1.5');
@@ -384,7 +384,7 @@ describe('ScriptToolbar.vue', () => {
 
     it('has correct actions section structure', () => {
       wrapper = createWrapper();
-      const actionsSection = wrapper.find('.add-script-actions');
+      const actionsSection = wrapper.find('[data-test="add-script-actions"]');
 
       expect(actionsSection.exists()).toBe(true);
       expect(actionsSection.classes()).toContain('tw:flex');

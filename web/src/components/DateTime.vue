@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -29,25 +29,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="datetimeBtn"
           data-cy="date-time-button"
           :variant="variant"
-          class="date-time-button"
+          size="sm-toolbar"
           :class="{
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
+            'tw:min-w-[286px]': !disableRelative && selectedType === 'absolute',
+            'tw:w-fit': disableRelative,
           }"
           :disabled="disable"
           icon-left="schedule"
         >
-          <span class="date-time-label">{{ getDisplayValue }}</span>
+          <span class="date-time-label tw:font-semibold tw:flex-1 tw:text-left">{{ getDisplayValue }}</span>
           <template #icon-right
-            ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow"
+            ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow tw:transition-transform tw:duration-250 tw:ml-auto tw:text-[18px]!"
           /></template>
         </OButton>
       </template>
-      <div id="date-time-menu" class="date-time-dialog">
+      <div id="date-time-menu" class="date-time-dialog tw:w-81.25 tw:z-10001 tw:max-h-(--reka-popper-available-height,600px) tw:overflow-y-auto">
         <div v-if="!disableRelative" class="tw:flex tw:justify-evenly tw:py-2">
           <OButton
             data-test="date-time-relative-tab"
-            class="tab-button"
+            class="tw:w-38.5"
             :variant="selectedType === 'relative' ? 'primary' : 'ghost-primary'"
             size="sm"
             @click="setDateType('relative')"
@@ -57,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSeparator vertical class="tw:my-2" />
           <OButton
             data-test="date-time-absolute-tab"
-            class="tab-button"
+            class="tw:w-38.5"
             :variant="selectedType === 'absolute' ? 'primary' : 'ghost-primary'"
             size="sm"
             @click="setDateType('absolute')"
@@ -66,16 +68,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <OSeparator />
-        <div class="date-time-tab-panels-wrapper">
+        <div class="tw:overflow-y-visible">
         <OTabPanels v-model="selectedType" animated>
           <OTabPanel v-if="!disableRelative" name="relative" class="tw:p-0">
             <div class="date-time-table tw:relative tw:flex tw:flex-col">
               <div
-                class="relative-row tw:pl-3 tw:py-2"
+                class="relative-row tw:flex tw:items-center tw:border-b tw:border-(--o2-border) tw:pl-3 tw:py-2"
                 v-for="(period, index) in relativePeriods"
                 :key="'date_' + index"
               >
-                <div class="relative-period-name">
+                <div class="tw:text-sm tw:font-semibold tw:min-w-18.75">
                   {{ period.label }}
                 </div>
                 <div
@@ -117,8 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <div class="relative-row tw:px-3 tw:py-2">
-                <div class="relative-period-name">{{ t("common.custom") }}</div>
+              <div class="relative-row tw:flex tw:items-center tw:border-b tw:border-(--o2-border) tw:px-3 tw:py-2">
+                <div class="tw:text-sm tw:font-semibold tw:min-w-18.75">{{ t("common.custom") }}</div>
                 <OTooltip
                   side="right"
                   align="center"
@@ -158,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </OTabPanel>
           <OTabPanel name="absolute">
-            <div class="date-time-table">
+            <div class="date-time-table tw:flex tw:flex-col">
               <OTooltip
                 side="right"
                 align="center"
@@ -176,17 +178,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:end-date="selectedDate.to = $event"
                 />
               </div>
-              <div class="notePara">{{ t("common.datetimeMessage") }}</div>
+              <div class="tw:pr-6 tw:pl-6 tw:text-[0.625rem]">{{ t("common.datetimeMessage") }}</div>
               <OSeparator v-if="!disableRelative" class="tw:my-2" />
 
-              <table v-if="!hideRelativeTime" class="tw:px-3 startEndTime">
+              <table v-if="!hideRelativeTime" class="tw:px-3 tw:w-[calc(100%-0.8rem)] tw:mx-[0.4rem] tw:mt-2 tw:mb-[0.3rem] startEndTime">
                 <tbody>
                   <tr>
-                    <td class="label tw:px-2">Start time</td>
-                    <td class="label tw:px-2">End time</td>
+                    <td class="label o-input-label tw:pr-1.5 tw:text-xs tw:font-semibold tw:w-1/2">Start time</td>
+                    <td class="label o-input-label tw:pl-1.5 tw:text-xs tw:font-semibold tw:w-1/2">End time</td>
                   </tr>
                   <tr>
-                    <td class="tw:pr-1.5">
+                    <td class="tw:pr-1.5 tw:w-1/2">
                       <OTime
                         class="tw:w-full"
                         v-model="selectedTime.startTime"
@@ -200,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       />
                     </td>
-                    <td class="tw:pl-1.5">
+                    <td class="tw:pl-1.5 tw:w-1/2">
                       <OTime
                         class="tw:w-full"
                         v-model="selectedTime.endTime"
@@ -231,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="onTimezoneChange"
             @open="isTimezoneSelectOpen = true"
             @close="isTimezoneSelectOpen = false"
-            class="timezone-select"
+            class="tw:my-2 tw:mx-[0.4rem]"
           />
         </div>
         <div v-if="!autoApply" class="tw:flex tw:justify-end tw:py-2 tw:px-3">
@@ -723,7 +725,6 @@ export default defineComponent({
 
     const setCustomDate = (dateType, dateobj) => {
       // Parent-invoked setter (e.g. metrics-brush time range) — programmatic.
-      markProgrammaticDateChange();
       var start_date = new Date(Math.floor(dateobj.start));
       const startObj = formatDate(start_date);
 
@@ -736,6 +737,7 @@ export default defineComponent({
       selectedTime.value.endTime = endObj.time;
 
       selectedType.value = dateType;
+      markProgrammaticDateChange();
     };
 
     const onBeforeShow = () => {
@@ -1148,246 +1150,12 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.date-time-container {
-  .date-time-button {
-    &.relativetype {
-    }
-    &.absolutetype {
-      min-width: 286px;
-    }
-    &.hideRelative {
-      width: fit-content;
-    }
-  }
-}
-</style>
-<style lang="scss">
-.q-btn--rectangle {
-  border-radius: 0.375rem;
-}
-.date-time-button {
-  height: 30px;
-  min-height: 30px;
-  border-radius: 0.375rem;
-  padding: 0px 5px;
-  font-size: 12px;
-  min-width: auto;
-  justify-content: flex-start !important;
-
-  .date-time-label {
-    font-weight: 600;
-    flex: 1;
-    text-align: left;
-  }
-
-  .date-time-arrow {
-    transition: transform 0.25s ease;
-    margin-left: auto;
-    font-size: 18px !important;
-  }
-  &.isOpen .date-time-arrow {
-    transform: rotate(180deg);
-  }
-
-  &:hover {
-    background: var(--o2-hover-accent) !important;
-  }
+<style>
+.date-time-button.isOpen .date-time-arrow {
+  transform: rotate(180deg);
 }
 
-.date-time-tab-panels-wrapper {
-  overflow-y: visible;
-}
-
-.date-time-dialog {
-  width: 325px;
-  z-index: 10001;
-  max-height: var(--reka-popper-available-height, 600px);
-  overflow-y: auto;
-
-  .tab-button {
-    &.q-btn {
-      padding-bottom: 0.1rem;
-      padding-top: 0.1rem;
-      font-size: 0.75rem;
-      font-weight: 700;
-
-      &.text-primary {
-        .q-btn__content {
-        }
-      }
-    }
-  }
-}
-
-.date-time-table {
-  display: flex;
-  flex-direction: column;
-
-  .relative-row {
-    display: flex;
-    align-items: center;
-    border-bottom: 1px solid $border-color;
-
-    .block {
-      font-weight: 700;
-    }
-    .q-field {
-      &__control {
-        height: 40px;
-      }
-      &__native {
-        font-size: 0.875rem;
-        font-weight: 600;
-      }
-      .q-select__dropdown-icon {
-      }
-    }
-
-    > * {
-      margin-right: 6px;
-    }
-  }
-}
-
-.absolute-calendar {
-  box-shadow: none;
-  .q-date__header {
-    display: none;
-  }
-  .q-date__view {
-    padding: 0;
-  }
-}
-
-.relative-period-name {
-  font-size: 0.875rem;
-  font-weight: 600;
-  min-width: 75px;
-}
-
-.rp-selector,
-.rp-selector-selected {
-  height: 32px;
-  width: 32px;
-  // border: $secondary;
-  background: rgba(0, 0, 0, 0.07);
-  font-weight: 700;
-
-  &:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-  }
-}
-
-.rp-selector-selected {
-  color: #ffffff;
-  background: var(--o2-primary-btn-bg);
-}
-
-.tab-button {
-  width: 154px;
-}
-
-.notePara {
-  padding-right: 1.5rem;
-  padding-left: 1.5rem;
-  font-size: 0.625rem;
-}
-.q-date {
-  &__navigation {
-    justify-content: center;
-    padding: 0 0.5rem;
-
-    .q-date__arrow {
-      & + .q-date__arrow {
-        margin-left: auto;
-      }
-      & + .col {
-        flex: initial;
-      }
-    }
-
-    .q-btn .block {
-      font-size: 0.75rem;
-      font-weight: 700;
-    }
-  }
-  &__calendar {
-    &-item .block {
-      font-weight: 700;
-    }
-    &-weekdays > div {
-      font-size: 0.875rem;
-      font-weight: 700;
-      opacity: 1;
-    }
-  }
-  &__range {
-    &,
-    &-from,
-    &-to {
-      .block {
-        color: white;
-      }
-      &:before {
-        bottom: 3px;
-        top: 3px;
-      }
-    }
-    .block {
-      color: $dark-page;
-    }
-  }
-}
-.startEndTime {
-  width: calc(100% - 0.8rem);
-  margin: 0.5rem 0.4rem 0.3rem 0.4rem;
-  td {
-    width: 50%;
-  }
-  .q-field__control-container {
-    min-height: 32px;
-    height: 32px;
-  }
-  .label {
-    font-size: 0.75rem;
-    // color: $dark-page;
-    font-weight: 600;
-  }
-  .timeInput {
-    .q-field__control {
-      padding-right: 0.375rem;
-    }
-
-    .q-btn-group {
-      & > .q-btn-item {
-        border-radius: 2px;
-      }
-
-      .q-btn {
-        padding: 0 0.3125rem;
-
-        .block {
-          font-size: 0.625rem;
-          font-weight: 700;
-        }
-      }
-    }
-  }
-}
-.drawer-footer {
-  .q-btn {
-    font-size: 0.75rem;
-    font-weight: 700;
-
-    &.clearBtn {
-      margin-right: 1rem;
-      color: $dark-page;
-    }
-  }
-}
-.timezone-select {
-  margin: 0.5rem 0.4rem 0.5rem 0.4rem;
+.date-time-table .relative-row > * {
+  margin-right: 6px;
 }
 </style>

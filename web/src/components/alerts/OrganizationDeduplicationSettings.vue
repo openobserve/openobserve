@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:px-2 org-dedup-settings tw:flex tw:flex-col">
+  <div class="tw:w-full tw:h-full tw:px-2 tw:bg-(--o2-card-bg) tw:flex tw:flex-col">
     <!-- Scrollable content area -->
     <div class="tw:flex-1 tw:overflow-y-auto tw:pr-2">
       <div class="tw:mb-6">
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OIcon>
         </div>
-        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
+        <div class="tw:text-sm tw:text-gray-600 tw:dark:text-gray-400 tw:mb-2">
           {{ t('alerts.correlation.fingerprintGroupsHint') }}
         </div>
         <div class="tw:flex tw:flex-col tw:gap-2">
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :content="t('alerts.correlation.defaultWindowTooltip')"
             />
         </div>
-        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
+        <div class="tw:text-sm tw:text-gray-600 tw:dark:text-gray-400 tw:mb-2">
           {{ t('alerts.correlation.defaultWindowDescription') }}
         </div>
         <OInput
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Sticky footer with buttons -->
-    <div class="tw:flex tw:justify-end tw:gap-3 tw:pt-4 tw:pb-2 tw:border-t tw:border-gray-200 dark:tw:border-gray-700 tw:bg-inherit tw:sticky tw:bottom-0">
+    <div class="tw:flex tw:justify-end tw:gap-3 tw:pt-4 tw:pb-2 tw:border-t tw:border-gray-200 tw:dark:border-gray-700 tw:bg-inherit tw:sticky tw:bottom-0">
       <OButton variant="outline" size="sm-action" @click="$emit('cancel')">{{ t('alerts.correlation.cancelButton') }}</OButton>
       <OButton
         variant="primary"
@@ -324,9 +324,3 @@ watch(
 );
 </script>
 
-<style scoped lang="scss">
-.org-dedup-settings {
-  // Match parent card-container background
-  background: var(--o2-card-bg);
-}
-</style>

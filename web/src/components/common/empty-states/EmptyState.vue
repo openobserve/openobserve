@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Slots: illustration | title | description | actions | extra
 -->
 <template>
-  <div class="empty-state-root tw:relative tw:w-full tw:h-full tw:overflow-hidden">
+  <div class="tw:relative tw:w-full tw:h-full tw:overflow-hidden tw:[--empty-dot:var(--color-grey-300)] tw:dark:[--empty-dot:var(--color-grey-800)]">
     <!-- decorative backdrop — subtle dot texture only (no color gradient) -->
     <div
       aria-hidden="true"
@@ -114,16 +114,3 @@ const dotGridStyle =
   "mask-image: radial-gradient(ellipse 60% 62% at 50% 44%, #000 0%, transparent 70%);";
 </script>
 
-<!--
-  Plain CSS (not SCSS) for the one thing Tailwind can't express here: a
-  theme-aware color for the decorative dot grid. There is no `dark:` variant
-  configured, so the dot color is set per theme via the `.dark` class.
--->
-<style scoped>
-.empty-state-root {
-  --empty-dot: var(--color-grey-300);
-}
-:global(.dark) .empty-state-root {
-  --empty-dot: var(--color-grey-800);
-}
-</style>

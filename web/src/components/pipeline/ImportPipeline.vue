@@ -45,10 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="error-report-container" style="height: calc(100vh - 128px) !important; overflow: auto; resize: none;">
           <!-- Pipeline Errors Section -->
           <div
-            class="error-section"
+            class="tw:p-2.5 tw:mb-2.5"
             v-if="pipelineErrorsToDisplay.length > 0"
           >
-            <div class="error-list">
+            <div>
               <!-- Iterate through the outer array -->
               <div
                 v-for="(errorGroup, index) in pipelineErrorsToDisplay"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="(errorMessage, errorIndex) in errorGroup"
                   :key="errorIndex"
-                  class="error-item"
+                  class="tw:py-1.25 tw:text-sm"
                   :data-test="`pipeline-import-error-${index}-${errorIndex}`"
                 >
                   <!-- pipeline name should not be empty -->
@@ -304,22 +304,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="error-section" v-if="pipelineCreators.length > 0">
+          <div class="tw:p-2.5 tw:mb-2.5" v-if="pipelineCreators.length > 0">
             <div
-              class="section-title text-primary"
+              class="tw:text-base tw:mb-2.5 tw:uppercase text-primary"
               data-test="pipeline-import-creation-title"
             >
               Pipeline Creation
             </div>
             <div
-              class="error-list"
               v-for="(val, index) in pipelineCreators"
               :key="index"
               :data-test="`pipeline-import-creation-${index}`"
             >
               <div
                 :class="{
-                  'error-item tw:font-bold': true,
+                  'tw:py-1.25 tw:text-sm tw:font-bold': true,
                   'text-green': val.success,
                   'text-red': !val.success,
                 }"
@@ -1509,26 +1508,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.error-report-container {
-  height: calc(100vh - 128px) !important;
-  overflow: auto;
-  resize: none;
-}
-
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-
-.error-item {
-  padding: 5px 0px;
-  font-size: 14px;
-}
-</style>

@@ -89,6 +89,19 @@ const useManagementRoutes = () => {
             routeGuard(to, from, next);
           },
         },
+        {
+          path: "gen_ai_agent_mapping",
+          name: "genAiAgentMapping",
+          component: () =>
+            import("@/components/settings/GenAiAgentMappingSettings.vue"),
+          meta: {
+            keepAlive: true,
+            title: "GenAI Agent Mapping",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
       ],
     },
   ];

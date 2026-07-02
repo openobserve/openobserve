@@ -36,15 +36,15 @@ describe("NoOrganizationSelected", () => {
   });
 
   it("should display no organization selected message", () => {
-    const message = wrapper.find('.no-org-selected');
+    const message = wrapper.find('[data-test="no-organization-selected-title"]');
     expect(message.exists()).toBe(true);
-    expect(message.text()).toBeTruthy();
+    expect(message.text()).toBe(i18n.global.t("ticket.noOrganizationSelected"));
   });
 
   it("should display select organization message", () => {
-    const message = wrapper.find('.select-org-msg');
+    const message = wrapper.find('[data-test="no-organization-selected-message"]');
     expect(message.exists()).toBe(true);
-    expect(message.text()).toBeTruthy();
+    expect(message.text()).toBe(i18n.global.t("ticket.selectOrganizationForQuota"));
   });
 
   it("should have correct component name", () => {
@@ -70,12 +70,14 @@ describe("NoOrganizationSelected", () => {
   });
 
   it("should apply correct styling to no organization selected text", () => {
-    const noOrgText = wrapper.find('.no-org-selected');
+    const noOrgText = wrapper.find('[data-test="no-organization-selected-title"]');
     expect(noOrgText.exists()).toBe(true);
+    expect(noOrgText.classes()).toContain('tw:font-semibold');
   });
 
   it("should apply correct styling to select organization message", () => {
-    const selectOrgMsg = wrapper.find('.select-org-msg');
+    const selectOrgMsg = wrapper.find('[data-test="no-organization-selected-message"]');
     expect(selectOrgMsg.exists()).toBe(true);
+    expect(selectOrgMsg.classes()).toContain('tw:font-normal');
   });
 });

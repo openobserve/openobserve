@@ -477,7 +477,9 @@
     "actions": "Aktionen",
     "incidents": "Vorfälle",
     "evals": "Evalen",
-    "aiObservability": "KI-Beobachtbarkeit"
+    "keyboardShortcuts": "Tastenkürzel",
+    "aiObservability": "KI-Beobachtbarkeit",
+    "aiAssistant": "KI-Assistent"
   },
   "rum": {
     "title": "Echte Benutzerüberwachung",
@@ -3119,6 +3121,25 @@
     "aiToolsets": "KI-Toolsets",
     "llmModelPricing": "LLM-Modellpreisgestaltung",
     "ingestionTokens": "Tokens für die Aufnahme",
+    "genAiAgentMapping": {
+      "tabLabel": "GenAI Agentenzuordnung",
+      "title": "GenAI Agentenzuordnung",
+      "description": "Konfigurieren Sie Fallback-Telemetrieattribute, die zur Normalisierung der Agentenidentität für LLM-Traces und -Auswertungen verwendet werden.",
+      "howItWorksTitle": "So funktioniert Mapping",
+      "howItWorksDescription": "OpenObserve behält zunächst die Standardattribute gen_ai.agent.name und gen_ai.agent.id bei. Diese Listen werden nur überprüft, wenn die Standardattribute fehlen oder leer sind. Fügen Sie ein eingehendes Telemetrieattribut pro Zeile hinzu.",
+      "agentNameFields": "Fallback-Felder für Agentennamen",
+      "agentNameHelp": "Eingehende Attribute, die als Fallbacks für gen_ai.agent.name verwendet werden sollen.",
+      "agentIdFields": "Fallback-Felder für Agenten-IDs",
+      "agentIdHelp": "Eingehende Attribute, die als Fallbacks für gen_ai.agent.id verwendet werden sollen.",
+      "fieldsPlaceholder": "agent.name\nllm.agent.name",
+      "applyDefaults": "Standardwerte anwenden",
+      "resetToEmpty": "Auf leer zurücksetzen",
+      "defaultsSource": "Die Standardwerte werden aus openobserve/sdr_patterns geladen und können vor dem Speichern für diese Organisation geändert werden.",
+      "saved": "Das GenAI-Agent-Mapping wurde erfolgreich gespeichert",
+      "loadFailed": "GenAI Agent-Mapping konnte nicht geladen werden",
+      "saveFailed": "Die GenAI-Agentenzuordnung konnte nicht gespeichert werden",
+      "defaultsLoadFailed": "Die Standardeinstellungen für die GenAI-Agentenzuordnung konnten nicht geladen werden"
+    },
     "groupGeneral": "Allgemein",
     "groupAccessSecurity": "Zugriff & Sicherheit",
     "groupDestinationsTemplates": "Ziele & Vorlagen",
@@ -5694,6 +5715,83 @@
       "description": "LLM-Anbieter speichern die Verbindungsdetails (Endpunkt und Anmeldeinformationen) für die Sprachmodelle, die Ihre LLM-Judge-Scorer aufrufen. Fügen Sie eines hinzu, um mit der Durchführung von Bewertungen durch Richter zu beginnen."
     }
   },
+  "shortcuts": {
+    "title": "Tastenkürzel",
+    "mac": "Mac",
+    "windowsLinux": "Windows/ Linux",
+    "toggleHint": "um dieses Panel umzuschalten",
+    "pages": {
+      "global": "Weltweit",
+      "logs": "Logs",
+      "dashboardsList": "Dashboards",
+      "dashboards": "Dashboard-Ansicht",
+      "dashboardsPanel": "Dashboard — Panel (bewegen Sie den Mauszeiger über ein Panel)",
+      "metrics": "Metriken",
+      "traces": "Spuren",
+      "alerts": "Warnmeldungen",
+      "streams": "Streams",
+      "pipelines": "Rohrleitungen",
+      "functions": "Funktionen",
+      "reports": "Berichte"
+    },
+    "actions": {
+      "openCheatsheet": "Cheatsheet mit Tastenkombinationen öffnen",
+      "closeDialog": "Schließt jeden Dialog, jede Schublade oder jedes Modal",
+      "focusSearch": "Fokus-Suchleiste",
+      "logsRunQuery": "Suchabfrage ausführen",
+      "logsRefresh": "Aktualisieren/ Suche erneut ausführen",
+      "logsToggleHistogram": "Histogramm umschalten",
+      "logsToggleSidebar": "Feld-Seitenleiste umschalten",
+      "dashboardsListAdd": "Neues Dashboard",
+      "dashboardsListImport": "Dashboard importieren",
+      "dashboardsListRefresh": "Liste aktualisieren",
+      "dashboardRefresh": "Alle Panels aktualisieren",
+      "dashboardAddPanel": "Neues Panel hinzufügen",
+      "dashboardSave": "Dashboard speichern",
+      "dashboardFullscreen": "Vollbild umschalten",
+      "panelView": "Panel im Vollbildmodus anzeigen",
+      "panelEdit": "Bedienfeld bearbeiten",
+      "panelDuplicate": "Panel duplizieren",
+      "panelDelete": "Panel löschen",
+      "metricsRunQuery": "PromQL-Abfrage ausführen",
+      "metricsRefresh": "Auffrischen",
+      "tracesSearch": "Suche nach Spuren",
+      "tracesRefresh": "Auffrischen",
+      "alertsCreate": "Neue Warnung erstellen",
+      "alertsRefresh": "Warnungsliste aktualisieren",
+      "alertsClose": "Warnungsdetailschublade schließen",
+      "streamsAdd": "Neuen Stream hinzufügen",
+      "streamsRefresh": "Liste aktualisieren",
+      "pipelinesAdd": "Neue Pipeline erstellen",
+      "pipelinesImport": "Pipeline importieren",
+      "pipelinesRefresh": "Liste aktualisieren",
+      "functionsAdd": "Neue Funktion hinzufügen",
+      "functionsRefresh": "Liste aktualisieren",
+      "reportsAdd": "Neuen Bericht erstellen",
+      "reportsRefresh": "Liste aktualisieren"
+    },
+    "search": "Kurzbefehle suchen...",
+    "noResults": "Keine Abkürzungen gefunden",
+    "subtitle": "Drücken? irgendwo · klicken Sie auf eine beliebige Zeile, um sie auszulösen",
+    "footerClose": "nahe",
+    "footerReopen": "erneut öffnen",
+    "footerRun": "Klicken Sie auf die Zeile, um sie auszuführen",
+    "footerMacHint": "⌘ = Cmd auf dem Mac · Strg auf Windows",
+    "modules": {
+      "global": "Weltweit",
+      "logs": "Logs",
+      "dashboards": "Dashboards",
+      "metrics": "Metriken",
+      "traces": "Spuren",
+      "alerts": "Warnmeldungen",
+      "streams": "Streams",
+      "pipelines": "Rohrleitungen",
+      "functions": "Funktionen",
+      "reports": "Berichte",
+      "iam": "IAM",
+      "runningQueries": "Abfragen ausführen"
+    }
+  },
   "aiObservability": {
     "title": "LLM Beobachtbarkeit",
     "sections": {
@@ -5753,6 +5851,14 @@
         "title": "Aktuelle Fehler",
         "subtitle": "Die letzten 10 fehlgeschlagenen Spans"
       }
+    },
+    "subtitle": {
+      "llmInsights": "Verfolgen Sie Latenz, Fehler, Tokens und Kosten in Ihrem gesamten LLM-Traffic",
+      "sessions": "Agentensitzungen nacheinander durchsuchen und überprüfen",
+      "quality": "Bewerte und verfolge die Qualität deiner LLM-Antworten",
+      "evalJobs": "Führen Sie Evaluierungsaufträge in Ihren Sitzungen aus und überwachen Sie sie",
+      "scorers": "Erstellen und verwalten Sie die Scorer, die LLM-Ergebnisse bewerten",
+      "scoreConfigs": "Konfigurieren Sie die Bewertungsrubriken, die für Ihre Bewertungen verwendet werden"
     }
   },
   "logs": {
