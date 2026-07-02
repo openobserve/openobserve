@@ -1422,7 +1422,7 @@ DO UPDATE SET
 
         // get pending jobs group by stream and order by num desc
         let sql = if fast_mode {
-            r#"SELECT stream, id, 0 as num FROM file_list_jobs WHERE status = $1 ORDER BY offsets DESC LIMIT $2;"#
+            r#"SELECT stream, id, 0::BIGINT AS num FROM file_list_jobs WHERE status = $1 ORDER BY offsets DESC LIMIT $2;"#
         } else {
             r#"
     SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
