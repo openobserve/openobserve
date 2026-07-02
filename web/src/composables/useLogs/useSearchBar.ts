@@ -123,9 +123,11 @@ export const useSearchBar = () => {
         })
         .catch((err) => {
           searchObj.loadingSavedView = false;
+          console.log(err);
         });
     } catch (e: any) {
       searchObj.loadingSavedView = false;
+      console.log("Error while getting saved views", e);
     }
   };
 
@@ -417,6 +419,7 @@ export const useSearchBar = () => {
       searchObj.loadingProgressPercentage = 0;
       await getQueryData();
     } catch (e: any) {
+      console.log("Error while loading logs data");
     }
   };
 

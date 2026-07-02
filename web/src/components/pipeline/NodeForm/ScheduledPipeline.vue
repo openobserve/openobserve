@@ -1814,6 +1814,7 @@ const updateCron = () => {
       minutes = Number(minutes.toString());
     }
   } catch (err) {
+    console.log(err);
     return;
   }
 
@@ -2381,6 +2382,7 @@ async function getStreamList() {
     // Mark this stream type as loaded
     loadedStreamTypes.value.add(selectedStreamType.value);
   } catch (err) {
+    console.log(err);
     streams.value = [];
     filteredStreams.value = [];
   } finally {

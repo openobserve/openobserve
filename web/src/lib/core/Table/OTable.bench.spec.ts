@@ -282,6 +282,7 @@ describe("OTable Performance Benchmarks", () => {
       });
       expect(wrapper.find('[data-test="o2-table-root"]').exists()).toBe(true);
       expect(wrapper.vm.getRows().length).toBeGreaterThan(0);
+      console.log("  [PERF] 5 mount/unmount cycles completed without errors");
     }, 30000);
   });
 

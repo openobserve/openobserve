@@ -589,6 +589,7 @@ const formatEvent = (event: any) => {
 
     return eventTypes[event.type](event);
   } catch (err) {
+    console.log(err);
     return null;
   }
 };

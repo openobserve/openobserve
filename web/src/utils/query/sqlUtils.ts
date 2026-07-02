@@ -1032,6 +1032,7 @@ export const getStreamNameFromQuery = async (query: any) => {
         }
       }
     } catch (error) {
+      console.log(error, "error parsing sql query");
     }
     return streamName;
   } catch (error) {

@@ -109,6 +109,7 @@ const MainLayoutCloudMixin = {
           }
         })
         .catch((e) => {
+          console.log("Error while fetching refresh token:", e);
         });
     };
 

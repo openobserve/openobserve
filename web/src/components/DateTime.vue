@@ -538,6 +538,7 @@ export default defineComponent({
         // displayValue.value = getDisplayValue();
         saveDate(props.defaultType);
       } catch (e) {
+        console.log(e);
       }
     });
 
@@ -1057,6 +1058,7 @@ export default defineComponent({
               }
             }
           } catch (e) {
+            console.log("Error while setting relative date", e);
           }
         }
       }

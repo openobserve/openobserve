@@ -1159,6 +1159,7 @@ export default defineComponent({
         openedFilterFields.value = openedFilterFields.value.filter(
           (field: string) => field !== name,
         );
+        console.log(err);
         toast({
           variant: "error",
           message: "Error while fetching field values",

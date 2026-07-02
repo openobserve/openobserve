@@ -827,6 +827,7 @@ const saveActionScript = async () => {
     }
     if (nameError.value || typeError.value || serviceAccountError.value || cronFieldError.value) return;
   } catch (err) {
+    console.log(err);
   }
 
   const updateAction =

@@ -67,6 +67,7 @@ import rateLimiterService from "@/services/rate_limit";
       return transformedData;
   } catch (error) {
     isApiLimitsLoading.value = false;
+      console.log(error);
   }
     };
     const getRoleLimitsByOrganization = async (orgId: string, rolename: string, interval: string = 'second') => {
@@ -112,6 +113,7 @@ import rateLimiterService from "@/services/rate_limit";
       isRoleLimitsLoading.value = false;
       return transformedData;
   } catch (error) {
+      console.log(error);
       isRoleLimitsLoading.value = false;
   }
     };

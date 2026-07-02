@@ -248,6 +248,7 @@ describe("PromQL Chunk Processor", () => {
     expect(stats.totalMetricsReceived).toBe(30000); // 2500 × 12
     expect(stats.metricsStored).toBe(100);
 
+    console.log(`✅ Processed 30,000 metrics across 12 chunks (limited to 100)`);
   });
 
   it("should produce identical data when limiting early vs late", () => {
@@ -336,5 +337,9 @@ describe("PromQL Chunk Processor", () => {
       expect(newMetric.values[2]).toEqual(oldMetric.values[2]);
     }
 
+    console.log(`✅ Data correctness verified: First 100 metrics are IDENTICAL`);
+    console.log(`   Old way: Load 9832 → limit to 100`);
+    console.log(`   New way: Limit during streaming → 100`);
+    console.log(`   Result: Perfect match! Chart will render identically.`);
   });
 });

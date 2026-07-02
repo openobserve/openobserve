@@ -1014,7 +1014,7 @@ export default defineComponent({
             setRumUser();
           }
         })
-        .catch(() => {});
+        .catch((error) => console.log(error));
     };
 
     if (config.isCloud == "true") {

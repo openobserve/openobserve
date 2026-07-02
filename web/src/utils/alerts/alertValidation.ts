@@ -439,6 +439,7 @@ export const validateInputs = (
         utc: true,
       });
     } catch (err) {
+      console.log(err);
       notify &&
         toast({
           variant: "error",

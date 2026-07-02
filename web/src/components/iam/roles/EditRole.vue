@@ -922,6 +922,7 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         await getResourceEntities(resourceMapper[resource]);
       }
     } catch (err) {
+      console.log(err);
     }
   }
 
@@ -1474,6 +1475,7 @@ const expandPermission = async (resource: any) => {
     try {
       await getResourceEntities(resource);
     } catch (err) {
+      console.log(err);
     }
   }
 };
@@ -2480,6 +2482,7 @@ const saveRole = () => {
           message: `Error while updating role!`,
         });
       }
+      console.log(err);
     });
 };
 

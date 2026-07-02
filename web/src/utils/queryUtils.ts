@@ -176,6 +176,7 @@ export const validateEmail = (email: string) => {
       return false;
     }
   } catch (e) {
+    console.log(`Error: Error while validatig email id ${email}`);
   }
 };
 

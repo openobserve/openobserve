@@ -507,7 +507,7 @@ function getQueryTransform() {
           }
         });
       })
-      .catch(() => {});
+      .catch((err) => console.log(err));
 
     return;
   } catch (e) {

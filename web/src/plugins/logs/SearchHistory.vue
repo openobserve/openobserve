@@ -443,6 +443,7 @@ export default defineComponent({
           message: "Failed to fetch search history. Please try again later.",
           timeout: 5000,
         });
+        console.log(error, "error");
         isLoading.value = false;
       } finally {
         isLoading.value = false;

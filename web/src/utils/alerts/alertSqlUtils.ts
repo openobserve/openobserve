@@ -28,6 +28,7 @@ export const getParser = (sqlQuery: string, context: SqlUtilsContext): boolean =
     // In catch block we are returning true, as we just wanted to validate if user have added * in the query to select all columns
     // select field from default // here default is not wrapped in "" so node sql parser will throw error as default is a reserved keyword. But our Backend supports this query without quotes
     // Query will be validated in the backend
+    console.log(error);
     return true;
   }
 };

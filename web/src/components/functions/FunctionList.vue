@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -537,6 +537,7 @@ export default defineComponent({
           confirmForceDelete.value = true;
         })
         .catch((err) => {
+          console.log(err);
         });
     };
 

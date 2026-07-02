@@ -69,6 +69,7 @@ export const useSearchPagination = () => {
         });
       }
     } catch (e: any) {
+      console.log("Error while refreshing partition pagination", e);
       notificationMsg.value = "Error while refreshing partition pagination.";
       return false;
     }

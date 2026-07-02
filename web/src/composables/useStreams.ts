@@ -714,6 +714,7 @@ const useStreams = () => {
         updateStreamsInStore(streamType, {});
       }
     } catch (e) {
+      console.log("Error while clearing local cache for stream type.", e);
     }
   };
   //ths is the type of the pattern associations

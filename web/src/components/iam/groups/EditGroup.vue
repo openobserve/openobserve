@@ -229,6 +229,7 @@ const getGroupDetails = () => {
       groupsState.groups[groupName] = groupDetails.value;
     })
     .catch((err) => {
+      console.log(err);
       toast({
         message: err?.message || "Group not found or has been deleted. Redirecting to groups list.",
         variant: "error",

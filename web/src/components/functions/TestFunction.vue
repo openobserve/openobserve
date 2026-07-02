@@ -802,6 +802,7 @@ function getLineRanges(object: any) {
 
     return ranges;
   } catch (e) {
+    console.log("Error in getLineRanges", e);
   }
 }
 
@@ -825,6 +826,7 @@ function highlightSpecificEvent() {
     if (outputEventsEditorRef.value)
       outputEventsEditorRef.value.addErrorDiagnostics(errorEventRanges);
   } catch (e) {
+    console.log("Error in highlightSpecificEvent", e);
   }
 }
 

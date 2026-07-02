@@ -55,6 +55,7 @@ export const getUserInfo = (loginString: string) => {
 
     return decToken;
   } catch (e) {
+    console.log("Error in getUserInfo util");
   }
 };
 
@@ -71,6 +72,7 @@ export const getDecodedAccessToken = (token: string) => {
       return "";
     }
   } catch (e) {
+    console.log("error decoding token");
   }
 };
 
@@ -83,6 +85,7 @@ export const getDecodedUserInfo = () => {
       return null;
     }
   } catch (e) {
+    console.log("Error: Error while pull sessionstorage value.");
   }
 };
 
