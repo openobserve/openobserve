@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed } from 'vue'
-import type { BrowserStep, StepAction, SelectorType, WireStep } from '@/types/synthetics'
+import type { BrowserStep, StepAction, SelectorType, StepReplayResult, WireStep } from '@/types/synthetics'
 import type { IconName } from '@/lib/core/Icon/OIcon.icons'
 
 /**
@@ -27,6 +27,8 @@ const props = defineProps<{
   replayDotState?: StepDotState
   /** When true, hide row actions (delete, duplicate, insert) during replay. */
   replayLocked?: boolean
+  /** Per-step replay result (for inline error card on failed steps). */
+  replayResult?: StepReplayResult
 }>()
 
 const emit = defineEmits<{
@@ -36,6 +38,7 @@ const emit = defineEmits<{
   'duplicate': []
   'insert-below': []
   'toggle-select': []
+  'retry-replay': []
 }>()
 
 // Action icon map — all values must be valid IconName keys
@@ -172,6 +175,45 @@ const rowOpacityClass = computed(() =>
   props.replayDotState === 'skip' ? 'tw:opacity-50' : ''
 )
 
+// ── Inline error card (shown when a step fails during replay) ───────────────
+const showErrorCard = computed(() =>
+  props.replayDotState === 'fail' && props.replayResult?.error
+)
+
+const se = computed(() => props.replayResult?.structuredError)
+
+/** Map structuredError.name to icon name. */
+const errorIconName = computed<string>(() => {
+  switch (se.value?.name) {
+    case 'TimeoutError': return 'timer-off'
+    case 'TargetClosedError': return 'visibility-off'
+    default: return 'error'
+  }
+})
+
+/** Map structuredError.name to human label. */
+const errorLabel = computed<string>(() => {
+  switch (se.value?.name) {
+    case 'TimeoutError': return 'Timeout'
+    case 'TargetClosedError': return 'Tab closed'
+    default: return 'Error'
+  }
+})
+
+/** Exit reason tag (e.g. "hit timeout", "tab closed"). */
+const exitReasonTag = computed<string>(() => {
+  const name = se.value?.name
+  if (name === 'TimeoutError') return 'hit timeout'
+  if (name === 'TargetClosedError') return 'tab closed'
+  return 'exit'
+})
+
+/** Formatted duration for the error card info box. */
+const errorDurationFormatted = computed<string>(() => {
+  const ms = props.replayResult?.durationMs ?? 0
+  return `${(ms / 1000).toFixed(1)} s`
+})
+
 function toggleExpanded() {
   emit('update:expanded', !props.expanded)
 }
@@ -285,6 +327,49 @@ function toggleExpanded() {
           @click="emit('delete')"
         >
           <OIcon name="delete" size="sm" aria-hidden="true" />
+        </OButton>
+      </div>
+    </div>
+
+    <!-- Inline error card (shown when a step fails during replay) -->
+    <div
+      v-if="showErrorCard"
+      class="tw:border tw:border-[var(--o2-error-300)] tw:rounded-lg tw:mx-2 tw:mb-2 tw:overflow-hidden"
+      data-test="synthetics-journey-step-error-card"
+    >
+      <!-- Header -->
+      <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:bg-[var(--o2-status-error-subtle)]">
+        <OIcon :name="errorIconName" size="sm" class="tw:text-[var(--o2-status-error)]" aria-hidden="true" />
+        <span class="tw:text-xs tw:font-semibold tw:text-[var(--o2-text-heading)] tw:flex-1">{{ errorLabel }}</span>
+        <span class="tw:text-xs tw:font-mono tw:text-[var(--o2-text-secondary)]">{{ exitReasonTag }} · {{ errorDurationFormatted }}</span>
+      </div>
+
+      <!-- Error message -->
+      <div class="tw:px-3 tw:py-3">
+        <p class="tw:text-[12.5px] tw:text-[var(--o2-text-body)] tw:m-0">
+          {{ se.value?.message || props.replayResult?.error }}
+        </p>
+      </div>
+
+      <!-- Info boxes -->
+      <div v-if="se.value?.selector" class="tw:flex tw:gap-4 tw:px-3 tw:pb-3">
+        <div class="tw:flex tw:flex-col tw:gap-1">
+          <span class="tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-label)]">Selector (Test ID)</span>
+          <span class="tw:text-xs tw:font-mono tw:text-[var(--o2-status-error)]">{{ se.value.selector }}</span>
+        </div>
+        <div class="tw:flex tw:flex-col tw:gap-1">
+          <span class="tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-label)]">Waited</span>
+          <span class="tw:text-xs tw:font-mono tw:text-[var(--o2-text-secondary)]">{{ errorDurationFormatted }} · {{ exitReasonTag }}</span>
+        </div>
+      </div>
+
+      <!-- Error card actions -->
+      <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:pb-3">
+        <OButton variant="primary" size="sm" data-test="synthetics-journey-error-retry-btn" @click="emit('retry-replay')">
+          Retry replay
+        </OButton>
+        <OButton variant="ghost" size="sm" disabled title="Coming soon">
+          Re-record from here
         </OButton>
       </div>
     </div>

@@ -30,6 +30,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: BrowserStep[]]
   'need-extension-setup': []
+  'clear-results': []
   'replay': []
   'stop-replay': []
   'auto-record-consumed': []
@@ -59,6 +60,21 @@ const isReplayTerminal = computed(() =>
 )
 const isReplayLocked = computed(() => isReplayRunning.value) // editing suppressed during running
 
+/** Index of the first failing step in journey order, or -1 when none failed. */
+const firstFailedIndex = computed(() =>
+  props.modelValue.findIndex((s) => {
+    const r = props.stepResults?.get(s.id)
+    return r && !r.passed
+  })
+)
+
+/** Replay result for the first failing step (for the inline error card). */
+const failedStepResult = computed<StepReplayResult | undefined>(() => {
+  if (firstFailedIndex.value < 0) return undefined
+  const step = props.modelValue[firstFailedIndex.value]
+  return props.stepResults?.get(step.id)
+})
+
 /** Derive the status dot state for a step based on replay results. */
 function stepDotState(stepId: string): StepDotState | undefined {
   if (!isReplayActive.value || !props.replayPhase) return undefined
@@ -66,15 +82,8 @@ function stepDotState(stepId: string): StepDotState | undefined {
   if (result) {
     return result.passed ? 'pass' : 'fail'
   }
-  // No result yet — is this step before or after the failed step?
-  // Find the first failing step in journey order
-  const firstFailedIndex = props.modelValue.findIndex((s) => {
-    const r = props.stepResults?.get(s.id)
-    return r && !r.passed
-  })
   const stepIndex = props.modelValue.findIndex((s) => s.id === stepId)
-
-  if (firstFailedIndex >= 0 && stepIndex > firstFailedIndex) return 'skip'
+  if (firstFailedIndex.value >= 0 && stepIndex > firstFailedIndex.value) return 'skip'
   if (props.replayPhase === 'running') return 'pending'
   return 'pending'
 }
@@ -132,8 +141,17 @@ function deleteSelectedSteps() {
 // Clear selection when the step list changes, filter changes, or replay starts
 watch(() => props.modelValue.length, () => { selectedStepIds.value = new Set() })
 watch(filterQuery, () => { selectedStepIds.value = new Set() })
-watch(() => props.replayPhase, (phase) => {
-  if (phase === 'running') selectedStepIds.value = new Set()
+watch(() => props.replayPhase, (phase, prev) => {
+  if (phase === 'running') {
+    selectedStepIds.value = new Set()
+    expandedSteps.value = new Set() // collapse all on new replay
+    return
+  }
+  // Auto-expand the first failing step when replay fails
+  if (phase === 'failed' && firstFailedIndex.value >= 0) {
+    const stepId = props.modelValue[firstFailedIndex.value]?.id
+    if (stepId) expandedSteps.value = new Set([stepId])
+  }
 })
 
 const multiSelectEnabled = computed(() =>
@@ -368,7 +386,7 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
 
     <!-- Replay running banner -->
     <div
-      v-if="replayPhase === 'running' || true"
+      v-if="replayPhase === 'running'"
       class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--o2-primary-50)] tw:border tw:border-[var(--o2-primary-200)]"
       role="status"
       data-test="synthetics-journey-replay-banner"
@@ -383,6 +401,58 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
       <span class="tw:text-sm tw:text-[var(--o2-text-secondary)]">
         {{ stepResults?.size ?? 0 }} of {{ modelValue.length }} steps
       </span>
+    </div>
+
+    <!-- Replay passed banner -->
+    <div
+      v-else-if="replayPhase === 'passed'"
+      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--o2-bg-success-subtle)] tw:border tw:border-[var(--o2-status-success)]"
+      role="status"
+      data-test="synthetics-journey-passed-banner"
+    >
+      <OIcon name="check-circle" size="sm" class="tw:text-[var(--o2-status-success)]" aria-hidden="true" />
+      <span class="tw:text-sm tw:text-[var(--o2-text-heading)]">Replay passed — all {{ modelValue.length }} steps completed successfully</span>
+      <span class="tw:flex-1" />
+      <OButton variant="ghost" size="xs" data-test="synthetics-journey-clear-results-btn" @click="emit('clear-results')">
+        <OIcon name="close" size="sm" />
+      </OButton>
+    </div>
+
+    <!-- Replay failed banner -->
+    <div
+      v-else-if="replayPhase === 'failed'"
+      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--o2-bg-error-subtle)] tw:border tw:border-[var(--o2-status-error)]"
+      role="alert"
+      data-test="synthetics-journey-failed-banner"
+    >
+      <OIcon name="error" size="sm" class="tw:text-[var(--o2-status-error)]" aria-hidden="true" />
+      <span class="tw:text-sm tw:text-[var(--o2-text-heading)]">Replay failed — stopped at step {{ firstFailedIndex + 1 }} of {{ modelValue.length }}</span>
+      <span v-if="failedStepResult?.stepName" class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:truncate">({{ failedStepResult.stepName }})</span>
+      <span class="tw:flex-1" />
+      <OButton variant="outline-destructive" size="xs" data-test="synthetics-journey-failed-retry-btn" @click="emit('replay')">
+        Re-run
+      </OButton>
+      <OButton variant="ghost" size="xs" data-test="synthetics-journey-clear-results-btn" @click="emit('clear-results')">
+        <OIcon name="close" size="sm" />
+      </OButton>
+    </div>
+
+    <!-- Replay stopped banner -->
+    <div
+      v-else-if="replayPhase === 'stopped'"
+      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--o2-bg-subtle)] tw:border tw:border-[var(--o2-border-color)]"
+      role="status"
+      data-test="synthetics-journey-stopped-banner"
+    >
+      <OIcon name="stop" size="sm" class="tw:text-[var(--o2-text-secondary)]" aria-hidden="true" />
+      <span class="tw:text-sm tw:text-[var(--o2-text-heading)]">Replay stopped at step {{ stepResults?.size ?? 0 }} of {{ modelValue.length }}</span>
+      <span class="tw:flex-1" />
+      <OButton variant="outline" size="xs" data-test="synthetics-journey-stopped-retry-btn" @click="emit('replay')">
+        Re-run
+      </OButton>
+      <OButton variant="ghost" size="xs" data-test="synthetics-journey-clear-results-btn" @click="emit('clear-results')">
+        <OIcon name="close" size="sm" />
+      </OButton>
     </div>
 
     <!-- Recorder error (extension missing / failed to start) -->
@@ -471,12 +541,14 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
         :selection-enabled="multiSelectEnabled"
         :replay-dot-state="stepDotState(step.id)"
         :replay-locked="isReplayLocked"
+        :replay-result="props.stepResults?.get(step.id)"
         @update:step="updateStep(index, $event)"
         @update:expanded="setStepExpanded(step.id, $event)"
         @delete="deleteStep(index)"
         @duplicate="duplicateStep(index)"
         @insert-below="insertStepBelow(index)"
         @toggle-select="toggleStepSelection(step.id)"
+        @retry-replay="emit('replay')"
       />
     </VueDraggableNext>
 
@@ -492,12 +564,14 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
         :selection-enabled="multiSelectEnabled"
         :replay-dot-state="stepDotState(step.id)"
         :replay-locked="isReplayLocked"
+        :replay-result="props.stepResults?.get(step.id)"
         @update:step="updateStep(originalIndex, $event)"
         @update:expanded="setStepExpanded(step.id, $event)"
         @delete="deleteStep(originalIndex)"
         @duplicate="duplicateStep(originalIndex)"
         @insert-below="insertStepBelow(originalIndex)"
         @toggle-select="toggleStepSelection(step.id)"
+        @retry-replay="emit('replay')"
       />
     </div>
 

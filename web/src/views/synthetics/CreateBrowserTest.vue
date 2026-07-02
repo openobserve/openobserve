@@ -271,6 +271,13 @@ function onReplay() {
 function onStopReplay() {
   recorder.stopReplay().catch(() => {})
 }
+
+function onClearResults() {
+  // Reset replay state through the composable
+  recorder.replayPhase.value = 'idle'
+  recorder.replayResult.value = null
+  recorder.stepResults.clear()
+}
 </script>
 
 <template>
@@ -501,6 +508,7 @@ function onStopReplay() {
             @need-extension-setup="onNeedExtensionSetup"
             @replay="onReplay"
             @stop-replay="onStopReplay"
+            @clear-results="onClearResults"
             @auto-record-consumed="autoRecord = false"
             @selection-changed="journeySelectionState = $event"
           />
