@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <section class="tw:flex tw:flex-col tw:gap-[10px] tw:min-h-0 tw:flex-1" data-test="quality-score-configs-overview">
     <div v-if="isLoading && rows.length === 0" class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-8 tw:px-3 tw:border tw:border-dashed tw:border-[var(--color-dialog-header-border,var(--o2-border))] tw:rounded-md tw:text-center tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">
       <OSpinner size="sm" />
@@ -6,7 +6,7 @@
     </div>
 
     <div
-      v-else-if="rows.length === 0"
+      v-if="rows.length === 0 && !isLoading"
       class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center"
       data-test="quality-overview-empty"
     >
@@ -34,7 +34,7 @@
         :footer-title="t('onlineEvals.quality.overview.title')"
         :show-global-filter="false"
         :page-size="20"
-        :page-size-options="[20, 50, 100]"
+        :page-size-options="[20, 50, 100, 250, 500]"
         :default-columns="false"
         :enable-column-resize="true"
         :persist-columns="true"
@@ -316,3 +316,4 @@ function relativeTime(timestampMs: number): string {
   return `${mo}mo ago`;
 }
 </script>
+

@@ -149,6 +149,6 @@ const handleBackspace = () => {
 }
 
 .tag-input::placeholder {
-  color: var(--q-color-text-hint);
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 </style>

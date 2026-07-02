@@ -4,7 +4,7 @@
     :data-test="`quality-kpi-${kpi.id}`"
   >
     <div class="tw:flex tw:flex-col tw:gap-[0.25rem]">
-      <div class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]">
+      <div class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:leading-normal tw:font-semibold tw:mb-[0.25rem]">
         {{ t(`onlineEvals.quality.kpis.${kpi.id}.title`) }}
       </div>
       <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
@@ -14,7 +14,7 @@
           </span>
           <span
             v-if="unitLabel"
-            class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
+            class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)] "
           >
             {{ unitLabel }}
           </span>

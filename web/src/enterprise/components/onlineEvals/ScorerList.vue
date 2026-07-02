@@ -110,10 +110,6 @@
           <span class="tw:font-mono tw:text-xs">{{ usedByText(row) }}</span>
         </template>
 
-        <template #cell-lastRun>
-          <span class="tw:text-text-secondary tw:text-xs">—</span>
-        </template>
-
         <template #cell-actions="{ row }">
           <div class="tw:flex tw:items-center actions-container">
             <OButton
@@ -258,13 +254,6 @@ const columns = computed(() => [
     sortable: true,
     size: COL.count,
     meta: { align: "right" },
-  },
-  {
-    id: "lastRun",
-    header: t("onlineEvals.scorer.columns.lastRun"),
-    sortable: false,
-    size: COL.date,
-    meta: { align: "left" },
   },
   {
     id: "actions",

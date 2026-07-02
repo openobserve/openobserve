@@ -53,25 +53,34 @@
       </header>
 
       <!-- Tab strip -->
-      <nav class="tw:flex tw:gap-4.5 tw:px-5 tw:border-b tw:border-dialog-header-border tw:bg-card-bg tw:shrink-0" role="tablist">
-        <button
+      <OTabs
+        :model-value="activeTab"
+        bordered
+        class="tw:flex-shrink-0 tw:px-5"
+        data-test="score-config-detail-tabs"
+        @update:model-value="activeTab = $event as TabId"
+      >
+        <!-- Slot mode (no `label` prop) so each tab can carry a count badge
+             alongside its label. -->
+        <OTab
           v-for="tab in tabs"
           :key="tab.id"
-          type="button"
-          class="scd__tab tw:inline-flex tw:items-center tw:gap-1.5 tw:py-2.5 tw:px-0 tw:bg-transparent tw:border-0 tw:border-b-2 tw:border-b-transparent tw:cursor-pointer tw:text-(--color-text-secondary) tw:font-semibold tw:text-[13px] tw:-mb-px"
-          :class="{ 'scd__tab--active tw:text-(--color-primary-600) tw:border-b-(--color-primary-600)!': activeTab === tab.id }"
-          role="tab"
-          :aria-selected="activeTab === tab.id"
+          :name="tab.id"
           :data-test="`score-config-detail-tab-${tab.id}`"
-          @click="activeTab = tab.id"
         >
           <span>{{ tab.label }}</span>
           <span
             v-if="tab.count != null"
-            class="scd__tab-count tw:inline-flex tw:items-center tw:justify-center tw:px-1.5 tw:min-w-[18px] tw:h-4 tw:rounded-full tw:font-semibold tw:text-[10px] tw:leading-none tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] tw:text-(--color-text-secondary)"
-          >{{ tab.count }}</span>
-        </button>
-      </nav>
+            class="tw:inline-flex tw:items-center tw:justify-center tw:px-1.5 tw:min-w-[1.125rem] tw:h-4 tw:rounded-full tw:text-[10px] tw:font-semibold tw:leading-none"
+            :class="
+              activeTab === tab.id
+                ? 'tw:bg-[color-mix(in_srgb,var(--color-primary-600,#3f7994)_18%,transparent)] tw:text-[var(--color-primary-600,#3f7994)]'
+                : 'tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] tw:text-[var(--color-text-secondary)]'
+            "
+            >{{ tab.count }}</span
+          >
+        </OTab>
+      </OTabs>
 
       <div class="tw:flex-1 tw:overflow-auto tw:px-5 tw:py-4.5 tw:flex tw:flex-col tw:gap-4.5 tw:min-h-0 tw:bg-card-bg">
         <!-- ─────────── OVERVIEW TAB ─────────── -->
@@ -232,6 +241,8 @@ import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import {
   dataTypeOf,
@@ -367,15 +378,6 @@ function formatTimestamp(microsOrMs: number): string {
     return String(microsOrMs);
   }
 }
-
-function formatDateShort(microsOrMs: number): string {
-  const ms = microsOrMs > 1e14 ? Math.round(microsOrMs / 1000) : microsOrMs;
-  try {
-    return new Date(ms).toISOString().slice(0, 10);
-  } catch {
-    return String(microsOrMs);
-  }
-}
 </script>
 
 <style>
@@ -394,31 +396,24 @@ function formatDateShort(microsOrMs: number): string {
   color: var(--color-text-primary, currentColor);
 }
 
-.scd__tab:hover { color: var(--color-text-primary, currentColor); }
-
-/* Active tab count pill */
-.scd__tab--active .scd__tab-count {
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 18%, transparent);
-  color: var(--color-primary-600, #3F7994);
-}
-
 /* scd-kv dt/dd — descendant selectors, cannot inline */
 .scd-kv dt {
-  font-size: 11px;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .scd-kv dd {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--color-text-primary, currentColor);
 }
 
 /* OButton internals — child selector targeting component internals */
 .scd-used-card button {
   height: auto !important;
-  padding: 12px 14px !important;
-  gap: 10px;
+  padding: 0.75rem 0.875rem !important;
+  gap: 0.625rem;
   justify-content: flex-start;
   text-align: left;
 }

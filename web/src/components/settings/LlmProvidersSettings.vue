@@ -295,6 +295,7 @@ async function loadProviders() {
 
 const DEFAULT_ENDPOINTS: Record<string, string> = {
   openai: "api.openai.com",
+  deepseek: "api.deepseek.com",
   anthropic: "api.anthropic.com",
 };
 

@@ -49,7 +49,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 46;
+pub const DB_SCHEMA_VERSION: u64 = 47;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1376,7 +1376,7 @@ pub struct Common {
     pub regex_patterns_source_url: String,
     #[env_config(
         name = "ZO_MODEL_PRICING_ENABLED",
-        default = false,
+        default = true,
         help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
     )]
     pub model_pricing_enabled: bool,

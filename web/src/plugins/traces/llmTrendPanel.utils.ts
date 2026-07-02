@@ -21,6 +21,8 @@
  * No Vue / DOM imports.
  */
 
+import { DateTime } from "luxon";
+
 /**
  * Convert a histogram interval string ("5 minutes", "1 hour") to its
  * duration in milliseconds. Used for the empty-data gap-fill: we
@@ -87,37 +89,35 @@ export function formatLatencyMs(ms: number): string {
 
 /**
  * Format a timestamp cell in the recent-errors table as `HH:mm:ss`
- * in the browser's local timezone. Accepts:
+ * in the **user-selected** timezone (`store.state.timezone`, passed in by
+ * the component). Accepts:
  *   - number in microseconds (>1e15)
  *   - number in milliseconds (1e12 – 1e15)
  *   - number in seconds (<1e12)
- *   - ISO-ish string with `T` or space separator
+ *   - ISO-ish string with `T` or space separator (interpreted as UTC, the
+ *     format histogram() / OO traces emit)
  *
  * Falls back to the raw input for unparseable values so the table
  * cell never shows "Invalid Date".
  *
- * @example formatTimeCell(1735776000000000) // "HH:MM:SS" in user TZ
- * @example formatTimeCell("2026-01-02 03:04:05") // "03:04:05" (parses)
+ * @example formatTimeCell(1735776000000000, "Asia/Kolkata") // "HH:MM:SS" in IST
+ * @example formatTimeCell("2026-01-02 03:04:05", "UTC")      // "03:04:05"
  * @example formatTimeCell(null) // ""
  */
-export function formatTimeCell(ts: any): string {
+export function formatTimeCell(ts: any, timezone: string = "UTC"): string {
   if (ts == null) return "";
-  let ms: number;
+  let dt: DateTime;
   if (typeof ts === "number") {
-    ms = ts > 1e15 ? ts / 1000 : ts > 1e12 ? ts : ts * 1000;
+    const ms = ts > 1e15 ? ts / 1000 : ts > 1e12 ? ts : ts * 1000;
+    dt = DateTime.fromMillis(ms);
   } else {
-    const str = String(ts);
-    const isoLike =
-      str.includes(" ") && !str.includes("T") ? str.replace(" ", "T") + "Z" : str;
-    const d = new Date(isoLike);
-    ms = d.getTime();
+    // Numeric strings are epoch values, not ISO dates — coerce so a stray
+    // string timestamp doesn't fall through to ISO parsing.
+    const str = String(ts).trim();
+    dt = DateTime.fromISO(str.replace(" ", "T"), { zone: "UTC" });
   }
-  if (!isFinite(ms)) return String(ts);
-  const d = new Date(ms);
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  const ss = String(d.getSeconds()).padStart(2, "0");
-  return `${hh}:${mm}:${ss}`;
+  if (!dt.isValid) return String(ts);
+  return dt.setZone(timezone || "UTC").toFormat("HH:mm:ss");
 }
 
 /**
@@ -170,17 +170,35 @@ export function chipColor(value: any): string {
 }
 
 /**
- * Format a histogram bucket label as `HH:mm` for the chart x-axis.
+ * Format a histogram bucket label as `HH:mm` for the chart x-axis, in the
+ * **user-selected** timezone. The server emits bucket keys as UTC wall-clock
+ * strings without an offset (e.g. `"2026-05-08T06:00:00"`), so we parse them
+ * as UTC and shift into `timezone` for display — matching how the logs
+ * histogram converts buckets (`histogramDateTimezone`, `utils/timezone.ts`).
+ *
  * Falls back to the raw input when parsing fails (defensive — avoids
  * "Invalid Date" labels).
  *
- * @example formatTimeLabel("2026-01-02 03:04:05") // "03:04"
- * @example formatTimeLabel("not a date")          // "not a date"
+ * @example formatTimeLabel("2026-05-08T06:00:00", "UTC")          // "06:00"
+ * @example formatTimeLabel("2026-05-08T06:00:00", "Asia/Kolkata") // "11:30"
+ * @example formatTimeLabel("not a date")                          // "not a date"
  */
-export function formatTimeLabel(ts: string): string {
-  const d = new Date(ts.replace(" ", "T"));
-  if (isNaN(d.getTime())) return ts;
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${hh}:${mm}`;
+export function formatTimeLabel(ts: string, timezone: string = "UTC"): string {
+  const d = DateTime.fromISO(String(ts).replace(" ", "T"), { zone: "UTC" });
+  if (!d.isValid) return ts;
+  return d.setZone(timezone || "UTC").toFormat("HH:mm");
+}
+
+/**
+ * Format a histogram bucket for the chart **tooltip header** as
+ * `MMM d, HH:mm` in the user-selected timezone (e.g. `"May 8, 11:30"`).
+ * Same UTC-parse-then-shift rule as `formatTimeLabel`.
+ *
+ * @example formatBucketTooltip("2026-05-08T06:00:00", "UTC")          // "May 8, 06:00"
+ * @example formatBucketTooltip("2026-05-08T06:00:00", "Asia/Kolkata") // "May 8, 11:30"
+ */
+export function formatBucketTooltip(ts: any, timezone: string = "UTC"): string {
+  const d = DateTime.fromISO(String(ts).replace(" ", "T"), { zone: "UTC" });
+  if (!d.isValid) return String(ts);
+  return d.setZone(timezone || "UTC").toFormat("MMM d, HH:mm");
 }

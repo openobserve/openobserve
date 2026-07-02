@@ -27,21 +27,21 @@
       </template>
     </AppPageHeader>
 
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:grid tw:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] tw:max-[1100px]:grid-cols-1 tw:gap-2.5">
-      <div class="job-form__main tw:min-w-0 tw:overflow-auto tw:pt-[18px] tw:px-6 tw:pb-6 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
-        <!-- Section 01: Target -->
-        <section class="job-section tw:mb-6">
-          <div class="job-section__head tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border,var(--o2-border)) tw:mb-3">
-            <span class="job-section__num tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:font-bold tw:text-[11px] tw:font-mono">01</span>
-            <div class="job-section__title tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.targetSection") }}</div>
+    <div class="job-form__body tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:flex tw:gap-2">
+      <div class="job-form__main tw:flex-[6.5] tw:min-w-0 tw:min-h-0 tw:overflow-auto tw:flex tw:flex-col tw:gap-2 tw:p-2">
+        <!-- Target -->
+        <section class="card-container tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:overflow-hidden tw:shrink-0">
+          <div class="tw:flex tw:items-center tw:py-[10px] tw:px-3 tw:border-b tw:border-(--color-border-default,var(--o2-border))">
+            <div class="tw:w-[3px] tw:h-4 tw:rounded-[2px] tw:mr-2 tw:shrink-0 tw:bg-(--q-primary)" />
+            <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.targetSection") }}</span>
           </div>
-
-          <div class="job-field tw:mb-3">
-            <div class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
+          <div class="tw:flex tw:flex-col tw:gap-3 tw:py-3.5 tw:px-4">
+          <div class="job-field">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
               {{ t("onlineEvals.job.nameLabel") }}
-              <span class="job-field__req tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="job-field__lock tw:ml-1.5 tw:text-(--color-text-secondary,var(--o2-text-secondary))" />
-            </div>
+              <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="tw:ml-1.5 tw:text-(--color-text-secondary,var(--o2-text-secondary))" />
+            </label>
             <OInput
               v-model.trim="form.name"
               :placeholder="t('onlineEvals.job.namePlaceholder')"
@@ -51,12 +51,12 @@
             />
           </div>
 
-          <div class="job-field tw:mb-3">
-            <div class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
+          <div class="job-field">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
               {{ t("onlineEvals.job.streamLabel") }}
-              <span class="job-field__req tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="job-field__lock tw:ml-1.5 tw:text-(--color-text-secondary,var(--o2-text-secondary))" />
-            </div>
+              <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="tw:ml-1.5 tw:text-(--color-text-secondary,var(--o2-text-secondary))" />
+            </label>
             <OSelect
               v-model="form.stream"
               :options="streamOptions"
@@ -67,8 +67,8 @@
             />
           </div>
 
-          <div class="job-field job-field--desc tw:mb-3">
-            <div class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">{{ t("onlineEvals.job.descriptionLabel") }}</div>
+          <div class="job-field job-field--desc">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">{{ t("onlineEvals.job.descriptionLabel") }}</label>
             <OInput
               v-model.trim="form.description"
               type="textarea"
@@ -78,15 +78,16 @@
               data-test="job-form-description-input"
             />
           </div>
+          </div>
         </section>
 
-        <!-- Section 02: Scorers + Filter + Mapping -->
-        <section class="job-section tw:mb-6">
-          <div class="job-section__head tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border,var(--o2-border)) tw:mb-3">
-            <span class="job-section__num tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:font-bold tw:text-[11px] tw:font-mono">02</span>
-            <div class="job-section__title tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</div>
+        <!-- Scorers + Filter + Mapping -->
+        <section class="card-container tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:overflow-hidden tw:shrink-0">
+          <div class="tw:flex tw:items-center tw:py-[10px] tw:px-3 tw:border-b tw:border-(--color-border-default,var(--o2-border))">
+            <div class="tw:w-[3px] tw:h-4 tw:rounded-[2px] tw:mr-2 tw:shrink-0 tw:bg-(--q-primary)" />
+            <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</span>
           </div>
-
+          <div class="tw:flex tw:flex-col tw:gap-3 tw:py-3.5 tw:px-4">
           <JobScorerPicker
             v-model="form.scorerIds"
             :scorers="scorers"
@@ -97,51 +98,24 @@
             @update:group="filterGroup = $event"
           />
 
-          <div class="job-presets tw:flex tw:items-center tw:flex-wrap tw:gap-2 tw:my-3 tw:mb-4">
-            <span class="job-presets__label tw:text-xs tw:font-semibold tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.job.presets.label") }}</span>
-            <button
-              type="button"
-              class="job-presets__chip tw:inline-flex tw:items-center tw:h-6 tw:px-[10px] tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-full tw:bg-(--color-card-bg) tw:text-(--color-text-primary,currentColor) tw:font-medium tw:text-[11px] tw:cursor-pointer tw:transition-[border-color,background] tw:duration-[120ms]"
-              data-test="job-form-preset-root-spans"
-              @click="applyPreset('rootSpans')"
-            >
-              {{ t("onlineEvals.job.presets.rootSpans") }}
-            </button>
-            <button
-              type="button"
-              class="job-presets__chip tw:inline-flex tw:items-center tw:h-6 tw:px-[10px] tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-full tw:bg-(--color-card-bg) tw:text-(--color-text-primary,currentColor) tw:font-medium tw:text-[11px] tw:cursor-pointer tw:transition-[border-color,background] tw:duration-[120ms]"
-              data-test="job-form-preset-llm-calls"
-              @click="applyPreset('llmCalls')"
-            >
-              {{ t("onlineEvals.job.presets.llmCalls") }}
-            </button>
-            <button
-              type="button"
-              class="job-presets__chip tw:inline-flex tw:items-center tw:h-6 tw:px-[10px] tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-full tw:bg-(--color-card-bg) tw:text-(--color-text-primary,currentColor) tw:font-medium tw:text-[11px] tw:cursor-pointer tw:transition-[border-color,background] tw:duration-[120ms]"
-              data-test="job-form-preset-tool-calls"
-              @click="applyPreset('toolCalls')"
-            >
-              {{ t("onlineEvals.job.presets.toolCalls") }}
-            </button>
-          </div>
-
           <JobInputMapping
             :selected-scorers="selectedScorers"
             :input-mappings="inputMappings"
             @update:input-mappings="inputMappings = $event"
           />
+          </div>
         </section>
 
-        <!-- Section 03: Sampling -->
-        <section class="job-section tw:mb-6">
-          <div class="job-section__head tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border,var(--o2-border)) tw:mb-3">
-            <span class="job-section__num tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:font-bold tw:text-[11px] tw:font-mono">03</span>
-            <div class="job-section__title tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</div>
+        <!-- Sampling -->
+        <section class="card-container tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:overflow-hidden tw:shrink-0">
+          <div class="tw:flex tw:items-center tw:py-[10px] tw:px-3 tw:border-b tw:border-(--color-border-default,var(--o2-border))">
+            <div class="tw:w-[3px] tw:h-4 tw:rounded-[2px] tw:mr-2 tw:shrink-0 tw:bg-(--q-primary)" />
+            <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</span>
           </div>
-
+          <div class="tw:flex tw:flex-col tw:gap-3 tw:py-3.5 tw:px-4">
           <div class="job-field-row tw:grid tw:grid-cols-2 tw:max-[1100px]:grid-cols-1 tw:gap-[14px]">
-            <div class="job-field tw:mb-3">
-              <div class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">{{ t("onlineEvals.job.samplingModeLabel") }}</div>
+            <div class="job-field">
+              <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
               <OSelect
                 v-model="form.samplingMode"
                 :options="samplingModeOptions"
@@ -151,11 +125,11 @@
               <div class="job-field__help tw:text-[11.5px] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:mt-1">{{ t("onlineEvals.job.samplingHelp") }}</div>
             </div>
 
-            <div class="job-field tw:mb-3">
-              <div class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
+            <div class="job-field">
+              <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
                 {{ t("onlineEvals.job.samplingValueLabel") }}
-                <span v-if="form.samplingMode !== 'all'" class="job-field__req tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
-              </div>
+                <span v-if="form.samplingMode !== 'all'" class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
+              </label>
               <OInput
                 v-model="form.samplingValue"
                 size="sm"
@@ -169,10 +143,18 @@
               </div>
             </div>
           </div>
+          </div>
         </section>
       </div>
 
-      <JobPreviewPanel :name="form.name" :stream-type="form.streamType" :mode="mode" />
+      <JobPreviewPanel
+        :name="form.name"
+        :stream-type="form.streamType"
+        :mode="mode"
+        :stream="form.stream"
+        :filter-where="filterWhere"
+        :filter-ready="filterReady"
+      />
     </div>
 
     <footer class="tw:sticky tw:bottom-0 tw:flex tw:items-center tw:justify-end tw:gap-2 tw:px-5.5 tw:py-3 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] tw:shrink-0 tw:z-1">
@@ -248,9 +230,12 @@ import {
 import { parseJson, showError, stringifyJson } from "../utils/evalFormat";
 import {
   buildJobFilterConditionPayload,
+  cleanFilterGroup,
   createEmptyJobFilterGroup,
+  isJobFilterComplete,
   normalizeJobFilterCondition,
 } from "../utils/jobFilter";
+import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import {
   buildJobInputMappingPayload,
   normalizeJobInputMappings,
@@ -280,6 +265,28 @@ const inputMappings = ref(initInputMappings(props.row));
 const scorerVersions = ref(initScorerVersions(props.row));
 const isSaving = ref(false);
 const pendingActivateOnSave = ref(false);
+
+// SQL WHERE body built from the filter builder — feeds the live "matched
+// spans" count in the preview panel. Built from the CLEANED group (incomplete
+// conditions stripped) so the SQL is always valid. Same formatter the form's
+// filter preview line uses (sqlMode → quoted, comparable values).
+const filterWhere = computed<string>(() => {
+  try {
+    return buildConditionsString(cleanFilterGroup(filterGroup.value), {
+      sqlMode: true,
+      addWherePrefix: false,
+      formatValues: true,
+    });
+  } catch {
+    return "";
+  }
+});
+
+// Pauses the match-count query while a condition is half-filled (column picked
+// but value still empty), so we don't query on every keystroke / partial edit.
+const filterReady = computed<boolean>(() =>
+  isJobFilterComplete(filterGroup.value),
+);
 
 const selectedScorers = computed(() =>
   form.value.scorerIds
@@ -366,29 +373,6 @@ function initScorerVersions(row: EvalJob | null) {
   );
 }
 
-function applyPreset(preset: "rootSpans" | "llmCalls" | "toolCalls") {
-  const presets: Record<string, { column: string; operator: string; value: string }> = {
-    rootSpans: { column: "parent_span_id", operator: "=", value: "" },
-    llmCalls: { column: "gen_ai_system", operator: "!=", value: "" },
-    toolCalls: { column: "gen_ai_operation_name", operator: "=", value: "execute_tool" },
-  };
-  const cond = presets[preset];
-  filterGroup.value = {
-    filterType: "group",
-    logicalOperator: "AND",
-    conditions: [
-      {
-        filterType: "condition",
-        column: cond.column,
-        operator: cond.operator,
-        value: cond.value,
-        values: [],
-        logicalOperator: "AND",
-      },
-    ],
-  } as any;
-}
-
 function syncMappings() {
   const { nextMappings, nextVersions } = syncJobInputMappings(
     form.value.scorerIds,
@@ -461,19 +445,28 @@ async function save(activateAfter = false) {
 }
 </script>
 
-<style>
-.job-form__main textarea {
+<style lang="scss">
+// Layout, spacing, colors, and text styling are Tailwind utilities in the
+// template. Only descendant/`:deep` selectors (targeting child-component
+// internals) and the responsive @media block remain here.
+.job-form__main :deep(textarea) {
   max-height: 200px;
   overflow-y: auto;
 }
 
-.job-form__main .job-field--desc textarea {
+.job-form__main .job-field--desc :deep(textarea) {
   max-height: 120px;
 }
 
-.job-presets__chip:hover {
-  border-color: var(--color-primary-600, #3F7994);
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 6%, var(--color-card-bg));
-  color: var(--color-primary-600, #3F7994);
+@media (max-width: 1100px) {
+  .job-form__body {
+    flex-direction: column;
+  }
+  .job-form__main {
+    flex: 1 1 auto;
+  }
+  .job-field-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -437,6 +437,11 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
+    allowAnnotationsAPI: {
+      default: true,
+      required: false,
+      type: Boolean,
+    },
     allowAlertCreation: {
       default: false,
       required: false,
@@ -641,6 +646,7 @@ export default defineComponent({
       folderId,
       reportId,
       allowAnnotationsAdd,
+      allowAnnotationsAPI,
       allowAlertCreation,
       runId,
       tabId,
@@ -685,6 +691,7 @@ export default defineComponent({
       folderName,
       shouldRefreshWithoutCache,
       regionClusterParams,
+      allowAnnotationsAPI,
     );
 
     const {

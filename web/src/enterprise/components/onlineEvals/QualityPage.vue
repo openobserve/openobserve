@@ -3,11 +3,40 @@
     class="quality-page tw:flex tw:flex-col tw:gap-[14px] tw:p-[14px_16px_18px] tw:min-h-0 tw:flex-1"
     data-test="quality-page"
   >
+    <!-- Agent filter — right-aligned at the top of the content container so it
+         sits with the KPIs + table it scopes (matches LLM Insights). -->
+    <div class="tw:flex tw:items-center tw:justify-end tw:px-4">
+      <div class="tw:w-[14rem] tw:flex-shrink-0">
+        <!-- While the agent list is loading we swap the select for a skeleton
+             of the same height so the control reads as "loading" (and can't be
+             opened on an empty list) instead of showing an empty dropdown. -->
+        <SkeletonBox
+          v-if="agentsLoading"
+          width="100%"
+          height="2.125rem"
+          rounded
+          data-test="quality-agent-filter-skeleton"
+        />
+        <OSelect
+          v-else
+          v-model="agentModel"
+          label="Agent"
+          label-position="inside"
+          :options="agentOptions || []"
+          labelKey="label"
+          valueKey="value"
+          class="tw:rounded"
+          data-test="quality-agent-filter"
+        />
+      </div>
+    </div>
+
     <QualityKpiSkeleton
       v-if="showKpiSkeleton"
       :count="visibleKpis.length"
+      class="tw:px-4"
     />
-    <section v-else class="quality-page__kpis tw:grid tw:gap-[10px]" aria-label="Tier 1 KPIs"
+    <section v-else class="quality-page__kpis tw:grid tw:gap-[10px] tw:px-4" aria-label="Tier 1 KPIs"
       style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))"
     >
       <QualityKpiCard
@@ -27,7 +56,7 @@
     >
       <QualityScoreConfigsTable
         :rows="configRows"
-        :is-loading="isConfigsLoading"
+        :is-loading="isConfigsLoading || !!configsLoading || !!agentsLoading"
         @select="selectConfig"
         @refresh="refreshAll"
       />
@@ -59,7 +88,8 @@
           v-if="selectedConfig?.version"
           class="qpd-version tw:ml-[6px] tw:text-[11px] tw:text-(--color-text-secondary) tw:[font-variant-numeric:tabular-nums]"
           data-test="quality-detail-version-badge"
-        >v{{ selectedConfig.version }}</span>
+          >v{{ selectedConfig.version }}</span
+        >
       </template>
 
       <QualityDetailPanel
@@ -77,12 +107,7 @@
         :boolean-trend="booleanTrend"
         :boolean-trend-series="booleanTrendSeries"
         :categorical-rows="categoricalRows"
-        :split-by-scorer="splitByScorer"
-        :split-by-source-type="splitBySourceType"
-        @update:split-by-scorer="splitByScorer = $event"
-        @update:split-by-source-type="splitBySourceType = $event"
         @back="clearSelection"
-        @drill="onDrill"
       />
     </ODrawer>
   </div>
@@ -92,7 +117,6 @@
 import { computed, onMounted, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
-import { useStore } from "vuex";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { useQualityData, type DateWindow } from "./composables/useQualityData";
 import {
@@ -106,6 +130,9 @@ import QualityKpiSkeleton from "./quality/QualityKpiSkeleton.vue";
 import QualityScoreConfigsTable from "./quality/QualityScoreConfigsTable.vue";
 import QualityDetailPanel from "./quality/QualityDetailPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import type { AgentFilterSelection } from "./utils/agentFilterSql";
 
 const props = defineProps<{
   scoreConfigs: ScoreConfig[];
@@ -113,19 +140,48 @@ const props = defineProps<{
   // in the embedded AppPageHeader). Quality just consumes it as a reactive
   // input to its data loaders.
   dateWindow: DateWindow;
+  agentFilter?: AgentFilterSelection | null;
+  // Agent filter dropdown — state stays in OnlineEvals (it owns the agent
+  // list + derives `agentFilter`); QualityPage just renders the control and
+  // emits the selected key back via v-model.
+  agentKey?: string;
+  agentOptions?: { label: string; value: string }[];
+  // True while OnlineEvals is still fetching the score-configs list. Until that
+  // resolves `scoreConfigs` is empty, so the table would otherwise flash "No
+  // Data" before its own skeleton kicks in. OR-ing this into the table's
+  // loading flag keeps the skeleton up from the very first paint.
+  configsLoading?: boolean;
+  // True during the agent-list fetch (first phase of the parent's reload).
+  // Drives the agent-dropdown skeleton plus the KPI/table skeletons so the
+  // whole page reads as "loading" from the start of a reload, not just once
+  // the data queries begin.
+  agentsLoading?: boolean;
 }>();
+
+const emit = defineEmits<{
+  (e: "update:agentKey", value: string): void;
+  // Fired once after mount so the parent can run the agents-first reload. The
+  // parent owns every reload trigger (mount / refresh / date / agent) — this
+  // page no longer self-loads on mount or on prop changes.
+  (e: "ready"): void;
+}>();
+
+const agentModel = computed<string>({
+  get: () => props.agentKey ?? "",
+  set: (value) => emit("update:agentKey", value),
+});
 
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
-const store = useStore();
 
 const dateWindowRef = toRef(props, "dateWindow");
+const agentFilterRef = toRef(props, "agentFilter");
 
-// `sourceStream` is intentionally not destructured — the composable keeps its
-// internal default ("__all__"), which is correct now that the UI selector is
-// hidden and we only have one score sink (`_llm_scores`).
-const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindowRef);
+const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(
+  dateWindowRef,
+  agentFilterRef,
+);
 
 // Evaluation cost is intentionally hidden until the backend writes cost data.
 // To restore it, remove this filter and re-add `kpis` to the v-for.
@@ -134,18 +190,18 @@ const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindowRef);
 // hidden. Keep the set in place so future placeholder KPIs can be
 // hidden the same way without touching the render loop.
 const HIDDEN_KPI_IDS = new Set<string>();
-const visibleKpis = computed(() => kpis.value.filter((k) => !HIDDEN_KPI_IDS.has(k.id)));
+const visibleKpis = computed(() =>
+  kpis.value.filter((k) => !HIDDEN_KPI_IDS.has(k.id)),
+);
 
 const scoreConfigsRef = toRef(props, "scoreConfigs");
 const {
   rows: configRows,
   isLoading: isConfigsLoading,
   refresh: refreshConfigs,
-} = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef);
+} = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef, agentFilterRef);
 
 const selectedConfigId = ref<string | null>(routeConfigId());
-const splitByScorer = ref(false);
-const splitBySourceType = ref(false);
 
 const selectedConfig = computed<ScoreConfig | null>(() => {
   const id = selectedConfigId.value;
@@ -161,7 +217,7 @@ const {
   booleanAgg,
   categoricalRows,
   refresh: refreshDetail,
-} = useQualityConfigDetail(selectedConfig, dateWindowRef);
+} = useQualityConfigDetail(selectedConfig, dateWindowRef, agentFilterRef);
 
 const {
   isLoading: isChartsLoading,
@@ -170,14 +226,18 @@ const {
   booleanTrend,
   booleanTrendSeries,
   refresh: refreshCharts,
-} = useQualityDetailCharts(selectedConfig, dateWindowRef, splitByScorer, splitBySourceType);
+} = useQualityDetailCharts(selectedConfig, dateWindowRef, agentFilterRef);
 
 const numericThreshold = computed(() => {
   const cfg = selectedConfig.value;
   if (!cfg) return null;
-  const ht: any = (cfg as any).healthyThreshold ?? (cfg as any).healthy_threshold;
+  const ht: any =
+    (cfg as any).healthyThreshold ?? (cfg as any).healthy_threshold;
   if (!ht || ht.value == null || !ht.direction) return null;
-  return { value: Number(ht.value), direction: ht.direction === "gte" ? "gte" : "lte" } as const;
+  return {
+    value: Number(ht.value),
+    direction: ht.direction === "gte" ? "gte" : "lte",
+  } as const;
 });
 
 const numericRange = computed(() => {
@@ -189,7 +249,12 @@ const numericRange = computed(() => {
 });
 
 async function refreshAll() {
-  await Promise.all([refresh(), refreshConfigs(), refreshDetail(), refreshCharts()]);
+  await Promise.all([
+    refresh(),
+    refreshConfigs(),
+    refreshDetail(),
+    refreshCharts(),
+  ]);
 }
 
 const isAnyLoading = computed(
@@ -204,25 +269,25 @@ const isAnyLoading = computed(
 // Refresh button it now renders in the embedded AppPageHeader actions slot.
 defineExpose({ refreshAll, isAnyLoading });
 
-/** Show the skeleton only on the *initial* load — i.e. when we're loading AND
- * no KPI values have been populated yet. Subsequent refreshes keep the rendered
- * cards visible (with their previous values + a subtle refresh spinner). */
-const showKpiSkeleton = computed(
-  () => isLoading.value && kpis.value.every((k) => k.value == null),
-);
+/** Show the KPI skeleton whenever the KPI queries are running — on the initial
+ * load AND on every refresh — matching the rest of the app (e.g. LLM Insights),
+ * so a refresh gives clear feedback instead of leaving the cards frozen. Also
+ * shown during the agent-list fetch (the phase before the KPI query starts) so
+ * the page reads as loading from the very start of a reload. */
+const showKpiSkeleton = computed(() => isLoading.value || !!props.agentsLoading);
 
+// The parent (OnlineEvals) owns every reload trigger — mount, refresh button,
+// date-time change, and agent change — and calls `refreshAll()` / `refreshConfigs()`
+// via the exposed handle. This page only signals readiness; it does NOT watch
+// `dateWindow`/`agentFilter` (doing so re-introduced the duplicate fetches that
+// fired once from here and again from the parent's reload).
 onMounted(() => {
-  void refreshAll();
+  emit("ready");
 });
 
-// No deep flag: the parent (OnlineEvals) always assigns a fresh
-// `{startUs,endUs}` object via `qualityDateWindow.value = …`, so the ref's
-// identity changes and the top-level watch already fires. Deep traversal
-// would just walk two numeric leaves on every change for no benefit.
-watch(dateWindowRef, () => {
-  void refreshAll();
-});
-
+// The score-configs list arrives asynchronously from the parent's `loadAll()`,
+// often AFTER the initial reload has run against an empty list. Re-run just the
+// table aggregate when it lands so the rows populate.
 watch(scoreConfigsRef, () => {
   void refreshConfigs();
 });
@@ -243,7 +308,10 @@ watch(
 
 function selectConfig(row: ScoreConfigRow) {
   selectedConfigId.value = String(row.config.id);
-  const query: Record<string, any> = { ...route.query, config: selectedConfigId.value };
+  const query: Record<string, any> = {
+    ...route.query,
+    config: selectedConfigId.value,
+  };
   router.push({ name: route.name as string, query }).catch(() => {});
 }
 
@@ -264,77 +332,6 @@ const detailDrawerOpen = computed<boolean>({
     if (!open) clearSelection();
   },
 });
-
-function escapeSqlString(s: string): string {
-  return s.replace(/'/g, "''");
-}
-
-/** Build the unhealthy SQL fragment that matches the config's `healthy_threshold`. */
-function unhealthySqlFor(config: ScoreConfig): string | null {
-  const ht: any = (config as any).healthyThreshold ?? (config as any).healthy_threshold;
-  const type = (config as any).dataType ?? (config as any).data_type;
-  if (!ht) return null;
-  if (type === "numeric") {
-    if (ht.value == null || !ht.direction) return null;
-    const op = ht.direction === "gte" ? "<" : ">";
-    return `value_numeric ${op} ${Number(ht.value)}`;
-  }
-  if (type === "categorical") {
-    const list: string[] = ht.healthy_categories || ht.healthyCategories || [];
-    if (!Array.isArray(list) || list.length === 0) return null;
-    const inList = list.map((c) => `'${escapeSqlString(String(c))}'`).join(", ");
-    return `value_categorical NOT IN (${inList})`;
-  }
-  if (type === "boolean") {
-    const healthy = ht.healthy_value ?? ht.healthyValue;
-    if (healthy == null) return null;
-    const expected = healthy === true || healthy === "true";
-    return `value_boolean = ${!expected}`;
-  }
-  return null;
-}
-
-const orgIdForDrill = computed<string>(
-  () => store.state.selectedOrganization?.identifier ?? "default",
-);
-
-function onDrill(kpiId: string) {
-  const cfg = selectedConfig.value;
-  if (!cfg) return;
-
-  const configId = escapeSqlString(String(cfg.id));
-  const baseWhere = `CAST(score_config_id AS VARCHAR) = '${configId}'`;
-  const unhealthyExpr = unhealthySqlFor(cfg);
-
-  let whereClause = baseWhere;
-  if (kpiId === "unhealthy" && unhealthyExpr) {
-    whereClause = `${baseWhere} AND (${unhealthyExpr})`;
-  } else if (kpiId === "healthy" && unhealthyExpr) {
-    whereClause = `${baseWhere} AND NOT (${unhealthyExpr})`;
-  }
-
-  const sql = `SELECT * FROM "_llm_scores" WHERE ${whereClause}`;
-  // Same encoder the rest of the app uses (see O2AIChat.vue).
-  const encoded = btoa(unescape(encodeURIComponent(sql)));
-
-  // Pass the absolute window as `from`/`to` (microseconds) so the Logs page
-  // reproduces exactly the same Quality window the user was looking at.
-  const queryParams: Record<string, string> = {
-    org_identifier: orgIdForDrill.value,
-    stream: "_llm_scores",
-    stream_type: "logs",
-    sql_mode: "true",
-    quick_mode: "false",
-    show_histogram: "true",
-    refresh: "0",
-    from: String(props.dateWindow.startUs),
-    to: String(props.dateWindow.endUs),
-    query: encoded,
-    type: "ai_chat_query",
-  };
-
-  router.push({ name: "logs", query: queryParams }).catch(() => {});
-}
 
 // Used by the drawer header's #header-right slot — same mapping the
 // detail panel used for its in-panel badge so type/version chrome looks

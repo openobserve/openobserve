@@ -119,6 +119,7 @@ export default defineComponent({
       orgnizationManagement: "organization_management",
       regexPatterns:         "regex_patterns",
       correlationSettings:   "correlation_settings",
+      genAiAgentMapping:     "gen_ai_agent_mapping",
     };
 
     const settingsTab = ref(
@@ -328,6 +329,15 @@ export default defineComponent({
           to: { name: "llmProviders", query: { org_identifier: org } },
           visible: (isEnt || isCloud) && !!z.online_evals_enabled,
           dataTest: "llm-providers-tab",
+          group: "Data & AI",
+        },
+        {
+          key: "gen_ai_agent_mapping",
+          label: t("settings.genAiAgentMapping.tabLabel"),
+          description: "Map GenAI spans to agent identifiers",
+          icon: "smart-toy",
+          to: { name: "genAiAgentMapping", query: { org_identifier: org } },
+          dataTest: "gen-ai-agent-mapping-tab",
           group: "Data & AI",
         },
         {

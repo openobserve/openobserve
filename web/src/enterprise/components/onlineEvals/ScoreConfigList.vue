@@ -74,7 +74,6 @@
         <template #cell-version="{ row }">
           <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs">
             <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-(--o2-status-success-text) tw:inline-block" />v{{ row.version }}
-            <span class="tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:font-normal">({{ t("onlineEvals.scoreConfig.active") }})</span>
           </span>
         </template>
 
@@ -218,17 +217,21 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.name"),
     accessorKey: "name",
     sortable: true,
-    size: COL.name,
+    size: 200,
     // `flex` (not `autoWidth`): fills leftover width on load AND stays
     // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
-    meta: { align: "left", flex: true },
+    meta: { align: "left" },
+
   },
   {
     id: "type",
     header: t("onlineEvals.scoreConfig.columns.type"),
     accessorFn: (row: ScoreConfig) => dataTypeOf(row),
     sortable: true,
-    size: COL.type,
+    // Type values are short ("numeric" / "categorical" / "boolean"), so the
+    // shared COL.type (180) is wider than needed — trim it back so the flex
+    // `name` column reclaims the width (matching the Scorers table).
+    size: 120,
     meta: { align: "left" },
   },
   {
@@ -236,7 +239,9 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.rangeValues"),
     accessorFn: (row: ScoreConfig) => rangeOrValues(row),
     sortable: false,
-    size: COL.description,
+    // Slightly narrower than COL.description (300) — the range/values text is
+    // compact, and the freed width goes to the flex `name` column.
+    size: 160,
     meta: { align: "left" },
   },
   {

@@ -71,10 +71,6 @@
           <span class="tw:font-mono tw:text-xs">{{ scorerCountText(row) }}</span>
         </template>
 
-        <template #cell-lastRun>
-          <span class="tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:text-xs">—</span>
-        </template>
-
         <template #cell-created="{ row }">
           {{ formatDateShort(rowCreated(row)) }}
         </template>
@@ -225,13 +221,6 @@ const columns = computed(() => [
     sortable: true,
     size: COL.count,
     meta: { align: "right" },
-  },
-  {
-    id: "lastRun",
-    header: t("onlineEvals.job.columns.lastRun"),
-    sortable: false,
-    size: COL.date,
-    meta: { align: "left" },
   },
   {
     id: "created",

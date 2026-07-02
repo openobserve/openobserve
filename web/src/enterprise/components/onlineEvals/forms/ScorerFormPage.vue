@@ -1,59 +1,46 @@
 ﻿<template>
-  <form class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:gap-2.5" @submit.prevent="save">
-    <div class="tw:flex tw:items-center tw:gap-2.5 tw:min-h-12 tw:px-3.5 tw:py-2 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] tw:shrink-0">
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="arrow-back-ios-new"
-        data-test="scorer-form-back-btn"
-        :title="t('onlineEvals.scorer.backTo')"
-        @click="$emit('cancel')"
-      />
-      <div class="tw:m-0 tw:text-[17px] tw:font-semibold tw:text-text-primary tw:tracking-[0.005em] tw:whitespace-nowrap">{{ titleText }}</div>
-      <span class="tw:text-text-secondary tw:text-xs tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:min-w-0">
-        {{
-          form.scorerType === "remote"
-            ? t("onlineEvals.scorer.subtitleRemote")
-            : t("onlineEvals.scorer.subtitleLlm")
-        }}
-      </span>
-      <div class="tw:flex-1 tw:min-w-2" />
-      <span
-        class="tw:py-[3px] tw:px-2 tw:rounded tw:font-bold tw:text-[11px] tw:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)] tw:text-(--color-text-primary) tw:whitespace-nowrap"
-        :class="{
-          'tw:bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)]! tw:text-(--o2-status-info-text)!': form.scorerType === 'llm_judge',
-          'tw:bg-[color-mix(in_srgb,var(--o2-status-success-text)_14%,transparent)]! tw:text-(--o2-status-success-text)!': form.scorerType === 'remote',
-        }"
-      >
-        {{
-          form.scorerType === "remote"
-            ? t("onlineEvals.scorer.badgeRemote")
-            : t("onlineEvals.scorer.badgeLlm")
-        }}
-      </span>
-      <button
-        type="button"
-        class="tw:inline-flex tw:items-center tw:justify-center tw:w-7 tw:h-7 tw:p-0 tw:text-(--color-text-secondary) tw:bg-transparent tw:border-0 tw:rounded-md tw:cursor-pointer tw:transition-[background,color] tw:duration-[150ms] tw:hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)] tw:hover:text-[var(--color-primary-600,#3F7994)]"
-        :aria-label="t('onlineEvals.buttons.cancel')"
-        data-test="scorer-form-close-btn"
-        @click="$emit('cancel')"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+  <form class="scorer-form tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:gap-2.5" @submit.prevent="save">
+    <!-- Shared page header (same as JobFormPage) so the two eval forms read
+         identically: Back pill in the module-icon slot, title, and the
+         scorer-type badge + close button in #actions. -->
+    <AppPageHeader
+      :back="{
+        label: t('onlineEvals.scorer.backTo'),
+        onClick: () => $emit('cancel'),
+        dataTest: 'scorer-form-back-btn',
+      }"
+      class="card-container tw:px-3 tw:border-b tw:border-border-default"
+      style="flex-shrink: 0"
+    >
+      <template #title>
+        <span data-test="scorer-form-title">{{ titleText }}</span>
+      </template>
+      <!-- Scorer-type badge sits inline, immediately after the title. -->
+      <template #title-trail>
+        <OBadge
+          :variant="form.scorerType === 'remote' ? 'success-soft' : 'blue-soft'"
+          size="sm"
+          data-test="scorer-form-type-badge"
         >
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
-    </div>
+          {{
+            form.scorerType === "remote"
+              ? t("onlineEvals.scorer.badgeRemote")
+              : t("onlineEvals.scorer.badgeLlm")
+          }}
+        </OBadge>
+      </template>
+      <template #actions>
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="close"
+          :aria-label="t('onlineEvals.buttons.cancel')"
+          :title="t('onlineEvals.buttons.cancel')"
+          data-test="scorer-form-close-btn"
+          @click="$emit('cancel')"
+        />
+      </template>
+    </AppPageHeader>
 
     <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:grid tw:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] tw:max-[1100px]:grid-cols-1 tw:gap-2.5">
       <div class="scorer-form__main tw:min-w-0 tw:overflow-auto tw:p-[18px_24px_24px] tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
@@ -691,6 +678,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
   type ExtraMetadataField,

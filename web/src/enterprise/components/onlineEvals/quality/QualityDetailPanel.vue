@@ -23,51 +23,25 @@
     </div>
 
     <template v-else>
+      <!-- KPI tiles reuse the exact card layout + text styles as the LLM
+           Sessions detail page (.kpi-card) so the AI module stays visually
+           consistent across pages. -->
       <div class="tw:grid tw:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] tw:gap-2.5">
-        <article
+        <div
           v-for="kpi in kpis"
           :key="kpi.id"
-          class="qdp-kpi card-container tw:flex tw:flex-col tw:gap-[6px] tw:py-[10px] tw:px-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:relative"
-          :class="`qdp-kpi--${kpi.id}`"
+          class="kpi-card tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem] tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:transition-shadow tw:duration-200"
           :data-test="`quality-detail-kpi-${kpi.id}`"
         >
-          <header class="tw:flex tw:items-center tw:justify-between tw:gap-[6px]">
-            <span class="tw:text-xs tw:font-semibold tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ kpiTitle(kpi) }}</span>
-            <button
-              type="button"
-              class="qdp-kpi__drill tw:border-0 tw:bg-transparent tw:py-0 tw:px-1 tw:rounded tw:cursor-pointer tw:font-semibold tw:text-sm tw:text-(--color-text-secondary,var(--o2-text-secondary))"
-              :aria-label="t('onlineEvals.quality.detail.drillTitle')"
-              :title="t('onlineEvals.quality.detail.drillTitle')"
-              data-test="quality-detail-drill"
-              @click="$emit('drill', kpi.id)"
-            >
-              →
-            </button>
-          </header>
-          <div class="tw:flex tw:items-baseline tw:justify-between tw:gap-2">
-            <span class="qdp-kpi__big tw:text-[26px] tw:font-bold tw:tracking-[-0.01em] tw:[font-variant-numeric:tabular-nums] tw:font-mono">{{ formatKpi(kpi) }}</span>
-            <span v-if="kpi.context" class="tw:text-[11px] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:text-right">{{ kpi.context }}</span>
+          <div class="tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]">
+            {{ kpiTitle(kpi) }}
           </div>
-        </article>
-      </div>
-
-      <div class="tw:flex tw:justify-end tw:gap-3.5 tw:text-xs tw:text-text-secondary">
-        <label class="qdp__split tw:inline-flex tw:items-center tw:gap-[6px] tw:py-1 tw:px-[10px] tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded tw:cursor-pointer tw:bg-(--o2-card-bg)">
-          <input
-            v-model="splitByScorer"
-            type="checkbox"
-            data-test="quality-detail-split-scorer"
-          />
-          <span>{{ t("onlineEvals.quality.detail.splitByScorer") }}</span>
-        </label>
-        <label class="qdp__split tw:inline-flex tw:items-center tw:gap-[6px] tw:py-1 tw:px-[10px] tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded tw:cursor-pointer tw:bg-(--o2-card-bg)">
-          <input
-            v-model="splitBySourceType"
-            type="checkbox"
-            data-test="quality-detail-split-source-type"
-          />
-          <span>{{ t("onlineEvals.quality.detail.splitBySourceType") }}</span>
-        </label>
+          <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
+            <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]">
+              {{ formatKpi(kpi) }}
+            </span>
+          </div>
+        </div>
       </div>
 
       <section v-if="dataType === 'numeric'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
@@ -196,27 +170,13 @@ const props = defineProps<{
   booleanTrend: BooleanTrendPoint[];
   booleanTrendSeries: BooleanTrendSeries[];
   categoricalRows: CategoricalAggRow[];
-  splitByScorer: boolean;
-  splitBySourceType: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "back"): void;
-  (e: "drill", kpiId: string): void;
-  (e: "update:splitByScorer", value: boolean): void;
-  (e: "update:splitBySourceType", value: boolean): void;
 }>();
 
 const { t } = useI18n();
-
-const splitByScorer = computed({
-  get: () => props.splitByScorer,
-  set: (v: boolean) => emit("update:splitByScorer", v),
-});
-const splitBySourceType = computed({
-  get: () => props.splitBySourceType,
-  set: (v: boolean) => emit("update:splitBySourceType", v),
-});
 
 function toNumber(v: unknown): number {
   if (v == null) return 0;
@@ -279,56 +239,10 @@ function formatKpi(kpi: DetailKpi): string {
   justify-content: center;
 }
 
-.qdp-kpi {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 14px;
-  background: var(--o2-card-bg);
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  position: relative;
+/* Hover shadow on KPI tiles — pseudo-class cannot be inlined. Mirrors the
+ * LLM Sessions detail page card chrome so the AI module's KPI tiles look
+ * identical across pages. */
+.kpi-card:hover {
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
 }
-.qdp-kpi::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 14px;
-  bottom: 14px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: transparent;
-}
-
-.qdp-kpi--unhealthy::before { background: var(--o2-status-warning-text, #b25400); }
-.qdp-kpi--healthy::before { background: var(--o2-status-success-text, #2e7d32); }
-.qdp-kpi--avg::before,
-.qdp-kpi--p50::before,
-.qdp-kpi--p95::before { background: var(--color-primary-600, #3F7994); }
-
-/* Hover state on drill button — pseudo-class with custom color-mix */
-.qdp-kpi__drill:hover {
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 12%, transparent);
-  color: var(--color-primary-600, #3F7994);
-}
-
-/* Descendant selector — unhealthy KPI colors the big value */
-.qdp-kpi__row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.qdp-kpi__big {
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-}
-
-.qdp-kpi--unhealthy .qdp-kpi__big { color: var(--o2-status-warning-text, #b25400); }
-
-/* Descendant selector — split label input margin reset */
-.qdp__split input { margin: 0; }
 </style>
