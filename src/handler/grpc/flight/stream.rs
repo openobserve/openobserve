@@ -81,7 +81,10 @@ impl FlightEncoderStreamBuilder {
         self
     }
 
-    /// Build the encoder stream, merging the plan's output partitions onto one stream.
+    /// Build the encoder stream from the plan's output partitions.
+    ///
+    /// One partition is polled inline; multiple partitions each get a task encoding in parallel,
+    /// merged over a shared channel (like `CoalescePartitionsExec`).
     pub fn build(
         self,
         partitions: Vec<SendableRecordBatchStream>,
@@ -89,30 +92,42 @@ impl FlightEncoderStreamBuilder {
     ) -> FlightEncoderStream {
         let child_span = info_span!("grpc:search:flight:execute_physical_plan");
         let _ = child_span.set_parent(span.context());
-        // One task per partition (like CoalescePartitionsExec) so execution and encoding run in
-        // parallel, each forwarding FlightData into the shared channel. The outer stream keeps
-        // its own encoder only for custom messages.
-        let cap = (partitions.len() * 2).max(2);
-        let mut handles = Vec::with_capacity(partitions.len());
-        let (tx, rx) = mpsc::channel::<Result<Vec<FlightData>, FlightError>>(cap);
-        for inner in partitions {
-            let tx = tx.clone();
-            let mut stream =
+
+        let (source, handles) = if partitions.len() == 1 {
+            // one partition: no parallelism to gain, poll inline (no task, no channel)
+            let inner = partitions.into_iter().next().unwrap();
+            let stream =
                 PartitionEncoderStream::new(inner, self.options.clone(), self.max_flight_data_size);
-            handles.push(tokio::spawn(async move {
-                while let Some(item) = stream.next().await {
-                    let is_err = item.is_err();
-                    if tx.send(item).await.is_err() {
-                        break; // receiver gone (client disconnect / error)
+            (FlightSource::Inline(Box::new(stream)), Vec::new())
+        } else {
+            // one task per partition, merged over the channel
+            let cap = (partitions.len() * 2).max(2);
+            let mut handles = Vec::with_capacity(partitions.len());
+            let (tx, rx) = mpsc::channel::<Result<Vec<FlightData>, FlightError>>(cap);
+            for inner in partitions {
+                let tx = tx.clone();
+                let mut stream = PartitionEncoderStream::new(
+                    inner,
+                    self.options.clone(),
+                    self.max_flight_data_size,
+                );
+                handles.push(tokio::spawn(async move {
+                    while let Some(item) = stream.next().await {
+                        let is_err = item.is_err();
+                        if tx.send(item).await.is_err() {
+                            break; // receiver gone (client disconnect / error)
+                        }
+                        if is_err {
+                            break;
+                        }
                     }
-                    if is_err {
-                        break;
-                    }
-                }
-            }));
-        }
+                }));
+            }
+            (FlightSource::Channel(rx), handles)
+        };
+
         FlightEncoderStream {
-            rx,
+            source,
             encoder: FlightDataEncoder::new(self.options, self.max_flight_data_size),
             queue: VecDeque::new(),
             custom_messages: self.custom_messages,
@@ -132,9 +147,16 @@ impl FlightEncoderStreamBuilder {
     }
 }
 
+/// Encoded FlightData groups: parallel partition tasks merged over a channel, or one partition
+/// polled inline.
+enum FlightSource {
+    Channel(mpsc::Receiver<Result<Vec<FlightData>, FlightError>>),
+    Inline(Box<PartitionEncoderStream>),
+}
+
 pub struct FlightEncoderStream {
-    /// Encoded FlightData from the per-partition tasks, one group (chunk) per item.
-    rx: mpsc::Receiver<Result<Vec<FlightData>, FlightError>>,
+    /// one coalesced chunk (dictionary + records) per item
+    source: FlightSource,
     /// Only used to encode custom messages (scan stats, peak memory, ...).
     encoder: FlightDataEncoder,
     queue: VecDeque<FlightData>,
@@ -237,6 +259,17 @@ impl FlightEncoderStream {
         self.queue.clear();
         Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))))
     }
+
+    /// Poll the next encoded group from the channel or the inline encoder.
+    fn poll_source(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Result<Vec<FlightData>, FlightError>>> {
+        match &mut self.source {
+            FlightSource::Channel(rx) => rx.poll_recv(cx),
+            FlightSource::Inline(stream) => stream.poll_next_unpin(cx),
+        }
+    }
 }
 
 impl Stream for FlightEncoderStream {
@@ -260,8 +293,8 @@ impl Stream for FlightEncoderStream {
                 return Poll::Ready(None);
             }
 
-            // 3. pull the next encoded FlightData from the partition tasks
-            match this.rx.poll_recv(cx) {
+            // 3. pull the next encoded FlightData from the partition encoder(s)
+            match this.poll_source(cx) {
                 Poll::Ready(Some(Ok(group))) => {
                     // before the first data, emit early-emit custom messages
                     if this.first_data {
@@ -630,6 +663,58 @@ mod tests {
             seen,
             2 * n_per_partition as usize,
             "every row must survive with its own dictionary"
+        );
+    }
+
+    // Single partition takes the inline fast path; verify it round-trips every row in order.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_single_partition_inline() {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
+        let total = 3 * 8192i32;
+
+        let batches: Vec<RecordBatch> = (0..total)
+            .step_by(8192)
+            .map(|s| {
+                let end = (s + 8192).min(total);
+                let vals = Int32Array::from((s..end).collect::<Vec<i32>>());
+                RecordBatch::try_new(schema.clone(), vec![Arc::new(vals)]).unwrap()
+            })
+            .collect();
+        let inner: SendableRecordBatchStream = Box::pin(RecordBatchStreamAdapter::new(
+            schema.clone(),
+            futures::stream::iter(batches.into_iter().map(Ok)),
+        ));
+
+        let options = IpcWriteOptions::default()
+            .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
+            .unwrap();
+        let stream = FlightEncoderStreamBuilder::new(options, 33554432)
+            .build(vec![inner], tracing::Span::none());
+
+        // one partition -> inline source, no tasks
+        assert!(matches!(stream.source, FlightSource::Inline(_)));
+        assert!(stream.ctx.handles.is_empty());
+
+        let fds: Vec<FlightData> = stream.try_collect().await.unwrap();
+        let dicts = std::collections::HashMap::new();
+        let decoded: Vec<i32> = fds
+            .iter()
+            .flat_map(|fd| {
+                let b = arrow_flight::utils::flight_data_to_arrow_batch(fd, schema.clone(), &dicts)
+                    .unwrap();
+                b.column(0)
+                    .as_any()
+                    .downcast_ref::<Int32Array>()
+                    .unwrap()
+                    .values()
+                    .to_vec()
+            })
+            .collect();
+
+        assert_eq!(
+            decoded,
+            (0..total).collect::<Vec<_>>(),
+            "single partition must preserve order and lose no rows"
         );
     }
 }
