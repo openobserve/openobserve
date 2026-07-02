@@ -105,17 +105,14 @@ export function useServiceCorrelation() {
       const age = Date.now() - cached.timestamp;
 
       if (age < SEMANTIC_GROUPS_CACHE_TTL_MS) {
-        console.log(`[useServiceCorrelation] Using cached semantic groups for org '${org}' (${cached.data.length} groups, age: ${Math.round(age / 1000)}s)`);
         return cached.data;
       } else {
-        console.log(`[useServiceCorrelation] Semantic groups cache expired for org '${org}' (age: ${Math.round(age / 1000)}s), fetching fresh data`);
         semanticGroupsGlobalCache.delete(org);
       }
     }
 
     // Check if there's already a pending request for this org
     if (pendingSemanticGroupsRequests.has(org)) {
-      console.log(`[useServiceCorrelation] Already loading semantic groups for org '${org}', awaiting existing request...`);
       // Await the existing promise directly - no polling or recursion needed
       return await pendingSemanticGroupsRequests.get(org)!;
     }
@@ -200,16 +197,6 @@ export function useServiceCorrelation() {
       // This matches the backend logic and reduces unnecessary data sent to API
       const dimensions = filterDimensionsForCorrelation(allDimensions, identityConfig);
 
-      console.log("[useServiceCorrelation] Dimension filtering:", {
-        original_count: Object.keys(allDimensions).length,
-        filtered_count: Object.keys(dimensions).length,
-        original: allDimensions,
-        filtered: dimensions,
-        identity_config: {
-          sets: identityConfig.sets?.length || 0,
-          tracked_alias_ids: identityConfig.tracked_alias_ids?.length || 0
-        }
-      });
 
 
       // Call the new _correlate API
@@ -230,13 +217,6 @@ export function useServiceCorrelation() {
         return null;
       }
 
-      console.log("[useServiceCorrelation] Correlation response:", {
-        service_name: correlationData.service_name,
-        matched_dimensions: correlationData.matched_dimensions,
-        metrics_count: correlationData.related_streams.metrics.length,
-        logs_count: correlationData.related_streams.logs.length,
-        traces_count: correlationData.related_streams.traces.length,
-      });
 
       // Convert correlation response to the format expected by the UI
       // Create a "virtual" ServiceMetadata from the correlation result
@@ -300,7 +280,6 @@ export function useServiceCorrelation() {
     fieldGroupingGlobalCache.delete(org);
     pendingFieldGroupingRequests.delete(org);
     clearIdentityConfigCache(org);
-    console.log(`[useServiceCorrelation] Cleared caches for org '${org}'`);
   }
 
   /**
@@ -315,7 +294,6 @@ export function useServiceCorrelation() {
     fieldGroupingGlobalCache.clear();
     pendingFieldGroupingRequests.clear();
     clearAllIdentityConfigCache();
-    console.log(`[useServiceCorrelation] Cleared all caches`);
   }
 
   /**

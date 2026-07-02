@@ -386,17 +386,11 @@ export default defineComponent({
       // If replacing existing dashboard, delete it first
       if (existingDashboardId) {
         try {
-          console.log("Attempting to delete dashboard:", {
-            orgId,
-            dashboardId: existingDashboardId,
-            folderId,
-          });
           const deleteResponse = await dashboardsService.delete(
             orgId,
             existingDashboardId,
             folderId,
           );
-          console.log("Delete response:", deleteResponse);
           // Wait a moment to ensure deletion completes
           await new Promise((resolve) => setTimeout(resolve, 500));
         } catch (deleteError) {
@@ -408,11 +402,6 @@ export default defineComponent({
       }
 
       // Import dashboard
-      console.log("Creating dashboard:", {
-        orgId,
-        folderId,
-        title: dashboardJson.title,
-      });
       await dashboardsService.create(orgId, dashboardJson, folderId);
     };
 
@@ -461,12 +450,6 @@ export default defineComponent({
           existingDashboard?.dashboard_id ||
           existingDashboard?.id;
 
-        console.log("Dashboard check:", {
-          dashboardTitle,
-          allDashboards: dashboardsResponse.data?.dashboards,
-          existingDashboard,
-          existingDashboardId,
-        });
 
         if (existingDashboard) {
           // Ask user if they want to replace the existing dashboard
