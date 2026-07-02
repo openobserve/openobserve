@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { defineComponent, h, nextTick } from 'vue';
 import { mount } from '@vue/test-utils';
 import { ShortcutManager, getManager, resetManager } from '@/lib/vue-shortcut-manager/manager';
@@ -69,6 +69,58 @@ describe('ShortcutManager', () => {
     } as any);
 
     expect(handler).toHaveBeenCalledOnce();
+  });
+
+  describe('input-focus guard', () => {
+    let input: HTMLInputElement;
+
+    beforeEach(() => {
+      input = document.createElement('input');
+      document.body.appendChild(input);
+    });
+
+    afterEach(() => {
+      input.blur();
+      input.remove();
+    });
+
+    it('should not fire shift+? while typing "?" in an input', () => {
+      const handler = vi.fn();
+      manager.register({ key: 'shift+?', handler, description: 'cheatsheet' });
+      input.focus();
+
+      manager.handleKeyDown({
+        key: '?', ctrlKey: false, shiftKey: true, altKey: false, metaKey: false,
+        preventDefault: vi.fn(), stopPropagation: vi.fn(),
+      } as any);
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('should fire shift+? when no input is focused', () => {
+      const handler = vi.fn();
+      manager.register({ key: 'shift+?', handler, description: 'cheatsheet' });
+
+      manager.handleKeyDown({
+        key: '?', ctrlKey: false, shiftKey: true, altKey: false, metaKey: false,
+        preventDefault: vi.fn(), stopPropagation: vi.fn(),
+      } as any);
+
+      expect(handler).toHaveBeenCalledOnce();
+    });
+
+    it('should still fire command-modifier shortcuts while typing in an input', () => {
+      const handler = vi.fn();
+      manager.register({ key: 'ctrl+shift+k', handler, description: 'command' });
+      input.focus();
+
+      manager.handleKeyDown({
+        key: 'k', ctrlKey: true, shiftKey: true, altKey: false, metaKey: false,
+        preventDefault: vi.fn(), stopPropagation: vi.fn(),
+      } as any);
+
+      expect(handler).toHaveBeenCalledOnce();
+    });
   });
 });
 

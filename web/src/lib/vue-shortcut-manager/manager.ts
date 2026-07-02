@@ -252,15 +252,17 @@ export class ShortcutManager {
   }
 
   /**
-   * Returns true when the shortcut key string contains at least one modifier
-   * (ctrl, meta, alt, shift). Pure single-letter keys have no modifier.
+   * Returns true when the shortcut key string contains a command modifier
+   * (ctrl, meta, alt). `shift` is intentionally excluded: on most keyboards it
+   * only produces a printable character (e.g. `shift+?` → "?"), so a shift-only
+   * combo behaves like a plain key and must still be suppressed while the user
+   * is typing in an input. Pure single-letter keys have no modifier.
    */
   private static hasModifier(key: string): boolean {
     return (
-      key.startsWith("ctrl+") ||
-      key.startsWith("meta+") ||
-      key.startsWith("alt+") ||
-      key.startsWith("shift+")
+      key.includes("ctrl+") ||
+      key.includes("meta+") ||
+      key.includes("alt+")
     );
   }
 
