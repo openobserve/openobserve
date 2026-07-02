@@ -75,7 +75,6 @@ pub struct SchedulerJobPuller {
 struct SchedulerLane {
     workers: Vec<SchedulerWorker>,
     job_puller: SchedulerJobPuller,
-    tx: mpsc::Sender<ScheduledJob>,
 }
 
 /// Main scheduler that coordinates workers and the job puller
@@ -442,7 +441,9 @@ impl SchedulerLane {
         let max_workers = std::cmp::max(1, concurrency) as usize;
 
         // Channel capacity matches the worker count so back-pressure (channel-full retry in the
-        // puller) kicks in exactly when all of this module's workers are busy.
+        // puller) kicks in exactly when all of this module's workers are busy. The puller owns the
+        // sole sender; the channel stays open for the process lifetime because the puller loops
+        // forever, so the lane doesn't retain its own copy.
         let (tx, rx) = mpsc::channel(max_workers);
         let rx = Arc::new(Mutex::new(rx));
 
@@ -450,12 +451,11 @@ impl SchedulerLane {
             .map(|id| SchedulerWorker::new(id, module.clone(), config.clone(), rx.clone()))
             .collect();
 
-        let job_puller = SchedulerJobPuller::new(tx.clone(), module.clone(), config.clone());
+        let job_puller = SchedulerJobPuller::new(tx, module.clone(), config.clone());
 
         Self {
             workers,
             job_puller,
-            tx,
         }
     }
 }
@@ -737,5 +737,127 @@ mod tests {
         let scheduler = Scheduler::new_with_modules(cfg, module_configs);
         assert_eq!(scheduler.lanes.len(), 1);
         assert_eq!(scheduler.workers.len(), 1);
+    }
+
+    fn find_module(
+        configs: &[ModuleSchedulerConfig],
+        module: TriggerModule,
+    ) -> ModuleSchedulerConfig {
+        configs
+            .iter()
+            .find(|c| c.module == module)
+            .cloned()
+            .unwrap_or_else(|| panic!("module {module:?} missing from resolved configs"))
+    }
+
+    #[test]
+    fn test_resolve_module_configs_covers_every_module_once() {
+        // Every TriggerModule variant must get exactly one lane config, else its rows would
+        // never be pulled once per-module pullers are enabled.
+        let cfg = config::Config::default();
+        let configs = resolve_module_configs(&cfg, &make_config());
+        assert_eq!(configs.len(), 6);
+        let modules: std::collections::HashSet<_> =
+            configs.iter().map(|c| c.module.clone()).collect();
+        assert_eq!(modules.len(), 6, "duplicate module in resolved configs");
+        for m in [
+            TriggerModule::Alert,
+            TriggerModule::Report,
+            TriggerModule::DerivedStream,
+            TriggerModule::Backfill,
+            TriggerModule::AnomalyDetection,
+            TriggerModule::QueryRecommendations,
+        ] {
+            assert!(modules.contains(&m), "missing module {m:?}");
+        }
+    }
+
+    #[test]
+    fn test_resolve_module_configs_zero_inherits_base_defaults() {
+        // With all per-module vars at 0, every module inherits the base (alert) concurrency and
+        // interval — except backfill (floored to 1) and derived_stream's cadence, which falls
+        // back to ZO_DERIVED_STREAM_SCHEDULE_INTERVAL.
+        let base = make_config(); // concurrency 3, interval 10
+        let mut cfg = config::Config::default();
+        cfg.limit.derived_stream_schedule_interval = 300;
+        let configs = resolve_module_configs(&cfg, &base);
+
+        for m in [
+            TriggerModule::Alert,
+            TriggerModule::Report,
+            TriggerModule::AnomalyDetection,
+            TriggerModule::QueryRecommendations,
+        ] {
+            let c = find_module(&configs, m.clone());
+            assert_eq!(c.concurrency, 3, "{m:?} should inherit base concurrency");
+            assert_eq!(
+                c.poll_interval_secs, 10,
+                "{m:?} should inherit base interval"
+            );
+        }
+
+        let backfill = find_module(&configs, TriggerModule::Backfill);
+        assert_eq!(backfill.concurrency, 1, "backfill floors to 1");
+        assert_eq!(
+            backfill.poll_interval_secs, 10,
+            "backfill inherits base interval"
+        );
+
+        let ds = find_module(&configs, TriggerModule::DerivedStream);
+        assert_eq!(
+            ds.concurrency, 3,
+            "derived_stream inherits base concurrency"
+        );
+        assert_eq!(
+            ds.poll_interval_secs, 300,
+            "derived_stream cadence falls back to derived_stream_schedule_interval"
+        );
+    }
+
+    #[test]
+    fn test_resolve_module_configs_overrides_take_effect() {
+        let base = make_config();
+        let mut cfg = config::Config::default();
+        cfg.limit.scheduler_alert_concurrency = 20;
+        cfg.limit.scheduler_report_concurrency = 7;
+        cfg.limit.scheduler_derived_stream_concurrency = 8;
+        cfg.limit.scheduler_derived_stream_interval = 120;
+        cfg.limit.scheduler_anomaly_concurrency = 4;
+        cfg.limit.scheduler_query_reco_concurrency = 2;
+        cfg.limit.scheduler_backfill_concurrency = 3;
+        cfg.limit.scheduler_backfill_interval = 60;
+        let configs = resolve_module_configs(&cfg, &base);
+
+        assert_eq!(find_module(&configs, TriggerModule::Alert).concurrency, 20);
+        assert_eq!(find_module(&configs, TriggerModule::Report).concurrency, 7);
+        assert_eq!(
+            find_module(&configs, TriggerModule::AnomalyDetection).concurrency,
+            4
+        );
+        assert_eq!(
+            find_module(&configs, TriggerModule::QueryRecommendations).concurrency,
+            2
+        );
+
+        let ds = find_module(&configs, TriggerModule::DerivedStream);
+        assert_eq!(ds.concurrency, 8);
+        assert_eq!(ds.poll_interval_secs, 120);
+
+        let backfill = find_module(&configs, TriggerModule::Backfill);
+        assert_eq!(backfill.concurrency, 3);
+        assert_eq!(backfill.poll_interval_secs, 60);
+    }
+
+    #[test]
+    fn test_resolve_module_configs_backfill_explicit_interval_overrides_base() {
+        // Backfill's own interval wins even when derived_stream/global intervals differ.
+        let base = make_config();
+        let mut cfg = config::Config::default();
+        cfg.limit.scheduler_backfill_interval = 45;
+        let configs = resolve_module_configs(&cfg, &base);
+        assert_eq!(
+            find_module(&configs, TriggerModule::Backfill).poll_interval_secs,
+            45
+        );
     }
 }
