@@ -8,7 +8,7 @@
 //      of truth for CDN releases (the CDN itself has no "latest" alias):
 //      https://github.com/openobserve/browser-sdk/blob/openobserve/README.md
 //   2. RUM_SDK_VERSION env var — manual override / offline fallback.
-//   3. null — keep whatever version is pinned in examples/cdn-rum-sample.
+//   3. null — keep whatever version is pinned in fixtures/rum/cdn-sample.
 //
 // NPM path (@openobserve/browser-rum + @openobserve/browser-logs):
 //   1. `npm view` dist-tag `latest` from the npm registry.

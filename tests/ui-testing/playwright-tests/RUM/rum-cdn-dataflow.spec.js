@@ -3,7 +3,7 @@
  *
  * Proves the full RUM pipeline using the REAL browser SDK (not synthetic POSTs):
  *   1. Create / read a RUM token from the token API (mirrors the Ingestion UI).
- *   2. Serve the existing `examples/cdn-rum-sample` app, templated with that
+ *   2. Serve the committed `fixtures/rum/cdn-sample` app, templated with that
  *      token, loading the LIVE CDN bundles from browsersdk.openobserve.ai.
  *      The bundle version tracks the latest release published in the
  *      browser-sdk README (fallback: RUM_SDK_VERSION env, then the version
