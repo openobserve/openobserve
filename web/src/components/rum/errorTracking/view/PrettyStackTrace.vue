@@ -17,7 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <!-- Loading state -->
-    <div v-if="isLoadingTranslation" class="loading-container tw:p-6 tw:text-center">
+    <div
+      v-if="isLoadingTranslation"
+      data-test="rum-pretty-stack-trace-loading"
+      class="loading-container tw:p-6 tw:text-center"
+    >
       <OSpinner variant="dots" size="lg" />
       <div class="tw:mt-3 tw:text-gray-400" style="font-size: 14px; font-weight: 500;">
         Translating stack trace with source maps...
@@ -28,7 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- No source maps available message -->
-    <div v-else-if="allSourceInfoNull" class="no-source-maps-container tw:p-3 tw:text-center">
+    <div
+      v-else-if="allSourceInfoNull"
+      data-test="rum-pretty-stack-trace-unavailable"
+      class="no-source-maps-container tw:p-3 tw:text-center"
+    >
       <OIcon name="code-off" size="lg" class="tw:mb-2" />
       <div class="tw:text-base tw:font-medium tw:text-gray-500 tw:mb-1" style="font-weight: 500;">
         Source Maps Not Available
@@ -58,7 +66,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Pretty formatted view -->
-    <div v-else-if="translatedStackTrace.length > 0" class="pretty-stack-container">
+    <div
+      v-else-if="translatedStackTrace.length > 0"
+      data-test="rum-pretty-stack-trace-container"
+      class="pretty-stack-container"
+    >
       <template v-for="(stackTrace, traceIndex) in translatedStackTrace" :key="traceIndex">
         <!-- Error message -->
         <div
@@ -99,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="stackTrace.stack[0].line"
+                data-test="rum-pretty-stack-trace-frame-line"
                 class="stack-line-header"
                 :style="{ color: textColor }"
               >
@@ -110,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Expandable source code context -->
           <div
             v-if="isFrameExpanded(traceIndex, 0) && stackTrace.stack[0].source_info"
+            data-test="rum-pretty-stack-trace-source-context"
             class="source-context tw:px-3 tw:pb-2"
             :style="{ 'background-color': isDarkMode ? '#0d0d0d' : '#f8f9fa' }"
           >
@@ -186,6 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-if="frame.line"
+                    data-test="rum-pretty-stack-trace-frame-line"
                     class="stack-line-collapsed"
                     :style="{ color: mutedTextColor }"
                   >
@@ -225,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Error state -->
-    <div v-else class="tw:p-3 tw:text-center tw:text-gray-400">
+    <div v-else data-test="rum-pretty-stack-trace-error" class="tw:p-3 tw:text-center tw:text-gray-400">
       <div v-if="translationError" class="tw:text-red-500">
         {{ translationError }}
       </div>

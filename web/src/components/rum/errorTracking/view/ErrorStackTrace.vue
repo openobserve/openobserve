@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:text-gray-500 tw:mb-1"
         align="left"
       >
-        <OTab name="raw" label="Raw" />
-        <OTab name="pretty" label="Pretty" />
+        <OTab name="raw" label="Raw" data-test="rum-error-stack-trace-raw-tab" />
+        <OTab name="pretty" label="Pretty" data-test="rum-error-stack-trace-pretty-tab" />
       </OTabs>
 
       <OSeparator class="tw:mb-2" />
