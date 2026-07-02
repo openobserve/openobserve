@@ -13,10 +13,10 @@
       <span
         v-if="row.name"
         :class="[
-          'tw:font-semibold tw:text-[1.125rem] tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:min-w-0 tw:truncate',
+          'font-semibold text-[1.125rem] px-2 py-1 rounded-md ml-2 min-w-0 truncate',
           store.state.theme === 'dark'
-            ? 'tw:text-blue-400 tw:bg-blue-900/50'
-            : 'tw:text-blue-600 tw:bg-blue-50',
+            ? 'text-blue-400 bg-blue-900/50'
+            : 'text-blue-600 bg-blue-50',
         ]"
         data-test="eval-job-detail-name-badge"
       >
@@ -26,20 +26,20 @@
     </template>
 
     <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
-    <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+    <div class="flex flex-col h-full min-h-0">
       <!-- ── Global window control ── -->
       <!-- A single date picker drives the WHOLE detail view — the KPI strip
            and both the Runs and Failures tables share this one window. Placed
            above the cards (right-aligned) so it reads as a page-level control,
            not a per-tab filter. Refresh re-queries everything. -->
       <div
-        class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:px-5 tw:pt-3"
+        class="flex items-center justify-end gap-[0.5rem] px-5 pt-3"
       >
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
           v-model="selectedDate"
           :auto-apply-dashboard="true"
-          class="tw:flex-none"
+          class="flex-none"
           data-test="eval-job-detail-window"
         />
         <OButton
@@ -59,7 +59,7 @@
            consistent. Pinned band (shrink-0) with a bottom divider; the cards
            below carry their own chrome via Tailwind. -->
       <section
-        class="tw:flex-shrink-0 tw:grid tw:grid-cols-4 tw:gap-[0.625rem] tw:px-5 tw:py-4 tw:border-b tw:border-b-[var(--color-dialog-header-border,var(--o2-border))]"
+        class="flex-shrink-0 grid grid-cols-4 gap-[0.625rem] px-5 py-4 border-b border-b-[var(--color-dialog-header-border,var(--o2-border))]"
       >
         <!-- While the KPI query is in flight, show skeleton tiles in place of
              the cards (matches the LLM Insights dashboard pattern). -->
@@ -68,22 +68,22 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem] tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
+          class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
         >
           <div
-            class="kpi-label tw:text-[0.7rem] tw:leading-normal tw:font-semibold tw:mb-[0.25rem]"
+            class="kpi-label text-[0.7rem] leading-normal font-semibold mb-[0.25rem]"
           >
             {{ card.label }}
           </div>
-          <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
+          <div class="flex items-baseline gap-[0.2rem]">
             <span
-              class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]"
+              class="text-[1.4rem] font-bold leading-none text-[var(--o2-text-primary)]"
             >
               {{ card.value }}
             </span>
             <span
               v-if="card.unit"
-              class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
+              class="text-[0.8rem] font-semibold text-[var(--o2-text-secondary)]"
             >
               {{ card.unit }}
             </span>
@@ -95,7 +95,7 @@
       <OTabs
         :model-value="activeTab"
         bordered
-        class="tw:flex-shrink-0 tw:px-5"
+        class="flex-shrink-0 px-5"
         data-test="eval-job-detail-tabs"
         @update:model-value="activeTab = $event as TabId"
       >
@@ -114,8 +114,8 @@
            edge-to-edge column headers. Bottom padding is opt-in for the
            Configuration (form) tab; the table tabs stay flush to the bottom. -->
       <div
-        class="tw:flex-1 tw:overflow-auto tw:flex tw:flex-col tw:gap-[1.125rem] tw:min-h-0 tw:pt-[1.125rem]"
-        :class="{ 'tw:pb-[1.125rem]': activeTab === 'configuration' }"
+        class="flex-1 overflow-auto flex flex-col gap-[1.125rem] min-h-0 pt-[1.125rem]"
+        :class="{ 'pb-[1.125rem]': activeTab === 'configuration' }"
       >
         <!-- Shared Runs/Failures filter row — agent filter (both tabs),
              right-aligned. The date picker + refresh live in the global
@@ -123,15 +123,15 @@
              once with v-show (not v-if) so it never remounts on tab switch. -->
         <div
           v-show="tableEnabled"
-          class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:flex-wrap tw:px-5"
+          class="flex items-center justify-end gap-2 flex-wrap px-5"
         >
-          <div class="tw:w-[14rem] tw:flex-shrink-0">
+          <div class="w-[14rem] flex-shrink-0">
             <OSelect
               v-model="agentKey"
               :options="agentOptions"
               labelKey="label"
               valueKey="value"
-              class="tw:w-full tw:rounded"
+              class="w-full rounded"
               data-test="eval-job-detail-runs-agent-filter"
             />
           </div>
@@ -140,9 +140,9 @@
         <!-- Configuration -->
         <template v-if="activeTab === 'configuration'">
           <!-- Target -->
-          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+          <section class="flex flex-col gap-2 px-5">
             <h4
-              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-[var(--color-text-primary)] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.targetSection") }}
             </h4>
@@ -183,13 +183,13 @@
           </section>
 
           <!-- Scorers -->
-          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+          <section class="flex flex-col gap-2 px-5">
             <h4
-              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-[var(--color-text-primary)] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.scorersSection") }}
               <span
-                class="tw:inline-flex tw:items-center tw:px-[0.3125rem] tw:rounded-[0.1875rem] tw:text-[0.625rem] tw:font-semibold tw:text-[var(--color-text-secondary)] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+                class="inline-flex items-center px-[0.3125rem] rounded-[0.1875rem] text-[0.625rem] font-semibold text-[var(--color-text-secondary)] bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
                 >{{ resolvedScorers.length }}</span
               >
             </h4>
@@ -226,7 +226,7 @@
                       }}</span>
                       <span
                         v-if="item.scorerTypeLabel"
-                        class="jd-scorers__type tw:text-[0.625rem] tw:font-semibold tw:leading-[1.5]"
+                        class="jd-scorers__type text-[0.625rem] font-semibold leading-[1.5]"
                         :class="`jd-scorers__type--${item.scorerType}`"
                       >
                         {{ item.scorerTypeLabel }}
@@ -265,7 +265,7 @@
                     </div>
                   </div>
                   <span
-                    class="jd-scorers__cta tw:text-[0.6875rem] tw:font-semibold"
+                    class="jd-scorers__cta text-[0.6875rem] font-semibold"
                   >
                     <span class="jd-scorers__cta-label">
                       {{ t("onlineEvals.job.detail.viewScorerHint") }}
@@ -282,9 +282,9 @@
           </section>
 
           <!-- Sampling -->
-          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+          <section class="flex flex-col gap-2 px-5">
             <h4
-              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-[var(--color-text-primary)] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.samplingSection") }}
             </h4>
@@ -302,9 +302,9 @@
           </section>
 
           <!-- Metadata -->
-          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+          <section class="flex flex-col gap-2 px-5">
             <h4
-              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-[var(--color-text-primary)] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.metadataSection") }}
             </h4>
@@ -350,10 +350,10 @@
             :footer-title="t('onlineEvals.job.detail.tabs.runs')"
             show-index
             width="100%"
-            class="tw:w-full"
+            class="w-full"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="tw:text-[var(--color-text-secondary)]">{{
+              <span class="text-[var(--color-text-secondary)]">{{
                 relativeTime(row.timestampMs)
               }}</span>
             </template>
@@ -363,20 +363,20 @@
             <template #cell-targetSpanId="{ row }">
               <span
                 v-if="row.targetSpanId"
-                class="tw:block tw:truncate"
+                class="block truncate"
                 :title="row.targetSpanId"
                 >{{ row.targetSpanId }}</span
               >
-              <span v-else class="tw:text-[var(--color-text-secondary)]">—</span>
+              <span v-else class="text-[var(--color-text-secondary)]">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
               <span
                 v-if="row.targetTraceId"
-                class="tw:block tw:truncate"
+                class="block truncate"
                 :title="row.targetTraceId"
                 >{{ row.targetTraceId }}</span
               >
-              <span v-else class="tw:text-[var(--color-text-secondary)]">—</span>
+              <span v-else class="text-[var(--color-text-secondary)]">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
               <span>{{ row.scoreDisplay }}</span>
@@ -418,10 +418,10 @@
             :footer-title="t('onlineEvals.job.detail.tabs.failures')"
             show-index
             width="100%"
-            class="tw:w-full"
+            class="w-full"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="tw:text-[var(--color-text-secondary)]">{{
+              <span class="text-[var(--color-text-secondary)]">{{
                 relativeTime(row.timestampMs)
               }}</span>
             </template>
@@ -431,20 +431,20 @@
             <template #cell-targetSpanId="{ row }">
               <span
                 v-if="row.targetSpanId"
-                class="tw:block tw:truncate"
+                class="block truncate"
                 :title="row.targetSpanId"
                 >{{ row.targetSpanId }}</span
               >
-              <span v-else class="tw:text-[var(--color-text-secondary)]">—</span>
+              <span v-else class="text-[var(--color-text-secondary)]">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
               <span
                 v-if="row.targetTraceId"
-                class="tw:block tw:truncate"
+                class="block truncate"
                 :title="row.targetTraceId"
                 >{{ row.targetTraceId }}</span
               >
-              <span v-else class="tw:text-[var(--color-text-secondary)]">—</span>
+              <span v-else class="text-[var(--color-text-secondary)]">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
               <span>{{ row.scoreDisplay }}</span>

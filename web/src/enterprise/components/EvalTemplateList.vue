@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="eval-template-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="flex flex-col h-full min-h-0"
   >
     <!-- Standard section header: title + section tabs + actions. -->
     <AppPageHeader
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="fact-check"
       :subtitle="'Reusable scoring templates for LLM evaluations'"
       tabs-below
-      class="tw:shrink-0 tw:px-4"
+      class="shrink-0 px-4"
     >
       <template #title>
         <span data-test="eval-template-list-title">{{ t("evalTemplate.header") }}</span>
@@ -54,8 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
 
     <!-- Table area -->
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="card-container h-full">
         <OTable
           :frame="false"
           data-test="eval-template-list-table"
@@ -75,26 +75,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :persist-columns="true"
           table-id="pipelines-evaluation-templates"
           width="100%"
-          class="tw:w-full tw:h-full"
+          class="w-full h-full"
         >
           <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+            <div class="flex items-center gap-2 w-full">
               <OSearchInput
                 data-test="eval-template-list-search-input"
                 v-model="filterQuery"
-                class="tw:flex-1"
+                class="flex-1"
                 :placeholder="t('evalTemplate.search')"
               />
             </div>
           </template>
           <!-- Version column -->
           <template #cell-version="{ row }">
-            <span class="tw:inline-flex tw:items-center tw:px-2 tw:py-0.5 tw:rounded-md tw:text-[var(--text-xs)] tw:font-semibold tw:border tw:border-[var(--o2-border-color,rgba(0,0,0,0.15))] tw:text-[var(--q-color-text)] tw:bg-transparent">v{{ row.version }}</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[var(--text-xs)] font-semibold border border-[var(--o2-border-color,rgba(0,0,0,0.15))] text-[var(--q-color-text)] bg-transparent">v{{ row.version }}</span>
           </template>
 
           <!-- Actions column -->
           <template #cell-actions="{ row }">
-            <div class="tw:flex tw:items-center tw:justify-center actions-container">
+            <div class="flex items-center justify-center actions-container">
               <OButton
                 :data-test="`eval-template-list-${row.name}-edit-btn`"
                 icon-left="edit"
@@ -129,10 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Pagination footer -->
           <template #bottom="bottomProps">
             <div
-              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
+              class="flex items-center justify-between w-full py-2"
             >
               <div
-                class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4"
+                class="flex items-center font-bold text-[14px] mr-4"
               >
                 {{ bottomProps.totalRows }} {{ t("evalTemplate.header") }}
               </div>

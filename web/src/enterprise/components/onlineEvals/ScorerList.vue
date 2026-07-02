@@ -40,13 +40,13 @@
         :persist-columns="true"
         table-id="scorer-list"
         width="100%"
-        class="tw:w-full tw:h-full"
+        class="w-full h-full"
         @row-click="(row: any) => $emit('view', row)"
       >
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="tw:flex-1 tw:min-w-0"
+            class="flex-1 min-w-0"
             :placeholder="t('onlineEvals.scorer.searchPlaceholder')"
             data-test="scorer-list-search-input"
             clearable
@@ -58,13 +58,13 @@
             :placeholder="t('onlineEvals.scorer.allTypes')"
             size="md"
             width="sm"
-            class="tw:shrink-0"
+            class="shrink-0"
             data-test="scorer-list-type-filter"
           />
         </template>
 
         <template #empty>
-          <div class="tw:flex tw:items-center tw:justify-center tw:py-8">
+          <div class="flex items-center justify-center py-8">
             <OEmptyState
               size="hero"
               preset="no-scorers"
@@ -76,14 +76,14 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="o2-table-footer-title tw:text-primary">
+          <span class="o2-table-footer-title text-primary">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scorer.listTitle") }}
           </span>
           <OButton
             v-if="selectedIds.length > 0"
             variant="outline"
             size="sm"
-            class="tw:ml-3"
+            class="ml-3"
             icon-left="download"
             data-test="scorer-bulk-export-btn"
             @click="handleBulkExport"
@@ -99,19 +99,19 @@
         </template>
 
         <template #cell-produces="{ row }">
-          <span class="tw:font-mono tw:text-xs">{{ producesLabel(row) || "—" }}</span>
+          <span class="font-mono text-xs">{{ producesLabel(row) || "—" }}</span>
         </template>
 
         <template #cell-version="{ row }">
-          <span class="tw:font-mono tw:text-xs">v{{ row.version }}</span>
+          <span class="font-mono text-xs">v{{ row.version }}</span>
         </template>
 
         <template #cell-usedBy="{ row }">
-          <span class="tw:font-mono tw:text-xs">{{ usedByText(row) }}</span>
+          <span class="font-mono text-xs">{{ usedByText(row) }}</span>
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center actions-container">
+          <div class="flex items-center actions-container">
             <OButton
               :data-test="`scorer-list-${row.name}-edit-btn`"
               variant="ghost"

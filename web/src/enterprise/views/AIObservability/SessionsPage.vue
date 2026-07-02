@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="ai-sessions-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:overflow-hidden"
+    class="flex flex-col h-full min-h-0 overflow-hidden"
   >
     <AppPageHeader
       :title="t('aiObservability.nav.sessions')"
       :subtitle="t('aiObservability.subtitle.sessions')"
       icon="forum"
-      class="tw:px-4 tw:border-b tw:border-border-default"
+      class="px-4 border-b border-border-default"
     >
       <template #actions>
         <date-time
@@ -37,13 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :default-relative-time="dateState.relativeTimePeriod ?? ''"
           data-test="ai-sessions-date-time"
-          class="tw:h-[2rem]"
+          class="h-[2rem]"
           @on:date-change="onDateChange"
         />
         <!-- Last-refresh + refresh control (logs-style), consistent with the
              LLM Insights page header. -->
         <div
-          class="tw:inline-flex tw:items-center tw:border tw:border-border-default tw:rounded-md tw:px-1 tw:h-[2rem] tw:overflow-hidden"
+          class="inline-flex items-center border border-border-default rounded-md px-1 h-[2rem] overflow-hidden"
         >
           <ORefreshButton
             :last-run-at="sessionsLastRunAt"
@@ -56,14 +56,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </AppPageHeader>
 
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+    <div class="flex-1 min-h-0 overflow-hidden">
       <SessionsList
         ref="sessionsRef"
         :stream-name="streamName"
         :start-time="timeRange.startTime"
         :end-time="timeRange.endTime"
         detail-route-name="aiSessionDetails"
-        class="tw:h-full"
+        class="h-full"
       />
     </div>
   </div>
