@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="[key, value] in getSortedDimensions(row.group_values).slice(2)"
                       :key="key"
                     >
-                      <span class="tw:inline-block tw:overflow-hidden tw:truncate">{{ key }}</span>=<span class="tw:inline-block tw:overflow-hidden tw:truncate">{{ value }}</span>
+                      <span>{{ key }}</span>=<span>{{ value }}</span>
                     </div>
                   </div>
                 </template>
