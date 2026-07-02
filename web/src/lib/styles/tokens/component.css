@@ -62,6 +62,12 @@
   --color-button-ghost-destructive-active-bg: var(--color-error-100);
   --color-button-ghost-destructive-focus-ring: var(--color-error-400);
 
+  /* Button — ghost-success (flat + positive green text) — play/resume actions */
+  --color-button-ghost-success-text: var(--color-success-600);
+  --color-button-ghost-success-hover-bg: var(--color-success-50);
+  --color-button-ghost-success-active-bg: var(--color-success-100);
+  --color-button-ghost-success-focus-ring: var(--color-success-400);
+
   /* Button — ghost-muted (secondary text at rest → primary text + bg on hover) */
   --color-button-ghost-muted-text: var(--color-text-secondary);
   --color-button-ghost-muted-hover-text: var(--color-primary-600);
@@ -786,6 +792,12 @@
   --color-button-ghost-destructive-hover-bg: var(--color-button-ghost-destructive-hover-bg);
   --color-button-ghost-destructive-active-bg: var(--color-button-ghost-destructive-active-bg);
   --color-button-ghost-destructive-focus-ring: var(--color-button-ghost-destructive-focus-ring);
+
+  /* Button — ghost-success */
+  --color-button-ghost-success-text: var(--color-button-ghost-success-text);
+  --color-button-ghost-success-hover-bg: var(--color-button-ghost-success-hover-bg);
+  --color-button-ghost-success-active-bg: var(--color-button-ghost-success-active-bg);
+  --color-button-ghost-success-focus-ring: var(--color-button-ghost-success-focus-ring);
 
   /* Button — ghost-muted */
   --color-button-ghost-muted-text: var(--color-button-ghost-muted-text);

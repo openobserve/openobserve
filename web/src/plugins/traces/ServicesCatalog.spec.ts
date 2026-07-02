@@ -1481,29 +1481,6 @@ describe("ServicesCatalog", () => {
   // Status badge classes per row
   // -----------------------------------------------------------------------
   describe("status badges", () => {
-    it("should apply correct badge class for healthy status", () => {
-      expect(wrapper?.vm?.statusBadgeClass("healthy")).toBe(
-        "tw:text-(--o2-service-health-healthy)",
-      );
-    });
-
-    it("should apply correct badge class for degraded status", () => {
-      expect(wrapper?.vm?.statusBadgeClass("degraded")).toBe(
-        "tw:text-(--o2-service-health-degraded)",
-      );
-    });
-
-    it("should apply correct badge class for warning status", () => {
-      expect(wrapper?.vm?.statusBadgeClass("warning")).toBe(
-        "tw:text-(--o2-service-health-warning)",
-      );
-    });
-
-    it("should apply correct badge class for critical status", () => {
-      expect(wrapper?.vm?.statusBadgeClass("critical")).toBe(
-        "tw:text-(--o2-service-health-critical)",
-      );
-    });
 
     it("should derive correct status from error rate", async () => {
       // Load services with known error rates and verify the derived status

@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-row-action="row.enabled ? 'pause' : 'resume'"
                       :data-test="`alert-list-${row.name}-pause-start-alert`"
                       class="tw:ml-1"
-                      :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+                      :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                       size="icon-sm"
                       :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                       @click.stop="toggleAlertState(row)"
@@ -534,7 +534,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:mr-2"
                       @click="bulkToggleAlerts('pause')"
                     >
-                      <OIcon name="pause" size="sm" />
+                      <OIcon name="pause" size="sm" class="tw:text-button-ghost-destructive-text" />
                       <span class="tw:ml-2">Pause</span>
                     </OButton>
                     <OButton
@@ -545,7 +545,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:mr-2"
                       @click="bulkToggleAlerts('resume')"
                     >
-                      <OIcon name="play-arrow" size="sm" />
+                      <OIcon name="play-arrow" size="sm" class="tw:text-button-ghost-success-text" />
                       <span class="tw:ml-2">Resume</span>
                     </OButton>
                     <OButton
@@ -743,7 +743,6 @@ import ODropdownSeparator from '@/lib/overlay/Dropdown/ODropdownSeparator.vue';
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -787,7 +786,6 @@ export default defineComponent({
     ODropdownItem,
     ODropdownSeparator,
     OSpinner,
-    OBadge,
     OSelect,
     OTable,
     OTimeCell,

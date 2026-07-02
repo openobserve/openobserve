@@ -84,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subject-chips="isNestedGroupMode ? [] : subjectChips"
         v-model:active-subject="activeSubject"
         overflow-mode="responsive"
-        badge-size="md"
         :get-subject-button-label="getSubjectButtonLabel"
       />
 
@@ -220,10 +219,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
                             <component v-else :is="group.icon" />
                             <span>{{ group.label }}</span>
-                            <OBadge
-                              variant="default"
+                            <OTag
+                              type="fieldTag"
                               class="tw:ml-1"
-                            >{{ group.streams.length }}</OBadge>
+                            >{{ group.streams.length }}</OTag>
                           </div>
                           <div class="tw:flex tw:gap-1">
                             <OButton
@@ -348,11 +347,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" />
                       <component v-else :is="group.icon" />
                       <span>{{ group.label }}</span>
-                      <OBadge
-                        :variant="activeMetricGroupTab === group.id ? 'primary' : 'default'"
+                      <OTag
+                        type="tabChip"
+                        :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
                         class="tw:ml-0.5"
-                        size="sm"
-                      >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OBadge>
+                      >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OTag>
                     </div>
                   </OTab>
                 </OTabs>
@@ -526,9 +525,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t('correlation.viewInTraces') }}
                     <OTooltip :content="t('correlation.viewInTraces')" side="top" />
                   </OButton>
-                  <OBadge variant="primary">
+                  <OTag type="fieldTag" value="primary">
                     {{ tracesForDimensions.length }} {{ t("menu.traces") }}
-                  </OBadge>
+                  </OTag>
                 </div>
               </div>
             </div>
@@ -721,10 +720,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
                           <component v-else :is="group.icon" />
                           <span>{{ group.label }}</span>
-                          <OBadge
-                            variant="default"
+                          <OTag
+                            type="fieldTag"
                             class="tw:ml-1"
-                          >{{ group.streams.length }}</OBadge>
+                          >{{ group.streams.length }}</OTag>
                         </div>
                         <div class="tw:flex tw:gap-1">
                           <OButton
@@ -856,11 +855,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="xs"
                     />
                     <span>{{ group.label }}</span>
-                    <OBadge
-                      :variant="activeMetricGroupTab === group.id ? 'primary' : 'default'"
+                    <OTag
+                      type="tabChip"
+                      :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
                       class="tw:ml-0.5"
-                      size="sm"
-                    >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OBadge>
+                    >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OTag>
                   </div>
                 </OTab>
               </OTabs>
@@ -1014,9 +1013,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("correlation.tracesFromService", { service: serviceName })
                 }}</span>
               </div>
-              <OBadge variant="primary">
+              <OTag type="fieldTag" value="primary">
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
-              </OBadge>
+              </OTag>
               <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
                 <OButton
                   variant="ghost"
@@ -1108,10 +1107,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
                 <component v-else :is="group.icon" />
                 <span>{{ group.label }}</span>
-                <OBadge
-                  variant="default"
+                <OTag
+                  type="fieldTag"
                   class="tw:ml-1"
-                >{{ group.streams.length }}</OBadge>
+                >{{ group.streams.length }}</OTag>
               </div>
               <div class="tw:flex tw:gap-1">
                 <OButton
@@ -1237,7 +1236,7 @@ import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

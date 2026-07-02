@@ -206,30 +206,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 Object.keys(getDefaultTier(row).prices || {}).length
               "
             >
-              <span
+              <ODimensionChip
                 v-for="(price, key) in getVisiblePrices(row)"
                 :key="key"
-                class="tw:inline-flex tw:items-center tw:gap-[2px] tw:py-[2px] tw:px-2 tw:rounded-md tw:text-[11px] tw:font-normal tw:whitespace-nowrap tw:border"
-                :class="[
-                  getPriceKeyColorClass(key as string),
-                  store.state.theme === 'dark'
-                    ? 'tw:text-white tw:border-[#4b5563]'
-                    : 'tw:text-inherit tw:border-[#d1d5db]',
-                ]"
-              >
-                <span class="tw:font-medium">{{
-                  formatPriceKey(key as string)
-                }}</span
-                >=<span>{{ formatPerMillion(price as number) }}</span>
-              </span>
-              <span
+                :dim-key="key as string"
+                :key-label="formatPriceKey(key as string)"
+                :value="formatPerMillion(price as number)"
+              />
+              <OTag
                 v-if="getOverflowCount(row) > 0"
-                class="tw:inline-flex tw:items-center tw:gap-[2px] tw:py-[2px] tw:px-2 tw:rounded-md tw:text-[11px] tw:whitespace-nowrap tw:border-0 tw:font-medium tw:cursor-pointer"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'tw:bg-[#4b5563] tw:text-[#d1d5db]'
-                    : 'tw:bg-[#e5e7eb] tw:text-[#6b7280]'
-                "
+                type="countChip"
+                value="neutral"
+                clickable
                 @click.stop="openPricingDialog(row)"
               >
                 +{{ getOverflowCount(row) }}
@@ -264,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                 </OTooltip>
-              </span>
+              </OTag>
             </template>
             <span v-else class="tw:text-text-primary">&mdash;</span>
           </div>
@@ -274,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="!isReadOnly(row)">
               <OButton
                 :variant="
-                  row.enabled ? 'ghost-destructive' : 'ghost'
+                  row.enabled ? 'ghost-destructive' : 'ghost-success'
                 "
                 size="icon-sm"
                 :title="
@@ -510,6 +498,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -694,29 +684,6 @@ const shadowingParentNames = computed(() => {
 /** Shorten usage key for display: replace underscores with hyphens, drop trailing "_tokens". */
 function formatPriceKey(key: string): string {
   return key.replace(/_tokens$/, "").replace(/_/g, "-");
-}
-
-function getPriceKeyColorClass(key: string): string {
-  const k = key.toLowerCase();
-  if (k.includes("input")) return "badge-blue";
-  if (k.includes("output")) return "badge-green";
-  const palette = [
-    "badge-cyan",
-    "badge-purple",
-    "badge-pink",
-    "badge-orange",
-    "badge-amber",
-    "badge-violet",
-    "badge-rose",
-    "badge-teal",
-    "badge-indigo",
-  ];
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash << 5) - hash + key.charCodeAt(i);
-    hash = hash & hash;
-  }
-  return palette[Math.abs(hash) % palette.length];
 }
 
 function formatPerMillion(pricePerToken: number | undefined | null): string {

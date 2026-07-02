@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-current_state="{ row }">
-        <OTag :value="row.current_state" size="sm" dot />
+        <OTag type="alertState" :value="row.current_state" />
       </template>
 
       <template #cell-frequency="{ row }">

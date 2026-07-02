@@ -145,17 +145,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full tw:px-2">
       <!-- Filter bar -->
       <div class="tw:flex tw:items-center tw:pr-2 tw:py-1  tw:shrink-0 tw:min-h-[2rem]">
-        <OBadge
-          variant="default"
+        <OTag
+          type="logsResultChip"
+          value="neutral"
           data-test="rum-player-traces-tab-count-badge"
-          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-4)]! tw:mr-[0.6rem]"
-        >{{ `${formatLargeNumber(correlatedViews.length)} ${t("menu.traces").toLowerCase()}` }}</OBadge>
-        <OBadge
+          class="tw:mr-[0.6rem]"
+        >{{ `${formatLargeNumber(correlatedViews.length)} ${t("menu.traces").toLowerCase()}` }}</OTag>
+        <OTag
           v-if="totalErrorCount > 0"
-          variant="error"
+          type="logsResultChip"
+          value="error"
           data-test="rum-player-traces-tab-error-count-badge"
-          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]!"
-        >{{ `${formatLargeNumber(totalErrorCount)} ${t("rum.errorTraces")}` }}</OBadge>
+        >{{ `${formatLargeNumber(totalErrorCount)} ${t("rum.errorTraces")}` }}</OTag>
       </div>
 
       <!-- Traces table -->
@@ -231,7 +232,7 @@ import useHttpStreaming from "@/composables/useStreamingSearch";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import TraceStatusCell from "@/plugins/traces/components/TraceStatusCell.vue";
 import TenstackTable from "@/components/TenstackTable.vue";

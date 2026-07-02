@@ -152,20 +152,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Name column: badges for type/preview -->
                 <template #cell-name="{ row }">
                   <span :data-test="`report-list-name-cell-${row.name}`">{{ row.name }}</span>
-                  <OBadge
+                  <OTag
                     v-if="row.dashboards?.[0]?.report_type === 'png'"
-                    variant="primary-outline"
+                    type="reportTag"
+                    value="png"
                     class="tw:ml-1"
-                  >
-                    PNG
-                  </OBadge>
-                  <OBadge
+                  />
+                  <OTag
                     v-if="row.imagePreview"
-                    variant="default-outline"
+                    type="reportTag"
+                    value="preview"
                     class="tw:ml-1"
-                  >
-                    Preview
-                  </OBadge>
+                  />
                 </template>
 
                 <!-- Owner column -->
@@ -338,7 +336,7 @@ import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OIcon from '@/lib/core/Icon/OIcon.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
