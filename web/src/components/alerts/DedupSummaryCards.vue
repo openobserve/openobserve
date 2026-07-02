@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="dedup-summary-cards" class="dedup-summary-cards tw:grid tw:grid-cols-4 tw:gap-4 tw:mb-4">
     <!-- Card 1: Total Alerts -->
-    <OCard data-test="total-alerts-card" class="summary-card">
+    <OCard data-test="total-alerts-card" class="tw:border tw:border-(--o2-border) tw:transition-all tw:duration-200 tw:hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
       <OCardSection class="tw:p-4">
         <div data-test="total-alerts-value" class="tw:text-2xl tw:font-semibold">{{ summary.total_alerts }}</div>
         <div data-test="total-alerts-label" class="tw:text-sm tw:text-gray-600">Total Alerts</div>
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCard>
 
     <!-- Card 2: Alerts with Dedup -->
-    <OCard data-test="alerts-with-dedup-card" class="summary-card">
+    <OCard data-test="alerts-with-dedup-card" class="tw:border tw:border-(--o2-border) tw:transition-all tw:duration-200 tw:hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
       <OCardSection class="tw:p-4">
         <div class="tw:flex tw:items-center tw:gap-2">
           <div data-test="alerts-with-dedup-value" class="tw:text-2xl tw:font-semibold">{{ summary.alerts_with_dedup }}</div>
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Card 3: Suppression Rate -->
     <OCard
       data-test="suppression-rate-card"
-      class="summary-card"
+      class="tw:border tw:border-(--o2-border) tw:transition-all tw:duration-200 tw:hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
       :class="{
         'tw:bg-green-50': summary.suppression_rate > 0.5,
         'tw:bg-yellow-50': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCard>
 
     <!-- Card 4: Pending Batches -->
-    <OCard data-test="pending-batches-card" class="summary-card">
+    <OCard data-test="pending-batches-card" class="tw:border tw:border-(--o2-border) tw:transition-all tw:duration-200 tw:hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
       <OCardSection class="tw:p-4">
         <div class="tw:flex tw:items-center tw:gap-2">
           <div data-test="pending-batches-value" class="tw:text-2xl tw:font-semibold">{{ summary.pending_batches }}</div>
@@ -145,14 +145,3 @@ defineExpose({
   fetchSummary
 });
 </script>
-
-<style scoped lang="scss">
-.summary-card {
-  border: 1px solid #e0e0e0;
-  transition: all 0.2s ease;
-
-  &:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  }
-}
-</style>

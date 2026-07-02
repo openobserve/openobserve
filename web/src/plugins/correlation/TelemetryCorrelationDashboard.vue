@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -84,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subject-chips="isNestedGroupMode ? [] : subjectChips"
         v-model:active-subject="activeSubject"
         overflow-mode="responsive"
-        badge-size="md"
         :get-subject-button-label="getSubjectButtonLabel"
       />
 
@@ -173,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- -- Left sidebar -- -->
             <template #before>
               <div
-                class="dimension-sidebar card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col"
+                class="tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-surface-overlay"
               >
                 <!-- Search -->
                   <div
@@ -204,10 +203,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template v-if="group.streams.length > 0">
                         <div
-                          class="metric-group-header tw:cursor-pointer"
+                          class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--o2-section-header-bg) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer"
                           @click="toggleGroupCollapse(group.id)"
                         >
-                          <div class="metric-group-label">
+                          <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
                             <OIcon
                               :name="
                                 collapsedGroups.has(group.id)
@@ -220,12 +219,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
                             <component v-else :is="group.icon" />
                             <span>{{ group.label }}</span>
-                            <OBadge
-                              variant="default"
+                            <OTag
+                              type="fieldTag"
                               class="tw:ml-1"
-                            >{{ group.streams.length }}</OBadge>
+                            >{{ group.streams.length }}</OTag>
                           </div>
-                          <div class="metric-group-actions">
+                          <div class="tw:flex tw:gap-1">
                             <OButton
                               variant="ghost"
                               size="chip"
@@ -249,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-show="!collapsedGroups.has(group.id)"
                           :key="stream.stream_name"
                           data-test="telemetry-correlation-metric-stream-item"
-                          class="dimension-list-item tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                          class="tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-[rgba(0,0,0,0.04)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
                           @click="toggleMetricStream(stream)"
                         >
                           <div class="tw:flex tw:items-center tw:shrink-0">
@@ -265,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                           <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                             <span
-                              class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
+                              class="tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
                               >{{ stream.stream_name }}</span
                             >
                           </div>
@@ -293,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- -- Separator -- -->
             <template #separator>
-              <div class="metric-splitter-separator" />
+              <div class="tw:w-px tw:h-full tw:bg-(--o2-border) tw:cursor-col-resize tw:dark:bg-[rgba(255,255,255,0.12)]" />
             </template>
 
             <!-- -- Right area: group tabs + dashboard -- -->
@@ -334,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="activeMetricGroupTab"
                   dense
                   align="left"
-                  class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                  class="metric-group-tabs tw:shrink-0 tw:bg-surface-panel tw:border-b tw:border-solid tw:border-(--o2-border-color)"
                 >
                   <OTab
                     v-for="group in groupedUniqueMetricStreams.groups.filter(
@@ -348,11 +347,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" />
                       <component v-else :is="group.icon" />
                       <span>{{ group.label }}</span>
-                      <OBadge
-                        :variant="activeMetricGroupTab === group.id ? 'primary' : 'default'"
+                      <OTag
+                        type="tabChip"
+                        :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
                         class="tw:ml-0.5"
-                        size="sm"
-                      >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OBadge>
+                      >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OTag>
                     </div>
                   </OTab>
                 </OTabs>
@@ -502,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Header -->
             <div
-              class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
+              class="tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-surface-panel"
             >
               <div class="tw:flex tw:items-center tw:gap-3">
                 <OIcon name="hub" size="md" />
@@ -526,9 +525,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t('correlation.viewInTraces') }}
                     <OTooltip :content="t('correlation.viewInTraces')" side="top" />
                   </OButton>
-                  <OBadge variant="primary">
+                  <OTag type="fieldTag" value="primary">
                     {{ tracesForDimensions.length }} {{ t("menu.traces") }}
-                  </OBadge>
+                  </OTag>
                 </div>
               </div>
             </div>
@@ -578,7 +577,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODrawer>
 
   <!-- Embedded Tabs Mode -->
-  <div v-else class="correlation-dashboard-embedded">
+  <div v-else class="tw:flex tw:flex-col tw:h-full tw:w-full tw:bg-surface-panel">
     <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
     <DimensionFiltersBar
       v-if="!props.hideDimensionFilters"
@@ -604,8 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
     <OCard
-      class="correlation-content tw:flex-1"
-      style="display: flex; flex-direction: column; overflow: auto"
+      class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-auto"
     >
       <div
         v-if="activeTab == 'logs'"
@@ -676,7 +674,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- -- Left sidebar -- -->
           <template #before>
             <div
-              class="dimension-sidebar card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col"
+              class="tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-surface-overlay"
             >
             <div
               class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
@@ -706,10 +704,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template v-if="group.streams.length > 0">
                       <div
-                        class="metric-group-header tw:cursor-pointer"
+                        class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--o2-section-header-bg) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer"
                         @click="toggleGroupCollapse(group.id)"
                       >
-                        <div class="metric-group-label">
+                        <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
                           <OIcon
                             :name="
                               collapsedGroups.has(group.id)
@@ -722,12 +720,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
                           <component v-else :is="group.icon" />
                           <span>{{ group.label }}</span>
-                          <OBadge
-                            variant="default"
+                          <OTag
+                            type="fieldTag"
                             class="tw:ml-1"
-                          >{{ group.streams.length }}</OBadge>
+                          >{{ group.streams.length }}</OTag>
                         </div>
-                        <div class="metric-group-actions">
+                        <div class="tw:flex tw:gap-1">
                           <OButton
                             variant="ghost"
                             size="chip"
@@ -751,7 +749,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-show="!collapsedGroups.has(group.id)"
                         :key="stream.stream_name"
                         data-test="telemetry-correlation-metric-stream-item"
-                        class="dimension-list-item tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                        class="tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-[rgba(0,0,0,0.04)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
                         @click="toggleMetricStream(stream)"
                       >
                         <div class="tw:flex tw:items-center tw:shrink-0">
@@ -767,7 +765,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                           <span
-                            class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
+                            class="tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
                             >{{ stream.stream_name }}</span
                           >
                         </div>
@@ -795,7 +793,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- -- Separator -- -->
           <template #separator>
-            <div class="metric-splitter-separator" />
+            <div class="tw:w-px tw:h-full tw:bg-(--o2-border) tw:cursor-col-resize tw:dark:bg-[rgba(255,255,255,0.12)]" />
           </template>
 
           <!-- -- Right area: group tabs + dashboard -- -->
@@ -836,7 +834,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="activeMetricGroupTab"
                 dense
                 align="left"
-                class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                class="metric-group-tabs tw:shrink-0 tw:bg-surface-panel tw:border-b tw:border-solid tw:border-(--o2-border-color)"
               >
                 <OTab
                   v-for="group in groupedUniqueMetricStreams.groups.filter(
@@ -857,11 +855,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="xs"
                     />
                     <span>{{ group.label }}</span>
-                    <OBadge
-                      :variant="activeMetricGroupTab === group.id ? 'primary' : 'default'"
+                    <OTag
+                      type="tabChip"
+                      :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
                       class="tw:ml-0.5"
-                      size="sm"
-                    >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OBadge>
+                    >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OTag>
                   </div>
                 </OTab>
               </OTabs>
@@ -1003,7 +1001,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Header -->
           <div
-            class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
+            class="tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-surface-panel"
           >
             <div class="tw:flex tw:items-center tw:gap-3">
               <OIcon name="hub" size="md" />
@@ -1015,9 +1013,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("correlation.tracesFromService", { service: serviceName })
                 }}</span>
               </div>
-              <OBadge variant="primary">
+              <OTag type="fieldTag" value="primary">
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
-              </OBadge>
+              </OTag>
               <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
                 <OButton
                   variant="ghost"
@@ -1089,7 +1087,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:w-full tw:mb-3"
     />
 
-    <div class="metric-list-container">
+    <div class="metric-list-container tw:max-h-100 tw:overflow-y-auto">
       <template
         v-if="
           groupedFilteredMetricStreams.groups.some(
@@ -1104,17 +1102,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Group section — tw:hidden when no streams match -->
           <template v-if="group.streams.length > 0">
             <!-- Group header -->
-            <div class="metric-group-header">
-              <div class="metric-group-label">
+            <div class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--o2-section-header-bg) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10">
+              <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
                 <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
                 <component v-else :is="group.icon" />
                 <span>{{ group.label }}</span>
-                <OBadge
-                  variant="default"
+                <OTag
+                  type="fieldTag"
                   class="tw:ml-1"
-                >{{ group.streams.length }}</OBadge>
+                >{{ group.streams.length }}</OTag>
               </div>
-              <div class="metric-group-actions">
+              <div class="tw:flex tw:gap-1">
                 <OButton
                   variant="ghost"
                   size="chip"
@@ -1138,7 +1136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="stream in group.streams"
               :key="stream.stream_name"
-              class="metric-list-item tw:flex tw:items-center tw:gap-2"
+              class="tw:flex tw:items-center tw:gap-2 tw:py-2 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border)] tw:hover:bg-[rgba(0,0,0,0.04)] tw:dark:border-[rgba(255,255,255,0.1)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
             >
               <div class="tw:flex tw:items-center tw:shrink-0">
                 <OCheckbox
@@ -1152,7 +1150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="metric-label">{{ stream.stream_name }}</span>
+                <span class="tw:text-sm tw:font-[monospace]">{{ stream.stream_name }}</span>
               </div>
             </div>
           </template>
@@ -1238,7 +1236,7 @@ import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -3427,227 +3425,20 @@ watch(
 );
 </script>
 
-<style lang="scss" scoped>
-.correlation-dashboard-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 90vw;
-  max-width: 87.5rem;
-  background: #ffffff !important;
-
-  .correlation-header {
-    flex-shrink: 0;
-    background: #ffffff !important;
-    z-index: 1;
-  }
-
-  .correlation-content {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-  }
+<style>
+.telemetry-correlation-traces .trace-details-content {
+  padding: 0 !important;
 }
-
-.telemetry-correlation-traces {
-  :deep(.trace-details-content) {
-    padding: 0 !important;
-  }
-
-  :deep(.trace-combined-header-wrapper) {
-    margin-bottom: 0 !important;
-  }
+.telemetry-correlation-traces .trace-combined-header-wrapper {
+  margin-bottom: 0 !important;
 }
-
-// Splitter separator visual divider
-.metric-splitter-separator {
-  width: 1px;
-  height: 100%;
-  background: var(--o2-border-color, #e0e0e0);
-  cursor: col-resize;
+.metric-group-tabs .o-tab {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  font-size: 0.8125rem;
 }
-
-body.body--dark .metric-splitter-separator {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-// Dimension sidebar (matching TracesAnalysisDashboard style)
-.dimension-sidebar {
-  background: #ffffff;
-}
-
-.dimension-list-item {
-  border-bottom: none;
-
-  &:hover {
-    background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
-  }
-
-  .dimension-label {
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-  }
-}
-
-// Metric group headers (used in both sidebar and selector dialog)
-.metric-group-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.375rem 0.5rem;
-  background: var(--q-color-grey-2, #f5f5f5);
-  border-bottom: 0.0625rem solid var(--q-border-color, #e0e0e0);
-  position: sticky;
-  top: 0;
-  z-index: 1;
-
-  .metric-group-label {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    opacity: 0.75;
-  }
-
-  .metric-group-actions {
-    display: flex;
-    gap: 0.25rem;
-  }
-}
-
-// Metric group tabs (Infra / Network / Others sub-tabs within the metrics section)
-.metric-group-tabs {
-  flex-shrink: 0;
-  background: var(--color-surface-panel);
-
-  :deep(.o-tab) {
-    min-height: 2rem;
-    padding: 0 0.75rem;
-    font-size: 0.8125rem;
-  }
-
-  :deep(.o-tab__indicator) {
-    height: 0.125rem;
-  }
-}
-
-// Metric selector dialog
-.metric-selector-dialog {
-  min-width: 25rem;
-  max-width: 31.25rem;
-}
-
-.metric-list-container {
-  max-height: 25rem;
-  overflow-y: auto;
-
-  .metric-list-item {
-    padding: 0.5rem 1rem;
-    border-bottom: 0.0625rem solid var(--q-border-color, #e0e0e0);
-
-    &:hover {
-      background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
-    }
-
-    .metric-label {
-      font-size: 0.875rem;
-      line-height: 1.25rem;
-      font-family: monospace;
-    }
-  }
-}
-
-// Embedded mode styling
-.correlation-dashboard-embedded {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  background: #ffffff !important;
-
-  .correlation-header {
-    flex-shrink: 0;
-    background: #ffffff !important;
-    z-index: 1;
-  }
-
-  .correlation-content {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-  }
-}
-
-// Dimension dropdown styling
-.dimension-dropdown {
-  :deep(.q-field__control) {
-    min-height: 2rem;
-    padding: 0 0.5rem;
-  }
-
-  :deep(.q-field__native) {
-    font-size: 0.875rem;
-    padding: 0.25rem 0;
-  }
-
-  :deep(.q-field__append) {
-    padding-left: 0.25rem;
-  }
-}
-
-// Trace header background - light mode
-.trace-header-bg {
-  background: #ffffff;
-}
-
-// Dark mode support
-body.body--dark {
-  .trace-header-bg {
-    background: #1e1e1e;
-  }
-  .correlation-dashboard-embedded {
-    background: #1e1e1e !important;
-
-    .correlation-header {
-      background: #1e1e1e !important;
-    }
-  }
-
-  .correlation-dashboard-card {
-    background: #1e1e1e !important;
-
-    .correlation-header {
-      background: #1e1e1e !important;
-    }
-  }
-
-  .dimension-sidebar {
-    background: #202223 !important;
-  }
-
-  .dimension-list-item {
-    border-bottom-color: rgba(255, 255, 255, 0.06);
-
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-  }
-
-  .metric-group-header {
-    background: #202223 !important;
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .metric-list-item {
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-  }
+.metric-group-tabs .o-tab__indicator {
+  height: 0.125rem;
 }
 
 </style>

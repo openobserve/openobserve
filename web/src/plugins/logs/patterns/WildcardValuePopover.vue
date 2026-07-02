@@ -18,66 +18,98 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-show="visible && !!anchorEl"
     ref="popoverRef"
-    class="wcp"
-    :class="{ 'wcp--flip-up': flipUpward }"
+    class="wcp tw:w-72 tw:bg-(--o2-card-bg-solid) tw:border tw:border-(--o2-border) tw:rounded-[0.625rem] tw:overflow-hidden tw:shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)] tw:[animation:wcpIn_0.15s_ease-out]"
+    :class="{ 'tw:[animation-name:wcpInUp]': flipUpward }"
     :style="popoverStyle"
     data-test="wildcard-value-popover"
     @mouseenter="$emit('popoverEnter')"
     @mouseleave="$emit('popoverLeave')"
   >
     <!-- ── Header ── -->
-    <div class="wcp__header">
-      <div class="wcp__header-left">
-        <OBadge variant="default-soft" size="sm" class="wcp__type-badge">
-          {{ tokenType }}
-        </OBadge>
-        <span class="wcp__title">Variable slot · {{ tokenType }}</span>
+    <div
+      class="wcp__header tw:flex tw:items-center tw:justify-between tw:gap-2 tw:pt-[0.625rem] tw:px-3 tw:pb-[0.375rem]"
+    >
+      <div
+        class="wcp__header-left tw:flex tw:items-center tw:gap-[0.375rem] tw:min-w-0"
+      >
+        <OTag
+          type="fieldType"
+          :value="tokenType"
+          :label="tokenType"
+          class="wcp__type-badge tw:shrink-0 tw:font-mono tw:font-bold"
+        />
+        <span
+          class="wcp__title tw:text-[0.8125rem] tw:font-semibold tw:text-(--o2-text-heading) tw:truncate"
+        >Variable slot · {{ tokenType }}</span>
       </div>
-      <div class="wcp__header-right">
-        <span class="wcp__unique-count">{{ displayValues.length }}</span>
-        <span class="wcp__unique-label">unique</span>
+      <div
+        class="wcp__header-right tw:flex tw:items-baseline tw:gap-1 tw:shrink-0"
+      >
+        <span
+          class="wcp__unique-count tw:text-sm tw:font-bold tw:text-(--o2-text-heading) tw:[font-variant-numeric:tabular-nums]"
+        >{{ displayValues.length }}</span>
+        <span
+          class="wcp__unique-label tw:text-[0.6875rem] tw:text-(--o2-text-caption)"
+        >unique</span>
       </div>
     </div>
 
 
     <!-- ── Value rows ── -->
-    <div class="wcp__body">
+    <div
+      class="wcp__body tw:py-1 tw:max-h-80 tw:overflow-y-auto"
+    >
       <div
         v-for="(item, i) in displayValues.slice(0, 10)"
         :key="i"
-        class="wcp__row"
+        class="wcp__row tw:px-3 tw:pt-[0.375rem] tw:pb-1"
         :data-test="`wildcard-value-row-${i}`"
       >
         <!-- Value name + count -->
-        <div class="wcp__row-top">
-          <span class="wcp__row-value">{{ item.value || "(empty)" }}</span>
-          <span class="wcp__row-count">{{ item.count.toLocaleString() }}</span>
+        <div
+          class="wcp__row-top tw:flex tw:items-baseline tw:justify-between tw:gap-2 tw:mb-1"
+        >
+          <span
+            class="wcp__row-value tw:text-xs tw:font-semibold tw:font-mono tw:text-(--o2-text-body) tw:truncate tw:flex-1 tw:min-w-0"
+          >{{ item.value || "(empty)" }}</span>
+          <span
+            class="wcp__row-count tw:text-[0.8125rem] tw:font-bold tw:text-(--o2-text-heading) tw:[font-variant-numeric:tabular-nums] tw:shrink-0"
+          >{{ item.count.toLocaleString() }}</span>
         </div>
         <!-- Full-width progress bar -->
-        <div class="wcp__bar-track">
+        <div
+          class="wcp__bar-track tw:w-full tw:h-1 tw:bg-(--o2-border-color) tw:rounded-full tw:overflow-hidden tw:mb-[0.1875rem]"
+        >
           <div
-            class="wcp__bar-fill"
+            class="wcp__bar-fill tw:h-full tw:rounded-full tw:transition-[width] tw:duration-200"
             :class="barColorClass"
             :style="{ width: barWidth(item.count) }"
           />
         </div>
         <!-- Percentage -->
-        <div class="wcp__row-pct">
+        <div
+          class="wcp__row-pct tw:text-[0.625rem] tw:text-(--o2-text-caption) tw:[font-variant-numeric:tabular-nums]"
+        >
           {{ totalOccurrences > 0 ? ((item.count / totalOccurrences) * 100).toFixed(1) + '%' : '' }}
         </div>
       </div>
 
       <div
         v-if="displayValues.length === 0"
-        class="wcp__empty"
+        class="wcp__empty tw:py-6 tw:px-3 tw:text-center tw:text-[0.6875rem] tw:text-(--o2-text-muted)"
       >
         {{ t("search.patternNoValuesAvailable") }}
       </div>
     </div>
 
     <!-- ── Footer ── -->
-    <div v-if="displayValues.length > 0 && totalOccurrences > 0" class="wcp__footer">
-      <span class="wcp__occurrences">{{ totalOccurrences.toLocaleString() }} occurrences</span>
+    <div
+      v-if="displayValues.length > 0 && totalOccurrences > 0"
+      class="wcp__footer tw:flex tw:items-center tw:justify-end tw:py-[0.4375rem] tw:px-3 tw:border-t tw:border-(--o2-border-color)"
+    >
+      <span
+        class="wcp__occurrences tw:text-[0.6875rem] tw:font-semibold tw:text-(--o2-text-caption) tw:[font-variant-numeric:tabular-nums]"
+      >{{ totalOccurrences.toLocaleString() }} occurrences</span>
     </div>
   </div>
 </template>
@@ -86,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { wildcardChipColor, wildcardLabel } from "@/composables/useLogs/useTemplateTokenizer";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { WildcardDisplayValue } from "./useWildcardHover";
 
 const props = defineProps<{
@@ -123,11 +155,11 @@ const barWidth = (count: number): string => {
 
 const barColorClass = computed(() => {
   const cls = wildcardChipColor(props.token, props.displayValues);
-  if (cls.includes("blue"))   return "wcp__bar--blue";
-  if (cls.includes("green"))  return "wcp__bar--green";
-  if (cls.includes("orange")) return "wcp__bar--orange";
-  if (cls.includes("purple")) return "wcp__bar--purple";
-  return "wcp__bar--default";
+  if (cls.includes("blue"))   return "tw:bg-(--o2-wildcard-bar-blue)";
+  if (cls.includes("green"))  return "tw:bg-(--o2-wildcard-bar-green)";
+  if (cls.includes("orange")) return "tw:bg-(--o2-wildcard-bar-orange)";
+  if (cls.includes("purple")) return "tw:bg-(--o2-wildcard-bar-purple)";
+  return "tw:bg-(--o2-primary-color)";
 });
 
 // ── Positioning ──────────────────────────────────────────────────────────────
@@ -179,168 +211,13 @@ watch(
 );
 </script>
 
-<style scoped lang="scss">
-/* ── Container ── */
-.wcp {
-  width: 18rem;
-  background: var(--o2-card-bg-solid, #ffffff);
-  border: 1px solid var(--o2-border, #e5e7eb);
-  border-radius: 0.625rem;
-  box-shadow:
-    0 0.5rem 1.5rem rgba(0, 0, 0, 0.14),
-    0 0.125rem 0.375rem rgba(0, 0, 0, 0.06);
-  overflow: hidden;
-  animation: wcpIn 0.15s ease-out;
-}
-
-.wcp--flip-up { animation-name: wcpInUp; }
-
+<style>
+/* ── Animation ── */
 @keyframes wcpIn    { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @keyframes wcpInUp  { from { opacity: 0; transform: translateY(4px);  } to { opacity: 1; transform: none; } }
 
-/* ── Header ── */
-.wcp__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.625rem 0.75rem 0.375rem;
-}
-
-.wcp__header-left {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  min-width: 0;
-}
-
-.wcp__type-badge {
-  flex-shrink: 0;
-  font-family: monospace;
-  font-weight: 700;
-}
-
-.wcp__title {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--o2-text-heading);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.wcp__header-right {
-  display: flex;
-  align-items: baseline;
-  gap: 0.25rem;
-  flex-shrink: 0;
-}
-
-.wcp__unique-count {
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: var(--o2-text-heading);
-  font-variant-numeric: tabular-nums;
-}
-
-.wcp__unique-label {
-  font-size: 0.6875rem;
-  color: var(--o2-text-caption);
-}
-
-
-/* ── Body ── */
-.wcp__body {
-  padding: 0.25rem 0;
-  max-height: 20rem;
-  overflow-y: auto;
-}
-
-/* ── Value row ── */
-.wcp__row {
-  padding: 0.375rem 0.75rem 0.25rem;
-}
-
+/* ── Sibling spacing ── */
 .wcp__row + .wcp__row {
   padding-top: 0.5rem;
-}
-
-.wcp__row-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
-}
-
-.wcp__row-value {
-  font-size: 0.75rem;
-  font-weight: 600;
-  font-family: monospace;
-  color: var(--o2-text-body);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  min-width: 0;
-}
-
-.wcp__row-count {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: var(--o2-text-heading);
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-}
-
-.wcp__bar-track {
-  width: 100%;
-  height: 0.25rem;
-  background: var(--o2-border-color);
-  border-radius: 9999px;
-  overflow: hidden;
-  margin-bottom: 0.1875rem;
-}
-
-.wcp__bar-fill {
-  height: 100%;
-  border-radius: 9999px;
-  transition: width 0.2s ease;
-
-  &.wcp__bar--blue    { background: var(--o2-wildcard-bar-blue,   #6366f1); }
-  &.wcp__bar--green   { background: var(--o2-wildcard-bar-green,  #10b981); }
-  &.wcp__bar--orange  { background: var(--o2-wildcard-bar-orange, #f59e0b); }
-  &.wcp__bar--purple  { background: var(--o2-wildcard-bar-purple, #8b5cf6); }
-  &.wcp__bar--default { background: var(--o2-primary-color,       #6366f1); }
-}
-
-.wcp__row-pct {
-  font-size: 0.625rem;
-  color: var(--o2-text-caption);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── Empty ── */
-.wcp__empty {
-  padding: 1.5rem 0.75rem;
-  text-align: center;
-  font-size: 0.6875rem;
-  color: var(--o2-text-muted);
-}
-
-/* ── Footer ── */
-.wcp__footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0.4375rem 0.75rem;
-  border-top: 1px solid var(--o2-border-color);
-}
-
-.wcp__occurrences {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--o2-text-caption);
-  font-variant-numeric: tabular-nums;
 }
 </style>

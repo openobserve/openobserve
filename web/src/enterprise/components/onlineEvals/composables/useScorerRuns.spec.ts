@@ -17,6 +17,12 @@ import { ref, nextTick } from "vue";
 import { useScorerRuns, type ScorerRunsWindow } from "./useScorerRuns";
 
 const DEFAULT_WINDOW: ScorerRunsWindow = { startUs: 100, endUs: 200 };
+const AGENT_FILTER = {
+  name: "support-agent",
+  id: "agent-123",
+  source_stream: "prod_traces",
+  source_stream_type: "traces",
+};
 
 beforeEach(() => {
   mockExecuteQuery.mockReset();
@@ -37,7 +43,11 @@ describe("useScorerRuns — KPI refresh (eager)", () => {
 
   it("fires the KPI query immediately when scorerId is set, regardless of runsEnabled", async () => {
     mockExecuteQuery.mockResolvedValue([]);
-    useScorerRuns(ref<string | null>("scorer-1"), ref(DEFAULT_WINDOW), ref(false));
+    useScorerRuns(
+      ref<string | null>("scorer-1"),
+      ref(DEFAULT_WINDOW),
+      ref(false),
+    );
     await flushAsync();
 
     expect(mockExecuteQuery).toHaveBeenCalledTimes(1);
@@ -52,7 +62,12 @@ describe("useScorerRuns — KPI refresh (eager)", () => {
 
   it("derives successRate from total and success counts", async () => {
     mockExecuteQuery.mockResolvedValue([
-      { total_runs: 40, success_runs: 36, failure_runs: 4, avg_latency_ms: 120 },
+      {
+        total_runs: 40,
+        success_runs: 36,
+        failure_runs: 4,
+        avg_latency_ms: 120,
+      },
     ]);
     const { kpis } = useScorerRuns(
       ref<string | null>("scorer-1"),
@@ -90,12 +105,31 @@ describe("useScorerRuns — KPI refresh (eager)", () => {
     await flushAsync();
     expect(mockExecuteQuery.mock.calls[0][0]).toContain("'s''1'");
   });
+
+  it("filters evaluator KPIs inline on attributes_target_agent_id when agent is selected", async () => {
+    mockExecuteQuery.mockResolvedValue([]);
+    useScorerRuns(
+      ref<string | null>("scorer-1"),
+      ref(DEFAULT_WINDOW),
+      ref(false),
+      ref(AGENT_FILTER),
+    );
+    await flushAsync();
+
+    const sql = mockExecuteQuery.mock.calls[0][0];
+    expect(sql).toContain("attributes_target_agent_id = 'agent-123'");
+    expect(sql).not.toContain("attributes_target_trace_id IN (");
+  });
 });
 
 describe("useScorerRuns — runs hits (lazy)", () => {
   it("does not fire the runs query when runsEnabled is false", async () => {
     mockExecuteQuery.mockResolvedValue([]);
-    useScorerRuns(ref<string | null>("scorer-1"), ref(DEFAULT_WINDOW), ref(false));
+    useScorerRuns(
+      ref<string | null>("scorer-1"),
+      ref(DEFAULT_WINDOW),
+      ref(false),
+    );
     await flushAsync();
     // Only the KPI query.
     expect(mockExecuteQuery).toHaveBeenCalledTimes(1);
@@ -105,7 +139,11 @@ describe("useScorerRuns — runs hits (lazy)", () => {
     mockExecuteQuery.mockResolvedValue([]);
     const runsEnabled = ref(false);
 
-    useScorerRuns(ref<string | null>("scorer-1"), ref(DEFAULT_WINDOW), runsEnabled);
+    useScorerRuns(
+      ref<string | null>("scorer-1"),
+      ref(DEFAULT_WINDOW),
+      runsEnabled,
+    );
     await flushAsync();
     mockExecuteQuery.mockClear();
 
@@ -116,10 +154,14 @@ describe("useScorerRuns — runs hits (lazy)", () => {
     const sql = mockExecuteQuery.mock.calls[0][0];
     expect(sql).toContain("LIMIT 200");
     expect(sql).toContain("ORDER BY _timestamp DESC");
+    expect(sql).not.toContain("attributes_target_agent_name");
+    expect(sql).not.toContain("attributes_target_agent_id");
   });
 
   it("clears runs when runsEnabled flips back to false", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
+    mockExecuteQuery.mockResolvedValueOnce([
+      { total_runs: 1, success_runs: 1 },
+    ]);
     mockExecuteQuery.mockResolvedValueOnce([
       {
         span_id: "s1",
@@ -145,7 +187,9 @@ describe("useScorerRuns — runs hits (lazy)", () => {
   // Each run row exposes the foreign job id so the Scorer detail's Runs tab
   // can resolve and display the job name in the row.
   it("surfaces attributes_job_id on each run row", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
+    mockExecuteQuery.mockResolvedValueOnce([
+      { total_runs: 1, success_runs: 1 },
+    ]);
     mockExecuteQuery.mockResolvedValueOnce([
       {
         span_id: "s1",
@@ -165,7 +209,9 @@ describe("useScorerRuns — runs hits (lazy)", () => {
   });
 
   it("falls back to a synthetic id when span_id is missing", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
+    mockExecuteQuery.mockResolvedValueOnce([
+      { total_runs: 1, success_runs: 1 },
+    ]);
     mockExecuteQuery.mockResolvedValueOnce([
       {
         // No span_id.
@@ -189,7 +235,9 @@ describe("useScorerRuns — runs hits (lazy)", () => {
 
 describe("useScorerRuns — score / status parsing", () => {
   it("parses numeric / boolean / categorical scores into separate fields", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 3, success_runs: 3 }]);
+    mockExecuteQuery.mockResolvedValueOnce([
+      { total_runs: 3, success_runs: 3 },
+    ]);
     mockExecuteQuery.mockResolvedValueOnce([
       { span_id: "a", attributes_response: '{"value_numeric": 0.75}' },
       { span_id: "b", attributes_response: '{"value_boolean": true}' },
@@ -211,7 +259,9 @@ describe("useScorerRuns — score / status parsing", () => {
   // Statuses outside the known set collapse to "unknown" so the status pill
   // doesn't render an unexpected class.
   it("normalises unknown status values to 'unknown'", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
+    mockExecuteQuery.mockResolvedValueOnce([
+      { total_runs: 1, success_runs: 1 },
+    ]);
     mockExecuteQuery.mockResolvedValueOnce([
       { span_id: "a", attributes_status: "weird_status" },
     ]);
@@ -230,7 +280,9 @@ describe("useScorerRuns — score / status parsing", () => {
   // newer rows but milliseconds for older ones. The composable picks based
   // on magnitude so the relativeTime helper gets a consistent ms value.
   it("normalises microsecond timestamps to milliseconds", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
+    mockExecuteQuery.mockResolvedValueOnce([
+      { total_runs: 1, success_runs: 1 },
+    ]);
     mockExecuteQuery.mockResolvedValueOnce([
       { span_id: "a", _timestamp: 1_700_000_000_000_000 }, // microseconds
     ]);
@@ -247,7 +299,9 @@ describe("useScorerRuns — score / status parsing", () => {
   });
 
   it("keeps millisecond timestamps as-is", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
+    mockExecuteQuery.mockResolvedValueOnce([
+      { total_runs: 1, success_runs: 1 },
+    ]);
     mockExecuteQuery.mockResolvedValueOnce([
       { span_id: "a", _timestamp: 1_700_000_000_000 }, // milliseconds
     ]);
@@ -281,7 +335,9 @@ describe("useScorerRuns — reactivity", () => {
   });
 
   it("clears KPIs when scorerId becomes null", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 5, success_runs: 5 }]);
+    mockExecuteQuery.mockResolvedValueOnce([
+      { total_runs: 5, success_runs: 5 },
+    ]);
     const scorerId = ref<string | null>("scorer-1");
     const { kpis } = useScorerRuns(scorerId, ref(DEFAULT_WINDOW), ref(false));
     await flushAsync();
@@ -306,7 +362,9 @@ describe("useScorerRuns — error handling", () => {
   });
 
   it("Runs query errors leave runs at empty without throwing", async () => {
-    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
+    mockExecuteQuery.mockResolvedValueOnce([
+      { total_runs: 1, success_runs: 1 },
+    ]);
     mockExecuteQuery.mockRejectedValueOnce(new Error("network"));
     const { runs } = useScorerRuns(
       ref<string | null>("scorer-1"),

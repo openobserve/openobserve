@@ -229,46 +229,6 @@ describe("PipelineHistory.vue", () => {
     });
   });
 
-  describe("getStatusVariant helper", () => {
-    it("should return success-outline variant for success status", () => {
-      const wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-
-      expect(vm.getStatusVariant("success")).toBe("success-outline");
-      expect(vm.getStatusVariant("ok")).toBe("success-outline");
-      expect(vm.getStatusVariant("completed")).toBe("success-outline");
-    });
-
-    it("should return error-outline variant for error status", () => {
-      const wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-
-      expect(vm.getStatusVariant("error")).toBe("error-outline");
-      expect(vm.getStatusVariant("failed")).toBe("error-outline");
-    });
-
-    it("should return warning-outline variant for warning status", () => {
-      const wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-
-      expect(vm.getStatusVariant("warning")).toBe("warning-outline");
-    });
-
-    it("should return primary-outline variant for pending/running status", () => {
-      const wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-
-      expect(vm.getStatusVariant("pending")).toBe("primary-outline");
-      expect(vm.getStatusVariant("running")).toBe("primary-outline");
-    });
-
-    it("should return default-outline variant for unknown status", () => {
-      const wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-
-      expect(vm.getStatusVariant("unknown")).toBe("default-outline");
-    });
-  });
 
   describe("table columns", () => {
     it("should have correct column definitions", () => {

@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="trace-correlation-card tw:mt-3">
-    <div class="tags-title tw:font-bold tw:ml-1 tw:mb-2">Distributed Trace</div>
+  <div class="tw:mt-3 tw:border tw:border-solid tw:border-(--o2-border-color) tw:rounded">
+    <div class="tw:text-base tw:text-(--o2-text-color) tw:font-bold tw:ml-1 tw:mb-2">Distributed Trace</div>
 
     <template v-if="isLoading">
       <div class="tw:p-3 tw:text-center">
@@ -34,11 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-else>
       <!-- Trace ID Section -->
-      <div class="trace-info-section tw:p-3">
+      <div class="tw:bg-(--o2-card-bg) tw:p-3">
         <div class="tw:flex tw:items-center tw:mb-3">
           <div class="tw:w-1/4 tw:text-gray-400">Trace ID:</div>
           <div class="tw:w-3/4 tw:flex tw:items-center tw:flex-nowrap">
-            <code class="trace-id-text">{{ formatTraceId(traceId) }}</code>
+            <code
+              data-test="trace-correlation-card-trace-id-text"
+              class="tw:font-mono tw:text-sm tw:py-1 tw:px-2 tw:bg-(--color-surface-accent) tw:rounded tw:text-(--o2-text-color)"
+            >{{ formatTraceId(traceId) }}</code>
             <OButton
               icon-left="content-copy"
               variant="ghost"
@@ -54,26 +57,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:mb-3" v-if="spanId">
           <div class="tw:w-1/4 tw:text-gray-400">Span ID:</div>
           <div class="tw:w-3/4">
-            <code class="span-id-text">{{ formatSpanId(spanId) }}</code>
+            <code
+              data-test="trace-correlation-card-span-id-text"
+              class="tw:font-mono tw:text-sm tw:py-1 tw:px-2 tw:bg-(--color-surface-accent) tw:rounded tw:text-(--o2-text-color)"
+            >{{ formatSpanId(spanId) }}</code>
           </div>
         </div>
 
         <!-- Span Hierarchy -->
         <div v-if="hasBackendTrace" class="tw:mb-3">
           <div class="tw:text-gray-400 tw:mb-1">Span Hierarchy:</div>
-          <div class="span-hierarchy tw:ml-3">
-            <div class="span-item">
+          <div class="tw:ml-3">
+            <div class="tw:flex tw:items-center tw:py-1 tw:text-sm">
               <OIcon name="circle" size="xs" class="tw:mr-1" />
               <span class="tw:text-gray-500">Application Span</span>
             </div>
-            <div class="span-item tw:ml-3">
+            <div class="tw:flex tw:items-center tw:py-1 tw:text-sm tw:ml-3">
               <OIcon name="arrow-right" size="sm" class="tw:mr-1" />
               <OIcon name="circle" size="xs" class="tw:mr-1" />
               <span class="tw:text-gray-500"
                 >Browser SDK Span ({{ formatSpanId(spanId) }})</span
               >
             </div>
-            <div class="span-item tw:ml-4" v-if="backendSpanCount > 0">
+            <div class="tw:flex tw:items-center tw:py-1 tw:text-sm tw:ml-4" v-if="backendSpanCount > 0">
               <OIcon name="arrow-right" size="sm" class="tw:mr-1" />
               <OIcon
                 name="circle"
@@ -90,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Performance Breakdown -->
         <div v-if="performanceData" class="tw:mb-3">
           <div class="tw:text-gray-400 tw:mb-1">Performance Breakdown:</div>
-          <div class="performance-breakdown">
+          <div class="tw:p-2 tw:bg-(--color-surface-accent) tw:rounded tw:text-sm">
             <div class="tw:flex tw:items-center tw:mb-1">
               <div class="tw:w-5/12 tw:text-gray-500">Total Duration:</div>
               <div class="tw:w-7/12 tw:font-bold">
@@ -178,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Missing trace notice -->
         <div
           v-if="!hasBackendTrace && traceId"
-          class="tw:mt-3 tw:p-2 tw:bg-[var(--o2-hover-accent)] tw:rounded"
+          class="tw:mt-3 tw:p-2 tw:bg-(--color-surface-accent) tw:rounded"
         >
           <div class="tw:flex tw:items-center">
             <OIcon name="info" size="sm" class="tw:mr-2" />
@@ -295,44 +301,3 @@ const refreshTraceData = () => {
 };
 </script>
 
-<style lang="scss" scoped>
-.trace-correlation-card {
-  border: 1px solid var(--o2-border-color);
-  border-radius: 4px;
-}
-
-.trace-info-section {
-  background-color: var(--o2-card-bg);
-}
-
-.trace-id-text,
-.span-id-text {
-  font-family: monospace;
-  font-size: 0.875rem;
-  padding: 0.25rem 0.5rem;
-  background-color: var(--o2-hover-accent);
-  border-radius: 4px;
-  color: var(--o2-text-color);
-}
-
-.span-hierarchy {
-  .span-item {
-    display: flex;
-    align-items: center;
-    padding: 0.25rem 0;
-    font-size: 0.875rem;
-  }
-}
-
-.performance-breakdown {
-  padding: 0.5rem;
-  background-color: var(--o2-hover-accent);
-  border-radius: 4px;
-  font-size: 0.875rem;
-}
-
-.tags-title {
-  font-size: 1rem;
-  color: var(--o2-text-color);
-}
-</style>

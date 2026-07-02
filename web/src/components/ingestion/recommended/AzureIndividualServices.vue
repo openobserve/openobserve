@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="azure-integration-grid">
+  <div class="tw:w-full">
     <div class="tw:mb-4">
       <OSearchInput
         v-model="searchQuery"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="filteredIntegrations.length === 0"
-      class="tw:text-center tw:py-12 empty-state"
+      class="tw:text-center tw:py-12 tw:text-[#666] tw:dark:text-[#999]"
     >
       <OIcon name="search-off" class="tw:mb-2" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-base">No integrations found matching your search</div>
@@ -118,19 +118,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.azure-integration-grid {
-  width: 100%;
-
-  .empty-state {
-    .body--light & {
-      color: #666;
-    }
-
-    .body--dark & {
-      color: #999;
-    }
-  }
-}
-</style>

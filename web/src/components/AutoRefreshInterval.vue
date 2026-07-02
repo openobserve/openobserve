@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon
             name="update"
-            :class="isAnimating ? 'rotating-icon' : ''"
+            :class="isAnimating ? 'tw:![animation:rotate_2s_linear_infinite] tw:![transform-origin:center_center] tw:!inline-block' : ''"
             size="sm"
           />
           <OTooltip :content="`${t('search.autoRefresh')}: ${selectedLabel}`" />
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="update"
               size="sm"
               :class="[
-                isAnimating ? 'rotating-icon' : '',
+                isAnimating ? 'tw:![animation:rotate_2s_linear_infinite] tw:![transform-origin:center_center] tw:!inline-block' : '',
                 isAnimating ? 'text-primary' : '',
                 'tw:mr-0.5',
               ]"
@@ -382,15 +382,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.refresh-interval-dropdown {
-  min-width: 2.25rem;
-  height: 100%;
-  min-height: 1.875rem;
-  line-height: 1.875rem;
-  padding: 0 0.3125rem;
-}
-
+<style>
 @keyframes rotate {
   0% {
     transform: rotate(0deg);
@@ -398,17 +390,5 @@ export default defineComponent({
   100% {
     transform: rotate(360deg);
   }
-}
-
-:deep(.rotating-icon) {
-  animation: rotate 2s linear infinite !important;
-  transform-origin: center center !important;
-  display: inline-block !important;
-}
-
-.rotating-icon {
-  animation: rotate 2s linear infinite !important;
-  transform-origin: center center !important;
-  display: inline-block !important;
 }
 </style>

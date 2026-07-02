@@ -1,8 +1,8 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:flex tw:flex-col index-menu default-index-menu tw:h-full!">
-    <div class="index-table logs-index-menu tw:h-full!">
+  <div class="tw:flex tw:flex-col tw:w-full index-menu default-index-menu tw:h-full!">
+    <div class="index-table logs-index-menu tw:h-full! tw:w-full">
       <OFieldList
         ref="fieldListRef"
         :fields="fieldListItems"
@@ -45,9 +45,9 @@
         <!-- Field row: render field name with expand chevron + actions inside OFieldRow -->
         <template #field-row="{ row }">
           <OFieldRow>
-            <span class="field-type-container">
+            <span class="field-type-container tw:w-[0.55rem] tw:shrink-0 tw:flex tw:items-center tw:justify-center">
               <OIcon
-                class="field-expand-icon"
+                class="field-expand-icon tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-4 tw:text-[var(--o2-text-muted)]"
                 :name="expandedRows[row.name] ? 'expand-more' : 'chevron-right'"
                 size="sm"
               />
@@ -157,7 +157,7 @@
 
         <!-- After list: pagination -->
         <template #after-list="bottomProps">
-          <div v-if="bottomProps.totalPages > 1" class="field-list-pagination">
+          <div v-if="bottomProps.totalPages > 1" class="tw:flex tw:items-center tw:gap-1 tw:ml-auto">
             <OTooltip
               side="left"
               align="center"
@@ -169,7 +169,7 @@
               size="icon-panel"
               :disabled="bottomProps.isFirstPage"
               @click="bottomProps.firstPage"
-              class="pagination-nav-btn"
+              class="tw:py-1.5 tw:px-1! tw:m-0! tw:min-w-6! tw:w-6! tw:min-h-5.5! tw:h-5.5! tw:rounded! tw:overflow-visible!"
             >
               <OIcon name="fast-rewind" size="sm" />
             </OButton>
@@ -182,7 +182,7 @@
                   bottomProps.currentPage === page ? 'primary' : 'ghost'
                 "
                 size="icon-panel"
-                class="pagination-page-btn"
+                class="tw:py-1.5 tw:px-1! tw:m-0! tw:min-w-6! tw:w-6! tw:min-h-5.5! tw:h-5.5! tw:text-xs! tw:font-medium tw:leading-none tw:text-(--o2-text-primary)! tw:rounded! tw:overflow-visible!"
                 @click="setPage(page)"
                 >{{ page }}</OButton
               >
@@ -192,7 +192,7 @@
               size="icon-panel"
               :disabled="bottomProps.isLastPage"
               @click="bottomProps.lastPage"
-              class="pagination-nav-btn"
+              class="tw:py-1.5 tw:px-1! tw:m-0! tw:min-w-6! tw:w-6! tw:min-h-5.5! tw:h-5.5! tw:rounded! tw:overflow-visible!"
             >
               <OIcon name="fast-forward" size="sm" />
             </OButton>

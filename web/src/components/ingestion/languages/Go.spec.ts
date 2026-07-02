@@ -119,7 +119,7 @@ describe('Go.vue Comprehensive Coverage', () => {
       wrapper = createWrapper();
       const docLink = wrapper.find('a');
       expect(docLink.classes()).toContain('tw:text-text-link');
-      expect(docLink.classes()).toContain('hover:tw:text-text-link-hover');
+      expect(docLink.classes()).toContain('tw:hover:text-text-link-hover');
       expect(docLink.classes()).toContain('tw:underline');
     });
 

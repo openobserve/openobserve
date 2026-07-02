@@ -92,12 +92,12 @@ function formatTime(ts: string): string {
 
 <template>
   <div
-    class="hch-root"
+    class="tw:flex tw:flex-col tw:h-full tw:text-base tw:w-[15em] tw:shrink-0 tw:border-r tw:border-r-[0.0625em] tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:overflow-hidden"
     :class="store.state.theme === 'dark' ? 'hch-dark' : 'hch-light'"
   >
     <!-- Header -->
-    <div class="hch-header">
-      <span class="hch-title">{{ t("chatHistory.title") }}</span>
+    <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:pt-[0.625em] tw:pb-[0.375em] tw:shrink-0">
+      <span class="tw:text-[0.8125em] tw:font-semibold tw:opacity-70">{{ t("chatHistory.title") }}</span>
       <OButton
         variant="ghost-muted"
         size="icon"
@@ -121,10 +121,10 @@ function formatTime(ts: string): string {
     </div>
 
     <!-- Search -->
-    <div class="hch-search">
-      <div class="hch-search-wrap">
+    <div class="tw:px-2 tw:pb-[0.375em] tw:shrink-0">
+      <div class="tw:flex tw:items-center tw:gap-[0.375em] tw:bg-(--o2-input-bg) tw:rounded-md tw:px-[0.375em]">
         <svg
-          class="hch-search-icon"
+          class="tw:opacity-50 tw:shrink-0"
           width="0.875em"
           height="0.875em"
           viewBox="0 0 24 24"
@@ -139,7 +139,7 @@ function formatTime(ts: string): string {
         </svg>
         <input
           v-model="searchTerm"
-          class="hch-search-input"
+          class="hch-search-input tw:flex-1 tw:min-w-0 tw:border-0 tw:bg-transparent tw:outline-none tw:text-[0.8125em] tw:text-(--o2-text-primary) tw:py-[0.375em]"
           :placeholder="t('chatHistory.search')"
           type="text"
         />
@@ -166,19 +166,21 @@ function formatTime(ts: string): string {
     </div>
 
     <!-- List -->
-    <div class="hch-list">
+    <div class="hch-list tw:flex-1 tw:overflow-y-auto tw:py-1 tw:px-[0.375em]">
       <div
         v-for="chat in filtered"
         :key="chat.id"
-        class="hch-item"
-        :class="{ 'hch-item-active': activeChatId === chat.id }"
+        class="tw:group tw:flex tw:items-center tw:gap-1 tw:py-[0.4375em] tw:px-2 tw:rounded-md tw:cursor-pointer tw:transition-[background] tw:duration-[120ms] tw:hover:bg-[var(--o2-hover-color,rgba(128,128,128,0.1))]"
+        :class="{
+          'tw:bg-[var(--o2-selected-color,rgba(57,126,246,0.12))]!': activeChatId === chat.id,
+        }"
         @click="selectChat(chat.id)"
       >
-        <div class="hch-item-content">
-          <div class="hch-item-title">{{ chat.title }}</div>
-          <div class="hch-item-time">{{ formatTime(chat.timestamp) }}</div>
+        <div class="tw:flex-1 tw:min-w-0">
+          <div class="tw:text-[0.8125em] tw:leading-[1.35] tw:truncate tw:text-(--o2-text-body)" :class="{ 'tw:font-medium': activeChatId === chat.id }">{{ chat.title }}</div>
+          <div class="tw:text-[0.6875em] tw:text-(--o2-text-caption) tw:mt-[0.0625em]">{{ formatTime(chat.timestamp) }}</div>
         </div>
-        <span class="hch-delete-wrap">
+        <span class="tw:inline-flex tw:items-center tw:shrink-0 tw:opacity-0 tw:transition-opacity tw:duration-[120ms] tw:group-hover:opacity-100">
           <OButton
             variant="ghost-destructive"
             size="icon"
@@ -205,7 +207,7 @@ function formatTime(ts: string): string {
         </span>
       </div>
 
-      <div v-if="filtered.length === 0" class="hch-empty">
+      <div v-if="filtered.length === 0" class="tw:text-center tw:text-[0.8125em] tw:opacity-[0.45] tw:py-[1.5em]">
         {{
           searchTerm ? t("chatHistory.noMatches") : t("chatHistory.noHistory")
         }}
@@ -213,7 +215,7 @@ function formatTime(ts: string): string {
     </div>
 
     <!-- Clear all -->
-    <div v-if="history.length > 0" class="hch-footer">
+    <div v-if="history.length > 0" class="tw:shrink-0 tw:py-[0.375em] tw:px-2 tw:border-t tw:border-t-[0.0625em] tw:border-t-(--o2-border-color)">
       <OButton variant="ghost-subtle" :block="true" @click="clearAll">
         <svg
           width="0.875em"
@@ -234,139 +236,10 @@ function formatTime(ts: string): string {
   </div>
 </template>
 
-<style scoped lang="scss">
-.hch-root {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  font-size: 1rem;
-  width: 15em;
-  flex-shrink: 0;
-  border-right: 0.0625em solid var(--o2-border-color);
-  background: var(--o2-card-bg);
-  overflow: hidden;
-}
-
-.hch-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.625em 0.75em 0.375em;
-  flex-shrink: 0;
-}
-
-.hch-title {
-  font-size: 0.8125em;
-  font-weight: 600;
+<style>
+/* placeholder pseudo-element — cannot be inlined */
+.hch-search-input::placeholder {
+  color: var(--o2-text-muted);
   opacity: 0.7;
-}
-
-.hch-search {
-  padding: 0 0.5em 0.375em;
-  flex-shrink: 0;
-}
-
-.hch-search-wrap {
-  display: flex;
-  align-items: center;
-  gap: 0.375em;
-  background: var(--o2-input-bg, rgba(128, 128, 128, 0.08));
-  border-radius: 0.375em;
-  padding: 0 0.375em;
-}
-
-.hch-search-icon {
-  opacity: 0.5;
-  flex-shrink: 0;
-}
-
-.hch-search-input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 0.8125em;
-  color: var(--o2-text-primary);
-  padding: 0.375em 0;
-
-  &::placeholder {
-    color: var(--o2-text-muted);
-    opacity: 0.7;
-  }
-}
-
-.hch-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.25em 0.375em;
-}
-
-.hch-item {
-  display: flex;
-  align-items: center;
-  gap: 0.25em;
-  padding: 0.4375em 0.5em;
-  border-radius: 0.375em;
-  cursor: pointer;
-  transition: background 0.12s;
-
-  &:hover {
-    background: var(--o2-hover-color, rgba(128, 128, 128, 0.1));
-
-    .hch-delete-wrap {
-      opacity: 1;
-    }
-  }
-}
-
-.hch-item-active {
-  background: var(--o2-selected-color, rgba(57, 126, 246, 0.12)) !important;
-
-  .hch-item-title {
-    color: var(--o2-text-body);
-    font-weight: 500;
-  }
-}
-
-.hch-item-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.hch-delete-wrap {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 0.12s;
-}
-
-.hch-item-title {
-  font-size: 0.8125em;
-  line-height: 1.35;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--o2-text-body);
-}
-
-.hch-item-time {
-  font-size: 0.6875em;
-  color: var(--o2-text-caption);
-  margin-top: 0.0625em;
-}
-
-.hch-empty {
-  text-align: center;
-  font-size: 0.8125em;
-  opacity: 0.45;
-  padding: 1.5em 0;
-}
-
-.hch-footer {
-  flex-shrink: 0;
-  padding: 0.375em 0.5em;
-  border-top: 0.0625em solid var(--o2-border-color);
 }
 </style>

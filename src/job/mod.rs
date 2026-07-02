@@ -763,6 +763,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
     );
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
+        "gen_ai_agent_registry_batch_processor",
+        get_o2_config()
+            .gen_ai_agent_registry
+            .batch_flush_interval_secs,
+        {
+            o2_enterprise::enterprise::llm_evaluations::agent_registry::run_once().await;
+        }
+    );
+    #[cfg(feature = "enterprise")]
+    spawn_pausable_job!(
         "service_streams_cleanup",
         get_o2_config().service_streams.cleanup_interval_mins * 60, // convert minutes to seconds
         {

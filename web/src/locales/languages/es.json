@@ -475,7 +475,9 @@
     "actions": "Acciones",
     "incidents": "Incidentes",
     "evals": "Evaluaciones",
-    "aiObservability": "Observabilidad de la IA"
+    "keyboardShortcuts": "Métodos abreviados de teclado",
+    "aiObservability": "Observabilidad de la IA",
+    "aiAssistant": "Asistente de IA"
   },
   "rum": {
     "title": "Monitorización de usuarios reales",
@@ -3107,6 +3109,25 @@
     "aiToolsets": "Conjuntos de herramientas de IA",
     "llmModelPricing": "Precios del modelo LLM",
     "ingestionTokens": "Tokens de ingestión",
+    "genAiAgentMapping": {
+      "tabLabel": "Mapeo de agentes GenAI",
+      "title": "Mapeo de agentes GenAI",
+      "description": "Configure los atributos de telemetría alternativos que se utilizan para normalizar la identidad del agente para los seguimientos y las evaluaciones de LLM.",
+      "howItWorksTitle": "Cómo funciona el mapeo",
+      "howItWorksDescription": "OpenObserve primero conserva los atributos gen_ai.agent.name y gen_ai.agent.id estándar. Estas listas se comprueban solo cuando faltan los atributos estándar o están vacíos. Agregue un atributo de telemetría entrante por línea.",
+      "agentNameFields": "Campos alternativos del nombre del agente",
+      "agentNameHelp": "Atributos entrantes para usar como respaldo para gen_ai.agent.name.",
+      "agentIdFields": "Campos alternativos de ID de agente",
+      "agentIdHelp": "Atributos entrantes para usar como respaldo para gen_ai.agent.id.",
+      "fieldsPlaceholder": "nombre del agente\nllm.agent.name",
+      "applyDefaults": "Aplicar valores predeterminados",
+      "resetToEmpty": "Restablecer como vacío",
+      "defaultsSource": "Los valores predeterminados se cargan desde openobserve/sdr_patterns y se pueden modificar antes de guardarlos para esta organización.",
+      "saved": "El mapeo de agentes de GenAI se guardó correctamente",
+      "loadFailed": "No se pudo cargar el mapeo del agente GenAI",
+      "saveFailed": "No se pudo guardar el mapeo de agentes de GenAI",
+      "defaultsLoadFailed": "No se pudieron cargar los valores predeterminados de mapeo del agente GenAI"
+    },
     "groupGeneral": "General",
     "groupAccessSecurity": "Acceso y seguridad",
     "groupDestinationsTemplates": "Destinos y plantillas",
@@ -5681,6 +5702,83 @@
       "description": "Los proveedores de LLM almacenan los detalles de conexión (punto final y credenciales) de los modelos lingüísticos a los que llaman los evaluadores de LLM Judge. Agregue uno para comenzar a realizar evaluaciones basadas en jueces."
     }
   },
+  "shortcuts": {
+    "title": "Métodos abreviados de teclado",
+    "mac": "Mac",
+    "windowsLinux": "Windows/Linux",
+    "toggleHint": "para cambiar este panel",
+    "pages": {
+      "global": "Global",
+      "logs": "Registros",
+      "dashboardsList": "Tableros",
+      "dashboards": "Vista del tablero",
+      "dashboardsPanel": "Tablero — Panel (coloca el cursor sobre un panel)",
+      "metrics": "Métricas",
+      "traces": "Huellas",
+      "alerts": "Alertas",
+      "streams": "Transmisiones",
+      "pipelines": "Tuberías",
+      "functions": "Funciones",
+      "reports": "Informes"
+    },
+    "actions": {
+      "openCheatsheet": "Abrir hoja de referencia de atajos de teclado",
+      "closeDialog": "Cierre cualquier cuadro de diálogo, cajón o modal",
+      "focusSearch": "Barra de búsqueda de enfoque",
+      "logsRunQuery": "Ejecutar consulta de búsqueda",
+      "logsRefresh": "Actualizar o volver a ejecutar la búsqueda",
+      "logsToggleHistogram": "Alternar histograma",
+      "logsToggleSidebar": "Barra lateral de alternar campos",
+      "dashboardsListAdd": "Nuevo panel",
+      "dashboardsListImport": "Panel de importación",
+      "dashboardsListRefresh": "Actualizar lista",
+      "dashboardRefresh": "Actualizar todos los paneles",
+      "dashboardAddPanel": "Añadir panel nuevo",
+      "dashboardSave": "Guardar panel",
+      "dashboardFullscreen": "Alternar pantalla completa",
+      "panelView": "Pantalla completa del panel de visualización",
+      "panelEdit": "Panel de edición",
+      "panelDuplicate": "Panel duplicado",
+      "panelDelete": "Eliminar panel",
+      "metricsRunQuery": "Ejecute la consulta PromQL",
+      "metricsRefresh": "Refrescar",
+      "tracesSearch": "Rastros de búsqueda",
+      "tracesRefresh": "Refrescar",
+      "alertsCreate": "Crear nueva alerta",
+      "alertsRefresh": "Actualizar lista de alertas",
+      "alertsClose": "Cerrar el cajón de detalles de alertas",
+      "streamsAdd": "Agregar nueva transmisión",
+      "streamsRefresh": "Actualizar lista",
+      "pipelinesAdd": "Crear una nueva canalización",
+      "pipelinesImport": "Canalización de importación",
+      "pipelinesRefresh": "Actualizar lista",
+      "functionsAdd": "Añadir nueva función",
+      "functionsRefresh": "Actualizar lista",
+      "reportsAdd": "Crear un nuevo informe",
+      "reportsRefresh": "Actualizar lista"
+    },
+    "search": "Atajos de búsqueda...",
+    "noResults": "No se han encontrado atajos",
+    "subtitle": "¿Prensa? en cualquier lugar · haga clic en cualquier fila para activarla",
+    "footerClose": "cerca",
+    "footerReopen": "volver a abrir",
+    "footerRun": "haga clic en la fila para ejecutar",
+    "footerMacHint": "⌘ = Cmd en Mac · Ctrl en Windows",
+    "modules": {
+      "global": "Global",
+      "logs": "Registros",
+      "dashboards": "Tableros",
+      "metrics": "Métricas",
+      "traces": "Huellas",
+      "alerts": "Alertas",
+      "streams": "Transmisiones",
+      "pipelines": "Tuberías",
+      "functions": "Funciones",
+      "reports": "Informes",
+      "iam": "SOY YO",
+      "runningQueries": "Ejecución de consultas"
+    }
+  },
   "aiObservability": {
     "title": "LLM Observabilidad",
     "sections": {
@@ -5740,6 +5838,14 @@
         "title": "Errores recientes",
         "subtitle": "últimos 10 intervalos fallidos"
       }
+    },
+    "subtitle": {
+      "llmInsights": "Realice un seguimiento de la latencia, los errores, los tokens y los costos en todo su tráfico de LLM",
+      "sessions": "Explore e inspeccione las sesiones de los agentes paso a paso",
+      "quality": "Califica y controla la calidad de tus respuestas de LLM",
+      "evalJobs": "Ejecute y supervise los trabajos de evaluación en todas sus sesiones",
+      "scorers": "Cree y administre los puntajes que califican los resultados del LLM",
+      "scoreConfigs": "Configure las rúbricas de puntuación utilizadas en sus evaluaciones"
     }
   },
   "logs": {

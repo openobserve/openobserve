@@ -43,10 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
         <OSeparator class="tw:mr-4 tw:mt-4" />
-        <div class="error-report-container">
+        <div class="tw:h-[calc(60vh-8px)] tw:overflow-auto [resize:none] tw:w-full tw:min-w-[400px]">
         <!-- Template Errors Section -->
         <div
-          class="error-section"
+          class="error-section tw:p-2.5 tw:mb-2.5"
           v-if="templateErrorsToDisplay.length > 0"
         >
           <div class="error-list">
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(errorMessage, errorIndex) in errorGroup"
                 :key="errorIndex"
-                class="error-item"
+                class="error-item tw:py-1.25 tw:px-0 tw:text-sm tw:wrap-break-word"
                 :data-test="`template-import-error-${index}-${errorIndex}`"
               >
                 <span
@@ -158,9 +158,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="error-section" v-if="tempalteCreators.length > 0">
+        <div class="error-section tw:p-2.5 tw:mb-2.5" v-if="tempalteCreators.length > 0">
           <div
-            class="section-title text-primary"
+            class="tw:text-base tw:mb-2.5 tw:uppercase text-primary"
             data-test="template-import-creation-title"
           >
             Template Creation
@@ -173,13 +173,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div
               :class="{
-                'error-item tw:font-bold': true,
+                'error-item tw:py-1.25 tw:px-0 tw:text-sm tw:wrap-break-word tw:font-bold': true,
                 'text-green ': val.success,
                 'text-red': !val.success,
               }"
               :data-test="`template-import-creation-${index}-message`"
             >
-              <pre>{{ val.message }}</pre>
+              <pre class="tw:[white-space:pre-wrap] tw:[word-wrap:break-word] tw:[word-break:break-word] tw:[overflow-wrap:break-word] tw:font-[inherit] tw:m-0">{{ val.message }}</pre>
             </div>
           </div>
         </div>
@@ -543,41 +543,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.error-report-container {
-  height: calc(60vh - 8px) !important;
-  overflow: auto;
-  resize: none;
-  width: 100%;
-  min-width: 400px;
-}
-
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-
-  pre {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    word-break: break-word;
-    overflow-wrap: break-word;
-    font-family: inherit;
-    margin: 0;
-  }
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-
-.error-item {
-  padding: 5px 0px;
-  font-size: 14px;
-  word-wrap: break-word;
-  word-break: break-word;
-  overflow-wrap: break-word;
-}
-</style>

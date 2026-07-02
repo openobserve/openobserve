@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <EvalListShell
     data-test="eval-job"
     :show-empty="false"
@@ -64,15 +64,11 @@
         </template>
 
         <template #cell-stream="{ row }">
-          <span class="ej-mono-cell">{{ row.stream }}</span>
+          <span class="tw:font-mono tw:text-xs">{{ row.stream }}</span>
         </template>
 
         <template #cell-scorers="{ row }">
-          <span class="ej-mono-cell">{{ scorerCountText(row) }}</span>
-        </template>
-
-        <template #cell-lastRun>
-          <span class="ej-muted-cell">—</span>
+          <span class="tw:font-mono tw:text-xs">{{ scorerCountText(row) }}</span>
         </template>
 
         <template #cell-created="{ row }">
@@ -84,7 +80,7 @@
             <OButton
               v-if="canActivate(row.status)"
               :data-test="`eval-job-list-${row.name}-activate-btn`"
-              variant="ghost"
+              variant="ghost-success"
               size="icon-sm"
               :title="t('onlineEvals.actions.activate')"
               icon-left="play-arrow"
@@ -95,7 +91,7 @@
             <OButton
               v-if="canPause(row.status)"
               :data-test="`eval-job-list-${row.name}-pause-btn`"
-              variant="ghost"
+              variant="ghost-destructive"
               size="icon-sm"
               :title="t('onlineEvals.actions.pause')"
               icon-left="pause"
@@ -227,13 +223,6 @@ const columns = computed(() => [
     meta: { align: "right" },
   },
   {
-    id: "lastRun",
-    header: t("onlineEvals.job.columns.lastRun"),
-    sortable: false,
-    size: COL.date,
-    meta: { align: "left" },
-  },
-  {
     id: "created",
     header: t("onlineEvals.job.columns.created"),
     accessorFn: (row: EvalJob) => rowCreated(row),
@@ -304,57 +293,3 @@ function formatDateShort(value: number) {
   return formatDate(value, "YYYY-MM-DD HH:mm:ss");
 }
 </script>
-
-<style lang="scss">
-.ej-status-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font: 600 11px/1.5 inherit;
-  text-transform: capitalize;
-}
-
-.ej-status-chip__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: currentColor;
-}
-
-.ej-status-chip--active {
-  background: color-mix(in srgb, var(--o2-status-success-text) 14%, transparent);
-  color: var(--o2-status-success-text);
-}
-
-.ej-status-chip--draft {
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.ej-status-chip--paused {
-  background: color-mix(in srgb, var(--o2-status-warning-text) 14%, transparent);
-  color: var(--o2-status-warning-text);
-}
-
-.ej-status-chip--degraded {
-  background: color-mix(in srgb, var(--o2-status-warning-text) 14%, transparent);
-  color: var(--o2-status-warning-text);
-}
-
-.ej-status-chip--archived {
-  background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  opacity: 0.7;
-}
-
-.ej-mono-cell {
-  font-size: 12px;
-}
-
-.ej-muted-cell {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-}
-</style>

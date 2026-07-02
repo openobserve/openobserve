@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:relative tw:rounded-lg tw:overflow-hidden copy-content-block">
+  <div class="tw:relative tw:rounded-lg tw:overflow-hidden copy-content-block" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(255,255,255,0.06)]' : 'tw:bg-[rgba(0,0,0,0.05)]'">
     <div class="tw:absolute tw:top-2 tw:right-2 tw:z-10">
       <OButton
         data-test="rum-copy-btn"
@@ -127,15 +127,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-.copy-content-block {
-  background-color: rgba(136, 136, 136, 0.103);
-}
-.dark-mode .copy-content-block {
-  background-color: rgba(255, 255, 255, 0.06);
-}
-.light-mode .copy-content-block {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-</style>

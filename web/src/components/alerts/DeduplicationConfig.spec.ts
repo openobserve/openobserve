@@ -67,7 +67,9 @@ describe("DeduplicationConfig - rendering", () => {
 
   it("renders the expanded content when isExpanded is true", async () => {
     const w = await mountComp();
-    expect(w.html()).toContain("deduplication-config");
+    expect(
+      w.find('[data-test="alerts-deduplication-config"]').exists(),
+    ).toBe(true);
   });
 });
 

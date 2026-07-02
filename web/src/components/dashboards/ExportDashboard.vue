@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="export-dashboard"
     icon-left="download"
   >
-    <OTooltip :content="t('dashboard.export')" />
+    <OTooltip :content="t('dashboard.export')" shortcut-id="dashboardExport" />
   </OButton>
 </template>
 <script lang="ts">

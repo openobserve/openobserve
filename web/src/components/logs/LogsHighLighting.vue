@@ -35,7 +35,7 @@ Usage Examples:
 - <LogsHighLighting :data="1234567890123" />  // Timestamp-like number
 -->
 <template>
-  <span class="logs-highlight-json" v-html="colorizedJson"></span>
+  <span class="logs-highlight-json tw:font-mono tw:text-xs tw:wrap-break-word tw:inline" v-html="colorizedJson"></span>
 </template>
 
 <script setup lang="ts">
@@ -80,13 +80,6 @@ const colorizedJson = computed((): string => {
 });
 </script>
 
-<style scoped lang="scss">
+<style>
 @import "@/assets/styles/log-highlighting.css";
-
-.logs-highlight-json {
-  font-family: monospace;
-  font-size: 12px;
-  word-break: break-word;
-  display: inline;
-}
 </style>

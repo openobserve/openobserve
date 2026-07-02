@@ -1023,16 +1023,18 @@ const setInitialReportData = async () => {
     isCachedReport.value = false;
   }
 
-  // Support both ?folder= (from ReportList) and ?folderId= (legacy links)
-  const reportFolderId = (queryParams.folder || queryParams.folderId) as
-    | string
-    | undefined;
-  if (reportFolderId) {
-    formData.value.dashboards[0].folder = reportFolderId;
-    await onFolderSelection(reportFolderId);
+  // ?folderId= is the dashboard folder (passed from a dashboard context, e.g.
+  // ScheduledDashboards). ?folder= is the REPORTS folder (from ReportList) and is
+  // handled separately via selectedReportFolderId — it must NOT be used to
+  // pre-select the dashboard folder, otherwise the dashboard folder dropdown shows
+  // the raw reports-folder id instead of a dashboard folder name.
+  const dashboardFolderId = queryParams.folderId as string | undefined;
+  if (dashboardFolderId) {
+    formData.value.dashboards[0].folder = dashboardFolderId;
+    await onFolderSelection(dashboardFolderId);
   }
 
-  if (reportFolderId && queryParams.dashboardId) {
+  if (dashboardFolderId && queryParams.dashboardId) {
     formData.value.dashboards[0].dashboard = queryParams.dashboardId as string;
     setDashboardTabOptions(queryParams.dashboardId);
   }

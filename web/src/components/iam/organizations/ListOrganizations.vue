@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-plan="{ row }">
-            <OTag v-if="row.plan && row.plan !== '-'" :value="row.plan" />
+            <OTag v-if="row.plan && row.plan !== '-'" type="subscriptionPlan" :value="row.plan" />
             <span v-else class="tw:text-text-primary">—</span>
           </template>
 
@@ -492,6 +492,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-</style>

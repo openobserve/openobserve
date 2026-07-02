@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Full-width content for diff view -->
     <template #full-width-content>
-      <div class="import-semantic-groups-container">
+      <div class="tw:w-full tw:p-2 tw:h-[calc(100vh-140px)] tw:flex tw:flex-col tw:overflow-hidden">
         <!-- Compact Header with File Upload -->
         <div class="card-container tw:p-2 tw:mb-2">
           <div class="tw:flex tw:items-center">
@@ -74,26 +74,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Diff Preview Section with Scrollable Content -->
-        <div v-if="diffData" class="diff-container">
+        <div v-if="diffData" class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
           <!-- Compact Summary Bar -->
           <div class="card-container tw:p-2 tw:mb-2">
             <div class="tw:flex tw:items-center tw:gap-2">
               <div class="col-auto">
-                <OBadge variant="success" class="summary-chip">
-                  <strong>{{ diffData.additions.length }}</strong
+                <OTag type="diffCategory" value="new" class="tw:text-sm!">
+                  <strong class="tw:text-[15px]">{{ diffData.additions.length }}</strong
                   >&nbsp;New
-                </OBadge>
+                </OTag>
               </div>
               <div class="col-auto">
-                <OBadge variant="warning" class="summary-chip">
-                  <strong>{{ diffData.modifications.length }}</strong
+                <OTag type="diffCategory" value="modified" class="tw:text-sm!">
+                  <strong class="tw:text-[15px]">{{ diffData.modifications.length }}</strong
                   >&nbsp;Modified
-                </OBadge>
+                </OTag>
               </div>
               <div class="col-auto">
-                <OBadge variant="default" class="summary-chip">
+                <OTag type="diffCategory" value="unchanged" class="tw:text-sm!">
                   {{ diffData.unchanged.length }} Unchanged
-                </OBadge>
+                </OTag>
               </div>
               <div class="tw:flex tw:flex-col">
                 <OButtonGroup class="float-right">
@@ -118,21 +118,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Scrollable Groups Container -->
-          <div class="card-container groups-scroll-container">
+          <div class="card-container groups-scroll-container tw:flex-1 tw:overflow-y-auto tw:overflow-x-hidden tw:p-2">
             <!-- Additions -->
             <div v-if="diffData.additions.length > 0" class="tw:mb-2">
-              <div class="section-header tw:text-green-500 tw:p-1">
+              <div class="tw:text-sm tw:font-semibold tw:border-b tw:border-[var(--color-separator)] tw:mb-1 tw:text-green-500 tw:p-1">
                 <OIcon name="add-circle" size="sm" />
                 New ({{ selectedAdditions.length }}/{{
                   diffData.additions.length
                 }})
               </div>
-              <ul class="compact-list tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+              <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md tw:mb-0">
                 <li
                   v-for="group in diffData.additions"
                   :key="group.id"
                   data-test="semantic-groups-addition-item"
-                  class="compact-item tw:flex tw:items-start tw:gap-2 tw:px-2 tw:py-1 tw:min-h-[44px] tw:cursor-pointer hover:tw:bg-muted/50"
+                  class="compact-item tw:flex tw:items-start tw:gap-2 tw:px-2 tw:py-1 tw:min-h-[44px] tw:cursor-pointer tw:hover:bg-muted/50"
                   @click="toggleAddition(group.id)"
                 >
                   <div class="tw:flex tw:items-start tw:shrink-0 tw:pt-1">
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="tw:text-[13px] tw:font-medium">{{ group.display }}</span>
                     <span class="tw:block tw:text-[11px] tw:text-muted-foreground tw:truncate">
                       {{ group.id }} • {{ group.fields.length }} fields
-                      <OBadge v-if="group.normalize" variant="primary" class="tw:ml-1">norm</OBadge>
+                      <OTag v-if="group.normalize" type="normalizeState" value="true" class="tw:ml-1" />
                     </span>
                   </div>
                   <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
@@ -163,18 +163,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Modifications -->
             <div v-if="diffData.modifications.length > 0" class="tw:mb-2">
-              <div class="section-header tw:text-amber-500 tw:p-1">
+              <div class="tw:text-sm tw:font-semibold tw:border-b tw:border-[var(--color-separator)] tw:mb-1 tw:text-amber-500 tw:p-1">
                 <OIcon name="edit" size="sm" />
                 Modified ({{ selectedModifications.length }}/{{
                   diffData.modifications.length
                 }})
               </div>
-              <ul class="compact-list tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+              <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md tw:mb-0">
                 <li
                   v-for="mod in diffData.modifications"
                   :key="mod.proposed.id"
                   data-test="semantic-groups-modification-item"
-                  class="compact-item tw:flex tw:items-start tw:gap-2 tw:px-2 tw:py-1 tw:min-h-[44px] tw:cursor-pointer hover:tw:bg-muted/50"
+                  class="compact-item tw:flex tw:items-start tw:gap-2 tw:px-2 tw:py-1 tw:min-h-[44px] tw:cursor-pointer tw:hover:bg-muted/50"
                   @click="toggleModification(mod.proposed.id)"
                 >
                   <div class="tw:flex tw:items-start tw:shrink-0 tw:pt-1">
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="`Unchanged (${diffData.unchanged.length})`"
                 icon="check-circle"
               >
-                <ul class="compact-list tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+                <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md tw:mb-0">
                   <li
                     v-for="group in diffData.unchanged"
                     :key="group.id"
@@ -259,20 +259,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:text-sm tw:font-medium tw:mb-2">
         Fields ({{ selectedGroup?.fields.length }})
       </div>
-      <OBadge
+      <OTag
         v-for="field in selectedGroup?.fields"
         :key="field"
-        color="primary"
-        text-color="white"
+        type="fieldNameChip"
+        value="highlight"
         class="tw:m-1"
       >
         {{ field }}
-      </OBadge>
+      </OTag>
       <div class="tw:mt-3">
-        <OBadge v-if="selectedGroup?.normalize" variant="primary"
-          >Normalized</OBadge
-        >
-        <OBadge v-else variant="default">Not Normalized</OBadge>
+        <OTag type="normalizeState" :value="!!selectedGroup?.normalize" />
       </div>
     </div>
   </ODialog>
@@ -293,16 +290,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-xs tw:mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="field-chips-container">
-          <OBadge
+        <div class="field-chips-container tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--o2-primary-background)] tw:rounded">
+          <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
-            color="grey-4"
-            size="sm"
+            type="fieldNameChip"
+            value="muted"
             class="tw:m-1"
           >
             {{ field }}
-          </OBadge>
+          </OTag>
         </div>
       </div>
       <div class="tw:w-1/2">
@@ -310,22 +307,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-xs tw:mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="field-chips-container">
-          <OBadge
+        <div class="field-chips-container tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--o2-primary-background)] tw:rounded">
+          <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
-            :variant="isNewField(field) ? 'success' : 'default'"
-            size="sm"
+            type="fieldDiffStatus"
+            :value="isNewField(field) ? 'new' : 'existing'"
             class="tw:m-1"
           >
             {{ field }}
-            <OIcon
-              v-if="isNewField(field)"
-              name="add"
-              size="xs"
-              class="tw:ml-1"
-            />
-          </OBadge>
+            <template #trailing>
+              <OIcon
+                v-if="isNewField(field)"
+                name="add"
+                size="xs"
+                class="tw:ml-1"
+              />
+            </template>
+          </OTag>
         </div>
       </div>
     </div>
@@ -336,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -579,103 +578,35 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 };
 </script>
 
-<style lang="scss" scoped>
-.import-semantic-groups-container {
-  width: 100%;
-  padding: 8px;
-  height: calc(100vh - 140px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+<style>
+.groups-scroll-container::-webkit-scrollbar {
+  width: 8px;
 }
 
-.compact-file-input {
-  :deep(.q-field__control) {
-    min-height: 40px;
-  }
+.groups-scroll-container::-webkit-scrollbar-track {
+  background: var(--o2-primary-background);
 }
 
-.diff-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-.groups-scroll-container {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 8px;
-
-  /* Custom scrollbar */
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: var(--q-dark-page);
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--q-primary);
-    border-radius: 4px;
-  }
-
-  &::-webkit-scrollbar-thumb:hover {
-    background: var(--q-primary-dark);
-  }
-}
-
-.section-header {
-  font-size: 14px;
-  font-weight: 600;
-  border-bottom: 1px solid var(--color-separator);
-  margin-bottom: 4px;
-}
-
-.compact-list {
-  margin-bottom: 0;
-}
-
-.compact-item {
-  min-height: 44px;
-  padding: 4px 8px;
-}
-
-.field-chips-container {
-  max-height: 250px;
-  overflow-y: auto;
-  padding: 8px;
-  background: var(--q-dark);
+.groups-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--o2-primary-color);
   border-radius: 4px;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: var(--q-dark-page);
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--q-primary);
-    border-radius: 3px;
-  }
 }
 
-.summary-chip {
-  font-size: 14px !important;
-
-  :deep(strong) {
-    font-size: 15px;
-  }
+.groups-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--o2-primary-dark, var(--o2-primary-color));
 }
 
-.action-btn {
-  font-size: 13px !important;
-  min-height: 34px;
-  padding: 6px 14px;
-  font-weight: 500;
+.field-chips-container::-webkit-scrollbar {
+  width: 6px;
 }
+
+.field-chips-container::-webkit-scrollbar-track {
+  background: var(--o2-primary-background);
+}
+
+.field-chips-container::-webkit-scrollbar-thumb {
+  background: var(--o2-primary-color);
+  border-radius: 3px;
+}
+
 </style>

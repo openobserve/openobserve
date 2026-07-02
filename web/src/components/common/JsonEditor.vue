@@ -1,15 +1,15 @@
 <template>
   <div
     class="tw:h-[calc(100vh-3.75rem)] tw:flex tw:min-h-0"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : ''"
+    :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-primary-background)' : ''"
   >
-    <div class="common-json-editor tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:min-w-0">
+    <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:min-w-0">
       <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
         <query-editor
           data-test="common-json-editor"
           ref="queryEditorRef"
           editor-id="common-json-editor"
-          class="monaco-editor tw:flex-1 tw:min-h-0"
+          class="tw:flex-1 tw:min-h-0 tw:h-full"
           :debounceTime="300"
           v-model:query="jsonContent"
           language="json"
@@ -20,7 +20,8 @@
       <!-- Display validation errors -->
       <div
         v-if="validationErrors.length > 0"
-        class="tw:p-3 tw:text-red-500 validation-errors tw:shrink-0"
+        data-test="common-json-editor-validation-errors"
+        class="tw:p-3 tw:text-red-500 tw:shrink-0 tw:max-h-50 tw:overflow-y-auto"
       >
         <div class="tw:font-bold tw:mb-2">Please fix the following issues:</div>
         <ul class="tw:ml-3">
@@ -157,7 +158,7 @@ export default defineComponent({
             ...newContent,
             ...storedFields.value
           };
-          
+
           // Update the editor content with reverted changes
           jsonContent.value = JSON.stringify(revertedContent, null, 2);
           return;
@@ -165,7 +166,7 @@ export default defineComponent({
 
         // If no protected fields were changed, update content normally
         jsonContent.value = value;
-        
+
         // Clear any previous protected field validation errors
         validationErrors.value = validationErrors.value.filter(err => !err.startsWith('Cannot modify'));
       } catch (error) {
@@ -195,7 +196,7 @@ export default defineComponent({
             ...parsedContent,
             ...storedFields.value
           };
-          
+
           emit("saveJson", JSON.stringify(finalContent));
         } catch (error) {
           console.log(error, 'error')
@@ -215,7 +216,7 @@ export default defineComponent({
           jsonContent.value = JSON.stringify(newVal, null, 2);
         },
       );
-      //whenever any errors happens at the time of validating the pipeline , 
+      //whenever any errors happens at the time of validating the pipeline ,
       //we need to show the errors in the json editor
       //so we need to watch the validationErrors array
       watch(
@@ -260,32 +261,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.common-json-editor {
-  display: flex;
-  flex-direction: column;
-
-  .dark-mode {
-    background-color: $dark-page;
-  }
-
-  :deep(.monaco-editor) {
-    height: 100%;
-  }
-
-  :deep(.q-card__section) {
-    padding-left: 8px;
-    padding-right: 0;
-  }
-
-  .validation-errors {
-    max-height: 200px;
-    overflow-y: auto;
-  }
-
-  .no-border {
-    border: none !important;
-  }
-}
-</style>

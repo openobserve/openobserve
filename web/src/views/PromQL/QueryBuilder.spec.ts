@@ -111,7 +111,9 @@ describe("QueryBuilder", () => {
     it("should render the component", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find(".promql-query-builder").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="promql-query-builder"]').exists(),
+      ).toBe(true);
     });
 
     it("should display the title and subtitle", () => {

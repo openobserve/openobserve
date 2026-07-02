@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="selectedDate"
           ref="dateTimePickerRef"
           :disable="disable"
-          class="dashboard-icons"
+          class="tw:h-8"
           data-test="metrics-date-picker"
         />
         <AutoRefreshInterval
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state?.zoConfig?.min_auto_refresh_interval || 5
           "
           @trigger="runQuery"
-          class="dashboard-icons"
+          class="tw:h-8"
           data-test="metrics-auto-refresh"
         />
         <ShareButton
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="icon-toolbar"
           data-test="metrics-share-btn"
-          class="dashboard-icons"
+          class="tw:h-8"
         />
         <template
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
@@ -163,6 +163,8 @@ const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
 import OButton from "@/lib/core/Button/OButton.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "Metrics",
@@ -598,6 +600,21 @@ export default defineComponent({
 
     // [END] cancel running queries
 
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "metricsRunQuery",
+        handler: () => runQuery(),
+      },
+      {
+        id: "metricsRefresh",
+        handler: () => {
+          if (isInputFocused()) return;
+          runQuery();
+        },
+      },
+    ]);
+
     return {
       t,
       updateDateTime,
@@ -628,9 +645,4 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.dashboard-icons {
-  height: 32px;
-}
-</style>
 

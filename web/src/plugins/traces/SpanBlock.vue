@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="tw:flex wrap tw:justify-start tw:items-center"
     :class="[
-      defocusSpan ? 'defocus' : '',
+      defocusSpan ? 'tw:opacity-30' : '',
       store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white',
     ]"
     :style="{
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           overflow: 'hidden',
         }"
         class="tw:cursor-pointer tw:flex tw:items-center tw:flex-nowrap position-relative"
-        :class="defocusSpan ? 'defocus' : ''"
+        :class="defocusSpan ? 'tw:opacity-30' : ''"
         @click="selectSpan(span.spanId)"
         data-test="span-block-select-trigger"
       >
@@ -315,33 +315,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.defocus {
-  opacity: 0.3;
-}
-
-.collapse-btn {
-  opacity: 0.6;
-}
-
-.collapse-container {
-  border: 1px solid #ececec;
-}
-
-.light-grey {
-  background-color: #ececec;
-}
-
-.view-span-logs {
-  visibility: hidden;
-}
-
-.span-block-overlay {
-  &:hover {
-    .view-span-logs {
-      visibility: visible;
-    }
-  }
-}
-</style>

@@ -289,5 +289,3 @@ const triggerClasses = computed<string>(() => {
   </template>
 </template>
 
-<style scoped>
-</style>
