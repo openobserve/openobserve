@@ -626,7 +626,6 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     size: "sm",
-    class: "tw:!py-0.5",
     values: {
       global: { variant: "primary-soft" },
       tabs: { variant: "primary-outline" },
