@@ -265,7 +265,7 @@ pub async fn get_summary(
                 MAX(_timestamp) as last_check_at \
          FROM \"{STREAM}\" \
          WHERE _timestamp >= {start_time} AND _timestamp <= {end_time} \
-           AND monitor_id = '{mid}'"
+           AND synthetics_id = '{mid}'"
     );
 
     let bucket_sql = format!(
@@ -388,19 +388,19 @@ pub async fn batch_synthetic_summary(
 
     // last_check_at + avg response time over last 7 days
     let agg_sql = format!(
-        "SELECT monitor_id, MAX(_timestamp) as last_check_at, AVG(response_time_ms) as avg_ms \
+        "SELECT synthetics_id, MAX(_timestamp) as last_check_at, AVG(response_time_ms) as avg_ms \
          FROM \"{STREAM}\" \
          WHERE _timestamp >= {seven_d_ago} AND _timestamp <= {now} \
-           AND monitor_id IN ({ids_sql}) \
-         GROUP BY monitor_id"
+           AND synthetics_id IN ({ids_sql}) \
+         GROUP BY synthetics_id"
     );
 
     // most recent status + response time within last hour
     let latest_sql = format!(
-        "SELECT monitor_id, status, response_time_ms \
+        "SELECT synthetics_id, status, response_time_ms \
          FROM \"{STREAM}\" \
          WHERE _timestamp >= {one_h_ago} AND _timestamp <= {now} \
-           AND monitor_id IN ({ids_sql}) \
+           AND synthetics_id IN ({ids_sql}) \
          ORDER BY _timestamp DESC"
     );
 
@@ -418,17 +418,17 @@ pub async fn batch_synthetic_summary(
         .hits
         .iter()
         .filter_map(|h| {
-            let mid = h.get("monitor_id")?.as_str()?.to_string();
+            let mid = h.get("synthetics_id")?.as_str()?.to_string();
             let last_check_at = h.get("last_check_at").and_then(|v| v.as_i64());
             let avg_ms = h.get("avg_ms").and_then(|v| v.as_f64());
             Some((mid, (last_check_at, avg_ms)))
         })
         .collect();
 
-    // ordered DESC — first hit per monitor_id is the most recent
+    // ordered DESC — first hit per synthetics_id is the most recent
     let mut latest_map: HashMap<String, (String, f64)> = HashMap::new();
     for h in &latest_resp.hits {
-        if let Some(mid) = h.get("monitor_id").and_then(|v| v.as_str()) {
+        if let Some(mid) = h.get("synthetics_id").and_then(|v| v.as_str()) {
             if !latest_map.contains_key(mid) {
                 let st = h
                     .get("status")
