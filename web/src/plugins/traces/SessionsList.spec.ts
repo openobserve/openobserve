@@ -393,7 +393,7 @@ describe("SessionsList — sessions table", () => {
     expect(statusCell.text()).toContain("ok");
     // ok status uses healthy (green) CSS classes
     expect(statusCell.classes().join(" ")).toContain(
-      "tw:text-[var(--o2-service-health-healthy,#16a34a)]",
+      "text-[var(--o2-service-health-healthy,#16a34a)]",
     );
   });
 
@@ -412,7 +412,7 @@ describe("SessionsList — sessions table", () => {
     expect(statusCell.text()).toContain("error");
     // error status uses critical CSS class
     expect(statusCell.classes().join(" ")).toContain(
-      "tw:text-[var(--o2-service-health-critical)]",
+      "text-[var(--o2-service-health-critical)]",
     );
   });
 

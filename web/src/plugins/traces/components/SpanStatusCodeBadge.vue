@@ -26,14 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
   <span
     v-if="!displayValue"
     data-test="span-status-code-badge-empty"
-    class="tw:text-[var(--o2-status-neutral-text)]"
+    class="text-[var(--o2-status-neutral-text)]"
   >
     —
   </span>
   <span
     v-else
     data-test="span-status-code-badge"
-    class="tw:rounded tw:py-[0.125rem] tw:px-[0.5rem] tw:inline-flex tw:items-center tw:w-fit tw:font-mono tw:text-[0.75rem] tw:font-semibold tw:tabular-nums"
+    class="rounded py-[0.125rem] px-[0.5rem] inline-flex items-center w-fit font-mono text-[0.75rem] font-semibold tabular-nums"
     :class="tierClass"
   >
     {{ displayValue }}
@@ -80,15 +80,15 @@ const displayValue = computed(() => {
 const tierClass = computed(() => {
   if (source.value === "grpc") {
     return grpcNum.value === 0
-      ? "tw:text-(--o2-status-success-text) tw:bg-(--o2-status-success-bg)"
-      : "tw:text-(--o2-status-error-text) tw:bg-(--o2-status-error-bg)";
+      ? "text-(--o2-status-success-text) bg-(--o2-status-success-bg)"
+      : "text-(--o2-status-error-text) bg-(--o2-status-error-bg)";
   }
   const n = httpNum.value;
-  if (!n) return "tw:text-(--o2-status-neutral-text) tw:bg-(--o2-status-neutral-bg)";
-  if (n >= 200 && n < 300) return "tw:text-(--o2-status-success-text) tw:bg-(--o2-status-success-bg)";
-  if (n >= 300 && n < 400) return "tw:text-(--o2-status-info-text) tw:bg-(--o2-status-info-bg)";
-  if (n >= 400 && n < 500) return "tw:text-(--o2-status-warning-text) tw:bg-(--o2-status-warning-bg)";
-  if (n >= 500 && n < 600) return "tw:text-(--o2-status-error-text) tw:bg-(--o2-status-error-bg)";
-  return "tw:text-(--o2-status-neutral-text) tw:bg-(--o2-status-neutral-bg)";
+  if (!n) return "text-(--o2-status-neutral-text) bg-(--o2-status-neutral-bg)";
+  if (n >= 200 && n < 300) return "text-(--o2-status-success-text) bg-(--o2-status-success-bg)";
+  if (n >= 300 && n < 400) return "text-(--o2-status-info-text) bg-(--o2-status-info-bg)";
+  if (n >= 400 && n < 500) return "text-(--o2-status-warning-text) bg-(--o2-status-warning-bg)";
+  if (n >= 500 && n < 600) return "text-(--o2-status-error-text) bg-(--o2-status-error-bg)";
+  return "text-(--o2-status-neutral-text) bg-(--o2-status-neutral-bg)";
 });
 </script>

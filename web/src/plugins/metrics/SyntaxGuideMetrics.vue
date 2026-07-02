@@ -30,33 +30,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
       <div v-if="!sqlmode">
-        <div class="syntax-guide-title tw:w-[420px]">
-          <div class="label tw:text-[15px] tw:font-bold">{{ t("search.syntaxGuideLabel") }}</div>
+        <div class="syntax-guide-title w-[420px]">
+          <div class="label text-[15px] font-bold">{{ t("search.syntaxGuideLabel") }}</div>
         </div>
-        <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
+        <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
-          <div class="tw:mb-[5px]">
-            <div class="tw:text-xs tw:ml-[5px]">
-              <ul class="tw:px-[10px] tw:mt-[10px] tw:mb-0 tw:text-[14px] tw:leading-[23px]">
+          <div class="mb-[5px]">
+            <div class="text-xs ml-[5px]">
+              <ul class="px-[10px] mt-[10px] mb-0 text-[14px] leading-[23px]">
                 <li>
                   For instant vector selectors, use
-                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"
+                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"
                     >metric_name{label1="value1", label2="value2"}</span
                   >
                 </li>
                 <li>
                   For range vector selectors, use
-                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'">metric_name[5m]</span>
+                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">metric_name[5m]</span>
                 </li>
                 <li>
                   To aggregate data, use
-                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'">sum by (label)(metric_name)</span>
+                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">sum by (label)(metric_name)</span>
                   or
-                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"> avg by (label)(metric_name)</span>
+                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"> avg by (label)(metric_name)</span>
                 </li>
                 <li>
                   For rate calculations over a range vector, use
-                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'">rate(metric_name[5m])</span>
+                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">rate(metric_name[5m])</span>
                 </li>
               </ul>
             </div>
@@ -64,43 +64,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div v-else>
-        <div class="syntax-guide-title tw:w-[420px]">
-          <div class="label tw:text-[15px] tw:font-bold">Syntax Guide: SQL Mode</div>
+        <div class="syntax-guide-title w-[420px]">
+          <div class="label text-[15px] font-bold">Syntax Guide: SQL Mode</div>
         </div>
-        <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
+        <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
-          <div class="tw:mb-[5px]">
-            <div class="tw:text-xs tw:ml-[5px]">
-              <ul class="tw:px-[10px] tw:mt-[10px] tw:mb-0 tw:text-[14px] tw:leading-[23px]">
+          <div class="mb-[5px]">
+            <div class="text-xs ml-[5px]">
+              <ul class="px-[10px] mt-[10px] mb-0 text-[14px] leading-[23px]">
                 <li>
                   For full text search of value 'error' use
-                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"
+                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                 </li>
                 <li>
                   For column search of value 'error' use
-                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"
+                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"
                     >SELECT * FROM <b>stream</b> WHERE
                     str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
                   To search value 200 for code column use
-                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"
+                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"
                     >SELECT * FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
                   To search value 'stderr' for stream column use
-                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"
+                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
                   >
                 </li>
                 <li>
                   To search and use query function <i>extract_ip</i> on column
                   log use
-                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"
+                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE
                     code=200</span
                   >
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="tw:hover:underline text-primary"
+                    class="hover:underline text-primary"
                     >click here</a
                   >.
                 </li>

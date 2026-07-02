@@ -439,7 +439,7 @@ describe("FieldListPagination", () => {
       const page2Btn = wrapper.find(
         '[data-test="logs-page-fields-list-pagination-page-2-button"]'
       );
-      expect(page2Btn.classes()).toContain("tw:bg-button-primary");
+      expect(page2Btn.classes()).toContain("bg-button-primary");
     });
 
     it("does not apply active class to non-current page buttons", () => {
@@ -452,7 +452,7 @@ describe("FieldListPagination", () => {
       const page1Btn = wrapper.find(
         '[data-test="logs-page-fields-list-pagination-page-1-button"]'
       );
-      expect(page1Btn.classes()).not.toContain("tw:bg-button-primary");
+      expect(page1Btn.classes()).not.toContain("bg-button-primary");
     });
   });
 
@@ -477,7 +477,7 @@ describe("FieldListPagination", () => {
     it("applies flex layout when showUserDefinedSchemaToggle is true", () => {
       const wrapper = createWrapper({ showUserDefinedSchemaToggle: true });
       const container = wrapper.find("div");
-      expect(container.classes()).toContain("tw:flex");
+      expect(container.classes()).toContain("flex");
     });
 
     it("applies flex layout when showQuickMode is true", () => {
@@ -486,7 +486,7 @@ describe("FieldListPagination", () => {
         showQuickMode: true,
       });
       const container = wrapper.find("div");
-      expect(container.classes()).toContain("tw:flex");
+      expect(container.classes()).toContain("flex");
     });
 
     it("does not apply flex layout when both toggles are false", () => {
@@ -495,7 +495,7 @@ describe("FieldListPagination", () => {
         showQuickMode: false,
       });
       const container = wrapper.find("div");
-      expect(container.classes()).not.toContain("tw:flex");
+      expect(container.classes()).not.toContain("flex");
     });
   });
 

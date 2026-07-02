@@ -168,8 +168,8 @@ describe("DimensionFiltersBar.vue", () => {
       const html = wrapper.html();
 
       // Check if opacity classes are applied
-      expect(html).toContain("tw:opacity-60");
-      expect(html).toContain("tw:opacity-100");
+      expect(html).toContain("opacity-60");
+      expect(html).toContain("opacity-100");
     });
 
     it("should show tooltip for unstable dimensions", () => {

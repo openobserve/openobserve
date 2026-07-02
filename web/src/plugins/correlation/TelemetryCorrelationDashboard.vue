@@ -31,23 +31,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
       <div
-        class="tw:py-2 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+        class="py-2 px-4 border-b border-solid border-[var(--o2-border-color)]"
       >
-        <div class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap">
-          <span class="tw:text-xs tw:font-semibold tw:opacity-70">
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="text-xs font-semibold opacity-70">
             {{ t("correlation.filters") }}:
           </span>
           <div
             v-for="(value, key) in pendingDimensions"
             :key="key"
-            class="tw:flex tw:items-center tw:gap-2"
+            class="flex items-center gap-2"
           >
             <span
-              class="tw:text-xs tw:font-semibold"
+              class="text-xs font-semibold"
               :class="
                 unstableDimensionKeys.has(key)
-                  ? 'tw:opacity-60'
-                  : 'tw:opacity-100'
+                  ? 'opacity-60'
+                  : 'opacity-100'
               "
             >
               {{ key }}:
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="!hasPendingChanges"
             @click="applyDimensionChanges"
-            class="tw:ml-2"
+            class="ml-2"
             data-test="apply-dimension-filters"
           >
             {{ t('common.apply') }}
@@ -88,8 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :get-subject-button-label="getSubjectButtonLabel"
       />
 
-      <!-- Tabs (only in dialog mode, tw:hidden in embedded-tabs mode) -->
-      <div class="tw:px-4">
+      <!-- Tabs (only in dialog mode, hidden in embedded-tabs mode) -->
+      <div class="px-4">
       <OTabs
         v-if="!isEmbeddedTabs"
         v-model="activeTab"
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Refresh Button (dialog mode) -->
           <div
             v-if="logsDashboardData"
-            class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
+            class="p-2 border-b border-solid border-[var(--o2-border-color)] flex justify-end"
           >
             <OButton
               variant="ghost"
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="loadDashboard"
               :loading="loading"
             >
-              <OIcon name="refresh" size="xs" class="tw:mr-1" />
+              <OIcon name="refresh" size="xs" class="mr-1" />
               {{ t('common.refresh') }}
             </OButton>
           </div>
@@ -130,10 +130,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div
             v-if="loading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
+            class="flex flex-col items-center justify-center h-full py-20 gap-3"
           >
             <OSpinner size="sm" />
-            <div class="tw:text-sm tw:opacity-70">
+            <div class="text-sm opacity-70">
               {{ t("correlation.loadingLogs") }}
             </div>
           </div>
@@ -152,32 +152,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- No Logs State -->
           <div
             v-else
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="flex flex-col items-center justify-center h-full py-20"
           >
-            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+            <div class="text-base font-medium mb-2 opacity-90">
               {{ t("correlation.noLogsFound") }}
             </div>
-            <div class="tw:text-sm tw:opacity-70">
+            <div class="text-sm opacity-70">
               {{ t("correlation.noLogsDescription") }}
             </div>
           </div>
         </OTabPanel>
 
         <!-- Metrics Tab Panel -->
-        <OTabPanel name="metrics" layout="flex-col" stretch class="tw:min-h-0">
+        <OTabPanel name="metrics" layout="flex-col" stretch class="min-h-0">
           <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
           <OSplitter
             v-model="splitterModel"
-            class="tw:flex-1 tw:min-h-0 full-height tw:w-full"
+            class="flex-1 min-h-0 full-height w-full"
           >
             <!-- -- Left sidebar -- -->
             <template #before>
               <div
-                class="tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-surface-overlay"
+                class="h-full min-h-0 flex flex-col bg-surface-overlay"
               >
                 <!-- Search -->
                   <div
-                    class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                    class="dimension-sidebar-search-container p-[0.625rem] border-b border-solid border-[var(--o2-border-color)]"
                   >
                     <OSearchInput
                       v-model="metricSearchText"
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Grouped metric list -->
                 <div
-                  class="dimension-list-container tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:px-[0.325rem]"
+                  class="dimension-list-container flex-1 min-h-0 overflow-y-auto px-[0.325rem]"
                   style="max-height: calc(100vh - 210px)"
                 >
                   <template
@@ -204,10 +204,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template v-if="group.streams.length > 0">
                         <div
-                          class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--o2-section-header-bg) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer"
+                          class="flex items-center justify-between py-1.5 px-2 bg-(--o2-section-header-bg) border-b border-solid border-(--o2-border) sticky top-0 z-10 cursor-pointer"
                           @click="toggleGroupCollapse(group.id)"
                         >
-                          <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
+                          <div class="flex items-center gap-[0.375rem] text-[0.6875rem] font-bold uppercase tracking-[0.05em] opacity-75">
                             <OIcon
                               :name="
                                 collapsedGroups.has(group.id)
@@ -215,17 +215,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   : 'expand-more'
                               "
                               size="sm"
-                              class="tw:mr-0.5"
+                              class="mr-0.5"
                             />
-                            <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
+                            <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="mr-0.5" />
                             <component v-else :is="group.icon" />
                             <span>{{ group.label }}</span>
                             <OBadge
                               variant="default"
-                              class="tw:ml-1"
+                              class="ml-1"
                             >{{ group.streams.length }}</OBadge>
                           </div>
-                          <div class="tw:flex tw:gap-1">
+                          <div class="flex gap-1">
                             <OButton
                               variant="ghost"
                               size="chip"
@@ -249,10 +249,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-show="!collapsedGroups.has(group.id)"
                           :key="stream.stream_name"
                           data-test="telemetry-correlation-metric-stream-item"
-                          class="tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-[rgba(0,0,0,0.04)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
+                          class="border-none! flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-[rgba(0,0,0,0.04)] dark:hover:bg-[rgba(255,255,255,0.05)]"
                           @click="toggleMetricStream(stream)"
                         >
-                          <div class="tw:flex tw:items-center tw:shrink-0">
+                          <div class="flex items-center shrink-0">
                             <OCheckbox
                               :model-value="
                                 selectedMetricStreams.some(
@@ -263,9 +263,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @update:model-value="toggleMetricStream(stream)"
                             />
                           </div>
-                          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                          <div class="flex flex-col flex-1 min-w-0">
                             <span
-                              class="tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
+                              class="truncate cursor-pointer text-[var(--o2-text-2)]! text-sm"
                               >{{ stream.stream_name }}</span
                             >
                           </div>
@@ -275,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <div
                     v-else
-                    class="tw:p-3 tw:text-center tw:text-xs tw:opacity-60"
+                    class="p-3 text-center text-xs opacity-60"
                   >
                     {{ t("search.noResult") }}
                   </div>
@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Footer: selected count -->
                 <div
-                  class="tw:p-3 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] o2-table-footer-title tw:text-[var(--o2-text-4)]!"
+                  class="p-3 border-t border-solid border-[var(--o2-border-color)] o2-table-footer-title text-[var(--o2-text-4)]!"
                 >
                   {{ selectedMetricStreams.length }} of
                   {{ uniqueMetricStreams.length }} selected
@@ -293,35 +293,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- -- Separator -- -->
             <template #separator>
-              <div class="tw:w-px tw:h-full tw:bg-(--o2-border) tw:cursor-col-resize tw:dark:bg-[rgba(255,255,255,0.12)]" />
+              <div class="w-px h-full bg-(--o2-border) cursor-col-resize dark:bg-[rgba(255,255,255,0.12)]" />
             </template>
 
             <!-- -- Right area: group tabs + dashboard -- -->
             <template #after>
-              <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+              <div class="flex flex-col h-full overflow-hidden">
                 <!-- Outer Pod/Node tabs — only shown in nested K8s mode -->
                 <OTabs
                   v-if="isNestedGroupMode"
                   v-model="activeOuterTab"
                   dense
                   align="left"
-                  class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                  class="metric-group-tabs border-b border-solid border-[var(--o2-border-color)]"
                 >
                   <OTab
                     v-for="outerGroup in groupDefs"
                     :key="outerGroup.id"
                     :name="outerGroup.id"
-                    class="tw:flex-none!"
+                    class="flex-none!"
                   >
-                    <div class="tw:flex tw:flex-col tw:items-start tw:px-1 tw:py-0.5 tw:min-w-0">
-                      <div class="tw:flex tw:items-center tw:gap-1">
+                    <div class="flex flex-col items-start px-1 py-0.5 min-w-0">
+                      <div class="flex items-center gap-1">
                         <OIcon v-if="typeof outerGroup.icon === 'string'" :name="outerGroup.icon" size="xs" />
                         <component v-else :is="outerGroup.icon" />
-                        <span class="tw:whitespace-nowrap">{{ outerGroup.label }}</span>
+                        <span class="whitespace-nowrap">{{ outerGroup.label }}</span>
                       </div>
                       <span
                         v-if="outerTabResourceName[outerGroup.id]"
-                        class="tw:text-xs tw:leading-tight tw:opacity-75 tw:whitespace-nowrap"
+                        class="text-xs leading-tight opacity-75 whitespace-nowrap"
                         :title="outerTabResourceName[outerGroup.id]"
                       >{{ outerTabResourceName[outerGroup.id] }}</span>
                     </div>
@@ -334,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="activeMetricGroupTab"
                   dense
                   align="left"
-                  class="metric-group-tabs tw:shrink-0 tw:bg-surface-panel tw:border-b tw:border-solid tw:border-(--o2-border-color)"
+                  class="metric-group-tabs shrink-0 bg-surface-panel border-b border-solid border-(--o2-border-color)"
                 >
                   <OTab
                     v-for="group in groupedUniqueMetricStreams.groups.filter(
@@ -342,15 +342,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     )"
                     :key="group.id"
                     :name="group.id"
-                    class="tw:flex-none!"
+                    class="flex-none!"
                   >
-                    <div class="tw:flex tw:items-center tw:gap-1 tw:px-1">
+                    <div class="flex items-center gap-1 px-1">
                       <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" />
                       <component v-else :is="group.icon" />
                       <span>{{ group.label }}</span>
                       <OBadge
                         :variant="activeMetricGroupTab === group.id ? 'primary' : 'default'"
-                        class="tw:ml-0.5"
+                        class="ml-0.5"
                         size="sm"
                       >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OBadge>
                     </div>
@@ -358,13 +358,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTabs>
 
                 <!-- Dashboard content -->
-                <div class="tw:flex-1 tw:overflow-auto">
+                <div class="flex-1 overflow-auto">
                   <div
                     v-if="loading"
-                    class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
+                    class="flex flex-col items-center justify-center h-full py-20 gap-3"
                   >
                     <OSpinner size="sm" />
-                    <div class="tw:text-sm tw:opacity-70">
+                    <div class="text-sm opacity-70">
                       {{
                         t("correlation.loadingMetrics", {
                           count: selectedMetricStreams.length,
@@ -374,14 +374,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     v-else-if="error"
-                    class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+                    class="flex flex-col items-center justify-center h-full py-20"
                   >
                     <div
-                      class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90"
+                      class="text-base font-medium mb-2 opacity-90"
                     >
                       {{ t("correlation.metricsError") }}
                     </div>
-                    <div class="tw:text-sm tw:opacity-70 tw:mb-4">
+                    <div class="text-sm opacity-70 mb-4">
                       {{ error || t("correlation.metricsErrorDetails") }}
                     </div>
                     <OButton
@@ -389,7 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm-action"
                       @click="loadDashboard"
                     >
-                      <OIcon name="refresh" size="xs" class="tw:mr-1" />
+                      <OIcon name="refresh" size="xs" class="mr-1" />
                       {{ t('correlation.retryButton') }}
                     </OButton>
                   </div>
@@ -407,14 +407,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-else
-                    class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-7.5rem)] tw:py-20"
+                    class="flex flex-col items-center justify-center h-[calc(100vh-7.5rem)] py-20"
                   >
                     <div
-                      class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90"
+                      class="text-base font-medium mb-2 opacity-90"
                     >
                       {{ t("correlation.noMetrics") }}
                     </div>
-                    <div class="tw:text-sm tw:opacity-70">
+                    <div class="text-sm opacity-70">
                       {{ t("correlation.noMetricsDescription") }}
                     </div>
                   </div>
@@ -431,10 +431,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div
             v-if="tracesLoading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
+            class="flex flex-col items-center justify-center h-full py-20 gap-3"
           >
             <OSpinner size="sm" />
-            <div class="tw:text-sm tw:opacity-70">
+            <div class="text-sm opacity-70">
               {{ t("correlation.loadingTraces") }}
             </div>
           </div>
@@ -442,12 +442,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Error State -->
           <div
             v-else-if="tracesError"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="flex flex-col items-center justify-center h-full py-20"
           >
-            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+            <div class="text-base font-medium mb-2 opacity-90">
               {{ t("correlation.tracesError") }}
             </div>
-            <div class="tw:text-sm tw:opacity-70 tw:mb-4">
+            <div class="text-sm opacity-70 mb-4">
               {{ tracesError || t("correlation.tracesErrorDetails") }}
             </div>
             <OButton
@@ -455,7 +455,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm-action"
               @click="loadCorrelatedTraces"
             >
-              <OIcon name="refresh" size="xs" class="tw:mr-1" />
+              <OIcon name="refresh" size="xs" class="mr-1" />
               {{ t('correlation.retryButton') }}
             </OButton>
           </div>
@@ -465,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="
               traceCorrelationMode === 'direct' && traceSpanList.length > 0
             "
-            class="tw:h-full tw:overflow-hidden telemetry-correlation-traces"
+            class="h-full overflow-hidden telemetry-correlation-traces"
           >
             <TraceDetails
               mode="embedded"
@@ -498,31 +498,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               traceCorrelationMode === 'dimension-based' &&
               tracesForDimensions.length > 0
             "
-            class="tw:h-full"
+            class="h-full"
           >
             <!-- Header -->
             <div
-              class="tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-surface-panel"
+              class="p-3 border-b border-solid border-(--o2-border-color) bg-surface-panel"
             >
-              <div class="tw:flex tw:items-center tw:gap-3">
+              <div class="flex items-center gap-3">
                 <OIcon name="hub" size="md" />
-                <div class="tw:flex tw:flex-col">
-                  <span class="tw:text-sm tw:font-semibold">{{
+                <div class="flex flex-col">
+                  <span class="text-sm font-semibold">{{
                     t("correlation.dimensionBasedCorrelation")
                   }}</span>
-                  <span class="tw:text-xs tw:text-gray-500">{{
+                  <span class="text-xs text-gray-500">{{
                     t("correlation.tracesFromService", { service: serviceName })
                   }}</span>
                 </div>
-                <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
+                <div class="ml-auto flex items-center gap-2">
                   <OButton
                     variant="ghost"
                     size="sm-action"
                     @click="openTracesPage"
                     data-test="correlation-view-traces-page"
-                    class="tw:text-xs"
+                    class="text-xs"
                   >
-                    <OIcon name="open-in-new" size="xs" class="tw:mr-1" />
+                    <OIcon name="open-in-new" size="xs" class="mr-1" />
                     {{ t('correlation.viewInTraces') }}
                     <OTooltip :content="t('correlation.viewInTraces')" side="top" />
                   </OButton>
@@ -548,12 +548,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- No Traces Found State -->
           <div
             v-else-if="traceCorrelationMode !== null"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-20"
+            class="flex flex-col items-center justify-center py-20"
           >
-            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+            <div class="text-base font-medium mb-2 opacity-90">
               {{ t("correlation.noTracesFound") }}
             </div>
-            <div class="tw:text-sm tw:opacity-70">
+            <div class="text-sm opacity-70">
               {{ t("correlation.noTracesDescription") }}
             </div>
           </div>
@@ -561,12 +561,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Initial State (waiting for tab to be shown) -->
           <div
             v-else
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="flex flex-col items-center justify-center h-full py-20"
           >
-            <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+            <div class="text-base font-medium mb-2 opacity-90">
               {{ t("correlation.correlatedTraces") }}
             </div>
-            <div class="tw:text-sm tw:opacity-70">
+            <div class="text-sm opacity-70">
               {{
                 t("correlation.correlatedTracesFor", { service: serviceName })
               }}
@@ -578,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODrawer>
 
   <!-- Embedded Tabs Mode -->
-  <div v-else class="tw:flex tw:flex-col tw:h-full tw:w-full tw:bg-surface-panel">
+  <div v-else class="flex flex-col h-full w-full bg-surface-panel">
     <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
     <DimensionFiltersBar
       v-if="!props.hideDimensionFilters"
@@ -604,7 +604,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
     <OCard
-      class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-auto"
+      class="flex flex-col flex-1 min-h-0 overflow-auto"
     >
       <div
         v-if="activeTab == 'logs'"
@@ -613,7 +613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Refresh Button (embedded mode) -->
           <div
             v-if="logsDashboardData"
-            class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
+            class="p-2 border-b border-solid border-[var(--o2-border-color)] flex justify-end"
           >
             <OButton
               variant="ghost"
@@ -621,7 +621,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="loadDashboard"
               :loading="loading"
             >
-              <OIcon name="refresh" size="xs" class="tw:mr-1" />
+              <OIcon name="refresh" size="xs" class="mr-1" />
               {{ t('common.refresh') }}
             </OButton>
           </div>
@@ -629,11 +629,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading State -->
         <div
           v-if="loading"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3"
+          class="flex flex-col items-center justify-center gap-3"
           style="flex: 1; min-height: 300px"
         >
           <OSpinner size="sm" />
-          <div class="tw:text-sm tw:opacity-70">
+          <div class="text-sm opacity-70">
             {{ t("correlation.loadingLogs") }}
           </div>
         </div>
@@ -652,12 +652,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Logs State -->
         <div
           v-else
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+          class="flex flex-col items-center justify-center h-full py-20"
         >
-          <div class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+          <div class="text-base font-medium mb-2 opacity-90">
             {{ t("correlation.noLogsFound") }}
           </div>
-          <div class="tw:text-sm tw:opacity-70">
+          <div class="text-sm opacity-70">
             {{ t("correlation.noLogsDescription") }}
           </div>
         </div>
@@ -665,20 +665,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-if="activeTab == 'metrics'"
-        class="tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:min-h-0 metrics-correlation-dashboard"
+        class="h-full flex flex-col overflow-hidden min-h-0 metrics-correlation-dashboard"
       >
         <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
         <OSplitter
           v-model="splitterModel"
-          class="tw:flex-1 tw:min-h-0 full-height tw:w-full"
+          class="flex-1 min-h-0 full-height w-full"
         >
           <!-- -- Left sidebar -- -->
           <template #before>
             <div
-              class="tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-surface-overlay"
+              class="h-full min-h-0 flex flex-col bg-surface-overlay"
             >
             <div
-              class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+              class="dimension-sidebar-search-container p-[0.625rem] border-b border-solid border-[var(--o2-border-color)]"
             >
               <OSearchInput
                 v-model="metricSearchText"
@@ -689,7 +689,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Grouped metric list -->
               <div
-                class="dimension-list-container tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:px-[0.325rem]"
+                class="dimension-list-container flex-1 min-h-0 overflow-y-auto px-[0.325rem]"
                 style="max-height: calc(100vh - 210px)"
               >
                 <template
@@ -705,10 +705,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template v-if="group.streams.length > 0">
                       <div
-                        class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--o2-section-header-bg) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer"
+                        class="flex items-center justify-between py-1.5 px-2 bg-(--o2-section-header-bg) border-b border-solid border-(--o2-border) sticky top-0 z-10 cursor-pointer"
                         @click="toggleGroupCollapse(group.id)"
                       >
-                        <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
+                        <div class="flex items-center gap-[0.375rem] text-[0.6875rem] font-bold uppercase tracking-[0.05em] opacity-75">
                           <OIcon
                             :name="
                               collapsedGroups.has(group.id)
@@ -716,17 +716,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 : 'expand-more'
                             "
                             size="sm"
-                            class="tw:mr-0.5"
+                            class="mr-0.5"
                           />
-                          <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
+                          <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="mr-0.5" />
                           <component v-else :is="group.icon" />
                           <span>{{ group.label }}</span>
                           <OBadge
                             variant="default"
-                            class="tw:ml-1"
+                            class="ml-1"
                           >{{ group.streams.length }}</OBadge>
                         </div>
-                        <div class="tw:flex tw:gap-1">
+                        <div class="flex gap-1">
                           <OButton
                             variant="ghost"
                             size="chip"
@@ -750,10 +750,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-show="!collapsedGroups.has(group.id)"
                         :key="stream.stream_name"
                         data-test="telemetry-correlation-metric-stream-item"
-                        class="tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-[rgba(0,0,0,0.04)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
+                        class="border-none! flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-[rgba(0,0,0,0.04)] dark:hover:bg-[rgba(255,255,255,0.05)]"
                         @click="toggleMetricStream(stream)"
                       >
-                        <div class="tw:flex tw:items-center tw:shrink-0">
+                        <div class="flex items-center shrink-0">
                           <OCheckbox
                             :model-value="
                               selectedMetricStreams.some(
@@ -764,9 +764,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @update:model-value="toggleMetricStream(stream)"
                           />
                         </div>
-                        <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                        <div class="flex flex-col flex-1 min-w-0">
                           <span
-                            class="tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
+                            class="truncate cursor-pointer text-[var(--o2-text-2)]! text-sm"
                             >{{ stream.stream_name }}</span
                           >
                         </div>
@@ -776,7 +776,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div
                   v-else
-                  class="tw:p-3 tw:text-center tw:text-xs tw:opacity-60"
+                  class="p-3 text-center text-xs opacity-60"
                 >
                   {{ t("search.noResult") }}
                 </div>
@@ -784,7 +784,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Footer: selected count -->
               <div
-                class="tw:p-3 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] o2-table-footer-title tw:text-[var(--o2-text-4)]!"
+                class="p-3 border-t border-solid border-[var(--o2-border-color)] o2-table-footer-title text-[var(--o2-text-4)]!"
               >
                 {{ selectedMetricStreams.length }} of
                 {{ uniqueMetricStreams.length }} selected
@@ -794,35 +794,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- -- Separator -- -->
           <template #separator>
-            <div class="tw:w-px tw:h-full tw:bg-(--o2-border) tw:cursor-col-resize tw:dark:bg-[rgba(255,255,255,0.12)]" />
+            <div class="w-px h-full bg-(--o2-border) cursor-col-resize dark:bg-[rgba(255,255,255,0.12)]" />
           </template>
 
           <!-- -- Right area: group tabs + dashboard -- -->
           <template #after>
-            <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+            <div class="flex flex-col h-full overflow-hidden">
               <!-- Outer Pod/Node tabs — only shown in nested K8s mode -->
               <OTabs
                 v-if="isNestedGroupMode"
                 v-model="activeOuterTab"
                 dense
                 align="left"
-                class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                class="metric-group-tabs border-b border-solid border-[var(--o2-border-color)]"
               >
                 <OTab
                   v-for="outerGroup in groupDefs"
                   :key="outerGroup.id"
                   :name="outerGroup.id"
-                  class="tw:flex-none!"
+                  class="flex-none!"
                 >
-                  <div class="tw:flex tw:flex-col tw:items-start tw:px-1 tw:py-0.5 tw:min-w-0">
-                    <div class="tw:flex tw:items-center tw:gap-1">
+                  <div class="flex flex-col items-start px-1 py-0.5 min-w-0">
+                    <div class="flex items-center gap-1">
                       <OIcon v-if="typeof outerGroup.icon === 'string'" :name="outerGroup.icon" size="xs" />
                       <component v-else :is="outerGroup.icon" />
-                      <span class="tw:whitespace-nowrap">{{ outerGroup.label }}</span>
+                      <span class="whitespace-nowrap">{{ outerGroup.label }}</span>
                     </div>
                     <span
                       v-if="outerTabResourceName[outerGroup.id]"
-                      class="tw:text-xs tw:leading-tight tw:opacity-75 tw:whitespace-nowrap"
+                      class="text-xs leading-tight opacity-75 whitespace-nowrap"
                       :title="outerTabResourceName[outerGroup.id]"
                     >{{ outerTabResourceName[outerGroup.id] }}</span>
                   </div>
@@ -835,7 +835,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="activeMetricGroupTab"
                 dense
                 align="left"
-                class="metric-group-tabs tw:shrink-0 tw:bg-surface-panel tw:border-b tw:border-solid tw:border-(--o2-border-color)"
+                class="metric-group-tabs shrink-0 bg-surface-panel border-b border-solid border-(--o2-border-color)"
               >
                 <OTab
                   v-for="group in groupedUniqueMetricStreams.groups.filter(
@@ -843,9 +843,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   )"
                   :key="group.id"
                   :name="group.id"
-                  class="tw:flex-none!"
+                  class="flex-none!"
                 >
-                  <div class="tw:flex tw:items-center tw:gap-1 tw:px-1">
+                  <div class="flex items-center gap-1 px-1">
                     <component
                       v-if="typeof group.icon !== 'string'"
                       :is="group.icon"
@@ -858,7 +858,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ group.label }}</span>
                     <OBadge
                       :variant="activeMetricGroupTab === group.id ? 'primary' : 'default'"
-                      class="tw:ml-0.5"
+                      class="ml-0.5"
                       size="sm"
                     >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OBadge>
                   </div>
@@ -866,13 +866,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTabs>
 
               <!-- Dashboard content -->
-              <div class="tw:flex-1 tw:overflow-auto">
+              <div class="flex-1 overflow-auto">
                 <div
                   v-if="loading"
-                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
+                  class="flex flex-col items-center justify-center h-full py-20 gap-3"
                 >
                   <OSpinner size="sm" />
-                  <div class="tw:text-sm tw:opacity-70">
+                  <div class="text-sm opacity-70">
                     {{
                       t("correlation.loadingMetrics", {
                         count: selectedMetricStreams.length,
@@ -882,14 +882,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else-if="error"
-                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+                  class="flex flex-col items-center justify-center h-full py-20"
                 >
                   <div
-                    class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90"
+                    class="text-base font-medium mb-2 opacity-90"
                   >
                     {{ t("correlation.metricsError") }}
                   </div>
-                  <div class="tw:text-sm tw:opacity-70 tw:mb-4">
+                  <div class="text-sm opacity-70 mb-4">
                     {{ error || t("correlation.metricsErrorDetails") }}
                   </div>
                   <OButton
@@ -897,7 +897,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm-action"
                     @click="loadDashboard"
                   >
-                    <OIcon name="refresh" size="xs" class="tw:mr-1" />
+                    <OIcon name="refresh" size="xs" class="mr-1" />
                     {{ t('correlation.retryButton') }}
                   </OButton>
                 </div>
@@ -912,14 +912,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-else
-                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-7.5rem)] tw:py-20"
+                  class="flex flex-col items-center justify-center h-[calc(100vh-7.5rem)] py-20"
                 >
                   <div
-                    class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90"
+                    class="text-base font-medium mb-2 opacity-90"
                   >
                     {{ t("correlation.noMetrics") }}
                   </div>
-                  <div class="tw:text-sm tw:opacity-70">
+                  <div class="text-sm opacity-70">
                     {{ t("correlation.noMetricsDescription") }}
                   </div>
                 </div>
@@ -929,35 +929,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OSplitter>
       </div>
 
-      <div v-if="activeTab == 'traces'" class="tw:h-full">
+      <div v-if="activeTab == 'traces'" class="h-full">
         <!-- Loading State -->
         <div
           v-if="tracesLoading"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-272px)] tw:py-20"
+          class="flex flex-col items-center justify-center h-[calc(100vh-272px)] py-20"
         >
-          <OSpinner size="xl" class="tw:mb-4" />
-          <div class="tw:text-base">{{ t("correlation.loadingTraces") }}</div>
+          <OSpinner size="xl" class="mb-4" />
+          <div class="text-base">{{ t("correlation.loadingTraces") }}</div>
         </div>
 
         <!-- Error State -->
         <div
           v-else-if="tracesError"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+          class="flex flex-col items-center justify-center h-full py-20"
         >
           <OIcon
             name="error-outline"
-            class="tw:mb-4" style="width: 3.75rem; height: 3.75rem;" />
-          <div class="tw:text-base tw:mb-2">
+            class="mb-4" style="width: 3.75rem; height: 3.75rem;" />
+          <div class="text-base mb-2">
             {{ t("correlation.tracesError") }}
           </div>
-          <div class="tw:text-sm tw:text-gray-500">{{ tracesError }}</div>
+          <div class="text-sm text-gray-500">{{ tracesError }}</div>
           <OButton
             variant="outline"
             size="sm-action"
-            class="tw:mt-4"
+            class="mt-4"
             @click="loadCorrelatedTraces"
           >
-            <OIcon name="refresh" size="xs" class="tw:mr-1" />
+            <OIcon name="refresh" size="xs" class="mr-1" />
             {{ t('correlation.retryButton') }}
           </OButton>
         </div>
@@ -967,7 +967,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="
             traceCorrelationMode === 'direct' && traceSpanList.length > 0
           "
-          class="tw:h-full tw:overflow-hidden telemetry-correlation-traces"
+          class="h-full overflow-hidden telemetry-correlation-traces"
         >
           <TraceDetails
             mode="embedded"
@@ -998,34 +998,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             traceCorrelationMode === 'dimension-based' &&
             tracesForDimensions.length > 0
           "
-          class="tw:h-full"
+          class="h-full"
         >
           <!-- Header -->
           <div
-            class="tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-surface-panel"
+            class="p-3 border-b border-solid border-(--o2-border-color) bg-surface-panel"
           >
-            <div class="tw:flex tw:items-center tw:gap-3">
+            <div class="flex items-center gap-3">
               <OIcon name="hub" size="md" />
-              <div class="tw:flex tw:flex-col">
-                <span class="tw:text-sm tw:font-semibold">{{
+              <div class="flex flex-col">
+                <span class="text-sm font-semibold">{{
                   t("correlation.dimensionBasedCorrelation")
                 }}</span>
-                <span class="tw:text-xs tw:text-gray-500">{{
+                <span class="text-xs text-gray-500">{{
                   t("correlation.tracesFromService", { service: serviceName })
                 }}</span>
               </div>
               <OBadge variant="primary">
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
               </OBadge>
-              <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
+              <div class="ml-auto flex items-center gap-2">
                 <OButton
                   variant="ghost"
                   size="sm-action"
                   @click="openTracesPage"
                   data-test="correlation-view-traces-page"
-                  class="tw:text-xs"
+                  class="text-xs"
                 >
-                  <OIcon name="open-in-new" size="xs" class="tw:mr-1" />
+                  <OIcon name="open-in-new" size="xs" class="mr-1" />
                   {{ t('correlation.viewInTraces') }}
                   <OTooltip :content="t('correlation.viewInTraces')" side="top" />
                 </OButton>
@@ -1048,13 +1048,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Traces Found State -->
         <div
           v-else-if="traceCorrelationMode !== null"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-7.5rem)] tw:py-20"
+          class="flex flex-col items-center justify-center h-[calc(100vh-7.5rem)] py-20"
         >
           <OIcon
             name="search-off"
-            class="tw:mb-4" style="width: 3.75rem; height: 3.75rem;" />
-          <div class="tw:text-base">{{ t("correlation.noTracesFound") }}</div>
-          <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
+            class="mb-4" style="width: 3.75rem; height: 3.75rem;" />
+          <div class="text-base">{{ t("correlation.noTracesFound") }}</div>
+          <div class="text-sm text-gray-500 mt-2">
             {{ t("correlation.noTracesDescription", { service: serviceName }) }}
           </div>
         </div>
@@ -1062,15 +1062,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Initial State (waiting for tab to be shown) -->
         <div
           v-else
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+          class="flex flex-col items-center justify-center h-full py-20"
         >
           <OIcon
             name="account-tree"
-            class="tw:mb-4" style="width: 3.75rem; height: 3.75rem;" />
-          <div class="tw:text-base">
+            class="mb-4" style="width: 3.75rem; height: 3.75rem;" />
+          <div class="text-base">
             {{ t("correlation.correlatedTraces") }}
           </div>
-          <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
+          <div class="text-sm text-gray-500 mt-2">
             {{ t("correlation.correlatedTracesFor", { service: serviceName }) }}
           </div>
         </div>
@@ -1085,10 +1085,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="metricSearchText"
       :placeholder="t('search.searchField')"
       clearable
-      class="tw:w-full tw:mb-3"
+      class="w-full mb-3"
     />
 
-    <div class="metric-list-container tw:max-h-100 tw:overflow-y-auto">
+    <div class="metric-list-container max-h-100 overflow-y-auto">
       <template
         v-if="
           groupedFilteredMetricStreams.groups.some(
@@ -1100,20 +1100,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="group in groupedFilteredMetricStreams.groups"
           :key="group.id"
         >
-          <!-- Group section — tw:hidden when no streams match -->
+          <!-- Group section — hidden when no streams match -->
           <template v-if="group.streams.length > 0">
             <!-- Group header -->
-            <div class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--o2-section-header-bg) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10">
-              <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
-                <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
+            <div class="flex items-center justify-between py-1.5 px-2 bg-(--o2-section-header-bg) border-b border-solid border-(--o2-border) sticky top-0 z-10">
+              <div class="flex items-center gap-[0.375rem] text-[0.6875rem] font-bold uppercase tracking-[0.05em] opacity-75">
+                <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="mr-0.5" />
                 <component v-else :is="group.icon" />
                 <span>{{ group.label }}</span>
                 <OBadge
                   variant="default"
-                  class="tw:ml-1"
+                  class="ml-1"
                 >{{ group.streams.length }}</OBadge>
               </div>
-              <div class="tw:flex tw:gap-1">
+              <div class="flex gap-1">
                 <OButton
                   variant="ghost"
                   size="chip"
@@ -1137,9 +1137,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="stream in group.streams"
               :key="stream.stream_name"
-              class="tw:flex tw:items-center tw:gap-2 tw:py-2 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border)] tw:hover:bg-[rgba(0,0,0,0.04)] tw:dark:border-[rgba(255,255,255,0.1)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
+              class="flex items-center gap-2 py-2 px-4 border-b border-solid border-[var(--o2-border)] hover:bg-[rgba(0,0,0,0.04)] dark:border-[rgba(255,255,255,0.1)] dark:hover:bg-[rgba(255,255,255,0.05)]"
             >
-              <div class="tw:flex tw:items-center tw:shrink-0">
+              <div class="flex items-center shrink-0">
                 <OCheckbox
                   :model-value="
                     selectedMetricStreams.some(
@@ -1150,8 +1150,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                 />
               </div>
-              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="tw:text-sm tw:font-[monospace]">{{ stream.stream_name }}</span>
+              <div class="flex flex-col flex-1 min-w-0">
+                <span class="text-sm font-[monospace]">{{ stream.stream_name }}</span>
               </div>
             </div>
           </template>
@@ -1159,7 +1159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- No results message -->
-      <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
+      <div v-else class="p-4 text-center text-gray-500">
         {{ t("search.noResult") }}
       </div>
     </div>

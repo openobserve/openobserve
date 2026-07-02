@@ -225,7 +225,7 @@ describe("MetricLegends", () => {
       // legend-grid scoped class replaced by Tailwind grid utilities
       const legendGrid = wrapper.find(".legends .tw\\:grid");
       expect(legendGrid.exists()).toBe(true);
-      expect(legendGrid.classes()).toContain("tw:grid-cols-2");
+      expect(legendGrid.classes()).toContain("grid-cols-2");
     });
   });
 
@@ -556,7 +556,7 @@ describe("MetricLegends", () => {
 
     it("should render an icon alongside each legend item label", () => {
       // Each legend item must have both an icon and a non-empty text label —
-      // the "tw:mr-2" spacing class is a visual detail handled by CSS, not a
+      // the "mr-2" spacing class is a visual detail handled by CSS, not a
       // behavioral assertion.
       const legendItems = wrapper.findAll('[data-test^="metrics-legends-item-"]');
       expect(legendItems.length).toBe(4);

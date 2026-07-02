@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:flex-col logs-index-menu tw:pr-[0.375rem]! tw:h-full tw:bg-surface-panel!"
+    class="flex flex-col logs-index-menu pr-[0.375rem]! h-full bg-surface-panel!"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div
-      class="tw:flex tw:items-center tw:gap-1"
+      class="flex items-center gap-1"
       style="max-width: 100%; overflow: hidden"
     >
       <OButton
@@ -31,13 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="log-search-index-list-stream-type-badge"
         variant="ghost"
         size="icon-sm"
-        class="tw:shrink-0 tw:h-8 tw:w-8 tw:border tw:border-(--o2-border) tw:rounded tw:p-0"
+        class="shrink-0 h-8 w-8 border border-(--o2-border) rounded p-0"
         @click="onStreamTypeChange('logs')"
       >
         <OIcon :name="streamTypeIcon" size="sm" />
         <OTooltip :content="streamTypeLabel + ' — ' + t('search.switchToLogs')" side="bottom" align="center" />
       </OButton>
-      <div class="tw:flex-1 tw:min-w-0">
+      <div class="flex-1 min-w-0">
         <OSelect
           ref="streamSelect"
           data-test="log-search-index-list-select-stream"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="placeHolderText"
           :multiple="selectionMode === 'multi'"
           :row-click-single-select="selectionMode === 'multi'"
-          class="tw:w-full"
+          class="w-full"
           @update:model-value="handleStreamSelection"
         >
           <template #empty>{{ t("search.noResult") }}</template>
@@ -63,17 +63,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="!searchObj.data.stream.selectedStream.length"
-      class="index-table tw:mt-1"
+      class="index-table mt-1"
     >
       <div
         data-test="logs-search-no-field-found-text"
-        class="tw:text-center tw:w-5/6 tw:mx-0 tw:pt-3"
+        class="text-center w-5/6 mx-0 pt-3"
       >
-        <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
+        <OIcon name="info" size="sm" class="align-middle mr-1" />
         {{ t("search.noFieldFoundInStream") }}
       </div>
     </div>
-    <div v-else class="index-table tw:mt-1">
+    <div v-else class="index-table mt-1">
       <GroupedFieldList
         ref="fieldListRef"
         :fields="streamFieldsRows"
@@ -151,9 +151,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty>
           <div
             data-test="logs-search-no-field-found-text"
-            class="tw:text-center tw:w-5/6 tw:mx-0 tw:pt-3"
+            class="text-center w-5/6 mx-0 pt-3"
           >
-            <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
+            <OIcon name="info" size="sm" class="align-middle mr-1" />
             {{ t("search.noFieldFoundInStream") }}
           </div>
         </template>
@@ -161,65 +161,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #loading>
           <div
             data-test="logs-indexlist-fieldlist-loading-skeleton"
-            class="tw:w-full tw:flex tw:flex-col"
+            class="w-full flex flex-col"
           >
             <!-- Group 1 header -->
-            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2">
-              <OSkeleton type="rect" class="tw:h-3 tw:w-24 tw:rounded-sm" />
-              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            <div class="h-7 flex items-center justify-between px-2">
+              <OSkeleton type="rect" class="h-3 w-24 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
             </div>
             <!-- Group 1 fields -->
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:flex-1" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:w-3/4" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="w-3/4" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:flex-1" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:w-4/5" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="w-4/5" />
             </div>
             <!-- Group 2 header -->
-            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2 tw:mt-2">
-              <OSkeleton type="rect" class="tw:h-3 tw:w-16 tw:rounded-sm" />
-              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            <div class="h-7 flex items-center justify-between px-2 mt-2">
+              <OSkeleton type="rect" class="h-3 w-16 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
             </div>
             <!-- Group 2 field -->
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:w-2/3" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="w-2/3" />
             </div>
             <!-- Group 3 header -->
-            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2 tw:mt-2">
-              <OSkeleton type="rect" class="tw:h-3 tw:w-32 tw:rounded-sm" />
-              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            <div class="h-7 flex items-center justify-between px-2 mt-2">
+              <OSkeleton type="rect" class="h-3 w-32 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
             </div>
             <!-- Group 3 fields -->
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:flex-1" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:w-4/5" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="w-4/5" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:flex-1" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:w-3/4" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="w-3/4" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:flex-1" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
             </div>
           </div>
         </template>
@@ -1752,7 +1752,7 @@ export default defineComponent({
             });
           });
 
-          // [NEW] Background capture into IndexedDB — does not tw:block return
+          // [NEW] Background capture into IndexedDB — does not block return
           if (streamValues.length > 0 && fieldName) {
             captureFromValuesApi(
               {

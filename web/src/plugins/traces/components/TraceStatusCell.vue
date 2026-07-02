@@ -17,23 +17,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="trace-row-status-pill"
-    class="tw:rounded tw:py-[0.125rem] tw:px-[0.625rem] tw:inline-flex tw:items-center tw:w-fit"
+    class="rounded py-[0.125rem] px-[0.625rem] inline-flex items-center w-fit"
     :class="
       hasErrors
-        ? 'o2-status-pill--error tw:text-(--o2-status-error-text) tw:bg-(--o2-status-error-bg)'
-        : 'o2-status-pill--success tw:text-(--o2-status-success-text) tw:bg-(--o2-status-success-bg)'
+        ? 'o2-status-pill--error text-(--o2-status-error-text) bg-(--o2-status-error-bg)'
+        : 'o2-status-pill--success text-(--o2-status-success-text) bg-(--o2-status-success-bg)'
     "
   >
     <span
-      class="tw:mr-1 tw:inline-block tw:w-[0.4375rem] tw:h-[0.4375rem] tw:rounded-full tw:shrink-0 o2-status-pill__dot"
+      class="mr-1 inline-block w-[0.4375rem] h-[0.4375rem] rounded-full shrink-0 o2-status-pill__dot"
       :class="
         hasErrors
-          ? 'tw:bg-[var(--o2-status-error-text)]'
-          : 'tw:bg-[var(--o2-status-success-text)]'
+          ? 'bg-[var(--o2-status-error-text)]'
+          : 'bg-[var(--o2-status-success-text)]'
       "
     />
     <span
-      class="tw:text-[0.7rem] tw:tracking-[0.03em] tw:leading-[1.0625rem] tw:uppercase tw:font-bold"
+      class="text-[0.7rem] tracking-[0.03em] leading-[1.0625rem] uppercase font-bold"
     >
       {{ label }}
     </span>

@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="tw:flex tw:flex-col full-height"
+    class="flex flex-col full-height"
     style="
       overflow: hidden !important;
       padding: 0 !important;
@@ -27,16 +27,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <div
-      class="search-list full-height tw:w-full tw:flex tw:flex-col"
+      class="search-list full-height w-full flex flex-col"
       ref="searchListContainer"
     >
       <!-- Section header: static at top -->
-      <div class="tw:flex tw:items-center tw:h-[2.25rem] tw:shrink-0 result-bar tw:bg-surface-panel">
+      <div class="flex items-center h-[2.25rem] shrink-0 result-bar bg-surface-panel">
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
           variant="outline"
           size="icon-xs-sq"
-          class="tw:ml-1.5 tw:shrink-0"
+          class="ml-1.5 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
           @click="toggleFieldList"
         >
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
         <div
-          class="tw:flex-1 tw:min-w-0 tw:text-left tw:pl-2 tw:bg-amber-500 text-white tw:rounded"
+          class="flex-1 min-w-0 text-left pl-2 bg-amber-500 text-white rounded"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="tw:flex-1 tw:min-w-0 tw:text-left tw:pl-2 warning tw:flex tw:items-center tw:flex-wrap tw:gap-1.5"
+          class="flex-1 min-w-0 text-left pl-2 warning flex items-center flex-wrap gap-1.5"
           data-test="logs-search-result-title"
           :data-search-state="searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'"
           :data-hits-count="searchObj.data?.queryResults?.hits?.length ?? 0"
@@ -72,23 +72,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OBadge
                 variant="default"
                 data-test="logs-result-records-chip"
-                class="tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-text-4)]!"
+                class="rounded! bg-[var(--o2-tag-grey-1)]! py-[0.4rem]! px-[0.625rem]! text-[0.75rem]! text-[var(--o2-text-4)]!"
               >{{ recordsChips.records }}</OBadge>
               <!-- Blue: time taken highlights query performance -->
               <OBadge
                 variant="default"
                 data-test="logs-result-time-chip"
-                class="tw:rounded! tw:bg-[var(--o2-status-info-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-status-info-text)]!"
+                class="rounded! bg-[var(--o2-status-info-bg)]! py-[0.4rem]! px-[0.625rem]! text-[0.75rem]! text-[var(--o2-status-info-text)]!"
               >{{ recordsChips.time }}</OBadge>
               <!-- Amber: resource/cost awareness -->
               <OBadge
                 v-if="recordsChips.scan"
                 variant="default"
                 data-test="logs-result-scan-chip"
-                class="tw:rounded! tw:bg-[var(--o2-status-warning-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-status-warning-text)]!"
+                class="rounded! bg-[var(--o2-status-warning-bg)]! py-[0.4rem]! px-[0.625rem]! text-[0.75rem]! text-[var(--o2-status-warning-text)]!"
               >{{ recordsChips.scan }}</OBadge>
             </template>
-            <span v-else class="tw:truncate tw:min-w-0">{{ noOfRecordsTitle }}</span>
+            <span v-else class="truncate min-w-0">{{ noOfRecordsTitle }}</span>
           </template>
           <!-- Patterns mode: structured chips -->
           <template v-else>
@@ -97,24 +97,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OBadge
                 variant="default"
                 data-test="logs-result-events-chip"
-                class="tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-text-4)]!"
+                class="rounded! bg-[var(--o2-tag-grey-1)]! py-[0.4rem]! px-[0.625rem]! text-[0.75rem]! text-[var(--o2-text-4)]!"
               >{{ patternChips.events }} events</OBadge>
               <!-- Grey: pattern count -->
               <OBadge
                 variant="default"
                 data-test="logs-result-patterns-chip"
-                class="tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-text-4)]!"
+                class="rounded! bg-[var(--o2-tag-grey-1)]! py-[0.4rem]! px-[0.625rem]! text-[0.75rem]! text-[var(--o2-text-4)]!"
               >{{ patternChips.patterns }} patterns</OBadge>
               <!-- Blue: time taken highlights query performance -->
               <OBadge
                 variant="default"
                 data-test="logs-result-pattern-time-chip"
-                class="tw:rounded! tw:bg-[var(--o2-status-info-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-status-info-text)]!"
+                class="rounded! bg-[var(--o2-status-info-bg)]! py-[0.4rem]! px-[0.625rem]! text-[0.75rem]! text-[var(--o2-status-info-text)]!"
               >{{ patternChips.time }} ms</OBadge>
             </template>
-            <span v-else class="tw:truncate tw:min-w-0">{{ patternSummaryText }}</span>
+            <span v-else class="truncate min-w-0">{{ patternSummaryText }}</span>
           </template>
-          <span v-if="searchObj.loadingCounter" class="tw:shrink-0">
+          <span v-if="searchObj.loadingCounter" class="shrink-0">
             <OSpinner size="xs" class="search-spinner" />
           </span>
           <div
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.loadingCounter &&
               searchObj.meta.showHistogram
             "
-            class="tw:shrink-0 tw:cursor-pointer"
+            class="shrink-0 cursor-pointer"
             :class="
               store.state.theme == 'dark'
                 ? 'histogram-unavailable-text'
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="tw:flex-none tw:pr-2 pagination-block tw:flex tw:items-center tw:justify-end tw:gap-1">
+        <div class="flex-none pr-2 pagination-block flex items-center justify-end gap-1">
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- INLINE BUTTONS (wider container) -->
           <template v-else>
             <!-- Refresh in bordered wrapper -->
-            <div class="tw:inline-flex tw:items-center tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:px-1 tw:h-6 tw:overflow-hidden">
+            <div class="inline-flex items-center border border-[var(--o2-border-color)] rounded-md px-1 h-6 overflow-hidden">
               <ORefreshButton
                 :last-run-at="searchObj.meta.lastRunAt"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Action buttons -->
             <div
               v-if="showInspectBtn || showAnalyzeBtn || showWrapBtn"
-              class="tw:inline-flex tw:items-center tw:gap-0.5"
+              class="inline-flex items-center gap-0.5"
             >
               <OButton
                 v-if="showInspectBtn"
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-inspect-button"
               >
                 <OIcon name="troubleshoot" size="sm" />
-                <span v-if="showActionLabels" class="tw:whitespace-nowrap">{{ t('volumeInsights.inspectBtnLabel') }}</span>
+                <span v-if="showActionLabels" class="whitespace-nowrap">{{ t('volumeInsights.inspectBtnLabel') }}</span>
                 <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.searchInspectionsLabel')" />
               </OButton>
               <OButton
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-analyze-dimensions-button"
               >
                 <OIcon name="timeline" size="sm" />
-                <span v-if="showActionLabels" class="tw:whitespace-nowrap">{{ t('volumeInsights.analyzeBtnLabel') }}</span>
+                <span v-if="showActionLabels" class="whitespace-nowrap">{{ t('volumeInsights.analyzeBtnLabel') }}</span>
                 <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.analyzeTooltipLogs')" />
               </OButton>
               <OButton
@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-result-records-per-page"
             v-model="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
-            class="select-pagination tw:min-w-[4.5rem]"
+            class="select-pagination min-w-[4.5rem]"
             size="sm"
             :searchable="false"
             :disable="searchObj.loading"
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Combined scroll area: histogram + logs/patterns scroll together -->
-      <div class="tw:flex-1 tw:overflow-y-auto tw:overflow-x-hidden" ref="scrollContainerRef">
+      <div class="flex-1 overflow-y-auto overflow-x-hidden" ref="scrollContainerRef">
         <div
           ref="histogramRef"
           :class="[
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.loading
             "
           >
-            <h6 class="tw:text-center">
+            <h6 class="text-center">
               <span class="histogram-empty__message">
                 <OIcon name="warning" size="xs"></OIcon> No
                 data found for histogram.</span
@@ -378,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Object.keys(plotChart)?.length === 0
             "
           >
-            <h5 class="tw:text-center">
+            <h5 class="text-center">
               <span class="histogram-empty__message" style="color: transparent"
                 >.</span
               >
@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <h6
-            class="tw:text-center histogram-error"
+            class="text-center histogram-error"
             v-if="
               searchObj.data.histogram.errorCode != 0 &&
               searchObj.data.histogram.errorCode != -1
@@ -423,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </h6>
           <h6
-            class="tw:text-center"
+            class="text-center"
             v-else-if="searchObj.data.histogram.errorCode != -1"
           >
             <SanitizedHtmlRenderer
@@ -501,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
             :highlight-query="searchObj.data.highlightQuery"
             :default-columns="!searchObj.data.stream.selectedFields.length"
-            class="tw:w-full"
+            class="w-full"
             :selectedStreamFields="searchObj.data.stream.selectedStreamFields"
             :scroll-el="scrollContainerRef"
             :scroll-margin="0"
@@ -529,7 +529,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Patterns View -->
         <div
           v-if="searchObj.meta.logsVisualizeToggle === 'patterns'"
-          class="tw:flex tw:flex-col"
+          class="flex flex-col"
           :class="[
             !searchObj.meta.showHistogram ||
             (searchObj.meta.showHistogram &&
@@ -634,7 +634,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <!-- Correlation Dashboard (for tw:inline expanded logs, opens as separate dialog) -->
+    <!-- Correlation Dashboard (for inline expanded logs, opens as separate dialog) -->
     <TelemetryCorrelationDashboard
       v-if="shouldShowInlineDialog"
       mode="dialog"
@@ -1404,7 +1404,7 @@ export default defineComponent({
 
       if (index === -1 || index === undefined) {
         console.error(
-          "[SearchResult] Could not find tw:flex index for correlation",
+          "[SearchResult] Could not find flex index for correlation",
           {
             rowTimestamp: row[timestampColumn],
             hitsCount: searchObj.data.queryResults?.hits?.length,
@@ -1550,7 +1550,7 @@ export default defineComponent({
           });
         }
 
-        // For tw:inline expanded logs, open the correlation dashboard as a dialog
+        // For inline expanded logs, open the correlation dashboard as a dialog
         // For DetailTable drawer, the data is passed via props (tabs are already visible)
         if (!searchObj.meta.showDetailTab) {
           showCorrelation.value = true;
