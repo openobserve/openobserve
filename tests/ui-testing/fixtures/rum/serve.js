@@ -116,6 +116,9 @@ function startFixtureServer(opts) {
 
       const ext = path.extname(filePath);
       const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream' };
+      // The JS Self-Profiling API (window.Profiler) only exists when the
+      // document opts in — without this the SDK never loads the profiler chunk.
+      if (ext === '.html') headers['Document-Policy'] = 'js-profiling';
 
       if (path.basename(filePath) === 'oo-rum.js') {
         const templated = templateOoRum(fs.readFileSync(filePath, 'utf8'), cfg);
@@ -123,11 +126,12 @@ function startFixtureServer(opts) {
         return;
       }
 
-      // Every sample page carries the CDN async loader — rewrite the bundle
-      // version on all of them so post-navigation pages load the same SDK.
-      if (ext === '.html' && cfg.sdkVersion) {
-        const html = templateSdkVersion(fs.readFileSync(filePath, 'utf8'), cfg.sdkVersion);
-        res.writeHead(200, headers).end(html);
+      // Every sample page carries the CDN async loader, and app.js fetches a
+      // CDN bundle in its resource demo — rewrite the version segment on all
+      // of them so the whole app exercises the same SDK release.
+      if ((ext === '.html' || ext === '.js') && cfg.sdkVersion) {
+        const body = templateSdkVersion(fs.readFileSync(filePath, 'utf8'), cfg.sdkVersion);
+        res.writeHead(200, headers).end(body);
         return;
       }
 

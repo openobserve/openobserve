@@ -15,6 +15,12 @@ async function driveRumSampleInteractions(page) {
   await page.locator('[data-test="rum-sample-log-error-btn"]').click();
   await page.locator('[data-test="rum-sample-throw-error-btn"]').click();
   await page.locator('[data-test="rum-sample-fetch-btn"]').click();
+  // The fetch button downloads openobserve-rum-slim.js from the CDN to create
+  // a resource-timing entry. Let it finish before navigating — otherwise the
+  // navigation aborts it mid-flight (net::ERR_ABORTED noise, no resource event).
+  await page
+    .waitForResponse((r) => r.url().includes('openobserve-rum-slim'), { timeout: 15000 })
+    .catch(() => {});
 
   // Navigating fires beforeunload/visibility flush of the SDK's batched beacons.
   await page.locator('[data-test="nav-products-link"]').click();

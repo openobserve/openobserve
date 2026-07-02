@@ -11,8 +11,9 @@
  *   3. Load it in a real browser, drive deterministic interactions, and let the
  *      SDK emit genuine beacons.
  *   4. Verify data flow in THREE layers:
- *        Layer 0 — browser: beacons fired to /rum/v1/{org}/{rum,logs,replay}
- *        Layer A — API:     rows land in _rumdata / _rumlog (search API)
+ *        Layer 0 — browser: beacons fired to /rum/v1/{org}/{rum,logs,replay};
+ *                  lazy recorder + profiler chunks load from the CDN with 2xx
+ *        Layer A — API:     rows land in _rumdata / _rumlog / _sessionreplay
  *        Layer B — UI:      the data surfaces on the RUM Error Tracking page
  *
  * Prerequisites:
@@ -121,7 +122,12 @@ test.describe('RUM CDN Data Flow', { tag: '@enterprise' }, () => {
     });
     app.on('requestfailed', (req) => {
       if (!req.url().includes('browsersdk.openobserve.ai')) return;
-      cdnFailures.push({ url: req.url(), error: (req.failure() || {}).errorText });
+      const error = (req.failure() || {}).errorText;
+      // ERR_ABORTED = cancelled by page lifecycle (navigation/close), not an
+      // asset problem. Genuinely missing files complete with a 4xx/5xx status
+      // and are caught by the all-2xx assertion on cdnAssets below.
+      if (error === 'net::ERR_ABORTED') return;
+      cdnFailures.push({ url: req.url(), error });
     });
 
     // Load the fixture and wait for the live CDN bundle to arrive. When an
@@ -142,6 +148,19 @@ test.describe('RUM CDN Data Flow', { tag: '@enterprise' }, () => {
     }
     // Let onReady() init + session replay start.
     await app.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+    // The recorder chunk must arrive before interactions are worth recording:
+    // the fixture force-starts session replay, so its download is mandatory.
+    // The profiler chunk is mandatory too (the fixture sets
+    // profilingSampleRate: 100). Poll — both are lazy-loaded after init.
+    const chunkLoaded = (name) =>
+      cdnAssets.find((a) => a.url.includes(`/chunks/${name}-`) && a.status >= 200 && a.status < 300);
+    await expect
+      .poll(() => Boolean(chunkLoaded('recorder')), { timeout: 20000, intervals: [1000, 2000] })
+      .toBe(true);
+    await expect
+      .poll(() => Boolean(chunkLoaded('profiler')), { timeout: 20000, intervals: [1000, 2000] })
+      .toBe(true);
 
     // Deterministic signal generation + flush (shared with the NPM path).
     await driveRumSampleInteractions(app);
@@ -165,11 +184,20 @@ test.describe('RUM CDN Data Flow', { tag: '@enterprise' }, () => {
 
     await app.close();
 
+    sessionId = dataRows[0]?.session_id || null;
     testLogger.info('Beacon tallies', beacons);
+    testLogger.info('CDN assets loaded', { assets: cdnAssets.map((a) => `${a.status} ${a.url}`) });
     expect(beacons.rum, '_rumdata beacons fired').toBeGreaterThan(0);
     expect(beacons.logs, '_rumlog beacons fired').toBeGreaterThan(0);
     expect(dataRows.length, `_rumdata delivery confirmed for ${SERVICE}`).toBeGreaterThan(0);
     expect(logRows.length, `_rumlog delivery confirmed for ${SERVICE}`).toBeGreaterThan(0);
+    expect(sessionId, 'generated RUM events should carry a session_id').toBeTruthy();
+    // Every completed CDN download must be 2xx (a 403 here means a bundle or
+    // chunk referenced by the release is not actually published), and no
+    // request may fail for a non-lifecycle reason (DNS, CORS, CSP, timeout).
+    const badAssets = cdnAssets.filter((a) => a.status < 200 || a.status >= 300);
+    expect(badAssets, 'all CDN assets must download with 2xx').toEqual([]);
+    expect(cdnFailures, 'no CDN asset request may fail').toEqual([]);
   });
 
   // ==========================================================================
@@ -197,6 +225,24 @@ test.describe('RUM CDN Data Flow', { tag: '@enterprise' }, () => {
     });
 
     expect(hits.length, `_rumlog should contain rows for ${SERVICE}`).toBeGreaterThan(0);
+  });
+
+  test('_sessionreplay stream receives recording segments for this run', {
+    tag: ['@rum', '@cdn', '@dataflow', '@P0'],
+  }, async ({ page }) => {
+    // sessionId was captured from this run's _rumdata rows in Layer 0.
+    // _sessionreplay has no service column, so the session id is the only
+    // way to scope the query to this run.
+    expect(sessionId, 'session_id captured during generation').toBeTruthy();
+
+    const hits = await waitForStreamRows(page, {
+      sql: `SELECT * FROM "_sessionreplay" WHERE session_id = '${sessionId}'`,
+      minRows: 1,
+      timeoutMs: 45000,
+    });
+
+    expect(hits.length, `_sessionreplay should contain segments for session ${sessionId}`)
+      .toBeGreaterThan(0);
   });
 
   // ==========================================================================
