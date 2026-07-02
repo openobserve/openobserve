@@ -427,6 +427,7 @@ import { computed, defineComponent, ref, watch, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import orgService from "../services/organizations";
+import configService from "@/services/config";
 import config from "../aws-exports";
 import { formatSizeFromMB, addCommasToNumber, getImageURL } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
@@ -598,6 +599,26 @@ export default defineComponent({
       store.state.selectedOrganization?.identifier != undefined
     ) {
       getSummary(store.state.selectedOrganization.identifier);
+    }
+
+    // Refresh config so the UsageReportBanner reflects the latest
+    // last_usage_report_ts each time the Home page is opened. HomeView remounts
+    // on every visit (the home router-view is not kept-alive), and config is
+    // otherwise only fetched at app startup.
+    const refreshConfig = async () => {
+      try {
+        const res: any = await configService.get_config();
+        store.dispatch("setConfig", res.data);
+      } catch (error) {
+        console.log(error);
+      }
+    };
+    // The UsageReportBanner only renders on self-hosted enterprise builds, so
+    // only that build needs the fresh last_usage_report_ts. Skip the extra
+    // /config fetch everywhere else. Optional chaining guards against the build
+    // config being unavailable so this can never throw during setup.
+    if (config?.isEnterprise === "true" && config?.isCloud === "false") {
+      refreshConfig();
     }
 
   const alertsPanelData = computed (() => {
