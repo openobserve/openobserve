@@ -70,8 +70,8 @@ async fn run_search(org_id: &str, req: &Request) -> anyhow::Result<SearchRespons
 
 fn parse_result(h: &serde_json::Value) -> Option<CheckResult> {
     Some(CheckResult {
-        job_id: h.get("job_id")?.as_i64()?,
-        monitor_id: h.get("monitor_id")?.as_str()?.to_string(),
+        job_id: h.get("job_id")?.as_str()?.to_string(),
+        synthetics_id: h.get("synthetics_id")?.as_str()?.to_string(),
         location: h.get("location")?.as_str()?.to_string(),
         pool: h
             .get("pool")
@@ -139,17 +139,18 @@ fn safe_ident(s: &str) -> String {
 pub async fn get_artifact_key(
     org_id: &str,
     synthetics_id: &str,
-    job_id: i64,
+    job_id: &str,
     artifact_type: &str,   // "screenshot" or "trace"
     step_id: Option<&str>, // required for screenshot
 ) -> anyhow::Result<Option<String>> {
     let now = config::utils::time::now_micros();
     let start_time = now - 90 * ONE_DAY_US;
     let sid = safe_ident(synthetics_id);
+    let jid = safe_ident(job_id);
     let sql = format!(
         "SELECT screenshot_refs, trace_ref FROM \"{STREAM}\" \
          WHERE _timestamp >= {start_time} AND _timestamp <= {now} \
-           AND synthetics_id = '{sid}' AND job_id = {job_id} LIMIT 1"
+           AND synthetics_id = '{sid}' AND job_id = '{jid}' LIMIT 1"
     );
     let req = build_req(sql, start_time, now, 1, 0);
     let resp = run_search(org_id, &req).await?;
@@ -199,11 +200,11 @@ pub async fn list_results(
 
     let mid = safe_ident(monitor_id);
     let sql = format!(
-        "SELECT job_id, monitor_id, location, pool, status, response_time_ms, \
-                error, browser_engine, device, _timestamp \
+        "SELECT job_id, synthetics_id, location, pool, status, response_time_ms, \
+                error, browser_engine, device, _timestamp, screenshot_refs, trace_ref \
          FROM \"{STREAM}\" \
          WHERE _timestamp >= {start_time} AND _timestamp <= {end_time} \
-           AND monitor_id = '{mid}'{where_extra} \
+           AND synthetics_id = '{mid}'{where_extra} \
          ORDER BY _timestamp DESC"
     );
 
@@ -224,18 +225,19 @@ pub async fn list_results(
 pub async fn get_result(
     org_id: &str,
     monitor_id: &str,
-    job_id: i64,
+    job_id: &str,
 ) -> anyhow::Result<Option<CheckResult>> {
     let now = config::utils::time::now_micros();
     let start_time = now - 90 * ONE_DAY_US;
 
     let mid = safe_ident(monitor_id);
+    let jid = safe_ident(job_id);
     let sql = format!(
-        "SELECT job_id, monitor_id, location, pool, status, response_time_ms, \
-                error, browser_engine, device, _timestamp \
+        "SELECT job_id, synthetics_id, location, pool, status, response_time_ms, \
+                error, browser_engine, device, _timestamp, screenshot_refs, trace_ref \
          FROM \"{STREAM}\" \
          WHERE _timestamp >= {start_time} AND _timestamp <= {now} \
-           AND monitor_id = '{mid}' AND job_id = {job_id}"
+           AND synthetics_id = '{mid}' AND job_id = '{jid}'"
     );
 
     let req = build_req(sql, start_time, now, 1, 0);

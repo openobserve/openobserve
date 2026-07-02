@@ -418,8 +418,8 @@ pub struct ScreenshotRef {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CheckResult {
-    pub job_id: i64,
-    pub monitor_id: String,
+    pub job_id: String,
+    pub synthetics_id: String,
     pub location: String,
     pub pool: String,
     pub status: CheckStatus,

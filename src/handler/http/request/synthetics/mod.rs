@@ -131,11 +131,7 @@ pub async fn list_results(
     ),
 )]
 pub async fn get_result(Path((org_id, id, job_id)): Path<(String, String, String)>) -> Response {
-    let job_id: i64 = match job_id.parse() {
-        Ok(v) => v,
-        Err(_) => return MetaHttpResponse::bad_request("invalid job_id"),
-    };
-    match crate::service::synthetics::get_result(&org_id, &id, job_id).await {
+    match crate::service::synthetics::get_result(&org_id, &id, &job_id).await {
         Ok(Some(r)) => MetaHttpResponse::json(r),
         Ok(None) => MetaHttpResponse::not_found("result not found"),
         Err(e) => {
@@ -179,15 +175,10 @@ pub async fn get_artifact_url(
     Path((org_id, id, job_id)): Path<(String, String, String)>,
     Query(query): Query<ArtifactQuery>,
 ) -> Response {
-    let job_id: i64 = match job_id.parse() {
-        Ok(v) => v,
-        Err(_) => return MetaHttpResponse::bad_request("invalid job_id"),
-    };
-
     let key = match crate::service::synthetics::get_artifact_key(
         &org_id,
         &id,
-        job_id,
+        &job_id,
         &query.artifact_type,
         query.step.as_deref(),
     )
