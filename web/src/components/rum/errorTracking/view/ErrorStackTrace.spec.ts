@@ -97,7 +97,7 @@ describe("ErrorStackTrace Component", () => {
     // Arrange + Act handled in beforeEach
 
     // Assert
-    const stackLines = wrapper.findAll(".error_stack");
+    const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     expect(stackLines).toHaveLength(3);
   });
 
@@ -105,7 +105,7 @@ describe("ErrorStackTrace Component", () => {
     // Arrange + Act handled in beforeEach
 
     // Assert
-    const stackLines = wrapper.findAll(".error_stack");
+    const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     expect(stackLines[0].text()).toBe("at Object.fn (/app/src/main.js:15:20)");
     expect(stackLines[1].text()).toBe(
       "at process.processImmediate (internal/timers.js:461:26)",
@@ -127,7 +127,7 @@ describe("ErrorStackTrace Component", () => {
 
     // Assert
     const container = wrapper.find(".error-stacks");
-    const lines = container.findAll(".error_stack");
+    const lines = container.findAll('[data-test="error-stack-trace-line"]');
     expect(lines).toHaveLength(mockErrorStack.length - 1);
   });
 
@@ -148,7 +148,7 @@ describe("ErrorStackTrace Component", () => {
     await wrapper.setProps({ error_stack: [] });
 
     // Assert
-    expect(wrapper.findAll(".error_stack")).toHaveLength(0);
+    expect(wrapper.findAll('[data-test="error-stack-trace-line"]')).toHaveLength(0);
   });
 
   it("renders no stack lines for single-line stack", async () => {
@@ -157,7 +157,7 @@ describe("ErrorStackTrace Component", () => {
 
     // Assert
     expect(wrapper.text()).toContain("Single error line");
-    expect(wrapper.findAll(".error_stack")).toHaveLength(0);
+    expect(wrapper.findAll('[data-test="error-stack-trace-line"]')).toHaveLength(0);
   });
 
   it("updates displayed stack lines when prop changes", async () => {
@@ -169,7 +169,7 @@ describe("ErrorStackTrace Component", () => {
 
     // Assert
     expect(wrapper.text()).toContain("New error");
-    expect(wrapper.findAll(".error_stack")).toHaveLength(2);
+    expect(wrapper.findAll('[data-test="error-stack-trace-line"]')).toHaveLength(2);
   });
 
   it("renders 50 stack lines for a long stack trace", async () => {
@@ -183,7 +183,7 @@ describe("ErrorStackTrace Component", () => {
     await wrapper.setProps({ error_stack: longStack });
 
     // Assert
-    expect(wrapper.findAll(".error_stack")).toHaveLength(50);
+    expect(wrapper.findAll('[data-test="error-stack-trace-line"]')).toHaveLength(50);
   });
 
   it("handles special characters in stack trace text", async () => {
@@ -199,7 +199,7 @@ describe("ErrorStackTrace Component", () => {
 
     // Assert
     expect(wrapper.text()).toContain("Error: Special chars");
-    const lines = wrapper.findAll(".error_stack");
+    const lines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     expect(lines[1].text()).toContain("<anonymous>");
   });
 
@@ -219,7 +219,7 @@ describe("ErrorStackTrace Component", () => {
     // Arrange + Act handled in beforeEach
 
     // Assert
-    const stackLines = wrapper.findAll(".error_stack");
+    const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     const firstStyle = stackLines[0].attributes("style");
     expect(firstStyle).toContain("border-top: 1px solid rgb(224, 224, 224)");
 
@@ -235,7 +235,7 @@ describe("ErrorStackTrace Component", () => {
     // Arrange + Act handled in beforeEach
 
     // Assert
-    const stackLines = wrapper.findAll(".error_stack");
+    const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     const style = stackLines[0].attributes("style");
     expect(style).toContain("border-radius: 4px 4px 0 0");
   });
@@ -244,7 +244,7 @@ describe("ErrorStackTrace Component", () => {
     // Arrange + Act handled in beforeEach
 
     // Assert
-    const stackLines = wrapper.findAll(".error_stack");
+    const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     const lastStyle = stackLines[stackLines.length - 1].attributes("style");
     expect(lastStyle).toContain("border-radius: 0 0 4px 4px");
   });
@@ -256,7 +256,7 @@ describe("ErrorStackTrace Component", () => {
     });
 
     // Assert
-    const stackLines = wrapper.findAll(".error_stack");
+    const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     expect(stackLines).toHaveLength(1);
     const style = stackLines[0].attributes("style");
     expect(style).toContain("border-top: 1px solid rgb(224, 224, 224)");
@@ -267,7 +267,7 @@ describe("ErrorStackTrace Component", () => {
     // Arrange + Act handled in beforeEach
 
     // Assert
-    const stackLines = wrapper.findAll(".error_stack");
+    const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     if (stackLines.length > 2) {
       for (let i = 1; i < stackLines.length - 1; i++) {
         const style = stackLines[i].attributes("style");

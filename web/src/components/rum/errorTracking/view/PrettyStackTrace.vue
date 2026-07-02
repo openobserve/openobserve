@@ -17,7 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <!-- Loading state -->
-    <div v-if="isLoadingTranslation" class="loading-container tw:p-6 tw:text-center">
+    <div
+      v-if="isLoadingTranslation"
+      class="loading-container tw:p-6 tw:text-center tw:min-h-[200px] tw:flex tw:flex-col tw:items-center tw:justify-center tw:rounded-md"
+      :style="{ 'background-color': backgroundColor, 'border': `1px solid ${borderColor}` }"
+    >
       <OSpinner variant="dots" size="lg" />
       <div class="tw:mt-3 tw:text-gray-400" style="font-size: 14px; font-weight: 500;">
         Translating stack trace with source maps...
@@ -28,7 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- No source maps available message -->
-    <div v-else-if="allSourceInfoNull" class="no-source-maps-container tw:p-3 tw:text-center">
+    <div
+      v-else-if="allSourceInfoNull"
+      class="no-source-maps-container tw:p-3 tw:text-center tw:flex tw:flex-col tw:items-center tw:justify-center tw:rounded-md tw:py-5 tw:px-6"
+      :style="{ 'background-color': backgroundColor, 'border': `1px solid ${borderColor}` }"
+    >
       <OIcon name="code-off" size="lg" class="tw:mb-2" />
       <div class="tw:text-base tw:font-medium tw:text-gray-500 tw:mb-1" style="font-weight: 500;">
         Source Maps Not Available
@@ -37,13 +45,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         To view detailed stack traces with original source code and line numbers, please upload source maps for this application.
       </div>
       <div v-if="props.error.service || props.error.version" class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:mt-2 tw:mb-2">
-        <span v-if="props.error.service" class="service-version-badge service-badge">
-          <span class="badge-label">Service:</span>
-          <span class="badge-value">{{ props.error.service }}</span>
+        <span
+          v-if="props.error.service"
+          class="service-version-badge service-badge tw:inline-flex tw:items-center tw:gap-1 tw:py-1 tw:px-[10px] tw:rounded tw:text-xs tw:font-medium"
+          :class="isDarkMode ? 'tw:bg-[rgba(149,117,205,0.2)] tw:text-[#b39ddb]' : 'tw:bg-[rgba(103,58,183,0.12)] tw:text-[#5e35b1]'"
+        >
+          <span class="badge-label tw:opacity-80">Service:</span>
+          <span class="badge-value tw:font-semibold">{{ props.error.service }}</span>
         </span>
-        <span v-if="props.error.version" class="service-version-badge version-badge">
-          <span class="badge-label">Version:</span>
-          <span class="badge-value">{{ props.error.version }}</span>
+        <span
+          v-if="props.error.version"
+          class="service-version-badge version-badge tw:inline-flex tw:items-center tw:gap-1 tw:py-1 tw:px-[10px] tw:rounded tw:text-xs tw:font-medium"
+          :class="isDarkMode ? 'tw:bg-[rgba(66,165,245,0.2)] tw:text-[#90caf9]' : 'tw:bg-[rgba(25,118,210,0.12)] tw:text-[#1976d2]'"
+        >
+          <span class="badge-label tw:opacity-80">Version:</span>
+          <span class="badge-value tw:font-semibold">{{ props.error.version }}</span>
         </span>
       </div>
       <OButton
@@ -63,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Error message -->
         <div
           v-if="stackTrace.error"
-          class="error-header tw:px-3 tw:py-2 text-weight-bold"
+          class="error-header tw:px-3 tw:py-2 text-weight-bold tw:border tw:border-solid tw:rounded-t-md tw:text-sm tw:font-semibold tw:[letter-spacing:0.01em] tw:!px-4 tw:!py-[10px] tw:[box-shadow:0_1px_2px_rgba(0,0,0,0.05)] tw:-mb-px"
           :style="{
             'background-color': errorHeaderBackground,
             'color': errorHeaderColor,
@@ -76,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- First stack frame - expandable/collapsible -->
         <div
           v-if="stackTrace.stack.length > 0"
-          class="stack-frame-wrapper"
+          class="stack-frame-wrapper tw:rounded-b-md tw:[box-shadow:0_1px_3px_rgba(0,0,0,0.08)] tw:overflow-hidden tw:mt-0"
           :style="{
             'border-top': `1px solid ${borderColor}`,
             'border-bottom': `1px solid ${borderColor}`,
@@ -88,10 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Frame header - clickable -->
           <div
-            class="frame-header tw:px-3 tw:py-2 tw:cursor-pointer"
+            class="frame-header tw:px-3 tw:py-2 tw:cursor-pointer tw:transition-all tw:duration-200 tw:ease-in-out tw:!px-4 tw:!py-3"
             @click="toggleFrame(traceIndex, 0)"
           >
-            <div class="frame-header-content">
+            <div class="frame-header-content tw:flex tw:items-center tw:gap-2">
               <OIcon
                 :name="isFrameExpanded(traceIndex, 0) ? 'expand-more' : 'chevron-right'"
                 size="xs"
@@ -99,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="stackTrace.stack[0].line"
-                class="stack-line-header"
+                class="stack-line-header tw:[font-family:'SF_Mono','Monaco','Inconsolata','Fira_Code','Droid_Sans_Mono',monospace] tw:text-[12.5px] tw:font-medium tw:break-all tw:flex-1 tw:[line-height:1.5]"
                 :style="{ color: textColor }"
               >
                 {{ stackTrace.stack[0].line }}
@@ -110,11 +126,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Expandable source code context -->
           <div
             v-if="isFrameExpanded(traceIndex, 0) && stackTrace.stack[0].source_info"
-            class="source-context tw:px-3 tw:pb-2"
+            class="source-context tw:!px-4 tw:!pb-4 tw:!pt-0"
             :style="{ 'background-color': isDarkMode ? '#0d0d0d' : '#f8f9fa' }"
           >
             <!-- File location -->
-            <div class="source-location-header tw:text-gray-400 tw:text-xs tw:mb-1">
+            <div class="source-location-header tw:text-gray-400 tw:text-xs tw:!mb-[10px] tw:text-[11px] tw:font-semibold tw:[letter-spacing:0.02em] tw:opacity-80">
               Line {{ stackTrace.stack[0].source_info.stack_line }}:{{ stackTrace.stack[0].source_info.stack_col }}
               <span class="tw:ml-1">
                 (Lines {{ stackTrace.stack[0].source_info.source_line_start }}-{{ stackTrace.stack[0].source_info.source_line_end }})
@@ -122,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Source code snippet with syntax highlighting -->
-            <div class="source-code-box" :style="{ 'border-color': borderColor }">
+            <div class="source-code-box tw:border tw:border-solid tw:rounded-md tw:h-[200px] tw:overflow-hidden tw:[box-shadow:0_2px_6px_rgba(0,0,0,0.1)]" :style="{ 'border-color': borderColor }">
               <CodeQueryEditor
                 :ref="(el: any) => setEditorRef(traceIndex, 0, el)"
                 :editor-id="`source-frame-${traceIndex}-0`"
@@ -138,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Remaining frames - collapsed by default -->
         <div
           v-if="stackTrace.stack.length > 1"
-          class="remaining-frames"
+          class="remaining-frames tw:rounded-b-md tw:[box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
           :style="{
             'border-bottom': `1px solid ${borderColor}`,
             'border-left': `1px solid ${borderColor}`,
@@ -150,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Show more button - only visible when frames are tw:hidden -->
           <div
             v-if="!expandedTraces[traceIndex]"
-            class="show-more-button tw:px-3 tw:py-2 tw:cursor-pointer"
+            class="show-more-button tw:px-3 tw:py-2 tw:cursor-pointer tw:flex tw:items-center tw:gap-[6px] tw:transition-all tw:duration-200 tw:ease-in-out tw:!px-4 tw:!py-[10px] tw:text-xs tw:font-medium"
             :style="{ 'border-top': `1px solid ${borderColor}` }"
             @click="showFrames(traceIndex)"
           >
@@ -174,11 +190,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Frame header - clickable -->
               <div
-                class="collapsed-frame-header tw:px-3 tw:py-1 tw:cursor-pointer"
+                class="collapsed-frame-header tw:px-3 tw:py-1 tw:cursor-pointer tw:transition-all tw:duration-200 tw:ease-in-out tw:!px-4 tw:!py-[10px]"
                 :style="{ 'background-color': backgroundColor }"
                 @click="toggleFrame(traceIndex, frameIndex + 1)"
               >
-                <div class="collapsed-frame-content">
+                <div class="collapsed-frame-content tw:flex tw:items-center tw:gap-2">
                   <OIcon
                     :name="isFrameExpanded(traceIndex, frameIndex + 1) ? 'expand-more' : 'chevron-right'"
                     size="xs"
@@ -186,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-if="frame.line"
-                    class="stack-line-collapsed"
+                    class="stack-line-collapsed tw:[font-family:'SF_Mono','Monaco','Inconsolata','Fira_Code','Droid_Sans_Mono',monospace] tw:text-[11.5px] tw:[line-height:1.5] tw:break-all tw:flex-1 tw:opacity-85"
                     :style="{ color: mutedTextColor }"
                   >
                     {{ frame.line }}
@@ -197,17 +213,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Expandable source code context -->
               <div
                 v-if="isFrameExpanded(traceIndex, frameIndex + 1) && frame.source_info"
-                class="source-context tw:px-3 tw:pb-2 tw:pt-1"
+                class="source-context tw:!px-4 tw:!pb-4 tw:!pt-0"
                 :style="{ 'background-color': isDarkMode ? '#0d0d0d' : '#f8f9fa' }"
               >
-                <div class="source-location-header tw:text-gray-400 tw:text-xs tw:mb-1 tw:ml-4">
+                <div class="source-location-header tw:text-gray-400 tw:text-xs tw:!mb-[10px] tw:ml-4 tw:text-[11px] tw:font-semibold tw:[letter-spacing:0.02em] tw:opacity-80">
                   Line {{ frame.source_info.stack_line }}:{{ frame.source_info.stack_col }}
                   <span class="tw:ml-1">
                     (Lines {{ frame.source_info.source_line_start }}-{{ frame.source_info.source_line_end }})
                   </span>
                 </div>
 
-                <div class="source-code-box tw:ml-4" :style="{ 'border-color': borderColor }">
+                <div class="source-code-box tw:ml-4 tw:border tw:border-solid tw:rounded-md tw:h-[200px] tw:overflow-hidden tw:[box-shadow:0_2px_6px_rgba(0,0,0,0.1)]" :style="{ 'border-color': borderColor }">
                   <CodeQueryEditor
                     :ref="(el: any) => setEditorRef(traceIndex, frameIndex + 1, el)"
                     :editor-id="`source-frame-${traceIndex}-${frameIndex + 1}`"
@@ -544,198 +560,16 @@ watch(
 );
 </script>
 
-<style lang="scss" scoped>
-.loading-container {
-  min-height: 200px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background-color: v-bind(backgroundColor);
-  border: 1px solid v-bind(borderColor);
-  border-radius: 6px;
+<style>
+.pretty-stack-container .stack-frame-wrapper .frame-header:hover {
+  background-color: v-bind(hoverBackgroundColor);
 }
 
-.no-source-maps-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background-color: v-bind(backgroundColor);
-  border: 1px solid v-bind(borderColor);
-  border-radius: 6px;
-  padding: 20px 24px !important;
-
-  .service-version-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
-
-    .badge-label {
-      opacity: 0.8;
-    }
-
-    .badge-value {
-      font-weight: 600;
-    }
-  }
-
-  .service-badge {
-    background-color: rgba(103, 58, 183, 0.12);
-    color: #5e35b1;
-  }
-
-  .version-badge {
-    background-color: rgba(25, 118, 210, 0.12);
-    color: #1976d2;
-  }
+.pretty-stack-container .remaining-frames .show-more-button:hover {
+  background-color: v-bind(hoverBackgroundColor);
 }
 
-:deep(.q-dark) {
-  .no-source-maps-container {
-    .service-badge {
-      background-color: rgba(149, 117, 205, 0.2);
-      color: #b39ddb;
-    }
-
-    .version-badge {
-      background-color: rgba(66, 165, 245, 0.2);
-      color: #90caf9;
-    }
-  }
-}
-
-.pretty-stack-container {
-  .error-header {
-    border: 1px solid;
-    border-radius: 6px 6px 0 0;
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    padding: 10px 16px !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    margin-bottom: -1px;
-  }
-
-  .stack-frame-wrapper {
-    border-radius: 0 0 6px 6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    overflow: hidden;
-    margin-top: 0;
-
-    .frame-header {
-      transition: all 0.2s ease;
-      padding: 12px 16px !important;
-
-      &:hover {
-        background-color: v-bind(hoverBackgroundColor);
-      }
-
-      .frame-header-content {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-
-        .stack-line-header {
-          font-family: "SF Mono", "Monaco", "Inconsolata", "Fira Code", "Droid Sans Mono", monospace;
-          font-size: 12.5px;
-          font-weight: 500;
-          word-break: break-all;
-          flex: 1;
-          line-height: 1.5;
-        }
-      }
-    }
-
-    .source-context {
-      padding: 0px 16px 16px 16px !important;
-
-      .source-location-header {
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.02em;
-        margin-bottom: 10px !important;
-        opacity: 0.8;
-      }
-
-      .source-code-box {
-        border: 1px solid;
-        border-radius: 6px;
-        height: 200px;
-        overflow: hidden;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-      }
-    }
-  }
-
-  .remaining-frames {
-    border-radius: 0 0 6px 6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-
-    .show-more-button {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
-      padding: 10px 16px !important;
-      font-size: 12px;
-      font-weight: 500;
-
-      &:hover {
-        background-color: v-bind(hoverBackgroundColor);
-      }
-    }
-
-    .collapsed-frame-wrapper {
-      .collapsed-frame-header {
-        transition: all 0.2s ease;
-        padding: 10px 16px !important;
-
-        &:hover {
-          background-color: v-bind(hoverBackgroundColor);
-        }
-
-        .collapsed-frame-content {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-
-          .stack-line-collapsed {
-            font-family: "SF Mono", "Monaco", "Inconsolata", "Fira Code", "Droid Sans Mono", monospace;
-            font-size: 11.5px;
-            line-height: 1.5;
-            word-break: break-all;
-            flex: 1;
-            opacity: 0.85;
-          }
-        }
-      }
-
-      .source-context {
-        padding: 0px 16px 16px 16px !important;
-
-        .source-location-header {
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.02em;
-          margin-bottom: 10px !important;
-          opacity: 0.8;
-        }
-
-        .source-code-box {
-          border: 1px solid;
-          border-radius: 6px;
-          height: 200px;
-          overflow: hidden;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-          margin-left: 28px !important;
-        }
-      }
-    }
-  }
+.pretty-stack-container .remaining-frames .collapsed-frame-wrapper .collapsed-frame-header:hover {
+  background-color: v-bind(hoverBackgroundColor);
 }
 </style>

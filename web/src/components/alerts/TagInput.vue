@@ -15,17 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="tag-input-container" class="tag-input-container">
-    <div data-test="tag-input-wrapper" class="tag-input-wrapper" :class="{ 'has-content': hasContent }">
-      <label v-if="label" data-test="tag-input-label" class="tag-input-label">{{ label }}</label>
-      <div data-test="tags-and-input" class="tags-and-input">
+  <div data-test="tag-input-container" class="tw:w-full tw:h-full">
+    <div
+      data-test="tag-input-wrapper"
+      class="tag-input-wrapper tw:relative tw:flex tw:flex-col tw:px-[5px] tw:py-0 tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.12)) tw:rounded tw:bg-(--o2-card-bg) tw:min-h-14 tw:h-full tw:w-full tw:max-w-full tw:cursor-text tw:transition-colors tw:duration-300 tw:overflow-hidden"
+      :class="{ 'has-content': hasContent }"
+    >
+      <label
+        v-if="label"
+        data-test="tag-input-label"
+        class="tag-input-label tw:absolute tw:top-4 tw:left-3 tw:text-base tw:text-[rgba(0,0,0,0.6)] tw:pointer-events-none tw:transition-all tw:duration-300 tw:bg-transparent tw:px-1 tw:-ml-1"
+        style="transition-timing-function: cubic-bezier(0.25, 0.8, 0.5, 1); transform-origin: left top;"
+      >{{ label }}</label>
+      <div data-test="tags-and-input" class="tw:flex tw:flex-wrap tw:items-start tw:gap-1 tw:mt-[5px] tw:w-full tw:overflow-hidden">
         <OBadge
           v-for="(tag, index) in modelValue"
           :key="index"
           :data-test="`tag-chip-${index}`"
           variant="default"
           size="sm"
-          class="tag-chip"
+          class="tag-chip tw:m-0! tw:shrink-0 tw:grow-0 tw:basis-auto"
+          style="background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%)"
         >
           {{ tag }}
           <template #trailing>
@@ -45,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="inputValue"
           type="text"
           :placeholder="modelValue.length > 0 ? '' : placeholder"
-          class="tag-input"
+          class="tag-input tw:[flex:1_1_100px] tw:min-w-[100px] tw:border-0 tw:outline-none tw:bg-transparent tw:p-1 tw:text-sm tw:text-(--q-color-text-primary)"
           @keydown.enter.prevent="addTag"
           @input="handleInput"
           @keydown.delete="handleBackspace"
@@ -124,84 +134,21 @@ const handleBackspace = () => {
 };
 </script>
 
-<style lang="scss" scoped>
-.tag-input-container {
-  width: 100%;
-  height: 100%;
+<style>
+.tag-input-wrapper:focus-within {
+  border-color: var(--q-primary);
 }
 
-.tag-input-wrapper {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  padding: 0px 5px;
-  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.12));
-  border-radius: 4px;
-  background-color: var(--o2-card-bg);
-  min-height: 56px;
-  height: 100%;
-  width: 100%;
-  max-width: 100%;
-  cursor: text;
-  transition: border-color 0.3s;
-  overflow: hidden;
-
-  &:focus-within {
-    border-color: var(--q-primary);
-
-    .tag-input-label {
-      color: var(--q-primary);
-    }
-  }
-
-  &.has-content .tag-input-label {
-    transform: translateY(-8px) scale(0.75);
-    color: var(--q-primary);
-  }
+.tag-input-wrapper:focus-within .tag-input-label {
+  color: var(--q-primary);
 }
 
-.tag-input-label {
-  position: absolute;
-  top: 16px;
-  left: 12px;
-  font-size: 16px;
-  color: rgba(0, 0, 0, 0.6);
-  pointer-events: none;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
-  transform-origin: left top;
-  background-color: transparent;
-  padding: 0 4px;
-  margin-left: -4px;
+.tag-input-wrapper.has-content .tag-input-label {
+  transform: translateY(-8px) scale(0.75);
+  color: var(--q-primary);
 }
 
-.tags-and-input {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 4px;
-  margin-top: 5px;
-  width: 100%;
-  overflow: hidden;
-}
-
-.tag-chip {
-  margin: 0 !important;
-  flex: 0 0 auto;
-  background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
-}
-
-.tag-input {
-  flex: 1 1 100px;
-  min-width: 100px;
-  border: none;
-  outline: none;
-  background: transparent;
-  padding: 4px;
-  font-size: 14px;
-  color: var(--q-color-text-primary);
-
-  &::placeholder {
-    color: var(--q-color-text-hint);
-  }
+.tag-input::placeholder {
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 </style>

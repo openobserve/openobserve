@@ -502,7 +502,7 @@ function getIcon(data, ioType) {
       @mouseleave="handleNodeLeave(id)"
       @click="editNode(id)"
     >
-      <div class="icon-container" style="display: flex; align-items: center">
+      <div class="icon-container tw:flex tw:items-center">
         <!-- Icon -->
         <OIcon
           :name="getIcon(data, io_type)"
@@ -517,7 +517,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="tw:flex node-label-text"
+          class="tw:flex tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
           align="left"
           style="
             text-align: left;
@@ -534,16 +534,18 @@ function getIcon(data, ioType) {
       <!-- Error Badge for Function Nodes -->
       <div
         v-if="hasNodeError"
-        class="error-badge"
+        data-test="pipeline-node-error-badge"
+        class="tw:absolute tw:top-[-12px] tw:right-[-12px] tw:w-[20px] tw:h-[20px] tw:bg-[#ef4444] tw:border-2 tw:border-white tw:rounded-full tw:flex tw:items-center tw:justify-center tw:cursor-pointer tw:z-[15] tw:shadow-[0_2px_6px_rgba(239,68,68,0.5)] tw:transition-all tw:duration-200 error-badge"
         @click.stop="navigateToFunction(data.name)"
       >
         <OIcon name="error" size="sm" />
         <span
+          data-test="pipeline-node-error-count"
           v-if="
             pipelineObj.currentSelectedPipeline?.last_error?.node_errors?.[id]
               ?.error_count
           "
-          class="error-count"
+          class="tw:absolute tw:top-[-6px] tw:right-[-6px] tw:bg-[#dc2626] tw:text-white tw:text-[9px] tw:font-bold tw:min-w-[14px] tw:h-[14px] tw:rounded-[7px] tw:flex tw:items-center tw:justify-center tw:px-[3px] tw:border-[1.5px] tw:border-solid tw:border-white tw:shadow-[0_1px_3px_rgba(0,0,0,0.4)]"
         >
           {{
             pipelineObj.currentSelectedPipeline.last_error.node_errors[id]
@@ -561,7 +563,7 @@ function getIcon(data, ioType) {
 
       <div
         v-show="showButtons"
-        class="node-action-buttons"
+        class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:transition-all tw:duration-300 tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px] node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -571,7 +573,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="node-action-btn delete-btn"
+          class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-(--node-color)! tw:text-(--node-color)! tw:transition-all! tw:duration-200! node-action-btn delete-btn"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -580,11 +582,11 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="custom-tooltip delete-tooltip"
+          class="tw:fixed tw:bg-[#dc2626] tw:text-white tw:py-[6px] tw:px-[10px] tw:rounded-md tw:text-[11px] tw:z-[1000] tw:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:pointer-events-none tw:whitespace-nowrap"
           style="left: 15px"
         >
           Delete Node
-          <div class="tooltip-arrow delete-arrow"></div>
+          <div class="tw:absolute tw:top-full tw:left-1/2 tw:-translate-x-1/2 tw:w-0 tw:h-0 tw:border-l-[5px] tw:border-l-transparent tw:border-r-[5px] tw:border-r-transparent tw:border-t-[5px] tw:[border-top-color:#dc2626]"></div>
         </div>
       </div>
     </div>
@@ -606,7 +608,7 @@ function getIcon(data, ioType) {
       @mouseleave="handleNodeLeave(id)"
       @click="editNode(id)"
     >
-      <div class="icon-container" style="display: flex; align-items: center">
+      <div class="icon-container tw:flex tw:items-center">
         <!-- Icon -->
         <OIcon
           :name="getIcon(data, io_type)"
@@ -622,7 +624,7 @@ function getIcon(data, ioType) {
       <div class="container">
         <div
           v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
-          class="tw:flex node-label-text"
+          class="tw:flex tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -634,7 +636,7 @@ function getIcon(data, ioType) {
         </div>
         <div
           v-else
-          class="tw:flex node-label-text"
+          class="tw:flex tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -647,7 +649,7 @@ function getIcon(data, ioType) {
       </div>
       <div
         v-show="showButtons"
-        class="node-action-buttons"
+        class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:transition-all tw:duration-300 tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px] node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -657,7 +659,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="node-action-btn delete-btn"
+          class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-(--node-color)! tw:text-(--node-color)! tw:transition-all! tw:duration-200! node-action-btn delete-btn"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -666,11 +668,11 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="custom-tooltip delete-tooltip"
+          class="tw:fixed tw:bg-[#dc2626] tw:text-white tw:py-[6px] tw:px-[10px] tw:rounded-md tw:text-[11px] tw:z-[1000] tw:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:pointer-events-none tw:whitespace-nowrap"
           style="left: 15px"
         >
           Delete Node
-          <div class="tooltip-arrow delete-arrow"></div>
+          <div class="tw:absolute tw:top-full tw:left-1/2 tw:-translate-x-1/2 tw:w-0 tw:h-0 tw:border-l-[5px] tw:border-l-transparent tw:border-r-[5px] tw:border-r-transparent tw:border-t-[5px] tw:[border-top-color:#dc2626]"></div>
         </div>
       </div>
     </div>
@@ -691,7 +693,7 @@ function getIcon(data, ioType) {
       @mouseleave="handleNodeLeave(id)"
       @click="editNode(id)"
     >
-      <div class="icon-container" style="display: flex; align-items: center">
+      <div class="icon-container tw:flex tw:items-center">
         <!-- Icon -->
         <OIcon
           :name="getIcon(data, io_type)"
@@ -706,7 +708,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="tw:flex node-label-text"
+          class="tw:flex tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -719,7 +721,7 @@ function getIcon(data, ioType) {
       </div>
       <div
         v-show="showButtons"
-        class="node-action-buttons"
+        class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:transition-all tw:duration-300 tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px] node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -729,7 +731,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="node-action-btn delete-btn"
+          class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-(--node-color)! tw:text-(--node-color)! tw:transition-all! tw:duration-200! node-action-btn delete-btn"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -738,11 +740,11 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="custom-tooltip delete-tooltip"
+          class="tw:fixed tw:bg-[#dc2626] tw:text-white tw:py-[6px] tw:px-[10px] tw:rounded-md tw:text-[11px] tw:z-[1000] tw:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:pointer-events-none tw:whitespace-nowrap"
           style="left: 15px"
         >
           Delete Node
-          <div class="tooltip-arrow delete-arrow"></div>
+          <div class="tw:absolute tw:top-full tw:left-1/2 tw:-translate-x-1/2 tw:w-0 tw:h-0 tw:border-l-[5px] tw:border-l-transparent tw:border-r-[5px] tw:border-r-transparent tw:border-t-[5px] tw:[border-top-color:#dc2626]"></div>
         </div>
       </div>
     </div>
@@ -764,7 +766,7 @@ function getIcon(data, ioType) {
       @mouseleave="handleNodeLeave(id)"
       @click="editNode(id)"
     >
-      <div class="icon-container" style="display: flex; align-items: center">
+      <div class="icon-container tw:flex tw:items-center">
         <!-- Icon -->
         <OIcon
           :name="getIcon(data, io_type)"
@@ -779,7 +781,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="tw:flex node-label-text"
+          class="tw:flex tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -793,7 +795,7 @@ function getIcon(data, ioType) {
 
       <div
         v-show="showButtons"
-        class="node-action-buttons"
+        class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:transition-all tw:duration-300 tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px] node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -803,7 +805,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="node-action-btn delete-btn"
+          class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-(--node-color)! tw:text-(--node-color)! tw:transition-all! tw:duration-200! node-action-btn delete-btn"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -812,11 +814,11 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="custom-tooltip delete-tooltip"
+          class="tw:fixed tw:bg-[#dc2626] tw:text-white tw:py-[6px] tw:px-[10px] tw:rounded-md tw:text-[11px] tw:z-[1000] tw:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:pointer-events-none tw:whitespace-nowrap"
           style="left: 15px"
         >
           Delete Node
-          <div class="tooltip-arrow delete-arrow"></div>
+          <div class="tw:absolute tw:top-full tw:left-1/2 tw:-translate-x-1/2 tw:w-0 tw:h-0 tw:border-l-[5px] tw:border-l-transparent tw:border-r-[5px] tw:border-r-transparent tw:border-t-[5px] tw:[border-top-color:#dc2626]"></div>
         </div>
       </div>
     </div>
@@ -837,7 +839,7 @@ function getIcon(data, ioType) {
       @mouseleave="handleNodeLeave(id)"
       @click="editNode(id)"
     >
-      <div class="icon-container" style="display: flex; align-items: center">
+      <div class="icon-container tw:flex tw:items-center">
         <!-- Icon -->
         <OIcon
           :name="getIcon(data, io_type)"
@@ -852,7 +854,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="node-label-text"
+          class="tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -866,7 +868,7 @@ function getIcon(data, ioType) {
 
       <div
         v-show="showButtons"
-        class="node-action-buttons"
+        class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:transition-all tw:duration-300 tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px] node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -876,7 +878,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="node-action-btn delete-btn"
+          class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-(--node-color)! tw:text-(--node-color)! tw:transition-all! tw:duration-200! node-action-btn delete-btn"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -885,11 +887,11 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="custom-tooltip delete-tooltip"
+          class="tw:fixed tw:bg-[#dc2626] tw:text-white tw:py-[6px] tw:px-[10px] tw:rounded-md tw:text-[11px] tw:z-[1000] tw:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:pointer-events-none tw:whitespace-nowrap"
           style="left: 15px"
         >
           Delete Node
-          <div class="tooltip-arrow delete-arrow"></div>
+          <div class="tw:absolute tw:top-full tw:left-1/2 tw:-translate-x-1/2 tw:w-0 tw:h-0 tw:border-l-[5px] tw:border-l-transparent tw:border-r-[5px] tw:border-r-transparent tw:border-t-[5px] tw:[border-top-color:#dc2626]"></div>
         </div>
       </div>
     </div>
@@ -911,7 +913,7 @@ function getIcon(data, ioType) {
       @mouseleave="handleNodeLeave(id)"
       @click="editNode(id)"
     >
-      <div class="icon-container" style="display: flex; align-items: center">
+      <div class="icon-container tw:flex tw:items-center">
         <!-- Icon -->
         <OIcon
           :name="getIcon(data, io_type)"
@@ -926,7 +928,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="node-label-text"
+          class="tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -976,7 +978,7 @@ function getIcon(data, ioType) {
 
       <div
         v-show="showButtons"
-        class="node-action-buttons"
+        class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:transition-all tw:duration-300 tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px] node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -986,7 +988,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="node-action-btn delete-btn"
+          class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-(--node-color)! tw:text-(--node-color)! tw:transition-all! tw:duration-200! node-action-btn delete-btn"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -995,11 +997,11 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="custom-tooltip delete-tooltip"
+          class="tw:fixed tw:bg-[#dc2626] tw:text-white tw:py-[6px] tw:px-[10px] tw:rounded-md tw:text-[11px] tw:z-[1000] tw:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:pointer-events-none tw:whitespace-nowrap"
           style="left: 15px"
         >
           Delete Node
-          <div class="tooltip-arrow delete-arrow"></div>
+          <div class="tw:absolute tw:top-full tw:left-1/2 tw:-translate-x-1/2 tw:w-0 tw:h-0 tw:border-l-[5px] tw:border-l-transparent tw:border-r-[5px] tw:border-r-transparent tw:border-t-[5px] tw:[border-top-color:#dc2626]"></div>
         </div>
       </div>
     </div>
@@ -1024,7 +1026,7 @@ function getIcon(data, ioType) {
   />
 </template>
 
-<style lang="scss">
+<style>
 .node_handle_custom {
   width: 16px !important;
   height: 16px !important;
@@ -1033,47 +1035,48 @@ function getIcon(data, ioType) {
   background: #6b7280;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
-
-  &::before {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #374151;
-    transition: all 0.3s ease;
-  }
 }
 
-// Input nodes - Blue theme
+.node_handle_custom::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #374151;
+  transition: all 0.3s ease;
+}
+
+/* Input nodes - Blue theme */
 .handle_input {
   background: #dbeafe !important;
-
-  &::before {
-    background: #3b82f6 !important;
-  }
 }
 
-// Output nodes - Green theme
+.handle_input::before {
+  background: #3b82f6 !important;
+}
+
+/* Output nodes - Green theme */
 .handle_output {
   background: #dcfce7 !important;
-
-  &::before {
-    background: #22c55e !important;
-  }
 }
 
-// Transform nodes (default) - Orange theme
+.handle_output::before {
+  background: #22c55e !important;
+}
+
+/* Transform nodes (default) - Orange theme */
 .handle_default {
   background: #fef3c7 !important;
-
-  &::before {
-    background: #f59e0b !important;
-  }
 }
+
+.handle_default::before {
+  background: #f59e0b !important;
+}
+
 .vue-flow__node-custom {
   padding: 10px;
   border-radius: 3px;
@@ -1087,48 +1090,10 @@ function getIcon(data, ioType) {
   border-color: var(--vf-node-color);
 }
 
-// Remove only transform effects but keep visual styling
-.o2vf_node_input,
-.o2vf_node_output,
-.o2vf_node_default,
-.custom-btn {
-  &:hover {
-    transform: none !important;
-  }
-}
-
-.menu-list {
-  margin: 0px 10px;
-  background-color: white;
-}
-
-// Node action buttons - hover to show with matching colors
-.node-action-buttons {
-  position: absolute;
-  top: -30px;
-  right: 0px;
-  display: flex;
-  gap: 6px;
-  transition: all 0.3s ease;
-  z-index: 10;
-  padding: 5px 5px 10px 5px;
-}
-
-.node-action-btn {
-  min-width: 20px !important;
-  width: 20px !important;
-  height: 20px !important;
-  padding: 0 !important;
-  border-radius: 4px !important;
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid var(--node-color) !important;
-  color: var(--node-color) !important;
-  transition: all 0.2s ease !important;
-&:hover {
-    background: var(--node-color) !important;
-    color: white !important;
-    transform: scale(1.1) !important;
-  }
+.node-action-btn:hover {
+  background: var(--node-color) !important;
+  color: white !important;
+  transform: scale(1.1) !important;
 }
 
 .delete-btn:hover {
@@ -1137,41 +1102,13 @@ function getIcon(data, ioType) {
   border-color: #ef4444 !important;
 }
 
-// Custom tooltips with arrow pointers
-.custom-tooltip {
-  position: fixed;
-  background: #dc2626;
-  color: white;
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 11px;
-  z-index: 1000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  pointer-events: none;
-  white-space: nowrap;
+.error-badge:hover {
+  transform: scale(1.2);
+  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.7);
+  z-index: 20;
 }
 
-.delete-tooltip {
-  background: #dc2626;
-}
-
-.tooltip-arrow {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 5px solid;
-}
-
-.delete-arrow {
-  border-top-color: #dc2626;
-}
-
-// Pipeline error tooltip styling - increased specificity to override global theme styles
+/* Pipeline error tooltip styling - increased specificity to override global theme styles */
 .body--dark .pipeline-error-tooltip,
 .body--light .pipeline-error-tooltip,
 .pipeline-error-tooltip {
@@ -1182,450 +1119,38 @@ function getIcon(data, ioType) {
   word-wrap: break-word !important;
   line-height: 1.5 !important;
   padding: 10px 14px !important;
-
-  div {
-    max-height: 300px;
-    overflow-y: auto;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 3px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.3);
-      border-radius: 3px;
-
-      &:hover {
-        background: rgba(255, 255, 255, 0.5);
-      }
-    }
-  }
 }
 
-// Error badge styling
-.error-badge {
-  position: absolute;
-  top: -12px;
-  right: -12px;
-  width: 20px;
-  height: 20px;
-  background: #ef4444;
-  border: 2px solid white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 15;
-  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.5);
-  transition: all 0.2s ease;
-
-  &:hover {
-    transform: scale(1.2);
-    box-shadow: 0 3px 10px rgba(239, 68, 68, 0.7);
-    z-index: 20;
-  }
-.error-count {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    background: #dc2626;
-    color: white;
-    font-size: 9px;
-    font-weight: bold;
-    min-width: 14px;
-    height: 14px;
-    border-radius: 7px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 3px;
-    border: 1.5px solid white;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  }
-}
-
-// Node label text styling
-.node-label-text {
-  font-size: 15px !important;
-  font-weight: 700 !important;
-  line-height: 1.4 !important;
-}
-
-// Function Details Dialog Styles
-.function-details-dialog {
-  .q-dialog__inner {
-    padding: 0;
-  }
-}
-
-// Condition Details Dialog Styles
-.condition-details-dialog {
-  .q-dialog__inner {
-    padding: 0;
-  }
-}
-
-// Query Details Dialog Styles
-.query-details-dialog {
-  .q-dialog__inner {
-    padding: 0;
-  }
-}
-
-.function-details-card {
-  border-radius: 0;
-  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
-}
-
-.function-info {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.function-name-section,
-.function-timing-section,
-.function-definition-section {
-  .text-subtitle1 {
-    color: #1976d2;
-    margin-bottom: 8px;
-    display: block;
-  }
-}
-
-.function-name {
-  font-size: 16px;
-  font-weight: 500;
-  color: #333;
-  padding: 8px 12px;
-  background-color: #f5f5f5;
-  border-radius: 4px;
-  border-left: 4px solid #1976d2;
-}
-
-.function-timing {
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
-  padding: 8px 12px;
-  background-color: #f8f9fa;
-  border-radius: 4px;
-  border-left: 4px solid #28a745;
-}
-
-.function-definition {
-  background-color: #f5f5f5;
-  border-radius: 4px;
-  border: 1px solid #e0e0e0;
-  overflow: hidden;
-}
-
-.function-code {
-  color: #333;
-  background-color: transparent;
-  margin: 0;
-  padding: 12px;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 13px;
-  line-height: 1.4;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-x: auto;
-}
-
-// Dark mode support
-.body--dark {
-  .function-details-card {
-    background-color: #1e1e1e;
-    color: #ffffff;
-
-    .q-card-section {
-      background-color: #1e1e1e;
-    }
-  }
-
-  .function-name {
-    background-color: #2d2d2d;
-    color: #ffffff;
-    border-left-color: #64b5f6;
-  }
-
-  .function-timing {
-    background-color: #2d2d2d;
-    color: #ffffff;
-    border-left-color: #4caf50;
-  }
-
-  .function-definition {
-    background-color: #2d2d2d;
-    border-color: #444;
-  }
-
-  .function-code {
-    color: #ffffff;
-  }
-
-  .function-definition-section .text-subtitle1,
-  .function-name-section .text-subtitle1,
-  .function-timing-section .text-subtitle1 {
-    color: #64b5f6;
-  }
-}
-
-// Condition Details Styles
-.condition-info {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.conditions-list-section {
-  .text-subtitle1 {
-    color: #1976d2;
-    margin-bottom: 12px;
-    display: block;
-  }
-}
-
-.conditions-container {
-  background-color: #f5f5f5;
-  border-radius: 6px;
-  border: 1px solid #e0e0e0;
-  padding: 16px;
-}
-
-.condition-item {
-  margin-bottom: 12px;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
-
-.condition-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  background-color: #ffffff;
-  border-radius: 4px;
-  border-left: 4px solid #1976d2;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.condition-field {
-  font-weight: 600;
-  color: #1976d2;
-  min-width: 80px;
-}
-
-.condition-operator {
-  font-weight: 500;
-  color: #666;
-  background-color: #e3f2fd;
-  padding: 2px 8px;
-  border-radius: 3px;
-  font-size: 12px;
-}
-
-.condition-value {
-  font-weight: 500;
-  color: #333;
-  background-color: #f0f0f0;
-  padding: 2px 8px;
-  border-radius: 3px;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 13px;
-}
-
-.and-operator {
-  display: flex;
-  justify-content: center;
-  margin: 8px 0;
-}
-
-.and-text {
-  background-color: #28a745;
-  color: white;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-weight: 600;
-  font-size: 12px;
-  text-align: center;
-  min-width: 40px;
-}
-
-// Dark mode support for conditions
-.body--dark {
-  .conditions-container {
-    background-color: #2d2d2d;
-    border-color: #444;
-  }
-
-  .condition-row {
-    background-color: #3a3a3a;
-    border-left-color: #64b5f6;
-  }
-
-  .condition-field {
-    color: #64b5f6;
-  }
-
-  .condition-operator {
-    background-color: #1e3a8a;
-    color: #bfdbfe;
-  }
-
-  .condition-value {
-    background-color: #4a4a4a;
-    color: #ffffff;
-  }
-
-  .conditions-list-section .text-subtitle1 {
-    color: #64b5f6;
-  }
-}
-
-// Query Details Styles
-.query-info {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.query-type-section,
-.query-content-section,
-.trigger-details-section {
-  .text-subtitle1 {
-    color: #1976d2;
-    margin-bottom: 12px;
-    display: block;
-  }
-}
-
-.query-type {
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-  padding: 8px 12px;
-  background-color: #e3f2fd;
-  border-radius: 4px;
-  border-left: 4px solid #1976d2;
-  text-align: center;
-  max-width: 100px;
-}
-
-.query-content {
-  background-color: #f5f5f5;
-  border-radius: 6px;
-  border: 1px solid #e0e0e0;
-  overflow: hidden;
+.body--dark .pipeline-error-tooltip div,
+.body--light .pipeline-error-tooltip div,
+.pipeline-error-tooltip div {
   max-height: 300px;
   overflow-y: auto;
 }
 
-.query-code {
-  color: #333;
-  background-color: transparent;
-  margin: 0;
-  padding: 16px;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-x: auto;
-  min-height: 80px;
-  border: none;
-  resize: none;
+.body--dark .pipeline-error-tooltip div::-webkit-scrollbar,
+.body--light .pipeline-error-tooltip div::-webkit-scrollbar,
+.pipeline-error-tooltip div::-webkit-scrollbar {
+  width: 6px;
 }
 
-.trigger-details {
-  background-color: #f8f9fa;
-  border-radius: 6px;
-  border: 1px solid #e0e0e0;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.trigger-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
-  border-bottom: 1px solid #e9ecef;
-
-  &:last-child {
-    border-bottom: none;
-  }
-}
-
-.trigger-label {
-  font-weight: 600;
-  color: #495057;
-  min-width: 80px;
-}
-
-.trigger-value {
-  font-weight: 500;
-  color: #333;
-  background-color: #ffffff;
-  padding: 4px 8px;
+.body--dark .pipeline-error-tooltip div::-webkit-scrollbar-track,
+.body--light .pipeline-error-tooltip div::-webkit-scrollbar-track,
+.pipeline-error-tooltip div::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 3px;
-  border: 1px solid #dee2e6;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 12px;
 }
 
-// Dark mode support for query dialog
-.body--dark {
-  .query-type {
-    background-color: #1e3a8a;
-    color: #bfdbfe;
-    border-left-color: #64b5f6;
-  }
+.body--dark .pipeline-error-tooltip div::-webkit-scrollbar-thumb,
+.body--light .pipeline-error-tooltip div::-webkit-scrollbar-thumb,
+.pipeline-error-tooltip div::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
 
-  .query-content {
-    background-color: #2d2d2d;
-    border-color: #444;
-  }
-
-  .query-code {
-    color: #ffffff;
-    background-color: #2d2d2d;
-  }
-
-  .trigger-details {
-    background-color: #2d2d2d;
-    border-color: #444;
-  }
-
-  .trigger-row {
-    border-bottom-color: #444;
-  }
-
-  .trigger-label {
-    color: #e9ecef;
-  }
-
-  .trigger-value {
-    background-color: #3a3a3a;
-    border-color: #555;
-    color: #ffffff;
-  }
-
-  .query-type-section .text-subtitle1,
-  .query-content-section .text-subtitle1,
-  .trigger-details-section .text-subtitle1 {
-    color: #64b5f6;
-  }
+.body--dark .pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover,
+.body--light .pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover,
+.pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 </style>

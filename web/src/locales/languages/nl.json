@@ -3125,6 +3125,25 @@
     "aiToolsets": "AI-toolsets",
     "llmModelPricing": "Prijzen van het LLM-model",
     "ingestionTokens": "Tokens voor inname",
+    "genAiAgentMapping": {
+      "tabLabel": "In kaart brengen van GenAI-agenten",
+      "title": "In kaart brengen van GenAI-agenten",
+      "description": "Configureer de telemetriekenmerken die worden gebruikt om de identiteit van agenten te normaliseren voor LLM-traceringen en evaluaties.",
+      "howItWorksTitle": "Hoe het in kaart brengen werkt",
+      "howItWorksDescription": "OpenObserve behoudt eerst de standaard gen_ai.agent.name en gen_ai.agent.id attributen. Deze lijsten worden alleen gecontroleerd als de standaardattributen ontbreken of leeg zijn. Voeg één inkomend telemetriekenmerk per regel toe.",
+      "agentNameFields": "Terugvalvelden voor de naam van de agent",
+      "agentNameHelp": "Inkomende attributen om te gebruiken als noodoplossing voor gen_ai.agent.name.",
+      "agentIdFields": "Terugvalvelden voor Agent-ID",
+      "agentIdHelp": "Inkomende attributen om te gebruiken als noodoplossing voor gen_ai.agent.id.",
+      "fieldsPlaceholder": "agent.naam\nllm.agent.name",
+      "applyDefaults": "Standaardwaarden toepassen",
+      "resetToEmpty": "Terugzetten naar leeg",
+      "defaultsSource": "De standaardinstellingen worden geladen vanuit openobserve/sdr_patterns en kunnen worden gewijzigd voordat ze voor deze organisatie worden opgeslagen.",
+      "saved": "De toewijzing van GenAI-agenten is met succes opgeslagen",
+      "loadFailed": "Het laden van de GenAI-agenttoewijzing is mislukt",
+      "saveFailed": "Kon de toewijzing van de GenAI-agent niet opslaan",
+      "defaultsLoadFailed": "Het laden van de standaardinstellingen voor GenAI-agenttoewijzing is mislukt"
+    },
     "groupGeneral": "Algemeen",
     "groupAccessSecurity": "Toegang en beveiliging",
     "groupDestinationsTemplates": "Bestemmingen en sjablonen",
@@ -5835,6 +5854,14 @@
         "title": "Recente fouten",
         "subtitle": "laatste 10 mislukte overspanningen"
       }
+    },
+    "subtitle": {
+      "llmInsights": "Volg latentie, fouten, tokens en kosten in al je LLM-verkeer",
+      "sessions": "Bekijk en inspecteer de sessies van agenten beurtelings",
+      "quality": "Scoor en volg de kwaliteit van je LLM-reacties",
+      "evalJobs": "Voer evaluatietaken uit en controleer ze tijdens al je sessies",
+      "scorers": "Creëer en beheer de scorers die LLM-resultaten beoordelen",
+      "scoreConfigs": "Configureer de scorerubrieken die voor uw evaluaties worden gebruikt"
     }
   },
   "logs": {

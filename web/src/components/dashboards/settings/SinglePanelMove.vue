@@ -182,8 +182,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.select-container {
-  width: 100%;
-}
-</style>

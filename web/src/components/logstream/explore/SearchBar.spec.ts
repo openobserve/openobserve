@@ -116,7 +116,11 @@ describe("SearchBar (logstream/explore)", () => {
     it("should render search bar container", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      expect(wrapper.find(".logs-search-bar-component").exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="logstream-explore-search-bar-container"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should render download logs button", async () => {

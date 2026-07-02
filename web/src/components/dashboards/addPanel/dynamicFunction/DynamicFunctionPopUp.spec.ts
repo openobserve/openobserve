@@ -656,7 +656,7 @@ describe("DynamicFunctionPopUp", () => {
         '[data-test="dynamic-function-popup-property-label"]',
       );
       expect(boldLabel.exists()).toBe(true);
-      expect(boldLabel.classes()).toContain("text-label-bold");
+      expect(boldLabel.classes()).toContain("tw:font-semibold");
     });
 
     it("should apply correct normal label styles", () => {
@@ -665,7 +665,7 @@ describe("DynamicFunctionPopUp", () => {
         '[data-test="dynamic-function-popup-label-text"]',
       );
       expect(normalLabel.exists()).toBe(true);
-      expect(normalLabel.classes()).toContain("text-label-normal");
+      expect(normalLabel.classes()).toContain("tw:font-normal");
     });
 
     it("should have edit-input class on inputs", () => {

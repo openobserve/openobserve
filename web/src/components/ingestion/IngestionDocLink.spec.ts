@@ -49,7 +49,7 @@ describe("IngestionDocLink.vue", () => {
     wrapper = createWrapper();
     const link = wrapper.find("a");
     expect(link.classes()).toContain("tw:text-text-link");
-    expect(link.classes()).toContain("hover:tw:text-text-link-hover");
+    expect(link.classes()).toContain("tw:hover:text-text-link-hover");
     expect(link.classes()).toContain("tw:underline");
     expect(link.classes()).toContain("tw:font-medium");
   });

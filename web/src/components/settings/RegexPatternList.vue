@@ -552,13 +552,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss">
-.o2-table-cell-content {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  width: 100%;
-  display: block;
-}
-</style>

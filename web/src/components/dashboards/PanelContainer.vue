@@ -16,17 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="panelcontainer"
+    class="tw:h-full tw:flex tw:flex-col tw:rounded-lg tw:overflow-hidden"
     @mouseover="() => (isCurrentlyHoveredPanel = true)"
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
     :data-test="`dashboard-panel-container`"
     :data-test-panel-id="props.data.id"
     :data-test-panel-title="props.data.title"
   >
-    <div :class="{ 'drag-allow': !viewOnly && !simplifiedPanelView }">
+    <div :class="{ 'tw:shrink-0': !viewOnly && !simplifiedPanelView }">
       <div
-        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:py-1 tw:px-2 tw:border-b tw:border-border-subtle panel-bar"
-        :class="{ 'dark-mode': store.state.theme === 'dark', 'panel-bar--loading': isPanelLoading }"
+        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:py-1 tw:px-2 tw:border-b tw:border-border-subtle tw:rounded-t-lg"
+        :class="{ 'tw:border-b-transparent': isPanelLoading }"
         data-test="dashboard-panel-bar"
       >
         <OIcon
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           :title="props.data.title"
-          class="panelHeader"
+          class="tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis tw:text-[0.8125rem] tw:font-medium tw:text-(--color-text-primary) tw:tracking-[0.02em]"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
@@ -92,11 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           name="info-outline"
           size="sm"
-          class="panel-info-icon"
+          class="tw:cursor-pointer"
           data-test="dashboard-panel-description-info"
         >
           <OTooltip side="bottom" align="end" max-width="13.75rem">
-            <template #content><div class="panel-description-tooltip">{{ props.data.description }}</div></template>
+            <template #content><div class="tw:whitespace-pre-wrap">{{ props.data.description }}</div></template>
           </OTooltip>
         </OIcon>
         <OButton
@@ -300,11 +300,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Panel-Level Variables (shown below drag-allow section) -->
-    <div class="panel-variables-wrapper">
+    <div class="tw:shrink-0">
       <slot name="panel-variables"></slot>
     </div>
 
-    <div class="panel-chart-wrapper">
+    <div class="tw:flex-1 tw:min-h-0">
       <PanelSchemaRenderer
         :panelSchema="props.data"
         :selectedTimeObj="props.selectedTimeDate"
@@ -1058,58 +1058,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.panelcontainer {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  border-radius: 0.5rem;
-  overflow: hidden;
-}
-
-.drag-allow {
-  flex-shrink: 0;
-}
-
-.panel-variables-wrapper {
-  flex-shrink: 0;
-}
-
-.panel-chart-wrapper {
-  flex: 1;
-  min-height: 0;
-}
-
-.panel-bar {
-  border-top-left-radius: 0.5rem;
-  border-top-right-radius: 0.5rem;
-}
-
-.panel-bar--loading {
-  border-bottom-color: transparent;
-}
-
-.panelHeader {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--color-text-primary);
-  letter-spacing: 0.02em;
-}
-
-.panel-info-icon {
-  cursor: pointer;
-}
-
-.panel-description-tooltip {
-  white-space: pre-wrap;
-}
-
-.warning {
-  color: var(--q-warning);
-}
-
-</style>

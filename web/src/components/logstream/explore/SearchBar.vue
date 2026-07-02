@@ -15,9 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="logs-search-bar-component" id="searchBarComponent">
-    <div class="tw:flex tw:flex tw:justify-end align-center">
-      <div class="col-auto tw:my-1">
+  <div
+    data-test="logstream-explore-search-bar-container"
+    class="tw:pb-px tw:h-full tw:overflow-hidden"
+    id="searchBarComponent"
+  >
+    <div class="tw:flex tw:flex tw:justify-end">
+      <div class="tw:my-1">
         <OButton
           class="tw:mr-2"
           variant="ghost"
@@ -46,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
         </div>
-        <div class="search-time tw:pl-2 float-left tw:mr-2">
+        <div class="tw:pl-2 float-left tw:mr-2">
           <OButton
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
@@ -59,13 +63,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="tw:flex query-editor-container">
+    <div class="tw:flex tw:h-[calc(100%-40px)]!">
       <div class="tw:flex tw:flex-col" style="border-top: 1px solid #dbdbdb; height: 100px">
         <b>Query Editor:</b>
         <code-query-editor
           editor-id="logsStreamQueryEditor"
           ref="queryEditorRef"
-          class="monaco-editor"
           v-model:query="query"
           @update:query="updateQueryValue"
           @run-query="searchData"
@@ -225,162 +228,8 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-#logsStreamQueryEditor,
-#fnEditor {
+<style>
+#logsStreamQueryEditor {
   height: calc(100% - 20px) !important;
-}
-#fnEditor {
-  width: 100%;
-  border-radius: 5px;
-  border: 0px solid #dbdbdb;
-  overflow: hidden;
-}
-
-.q-field--standard .q-field__control:before,
-.q-field--standard .q-field__control:focus:before,
-.q-field--standard .q-field__control:hover:before {
-  border: 0px !important;
-  border-color: none;
-  transition: none;
-}
-
-.logs-search-bar-component > .row:nth-child(2) {
-  height: calc(100% - 38px); /* or any other height you want to set */
-}
-
-.logs-search-bar-component {
-  padding-bottom: 1px;
-  height: 100%;
-  overflow: hidden;
-
-  .function-dropdown {
-    width: 205px;
-    padding-bottom: 0px;
-    border: 1px solid #dbdbdb;
-    border-radius: 5px;
-    cursor: pointer;
-
-    .q-field__input {
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 12px;
-    }
-    .q-field__native,
-    .q-field__control {
-      min-height: 29px;
-      height: 29px;
-      padding: 0px 0px 0px 4px;
-    }
-
-    .q-field__marginal {
-      height: 30px;
-    }
-  }
-
-  .q-toggle__inner {
-    font-size: 30px;
-  }
-
-  .q-toggle__label {
-    font-size: 12px;
-  }
-
-  .casesensitive-btn {
-    padding: 8px;
-    margin-left: -6px;
-    background-color: #d5d5d5;
-    border-radius: 0px 3px 3px 0px;
-  }
-
-  .search-field .q-field {
-    &__control {
-      border-radius: 3px 0px 0px 3px !important;
-    }
-
-    &__native {
-      font-weight: 600;
-    }
-  }
-
-  .search-time {
-    // width: 120px;
-    .q-btn-group {
-      border-radius: 3px;
-
-      .q-btn {
-        min-height: auto;
-      }
-    }
-  }
-
-  .search-dropdown {
-    padding: 0px;
-
-    .block {
-      color: $dark-page;
-      font-weight: 600;
-      font-size: 12px;
-    }
-
-    .q-btn-dropdown__arrow-container {
-      color: $light-text2;
-    }
-  }
-
-  .refresh-rate-dropdown-container {
-    width: 220px;
-
-    * .q-btn {
-      font-size: 12px !important;
-      padding-left: 8px;
-      padding-right: 8px;
-    }
-  }
-
-  .flex-start {
-    justify-content: flex-start;
-    align-items: flex-start;
-    display: flex;
-  }
-
-  .resultsOverChart {
-    margin-bottom: 0.75rem;
-    font-size: 0.875rem;
-    color: $dark-page;
-    font-weight: 700;
-  }
-
-  .ddlWrapper {
-    position: relative;
-    z-index: 10;
-
-    .listWrapper {
-      box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-      transition: height 0.25s ease;
-      height: calc(100vh - 146px);
-      background-color: white;
-      position: absolute;
-      top: 2.75rem;
-      width: 100%;
-      left: 0;
-
-      &:empty {
-        height: 0;
-      }
-
-      & {
-        border-radius: 3px;
-      }
-    }
-  }
-
-  .fields_autocomplete {
-    max-height: 250px;
-  }
-}
-
-.query-editor-container {
-  height: calc(100% - 40px) !important;
 }
 </style>

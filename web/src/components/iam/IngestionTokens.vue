@@ -122,7 +122,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Create token dialog -->
     <ODialog
       v-model:open="showCreateForm"
-      :persistent="true"
       size="sm"
       :title="t('ingestion.createTokenTitle')"
       :primary-button-label="t('common.create')"

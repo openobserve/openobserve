@@ -79,7 +79,7 @@ withDefaults(
 );
 </script>
 
-<style scoped>
+<style>
 .es-item,
 .es-spark {
   transform-box: fill-box;

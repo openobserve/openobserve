@@ -60,7 +60,7 @@ withDefaults(
 );
 </script>
 
-<style scoped>
+<style>
 .es-hand {
   transform-box: view-box;
   transform-origin: 120px 88px;

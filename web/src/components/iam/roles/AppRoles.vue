@@ -345,5 +345,3 @@ useShortcuts([
 ]);
 
 </script>
-
-<style scoped></style>

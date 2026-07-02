@@ -43,13 +43,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">{{ t('modelPricing.outputMessages') }}</div>
         <OSeparator class="tw:mr-4 tw:mt-4" />
-        <div class="error-report-container">
+        <div class="tw:overflow-auto tw:resize-none" style="height: calc(100vh - 200px)">
           <!-- Model Pricing Errors Section -->
           <div
-            class="error-section"
+            class="tw:p-2.5 tw:mb-2.5"
             v-if="modelPricingErrorsToDisplay.length > 0"
           >
-            <div class="error-list">
+            <div>
               <div
                 v-for="(errorGroup, index) in modelPricingErrorsToDisplay"
                 :key="index"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="(errorMessage, errorIndex) in errorGroup"
                   :key="errorIndex"
-                  class="error-item"
+                  class="tw:py-1.25 tw:text-sm"
                   :data-test="`model-pricing-import-error-${index}-${errorIndex}`"
                 >
                   <span
@@ -102,28 +102,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="error-section" v-if="modelPricingCreators.length > 0">
+          <div class="tw:p-2.5 tw:mb-2.5" v-if="modelPricingCreators.length > 0">
             <div
-              class="section-title text-primary"
+              class="tw:text-base tw:mb-2.5 tw:uppercase text-primary"
               data-test="model-pricing-import-creation-title"
             >
               {{ t('modelPricing.modelPricingCreation') }}
             </div>
             <div
-              class="error-list"
+              class=""
               v-for="(val, index) in modelPricingCreators"
               :key="index"
               :data-test="`model-pricing-import-creation-${index}`"
             >
               <div
                 :class="{
-                  'error-item tw:font-bold': true,
+                  'tw:py-1.25 tw:text-sm tw:font-bold': true,
                   'text-green ': val.success,
                   'text-red': !val.success,
                 }"
                 :data-test="`model-pricing-import-creation-${index}-message`"
               >
-                <pre class="creators-message">{{ val.message }}</pre>
+                <pre class="creators-message" style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; max-width: 100%;">{{ val.message }}</pre>
               </div>
             </div>
           </div>
@@ -417,45 +417,3 @@ function arrowBackFn() {
   emit("cancel:hideform");
 }
 </script>
-
-<style scoped lang="scss">
-.editor-container-built-in {
-  width: 100%;
-  height: calc(100vh - 128px);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.error-report-container {
-  height: calc(100vh - 200px) !important;
-  overflow: auto;
-  resize: none;
-}
-
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-}
-
-.error-list {
-}
-
-.error-item {
-  padding: 5px 0px;
-  font-size: 14px;
-}
-
-.creators-message {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  word-break: break-word;
-  max-width: 100%;
-}
-</style>

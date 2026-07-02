@@ -80,38 +80,15 @@ const displayValue = computed(() => {
 const tierClass = computed(() => {
   if (source.value === "grpc") {
     return grpcNum.value === 0
-      ? "o2-status-badge--success"
-      : "o2-status-badge--error";
+      ? "tw:text-(--o2-status-success-text) tw:bg-(--o2-status-success-bg)"
+      : "tw:text-(--o2-status-error-text) tw:bg-(--o2-status-error-bg)";
   }
   const n = httpNum.value;
-  if (!n) return "o2-status-badge--neutral";
-  if (n >= 200 && n < 300) return "o2-status-badge--success";
-  if (n >= 300 && n < 400) return "o2-status-badge--info";
-  if (n >= 400 && n < 500) return "o2-status-badge--warning";
-  if (n >= 500 && n < 600) return "o2-status-badge--error";
-  return "o2-status-badge--neutral";
+  if (!n) return "tw:text-(--o2-status-neutral-text) tw:bg-(--o2-status-neutral-bg)";
+  if (n >= 200 && n < 300) return "tw:text-(--o2-status-success-text) tw:bg-(--o2-status-success-bg)";
+  if (n >= 300 && n < 400) return "tw:text-(--o2-status-info-text) tw:bg-(--o2-status-info-bg)";
+  if (n >= 400 && n < 500) return "tw:text-(--o2-status-warning-text) tw:bg-(--o2-status-warning-bg)";
+  if (n >= 500 && n < 600) return "tw:text-(--o2-status-error-text) tw:bg-(--o2-status-error-bg)";
+  return "tw:text-(--o2-status-neutral-text) tw:bg-(--o2-status-neutral-bg)";
 });
 </script>
-
-<style scoped>
-.o2-status-badge--success {
-  color: var(--o2-status-success-text);
-  background: var(--o2-status-success-bg);
-}
-.o2-status-badge--info {
-  color: var(--o2-status-info-text);
-  background: var(--o2-status-info-bg);
-}
-.o2-status-badge--warning {
-  color: var(--o2-status-warning-text);
-  background: var(--o2-status-warning-bg);
-}
-.o2-status-badge--error {
-  color: var(--o2-status-error-text);
-  background: var(--o2-status-error-bg);
-}
-.o2-status-badge--neutral {
-  color: var(--o2-status-neutral-text);
-  background: var(--o2-status-neutral-bg);
-}
-</style>

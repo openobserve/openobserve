@@ -149,6 +149,7 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
     ];
 
     let mut created_count = 0;
+    let mut updated_count = 0;
     let mut skipped_count = 0;
 
     for prebuilt_type in prebuilt_types {
@@ -158,14 +159,41 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
 
             // Check if template already exists
             match db::alerts::templates::get(DEFAULT_ORG, &template.name).await {
-                Ok(_) => {
-                    // Template already exists, skip
-                    skipped_count += 1;
-                    log::debug!(
-                        "[TEMPLATES] System template '{}' already exists in {}",
-                        template.name,
-                        DEFAULT_ORG
-                    );
+                Ok(existing) => {
+                    // System templates are protected from user edits, so the
+                    // prebuilt definition is the source of truth. Refresh the
+                    // stored copy when it has drifted (e.g. a shipped fix to the
+                    // body/title) so existing installs pick up the correction.
+                    if existing.body != template.body
+                        || existing.template_type != template.template_type
+                    {
+                        // Preserve the stored id so this is an update, not an insert.
+                        template.id = existing.id;
+                        match db::alerts::templates::set(template.clone()).await {
+                            Ok(_) => {
+                                updated_count += 1;
+                                log::info!(
+                                    "[TEMPLATES] Updated system template '{}' in {}",
+                                    template.name,
+                                    DEFAULT_ORG
+                                );
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "[TEMPLATES] Failed to update system template '{}': {}",
+                                    template.name,
+                                    e
+                                );
+                            }
+                        }
+                    } else {
+                        skipped_count += 1;
+                        log::debug!(
+                            "[TEMPLATES] System template '{}' already up to date in {}",
+                            template.name,
+                            DEFAULT_ORG
+                        );
+                    }
                 }
                 Err(TemplateError::NotFound) => {
                     // Template doesn't exist, create it
@@ -203,8 +231,9 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
     drop(locker);
 
     log::info!(
-        "[TEMPLATES] System templates initialization complete: {} created, {} already existed",
+        "[TEMPLATES] System templates initialization complete: {} created, {} updated, {} already existed",
         created_count,
+        updated_count,
         skipped_count
     );
 

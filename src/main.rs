@@ -438,6 +438,13 @@ async fn main() -> Result<(), anyhow::Error> {
         {
             log::error!("Failed to flush service discovery: {}", e);
         }
+
+        log::info!("Flushing Gen-AI agent registry...");
+        if let Err(e) =
+            o2_enterprise::enterprise::llm_evaluations::agent_registry::flush_all().await
+        {
+            log::error!("Failed to flush Gen-AI agent registry: {}", e);
+        }
     }
 
     // leave the cluster

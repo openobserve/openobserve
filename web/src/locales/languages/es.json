@@ -3109,6 +3109,25 @@
     "aiToolsets": "Conjuntos de herramientas de IA",
     "llmModelPricing": "Precios del modelo LLM",
     "ingestionTokens": "Tokens de ingestión",
+    "genAiAgentMapping": {
+      "tabLabel": "Mapeo de agentes GenAI",
+      "title": "Mapeo de agentes GenAI",
+      "description": "Configure los atributos de telemetría alternativos que se utilizan para normalizar la identidad del agente para los seguimientos y las evaluaciones de LLM.",
+      "howItWorksTitle": "Cómo funciona el mapeo",
+      "howItWorksDescription": "OpenObserve primero conserva los atributos gen_ai.agent.name y gen_ai.agent.id estándar. Estas listas se comprueban solo cuando faltan los atributos estándar o están vacíos. Agregue un atributo de telemetría entrante por línea.",
+      "agentNameFields": "Campos alternativos del nombre del agente",
+      "agentNameHelp": "Atributos entrantes para usar como respaldo para gen_ai.agent.name.",
+      "agentIdFields": "Campos alternativos de ID de agente",
+      "agentIdHelp": "Atributos entrantes para usar como respaldo para gen_ai.agent.id.",
+      "fieldsPlaceholder": "nombre del agente\nllm.agent.name",
+      "applyDefaults": "Aplicar valores predeterminados",
+      "resetToEmpty": "Restablecer como vacío",
+      "defaultsSource": "Los valores predeterminados se cargan desde openobserve/sdr_patterns y se pueden modificar antes de guardarlos para esta organización.",
+      "saved": "El mapeo de agentes de GenAI se guardó correctamente",
+      "loadFailed": "No se pudo cargar el mapeo del agente GenAI",
+      "saveFailed": "No se pudo guardar el mapeo de agentes de GenAI",
+      "defaultsLoadFailed": "No se pudieron cargar los valores predeterminados de mapeo del agente GenAI"
+    },
     "groupGeneral": "General",
     "groupAccessSecurity": "Acceso y seguridad",
     "groupDestinationsTemplates": "Destinos y plantillas",
@@ -5819,6 +5838,14 @@
         "title": "Errores recientes",
         "subtitle": "últimos 10 intervalos fallidos"
       }
+    },
+    "subtitle": {
+      "llmInsights": "Realice un seguimiento de la latencia, los errores, los tokens y los costos en todo su tráfico de LLM",
+      "sessions": "Explore e inspeccione las sesiones de los agentes paso a paso",
+      "quality": "Califica y controla la calidad de tus respuestas de LLM",
+      "evalJobs": "Ejecute y supervise los trabajos de evaluación en todas sus sesiones",
+      "scorers": "Cree y administre los puntajes que califican los resultados del LLM",
+      "scoreConfigs": "Configure las rúbricas de puntuación utilizadas en sus evaluaciones"
     }
   },
   "logs": {

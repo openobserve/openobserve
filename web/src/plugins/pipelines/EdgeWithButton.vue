@@ -72,6 +72,3 @@ export default {
   </EdgeLabelRenderer>
 </template>
 
-<style scoped lang="scss">
-/* Edge button styles removed - using keyboard deletion instead */
-</style>

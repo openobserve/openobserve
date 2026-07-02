@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -116,24 +116,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
 
       <!-- Dashboard Content with Sidebar -->
-      <div class="analysis-content tw:flex-1 tw:pt-2 tw:overflow-hidden tw:flex">
+      <div class="analysis-content tw:flex-1 tw:pt-2 tw:overflow-hidden tw:flex tw:min-h-0 tw:bg-[#f5f5f5]">
         <!-- Collapsed dimension sidebar bar (shown when hidden) -->
         <div
           v-if="!showDimensionSelector"
-          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel! tw:shrink-0 tw:cursor-pointer"
+          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel! tw:shrink-0 tw:cursor-pointer tw:flex tw:flex-col tw:items-center tw:justify-start tw:pt-2 tw:gap-1.5"
           style="width: 50px; height: 100%"
           data-test="dimension-selector-collapsed-bar"
           @click="toggleDimensionSelector"
         >
-          <OIcon name="expand-all" size="sm" class="field-list-collapsed-icon rotate-90" />
-          <div class="field-list-collapsed-title">Dimensions</div>
+          <OIcon name="expand-all" size="sm" class="field-list-collapsed-icon rotate-90 tw:mt-2.5 tw:text-[20px]" />
+          <div class="field-list-collapsed-title tw:[writing-mode:vertical-rl] tw:[text-orientation:mixed] tw:font-bold tw:text-xs">Dimensions</div>
         </div>
 
         <OSplitter
           v-model="splitterModel"
           :limits="splitterLimits"
           :style="{ width: showDimensionSelector ? '100%' : 'calc(100% - 50px)', height: '100%' }"
-          class="analysis-splitter-smooth"
+          class="analysis-splitter-smooth tw:[transition:all_0.3s_ease]"
           @update:model-value="onSplitterUpdate"
         >
           <!-- LEFT: Dimension Selector Sidebar -->
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="relative-position tw:h-full">
               <div
                 v-if="showDimensionSelector"
-                class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
+                class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col tw:bg-white"
                 data-test="dimension-selector-sidebar"
               >
                 <!-- Sidebar Header with collapse button -->
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                         <span
-                          class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]!"
+                          class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm tw:[line-height:1.25rem]"
                         >
                           {{ dimension.label }}
                           <OTooltip
@@ -1114,185 +1114,65 @@ watch(
 );
 </script>
 
-<style lang="scss">
-// Non-scoped: ODrawer body for this drawer does not have flex:1 by default
-// (intentional for form drawers, but the Insights drawer needs a full-height
-// splitter layout). Override the body div — 4th child of the drawer panel after
-// the two sr-only elements (h2, p) and the header div.
-// Also adds the top gap (matching --spacing-dialog-content-py = 0.75rem)
-// that ODialog provides by default but ODrawer omits.
+<style>
+/* Non-scoped: ODrawer body for this drawer does not have flex:1 by default
+ * (intentional for form drawers, but the Insights drawer needs a full-height
+ * splitter layout). Override the body div — 4th child of the drawer panel after
+ * the two sr-only elements (h2, p) and the header div.
+ * Also adds the top gap (matching --spacing-dialog-content-py = 0.75rem)
+ * that ODialog provides by default but ODrawer omits.
+ */
 [data-test="traces-analysis-dashboard-drawer"] > div:nth-child(4) {
   flex: 1 1 0 !important;
   overflow: hidden !important;
   display: flex;
   flex-direction: column;
 }
-</style>
 
-<style lang="scss" scoped>
-.analysis-dashboard-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 90vw;
-  max-width: 87.5rem;
-  .analysis-header {
-    flex-shrink: 0;
-    z-index: 1;
-    margin: 8px 0px;
-  }
-
-  .insights-dashboard-tabs {
-    :deep(.o-tabs__content .OIcon) {
-      font-size: 1.2rem;
-      display: flex;
-      align-items: center;
-    }
-
-    :deep(.o-tab__label) {
-      font-weight: bold;
-      padding-left: 0.13rem;
-    }
-  }
-
-  .trace-analysis-dashboards {
-    :deep(.render-dashboard-charts-container) {
-      padding: 0rem !important;
-    }
-
-    :deep(.global-variables-selector) {
-      margin-top: 0rem !important;
-    }
-  }
-
-  .trace-analysis-dashboards {
-    :deep(.panelHeader) {
-      padding-left: 0.325rem !important;
-    }
-  }
-
-  .q-card__section--vert {
-    padding: 8px !important;
-  }
-}
-
-// Time range chips styling - matching chart colors
-// (lifted out: .analysis-dashboard-card wrapper no longer exists in template)
+/* Time range chips styling - matching chart colors */
 .time-range-chip {
   font-size: 0.7rem;
   line-height: 1.2;
   transition: all 0.2s ease;
-
-  &.baseline-chip,
-  &.selected-chip {
-    background: color-mix(in srgb, var(--chip-color) 20%, transparent);
-    border: 1px solid color-mix(in srgb, var(--chip-color) 50%, transparent);
-    color: color-mix(in srgb, var(--chip-color) 80%, #000) !important;
-    font-weight: 500;
-  }
 }
 
-.analysis-content {
-  flex: 1;
-  overflow: hidden; // Changed to tw:hidden - q-splitter handles overflow
-  min-height: 0;
-  background: #f5f5f5 !important;
+.time-range-chip.baseline-chip,
+.time-range-chip.selected-chip {
+  background: color-mix(in srgb, var(--chip-color) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chip-color) 50%, transparent);
+  color: color-mix(in srgb, var(--chip-color) 80%, #000) !important;
+  font-weight: 500;
 }
 
-// Dimension sidebar (in splitter)
-.dimension-sidebar {
-  background: #ffffff;
-  // border-right: 1px solid var(--q-border-color, #e0e0e0);
+.dimension-list-item:hover {
+  background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
 }
 
-.dimension-list-container {
-  // max-height removed - now handled by flex container
-
-  .dimension-list-item {
-    border-bottom: none;
-
-    &:hover {
-      background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
-    }
-
-    .dimension-label {
-      font-size: 0.875rem;
-      line-height: 1.25rem;
-    }
-  }
-}
-
-// Splitter smooth transition
-.analysis-splitter-smooth {
-  transition: all 0.3s ease;
-}
-
-// Collapsed sidebar bar (mirrors PanelEditor pattern)
-.field-list-sidebar-header-collapsed {
-  cursor: pointer;
-  width: 50px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  padding-top: 8px;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.field-list-collapsed-icon {
-  margin-top: 10px;
-  font-size: 20px;
-}
-
-.field-list-collapsed-title {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-weight: bold;
-  font-size: 12px;
-}
-
-// Splitter icon positioning (at top, like logs page)
-// Splitter separator bar — visible narrow divider with collapse button at top
-:deep(.analysis-splitter-smooth.q-splitter--vertical > .q-splitter__separator) {
+/* Splitter separator bar — visible narrow divider */
+.analysis-splitter-smooth.q-splitter--vertical > .q-splitter__separator {
   width: 10px !important;
 }
 
+/* Dark mode support */
+body.body--dark .analysis-content {
+  background: #2a2a2a !important;
+}
 
-// Dark mode support
-body.body--dark {
-  .analysis-dashboard-card {
-    background: #1e1e1e !important;
+body.body--dark .dimension-sidebar {
+  background: #202223 !important;
+}
 
-    .analysis-header {
-      background: #1e1e1e !important;
-    }
+body.body--dark .dimension-list-item {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
 
-  }
+body.body--dark .dimension-list-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
 
-  .analysis-content {
-    background: #2a2a2a !important;
-  }
-
-  .dimension-sidebar {
-    background: #202223 !important;
-  }
-
-  .dimension-list-item {
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-  }
-
-  // Time range chips: dark mode text adjustment
-  .time-range-chip {
-    &.baseline-chip,
-    &.selected-chip {
-      color: color-mix(in srgb, var(--chip-color) 80%, #fff) !important;
-    }
-  }
+/* Time range chips: dark mode text adjustment */
+body.body--dark .time-range-chip.baseline-chip,
+body.body--dark .time-range-chip.selected-chip {
+  color: color-mix(in srgb, var(--chip-color) 80%, #fff) !important;
 }
 </style>

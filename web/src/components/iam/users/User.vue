@@ -1309,99 +1309,12 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-
-/* Role chip — matches the incident "dimension-badge" sizing so role pills
-   read consistently across the app (2px 8px padding, 11px font, weight 600). */
+<style>
 :deep(.o2-role-chip) {
   padding: 2px 8px;
   font-size: 11px;
   font-weight: 600;
   border-radius: 6px;
   line-height: 1.4;
-}
-
-.iconHoverBtn {
-  cursor: pointer !important;
-}
-
-.confirmBody {
-  padding: 11px 1.375rem 0;
-  font-size: 0.875rem;
-  text-align: center;
-  font-weight: 700;
-
-  .head {
-    line-height: 2.125rem;
-    margin-bottom: 0.5rem;
-    color: $dark-page;
-  }
-
-  .para {
-    color: $light-text;
-  }
-}
-
-.confirmActions {
-  justify-content: center;
-  padding: 1.25rem 1.375rem 1.625rem;
-  display: flex;
-}
-
-.non-selectable {
-  cursor: default !important;
-}
-
-.invite-user {
-  background: $input-bg;
-  border-radius: 4px;
-
-  .separator {
-    width: 1px;
-  }
-}
-
-.inputHint {
-  font-size: 11px;
-  color: $light-text;
-}
-
-.role-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
-  padding: 4px 10px;
-  border-radius: 6px;
-  background-color: transparent;
-  white-space: nowrap;
-}
-
-.role-badge-system {
-  color: #8a6a1f;
-  border: 1px solid #8a6a1f;
-}
-
-.role-badge-custom {
-  color: #a04545;
-  border: 1px solid #a04545;
-  font-weight: 700;
-}
-
-.role-badge-more {
-  color: #a04545;
-  border: 1px solid #a04545;
-  cursor: pointer;
-}
-
-.role-badge-sso {
-  color: #1f6f8b;
-  border: 1px solid #1f6f8b;
-}
-
-.role-badge-local {
-  color: #4a4a4a;
-  border: 1px solid #4a4a4a;
 }
 </style>

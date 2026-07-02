@@ -375,11 +375,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-</style>

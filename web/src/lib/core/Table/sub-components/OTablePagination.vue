@@ -60,7 +60,7 @@ const pageSizeSelectOptions = computed(() =>
       <!-- Loading: always skeleton, regardless of slot/count -->
       <span
         v-if="loading"
-        class="o2-pag-skel tw:inline-block tw:h-3 tw:w-24 tw:rounded-md"
+        class="o2-pag-skel tw:inline-block tw:h-3 tw:w-24 tw:rounded-md tw:[background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] tw:[background-size:200%_100%] tw:[animation:o2-pag-shimmer_1.5s_ease-in-out_infinite]"
         aria-hidden="true"
         data-test="o2-table-pagination-count-skel"
       />
@@ -77,7 +77,7 @@ const pageSizeSelectOptions = computed(() =>
     <div class="tw:flex tw:items-center tw:gap-3">
       <span
         v-if="loading"
-        class="o2-pag-skel tw:inline-block tw:h-3 tw:w-36 tw:rounded-md"
+        class="o2-pag-skel tw:inline-block tw:h-3 tw:w-36 tw:rounded-md tw:[background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] tw:[background-size:200%_100%] tw:[animation:o2-pag-shimmer_1.5s_ease-in-out_infinite]"
         aria-hidden="true"
         data-test="o2-table-pagination-info-skel"
       />
@@ -142,17 +142,7 @@ const pageSizeSelectOptions = computed(() =>
   </div>
 </template>
 
-<style scoped>
-.o2-pag-skel {
-  background: linear-gradient(
-    90deg,
-    var(--color-skeleton-base) 0%,
-    var(--color-skeleton-highlight) 50%,
-    var(--color-skeleton-base) 100%
-  );
-  background-size: 200% 100%;
-  animation: o2-pag-shimmer 1.5s ease-in-out infinite;
-}
+<style>
 @keyframes o2-pag-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }

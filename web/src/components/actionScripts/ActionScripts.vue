@@ -872,35 +872,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.alerts-tabs {
-  .o-tabs {
-    &--vertical {
-      margin: 1.5rem 1rem 0 0;
-
-      .o-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-
-        &__content.tab_content {
-          .o-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-
-        &--active {
-          background-color: $accent;
-        }
-      }
-    }
-  }
-}
-.clone-alert-popup {
-  width: 400px;
-}
-</style>

@@ -88,7 +88,7 @@ describe("PromQLBuilderOptions", () => {
 
     it("should display options label", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".layout-name").text()).toBe("Options");
+      expect(wrapper.find('[data-test="promql-builder-options-label"]').text()).toBe("Options");
     });
 
     it("should render separator", () => {
@@ -123,19 +123,19 @@ describe("PromQLBuilderOptions", () => {
 
     it("should display legend label", () => {
       wrapper = createWrapper();
-      const labels = wrapper.findAll(".field-label");
+      const labels = wrapper.findAll('[data-test="promql-builder-options-field-label"]');
       expect(labels[0].text()).toBe("Legend");
     });
 
     it("should display step value label", () => {
       wrapper = createWrapper();
-      const labels = wrapper.findAll(".field-label");
+      const labels = wrapper.findAll('[data-test="promql-builder-options-field-label"]');
       expect(labels[1].text()).toBe("Step Value");
     });
 
     it("should display query type label", () => {
       wrapper = createWrapper();
-      const labels = wrapper.findAll(".field-label");
+      const labels = wrapper.findAll('[data-test="promql-builder-options-field-label"]');
       expect(labels[2].text()).toBe("Type");
     });
   });
@@ -162,7 +162,7 @@ describe("PromQLBuilderOptions", () => {
 
     it("should show legend info tooltip", () => {
       wrapper = createWrapper();
-      const infoIcons = wrapper.findAll(".field-info-icon");
+      const infoIcons = wrapper.findAll('[data-test="promql-builder-options-field-info-icon"]');
       expect(infoIcons.length).toBeGreaterThan(0);
     });
 
@@ -544,24 +544,24 @@ describe("PromQLBuilderOptions", () => {
   describe("Layout and Styling", () => {
     it("should have option field wrappers", () => {
       wrapper = createWrapper();
-      const wrappers = wrapper.findAll(".option-field-wrapper");
+      const wrappers = wrapper.findAll('[data-test="promql-builder-options-field-wrapper"]');
       expect(wrappers.length).toBe(3); // Legend, Step Value, and Query Type
     });
 
     it("should have axis container", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".axis-container").exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-builder-options-axis-container"]').exists()).toBe(true);
     });
 
     it("should have field labels", () => {
       wrapper = createWrapper();
-      const labels = wrapper.findAll(".field-label");
+      const labels = wrapper.findAll('[data-test="promql-builder-options-field-label"]');
       expect(labels.length).toBe(3); // Legend, Step Value, and Query Type
     });
 
     it("should have field input wrappers", () => {
       wrapper = createWrapper();
-      const inputWrappers = wrapper.findAll(".field-input-wrapper");
+      const inputWrappers = wrapper.findAll('[data-test="promql-builder-options-field-input-wrapper"]');
       expect(inputWrappers.length).toBeGreaterThan(0);
     });
   });

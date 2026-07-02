@@ -3125,6 +3125,25 @@
     "aiToolsets": "Yapay Zeka Araç Setleri",
     "llmModelPricing": "LLM Model Fiyatlandırması",
     "ingestionTokens": "Yutma Jetonları",
+    "genAiAgentMapping": {
+      "tabLabel": "GenAI Aracı Haritalama",
+      "title": "GenAI Aracı Haritalama",
+      "description": "LLM izleri ve değerlendirmeleri için ajan kimliğini normalleştirmek için kullanılan yedek telemetri özniteliklerini yapılandırın.",
+      "howItWorksTitle": "Haritalama nasıl çalışır",
+      "howItWorksDescription": "OpenObserve öncelikle standart gen_ai.agent.name ve gen_ai.agent.id özniteliklerini korur. Bu listeler yalnızca standart öznitelikler eksik veya boş olduğunda kontrol edilir. Satır başına bir gelen telemetri özelliği ekleyin.",
+      "agentNameFields": "Temsilci adı geri dönüş alanları",
+      "agentNameHelp": "gen_ai.agent.name için yedek olarak kullanılacak gelen öznitelikler.",
+      "agentIdFields": "Ajan Kimliği geri dönüş alanları",
+      "agentIdHelp": "gen_ai.agent.id için yedek olarak kullanılacak gelen öznitelikler.",
+      "fieldsPlaceholder": "ajanın adı\nllm.agent.adı",
+      "applyDefaults": "Varsayılanları uygula",
+      "resetToEmpty": "Boşa sıfırla",
+      "defaultsSource": "Varsayılanlar openobserve/sdr_pattern'den yüklenir ve bu kuruluş için kaydedilmeden önce değiştirilebilir.",
+      "saved": "GenAI aracı eşlemesi başarıyla kaydedildi",
+      "loadFailed": "GenAI aracı eşlemesi yüklenemedi",
+      "saveFailed": "GenAI aracı eşlemesi kaydedilemedi",
+      "defaultsLoadFailed": "GenAI aracı eşleme varsayılanları yüklenemedi"
+    },
     "groupGeneral": "Genel",
     "groupAccessSecurity": "Erişim ve Güvenlik",
     "groupDestinationsTemplates": "Hedefler ve Şablonlar",
@@ -5835,6 +5854,14 @@
         "title": "Son hatalar",
         "subtitle": "son 10 başarısız yayılım"
       }
+    },
+    "subtitle": {
+      "llmInsights": "LLM trafiğiniz genelinde gecikmeyi, hataları, belirteçleri ve maliyeti izleyin",
+      "sessions": "Aracı oturumlarına sırayla göz atın ve denetleyin",
+      "quality": "LLM yanıtlarınızın kalitesini puanlayın ve izleyin",
+      "evalJobs": "Oturumlarınız boyunca değerlendirme işlerini çalıştırın ve izleyin",
+      "scorers": "LLM çıktılarını derecelendiren puanları oluşturun ve yönetin",
+      "scoreConfigs": "Değerlendirmeleriniz tarafından kullanılan puanlama derecelerini yapılandırın"
     }
   },
   "logs": {
