@@ -512,21 +512,10 @@ pub async fn notify_check_result(
 
     // TODO: enforce alert_if_fails (consecutive failure count) and cooldown_mins (silence period).
     // Requires a persistent state store keyed by (org_id, synthetics_id) tracking consecutive
-    // failure count and last-notified-at timestamp. Until then every failed run fires a notification.
+    // failure count and last-notified-at timestamp. Until then every failed run fires a
+    // notification.
 
     use config::meta::destinations::Module;
-
-    let vars: &[(&str, &str)] = &[
-        ("monitor_name", monitor_name),
-        ("monitor_id", monitor_id),
-        ("monitor_type", monitor_type),
-        ("target", target),
-        ("location", location),
-        ("status", status),
-        ("response_time_ms", &format!("{response_time_ms:.2}")),
-        ("error", error.unwrap_or("")),
-        ("checked_at", &checked_at.to_string()),
-    ];
 
     for dest_name in destinations {
         match crate::service::alerts::destinations::get_with_template(org_id, dest_name).await {
@@ -538,21 +527,23 @@ pub async fn notify_check_result(
                     continue;
                 };
 
-                let msg = if let Some(t) = tpl {
-                    render_template(&t.body, vars)
-                } else {
-                    default_notification_payload(
-                        monitor_name,
-                        monitor_id,
-                        monitor_type,
-                        target,
-                        location,
-                        status,
-                        response_time_ms,
-                        error,
-                        checked_at,
-                    )
-                };
+                // Alert-system templates use single-brace vars ({alert_name}, {alert_url})
+                // that are not defined in the synthetics context. Slack rejects payloads
+                // with unreplaced {alert_url} in button elements (invalid URI). Until
+                // synthetics has its own template system, always use the built-in payload.
+                // TODO: support synthetics-specific templates with {{monitor_name}} vars.
+                let _ = tpl;
+                let msg = default_notification_payload(
+                    monitor_name,
+                    monitor_id,
+                    monitor_type,
+                    target,
+                    location,
+                    status,
+                    response_time_ms,
+                    error,
+                    checked_at,
+                );
 
                 let subject = format!("Synthetics: {monitor_name} [{location}] is {status}");
                 if let Err(e) = crate::service::alerts::alert::dispatch_notification(
@@ -570,15 +561,6 @@ pub async fn notify_check_result(
             }
         }
     }
-}
-
-#[cfg(feature = "enterprise")]
-fn render_template(body: &str, vars: &[(&str, &str)]) -> String {
-    let mut out = body.to_string();
-    for (k, v) in vars {
-        out = out.replace(&format!("{{{{{k}}}}}"), v);
-    }
-    out
 }
 
 /// Default fallback payload when the destination has no template configured.
