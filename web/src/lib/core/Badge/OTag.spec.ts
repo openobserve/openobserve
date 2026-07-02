@@ -80,9 +80,9 @@ describe("OTag shape", () => {
     const html = mount(OTag, { props: { type: "logsResultChip", value: "neutral" } }).html();
     expect(html.includes("tw:rounded-md")).toBe(true);
   });
-  it("group-declared class is merged onto the badge (variableScope tighter padding)", () => {
-    const html = mount(OTag, { props: { type: "variableScope", value: "global" } }).html();
-    expect(html.includes("tw:!py-0.5")).toBe(true);
+  it("group-declared class is merged onto the badge (qualityStatus naked dot)", () => {
+    const html = mount(OTag, { props: { type: "qualityStatus", value: "healthy" } }).html();
+    expect(html.includes("tw:!bg-transparent")).toBe(true);
   });
   it("manual badge defaults to pill", () => {
     const html = mount(OTag, { props: { variant: "default-soft" }, slots: { default: "5" } }).html();
