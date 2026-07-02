@@ -91,6 +91,8 @@ import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
 
 
@@ -324,7 +326,22 @@ const bulkDeleteUserRoles = async () => {
   }
 };
 
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcuts([
+  {
+    id: "iamRolesAdd",
+    handler: () => { if (!isInputFocused()) addRole(); },
+  },
+  {
+    id: "iamRolesRefresh",
+    handler: () => { if (!isInputFocused()) setupRoles(); },
+  },
+  {
+    id: "iamRolesFocusSearch",
+    handler: () => {
+      focusSearchInput("iam-roles-search-input");
+    },
+  },
+]);
 
 </script>
-
-<style scoped></style>

@@ -16,12 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-alert-conditions"
+    class="step-alert-conditions tw:w-full tw:rounded-lg tw:mx-auto tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <!-- Section header -->
-    <div class="section-header">
-      <div class="section-header-accent" />
-      <span class="section-header-title">{{
+    <div
+      class="tw:flex tw:items-center tw:py-2.5 tw:px-3"
+      :class="store.state.theme === 'dark' ? 'tw:border-b tw:border-[#343434]' : 'tw:border-b tw:border-[#eeeeee]'"
+    >
+      <div class="tw:w-0.75 tw:h-4 tw:rounded-xs tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
+      <span
+        class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-[var(--color-text-primary)]"
+      >{{
         t("alerts.alertSettings.sectionTitle")
       }}</span>
     </div>
@@ -64,6 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     margin-left: 0 !important;
                     height: 28px;
                     font-size: 13px;
+                  "
+                  :class="
+                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
                   "
                   class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
                 >
@@ -143,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Scheduled Alerts -->
         <template v-else>
           <!-- Period -->
-          <div class="tw:flex tw:items-start tw:mr-2 alert-settings-row">
+          <div class="tw:flex tw:items-start tw:mr-2 tw:mb-4!">
             <div
               class="tw:font-semibold tw:flex tw:items-center"
               style="width: 190px; height: 28px"
@@ -182,6 +191,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     font-weight: normal;
                     font-size: 13px;
                   "
+                  :class="
+                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
+                  "
                   class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
@@ -198,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-          <div class="tw:flex tw:items-start tw:mr-2 alert-settings-row">
+          <div class="tw:flex tw:items-start tw:mr-2 tw:mb-4!">
             <div
               class="tw:font-semibold tw:flex tw:items-center"
               style="width: 190px; height: 28px"
@@ -233,6 +245,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     height: 28px;
                     font-size: 13px;
                   "
+                  :class="
+                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
+                  "
                   class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
@@ -254,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destinations -->
-          <div class="tw:flex tw:items-start tw:mr-2 alert-settings-row">
+          <div class="tw:flex tw:items-start tw:mr-2 tw:mb-4!">
             <div
               class="tw:font-semibold tw:flex tw:items-center"
               style="width: 190px; height: 28px"
@@ -319,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- Creates Incident toggle — shown for all alert types -->
-        <div class="tw:flex tw:items-start alert-settings-row">
+        <div class="tw:flex tw:items-start tw:mb-4!">
           <div
             class="tw:font-semibold tw:flex tw:items-center"
             style="width: 190px; height: 28px"
@@ -970,158 +985,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.step-alert-conditions {
-  width: 100%;
-  margin: 0 auto;
-  border-radius: 8px;
-
-  .step-content {
-    border-radius: 8px;
-    height: 100%;
-    overflow-y: auto;
-  }
-
-  .step-header {
-    .step-title {
-      font-size: 20px;
-      font-weight: 600;
-      margin-bottom: 0.2rem;
-    }
-
-    .step-subtitle {
-      font-size: 13px;
-      opacity: 0.8;
-      margin: 0;
-      margin-bottom: 0.5rem;
-    }
-  }
-
-  background-color: var(--color-surface-overlay);
-  border: 1px solid var(--color-border-default);
-
-  .section-header {
-    border-bottom: 1px solid var(--color-border-default);
-  }
-  .section-header-title {
-    color: var(--color-text-primary);
-  }
-  .section-header-accent {
-    background: var(--q-primary);
-  }
-  .step-title {
-    color: var(--color-text-heading);
-  }
-  .step-subtitle {
-    color: var(--color-text-secondary);
-  }
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
-}
-
-.section-header-accent {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-
-.section-header-title {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-// Consistent spacing for alert settings rows
-.alert-settings-row {
-  margin-bottom: 16px !important;
-  padding-bottom: 0 !important;
-}
-
-// Fix for destinations select - keep selected items and input on same line
-.destinations-select-field {
-  :deep(.q-field__control) {
-    .q-field__native {
-      display: flex !important;
-      flex-direction: row !important;
-      align-items: center !important;
-      flex-wrap: nowrap !important;
-      overflow: hidden !important;
-
-      > span {
-        flex: 0 0 80% !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-        min-width: 0 !important;
-      }
-
-      > input {
-        flex: 0 0 20% !important;
-        min-width: 0 !important;
-        width: 20% !important;
-      }
-    }
-  }
-}
-
-// Destination select — always has a subtle border (like stream type fields)
-.destination-select-field {
-  :deep(.q-field__control) {
-    border: 1px solid rgba(0, 0, 0, 0.2) !important;
-    border-radius: 4px !important;
-    background: rgba(0, 0, 0, 0.03) !important;
-  }
-}
-.body--dark .destination-select-field {
-  :deep(.q-field__control) {
-    border-color: rgba(255, 255, 255, 0.2) !important;
-    background: rgba(255, 255, 255, 0.05) !important;
-  }
-}
-.destination-select-field.destination-select-error {
-  :deep(.q-field__control) {
-    border-color: #ef5350 !important;
-    background: rgba(239, 83, 80, 0.05) !important;
-  }
-}
-.body--dark .destination-select-field.destination-select-error {
-  :deep(.q-field__control) {
-    border-color: #ef5350 !important;
-    background: rgba(239, 83, 80, 0.08) !important;
-  }
-}
-
-// Fix for template select - keep selected value and input on same line
-.template-select-field {
-  :deep(.q-field__control) {
-    .q-field__native {
-      display: flex !important;
-      flex-direction: row !important;
-      align-items: center !important;
-      flex-wrap: nowrap !important;
-      overflow: hidden !important;
-
-      > span {
-        flex: 0 0 70% !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-        min-width: 0 !important;
-      }
-
-      > input {
-        flex: 0 0 30% !important;
-        min-width: 0 !important;
-        width: 30% !important;
-      }
-    }
-  }
-}
-</style>

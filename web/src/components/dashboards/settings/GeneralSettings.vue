@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
     <div>
     <OForm ref="formRef" :schema="generalSettingsSchema" :default-values="generalSettingsDefaults()" @submit="onSubmit" v-slot="{ isSubmitting }">
-    <div class="tw:flex tw:flex-col tw:gap-3 tw:px-3">
+    <div class="tw:flex tw:flex-col tw:gap-3 tw:px-3 tw:py-3">
         <OFormInput
           name="name"
           :label="t('dashboard.name')"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <DateTimePickerDashboard
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
-            class="dashboard-icons tw:my-2"
+            class="tw:h-7.5 tw:my-2"
             size="sm"
             :initialTimezone="initialTimezone"
             v-model="dateTimeValue"
@@ -238,8 +238,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.dashboard-icons {
-  height: 30px;
-}
-</style>

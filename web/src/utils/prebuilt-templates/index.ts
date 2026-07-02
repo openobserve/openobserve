@@ -151,10 +151,10 @@ export function generateDestinationHeaders(type: string, credentials: Record<str
   // Add dynamic headers based on credentials
   switch (type) {
     case 'pagerduty':
-      // PagerDuty uses X-Routing-Key header for integration key
-      if (credentials.integrationKey) {
-        headers['X-Routing-Key'] = credentials.integrationKey;
-      }
+      // PagerDuty Events API v2 reads the integration key from the request body
+      // (`routing_key`), NOT from any header. The key is carried in destination
+      // metadata (see generatePrebuiltMetadata) so the server can substitute it
+      // into the template body at send time.
       break;
     case 'opsgenie':
       if (credentials.apiKey) {
@@ -169,4 +169,33 @@ export function generateDestinationHeaders(type: string, credentials: Record<str
   }
 
   return headers;
+}
+
+/**
+ * Generate destination metadata (bare template variables) for a prebuilt type.
+ *
+ * These keys are substituted into the template body server-side by the alert
+ * engine's endpoint-metadata substitution (each `{key}` in the template body is
+ * replaced by the matching metadata value at send time). Use this for values
+ * that must appear inside the request body — e.g. PagerDuty's `routing_key`,
+ * which the Events API v2 requires in the payload rather than a header.
+ */
+export function generatePrebuiltMetadata(type: string, credentials: Record<string, any>): Record<string, string> {
+  const metadata: Record<string, string> = {};
+
+  switch (type) {
+    case 'pagerduty':
+      // routing_key = PagerDuty integration key (required in the body).
+      if (credentials.integrationKey) {
+        metadata['routing_key'] = credentials.integrationKey;
+      }
+      if (credentials.severity) {
+        metadata['severity'] = credentials.severity;
+      }
+      // PagerDuty requires a non-empty `source` in the payload.
+      metadata['source'] = 'openobserve';
+      break;
+  }
+
+  return metadata;
 }

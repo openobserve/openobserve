@@ -281,22 +281,28 @@ export class ModelPricingPage {
      *  @param {number} [tierIndex=0]
      */
     async addPriceRow(key, valuePricePerMillion, tierIndex = 0) {
-        const tierCard = this.page.locator('.tier-card').nth(tierIndex);
-        const addRow   = tierCard.locator('.price-add-row');
-
-        const keyInput = addRow.getByPlaceholder('Usage key (e.g. input)');
+        // Add-row inputs are OInput components scoped per tier index — fill the
+        // auto-derived `-field` native input variant.
+        const keyInput = this.page.locator(`[data-test="model-pricing-add-price-key-input-${tierIndex}-field"]`);
         await keyInput.waitFor({ state: 'visible', timeout: 5000 });
         await keyInput.fill(key);
 
-        const valueInput = addRow.getByPlaceholder('0.00');
+        const valueInput = this.page.locator(`[data-test="model-pricing-add-price-value-input-${tierIndex}-field"]`);
         await valueInput.waitFor({ state: 'visible', timeout: 5000 });
         await valueInput.fill(String(valuePricePerMillion));
 
-        const addPriceBtn = addRow.locator('button');
+        const addPriceBtn = this.page.locator(`[data-test="model-pricing-add-price-btn-${tierIndex}"]`);
         await expect(addPriceBtn).toBeEnabled({ timeout: 5000 });
         await addPriceBtn.click();
-        // Wait for Vue to process the add and reset the add-row inputs
-        await this.page.waitForTimeout(200);
+        // The add settles into one of two deterministic states: a valid key clears
+        // the add-row key input, while an invalid key keeps the value and fires a
+        // warning toast. Wait for either so the helper works for both valid and
+        // validation-failure callers (no fixed timeout).
+        await expect.poll(async () => {
+            const keyCleared = (await keyInput.inputValue().catch(() => null)) === '';
+            const toastVisible = await this.toastMessage.first().isVisible().catch(() => false);
+            return keyCleared || toastVisible;
+        }, { timeout: 5000 }).toBe(true);
     }
 
     async clickSave() {

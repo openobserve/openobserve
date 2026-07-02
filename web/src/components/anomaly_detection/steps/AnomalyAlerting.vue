@@ -16,12 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-anomaly-alerting"
+    class="step-anomaly-alerting tw:h-full"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div class="step-content tw:px-3 tw:py-4">
+    <div
+      class="step-content tw:px-3 tw:py-4 tw:rounded-lg tw:h-full tw:overflow-y-auto tw:border tw:bg-[var(--color-surface-overlay)] tw:border-[var(--color-border-default)]"
+    >
       <!-- Enable Notifications toggle -->
-      <div class="tw:flex tw:items-start alert-settings-row">
+      <div class="tw:flex tw:items-start tw:mb-6!  tw:pb-0!">
         <div
           class="tw:font-semibold tw:flex tw:items-center"
           style="width: 190px; height: 36px"
@@ -47,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Destination picker (shown when alert_enabled) -->
       <div
         v-if="config.alert_enabled"
-        class="tw:flex tw:items-start alert-settings-row"
+        class="tw:flex tw:items-start tw:mb-6! tw:pb-0!"
       >
         <div
           class="tw:font-semibold tw:flex tw:items-center"
@@ -65,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               valueKey="name"
               multiple
               searchable
-              class="destination-select"
+              class="tw:min-h-auto! tw:h-auto!"
               style="min-width: 300px; max-width: 420px"
               data-test="anomaly-destination"
             >
@@ -198,61 +200,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.step-anomaly-alerting {
-  height: 100%;
-
-  .step-content {
-    border-radius: 8px;
-    height: 100%;
-    overflow-y: auto;
-  }
-
-  &.dark-mode {
-    .step-content {
-      background-color: #212121;
-      border: 1px solid #343434;
-    }
-  }
-
-  &.light-mode {
-    .step-content {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
-    }
-  }
-}
-
-.alert-settings-row {
-  margin-bottom: 24px !important;
-  padding-bottom: 0 !important;
-}
-
-.destination-select {
-  // override the compact 28px from alert-v3-select — chips need flexible height
-  min-height: auto !important;
-  height: auto !important;
-  :deep(.q-field__inner) {
-    min-height: auto !important;
-    max-height: none !important;
-    height: auto !important;
-  }
-  :deep(.q-field__control) {
-    min-height: 1.75rem !important;
-    max-height: none !important;
-    height: auto !important;
-    flex-wrap: nowrap;
-  }
-  :deep(.q-field__control-container) {
-    flex-wrap: nowrap;
-    overflow: hidden;
-  }
-  :deep(.q-field__marginal) {
-    height: auto !important;
-  }
-  :deep(.q-field__append) {
-    height: auto !important;
-  }
-}
-</style>

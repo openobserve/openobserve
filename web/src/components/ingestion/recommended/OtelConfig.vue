@@ -78,5 +78,3 @@ service:
       level: warn`;
 });
 </script>
-
-<style scoped></style>

@@ -32,7 +32,7 @@ Usage:
 - <ChunkedContent :data="value" :field-key="'field_name'" :query-string="highlightQuery" />
 -->
 <template>
-  <div class="chunked-content">
+  <div data-test="logs-chunked-content-container" class="tw:inline-block tw:w-full">
     <!-- Display the visible content with highlighting -->
     <LogsHighLighting
       :data="visibleContent"
@@ -44,7 +44,7 @@ Usage:
     <!-- Load more button and info -->
     <div
       v-if="shouldShowLoadMore"
-      class="load-more-container tw-mt-2 tw-flex tw-items-center tw-gap-3"
+      class="tw:pt-2 tw:[border-top:1px_solid_var(--o2-border-color)] tw:mt-2 tw:flex tw:items-center tw:gap-3"
     >
       <OButton
         :data-test="`load-more-btn-${fieldKey}`"
@@ -55,7 +55,7 @@ Usage:
         <OIcon name="expand-more" size="xs" class="tw:mr-1" />
         Load more ({{ chunkInfo.loadedSizeKB }}KB / {{ chunkInfo.totalSizeKB }}KB)
       </OButton>
-      <span class="tw-text-sm tw-font-medium" style="color: var(--q-primary)">
+      <span class="tw:text-sm tw:font-medium tw:text-(--q-primary)">
         Showing chunk {{ chunkInfo.currentChunk }} of {{ chunkInfo.totalChunks }}
       </span>
     </div>
@@ -173,20 +173,3 @@ const handleLoadMore = () => {
   loadNextChunk(props.fieldKey);
 };
 </script>
-
-<style scoped>
-.chunked-content {
-  display: inline-block;
-  width: 100%;
-}
-
-.load-more-container {
-  padding-top: 8px;
-  border-top: 1px solid var(--o2-border-color);
-}
-
-.load-more-btn {
-  font-size: 13px;
-  padding: 4px 8px;
-}
-</style>

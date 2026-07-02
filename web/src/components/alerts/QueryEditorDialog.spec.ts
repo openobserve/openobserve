@@ -529,8 +529,10 @@ describe("QueryEditorDialog - ODrawer Migration", () => {
     const w = await mountWithDrawerStub();
     await flushPromises();
     const drawer = w.findComponent(ODrawerStub);
-    // editor-dialog-card lives inside the drawer's default slot
-    expect(drawer.find(".editor-dialog-card").exists()).toBe(true);
+    // the dialog card lives inside the drawer's default slot
+    expect(
+      drawer.find('[data-test="query-editor-dialog-card"]').exists(),
+    ).toBe(true);
   });
 
   it("no longer renders any q-dialog wrapper (migration completed)", async () => {

@@ -452,7 +452,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["l1", "l2"]), true);
 
       const item = findByTestId(wrapper, "toc-level3-item-l3-1");
-      expect(item.classes()).toContain("hover:tw:bg-gray-700");
+      expect(item.classes()).toContain("tw:hover:bg-gray-700");
       expect(item.classes()).toContain("tw:text-gray-400");
     });
 
@@ -461,7 +461,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["l1", "l2"]), false);
 
       const item = findByTestId(wrapper, "toc-level3-item-l3-1");
-      expect(item.classes()).toContain("hover:tw:bg-blue-50");
+      expect(item.classes()).toContain("tw:hover:bg-blue-50");
       expect(item.classes()).toContain("tw:text-gray-600");
     });
   });

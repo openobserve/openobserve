@@ -177,7 +177,7 @@ describe("ErrorDetail", () => {
   describe("Event Handling", () => {
     it("emits event-emitted with error_type_click type when error type element is clicked", async () => {
       // Arrange — find the clickable error type element (has cursor-pointer title attribute)
-      const errorTypeEl = wrapper.find('[class*="error_type"]');
+      const errorTypeEl = wrapper.find('[data-test="error-detail-error-type"]');
 
       // Act
       await errorTypeEl.trigger("click");
@@ -194,7 +194,7 @@ describe("ErrorDetail", () => {
 
     it("emits event-emitted twice when error type element is clicked twice", async () => {
       // Arrange
-      const errorTypeEl = wrapper.find('[class*="error_type"]');
+      const errorTypeEl = wrapper.find('[data-test="error-detail-error-type"]');
 
       // Act
       await errorTypeEl.trigger("click");

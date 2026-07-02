@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="template-body-editor"
                 ref="queryEditorRef"
                 editor-id="template-body-editor"
-                class="monaco-editor tw:mb-3"
+                class="tw:w-full tw:min-h-[310px]! tw:rounded-[5px] tw:border tw:border-(--o2-border-color) tw:resize-y tw:overflow-auto tw:mb-3"
                 language="markdown"
                 v-model:query="formData.body"
               />
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="template-body-editor"
                 ref="queryEditorRef"
                 editor-id="template-body-editor"
-                class="monaco-editor tw:mb-3"
+                class="tw:w-full tw:min-h-[310px]! tw:rounded-[5px] tw:border tw:border-(--o2-border-color) tw:resize-y tw:overflow-auto tw:mb-3"
                 language="json"
                 v-model:query="formData.body"
               />
@@ -171,9 +171,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 data-test="add-template-sample-template-text"
-                class="add-template tw:px-2 tw:rounded"
+                class="tw:bg-black/[0.07] tw:px-2 tw:rounded"
               >
-                <pre class="example-template-body tw:my-0">
+                <pre class="tw:text-[10px] tw:my-0">
                     {{ template.body }}
                   </pre
                 >
@@ -435,22 +435,3 @@ const copyTemplateBody = (text: any) => {
   });
 };
 </script>
-<style lang="scss" scoped>
-.monaco-editor {
-  width: 100%;
-  min-height: 310px !important;
-  border-radius: 5px;
-  border: 1px solid var(--o2-border-color);
-  // padding-bottom: 14px;
-  resize: vertical;
-  overflow: auto;
-}
-
-.example-template-body {
-  font-size: 10px;
-}
-
-.add-template {
-  background: rgba(0, 0, 0, 0.07);
-}
-</style>

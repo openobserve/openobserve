@@ -19,6 +19,7 @@ use std::collections::HashMap;
 
 use config::utils::json;
 
+pub mod agent;
 pub mod evaluation;
 pub mod gen_ai_operation;
 pub mod input_output;
@@ -32,6 +33,7 @@ pub mod tool;
 pub mod usage;
 pub mod utils;
 
+pub use agent::{AgentExtractor, AgentIdentity};
 pub use evaluation::{Evaluation, EvaluationExtractor};
 pub use gen_ai_operation::{
     ScopeInfo, is_generation_or_embedding, is_llm_trace, map_to_gen_ai_operation_name,

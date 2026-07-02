@@ -51,7 +51,8 @@ fn scorer_error_response(value: ScorerError) -> Response {
         | ScorerError::ScorerTypeImmutable
         | ScorerError::ProducesScoreConfigIdImmutable
         | ScorerError::ScoreConfigVersionNotFound
-        | ScorerError::InvalidOutputSchema(_) => MetaHttpResponse::bad_request(value),
+        | ScorerError::InvalidOutputSchema(_)
+        | ScorerError::InvalidProviderConfig(_) => MetaHttpResponse::bad_request(value),
         ScorerError::DuplicateName => MetaHttpResponse::conflict(value),
         ScorerError::InUseByEvalJob => MetaHttpResponse::conflict(value),
     }
@@ -558,6 +559,7 @@ mod tests {
             (ScorerError::ScorerTypeImmutable, 400),
             (ScorerError::ProducesScoreConfigIdImmutable, 400),
             (ScorerError::InvalidOutputSchema("bad".to_string()), 400),
+            (ScorerError::InvalidProviderConfig("bad".to_string()), 400),
             (ScorerError::DuplicateName, 409),
             (ScorerError::InUseByEvalJob, 409),
         ];

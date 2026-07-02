@@ -688,10 +688,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.ingestionPage {
-  .head {
-    padding-bottom: 1rem;
-  }
-}
-</style>

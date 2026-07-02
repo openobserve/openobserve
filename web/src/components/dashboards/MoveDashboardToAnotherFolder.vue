@@ -153,12 +153,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-:deep(.flex.justify-center.items-start) {
-  align-items: center !important;
-}
-:deep(.add-folder-btn) {
-  margin-bottom: 0 !important;
-  margin-top: 30px !important;
-}
-</style>

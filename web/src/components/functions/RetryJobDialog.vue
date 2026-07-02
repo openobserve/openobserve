@@ -19,20 +19,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <Transition name="fade">
       <div
         v-if="modelValue"
-        class="retry-dialog-backdrop"
+        class="retry-dialog-backdrop tw:fixed tw:top-0 tw:left-0 tw:w-full tw:h-full tw:bg-[rgba(0,0,0,0.5)] tw:flex tw:justify-center tw:items-center tw:z-[9999]"
         @click="handleBackdropClick"
       >
         <div
-          class="retry-dialog"
+          class="retry-dialog tw:bg-white tw:dark:bg-[#1e1e1e] tw:dark:text-[var(--o2-border)] tw:rounded-lg tw:shadow-[0_4px_20px_rgba(0,0,0,0.15)] tw:w-[90%] tw:max-w-[600px] tw:max-h-[90vh] tw:flex tw:flex-col tw:overflow-hidden"
           ref="dialogRef"
           @click.stop
           role="dialog"
           aria-modal="true"
-          :class="{ 'dark-theme': store.state.theme === 'dark' }"
         >
           <!-- Header -->
-          <div class="retry-dialog-header">
-            <h3 class="retry-dialog-title">Retry Enrichment Table Job</h3>
+          <div
+            class="retry-dialog-header tw:flex tw:justify-between tw:items-center tw:py-5 tw:px-6 tw:border-b tw:border-[#eaeaea] tw:dark:border-[#3a3a3a]"
+          >
+            <h3
+              class="retry-dialog-title tw:text-lg tw:font-semibold tw:m-0 tw:text-[#333] tw:dark:text-[var(--o2-border)]"
+            >Retry Enrichment Table Job</h3>
             <OButton
               variant="ghost"
               size="icon"
@@ -43,22 +46,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Content -->
-          <div class="retry-dialog-content">
-            <div class="table-info">
-              <div class="info-row">
-                <span class="info-label">Table:</span>
-                <span class="info-value">{{ tableName }}</span>
+          <div
+            class="retry-dialog-content tw:p-6 tw:overflow-y-auto tw:flex-1"
+          >
+            <div
+              class="table-info tw:mb-5 tw:p-4 tw:bg-[#f8f9fa] tw:dark:bg-[#2a2a2a] tw:rounded-md"
+            >
+              <div
+                class="info-row tw:flex tw:mb-2 tw:last:mb-0"
+              >
+                <span class="tw:font-semibold tw:min-w-[60px] tw:text-[#666]"
+                >Table:</span>
+                <span class="tw:text-[#333] tw:break-words"
+                >{{ tableName }}</span>
               </div>
-              <div class="info-row">
-                <span class="info-label">URL:</span>
-                <span class="info-value url-text">{{ url }}</span>
+              <div
+                class="info-row tw:flex tw:mb-2 tw:last:mb-0"
+              >
+                <span class="tw:font-semibold tw:min-w-[60px] tw:text-[#666]"
+                >URL:</span>
+                <span class="tw:text-[#333] tw:break-words tw:font-mono tw:text-[13px]"
+                >{{ url }}</span>
               </div>
             </div>
 
             <!-- Range Support Warning -->
-            <div v-if="!supportsRange" class="warning-banner">
-              <OIcon name="warning" size="sm" class="warning-icon" />
-              <div class="warning-text">
+            <div
+              v-if="!supportsRange"
+              class="warning-banner tw:flex tw:gap-3 tw:p-4 tw:bg-[#fff3cd] tw:dark:bg-[#3d3516] tw:border tw:border-[#ffc107] tw:dark:border-[#a67c00] tw:rounded-md tw:mb-5"
+            >
+              <OIcon name="warning" size="sm" class="tw:text-[#ff9800] tw:shrink-0" />
+              <div
+                class="warning-text tw:flex-1"
+              >
                 <strong>Range requests not supported</strong>
                 <p>
                   This URL does not support resuming from the last position.
@@ -68,46 +88,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Retry Options (only shown if range is supported) -->
-            <div v-if="supportsRange" class="retry-options">
-              <p class="options-title">How would you like to retry?</p>
+            <div
+              v-if="supportsRange"
+              class="tw:mt-5"
+            >
+              <p
+                class="options-title tw:font-semibold tw:mb-4 tw:text-[#333] tw:dark:text-[var(--o2-border)]"
+              >How would you like to retry?</p>
 
-              <div class="option-card" :class="{ selected: !resumeFromLast }">
-                <label class="option-label">
+              <div
+                class="option-card tw:border-2 tw:border-(--o2-border) tw:dark:border-[#3a3a3a] tw:rounded-lg tw:mb-3 tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:border-[#1976d2] tw:hover:bg-[#f5f9ff] tw:dark:hover:border-[#1976d2] tw:dark:hover:bg-[#1a2332]"
+                :class="[
+                  { selected: !resumeFromLast },
+                  !resumeFromLast ? 'tw:border-[#1976d2]! tw:bg-[#e3f2fd]!' : ''
+                ]"
+              >
+                <label
+                  class="tw:block tw:p-4 tw:cursor-pointer tw:w-full"
+                >
                   <input
                     type="radio"
                     name="retryOption"
                     :value="false"
                     v-model="resumeFromLast"
-                    class="option-radio"
+                   class="tw:absolute tw:opacity-0 tw:cursor-pointer"
                   />
-                  <div class="option-content">
-                    <div class="option-header">
-                      <OIcon name="refresh" size="sm" class="option-icon" />
-                      <span class="option-name">Start from Beginning</span>
+                  <div
+                    class="tw:flex tw:flex-col tw:gap-2"
+                  >
+                    <div
+                      class="option-header tw:flex tw:items-center tw:gap-[10px] tw:font-semibold tw:text-[#333] tw:dark:text-[var(--o2-border)]"
+                    >
+                      <OIcon name="refresh" size="sm" class="tw:text-[#1976d2]" />
+                      <span class="tw:flex-1">Start from Beginning</span>
                     </div>
-                    <p class="option-description">
+                    <p
+                      class="tw:m-0 tw:text-sm tw:text-[#666] tw:leading-normal"
+                    >
                       Download the entire file from scratch. All previous progress will be discarded.
                     </p>
                   </div>
                 </label>
               </div>
 
-              <div class="option-card" :class="{ selected: resumeFromLast }">
-                <label class="option-label">
+              <div
+                class="option-card tw:border-2 tw:border-(--o2-border) tw:dark:border-[#3a3a3a] tw:rounded-lg tw:mb-3 tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:border-[#1976d2] tw:hover:bg-[#f5f9ff] tw:dark:hover:border-[#1976d2] tw:dark:hover:bg-[#1a2332]"
+                :class="[
+                  { selected: resumeFromLast },
+                  resumeFromLast ? 'tw:border-[#1976d2]! tw:bg-[#e3f2fd]!' : ''
+                ]"
+              >
+                <label
+                  class="tw:block tw:p-4 tw:cursor-pointer tw:w-full"
+                >
                   <input
                     type="radio"
                     name="retryOption"
                     :value="true"
                     v-model="resumeFromLast"
-                    class="option-radio"
+                    class="tw:absolute tw:opacity-0 tw:cursor-pointer"
                   />
-                  <div class="option-content">
-                    <div class="option-header">
-                      <OIcon name="play-arrow" size="sm" class="option-icon" />
-                      <span class="option-name">Resume from Last Position</span>
-                      <span class="recommended-badge">Recommended</span>
+                  <div
+                    class="tw:flex tw:flex-col tw:gap-2"
+                  >
+                    <div
+                      class="option-header tw:flex tw:items-center tw:gap-[10px] tw:font-semibold tw:text-[#333] tw:dark:text-[var(--o2-border)]"
+                    >
+                      <OIcon name="play-arrow" size="sm" class="tw:text-[#1976d2]" />
+                      <span class="tw:flex-1">Resume from Last Position</span>
+                      <span
+                        class="tw:bg-[#4caf50] tw:text-white tw:py-[2px] tw:px-2 tw:rounded-full tw:text-[11px] tw:font-semibold tw:uppercase"
+                      >Recommended</span>
                     </div>
-                    <p class="option-description">
+                    <p
+                      class="tw:m-0 tw:text-sm tw:text-[#666] tw:leading-normal"
+                    >
                       Continue downloading from where it stopped.
                       <span v-if="lastBytePosition > 0">
                         Already processed: {{ formatBytes(lastBytePosition) }}
@@ -120,12 +175,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Footer -->
-          <div class="retry-dialog-footer">
+          <div
+            class="retry-dialog-footer tw:py-4 tw:px-6 tw:border-t tw:border-[#eaeaea] tw:dark:border-[#3a3a3a] tw:flex tw:justify-end tw:gap-3"
+          >
             <OButton
               variant="outline"
               size="sm-action"
               @click="handleCancel"
-              class="footer-btn"
+              class="tw:min-w-[100px]"
             >
               Cancel
             </OButton>
@@ -133,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               size="sm-action"
               @click="handleConfirm"
-              class="footer-btn"
+              class="tw:min-w-[100px]"
             >
               Retry
             </OButton>
@@ -300,143 +357,11 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.retry-dialog-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 9999;
-}
-
-.retry-dialog {
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  width: 90%;
-  max-width: 600px;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.retry-dialog.dark-theme {
-  background-color: #1e1e1e;
-  color: #e0e0e0;
-}
-
-.retry-dialog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #eaeaea;
-}
-
-.dark-theme .retry-dialog-header {
-  border-bottom-color: #3a3a3a;
-}
-
-.retry-dialog-title {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0;
-  color: #333;
-}
-
-.dark-theme .retry-dialog-title {
-  color: #e0e0e0;
-}
-
-
-.retry-dialog-content {
-  padding: 24px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.table-info {
-  margin-bottom: 20px;
-  padding: 16px;
-  background-color: #f8f9fa;
-  border-radius: 6px;
-}
-
-.dark-theme .table-info {
-  background-color: #2a2a2a;
-}
-
-.info-row {
-  display: flex;
-  margin-bottom: 8px;
-}
-
-.info-row:last-child {
-  margin-bottom: 0;
-}
-
-.info-label {
-  font-weight: 600;
-  min-width: 60px;
-  color: #666;
-}
-
-.dark-theme .info-label {
-  color: #999;
-}
-
-.info-value {
-  color: #333;
-  word-break: break-word;
-}
-
-.dark-theme .info-value {
-  color: #e0e0e0;
-}
-
-.url-text {
-  font-family: monospace;
-  font-size: 13px;
-}
-
-.warning-banner {
-  display: flex;
-  gap: 12px;
-  padding: 16px;
-  background-color: #fff3cd;
-  border: 1px solid #ffc107;
-  border-radius: 6px;
-  margin-bottom: 20px;
-}
-
-.dark-theme .warning-banner {
-  background-color: #3d3516;
-  border-color: #a67c00;
-}
-
-.warning-icon {
-  color: #ff9800;
-  flex-shrink: 0;
-}
-
-.warning-text {
-  flex: 1;
-}
-
+<style>
 .warning-text strong {
   display: block;
   margin-bottom: 4px;
   color: #d68400;
-}
-
-.dark-theme .warning-text strong {
-  color: #ffb84d;
 }
 
 .warning-text p {
@@ -445,132 +370,18 @@ export default defineComponent({
   color: #856404;
 }
 
-.dark-theme .warning-text p {
+.dark .warning-text strong {
+  color: #ffb84d;
+}
+
+.dark .warning-text p {
   color: #d4a86a;
 }
 
-.retry-options {
-  margin-top: 20px;
-}
-
-.options-title {
-  font-weight: 600;
-  margin-bottom: 16px;
-  color: #333;
-}
-
-.dark-theme .options-title {
-  color: #e0e0e0;
-}
-
-.option-card {
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  transition: all 0.2s;
-  cursor: pointer;
-}
-
-.option-card:hover {
-  border-color: #1976d2;
-  background-color: #f5f9ff;
-}
-
-.dark-theme .option-card {
-  border-color: #3a3a3a;
-}
-
-.dark-theme .option-card:hover {
-  border-color: #1976d2;
+.dark .option-card.selected {
   background-color: #1a2332;
 }
 
-.option-card.selected {
-  border-color: #1976d2;
-  background-color: #e3f2fd;
-}
-
-.dark-theme .option-card.selected {
-  background-color: #1a2332;
-}
-
-.option-label {
-  display: block;
-  padding: 16px;
-  cursor: pointer;
-  width: 100%;
-}
-
-.option-radio {
-  position: absolute;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.option-content {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.option-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
-  color: #333;
-}
-
-.dark-theme .option-header {
-  color: #e0e0e0;
-}
-
-.option-icon {
-  color: #1976d2;
-}
-
-.option-name {
-  flex: 1;
-}
-
-.recommended-badge {
-  background-color: #4caf50;
-  color: white;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.option-description {
-  margin: 0;
-  font-size: 14px;
-  color: #666;
-  line-height: 1.5;
-}
-
-.dark-theme .option-description {
-  color: #999;
-}
-
-.retry-dialog-footer {
-  padding: 16px 24px;
-  border-top: 1px solid #eaeaea;
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.dark-theme .retry-dialog-footer {
-  border-top-color: #3a3a3a;
-}
-
-.footer-btn {
-  min-width: 100px;
-}
-
-/* Transition effects */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease;
@@ -581,7 +392,6 @@ export default defineComponent({
   opacity: 0;
 }
 
-/* Ensure dialog slides in when it appears */
 .fade-enter-active .retry-dialog {
   animation: slide-up 0.3s ease;
 }

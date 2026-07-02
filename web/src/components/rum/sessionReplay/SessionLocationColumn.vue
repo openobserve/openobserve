@@ -50,21 +50,3 @@ defineProps({
   },
 });
 </script>
-<style lang="scss">
-.error_type {
-  font-size: 1rem;
-  color: $info;
-}
-
-.error_description {
-  font-size: 0.875rem;
-}
-
-.error_message {
-  font-size: 0.875rem;
-}
-
-.error_time {
-  font-size: 0.75rem;
-}
-</style>

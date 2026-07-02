@@ -79,7 +79,7 @@ describe("SkeletonBox", () => {
       },
     });
 
-    expect(wrapper.find(".skeleton-text").exists()).toBe(true);
+    expect(wrapper.find(".skeleton-box").classes()).toContain("tw:rounded-[3px]");
   });
 
   it("should apply title variant class", () => {
@@ -92,7 +92,7 @@ describe("SkeletonBox", () => {
       },
     });
 
-    expect(wrapper.find(".skeleton-title").exists()).toBe(true);
+    expect(wrapper.find(".skeleton-box").classes()).toContain("tw:rounded");
   });
 
   it("should apply button variant class", () => {
@@ -105,7 +105,7 @@ describe("SkeletonBox", () => {
       },
     });
 
-    expect(wrapper.find(".skeleton-button").exists()).toBe(true);
+    expect(wrapper.find(".skeleton-box").classes()).toContain("tw:rounded-md");
   });
 
   it("should apply avatar variant class", () => {
@@ -118,7 +118,7 @@ describe("SkeletonBox", () => {
       },
     });
 
-    expect(wrapper.find(".skeleton-avatar").exists()).toBe(true);
+    expect(wrapper.find(".skeleton-box").classes()).toContain("tw:rounded-full");
   });
 
   it("should apply image variant class", () => {
@@ -131,7 +131,7 @@ describe("SkeletonBox", () => {
       },
     });
 
-    expect(wrapper.find(".skeleton-image").exists()).toBe(true);
+    expect(wrapper.find(".skeleton-box").classes()).toContain("tw:rounded-lg");
   });
 
   it("should apply rounded class when rounded prop is true", () => {
@@ -144,7 +144,7 @@ describe("SkeletonBox", () => {
       },
     });
 
-    expect(wrapper.find(".skeleton-rounded").exists()).toBe(true);
+    expect(wrapper.find(".skeleton-box").classes()).toContain("tw:rounded-lg");
   });
 
   it("should apply circle class when circle prop is true", () => {
@@ -157,7 +157,9 @@ describe("SkeletonBox", () => {
       },
     });
 
-    expect(wrapper.find(".skeleton-circle").exists()).toBe(true);
+    const skeletonBox = wrapper.find(".skeleton-box");
+    expect(skeletonBox.classes()).toContain("tw:rounded-full");
+    expect(skeletonBox.classes()).toContain("tw:aspect-square");
   });
 
   it("should apply custom border radius", () => {
@@ -268,9 +270,10 @@ describe("SkeletonBox", () => {
     });
 
     const skeletonBox = wrapper.find(".skeleton-box");
-    expect(skeletonBox.classes()).toContain("skeleton-button");
-    expect(skeletonBox.classes()).toContain("skeleton-rounded");
-    expect(skeletonBox.classes()).toContain("skeleton-circle");
+    expect(skeletonBox.classes()).toContain("tw:rounded-md");
+    expect(skeletonBox.classes()).toContain("tw:rounded-lg");
+    expect(skeletonBox.classes()).toContain("tw:rounded-full");
+    expect(skeletonBox.classes()).toContain("tw:aspect-square");
   });
 
   it("should have skeleton-wave animation class", () => {

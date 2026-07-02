@@ -69,40 +69,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Resource Details -->
         <div class="tw:mb-3">
-          <div class="tags-title tw:font-bold tw:ml-1 tw:mb-2">
+          <div class="tw:text-base tw:text-[var(--o2-text-color)] tw:font-bold tw:ml-1 tw:mb-2">
             Resource Information
           </div>
-          <div class="resource-info-grid">
-            <div class="info-row" v-if="resource.resource_type">
-              <div class="info-label">Type:</div>
-              <div class="info-value">{{ resource.resource_type }}</div>
+          <div>
+            <div class="tw:flex tw:py-2 tw:px-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]" v-if="resource.resource_type">
+              <div class="tw:w-[150px] tw:text-[var(--o2-text-secondary)] tw:font-medium tw:shrink-0">Type:</div>
+              <div class="tw:flex-1 tw:text-[var(--o2-text-color)] tw:break-words">{{ resource.resource_type }}</div>
             </div>
-            <div class="info-row" v-if="resource.resource_size">
-              <div class="info-label">Size:</div>
-              <div class="info-value">
+            <div class="tw:flex tw:py-2 tw:px-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]" v-if="resource.resource_size">
+              <div class="tw:w-[150px] tw:text-[var(--o2-text-secondary)] tw:font-medium tw:shrink-0">Size:</div>
+              <div class="tw:flex-1 tw:text-[var(--o2-text-color)] tw:break-words">
                 {{ formatBytes(resource.resource_size) }}
               </div>
             </div>
             <div
-              class="info-row"
+              class="tw:flex tw:py-2 tw:px-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
               v-if="resource.resource_render_blocking_status"
             >
-              <div class="info-label">Render Blocking:</div>
-              <div class="info-value">
+              <div class="tw:w-[150px] tw:text-[var(--o2-text-secondary)] tw:font-medium tw:shrink-0">Render Blocking:</div>
+              <div class="tw:flex-1 tw:text-[var(--o2-text-color)] tw:break-words">
                 {{ resource.resource_render_blocking_status }}
               </div>
             </div>
-            <div class="info-row" v-if="resource.session?.id">
-              <div class="info-label">Session ID:</div>
-              <div class="info-value">
-                <code class="session-id-text">{{
+            <div class="tw:flex tw:py-2 tw:px-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]" v-if="resource.session?.id">
+              <div class="tw:w-[150px] tw:text-[var(--o2-text-secondary)] tw:font-medium tw:shrink-0">Session ID:</div>
+              <div class="tw:flex-1 tw:text-[var(--o2-text-color)] tw:break-words">
+                <code
+                  data-test="resource-detail-drawer-session-id-text"
+                  class="tw:font-mono tw:text-sm tw:px-2 tw:py-1 tw:bg-(--color-surface-accent) tw:rounded tw:text-[var(--o2-text-color)]"
+                >{{
                   formatSessionId(resource.session.id)
                 }}</code>
               </div>
             </div>
-            <div class="info-row" v-if="resource.view?.url">
-              <div class="info-label">Page URL:</div>
-              <div class="info-value tw:truncate" :title="resource.view.url">
+            <div class="tw:flex tw:py-2 tw:px-3" v-if="resource.view?.url">
+              <div class="tw:w-[150px] tw:text-[var(--o2-text-secondary)] tw:font-medium tw:shrink-0">Page URL:</div>
+              <div class="tw:flex-1 tw:text-[var(--o2-text-color)] tw:truncate" :title="resource.view.url">
                 {{ resource.view.url }}
               </div>
             </div>
@@ -123,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Trace ID Notice -->
         <div
           v-else
-          class="tw:p-3 tw:text-center tw:bg-[var(--o2-hover-accent)] tw:rounded"
+          class="tw:p-3 tw:text-center tw:bg-(--color-surface-accent) tw:rounded"
         >
           <OIcon name="info" size="md" class="tw:mb-2" />
           <div class="tw:text-gray-400">
@@ -138,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Session Context -->
         <div v-if="resource.session?.id" class="tw:mt-3">
           <OSeparator class="tw:my-4" />
-          <div class="tags-title tw:font-bold tw:ml-1 tw:mb-2">
+          <div class="tw:text-base tw:text-[var(--o2-text-color)] tw:font-bold tw:ml-1 tw:mb-2">
             Session Context
           </div>
           <div class="tw:flex tw:gap-2">
@@ -288,50 +291,3 @@ defineExpose({
 });
 </script>
 
-<style lang="scss" scoped>
-.resource-detail-drawer {
-  .tags-title {
-    font-size: 1rem;
-    color: var(--o2-text-color);
-  }
-
-  .resource-info-grid {
-    .info-row {
-      display: flex;
-      padding: 0.5rem 0.75rem;
-      border-bottom: 1px solid var(--o2-border-color);
-
-      &:last-child {
-        border-bottom: none;
-      }
-
-      .info-label {
-        width: 150px;
-        color: var(--o2-text-secondary);
-        font-weight: 500;
-      }
-
-      .info-value {
-        flex: 1;
-        color: var(--o2-text-color);
-        word-break: break-word;
-      }
-    }
-  }
-
-  .session-id-text {
-    font-family: monospace;
-    font-size: 0.875rem;
-    padding: 0.25rem 0.5rem;
-    background-color: var(--o2-hover-accent);
-    border-radius: 4px;
-    color: var(--o2-text-color);
-  }
-
-  .ellipsis {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-</style>

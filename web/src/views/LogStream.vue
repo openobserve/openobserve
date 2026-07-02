@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -134,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="search"
                 :title="t('logStream.explore')"
                 data-test="log-stream-explore-btn"
+                data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
                 @click="exploreStream({ row })"
@@ -142,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="description"
                 :title="t('logStream.schemaHeader')"
                 data-test="log-stream-schema-btn"
+                data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
                 @click="listSchema({ row })"
@@ -150,6 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="delete"
                 :title="t('logStream.delete')"
                 data-test="log-stream-delete-btn"
+                data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
                 @click="confirmDeleteAction({ row })"
@@ -218,10 +221,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:w-full tw:flex tw:items-center tw:gap-2 tw:text-sm tw:text-gray-500"
         >
           <OCheckbox
-            class="checkbox-delete-associated-alerts-pipelines"
             v-model="deleteAssociatedAlertsPipelines"
           />
-          <span class="delete-associated-alerts-pipelines-text">
+          <span class="tw:text-(--o2-text-secondary) tw:text-xs tw:font-medium">
             {{ t("logStream.deleteAssociatedAlertsPipelines") }}
           </span>
         </div>
@@ -244,10 +246,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:w-full tw:flex tw:items-center tw:gap-2 tw:text-sm tw:text-gray-500"
         >
           <OCheckbox
-            class="checkbox-delete-associated-alerts-pipelines"
             v-model="deleteAssociatedAlertsPipelines"
           />
-          <span class="delete-associated-alerts-pipelines-text">
+          <span class="tw:text-(--o2-text-secondary) tw:text-xs tw:font-medium">
             Delete all Pipelines and Alerts associated with the selected streams
           </span>
         </div>
@@ -299,6 +300,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -831,6 +834,26 @@ export default defineComponent({
       streamActiveTab.value = tab;
       onChangeStreamFilter(tab);
     };
+
+
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "streamsAdd",
+        handler: () => { if (!isInputFocused()) addStream(); },
+      },
+      {
+        id: "streamsRefresh",
+        handler: () => { if (!isInputFocused()) getLogStream(true); },
+      },
+      {
+        id: "streamsFocusSearch",
+        handler: () => {
+          focusSearchInput("streams-search-stream-input");
+        },
+      },
+    ]);
     return {
       t,
       router,
@@ -879,57 +902,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped></style>
-
-<style lang="scss">
-.bottom-bar {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  align-items: center;
-}
-.delete-btn {
-  width: 10vw;
-}
-
-.confirmBodyLogStream {
-  padding: 22px 1.375rem 0;
-  font-size: 0.875rem;
-  text-align: center;
-  font-weight: 700;
-
-  .head {
-    line-height: 2.15em;
-    margin-bottom: 4px;
-  }
-
-  .para {
-    color: $light-text;
-  }
-}
-
-.delete-associated-alerts-pipelines-text {
-  color: $light-text;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.confirmActionsLogStream {
-  justify-content: center;
-  padding: 16px 22px 22px;
-  display: flex;
-}
-.checkbox-delete-associated-alerts-pipelines {
-  .q-checkbox__inner {
-    height: 28px !important;
-    min-height: 28px !important;
-    width: 28px !important;
-    min-width: 28px !important;
-  }
-  .q-checkbox__bg {
-    height: 16px !important;
-    width: 16px !important;
-  }
-}
-</style>

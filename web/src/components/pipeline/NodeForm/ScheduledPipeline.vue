@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full scheduled-pipeline-container">
+  <div class="tw:w-full tw:h-full scheduled-pipeline-container">
     <!-- <OSeparator /> -->
 
     <div class="tw:mb-2 stepper-header tw:w-full tw:flex tw:h-full">
@@ -26,13 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar (shown when hidden) -->
         <div
           v-if="collapseFields"
-          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel! tw:shrink-0 tw:cursor-pointer"
+          class="card-container tw:bg-surface-panel! tw:shrink-0 tw:cursor-pointer tw:flex tw:flex-col tw:items-center tw:justify-start tw:pt-2 tw:gap-1.5"
           style="width: 50px; height: 100%"
           data-test="scheduled-pipeline-field-list-collapsed-bar"
           @click="collapseFieldList"
         >
-          <OIcon name="expand-all" size="sm" class="field-list-collapsed-icon rotate-90" />
-          <div class="field-list-collapsed-title">{{ t("pipeline.buildQuery") }}</div>
+          <OIcon name="expand-all" size="sm" class="rotate-90 tw:mt-[10px] tw:text-[20px]" />
+          <div class="tw:[writing-mode:vertical-rl] tw:[text-orientation:mixed] tw:font-bold tw:text-[12px]">{{ t("pipeline.buildQuery") }}</div>
         </div>
 
         <OSplitter
@@ -858,9 +858,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div
                       v-if="!query && queryEditorPlaceholderFlag && expandState.query"
-                      class="query-editor-placeholder-overlay"
+                      class="query-editor-placeholder-overlay tw:absolute tw:inset-0 tw:flex tw:items-start tw:pt-0.75 tw:pl-[2.15rem] tw:pr-2 tw:pointer-events-none tw:z-1 tw:select-none"
                     >
-                      <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
+                      <span class="query-editor-placeholder-typewriter tw:[font-family:monospace] tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:dark:text-[#718096] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ editorPlaceholder }}</span>
                     </div>
                   </div>
 
@@ -945,7 +945,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                class="scheduled-pipeline-footer tw:sticky tw:bottom-0 tw:px-4 tw:py-3 tw:z-10"
+                class="tw:border-t tw:border-(--o2-border-color) tw:sticky tw:bottom-0 tw:px-4 tw:py-3 tw:z-10"
                 :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
               >
                 <div class="tw:flex tw:justify-end tw:gap-2">
@@ -2798,170 +2798,36 @@ defineExpose({
 });
 </script>
 
-<style lang="scss" scoped>
-.scheduled-pipeline-tabs {
-  padding: 0px !important;
-  height: 28px !important;
-  border: 1px solid $primary;
-  width: 200px;
-  border-radius: 4px;
+<style>
+.scheduled-pipeline-container .o-splitter__before {
   overflow: hidden;
 }
 
-.scheduled-pipeline-footer {
-  border-top: 1px solid var(--o2-border-color);
+.scheduled-pipeline-container .o-splitter__after {
+  overflow: hidden;
 }
 
-.query-editor-placeholder-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-start;
-  padding: 0.1875rem 0.5rem 0 2.15rem;
-  pointer-events: none;
-  z-index: 1;
-  user-select: none;
-
-  .query-editor-placeholder-typewriter {
-    font-family: monospace;
-    font-size: var(--text-base);
-    line-height: 1.3125rem;
-    color: #a0aec0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-
-.body--dark .query-editor-placeholder-overlay {
-  .query-editor-placeholder-typewriter {
-    color: #718096;
-  }
-}
-
-// Collapsed sidebar bar (mirrors PanelEditor pattern)
-.field-list-sidebar-header-collapsed {
-  cursor: pointer;
-  width: 50px;
+.scheduled-pipeline-container .pipeline-field-list-wrapper .index-menu,
+.scheduled-pipeline-container .pipeline-field-list-wrapper .index-table {
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  padding-top: 8px;
-  gap: 6px;
-  flex-shrink: 0;
 }
 
-.field-list-collapsed-icon {
-  margin-top: 10px;
-  font-size: 20px;
+.scheduled-pipeline-container .pipeline-field-list-wrapper .traces-field-table {
+  height: 100% !important;
 }
 
-.field-list-collapsed-title {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-weight: bold;
-  font-size: 12px;
+.scheduled-pipeline-container .scheduled-pipelines .monaco-editor {
+  width: 100%;
 }
-</style>
-<style lang="scss">
-.scheduled-pipeline-container {
+
+.scheduled-pipeline-container .scheduled-pipelines .query-editor-container {
+  width: 100% !important;
+}
+
+.o2-custom-splitter > .o-splitter__separator {
+  width: 0.625rem;
+  z-index: 999 !important;
   height: 100%;
-  .o-splitter__before {
-    overflow: hidden;
-  }
-  .o-splitter__after {
-    overflow: hidden;
-  }
-
-  // Propagate 100% height through every level of the FieldList component so the
-  // q-table fills its flex container and can scroll internally instead of
-  // overflowing the splitter pane with the traces-page viewport calculation.
-  .pipeline-field-list-wrapper {
-    .index-menu,
-    .index-table {
-      height: 100%;
-    }
-
-    .traces-field-table {
-      height: 100% !important;
-    }
-  }
-
-  .q-table__control {
-    width: 100%;
-  }
-  .q-table__top {
-    padding: 0px !important;
-  }
-  .scheduled-pipeline-tabs {
-    padding: 0px !important;
-
-    .q-tab--active {
-      background-color: $primary;
-      color: $white;
-    }
-
-    .q-tab__indicator {
-      display: none;
-    }
-
-    .q-tab {
-      min-height: 28px;
-      height: 32px;
-    }
-  }
-  .scheduled-pipelines {
-    .monaco-editor {
-      width: 100%;
-    }
-    .query-editor-container {
-      width: 100% !important;
-    }
-
-    .q-btn {
-      &.icon-dark {
-        filter: none !important;
-      }
-    }
-  }
-  .field-list-collapse-btn {
-    z-index: 11;
-    position: absolute;
-    top: -6px !important;
-    font-size: 12px !important;
-  }
-  .stream-routing-title {
-    font-size: 18px;
-    padding-top: 12px;
-  }
-}
-
-.search-button-pipeline {
-  height: 32px !important;
-  min-width: 77px;
-  line-height: 29px;
-  font-weight: bold;
-  text-transform: initial;
-  font-size: 11px;
-  color: white;
-
-  .q-btn__content {
-    background: $secondary;
-    border-radius: 3px 3px 3px 3px;
-    padding: 0px 5px;
-}
-}
-.o2-custom-splitter {
-  > .o-splitter__separator {
-    width: 0.625rem; // 10px
-    z-index: 999 !important;
-    height: 100%;
-    background: transparent;
-  }
+  background: transparent;
 }
 </style>

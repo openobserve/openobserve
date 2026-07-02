@@ -1,5 +1,5 @@
-<template>
-    <div class="filter-condition-row tw:flex tw:items-start tw:gap-1 tw:flex-no-wrap">
+﻿<template>
+    <div class="tw:flex tw:items-start tw:gap-1 tw:flex-no-wrap">
       <!-- V2: Fixed-width left column for alignment -->
       <!-- All conditions have the same width for the operator/label section -->
       <div class="tw:flex tw:items-center tw:justify-center tw:mt-1 tw:min-w-[60px]">
@@ -27,7 +27,7 @@
             data-test="alert-conditions-toggle-operator-btn"
             variant="ghost"
             size="icon-circle-sm"
-            class="tw:h-[26px] tw:flex-shrink-0 operator-toggle-btn"
+            class="tw:h-[26px] tw:flex-shrink-0 tw:text-(--o2-primary-btn-bg)! tw:hover:bg-[rgba(var(--o2-primary-btn-bg-rgb),0.1)]!"
             @click="toggleOperator"
           >
             <OIcon name="restart-alt" size="sm" />
@@ -87,7 +87,7 @@
         </div>
     </div>
   </template>
-  
+
   <script setup lang="ts">
   import OButton from '@/lib/core/Button/OButton.vue';
   import OSelect from '@/lib/forms/Select/OSelect.vue';
@@ -232,12 +232,12 @@ const toggleOperator = () => {
 
 const computedInputWidth = computed(() => {
   // If custom width is provided, use it; otherwise use default responsive width
-  return props.inputWidth || (store.state.isAiChatEnabled ? '' : 'xl:tw:min-w-[200px] lg:tw:min-w-[90px] lg:tw:w-fit');
+  return props.inputWidth || (store.state.isAiChatEnabled ? '' : 'tw:xl:min-w-[200px] tw:lg:min-w-[90px] tw:lg:w-fit');
 });
 
 const computedValueWidth = computed(() => {
   // If custom width is provided, use it; otherwise use default responsive width
-  return props.inputWidth || (store.state.isAiChatEnabled ? 'tw:w-[110px]' : 'xl:tw:min-w-[200px] lg:tw:w-fit lg:tw:min-w-[80px]');
+  return props.inputWidth || (store.state.isAiChatEnabled ? 'tw:w-[110px]' : 'tw:xl:min-w-[200px] tw:lg:w-fit tw:lg:min-w-[80px]');
 });
 
 
@@ -253,18 +253,3 @@ const filterColumns = (val: string) => {
 };
 
   </script>
-
-  <style scoped lang="scss">
-.operator-toggle-btn {
-  color: var(--o2-primary-btn-bg) !important;
-}
-
-.operator-toggle-btn:hover {
-  background-color: rgba(var(--o2-primary-btn-bg-rgb), 0.1) !important;
-}
-
-.filter-condition-row:has(.q-field--error) {
-  padding-bottom: 20px;
-}
-</style>
-  

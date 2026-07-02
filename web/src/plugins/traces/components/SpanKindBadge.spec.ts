@@ -128,35 +128,35 @@ describe("SpanKindBadge", () => {
       wrapper = mountBadge("Client");
       const badge = wrapper.find('[data-test="trace-tree-span-kind-badge-client"]');
 
-      expect(badge.classes()).toContain("span-kind-badge--client");
+      expect(badge.classes()).toContain("tw:text-(--o2-span-kind-client-text)");
     });
 
     it('should apply "span-kind-badge--server" class when kind is "Server"', () => {
       wrapper = mountBadge("Server");
       const badge = wrapper.find('[data-test="trace-tree-span-kind-badge-server"]');
 
-      expect(badge.classes()).toContain("span-kind-badge--server");
+      expect(badge.classes()).toContain("tw:text-(--o2-span-kind-server-text)");
     });
 
     it('should apply "span-kind-badge--producer" class when kind is "Producer"', () => {
       wrapper = mountBadge("Producer");
       const badge = wrapper.find('[data-test="trace-tree-span-kind-badge-producer"]');
 
-      expect(badge.classes()).toContain("span-kind-badge--producer");
+      expect(badge.classes()).toContain("tw:text-(--o2-span-kind-producer-text)");
     });
 
     it('should apply "span-kind-badge--consumer" class when kind is "Consumer"', () => {
       wrapper = mountBadge("Consumer");
       const badge = wrapper.find('[data-test="trace-tree-span-kind-badge-consumer"]');
 
-      expect(badge.classes()).toContain("span-kind-badge--consumer");
+      expect(badge.classes()).toContain("tw:text-(--o2-span-kind-consumer-text)");
     });
 
     it('should apply "span-kind-badge--internal" class when kind is "Internal"', () => {
       wrapper = mountBadge("Internal");
       const badge = wrapper.find('[data-test="trace-tree-span-kind-badge-internal"]');
 
-      expect(badge.classes()).toContain("span-kind-badge--internal");
+      expect(badge.classes()).toContain("tw:text-(--o2-span-kind-internal-text)");
     });
   });
 

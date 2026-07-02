@@ -16,9 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="preview-alert-container"
-    :class="{ 'preview-alert-container-light': store.state.theme !== 'dark' }"
     ref="chartPanelRef"
+    :class="store.state.theme !== 'dark' ? 'tw:border tw:border-[#e6e6e6]' : 'tw:border tw:border-[rgb(39,39,39)]'"
     style="
       height: 100%;
       position: relative;
@@ -1292,19 +1291,3 @@ const resizeChart = async () => {
 defineExpose({ refreshData, resizeChart, evaluationStatus });
 </script>
 
-<style scoped>
-.sql-preview {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: 5vh;
-}
-.preview-alert-container {
-  border: 1px solid rgb(39, 39, 39) !important;
-}
-.preview-alert-container-light {
-  border: 1px solid #e6e6e6 !important;
-}
-
-/* Status Bar Styles */
-</style>
