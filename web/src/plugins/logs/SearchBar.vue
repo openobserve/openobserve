@@ -1201,6 +1201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="editorContainerRef"
       class="tw:flex tw:relative query-editor-container tw:w-full tw:overflow-visible"
       :class="{ 'tw:overflow-hidden! tw:bg-[var(--o2-body-primary-bg)]! tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:[box-shadow:0_0.5rem_2rem_rgba(0,0,0,0.18)]': isFocused }"
+      :data-fullscreen="isFocused ? 'true' : 'false'"
       :style="editorFullscreenStyle"
     >
       <!-- Expand / collapse button — always top-right of the full editor area -->

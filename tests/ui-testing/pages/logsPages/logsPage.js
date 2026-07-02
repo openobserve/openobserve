@@ -303,7 +303,10 @@ export class LogsPage {
         // ===== QUERY EDITOR EXPAND/COLLAPSE SELECTORS =====
         this.queryEditorFullScreenBtn = '[data-test="logs-query-editor-full_screen-btn"]';
         this.queryEditorContainer = '.query-editor-container';
-        this.expandOnFocusClass = '.editor-fullscreen';
+        // Fullscreen state is exposed via a stable data attribute on the container
+        // (the old `.editor-fullscreen` scoped class was removed in PR #12764 in
+        // favour of inline utility classes bound to `isFocused`).
+        this.expandOnFocusClass = '[data-fullscreen="true"]';
 
         // ===== LOG DETAIL SIDEBAR SELECTORS (Bug #9724) =====
         this.logDetailDialogBox = '[data-test="log-detail-dialog"]';
@@ -4392,9 +4395,9 @@ export class LogsPage {
     }
 
     async isQueryEditorExpanded() {
-        // editor-fullscreen is added to the container itself, not a child element.
-        // Use a combined selector (.query-editor-container.editor-fullscreen) instead of
-        // container.locator('.editor-fullscreen') which would search descendants only.
+        // Fullscreen state is reflected by data-fullscreen="true" on the container itself.
+        // Use a combined selector (.query-editor-container[data-fullscreen="true"]) so we
+        // match the container node, not a descendant.
         return await this.page.locator(`${this.queryEditorContainer}${this.expandOnFocusClass}`).count() > 0;
     }
 
