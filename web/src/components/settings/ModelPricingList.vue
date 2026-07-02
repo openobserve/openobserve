@@ -262,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="!isReadOnly(row)">
               <OButton
                 :variant="
-                  row.enabled ? 'ghost-destructive' : 'ghost'
+                  row.enabled ? 'ghost-destructive' : 'ghost-success'
                 "
                 size="icon-sm"
                 :title="
