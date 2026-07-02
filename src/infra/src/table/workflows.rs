@@ -227,7 +227,7 @@ pub async fn delete_all_errors_older_than(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let _lock = get_lock().await;
 
-    // ideally this could be delete returning, but sqlite does not 
+    // ideally this could be delete returning, but sqlite does not
     // support that with seaorm, so transaction instead, which is still not
     // the same, but should be ok
     let txn = client.begin().await?;

@@ -437,6 +437,7 @@ impl ExecutablePipeline {
             node_map,
             sorted_nodes,
             function_map,
+            is_realtime: false,
             kind: PipelineKind::User,
         })
     }
@@ -821,6 +822,7 @@ impl ExecutablePipeline {
                 print_event: false, // do not print events for workflows
                 leaf_dest_stream: _leaf_dest_stream,
                 return_value_for_error: true,
+                source_stream_name: "system_workflow_trigger".to_string(),
             };
             let channels = ProcessChannels {
                 receiver: node_receiver,
