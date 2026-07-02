@@ -5,19 +5,10 @@
 // This is the "source of truth" verification layer for the RUM E2E specs.
 
 const testLogger = require('./test-logger.js');
+const { rumTestContext, basicAuthHeader } = require('./rum-env.js');
 
-function ctx() {
-  return {
-    orgId: process.env['ORGNAME'] || 'default',
-    baseUrl: process.env['ZO_BASE_URL'] || 'http://localhost:5080',
-    email: process.env['ZO_ROOT_USER_EMAIL'],
-    password: process.env['ZO_ROOT_USER_PASSWORD'],
-  };
-}
-
-function authHeader(email, password) {
-  return `Basic ${Buffer.from(`${email}:${password}`).toString('base64')}`;
-}
+const ctx = rumTestContext;
+const authHeader = basicAuthHeader;
 
 /**
  * Run a SQL search against a stream and return the hits array.

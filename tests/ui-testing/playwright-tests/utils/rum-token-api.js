@@ -3,23 +3,15 @@
 // Thin wrappers over the RUM token REST API used by the RUM E2E specs.
 //   GET  /api/{org}/rumtoken  -> read current token
 //   POST /api/{org}/rumtoken  -> create / reset token
-// Auth uses the root user's Basic auth (same pattern as rum-error-ingestion.js)
-// so it works regardless of the browser storageState.
+// Auth works regardless of the browser storageState. Credential selection,
+// org-id validation and the plain-HTTP guard live in rum-env.js — prefer a
+// dedicated least-privilege account via ZO_RUM_TEST_EMAIL/PASSWORD.
 
 const testLogger = require('./test-logger.js');
+const { rumTestContext, basicAuthHeader } = require('./rum-env.js');
 
-function ctx() {
-  return {
-    orgId: process.env['ORGNAME'] || 'default',
-    baseUrl: process.env['ZO_BASE_URL'] || 'http://localhost:5080',
-    email: process.env['ZO_ROOT_USER_EMAIL'],
-    password: process.env['ZO_ROOT_USER_PASSWORD'],
-  };
-}
-
-function authHeader(email, password) {
-  return `Basic ${Buffer.from(`${email}:${password}`).toString('base64')}`;
-}
+const ctx = rumTestContext;
+const authHeader = basicAuthHeader;
 
 function extractToken(body) {
   // GET returns { data: { rum_token } }; POST returns { data: { new_key } }.
