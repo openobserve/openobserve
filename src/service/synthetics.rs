@@ -483,10 +483,14 @@ pub async fn batch_synthetic_summary(
 
 /// Sends a check result notification to each configured alert destination.
 ///
+/// Only fires when the check did NOT pass (status != "up"). Passing runs are
+/// intentionally suppressed — operators want alerts, not confirmations.
+///
 /// Uses the destination's configured template for body rendering when present,
-/// falling back to a JSON payload. Template variables: `{{monitor_name}}`,
-/// `{{monitor_id}}`, `{{monitor_type}}`, `{{target}}`, `{{location}}`,
-/// `{{status}}`, `{{response_time_ms}}`, `{{error}}`, `{{checked_at}}`.
+/// falling back to a plain-text Slack/webhook-compatible payload. Template
+/// variables: `{{monitor_name}}`, `{{monitor_id}}`, `{{monitor_type}}`,
+/// `{{target}}`, `{{location}}`, `{{status}}`, `{{response_time_ms}}`,
+/// `{{error}}`, `{{checked_at}}`.
 #[cfg(feature = "enterprise")]
 pub async fn notify_check_result(
     org_id: &str,
@@ -501,6 +505,11 @@ pub async fn notify_check_result(
     error: Option<&str>,
     checked_at: i64,
 ) {
+    // Suppress notifications for passing runs — only alert on failure/error.
+    if status == "up" {
+        return;
+    }
+
     use config::meta::destinations::Module;
 
     let vars: &[(&str, &str)] = &[
@@ -568,28 +577,28 @@ fn render_template(body: &str, vars: &[(&str, &str)]) -> String {
     out
 }
 
+/// Default fallback payload when the destination has no template configured.
+/// Wraps in `{"text":"..."}` so Slack (and most generic webhooks) accept it
+/// without requiring a custom template. If the destination has a template,
+/// `render_template` is used instead and this function is never called.
 #[cfg(feature = "enterprise")]
 fn default_notification_payload(
     monitor_name: &str,
-    monitor_id: &str,
-    monitor_type: &str,
+    _monitor_id: &str,
+    _monitor_type: &str,
     target: &str,
     location: &str,
     status: &str,
     response_time_ms: f64,
     error: Option<&str>,
-    checked_at: i64,
+    _checked_at: i64,
 ) -> String {
-    serde_json::json!({
-        "monitor_name": monitor_name,
-        "monitor_id": monitor_id,
-        "monitor_type": monitor_type,
-        "target": target,
-        "location": location,
-        "status": status,
-        "response_time_ms": response_time_ms,
-        "error": error,
-        "checked_at": checked_at,
-    })
-    .to_string()
+    let error_line = match error {
+        Some(e) if !e.is_empty() => format!("\nError: {e}"),
+        _ => String::new(),
+    };
+    let text = format!(
+        "Synthetic monitor *{monitor_name}* [{location}] is *{status}*\nTarget: {target}\nDuration: {response_time_ms:.0} ms{error_line}"
+    );
+    serde_json::json!({ "text": text }).to_string()
 }
