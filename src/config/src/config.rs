@@ -1003,7 +1003,11 @@ pub struct Common {
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_INDEX_EXTRA_FIELDS", default = "")]
     pub feature_secondary_index_extra_fields: String,
-    #[env_config(name = "ZO_FEATURE_BLOOM_FILTER_EXTRA_FIELDS", default = "")]
+    #[env_config(
+        name = "ZO_FEATURE_BLOOM_FILTER_EXTRA_FIELDS",
+        default = "",
+        help = "Comma-separated fields to build bloom filter on for all streams, replaces the deprecated ZO_BLOOM_FILTER_DEFAULT_FIELDS"
+    )]
     pub feature_bloom_filter_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
     pub feature_distinct_extra_fields: String,
