@@ -178,7 +178,7 @@
                 />
               </OIcon>
             </span>
-            <OBadge variant="default-outline" size="sm">{{ t("onlineEvals.scoreConfig.optional") }}</OBadge>
+            <OTag type="fieldTag" value="outlinesm">{{ t("onlineEvals.scoreConfig.optional") }}</OTag>
           </div>
 
           <!-- Numeric threshold -->
@@ -291,7 +291,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import TagInput from "@/components/alerts/TagInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";

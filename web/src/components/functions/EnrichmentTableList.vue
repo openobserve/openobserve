@@ -319,14 +319,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="tw:text-sm tw:font-bold">Job {{ index + 1 }}</span>
                 <span class="tw:block tw:text-xs tw:text-muted-foreground">{{ job.url }}</span>
                 <span class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
-                  <OBadge
+                  <OTag
                     :data-test="`enrichment-url-jobs-item-${index}-status-badge`"
                     :data-test-value="job.status"
-                    dot
-                    :variant="job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : job.status === 'processing' ? 'primary' : 'default'"
-                  >
-                    {{ job.status }}
-                  </OBadge>
+                    type="enrichmentJobStatus"
+                    :value="job.status"
+                  />
                 </span>
                 <span v-if="job.status === 'completed'" class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
@@ -379,7 +377,6 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -403,7 +400,6 @@ export default defineComponent({
     OTooltip,
     OCheckbox,
     OIcon,
-    OBadge,
     OTag,
     ONumberCell,
     OTable,

@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:text-[13px] tw:font-semibold tw:mb-0.5 tw:leading-[1.25] tw:flex tw:items-center tw:gap-1.5" :class="isDark ? 'tw:text-[rgba(255,255,255,0.95)]' : 'tw:text-[rgba(0,0,0,0.87)]'">
                   {{ feature.name }}
                   <OIcon v-if="feature.link" name="open-in-new" size="xs" class="tw:opacity-60 tw:ml-1 tw:align-middle" />
-                  <span v-if="feature.beta" class="tw:inline-flex tw:items-center tw:py-px tw:px-1 tw:text-[var(--q-primary)] tw:border tw:border-[var(--q-primary)] tw:rounded-[10px] tw:text-[8px] tw:font-bold tw:[letter-spacing:0.5px] tw:leading-[1.4] tw:uppercase">BETA</span>
+                  <OTag v-if="feature.beta" type="featureFlag" value="beta" data-test="enterprise-upgrade-feature-beta-badge" />
                 </div>
                 <div class="tw:text-[11px] tw:leading-[1.25]" :class="isDark ? 'tw:text-[rgba(255,255,255,0.55)]' : 'tw:text-[rgba(0,0,0,0.55)]'">{{ feature.note }}</div>
               </div>
@@ -229,9 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div data-test="enterprise-upgrade-feature-name" class="tw:text-[13px] tw:font-semibold tw:mb-0.5 tw:leading-[1.25] tw:flex tw:items-center tw:gap-1.5" :class="isDark ? 'tw:text-[rgba(255,255,255,0.95)]' : 'tw:text-[rgba(0,0,0,0.87)]'">
                   {{ feature.name }}
                   <OIcon v-if="feature.link" name="open-in-new" size="xs" data-test="enterprise-upgrade-feature-external-link" class="tw:opacity-60 tw:ml-1 tw:align-middle" />
-                  <span v-if="feature.beta" data-test="enterprise-upgrade-feature-beta-badge" class="tw:inline-flex tw:items-center tw:py-px tw:px-1 tw:text-[var(--q-primary)] tw:border tw:border-[var(--q-primary)] tw:rounded-[10px] tw:text-[8px] tw:font-bold tw:[letter-spacing:0.5px] tw:leading-[1.4] tw:uppercase">BETA</span>
-                  <span v-if="feature.requiresHA" data-test="enterprise-upgrade-feature-ha-badge" class="tw:inline-flex tw:items-center tw:py-0.5 tw:px-[7px] tw:text-[var(--q-primary)] tw:rounded tw:text-[9px] tw:font-bold tw:[letter-spacing:0.5px] tw:leading-none tw:cursor-pointer tw:ml-1" :class="isDark ? 'tw:bg-[rgba(var(--q-primary-rgb),0.2)]' : 'tw:bg-[rgba(var(--q-primary-rgb),0.15)]'">
-                    HA
+                  <OTag v-if="feature.beta" type="featureFlag" value="beta" data-test="enterprise-upgrade-feature-beta-badge" />
+                  <span v-if="feature.requiresHA" class="tw:inline-flex">
+                    <OTag type="featureFlag" value="ha" data-test="enterprise-upgrade-feature-ha-badge" />
                     <OTooltip side="top" align="center" :sideOffset="8" :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')" />
                   </span>
                 </div>
@@ -257,6 +257,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const ChartRenderer = defineAsyncComponent(
@@ -313,6 +314,7 @@ export default defineComponent({
     ODialog,
     OSkeleton,
     OTooltip,
+    OTag,
   },
   props: {
     modelValue: {

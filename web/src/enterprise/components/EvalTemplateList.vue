@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <!-- Version column -->
           <template #cell-version="{ row }">
-            <span class="tw:inline-flex tw:items-center tw:px-2 tw:py-0.5 tw:rounded-md tw:text-[var(--text-xs)] tw:font-semibold tw:border tw:border-[var(--o2-border-color,rgba(0,0,0,0.15))] tw:text-[var(--q-color-text)] tw:bg-transparent">v{{ row.version }}</span>
+            <OTag type="fieldTag" value="soft">v{{ row.version }}</OTag>
           </template>
 
           <!-- Actions column -->
@@ -183,6 +183,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { evalTemplateService } from "@/services/eval-template.service";

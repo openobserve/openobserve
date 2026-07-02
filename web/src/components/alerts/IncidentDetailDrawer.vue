@@ -16,24 +16,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md tw:p-0" data-test="incident-detail-page">
-    <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-2.5 tw:pt-1 tw:pb-2.5">
+    <div class="tw:w-full tw:h-full tw:flex tw:flex-col">
     <!-- Header -->
-    <div class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-2.5 tw:h-[68px] tw:px-2.5 tw:-mx-2.5 tw:mb-2.5 tw:border-b tw:border-border-default">
+    <div class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-2.5 tw:h-[60px] tw:px-2.5">
       <div class="tw:flex tw:items-center tw:gap-3 tw:flex-1">
-        <div
+        <button
+          type="button"
           data-test="incident-detail-back-btn"
-          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-          "
+          class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-9.5 tw:h-9.5 tw:rounded-[0.625rem] tw:text-text-secondary tw:transition-colors tw:hover:bg-surface-subtle tw:hover:text-text-primary tw:outline-none tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset tw:cursor-pointer"
           :title="t('alerts.incidents.goBack')"
+          :aria-label="t('alerts.incidents.goBack')"
           @click="close"
         >
-          <OIcon name="arrow-back-ios-new" size="xs" />
-        </div>
+          <OIcon name="chevron-left" size="md" />
+        </button>
         <div class="tw:text-xl tw:font-semibold tw:text-text-primary">
           {{ t('alerts.incidents.incident') }}
         </div>
@@ -67,35 +63,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Status, Severity, Alerts badges — match the soft dot-badge variant
              used in the Incident list (no heavy ring/icon). -->
         <template v-if="incidentDetails && !isEditingTitle">
-          <OBadge
-            :variant="getStatusVariant(incidentDetails.status)"
-            dot
-            size="sm"
-            class="tw:cursor-default"
-          >
-            {{ getStatusLabel(incidentDetails.status) }}
-            <OTooltip :delay="200" :content="t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)" />
-          </OBadge>
+          <span class="tw:inline-flex tw:cursor-default">
+            <OTag type="incidentStatus" :value="incidentDetails.status" />
+            <OTooltip :content="t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)" />
+          </span>
 
-          <OBadge
-            :variant="getSeverityVariant(incidentDetails.severity)"
-            dot
-            size="sm"
-            class="tw:cursor-default"
-          >
-            {{ incidentDetails.severity }}
-            <OTooltip :delay="200" :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
-          </OBadge>
+          <span class="tw:inline-flex tw:cursor-default">
+            <OTag type="severity" :value="incidentDetails.severity" />
+            <OTooltip :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
+          </span>
 
-          <OBadge
-            variant="primary-soft"
-            dot
-            size="sm"
-            class="tw:cursor-default"
-          >
-            {{ triggers.length }} Alerts
-            <OTooltip :delay="200" :content="t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'" />
-          </OBadge>
+          <span class="tw:inline-flex tw:cursor-default">
+            <OTag type="countChip" value="alerts">{{ triggers.length }} Alerts</OTag>
+            <OTooltip :content="t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'" />
+          </span>
         </template>
       </div>
 
@@ -130,38 +111,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :loading="updating"
           @click="acknowledgeIncident"
-        >{{ t("alerts.incidents.acknowledge") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')" /></OButton>
+        ><OIcon name="visibility" size="sm"/>{{ t("alerts.incidents.acknowledge") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')" /></OButton>
         <OButton
           v-if="incidentDetails.status !== 'resolved'"
           variant="outline"
           size="sm"
           :loading="updating"
           @click="resolveIncident"
-        >{{ t("alerts.incidents.resolve") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsResolvedTooltip')" /></OButton>
+        ><OIcon name="task-alt" size="sm"/>{{ t("alerts.incidents.resolve") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsResolvedTooltip')" /></OButton>
         <OButton
           v-if="incidentDetails.status === 'resolved'"
           variant="outline"
           size="sm"
           :loading="updating"
           @click="reopenIncident"
-        ><OIcon name="refresh" size="sm" class="tw:mr-1" />{{ t("alerts.incidents.reopen") }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')" /></OButton>
+        ><OIcon name="refresh" size="sm"/>{{ t("alerts.incidents.reopen") }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')" /></OButton>
 
         <!-- Edit Title Button -->
         <OButton
           variant="outline"
           size="sm"
           @click="startTitleEdit"
-        >{{ t("alerts.edit") }}<OTooltip :delay="500" :content="t('alerts.incidents.editIncidentTitleTooltip')" /></OButton>
+        ><OIcon name="edit" size="sm"/>{{ t("alerts.edit") }}<OTooltip :delay="500" :content="t('alerts.incidents.editIncidentTitleTooltip')" /></OButton>
       </div>
     </div>
 
     <!-- Content -->
-    <div v-if="!loading && incidentDetails" class="card-container tw:flex tw:flex-col tw:overflow-hidden" style="height: calc(100vh - 130px);">
-      <!-- Tabs (moved to top level) -->
-      <div class="tw:flex-shrink-0 tw:px-4 tw:pt-3">
+    <div v-if="!loading && incidentDetails" class="card-container tw:flex tw:flex-col tw:overflow-hidden tw:-mt-2 tw:flex-1 tw:min-h-0">
+      <div class="tw:flex-shrink-0 tw:px-2 tw:border-b tw:border-border-default">
         <OTabs
           v-model="activeTab"
-          dense
           align="left"
           class="tw:flex-1"
           mobile-arrows
@@ -194,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #default>
               <div class="tw:flex tw:items-center tw:gap-1.5">
                 <span>{{ t('alerts.incidents.alertTriggers') }}</span>
-                <span class="tw:text-sm tw:opacity-70">({{ triggers.length }})</span>
+                <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
               </div>
             </template>
           </OTab>
@@ -628,26 +607,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Status
                     </div>
                     <div class="tw:flex tw:gap-2 tw:flex-wrap">
-                      <div
+                      <button
                         v-for="option in statusOptions"
                         :key="option.value"
+                        type="button"
                         @click="editableStatus !== option.value && handleStatusChange(option.value as 'open' | 'acknowledged' | 'resolved')"
-                        class="tw:px-3 tw:py-1.5 tw:rounded-md tw:text-xs tw:font-medium tw:transition-all tw:border"
-                        :class="editableStatus === option.value ? '' : 'tw:cursor-pointer'"
-                        :style="{
-                          backgroundColor: editableStatus === option.value
-                            ? (option.value === 'open' ? 'rgba(239, 68, 68, 0.1)' : option.value === 'acknowledged' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)')
-                            : (store.state.theme === 'dark' ? '#2A2B2C' : '#FFFFFF'),
-                          color: editableStatus === option.value
-                            ? (option.value === 'open' ? '#EF4444' : option.value === 'acknowledged' ? '#F59E0B' : '#10B981')
-                            : (store.state.theme === 'dark' ? '#E5E7EB' : '#111827'),
-                          borderColor: editableStatus === option.value
-                            ? (option.value === 'open' ? '#EF4444' : option.value === 'acknowledged' ? '#F59E0B' : '#10B981')
-                            : (store.state.theme === 'dark' ? '#444444' : '#D1D5DB')
-                        }"
+                        class="tw:rounded-full tw:outline-none"
+                        :class="editableStatus === option.value ? 'tw:cursor-default' : 'tw:cursor-pointer'"
+                        :data-test="`incident-manage-status-${option.value}`"
                       >
-                        {{ option.label }}
-                      </div>
+                        <OTag
+                          :type="editableStatus === option.value ? 'incidentStatus' : 'countChip'"
+                          :value="editableStatus === option.value ? option.value : 'neutral'"
+                          dot
+                        >{{ option.label }}</OTag>
+                      </button>
                     </div>
                   </div>
 
@@ -660,26 +634,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Severity
                     </div>
                     <div class="tw:flex tw:gap-2 tw:flex-wrap">
-                      <div
+                      <button
                         v-for="option in severityOptions"
                         :key="option.value"
+                        type="button"
                         @click="editableSeverity !== option.value && handleSeverityChange(option.value as 'P1' | 'P2' | 'P3' | 'P4')"
-                        class="tw:px-3 tw:py-1.5 tw:rounded-md tw:text-xs tw:font-medium tw:transition-all tw:border"
-                        :class="editableSeverity === option.value ? '' : 'tw:cursor-pointer'"
-                        :style="{
-                          backgroundColor: editableSeverity === option.value
-                            ? (option.value === 'P1' ? 'rgba(220, 38, 38, 0.1)' : option.value === 'P2' ? 'rgba(249, 115, 22, 0.1)' : option.value === 'P3' ? 'rgba(251, 146, 60, 0.1)' : 'rgba(59, 130, 246, 0.1)')
-                            : (store.state.theme === 'dark' ? '#2A2B2C' : '#FFFFFF'),
-                          color: editableSeverity === option.value
-                            ? (option.value === 'P1' ? '#DC2626' : option.value === 'P2' ? '#F97316' : option.value === 'P3' ? '#FB923C' : '#3B82F6')
-                            : (store.state.theme === 'dark' ? '#E5E7EB' : '#111827'),
-                          borderColor: editableSeverity === option.value
-                            ? (option.value === 'P1' ? '#DC2626' : option.value === 'P2' ? '#F97316' : option.value === 'P3' ? '#FB923C' : '#3B82F6')
-                            : (store.state.theme === 'dark' ? '#444444' : '#D1D5DB')
-                        }"
+                        class="tw:rounded-full tw:outline-none"
+                        :class="editableSeverity === option.value ? 'tw:cursor-default' : 'tw:cursor-pointer'"
+                        :data-test="`incident-manage-severity-${option.value}`"
                       >
-                        {{ option.label }}
-                      </div>
+                        <!-- Selected → semantic severity colour; unselected → neutral grey. -->
+                        <OTag
+                          :type="editableSeverity === option.value ? 'severity' : 'countChip'"
+                          :value="editableSeverity === option.value ? option.value : 'neutral'"
+                          dot
+                        >{{ option.label }}</OTag>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -892,7 +862,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="tw:space-y-2">
                       <!-- Alert Name -->
                       <div class="tw:flex tw:flex-col tw:gap-0.5">
-                        <span :class="'tw:text-text-muted'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                        <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                           Alert Name
                         </span>
                         <span :class="'tw:text-text-primary'" class="tw:text-sm tw:font-medium">
@@ -903,15 +873,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Stream Type & Name -->
                       <div class="tw:grid tw:grid-cols-2 tw:gap-2">
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-muted'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Stream Type
                           </span>
-                          <OBadge :variant="getStreamTypeVariant(alerts[selectedAlertIndex]?.stream_type)" class="tw:w-fit">
-                            <span class="tw:text-[10px]">{{ alerts[selectedAlertIndex]?.stream_type || 'N/A' }}</span>
-                          </OBadge>
+                          <OTag
+                            type="streamType"
+                            :value="alerts[selectedAlertIndex]?.stream_type || 'N/A'"
+                            class="tw:w-fit"
+                          />
                         </div>
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-muted'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Stream Name
                           </span>
                           <span :class="'tw:text-text-primary'" class="tw:text-sm tw:font-medium tw:truncate">
@@ -923,7 +895,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Threshold & Period -->
                       <div class="tw:grid tw:grid-cols-2 tw:gap-2">
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-muted'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Threshold
                           </span>
                           <span :class="'tw:text-text-primary'" class="tw:text-sm tw:font-medium">
@@ -931,7 +903,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </span>
                         </div>
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-muted'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Period
                           </span>
                           <span :class="'tw:text-text-primary'" class="tw:text-sm tw:font-medium">
@@ -943,7 +915,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Frequency & Silence -->
                       <div class="tw:grid tw:grid-cols-2 tw:gap-2">
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-muted'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Frequency
                           </span>
                           <span :class="'tw:text-text-primary'" class="tw:text-sm tw:font-medium">
@@ -951,7 +923,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </span>
                         </div>
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-muted'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Silence
                           </span>
                           <span :class="'tw:text-text-primary'" class="tw:text-sm tw:font-medium">
@@ -1194,8 +1166,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -1217,7 +1188,7 @@ export default defineComponent({
     OSpinner,
     OTooltip,
     OIcon,
-    OBadge,
+    OTag,
 },
   emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {
@@ -2184,19 +2155,6 @@ export default defineComponent({
       }
     };
 
-    const getStatusVariant = (status: string): BadgeVariant => {
-      switch (status) {
-        case "open":
-          return "error-soft";
-        case "acknowledged":
-          return "warning-soft";
-        case "resolved":
-          return "success-soft";
-        default:
-          return "default-soft";
-      }
-    };
-
     const getStatusLabel = (status: string) => {
       switch (status) {
         case "open":
@@ -2224,37 +2182,6 @@ export default defineComponent({
           return "#6b7280"; // gray-500
       }
     };
-
-    const getStreamTypeVariant = (streamType: string): BadgeVariant => {
-      switch (streamType?.toLowerCase()) {
-        case "logs":
-          return "info-outline";
-        case "metrics":
-          return "purple-outline";
-        case "traces":
-          return "success-outline";
-        case "rum":
-          return "warning-outline";
-        default:
-          return "primary-outline";
-      }
-    };
-
-    const getSeverityVariant = (severity: string): BadgeVariant => {
-      switch (severity) {
-        case "P1":
-          return "error-soft";
-        case "P2":
-          return "warning-soft";
-        case "P3":
-          return "warning-soft";
-        case "P4":
-          return "default-soft";
-        default:
-          return "default-soft";
-      }
-    };
-
 
     const formatPeriod = (periodInSeconds: number | undefined) => {
       if (!periodInSeconds) return 'N/A';
@@ -2927,11 +2854,8 @@ export default defineComponent({
       handleStatusChange,
       handleSeverityChange,
       handleTriggerRowClick,
-      getStatusVariant,
       getStatusLabel,
       getSeverityColorHex,
-      getSeverityVariant,
-      getStreamTypeVariant,
       formatPeriod,
       formatCustomConditions,
       formatTimestamp,

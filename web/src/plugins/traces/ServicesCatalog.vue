@@ -240,13 +240,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Status badge -->
         <template #cell-status="{ item }">
-          <span
-            class="tw:rounded tw:py-[0.125rem] tw:inline-flex tw:items-center tw:w-fit tw:text-[0.75rem] tw:font-semibold"
-            :class="statusBadgeClass(item.status)"
+          <OTag
+            type="serviceStatus"
+            :value="item.status"
             :data-test="`services-catalog-status-${item.service_name}`"
           >
             {{ t(`traces.servicesCatalog.status.${item.status}`) }}
-          </span>
+          </OTag>
         </template>
 
         <!-- Service name via TraceServiceCell -->
@@ -394,6 +394,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 
 const { t } = useI18n();

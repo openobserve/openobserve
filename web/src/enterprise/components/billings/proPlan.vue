@@ -23,13 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("billing.proPlanSubtitle") }}
         </p>
       </div>
-      <OBadge
+      <OTag
         v-if="planType == planName"
-        variant="primary-soft"
-        class="tw:mt-2 tw:text-xs tw:px-2 tw:py-3"
-      >
-        {{ t("billing.subscribed") }}
-      </OBadge>
+        type="billingTag"
+        value="subscribed"
+        class="tw:mt-2"
+      />
     </div>
 
     <OSeparator class="tw:my-2" />
@@ -87,13 +86,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex tw:justify-between tw:p-3">
       <!-- AWS Marketplace billing - show managed externally message -->
       <div v-if="billingProvider === 'aws'" class="tw:w-full tw:text-center">
-        <OBadge
-          variant="success-soft"
-          class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1"
+        <OTag
+          type="billingManagement"
+          value="aws"
+          class="tw:inline-flex tw:items-center tw:gap-1"
         >
-          <OIcon name="check-circle" size="xs" />
-          Managed via AWS Marketplace
-        </OBadge>
+          <template #icon>
+            <OIcon name="check-circle" size="xs" />
+          </template>
+        </OTag>
         <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
           Billing is handled through your AWS account
         </div>
@@ -102,13 +103,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="billingProvider === 'azure'"
         class="tw:w-full tw:text-center"
       >
-        <OBadge
-          variant="success-soft"
-          class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1"
+        <OTag
+          type="billingManagement"
+          value="azure"
+          class="tw:inline-flex tw:items-center tw:gap-1"
         >
-          <OIcon name="check-circle" size="xs" />
-          Managed via Azure Marketplace
-        </OBadge>
+          <template #icon>
+            <OIcon name="check-circle" size="xs" />
+          </template>
+        </OTag>
         <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
           Billing is handled through your Azure account
         </div>
@@ -118,10 +121,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="subscriptionType === 'external-contract'"
         class="tw:w-full tw:text-center"
       >
-        <OBadge variant="default" class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1">
-          <OIcon name="description" size="xs" />
-          Managed via contract
-        </OBadge>
+        <OTag
+          type="billingManagement"
+          value="contract"
+          class="tw:inline-flex tw:items-center tw:gap-1"
+        >
+          <template #icon>
+            <OIcon name="description" size="xs" />
+          </template>
+        </OTag>
         <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
           Billing is handled through your contract — contact your account
           manager for changes
@@ -154,14 +162,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 
 export default defineComponent({
   name: "proPlan",
-  components: { OSeparator, OButton, OBadge, OIcon, OCard },
+  components: { OSeparator, OButton, OTag, OIcon, OCard },
   props: [
     "planType",
     "billingProvider",

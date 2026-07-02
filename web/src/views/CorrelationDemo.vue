@@ -75,12 +75,12 @@
 
             <div class="tw:text-sm tw:font-medium tw:mb-2">Current Status:</div>
             <div>
-              <OBadge v-if="isServiceStreamsEnabled" variant="success">
+              <OTag v-if="isServiceStreamsEnabled" type="featureStatus" value="enabled">
                 Service Streams: Enabled
-              </OBadge>
-              <OBadge v-else variant="error">
+              </OTag>
+              <OTag v-else type="featureStatus" value="disabled">
                 Service Streams: Disabled
-              </OBadge>
+              </OTag>
             </div>
             <div class="tw:mt-1 tw:text-xs tw:text-gray-400">
               Note: This is a demo using simulated data. In production,
@@ -138,7 +138,7 @@ import TelemetryCorrelationPanel from "@/components/TelemetryCorrelationPanel.vu
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
