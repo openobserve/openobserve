@@ -100,31 +100,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-scope="{ row }">
             <div class="tw:flex tw:items-center">
-              <OBadge
-                variant="primary-soft"
-                class="tw:ring-1 tw:ring-inset tw:ring-current"
-                size="sm"
+              <OTag
+                type="variableScope"
+                value="global"
                 data-test="dashboard-variable-scope-badge"
                 v-if="getScopeType(row) === 'global'"
-              >
-                Global
-              </OBadge>
-              <OBadge
-                variant="primary-outline"
-                size="sm"
+              />
+              <OTag
+                type="variableScope"
+                value="tabs"
                 data-test="dashboard-variable-scope-badge"
                 v-else-if="getScopeType(row) === 'tabs'"
               >
                 {{ row.tabs?.length || 0 }} Tabs
-              </OBadge>
-              <OBadge
-                variant="primary-outline"
-                size="sm"
+              </OTag>
+              <OTag
+                type="variableScope"
+                value="panels"
                 data-test="dashboard-variable-scope-badge"
                 v-else-if="getScopeType(row) === 'panels'"
               >
                 {{ row.panels?.length || 0 }} Panels
-              </OBadge>
+              </OTag>
 
               <OTooltip
                 v-if="getScopeType(row) === 'tabs' && row.tabs?.length"
@@ -223,7 +220,7 @@ import useNotifications from "@/composables/useNotifications";
 import Sortable from "sortablejs";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
@@ -242,7 +239,7 @@ export default defineComponent({
     OButton,
     OIcon,
     ODialog,
-    OBadge,
+    OTag,
     OTooltip,
     OTable,
   },

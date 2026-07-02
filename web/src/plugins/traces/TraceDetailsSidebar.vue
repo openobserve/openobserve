@@ -39,12 +39,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </span>
         <!-- Observation Type Badge (for LLM spans) -->
-        <OBadge
+        <OTag
           v-if="isLLMSpan"
-          :variant="getObservationTypeVariant(span.gen_ai_operation_name)"
+          type="observationType"
+          :value="span.gen_ai_operation_name"
           class="tw:mr-1 tw:normal-case!"
           data-test="trace-details-sidebar-observation-badge"
-        >{{ span.gen_ai_operation_name?.charAt(0) + span.gen_ai_operation_name?.slice(1).toLowerCase() }}</OBadge>
+        >{{ span.gen_ai_operation_name?.charAt(0) + span.gen_ai_operation_name?.slice(1).toLowerCase() }}</OTag>
 
         <span class="tw:truncate">{{ span.operation_name }}</span>
       </div>
@@ -69,8 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="tw:flex tw:items-center" style="flex-wrap: nowrap">
           <!-- Service Badge -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             class="toolbar-chip service-chip tw:mr-[0.325rem]"
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
@@ -90,11 +91,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ span.service_name }}
             </span>
-          </OBadge>
+          </OTag>
 
           <!-- Duration Badge -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             class="toolbar-chip duration-chip tw:mr-[0.325rem]"
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
@@ -102,12 +103,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon><OIcon name="schedule" size="xs" /></template>
             <span class="chip-label">Duration</span>
             <span class="chip-value">{{ getDuration }}</span>
-          </OBadge>
+          </OTag>
 
           <!-- TTFT Badge -->
-          <OBadge
+          <OTag
             v-if="getTTFT"
-            size="sm"
+            type="metricChip"
             class="toolbar-chip ttft-chip tw:mr-[0.325rem]"
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
@@ -115,11 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon><OIcon name="speed" size="xs" /></template>
             <span class="chip-label">TTFT</span>
             <span class="chip-value">{{ getTTFT }}</span>
-          </OBadge>
+          </OTag>
 
           <!-- Start Time Badge -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             class="toolbar-chip time-chip tw:mr-[0.325rem]"
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
@@ -127,12 +128,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon><OIcon name="access-time" size="xs" /></template>
             <span class="chip-label">Start</span>
             <span class="chip-value">{{ getStartTime }}</span>
-          </OBadge>
+          </OTag>
 
           <!-- Resend Count Badge -->
-          <OBadge
+          <OTag
             v-if="spanHttpResendCount"
-            size="sm"
+            type="metricChip"
             class="toolbar-chip resend-chip tw:mr-[0.325rem]"
             :title="`Request resent ${spanHttpResendCount} time(s)`"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
@@ -140,13 +141,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon><OIcon name="replay" size="xs" /></template>
             <span class="chip-label">Resends</span>
             <span class="chip-value">{{ spanHttpResendCount }}</span>
-          </OBadge>
+          </OTag>
         </div>
 
         <div class="tw:flex tw:items-center">
           <!-- Span ID Badge -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             clickable
             class="toolbar-chip span-id-chip tw:mr-[0.325rem]"
             :title="`Span ID: ${span.span_id}`"
@@ -161,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:ml-1 copy-icon"
               data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
             />
-          </OBadge>
+          </OTag>
 
           <!-- View Logs Button -->
           <span v-if="parentMode === 'standalone'" class="tw:shrink-0">
@@ -199,43 +200,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="tw:flex tw:items-center" style="flex-wrap: nowrap">
           <!-- Model Chip -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             icon="psychology"
             class="llm-chip model-chip"
             :title="span.gen_ai_response_model"
           >
             <span class="chip-value tw:font-bold">{{ span.gen_ai_response_model }}</span>
-          </OBadge>
+          </OTag>
 
           <!-- Token Usage Group -->
           <div class="tokens-group">
             <!-- Input Tokens -->
-            <OBadge
-              size="sm"
+            <OTag
+              type="metricChip"
               class="llm-chip token-chip input-token-chip"
               title="Input Tokens"
             >
               <template #icon><OIcon name="arrow-upward" size="xs" /></template>
               <span class="chip-label">In</span>
               <span class="chip-value">{{ llmMetrics.usage.input }}</span>
-            </OBadge>
+            </OTag>
 
             <!-- Output Tokens -->
-            <OBadge
-              size="sm"
+            <OTag
+              type="metricChip"
               class="llm-chip token-chip output-token-chip"
               title="Output Tokens"
             >
               <template #icon><OIcon name="arrow-downward" size="xs" /></template>
               <span class="chip-label">Out</span>
               <span class="chip-value">{{ llmMetrics.usage.output }}</span>
-            </OBadge>
+            </OTag>
           </div>
 
           <!-- Cost Chip -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             icon="attach-money"
             class="llm-chip cost-chip"
             title="Total Cost"
@@ -243,16 +244,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="chip-value tw:font-bold"
               >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
             >
-          </OBadge>
+          </OTag>
         </div>
 
         <div class="tw:flex tw:items-center">
           <!-- Provider Badge -->
-          <OBadge
+          <OTag
             v-if="span.gen_ai_provider_name"
-            variant="primary"
+            type="metricChip"
             class="provider-badge"
-          >{{ span.gen_ai_provider_name }}</OBadge>
+          >{{ span.gen_ai_provider_name }}</OTag>
         </div>
       </div>
     </div>
@@ -289,13 +290,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:font-normal! tw:gap-1!"
         >
           {{ t('common.error') }}
-          <OBadge
+          <OTag
             v-if="hasExceptionEvents.length"
-            variant="error"
-            size="sm"
-            class="tw:font-normal! tw:text-[10px]!  tw:ml-0 tw:text-[var(--o2-error-tag-text)]! tw:bg-[var(--o2-error-tag-bg)]! tw:rounded!"
+            type="countChip"
+            value="error"
+            class="tw:ml-0"
             data-test="trace-details-sidebar-tabs-error-count"
-          >{{ hasExceptionEvents.length }}</OBadge>
+          >{{ hasExceptionEvents.length }}</OTag>
         </OTab>
         <OTab
           v-if="hasDbSpan"
@@ -935,9 +936,8 @@ import TraceErrorTab from "./components/TraceErrorTab.vue";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
 import {
@@ -1017,7 +1017,7 @@ export default defineComponent({
     TraceErrorTab,
     OSpinner,
     OSwitch,
-    OBadge,
+    OTag,
   },
   emits: [
     "close",
@@ -2109,25 +2109,6 @@ export default defineComponent({
       copyContent,
       formatModelParams,
       getObservationTypeColor,
-      getObservationTypeVariant: (type: string | null | undefined): BadgeVariant => {
-        const color = getObservationTypeColor(type);
-        const map: Record<string, BadgeVariant> = {
-          green: "success",
-          blue: "primary",
-          purple: "primary",
-          orange: "warning",
-          indigo: "primary",
-          cyan: "primary",
-          teal: "primary",
-          pink: "primary",
-          "deep-purple": "primary",
-          "light-blue": "primary",
-          red: "error",
-          grey: "default",
-          amber: "warning",
-        };
-        return map[color] || "default";
-      },
       hasContent,
       sysInstrOpen,
       modelParamsOpen,

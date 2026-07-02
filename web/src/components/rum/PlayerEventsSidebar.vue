@@ -94,14 +94,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:mr-3 tw:inline" data-test="event-display-time">
                 {{ filteredEvent.displayTime }}
               </div>
-              <OBadge
-                :variant="filteredEvent.type === 'error' ? 'error' : 'default'"
-                size="sm"
+              <OTag
+                type="rumEventType"
+                :value="filteredEvent.type"
                 class="tw:mr-3"
                 data-test="event-type-badge"
-              >
-                {{ filteredEvent.type }}
-              </OBadge>
+              />
               <template
                 v-if="
                   filteredEvent.frustration_types &&
@@ -138,7 +136,7 @@ import { useI18n } from "vue-i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import PlayerTracesTab from "./PlayerTracesTab.vue";
 
 const { t } = useI18n();

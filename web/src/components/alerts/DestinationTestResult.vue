@@ -29,9 +29,9 @@ limitations under the License. -->
         </div>
         <div data-test="test-success-timestamp" class="tw:text-[11px] tw:text-(--q-text-secondary) tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
           {{ formatTimestamp(result.timestamp) }}
-          <span v-if="result.statusCode" class="tw:inline-block tw:py-[2px] tw:px-[6px] tw:rounded-[3px] tw:text-[10px] tw:font-semibold tw:font-['Monaco','Consolas','Courier_New',monospace] tw:tracking-[0.3px] tw:bg-(--q-positive) tw:text-white">
+          <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
-          </span>
+          </OTag>
           <span v-if="result.responseTime" class="tw:font-['Monaco','Consolas','Courier_New',monospace] tw:text-(--q-text-secondary)">
             {{ result.responseTime }}ms
           </span>
@@ -54,9 +54,9 @@ limitations under the License. -->
         </div>
         <div v-if="result.timestamp" data-test="test-failure-timestamp" class="tw:text-[11px] tw:text-(--q-text-secondary) tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
           {{ formatTimestamp(result.timestamp) }}
-          <span v-if="result.statusCode" class="tw:inline-block tw:py-[2px] tw:px-[6px] tw:rounded-[3px] tw:text-[10px] tw:font-semibold tw:font-['Monaco','Consolas','Courier_New',monospace] tw:tracking-[0.3px] tw:bg-(--q-negative) tw:text-white">
+          <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
-          </span>
+          </OTag>
           <span v-if="result.responseTime" class="tw:font-['Monaco','Consolas','Courier_New',monospace] tw:text-(--q-text-secondary)">
             {{ result.responseTime }}ms
           </span>
@@ -157,6 +157,8 @@ import type { TestResult } from '@/utils/prebuilt-templates/types';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { httpStatusBucket } from "@/lib/core/Badge/badgeGroups";
 import { ref } from 'vue';
 
 // Define component props
