@@ -261,7 +261,6 @@ use crate::{common::meta, handler::http::request};
         request::synthetics::run_synthetic_now,
         request::synthetics::list_locations,
         request::synthetics::list_results,
-        request::synthetics::get_result,
         request::synthetics::get_artifact_url,
         request::synthetics::get_summary,
         request::synthetics::job_resolve,

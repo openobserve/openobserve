@@ -75,6 +75,18 @@ pub struct MoveSyntheticsRequestBody {
 
 // ── Results API ───────────────────────────────────────────────────────────────
 
+pub async fn get_artifacts(Path((org_id, id, job_id)): Path<(String, String, String)>) -> Response {
+    match crate::service::synthetics::get_artifacts(&org_id, &id, &job_id).await {
+        Ok(Some(r)) => MetaHttpResponse::json(r),
+        Ok(None) => MetaHttpResponse::not_found("artifacts not found"),
+        Err(e) => {
+            tracing::error!("[synthetics] get_artifacts: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
+        }
+    }
+}
+
 #[utoipa::path(
     get,
     path = "/{org_id}/synthetics/{id}/results",
@@ -105,37 +117,6 @@ pub async fn list_results(
         Ok(resp) => MetaHttpResponse::json(resp),
         Err(e) => {
             tracing::error!("[synthetics] list_results: {e}");
-            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                .into_response()
-        }
-    }
-}
-
-#[utoipa::path(
-    get,
-    path = "/{org_id}/synthetics/{id}/results/{job_id}",
-    context_path = "/api",
-    tag = "Synthetics",
-    operation_id = "GetSyntheticsResult",
-    summary = "Get a single check result",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("id" = String, Path, description = "Monitor ID"),
-        ("job_id" = i64, Path, description = "Job ID"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 404, description = "Not found"),
-        (status = 500, description = "Error",   content_type = "application/json", body = Object),
-    ),
-)]
-pub async fn get_result(Path((org_id, id, job_id)): Path<(String, String, String)>) -> Response {
-    match crate::service::synthetics::get_result(&org_id, &id, &job_id).await {
-        Ok(Some(r)) => MetaHttpResponse::json(r),
-        Ok(None) => MetaHttpResponse::not_found("result not found"),
-        Err(e) => {
-            tracing::error!("[synthetics] get_result: {e}");
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                 .into_response()
         }
@@ -196,35 +177,21 @@ pub async fn get_artifact_url(
         }
     };
 
-    if config::is_local_disk_storage() {
-        // serve file bytes directly
-        match infra::storage::get_bytes("default", &key).await {
-            Ok(bytes) => {
-                let content_type = if query.artifact_type == "screenshot" {
-                    "image/png"
-                } else {
-                    "application/zip"
-                };
-                (
-                    StatusCode::OK,
-                    [(axum::http::header::CONTENT_TYPE, content_type)],
-                    bytes,
-                )
-                    .into_response()
-            }
-            Err(e) => {
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
-        }
+    let content_type = if query.artifact_type == "screenshot" {
+        "image/png"
     } else {
-        let expires = std::time::Duration::from_secs(5 * 60);
-        match infra::storage::presign_url(&key, reqwest::Method::GET, expires).await {
-            Ok(url) => axum::response::Redirect::temporary(url.as_str()).into_response(),
-            Err(e) => {
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+        "application/zip"
+    };
+    match infra::storage::get_bytes("default", &key).await {
+        Ok(bytes) => (
+            StatusCode::OK,
+            [(axum::http::header::CONTENT_TYPE, content_type)],
+            bytes,
+        )
+            .into_response(),
+        Err(e) => {
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
         }
     }
 }

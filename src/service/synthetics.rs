@@ -73,11 +73,7 @@ fn parse_result(h: &serde_json::Value) -> Option<CheckResult> {
         job_id: h.get("job_id")?.as_str()?.to_string(),
         synthetics_id: h.get("synthetics_id")?.as_str()?.to_string(),
         location: h.get("location")?.as_str()?.to_string(),
-        pool: h
-            .get("pool")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
+        pool: String::new(),
         status: match h.get("status").and_then(|v| v.as_str()).unwrap_or("error") {
             "up" => CheckStatus::Up,
             "warning" => CheckStatus::Warning,
@@ -114,7 +110,13 @@ fn parse_result(h: &serde_json::Value) -> Option<CheckResult> {
         checked_at: h.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
         screenshot_refs: h
             .get("screenshot_refs")
-            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .and_then(|v| {
+                if v.is_array() {
+                    serde_json::from_value(v.clone()).ok()
+                } else {
+                    v.as_str().and_then(|s| serde_json::from_str(s).ok())
+                }
+            })
             .unwrap_or_default(),
         trace_ref: h
             .get("trace_ref")
@@ -134,6 +136,73 @@ fn safe_ident(s: &str) -> String {
         .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
         .take(128)
         .collect()
+}
+
+#[derive(serde::Serialize)]
+pub struct ScreenshotArtifact {
+    pub step_id: String,
+    pub url: String,
+}
+
+#[derive(serde::Serialize)]
+pub struct ArtifactsResponse {
+    pub screenshots: Vec<ScreenshotArtifact>,
+    pub trace: Option<String>,
+}
+
+pub async fn get_artifacts(
+    org_id: &str,
+    synthetics_id: &str,
+    job_id: &str,
+) -> anyhow::Result<Option<ArtifactsResponse>> {
+    let now = config::utils::time::now_micros();
+    let start_time = now - 90 * ONE_DAY_US;
+    let sid = safe_ident(synthetics_id);
+    let jid = safe_ident(job_id);
+    let sql = format!(
+        "SELECT screenshot_refs, trace_ref FROM \"{STREAM}\" \
+         WHERE _timestamp >= {start_time} AND _timestamp <= {now} \
+           AND synthetics_id = '{sid}' AND job_id = '{jid}' LIMIT 1"
+    );
+    let req = build_req(sql, start_time, now, 1, 0);
+    let resp = run_search(org_id, &req).await?;
+    let Some(hit) = resp.hits.first() else {
+        return Ok(None);
+    };
+
+    let screenshot_refs: Vec<ScreenshotRef> = hit
+        .get("screenshot_refs")
+        .and_then(|v| {
+            if v.is_array() {
+                serde_json::from_value(v.clone()).ok()
+            } else {
+                v.as_str().and_then(|s| serde_json::from_str(s).ok())
+            }
+        })
+        .unwrap_or_default();
+
+    let has_trace = hit
+        .get("trace_ref")
+        .and_then(|v| v.as_str())
+        .is_some_and(|s| !s.is_empty());
+
+    let screenshots = screenshot_refs
+        .into_iter()
+        .map(|r| ScreenshotArtifact {
+            url: format!(
+                "/api/{org_id}/synthetics/{synthetics_id}/results/{job_id}/artifact\
+                 ?type=screenshot&step={}",
+                r.step_id
+            ),
+            step_id: r.step_id,
+        })
+        .collect();
+
+    let trace = has_trace.then(|| {
+        format!("/api/{org_id}/synthetics/{synthetics_id}/results/{job_id}/artifact?type=trace")
+    });
+
+    Ok(Some(ArtifactsResponse { screenshots, trace }))
 }
 
 pub async fn get_artifact_key(
@@ -169,7 +238,13 @@ pub async fn get_artifact_key(
             };
             let refs: Vec<ScreenshotRef> = hit
                 .get("screenshot_refs")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .and_then(|v| {
+                    if v.is_array() {
+                        serde_json::from_value(v.clone()).ok()
+                    } else {
+                        v.as_str().and_then(|s| serde_json::from_str(s).ok())
+                    }
+                })
                 .unwrap_or_default();
             Ok(refs.into_iter().find(|r| r.step_id == step).map(|r| r.key))
         }
@@ -200,7 +275,7 @@ pub async fn list_results(
 
     let mid = safe_ident(monitor_id);
     let sql = format!(
-        "SELECT job_id, synthetics_id, location, pool, status, response_time_ms, \
+        "SELECT job_id, synthetics_id, location, status, response_time_ms, \
                 error, browser_engine, device, _timestamp, screenshot_refs, trace_ref \
          FROM \"{STREAM}\" \
          WHERE _timestamp >= {start_time} AND _timestamp <= {end_time} \
@@ -220,29 +295,6 @@ pub async fn list_results(
         total: resp.total as i64,
         results: resp.hits.iter().filter_map(parse_result).collect(),
     })
-}
-
-pub async fn get_result(
-    org_id: &str,
-    monitor_id: &str,
-    job_id: &str,
-) -> anyhow::Result<Option<CheckResult>> {
-    let now = config::utils::time::now_micros();
-    let start_time = now - 90 * ONE_DAY_US;
-
-    let mid = safe_ident(monitor_id);
-    let jid = safe_ident(job_id);
-    let sql = format!(
-        "SELECT job_id, synthetics_id, location, pool, status, response_time_ms, \
-                error, browser_engine, device, _timestamp, screenshot_refs, trace_ref \
-         FROM \"{STREAM}\" \
-         WHERE _timestamp >= {start_time} AND _timestamp <= {now} \
-           AND synthetics_id = '{mid}' AND job_id = '{jid}'"
-    );
-
-    let req = build_req(sql, start_time, now, 1, 0);
-    let resp = run_search(org_id, &req).await?;
-    Ok(resp.hits.first().and_then(parse_result))
 }
 
 pub async fn get_summary(
@@ -274,7 +326,7 @@ pub async fn get_summary(
                 COUNT(*) as total \
          FROM \"{STREAM}\" \
          WHERE _timestamp >= {bucket_start} AND _timestamp <= {end_time} \
-           AND monitor_id = '{mid}' \
+           AND synthetics_id = '{mid}' \
          GROUP BY hour_bucket \
          ORDER BY hour_bucket"
     );
@@ -283,7 +335,7 @@ pub async fn get_summary(
         "SELECT status, response_time_ms, _timestamp \
          FROM \"{STREAM}\" \
          WHERE _timestamp >= {start_time} AND _timestamp <= {end_time} \
-           AND monitor_id = '{mid}' \
+           AND synthetics_id = '{mid}' \
          ORDER BY _timestamp DESC"
     );
 

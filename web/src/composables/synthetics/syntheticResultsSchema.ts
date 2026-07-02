@@ -68,6 +68,11 @@ export interface SyntheticKpi {
   lastRunAt: number | null;
 }
 
+export interface ScreenshotRef {
+  step_id: string;
+  key: string;
+}
+
 export interface SyntheticRun {
   /** Run timestamp, milliseconds epoch. */
   timestamp: number;
@@ -79,6 +84,9 @@ export interface SyntheticRun {
   error: string;
   /** KSUID job identifier — used to fetch run detail and artifacts. */
   jobId: string;
+  browserEngine: string;
+  screenshotRefs: ScreenshotRef[];
+  traceRef: string | null;
 }
 
 export interface SyntheticBucket {
@@ -204,7 +212,7 @@ ORDER BY ts`;
 /** Most-recent runs for the Runs table. */
 export function buildRunsSql(monitorId: string, limit: number): string {
   const id = escapeSqlLiteral(monitorId);
-  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.error} as error, job_id
+  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.error} as error, job_id, browser_engine, screenshot_refs, trace_ref
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'
 ORDER BY ${F.timestamp} DESC
@@ -232,6 +240,16 @@ export function mapKpi(
   };
 }
 
+/** Parse screenshot_refs from a JSON string or array (OO stores it as a JSON string). */
+function parseScreenshotRefs(raw: unknown): ScreenshotRef[] {
+  if (!raw) return [];
+  if (typeof raw === "string") {
+    try { return JSON.parse(raw) as ScreenshotRef[]; } catch { return []; }
+  }
+  if (Array.isArray(raw)) return raw as ScreenshotRef[];
+  return [];
+}
+
 /** Map one runs-table hit to the typed model. */
 export function mapRun(rawHit: Record<string, unknown>): SyntheticRun {
   return {
@@ -242,6 +260,9 @@ export function mapRun(rawHit: Record<string, unknown>): SyntheticRun {
     device: str(rawHit.device),
     error: str(rawHit.error),
     jobId: str(rawHit.job_id),
+    browserEngine: str(rawHit.browser_engine),
+    screenshotRefs: parseScreenshotRefs(rawHit.screenshot_refs),
+    traceRef: rawHit.trace_ref ? str(rawHit.trace_ref) : null,
   };
 }
 

@@ -246,6 +246,9 @@ interface RunRow {
   device: string;
   error: string;
   jobId: string;
+  browserEngine: string;
+  screenshotRefs: { step_id: string; key: string }[];
+  traceRef: string | null;
 }
 
 const runRows = computed<RunRow[]>(() =>
@@ -255,7 +258,7 @@ const runRows = computed<RunRow[]>(() =>
 // ── Run detail drawer ─────────────────────────────────────────────────────
 const drawerOpen = ref(false);
 const selectedRun = ref<{
-  job_id: string; synthetics_id: string; location: string; pool: string;
+  job_id: string; synthetics_id: string; location: string;
   status: "up" | "warning" | "down" | "error"; response_time_ms: number;
   error?: string; browser_engine?: string; device?: string;
   checked_at: number; screenshot_refs: { step_id: string; key: string }[]; trace_ref?: string;
@@ -266,14 +269,14 @@ function openRunDetail(row: RunRow) {
     job_id: row.jobId,
     synthetics_id: props.monitorId,
     location: row.location,
-    pool: "",
     status: row.status === "passed" ? "up" : "down",
     response_time_ms: row.durationMs,
     error: row.error || undefined,
+    browser_engine: row.browserEngine || undefined,
     device: row.device || undefined,
     checked_at: row.timestamp * 1000,
-    screenshot_refs: [],
-    trace_ref: undefined,
+    screenshot_refs: row.screenshotRefs,
+    trace_ref: row.traceRef ?? undefined,
   };
   drawerOpen.value = true;
 }

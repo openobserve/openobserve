@@ -45,8 +45,8 @@ const syntheticsService = {
   results: (orgIdentifier: string, id: string, params?: Record<string, string | number>) =>
     http().get(`/api/${orgIdentifier}/synthetics/${id}/results`, { params }),
 
-  getResult: (orgIdentifier: string, id: string, jobId: string) =>
-    http().get(`/api/${orgIdentifier}/synthetics/${id}/results/${jobId}`),
+  getArtifacts: (orgIdentifier: string, id: string, jobId: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/${id}/results/${jobId}/artifacts`),
 
   artifactUrl: (orgIdentifier: string, id: string, jobId: string, type: 'screenshot' | 'trace', step?: string) => {
     const params = new URLSearchParams({ type })
