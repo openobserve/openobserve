@@ -407,8 +407,10 @@ export class LogsPage {
         this.patternCardIncludeBtn = (index) => `[data-test="pattern-card-${index}-include-btn"]`;
         this.patternCardExcludeBtn = (index) => `[data-test="pattern-card-${index}-exclude-btn"]`;
         this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}"]`;
-        this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] .wildcard-chip`;
-        this.wildcardChip = '.wildcard-chip';
+        // #12764 (scoped scss styles removal) dropped the `.wildcard-chip` class from the
+        // pattern template OBadge; it now carries a data-test hook instead.
+        this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] [data-test="wildcard-chip"]`;
+        this.wildcardChip = '[data-test="wildcard-chip"]';
         // Pattern details dialog (ODrawer — PatternDetailsDialog.vue)
         this.closePatternDialog = '[data-test="pattern-details-dialog"] [data-test="o-drawer-close-btn"]';
         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';

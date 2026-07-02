@@ -177,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OBadge
                   size="sm"
+                  data-test="wildcard-chip"
                   class="tw:font-mono tw:text-xs tw:font-bold tw:h-4.5 tw:py-0 tw:px-1.25 tw:rounded-[0.1875rem] tw:leading-4.5 tw:shrink-0 tw:my-0 tw:mx-0"
                   :class="wildcardChipColor(tok.value, tok.sampleValues)"
                 >
