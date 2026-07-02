@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:justify-between tw:mb-2 tw:pl-1">
         <div class="tw:text-sm tw:font-medium tw:tracking-[0.01em] tw:text-(--o2-text-primary)">
           {{ t('overview.activeIncidents') }}
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:min-w-5 tw:h-5 tw:px-[0.3rem] tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-semibold tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text) tw:border tw:border-[0.0625em] tw:border-(--o2-warning) tw:ml-[0.375rem] tw:align-middle">{{ incidentsTotal }}</span>
+          <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
           <span v-if="incidentsTotal > incidents.length" class="tw:ml-2 tw:text-xs tw:font-normal tw:text-(--o2-text-muted) tw:align-middle">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
         </div>
         <button class="tw:text-xs tw:font-medium tw:text-(--o2-primary-color) tw:bg-none tw:border-none tw:p-0 tw:cursor-pointer tw:whitespace-nowrap tw:transition-opacity tw:duration-150 tw:opacity-80 tw:hover:opacity-100 tw:hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
@@ -65,18 +65,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <div class="tw:flex-1 tw:min-w-0">
             <div class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary) tw:flex tw:items-center tw:flex-wrap tw:gap-1">
-              <span class="tw:inline-block tw:text-[0.625rem] tw:leading-5 tw:font-bold tw:py-[0.1rem] tw:px-[0.35rem] tw:rounded-[0.2rem] tw:tracking-[0.04em]" :class="severityBadgeClass(inc.severity)">
-                {{ (inc.severity || 'P4').toUpperCase() }}
-              </span>
+              <OTag type="severity" :value="(inc.severity || 'p4').toLowerCase()" />
               {{ inc.title || t('overview.untitledIncident') }}
               <template v-if="inc.group_values && Object.keys(inc.group_values).length > 0">
-                <span
+                <ODimensionChip
                   v-for="[key, val] in sortedDimensions(inc.group_values)"
                   :key="key"
-                  class="tw:inline-flex tw:items-center tw:gap-[0.125em] tw:py-[0.125em] tw:px-[0.5em] tw:rounded-[0.75em] tw:text-[0.6875em] tw:leading-5 tw:font-semibold tw:mx-[0.125em] tw:max-w-[11.25em] tw:overflow-hidden"
-                  :class="dimColorClass(key)"
-                  :title="`${key}=${val}`"
-                ><span class="tw:inline-block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">{{ shortDimKey(key) }}: {{ val }}</span></span>
+                  :dim-key="key"
+                  :key-label="shortDimKey(key)"
+                  :value="val"
+                  :tooltip="true"
+                />
               </template>
             </div>
           </div>
@@ -103,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:justify-between tw:mb-2 tw:pl-1">
         <div class="tw:text-sm tw:font-medium tw:tracking-[0.01em] tw:text-(--o2-text-primary)">
           {{ t('overview.services') }}
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:min-w-5 tw:h-5 tw:px-[0.3rem] tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-semibold tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text) tw:border tw:border-[0.0625em] tw:border-(--o2-warning) tw:ml-[0.375rem] tw:align-middle">{{ services.length }}</span>
+          <OTag type="countChip" value="warning">{{ services.length }}</OTag>
           <span v-if="servicePanelVisible && selectedService" class="tw:text-xs tw:font-normal tw:text-(--o2-text-muted) tw:ml-1">
             — viewing <strong class="tw:font-semibold tw:text-(--o2-text-primary)">{{ selectedService.label ?? selectedService.id }}</strong>
           </span>
@@ -199,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:justify-between tw:mb-2 tw:pl-1">
         <div class="tw:text-sm tw:font-medium tw:tracking-[0.01em] tw:text-(--o2-text-primary)">
           {{ t('overview.activeAnomalies') }}
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:min-w-5 tw:h-5 tw:px-[0.3rem] tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-semibold tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text) tw:border tw:border-[0.0625em] tw:border-(--o2-warning) tw:ml-[0.375rem] tw:align-middle">{{ anomalies.length }}</span>
+          <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
         </div>
         <button class="tw:text-xs tw:font-medium tw:text-(--o2-primary-color) tw:bg-none tw:border-none tw:p-0 tw:cursor-pointer tw:whitespace-nowrap tw:transition-opacity tw:duration-150 tw:opacity-80 tw:hover:opacity-100 tw:hover:underline" @click="goToAnomalies">{{ t('overview.viewAll') }} →</button>
       </div>
@@ -240,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:justify-between tw:mb-2 tw:pl-1">
         <div class="tw:text-sm tw:font-medium tw:tracking-[0.01em] tw:text-(--o2-text-primary)">
           {{ t('overview.recentEvents') }}
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:min-w-5 tw:h-5 tw:px-[0.3rem] tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-semibold tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text) tw:border tw:border-[0.0625em] tw:border-(--o2-warning) tw:ml-[0.375rem] tw:align-middle">{{ recentEvents.length }}</span>
+          <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
         </div>
         <button class="tw:text-xs tw:font-medium tw:text-(--o2-primary-color) tw:bg-none tw:border-none tw:p-0 tw:cursor-pointer tw:whitespace-nowrap tw:transition-opacity tw:duration-150 tw:opacity-80 tw:hover:opacity-100 tw:hover:underline" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
       </div>
@@ -250,14 +249,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="ev.id"
           class="ov-event-row tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-[0.875rem] tw:border-b tw:border-b-[0.0625em] tw:border-b-(--o2-border-color) tw:text-[0.8125rem] tw:transition-[background] tw:duration-150 tw:hover:bg-(--o2-hover-gray)"
         >
-          <span class="tw:shrink-0 tw:text-[0.6875rem] tw:font-semibold tw:py-[0.15rem] tw:px-[0.4rem] tw:rounded-[0.2rem] tw:tracking-[0.03em]" :class="ev.typeLabel === 'Failed' ? 'tw:bg-(--o2-status-error-bg) tw:text-(--o2-status-error-text) tw:font-bold' : ev.typeLabel === 'Error' ? 'tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text)' : 'tw:bg-(--o2-status-error-bg) tw:text-(--o2-status-error-text)'">
-            {{ ev.typeLabel }}
-          </span>
+          <OTag type="eventStatus" :value="ev.typeLabel" class="tw:shrink-0" />
           <span class="tw:font-medium tw:text-(--o2-text-primary) tw:whitespace-nowrap tw:min-w-[7.5em] tw:max-w-[12.5em] tw:overflow-hidden tw:text-ellipsis">{{ ev.service }}</span>
           <span class="tw:flex-1 tw:text-(--o2-text-muted) tw:truncate">{{ ev.description }}</span>
-          <span v-if="ev.failCount > 1" class="tw:shrink-0 tw:text-[0.6875rem] tw:font-bold tw:text-(--o2-status-error-text) tw:bg-(--o2-status-error-bg) tw:border tw:border-[0.0625em] tw:border-(--o2-negative) tw:rounded-[0.75rem] tw:py-[0.1rem] tw:px-[0.4rem] tw:whitespace-nowrap" :title="`Failed ${ev.failCount} times in this window`">
-            ×{{ ev.failCount }}
-          </span>
+          <OTag
+            v-if="ev.failCount > 1"
+            type="countChip"
+            value="error"
+            class="tw:shrink-0"
+            :title="`Failed ${ev.failCount} times in this window`"
+          >×{{ ev.failCount }}</OTag>
           <span class="tw:shrink-0 tw:text-(--o2-text-muted) tw:text-xs tw:whitespace-nowrap">{{ ev.timeAgo }}</span>
         </div>
       </div>
@@ -350,6 +351,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -750,51 +753,6 @@ const sortedDimensions = (dims: Record<string, string>): [string, string][] =>
 // Shorten verbose k8s-style keys for display: "k8s-namespace" → "namespace"
 const shortDimKey = (key: string): string =>
   key.replace(/^k8s-/, "").replace(/^kubernetes[_-]/, "");
-
-// Full Tailwind class strings per named color — complete strings so Tailwind can scan them
-const DIM_BORDER_CLASSES: Record<string, string> = {
-  blue:   "tw:border tw:border-[0.0625em] tw:border-(--o2-status-info-text)",
-  green:  "tw:border tw:border-[0.0625em] tw:border-(--o2-positive)",
-  yellow: "tw:border tw:border-[0.0625em] tw:border-(--o2-warning)",
-  pink:   "tw:border tw:border-[0.0625em] tw:border-(--o2-negative)",
-  purple: "tw:border tw:border-[0.0625em] tw:border-(--o2-primary-color)",
-  orange: "tw:border tw:border-[0.0625em] tw:border-(--o2-status-warning-text)",
-  cyan:   "tw:border tw:border-[0.0625em] tw:border-(--o2-positive)",
-  indigo: "tw:border tw:border-[0.0625em] tw:border-(--o2-theme-color)",
-  teal:   "tw:border tw:border-[0.0625em] tw:border-(--o2-positive)",
-  red:    "tw:border tw:border-[0.0625em] tw:border-(--o2-negative)",
-  amber:  "tw:border tw:border-[0.0625em] tw:border-(--o2-warning)",
-  gray:   "tw:border tw:border-[0.0625em] tw:border-(--o2-border-color)",
-};
-
-// Dimension key → named color (aliases share the same color name)
-const DIM_COLOR_KEY: Record<string, string> = {
-  deployment:       "blue",
-  "k8s-deployment": "blue",
-  namespace:        "orange",
-  "k8s-namespace":  "orange",
-  env:              "green",
-  environment:      "green",
-  host:             "purple",
-  hostname:         "purple",
-  service:          "cyan",
-  service_name:     "cyan",
-  region:           "pink",
-  zone:             "pink",
-  cluster:          "indigo",
-  "k8s-cluster":    "indigo",
-  pod:              "teal",
-  container:        "red",
-  app:              "yellow",
-  application:      "yellow",
-};
-
-const dimColorClass = (key: string): string => {
-  const colorKey = DIM_COLOR_KEY[key]
-    ?? (Object.entries(DIM_COLOR_KEY).find(([k]) => key.toLowerCase().includes(k))?.[1])
-    ?? "gray";
-  return DIM_BORDER_CLASSES[colorKey];
-};
 
 const severityRowClass = (severity: string) =>
   severity === "critical"

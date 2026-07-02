@@ -79,6 +79,13 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-destructive-focus-ring",
     "tw:disabled:opacity-60",
   ].join(" "),
+  "ghost-success": [
+    "tw:bg-transparent tw:text-button-ghost-success-text tw:border-0",
+    "tw:enabled:hover:bg-button-ghost-success-hover-bg",
+    "tw:enabled:active:bg-button-ghost-success-active-bg",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-success-focus-ring",
+    "tw:disabled:opacity-60",
+  ].join(" "),
   destructive: [
     "tw:bg-button-destructive tw:text-button-destructive-foreground",
     "tw:enabled:hover:bg-button-destructive-hover",

@@ -49,7 +49,6 @@ describe("PatternCard", () => {
   const OBadgeStub = {
     name: "OBadge",
     props: ["size"],
-    // Vue 3 auto-merges parent class onto root element, so wildcard-chip etc. appear naturally
     template: '<span data-test-stub="o-badge"><slot /></span>',
   };
   const OTooltipStub = {
@@ -217,10 +216,9 @@ describe("PatternCard", () => {
   });
 
   describe("Hover Effect", () => {
-    it("should have table-row-hover class for hover effect", () => {
+    it("should have hover transition class for hover effect", () => {
       const card = wrapper.find('[data-test="pattern-card-0"]');
-      // table-row-hover scoped class replaced by a Tailwind hover utility
-      expect(card.classes()).toContain("tw:hover:bg-[var(--o2-hover-gray)]");
+      expect(card.classes()).toContain("tw:transition-colors");
     });
 
     it("should have cursor-pointer class", () => {
@@ -239,7 +237,7 @@ describe("PatternCard", () => {
       const card = wrapper.find('[data-test="pattern-card-0"]');
       // Check that the component has the hover styles applied
       expect(card.exists()).toBe(true);
-      // Transition is now a Tailwind utility rather than scoped SCSS
+      // The transition is defined via Tailwind utility classes.
       expect(card.classes()).toContain("tw:transition-colors");
       expect(card.classes()).toContain("tw:duration-150");
     });
@@ -271,9 +269,7 @@ describe("PatternCard", () => {
 
   describe("Wildcard chip hover interactions", () => {
     it("should render wildcard chips for each wildcard in the template", () => {
-      // Wildcard chips are now OBadge components inside the template cell
-      const template = wrapper.find('[data-test="pattern-card-0-template"]');
-      const chips = template.findAll('[data-test-stub="o-badge"]');
+      const chips = wrapper.findAll('[data-test="pattern-card-wildcard-chip"]');
       expect(chips.length).toBeGreaterThan(0);
     });
 

@@ -29,12 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="job" class="tw:flex tw:flex-col tw:gap-5 tw:px-6 tw:py-4">
           <!-- Status and Actions -->
           <div class="tw:flex tw:items-center tw:justify-between">
-            <OBadge
-              :variant="getStatusColor(job.status, job.deletion_status)"
-              size="md"
+            <OTag
+              type="backfillJobStatus"
+              :value="getStatusKey(job.status, job.deletion_status)"
             >
               {{ getStatusLabel(job.status, job.deletion_status) }}
-            </OBadge>
+            </OTag>
             <OButton
               v-if="canCancelJob"
               variant="outline-destructive"
@@ -111,9 +111,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:grid tw:grid-cols-2 tw:gap-x-6 tw:gap-y-3">
                 <div>
                   <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Status</div>
-                  <OBadge :variant="getDeletionStatusColor(job.deletion_status)" size="sm">
-                    {{ getDeletionStatusLabel(job.deletion_status) }}
-                  </OBadge>
+                  <OTag
+                    type="deletionStatus"
+                    :value="typeof job.deletion_status === 'object' ? 'failed' : job.deletion_status"
+                    :label="getDeletionStatusLabel(job.deletion_status)"
+                  />
                 </div>
                 <div v-if="job.deletion_job_ids && job.deletion_job_ids.length > 0">
                   <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Deletion Job IDs ({{ job.deletion_job_ids.length }})</div>
@@ -218,8 +220,7 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
 import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.types";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
@@ -420,25 +421,11 @@ const getBackfillStartTime = computed(() => {
 });
 
 // Helper functions
-const getStatusColor = (status: string, deletionStatus?: any): BadgeVariant => {
+const getStatusKey = (status: string, deletionStatus?: any): string => {
   if (deletionStatus && typeof deletionStatus === "object" && "failed" in deletionStatus) {
-    return "error";
+    return "deletionfailed";
   }
-
-  switch (status) {
-    case "running":
-      return "success";
-    case "completed":
-      return "success";
-    case "failed":
-      return "error";
-    case "pending":
-      return "warning";
-    case "canceled":
-      return "default";
-    default:
-      return "default";
-  }
+  return status;
 };
 
 const getStatusLabel = (status: string, deletionStatus?: any) => {
@@ -454,15 +441,6 @@ const getProgressColor = (deletionStatus?: any) => {
     return "blue";
   }
   return "positive";
-};
-
-const getDeletionStatusColor = (status?: any): BadgeVariant => {
-  if (!status) return "default";
-  if (typeof status === "object" && "failed" in status) return "error";
-  if (status === "completed") return "success";
-  if (status === "in_progress") return "primary";
-  if (status === "pending") return "warning";
-  return "default";
 };
 
 const getDeletionStatusLabel = (status?: any) => {

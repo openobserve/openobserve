@@ -471,14 +471,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="store.state.zoConfig.super_cluster_enabled"
             #cell-region="{ row }"
           >
-            <OBadge variant="default" class="tw:bg-[#ede9fe] tw:leading-[23px] tw:px-[7px] tw:text-[#6d28d9] tw:mr-1"
+            <OTag type="fieldTag" class="badge-region tw:mr-1"
               >{{ row.region }}
               <OTooltip :content="t('nodes.region')" />
-            </OBadge>
-            <OBadge variant="default" class="tw:bg-[#fff2d4] tw:leading-[23px] tw:px-[7px] tw:text-[#374151]"
+            </OTag>
+            <OTag type="fieldTag" class="badge-cluster"
               >{{ row.cluster }}
               <OTooltip :content="t('nodes.cluster')" />
-            </OBadge>
+            </OTag>
           </template>
 
           <template #cell-tcp="{ row }">
@@ -540,7 +540,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
@@ -560,7 +560,7 @@ export default defineComponent({
     ORange,
     OIcon,
     OSearchInput,
-    OBadge,
+    OTag,
     OCollapsible,
     OSeparator,
     OSplitter,
