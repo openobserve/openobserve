@@ -156,15 +156,13 @@ pub async fn get_artifacts(
     job_id: &str,
 ) -> anyhow::Result<Option<ArtifactsResponse>> {
     let now = config::utils::time::now_micros();
-    let start_time = now - 90 * ONE_DAY_US;
     let sid = safe_ident(synthetics_id);
     let jid = safe_ident(job_id);
     let sql = format!(
         "SELECT screenshot_refs, trace_ref FROM \"{STREAM}\" \
-         WHERE _timestamp >= {start_time} AND _timestamp <= {now} \
-           AND synthetics_id = '{sid}' AND job_id = '{jid}' LIMIT 1"
+         WHERE synthetics_id = '{sid}' AND job_id = '{jid}' LIMIT 1"
     );
-    let req = build_req(sql, start_time, now, 1, 0);
+    let req = build_req(sql, 0, now, 1, 0);
     let resp = run_search(org_id, &req).await?;
     let Some(hit) = resp.hits.first() else {
         return Ok(None);
@@ -213,15 +211,13 @@ pub async fn get_artifact_key(
     step_id: Option<&str>, // required for screenshot
 ) -> anyhow::Result<Option<String>> {
     let now = config::utils::time::now_micros();
-    let start_time = now - 90 * ONE_DAY_US;
     let sid = safe_ident(synthetics_id);
     let jid = safe_ident(job_id);
     let sql = format!(
         "SELECT screenshot_refs, trace_ref FROM \"{STREAM}\" \
-         WHERE _timestamp >= {start_time} AND _timestamp <= {now} \
-           AND synthetics_id = '{sid}' AND job_id = '{jid}' LIMIT 1"
+         WHERE synthetics_id = '{sid}' AND job_id = '{jid}' LIMIT 1"
     );
-    let req = build_req(sql, start_time, now, 1, 0);
+    let req = build_req(sql, 0, now, 1, 0);
     let resp = run_search(org_id, &req).await?;
     let Some(hit) = resp.hits.first() else {
         return Ok(None);
