@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="filterQuery"
                 :placeholder="t('ingestion.searchToken', 'Search tokens')"
                 class="tw:flex-1"
+                data-test="ingestion-tokens-search-input"
               />
             </div>
           </template>
@@ -92,8 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw:font-medium">{{ row.name }}</span>
           </template>
 
+          <!-- Copy yields a ready-to-paste "Basic base64(name:token)" credential
+               (OCodeCell copies exactly what it shows), so no manual email +
+               base64 step is needed. -->
           <template #cell-token="{ row }">
-            <OCodeCell :value="row.token" />
+            <OCodeCell :value="toBasicAuth(row.name, row.token)" />
           </template>
 
           <template #cell-created_by="{ row }">
@@ -118,7 +122,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Create token dialog -->
     <ODialog
       v-model:open="showCreateForm"
-      :persistent="true"
       size="sm"
       :title="t('ingestion.createTokenTitle')"
       :primary-button-label="t('common.create')"
@@ -158,13 +161,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :secondary-button-label="t('common.close')"
       @click:secondary="showRevealedDialog = false"
     >
+      <!-- Primary: the ready-to-paste Authorization credential. -->
+      <div class="tw:mb-1 tw:text-xs tw:font-medium tw:text-text-primary">
+        {{ t('ingestion.authHeaderLabel') }}
+      </div>
       <div
-        class="tw:p-2.5 tw:border tw:border-dashed tw:rounded tw:border-gray-400 tw:mb-4"
+        class="tw:p-2.5 tw:border tw:border-dashed tw:rounded tw:border-gray-400 tw:mb-1"
         :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'tw:bg-gray-100'"
       >
         <code
           class="tw:break-all tw:font-mono tw:text-sm"
-        >{{ revealedToken?.token }}</code>
+        >{{ revealedBasicAuth }}</code>
+      </div>
+      <div class="tw:mb-3 tw:text-xs tw:text-text-secondary">
+        {{ t('ingestion.authHeaderHelp') }}
       </div>
       <div class="tw:flex tw:justify-end tw:gap-2">
         <OButton
@@ -173,7 +183,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="content-copy"
           @click="copyToken(revealedToken?.token || '')"
         >
-          {{ t('ingestion.copyTokenBtn') }}
+          {{ t('ingestion.copyRawTokenBtn') }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          icon="content-copy"
+          @click="copyToken(revealedBasicAuth)"
+        >
+          {{ t('ingestion.copyAuthHeaderBtn') }}
         </OButton>
       </div>
     </ODialog>
@@ -181,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, defineComponent, onBeforeMount } from "vue";
+import { ref, computed, defineComponent, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -203,7 +221,10 @@ import {
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import { getBasicAuth } from "@/utils/auth";
 import organizationsService from "@/services/organizations";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 interface Token {
@@ -223,6 +244,11 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
 
+    // Create-token dialog is an OForm — the schema (name required + max 256) and
+    // its defaults factory MUST be returned from setup() (Options-API), else
+    // :schema/:default-values resolve to undefined.
+    const createTokenSchema = makeCreateTokenSchema(t);
+
     const tokens = ref<Token[]>([]);
     const loading = ref(false);
     const filterQuery = ref("");
@@ -230,10 +256,13 @@ export default defineComponent({
     const showRevealedDialog = ref(false);
     const revealedToken = ref<{ name: string; token: string } | null>(null);
 
-    // Options-API: the schema (and the defaults factory) MUST be returned from
-    // setup() — a bare module import is out of the template's scope, so :schema
-    // would resolve to undefined and validation would silently no-op.
-    const createTokenSchema = makeCreateTokenSchema(t);
+    // Ready-to-paste "Basic base64(name:token)" credential shown in the
+    // "New Token Generated" dialog (restored — the merge auto-drop lost it).
+    const revealedBasicAuth = computed(() =>
+      revealedToken.value
+        ? getBasicAuth(revealedToken.value.name, revealedToken.value.token)
+        : "",
+    );
 
     const columns: OTableColumnDef<Token>[] = [
       {
@@ -249,12 +278,12 @@ export default defineComponent({
       },
       {
         id: "token",
-        header: t("serviceAccounts.token"),
+        header: t("ingestion.tokenAuthHeader"),
         accessorKey: "token",
         sortable: false,
         resizable: true,
         hideable: true,
-        // Wide enough for the truncated token (code max-w 280) + gap + copy btn.
+        // Wide enough for the truncated credential + gap + copy btn.
         size: 340,
         meta: { align: "left" },
       },
@@ -362,6 +391,14 @@ export default defineComponent({
       }
     };
 
+    // Build a ready-to-paste Authorization value: "Basic base64(name:token)".
+    // The username part is the TOKEN NAME (not a user email): org ingestion
+    // tokens are org-scoped and the backend ignores the username, so using the
+    // token name keeps the credential person-independent (never goes stale when
+    // a user leaves) and gives meaningful ingestion-log attribution.
+    const toBasicAuth = (name: string, token: string) =>
+      getBasicAuth(name, token);
+
     const copyToken = (token: string) => {
       copyToClipboard(token);
     };
@@ -369,6 +406,24 @@ export default defineComponent({
     onBeforeMount(() => {
       fetchTokens();
     });
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "ingestionTokensAdd",
+        handler: () => { if (!isInputFocused()) showCreateForm.value = true; },
+      },
+      {
+        id: "ingestionTokensRefresh",
+        handler: () => { if (!isInputFocused()) fetchTokens(); },
+      },
+      {
+        id: "ingestionTokensFocusSearch",
+        handler: () => {
+          focusSearchInput("ingestion-tokens-search-input");
+        },
+      },
+    ]);
 
     return {
       store,
@@ -380,12 +435,14 @@ export default defineComponent({
       showCreateForm,
       showRevealedDialog,
       revealedToken,
-      createTokenSchema,
-      createTokenDefaults,
+      revealedBasicAuth,
       fetchTokens,
       createToken,
+      createTokenSchema,
+      createTokenDefaults,
       toggleEnabled,
       copyToken,
+      toBasicAuth,
     };
   },
 });

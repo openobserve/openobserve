@@ -103,7 +103,7 @@ function mountComp(props: Record<string, unknown> = {}): VueWrapper<any> {
 const getForm = (wrapper: VueWrapper<any>) =>
   wrapper.findComponent({ name: "OForm" });
 const getEmailInput = (wrapper: VueWrapper<any>) =>
-  wrapper.find('[data-test="iam-add-service-account-email-input"] input');
+  wrapper.find('[data-test="iam-add-service-account-identifier-input"] input');
 const getDescriptionInput = (wrapper: VueWrapper<any>) =>
   wrapper.find('[data-test="iam-add-service-account-description-input"] input');
 
@@ -149,7 +149,7 @@ describe("AddServiceAccount", () => {
       await nextTick();
 
       expect(
-        w.find('[data-test="iam-add-service-account-email-input"]').exists(),
+        w.find('[data-test="iam-add-service-account-identifier-input"]').exists(),
       ).toBe(false);
       expect(getDescriptionInput(w).exists()).toBe(true);
       expect(

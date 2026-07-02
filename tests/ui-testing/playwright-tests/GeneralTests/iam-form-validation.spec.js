@@ -185,7 +185,7 @@ test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {
         await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeEnabled();
         await pm.iamFormValidation.submitGroupForm(); // reveal the error
         await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toContainText("Use alphanumeric and '_' characters only, without spaces.");
+        await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toContainText("Use letters, numbers and underscores only, without spaces.");
 
         testLogger.info('Group special-char error correctly shown');
     });

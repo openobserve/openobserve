@@ -40,6 +40,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-role-rolename-input-btn"
           :help-text="t('iam.nameHelpText')"
         />
+
+        <div data-test="add-role-start-from-section" class="tw:mt-4">
+          <div class="tw:mb-1 tw:text-sm tw:font-medium">
+            {{ t("iam.role.startFrom.label") }}
+          </div>
+          <OFormRadioGroup name="startFrom" orientation="vertical">
+            <ORadio
+              v-for="option in startFromOptions"
+              :key="option.value"
+              :val="option.value"
+              :label="option.label"
+              :data-test="`add-role-start-from-${option.value}-radio`"
+            />
+          </OFormRadioGroup>
+        </div>
       </OForm>
     </div>
   </ODialog>
@@ -50,6 +65,8 @@ import { createRole } from "@/services/iam";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -77,27 +94,38 @@ const emits = defineEmits(["update:open", "added:role"]);
 
 const { track } = useReo();
 
+// "Start from" preset options — the selected value is form-owned (startFrom):
+// "custom" = empty role (default); "readonly" = seed read-only permissions
+// (AllowList + AllowGet) once the user lands on EditRole.
+const startFromOptions = computed(() => [
+  { label: t("iam.role.startFrom.custom"), value: "custom" },
+  { label: t("iam.role.startFrom.readonly"), value: "readonly" },
+]);
+
 const store = useStore();
 
 const addRoleSchema = makeAddRoleSchema(t);
 
-// The OForm owns `name`. The ODialog unmounts its body on close + remounts fresh
-// on open, so this typed computed re-seeds `:default-values` each open (the
-// optional `role` prop prefills it, otherwise blank). No local model / watch.
+// The OForm owns `name` + `startFrom`. The ODialog unmounts its body on close +
+// remounts fresh on open, so this typed computed re-seeds `:default-values` each
+// open (the optional `role` prop prefills the name; startFrom resets to "custom").
+// No local model / watch.
 const addRoleDefaults = computed((): AddRoleForm => ({
   name: props.role?.name ?? "",
+  startFrom: "custom",
 }));
 
 // Plain async @submit handler — the validated `value` is the source of truth.
 // The schema validates the trimmed name; trim again here so the saved value
 // matches (mirrors the old `v-model.trim`). `saveRole` always calls createRole
 // (even when prefilled in edit mode) — behavior preserved from the original.
+// Emits the "start from" preset so AppRoles can seed EditRole's permissions.
 const saveRole = async (value: AddRoleForm) => {
   const name = value.name.trim();
   try {
     await createRole(name, store.state.selectedOrganization.identifier);
     emits("update:open", false);
-    emits("added:role");
+    emits("added:role", { role_name: name, startFrom: value.startFrom });
     toast({
       message: `Role "${name}" Created Successfully!`,
       variant: "success",

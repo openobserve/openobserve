@@ -132,12 +132,18 @@ describe("AddRole", () => {
     });
 
     it("seeds blank default-values in create mode", () => {
-      expect(getForm(wrapper).props("defaultValues")).toEqual({ name: "" });
+      expect(getForm(wrapper).props("defaultValues")).toEqual({
+        name: "",
+        startFrom: "custom",
+      });
     });
 
     it("seeds the role name when a role prop is provided", () => {
       const w = mountComp({ role: { name: "existing_role" } });
-      expect(getForm(w).props("defaultValues")).toEqual({ name: "existing_role" });
+      expect(getForm(w).props("defaultValues")).toEqual({
+        name: "existing_role",
+        startFrom: "custom",
+      });
       w.unmount();
     });
 
@@ -197,7 +203,7 @@ describe("AddRole", () => {
       expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
       expect(createRole).not.toHaveBeenCalled();
       expect(wrapper.text()).toContain(
-        "Use alphanumeric and '_' characters only, without spaces.",
+        "Use letters, numbers and underscores only, without spaces.",
       );
     });
 

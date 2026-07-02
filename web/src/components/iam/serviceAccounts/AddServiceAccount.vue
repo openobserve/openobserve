@@ -35,9 +35,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OFormInput
           v-if="!beingUpdated"
           name="email"
-          :label="t('user.email')"
+          :label="t('serviceAccounts.form.identifier.label')"
+          :placeholder="t('serviceAccounts.form.identifier.placeholder')"
+          :help-text="t('serviceAccounts.form.identifier.help')"
           required
-          data-test="iam-add-service-account-email-input"
+          data-test="iam-add-service-account-identifier-input"
           class="showLabelOnTop tw:mt-2"
         />
 

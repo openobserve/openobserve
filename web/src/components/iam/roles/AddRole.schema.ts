@@ -20,8 +20,11 @@ export const makeAddRoleSchema = (
       .string()
       .trim()
       .min(1, t("common.nameRequired"))
-      .regex(roleNameRegex, t("iam.nameHelpText"))
+      .regex(roleNameRegex, t("iam.role.name.invalidChars"))
       .max(100, t("common.nameMaxLength", { max: 100 })),
+    // "Start from" preset (from #12460): "custom" = empty role; "readonly" =
+    // seed read-only perms once on EditRole. Form-owned, defaults to "custom".
+    startFrom: z.enum(["custom", "readonly"]).default("custom"),
   });
 
 export type AddRoleForm = z.infer<ReturnType<typeof makeAddRoleSchema>>;

@@ -99,7 +99,7 @@ const saveGroup = async (value: AddGroupForm) => {
       name,
       store.state.selectedOrganization.identifier,
     );
-    emits("added:group", res.data);
+    emits("added:group", { group_name: name, data: res.data });
     emits("update:open", false);
 
     toast({

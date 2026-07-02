@@ -182,7 +182,7 @@ describe("AddGroup", () => {
       expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
       expect(createGroup).not.toHaveBeenCalled();
       expect(wrapper.text()).toContain(
-        "Use alphanumeric and '_' characters only, without spaces.",
+        "Use letters, numbers and underscores only, without spaces.",
       );
     });
 
@@ -211,6 +211,10 @@ describe("AddGroup", () => {
         "test_group",
         store.state.selectedOrganization.identifier,
       );
+      // Emit contract consumed by AppGroups.onGroupAdded (routes to editGroup).
+      expect(wrapper.emitted("added:group")?.[0]).toEqual([
+        { group_name: "test_group", data: { name: "test_group" } },
+      ]);
     });
 
     it("trims the submitted name via the schema", async () => {
@@ -236,7 +240,9 @@ describe("AddGroup", () => {
       await getNameInput(wrapper).setValue("test_group");
       await submitForm(wrapper);
 
-      expect(wrapper.emitted("added:group")?.[0]).toEqual([mockResponse.data]);
+      expect(wrapper.emitted("added:group")?.[0]).toEqual([
+        { group_name: "test_group", data: mockResponse.data },
+      ]);
       const updateOpen = wrapper.emitted("update:open");
       expect(updateOpen[updateOpen.length - 1]).toEqual([false]);
       expect(mockToast).toHaveBeenCalledWith({
