@@ -1,6 +1,0 @@
-{
-  "group": "Reports",
-  "spec_filename": "reportCsvMediaType.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}
