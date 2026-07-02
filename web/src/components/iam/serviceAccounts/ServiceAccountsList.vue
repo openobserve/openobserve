@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="filterQuery"
                   :placeholder="t('serviceAccounts.search')"
                   class="tw:flex-1"
+                  data-test="iam-service-accounts-search-input"
                 />
               </div>
             </template>
@@ -138,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   data-test="service-accounts-edit"
+                  data-row-action="edit"
                   :title="t('serviceAccounts.update')"
                   variant="ghost"
                   size="icon-sm"
@@ -146,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   data-test="service-accounts-delete"
+                  data-row-action="delete"
                   :title="t('serviceAccounts.deleteServiceAccount')"
                   variant="ghost"
                   size="icon-sm"
@@ -408,6 +411,8 @@ import { computed } from "vue";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "ServiceAccountsList",
   components: { OEmptyState, AddServiceAccount, ConfirmDialog, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OTag, OCodeCell, OUserCell, OSearchInput, OTabs, OTab, OTabPanels, OTabPanel },
@@ -907,6 +912,24 @@ export default defineComponent({
     };
 
 
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "iamServiceAccountsAdd",
+        handler: () => { if (!isInputFocused()) addRoutePush({}); },
+      },
+      {
+        id: "iamServiceAccountsRefresh",
+        handler: () => { if (!isInputFocused()) getServiceAccountsUsers(); },
+      },
+      {
+        id: "iamServiceAccountsFocusSearch",
+        handler: () => {
+          focusSearchInput("iam-service-accounts-search-input");
+        },
+      },
+    ]);
     return {
       t,
       router,
@@ -971,5 +994,4 @@ export default defineComponent({
   },
 });
 </script>
-
 

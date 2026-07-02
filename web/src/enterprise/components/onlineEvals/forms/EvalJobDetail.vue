@@ -965,7 +965,7 @@ function relativeTime(timestampMs: number): string {
 }
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 // Page layout, spacing, colors, and text styling are Tailwind utilities in the
 // template (matching SessionDetails.vue). Only cohesive blocks that rely on
 // descendant/element selectors or hover state remain here. Font-family is never

@@ -137,31 +137,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.o-tabs {
-  .o-tab {
-    text-transform: none;
-  }
-  &--vertical {
-    margin: 5px;
-    .o-tab {
-      justify-content: flex-start;
-      padding: 0 1rem 0 1.25rem;
-      border-radius: 0.5rem;
-      &__content.tab_content {
-        .o-tab {
-          &__icon + &__label {
-            padding-left: 0.875rem;
-            font-weight: 600;
-          }
-        }
-      }
-      &--active {
-        background-color: $accent;
-        color: black;
-      }
-    }
-  }
-}
-</style>

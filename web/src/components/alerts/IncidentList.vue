@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loading"
               @click="refreshIncidents"
               data-test="incident-refresh-btn"
-            ><OIcon name="refresh" size="sm"/>{{ t('common.refresh') }}</OButton>
+            >{{ t('common.refresh') }}</OButton>
           </template>
         </AppPageHeader>
       </template>
@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="alerts-incident-list"
-        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
         data-test="incident-list-table"
         @row-click="viewIncident"
       >
@@ -96,6 +95,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="incidentStatus"
             :value="row.status"
+            :label="getStatusLabel(row.status)"
+            size="sm"
             data-test="incident-status-badge"
           />
         </template>
@@ -126,8 +127,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OTag
               v-if="getSortedDimensions(row.group_values).length > 2"
-              variant="default-soft"
-              size="sm"
+              type="countChip"
+              value="neutral"
               class="tw:shrink-0"
             >
               +{{ getSortedDimensions(row.group_values).length - 2 }} more
@@ -138,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="[key, value] in getSortedDimensions(row.group_values).slice(2)"
                       :key="key"
                     >
-                      <span>{{ key }}</span>=<span>{{ value }}</span>
+                      <span class="tw:inline-block tw:overflow-hidden tw:truncate">{{ key }}</span>=<span class="tw:inline-block tw:overflow-hidden tw:truncate">{{ value }}</span>
                     </div>
                   </div>
                 </template>
@@ -156,36 +157,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center tw:justify-center tw:gap-1">
-            <!-- Slot 1: acknowledge (only when "open"); an empty spacer holds the
-                 slot otherwise so the resolve/reopen action below always lands in
-                 the 2nd column, keeping every row's primary action aligned. -->
-            <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-8">
-              <OButton
-                v-if="row.status === 'open'"
-                variant="ghost-warning"
-                size="icon-sm"
-                @click.stop="acknowledgeIncident(row)"
-                data-test="incident-ack-btn"
-              ><OIcon name="visibility" size="sm" /><OTooltip :content="t('alerts.incidents.acknowledge')" /></OButton>
-            </span>
-            <!-- Slot 2: resolve (open/acknowledged) or reopen (resolved) — always present. -->
-            <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-8">
-              <OButton
-                v-if="row.status !== 'resolved'"
-                variant="ghost-primary"
-                size="icon-sm"
-                @click.stop="resolveIncident(row)"
-                data-test="incident-resolve-btn"
-              ><OIcon name="task-alt" size="sm" /><OTooltip :content="t('alerts.incidents.resolve')" /></OButton>
-              <OButton
-                v-else
-                variant="ghost-warning"
-                size="icon-sm"
-                @click.stop="reopenIncident(row)"
-                data-test="incident-reopen-btn"
-              ><OIcon name="restart-alt" size="sm" /><OTooltip :content="t('alerts.incidents.reopen')" /></OButton>
-            </span>
+          <div class="tw:flex tw:justify-end tw:items-center">
+            <OButton
+              v-if="row.status === 'open'"
+              variant="ghost-warning"
+              size="icon-sm"
+              @click.stop="acknowledgeIncident(row)"
+              data-test="incident-ack-btn"
+            ><OIcon name="visibility" size="sm" /><OTooltip :content="t('alerts.incidents.acknowledge')" /></OButton>
+            <OButton
+              v-if="row.status !== 'resolved'"
+              variant="ghost-primary"
+              size="icon-sm"
+              @click.stop="resolveIncident(row)"
+              data-test="incident-resolve-btn"
+            ><OIcon name="task-alt" size="sm" /><OTooltip :content="t('alerts.incidents.resolve')" /></OButton>
+            <OButton
+              v-if="row.status === 'resolved'"
+              variant="ghost-warning"
+              size="icon-sm"
+              @click.stop="reopenIncident(row)"
+              data-test="incident-reopen-btn"
+            ><OIcon name="restart-alt" size="sm" /><OTooltip :content="t('alerts.incidents.reopen')" /></OButton>
           </div>
         </template>
 
@@ -204,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Bottom -->
         <template #bottom>
-          <div class="bottom-btn tw:h-[48px]">
+          <div class="tw:flex tw:w-full tw:justify-between tw:items-center tw:h-[48px]">
             <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
               {{ visibleIncidents.length }} {{ visibleIncidents.length === 1 ? 'Incident' : 'Incidents' }}
             </div>
@@ -310,7 +303,7 @@ export default defineComponent({
         accessorKey: "status",
         resizable: true,
         hideable: true,
-        size: 130,
+        size: 120,
         meta: { align: "left" },
       },
       {
@@ -347,10 +340,7 @@ export default defineComponent({
         isAction: true,
         pinned: "right",
         size: 100,
-        meta: {
-          align: "center",
-          actionCount: 2,
-        },
+        meta: { align: "center", actionCount: 2 },
       },
     ];
 
@@ -653,28 +643,8 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.bottom-btn {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.o2-search-input {
-  width: 250px;
-}
-
+<style>
 /* Status badge styling */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
 .status-open {
   border: 1px solid #dc2626;
 }
@@ -692,49 +662,36 @@ export default defineComponent({
 }
 
 /* Severity badge styling */
-.severity-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
+.severity-p1 {
+  border: 1px solid #991b1b;
 }
 
-/* Dark mode adjustments for status badges */
-body.body--dark {
-  .status-open { border: 1px solid #fca5a5; }
-  .status-acknowledged { border: 1px solid #fbbf24; }
-  .status-resolved { border: 1px solid #6ee7b7; }
-  .status-default { border: 1px solid #d1d5db; }
+.severity-p2 {
+  border: 1px solid #c2410c;
 }
 
-/* Dimension badge base styling */
-.dimension-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  margin: 2px;
-  max-width: 180px;
-  overflow: hidden;
-
-  span {
-    display: inline-block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+.severity-p3 {
+  border: 1px solid #92400e;
 }
 
-.badge-more {
-  background: var(--color-surface-panel);
-  color: var(--o2-text-secondary);
-  font-weight: 500;
+.severity-p4 {
+  border: 1px solid #6b7280;
 }
+
+.severity-default {
+  border: 1px solid #6b7280;
+}
+
+/* Dark mode adjustments for status and severity badges */
+body.body--dark .status-open { border: 1px solid #fca5a5; }
+body.body--dark .status-acknowledged { border: 1px solid #fbbf24; }
+body.body--dark .status-resolved { border: 1px solid #6ee7b7; }
+body.body--dark .status-default { border: 1px solid #d1d5db; }
+body.body--dark .severity-p1 { border: 1px solid #fca5a5; }
+body.body--dark .severity-p2 { border: 1px solid #fdba74; }
+body.body--dark .severity-p3 { border: 1px solid #fcd34d; }
+body.body--dark .severity-p4 { border: 1px solid #d1d5db; }
+body.body--dark .severity-default { border: 1px solid #d1d5db; }
 
 /* Color scheme matching schema.scss type badges */
 .badge-blue { border: 1px solid #1d4ed8; }
@@ -753,21 +710,18 @@ body.body--dark {
 .badge-rose { border: 1px solid #e11d48; }
 
 /* Dark mode adjustments */
-body.body--dark {
-  .badge-blue { border: 1px solid #93c5fd; }
-  .badge-green { border: 1px solid #6ee7b7; }
-  .badge-yellow { border: 1px solid #fcd34d; }
-  .badge-pink { border: 1px solid #f9a8d4; }
-  .badge-purple { border: 1px solid #c4b5fd; }
-  .badge-orange { border: 1px solid #fdba74; }
-  .badge-cyan { border: 1px solid #67e8f9; }
-  .badge-indigo { border: 1px solid #a5b4fc; }
-  .badge-teal { border: 1px solid #5eead4; }
-  .badge-red { border: 1px solid #fca5a5; }
-  .badge-gray { border: 1px solid #d1d5db; }
-  .badge-amber { border: 1px solid #fbbf24; }
-  .badge-violet { border: 1px solid #c4b5fd; }
-  .badge-rose { border: 1px solid #fda4af; }
-}
-
+body.body--dark .badge-blue { border: 1px solid #93c5fd; }
+body.body--dark .badge-green { border: 1px solid #6ee7b7; }
+body.body--dark .badge-yellow { border: 1px solid #fcd34d; }
+body.body--dark .badge-pink { border: 1px solid #f9a8d4; }
+body.body--dark .badge-purple { border: 1px solid #c4b5fd; }
+body.body--dark .badge-orange { border: 1px solid #fdba74; }
+body.body--dark .badge-cyan { border: 1px solid #67e8f9; }
+body.body--dark .badge-indigo { border: 1px solid #a5b4fc; }
+body.body--dark .badge-teal { border: 1px solid #5eead4; }
+body.body--dark .badge-red { border: 1px solid #fca5a5; }
+body.body--dark .badge-gray { border: 1px solid #d1d5db; }
+body.body--dark .badge-amber { border: 1px solid #fbbf24; }
+body.body--dark .badge-violet { border: 1px solid #c4b5fd; }
+body.body--dark .badge-rose { border: 1px solid #fda4af; }
 </style>

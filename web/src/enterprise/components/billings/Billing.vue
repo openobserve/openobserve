@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:before>
         <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pt-2 tw:pb-[0.625rem]">
-          <div class="card-container tw:h-full">
+          <div class="tw:overflow-y-auto tw:h-full">
             <OTabs
               v-model="billingtab"
               orientation="vertical"
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:pt-2">
           <div
             v-if="isUsageRoute"
-            class="tw:flex tw:gap-2 tw:items-center tw:justify-end card-container tw:shrink-0 tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-2"
+            class="tw:flex tw:gap-2 tw:items-center tw:justify-end tw:overflow-y-auto tw:shrink-0 tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-2"
           >
             <div class="custom-usage-date-select">
               <OSelect
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :members="billingMembers"
               />
             </div>
-            <div class="card-container tw:pb-3 tw:flex-1 tw:min-w-0 tw:h-full">
+            <div class="tw:overflow-y-auto tw:pb-3 tw:flex-1 tw:min-w-0 tw:h-full">
               <router-view title=""> </router-view>
             </div>
           </div>
@@ -379,11 +379,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-
-.card-container {
-  overflow-y: auto;
-}
-
-</style>

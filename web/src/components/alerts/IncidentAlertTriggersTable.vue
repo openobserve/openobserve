@@ -174,8 +174,8 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-:deep(.o2-table tbody tr) {
+<style>
+.o2-table tbody tr {
   cursor: pointer;
 }
 </style>

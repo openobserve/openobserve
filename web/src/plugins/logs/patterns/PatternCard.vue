@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:border-b tw:border-[var(--color-border-default)] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] table-row-hover tw:relative tw:py-1"
+    class="tw:flex tw:border-b tw:border-[var(--color-border-default)] tw:cursor-pointer tw:hover:bg-[var(--o2-hover-gray)] tw:relative tw:py-1 tw:transition-colors tw:duration-150 tw:ease-in-out"
     :class="wrap ? 'tw:items-start' : 'tw:items-center'"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex-1 tw:min-w-0 tw:px-2 tw:pl-3" :class="wrap ? '' : 'tw:overflow-hidden'">
       <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
-        class="pattern-template-text tw:w-full"
+        class="tw:font-mono tw:text-xs tw:w-full"
         :class="[
           store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-500',
           wrap
@@ -215,24 +215,6 @@ function highlightLevels(text: string): HighlightSegment[] {
 }
 </script>
 
-<style scoped lang="scss">
-@import "@/styles/logs/search-result.scss";
-
-.pattern-template-text {
-  font-family: monospace;
-  font-size: 0.75rem;
-}
-
-// Add explicit hover styles
-.table-row-hover {
-  transition: background-color 0.15s ease-in-out;
-
-  &:hover {
-    background-color: var(--o2-hover-gray) !important;
-  }
-}
-</style>
-
-<style lang="scss">
+<style>
 @import "@/assets/styles/log-highlighting.css";
 </style>

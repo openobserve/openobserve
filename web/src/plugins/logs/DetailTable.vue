@@ -72,7 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OSeparator />
 
-    <div :class="['tab-panels-container tw:h-screen tw:overflow-y-auto', tab.startsWith('correlated-') ? 'full-height-panels' : '']">
+    <div
+      :class="[
+        'tw:flex tw:flex-col tw:h-screen',
+        tab.startsWith('correlated-') ? 'tw:overflow-hidden full-height-panels' : 'tw:overflow-y-auto',
+      ]"
+    >
     <OTabPanels
       data-test="log-detail-tab-container"
       v-model="tab"
@@ -117,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="_rowKey"
             pagination="none"
             :default-columns="false"
-            class="o2-quasar-table o2-row-md o2-schema-table log-detail-source-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+            class="o2-table o2-row-md o2-schema-table log-detail-source-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
             :class="store.state.theme === 'dark' && 'dark'"
           >
             <template #cell-field="{ row, value }">
@@ -532,7 +537,7 @@ export default defineComponent({
     ) {
       this.$emit("add:searchterm", field, field_value, action);
     },
-    searchTimeBoxed(rowData: any, size: number) { 
+    searchTimeBoxed(rowData: any, size: number) {
       this.$emit("search:timeboxed", {
         key: rowData[this.store.state.zoConfig.timestamp_column],
         size: size,
@@ -914,22 +919,11 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-@import "@/styles/logs/detail-table.scss";
-@import "@/styles/logs/json-preview.scss";
-
-// Make correlation tab panels use full remaining height (no footer space)
-.full-height-panels {
+<style>
+.full-height-panels .o-tab-panel {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-
-  :deep(.o-tab-panel) {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
 }
 </style>

@@ -65,9 +65,9 @@
                   Copy
                 </OButton>
               </div>
-              <div class="tw:relative tw:group">
+              <div class="tw:relative tw:group tw:mt-1">
                 <div
-                  class="tw:p-2 tw:rounded-lg tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all inspector-query-editor"
+                  class="tw:p-2 tw:rounded-lg tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all tw:[scrollbar-width:thin] tw:[scrollbar-color:rgba(128,128,128,0.2)_transparent] inspector-query-editor"
                   :data-test="`query-inspector-original-query-${index}`"
                   v-html="
                     highlightSearch(
@@ -95,9 +95,9 @@
                   Copy
                 </OButton>
               </div>
-              <div class="tw:relative tw:group">
+              <div class="tw:relative tw:group tw:mt-1">
                 <div
-                  class="tw:p-2 tw:rounded-lg tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all inspector-query-editor"
+                  class="tw:p-2 tw:rounded-lg tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all tw:[scrollbar-width:thin] tw:[scrollbar-color:rgba(128,128,128,0.2)_transparent] inspector-query-editor"
                   :data-test="`query-inspector-executed-query-${index}`"
                   v-html="
                     highlightSearch(
@@ -158,7 +158,7 @@
                 <label class="tw:text-xs tw:font-bold tw:tracking-wider"
                   >Variable(s)</label
                 >
-                <div class="tw:flex tw:flex-wrap tw:gap-2">
+                <div class="tw:flex tw:flex-wrap tw:gap-2 tw:mt-1">
                   <template v-if="getVariablesByType(query, 'variable').length">
                     <div
                       v-for="v in getVariablesByType(query, 'variable')"
@@ -187,7 +187,7 @@
                 <label class="tw:text-xs tw:font-bold tw:tracking-wider"
                   >Fixed Variable(s)</label
                 >
-                <div class="tw:flex tw:flex-wrap tw:gap-2">
+                <div class="tw:flex tw:flex-wrap tw:gap-2 tw:mt-1">
                   <template v-if="getVariablesByType(query, 'fixed').length">
                     <div
                       v-for="v in getVariablesByType(query, 'fixed')"
@@ -216,7 +216,7 @@
                 <label class="tw:text-xs tw:font-bold tw:tracking-wider"
                   >Dynamic Variable(s)</label
                 >
-                <div class="tw:flex tw:flex-wrap tw:gap-2">
+                <div class="tw:flex tw:flex-wrap tw:gap-2 tw:mt-1">
                   <template
                     v-if="getVariablesByType(query, 'dynamicVariable').length"
                   >
@@ -396,33 +396,26 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.inspector-query-editor {
-  /* Custom scrollbar styling */
-  &::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(128, 128, 128, 0.2);
-    border-radius: 10px;
-
-    &:hover {
-      background: rgba(128, 128, 128, 0.4);
-    }
-  }
-
-  /* Firefox scrollbar styling */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(128, 128, 128, 0.2) transparent;
+<style>
+.inspector-query-editor::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-:deep(mark) {
+.inspector-query-editor::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.inspector-query-editor::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.2);
+  border-radius: 10px;
+}
+
+.inspector-query-editor::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.4);
+}
+
+.inspector-query-editor mark {
   all: unset;
   background-color: #facc15;
   color: black;
@@ -430,8 +423,8 @@ export default defineComponent({
   padding: 0;
 }
 
-// Ensure Monaco colorized content looks good
-:deep(.mtk1) {
+/* Ensure Monaco colorized content looks good */
+.inspector-query-editor .mtk1 {
   color: inherit;
 }
 </style>

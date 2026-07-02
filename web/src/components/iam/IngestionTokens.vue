@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="filterQuery"
                 :placeholder="t('ingestion.searchToken', 'Search tokens')"
                 class="tw:flex-1"
+                data-test="ingestion-tokens-search-input"
               />
             </div>
           </template>
@@ -121,7 +122,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Create token dialog -->
     <ODialog
       v-model:open="showCreateForm"
-      :persistent="true"
       size="sm"
       :title="t('ingestion.createTokenTitle')"
       :primary-button-label="t('common.create')"
@@ -208,6 +208,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getBasicAuth } from "@/utils/auth";
 import organizationsService from "@/services/organizations";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 interface Token {
@@ -384,6 +386,24 @@ export default defineComponent({
     onBeforeMount(() => {
       fetchTokens();
     });
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "ingestionTokensAdd",
+        handler: () => { if (!isInputFocused()) showCreateForm.value = true; },
+      },
+      {
+        id: "ingestionTokensRefresh",
+        handler: () => { if (!isInputFocused()) fetchTokens(); },
+      },
+      {
+        id: "ingestionTokensFocusSearch",
+        handler: () => {
+          focusSearchInput("ingestion-tokens-search-input");
+        },
+      },
+    ]);
 
     return {
       store,

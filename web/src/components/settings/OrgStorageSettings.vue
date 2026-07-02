@@ -40,26 +40,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ========== NOT CONFIGURED: cloud hero ========== -->
     <div
       v-else-if="!isConfigured && isCloud"
-      class="hero-page"
+      class="hero-page tw:flex tw:flex-col"
+      :style="{ minHeight: 'calc(100vh - var(--navbar-height) - 100px)' }"
       :class="store.state.theme === 'dark' ? 'hero-page--dark' : ''"
     >
-      <div class="hero-page__body">
+      <div class="hero-page__body tw:flex tw:items-center tw:justify-between tw:flex-1 tw:py-[72px] tw:px-[80px]" style="gap: 56px;">
         <!-- left -->
-        <div class="hero-page__left">
+        <div class="hero-page__left tw:flex-1 tw:max-w-[480px]">
 
-          <div class="hero-page__headline">
-            {{ t("storage_settings.heroHeadline") }} <span class="hero-page__brand-text">OpenObserve.</span>
+          <div class="hero-page__headline tw:font-bold tw:leading-tight tw:mb-[18px] tw:text-[#111827]" :class="store.state.theme === 'dark' ? 'tw:text-[#f1f1f5]' : ''" style="font-size: 2.6rem; letter-spacing: -0.6px; line-height: 1.2;">
+            {{ t("storage_settings.heroHeadline") }} <span class="hero-page__brand-text tw:text-(--q-primary)">OpenObserve.</span>
           </div>
 
-          <div class="hero-page__sub">
+          <div class="hero-page__sub tw:leading-[1.7] tw:text-[#6b7280] tw:mb-9 tw:max-w-[400px]" :class="store.state.theme === 'dark' ? 'tw:text-[#9ca3af]' : ''" style="font-size: 0.97rem;">
             {{ t("storage_settings.heroSub") }}
           </div>
 
-          <div class="hero-page__actions">
+          <div class="hero-page__actions tw:mb-7">
             <OButton
               data-test="storage-settings-configure-btn"
               variant="primary"
-              class="no-border o2-primary-button hero-cta-btn"
+              class="no-border o2-primary-button hero-cta-btn tw:h-11 tw:px-7 tw:font-semibold" style="font-size: 0.95rem;"
               :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               @click="navigateToCreate"
             >
@@ -68,15 +69,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- supported infrastructure -->
-          <div class="hero-page__inline-providers">
-            <span class="hero-page__inline-label">{{ t("storage_settings.supportedProviders") }}</span>
-            <div class="hero-page__inline-logos">
+          <div class="hero-page__inline-providers tw:flex tw:items-center tw:gap-3">
+            <span class="hero-page__inline-label tw:font-medium tw:whitespace-nowrap tw:text-[#aaa]" :class="store.state.theme === 'dark' ? 'tw:text-[#666]' : ''" style="font-size: 0.8rem; letter-spacing: 0px;">{{ t("storage_settings.supportedProviders") }}</span>
+            <div class="hero-page__inline-logos tw:flex tw:items-center" style="gap: 10px;">
               <div
                 v-for="p in availableProviders"
                 :key="p.value"
-                class="hero-page__inline-logo-wrap"
+                class="hero-page__inline-logo-wrap tw:w-7 tw:h-7 tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:cursor-default tw:opacity-70 tw:transition-opacity tw:duration-150"
               >
-                <img :src="p.image" :alt="p.label" class="hero-page__inline-logo" />
+                <img :src="p.image" :alt="p.label" class="hero-page__inline-logo tw:w-7 tw:h-7 tw:max-w-[28px] tw:max-h-[28px] tw:object-contain tw:block" />
                 <OTooltip :content="p.label" />
               </div>
             </div>
@@ -84,19 +85,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- right: feature cards -->
-        <div class="hero-page__right">
+        <div class="hero-page__right tw:w-[340px] tw:shrink-0 tw:flex tw:flex-col" style="gap: 14px;">
           <div
             v-for="feature in features"
             :key="feature.title"
-            class="feature-card"
-            :class="store.state.theme === 'dark' ? 'feature-card--dark' : ''"
+            class="feature-card tw:flex tw:items-start tw:rounded-[16px] tw:border tw:border-[rgba(0,0,0,0.07)] tw:bg-white tw:transition-all tw:duration-200" style="gap: 16px; padding: 20px 22px; box-shadow: 0 2px 12px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04);"
+            :class="store.state.theme === 'dark' ? 'feature-card--dark tw:bg-[rgba(255,255,255,0.05)] tw:border-[rgba(255,255,255,0.08)] tw:[box-shadow:0_2px_12px_rgba(0,0,0,0.3)]' : ''"
           >
-            <div class="feature-card__icon-box" :class="store.state.theme === 'dark' ? 'feature-card__icon-box--dark' : ''">
-              <OIcon :name="feature.icon" size="md" class="feature-card__icon" />
+            <div class="feature-card__icon-box tw:w-10 tw:h-10 tw:rounded-[10px] tw:bg-[rgba(66,133,244,0.08)] tw:flex tw:items-center tw:justify-center tw:shrink-0" :class="store.state.theme === 'dark' ? 'feature-card__icon-box--dark tw:bg-[rgba(66,133,244,0.15)]' : ''">
+              <OIcon :name="feature.icon" size="md" class="feature-card__icon tw:text-(--q-primary) tw:opacity-85" />
             </div>
-            <div class="feature-card__content">
-              <div class="feature-card__title">{{ feature.title }}</div>
-              <div class="feature-card__desc">{{ feature.desc }}</div>
+            <div class="feature-card__content tw:pt-[2px] tw:flex-1">
+              <div class="feature-card__title tw:font-bold tw:text-[#111827] tw:mb-[5px]" :class="store.state.theme === 'dark' ? 'tw:text-[#f3f4f6]' : ''" style="font-size: 0.92rem;">{{ feature.title }}</div>
+              <div class="feature-card__desc tw:text-[#6b7280] tw:leading-[1.55]" :class="store.state.theme === 'dark' ? 'tw:text-[#9ca3af]' : ''" style="font-size: 0.8rem;">{{ feature.desc }}</div>
             </div>
           </div>
         </div>
@@ -106,33 +107,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ========== NOT CONFIGURED: enterprise empty state ========== -->
     <div
       v-else-if="!isConfigured && !isCloud"
-      class="ent-empty"
+      class="ent-empty tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center tw:py-12 tw:px-6"
+      :style="{ minHeight: 'calc(100vh - var(--navbar-height) - 160px)' }"
       :class="store.state.theme === 'dark' ? 'ent-empty--dark' : ''"
     >
       <!-- double-ring icon -->
-      <div class="ent-empty__icon-outer">
-        <div class="ent-empty__icon-inner" :class="store.state.theme === 'dark' ? 'ent-empty__icon-inner--dark' : ''">
-          <OIcon name="cloud-upload" size="lg" class="ent-empty__icon" />
+      <div class="ent-empty__icon-outer tw:w-[100px] tw:h-[100px] tw:rounded-full tw:border tw:border-dashed tw:border-[rgba(66,133,244,0.25)] tw:flex tw:items-center tw:justify-center tw:mb-7" :class="store.state.theme === 'dark' ? 'tw:border-[rgba(66,133,244,0.3)]' : ''">
+        <div class="ent-empty__icon-inner tw:w-[68px] tw:h-[68px] tw:rounded-full tw:bg-[rgba(66,133,244,0.09)] tw:flex tw:items-center tw:justify-center" style="border: 1.5px solid rgba(66,133,244,0.22);" :class="store.state.theme === 'dark' ? 'ent-empty__icon-inner--dark tw:bg-[rgba(66,133,244,0.18)] tw:border-[rgba(66,133,244,0.35)]' : ''">
+          <OIcon name="cloud-upload" size="lg" class="ent-empty__icon tw:text-(--q-primary) tw:opacity-85" />
         </div>
       </div>
 
-      <div class="ent-empty__title">{{ t("storage_settings.noStorageConfigured") }}</div>
+      <div class="ent-empty__title tw:font-bold tw:text-[#111827] tw:mb-[10px]" :class="store.state.theme === 'dark' ? 'tw:text-[#f1f1f5]' : ''" style="font-size: 1.2rem; letter-spacing: -0.2px;">{{ t("storage_settings.noStorageConfigured") }}</div>
 
-      <div class="ent-empty__desc">
+      <div class="ent-empty__desc tw:text-[#6b7280] tw:leading-[1.65] tw:max-w-[400px] tw:mb-6" :class="store.state.theme === 'dark' ? 'tw:text-[#9ca3af]' : ''" style="font-size: 0.88rem;">
         {{ t("storage_settings.routeDataDesc") }}
       </div>
 
       <!-- key fact chips -->
-      <div class="ent-empty__chips">
-        <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
+      <div class="ent-empty__chips tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:justify-center tw:mb-8">
+        <span class="ent-empty__chip tw:inline-flex tw:items-center tw:font-medium tw:text-[#6b7280] tw:bg-[#f3f4f6] tw:border tw:border-[#e5e7eb] tw:rounded-[20px] tw:py-1 tw:px-3" style="gap: 5px; font-size: 0.75rem;" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark tw:text-[#9ca3af] tw:bg-[rgba(255,255,255,0.06)] tw:border-[rgba(255,255,255,0.1)]' : ''">
           <OIcon name="corporate-fare" size="xs" />
           {{ t("storage_settings.perOrgIsolation") }}
         </span>
-        <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
+        <span class="ent-empty__chip tw:inline-flex tw:items-center tw:font-medium tw:text-[#6b7280] tw:bg-[#f3f4f6] tw:border tw:border-[#e5e7eb] tw:rounded-[20px] tw:py-1 tw:px-3" style="gap: 5px; font-size: 0.75rem;" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark tw:text-[#9ca3af] tw:bg-[rgba(255,255,255,0.06)] tw:border-[rgba(255,255,255,0.1)]' : ''">
           <OIcon name="bolt" size="xs" />
           {{ t("storage_settings.appliesImmediately") }}
         </span>
-        <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
+        <span class="ent-empty__chip tw:inline-flex tw:items-center tw:font-medium tw:text-[#6b7280] tw:bg-[#f3f4f6] tw:border tw:border-[#e5e7eb] tw:rounded-[20px] tw:py-1 tw:px-3" style="gap: 5px; font-size: 0.75rem;" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark tw:text-[#9ca3af] tw:bg-[rgba(255,255,255,0.06)] tw:border-[rgba(255,255,255,0.1)]' : ''">
           <OIcon name="lock" size="xs" />
           {{ t("storage_settings.usesOrgCredentials") }}
         </span>
@@ -141,22 +143,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         data-test="storage-settings-configure-btn"
         variant="primary"
-        class="no-border o2-primary-button ent-empty__btn"
+        class="no-border o2-primary-button ent-empty__btn tw:h-10 tw:font-semibold tw:mb-9 tw:px-6" style="font-size: 0.92rem;"
         :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         @click="navigateToCreate"
       >
         {{ t("storage_settings.configureStorage") }}
       </OButton>
 
-      <div class="ent-empty__providers">
-        <span class="ent-empty__providers-label">{{ t("storage_settings.supportedProviders") }}</span>
-        <div class="ent-empty__providers-logos">
+      <div class="ent-empty__providers tw:flex tw:items-center tw:gap-3">
+        <span class="ent-empty__providers-label tw:font-medium tw:whitespace-nowrap tw:text-[#aaa]" :class="store.state.theme === 'dark' ? 'tw:text-[#666]' : ''" style="font-size: 0.78rem;">{{ t("storage_settings.supportedProviders") }}</span>
+        <div class="ent-empty__providers-logos tw:flex tw:items-center" style="gap: 10px;">
           <div
             v-for="p in providerDefinitions"
             :key="p.value"
-            class="ent-empty__logo-wrap"
+            class="ent-empty__logo-wrap tw:w-7 tw:h-7 tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:cursor-default tw:opacity-[0.65] tw:transition-opacity tw:duration-150"
           >
-            <img :src="p.image" :alt="p.label" class="ent-empty__logo" />
+            <img :src="p.image" :alt="p.label" class="ent-empty__logo tw:w-7 tw:h-7 tw:max-w-[28px] tw:max-h-[28px] tw:object-contain tw:block" />
             <OTooltip :content="p.label" />
           </div>
         </div>
@@ -168,8 +170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="tw:p-3">
       <OCard
-        class="storage-card"
-        :class="store.state.theme === 'dark' ? 'storage-card--dark' : ''"
+        class="storage-card tw:rounded-xl"
+        :class="store.state.theme === 'dark' ? 'storage-card--dark tw:bg-[#1e1e1e]' : ''"
         style="max-width: 680px;"
       >
         <!-- Card header: logo + name + badge | update button -->
@@ -203,30 +205,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Field grid -->
         <OCardSection role="body">
-          <div class="storage-detail-grid">
+          <div class="storage-detail-grid tw:grid tw:gap-x-8 tw:gap-y-5" style="grid-template-columns: repeat(2, 1fr);">
             <div v-if="storageData.bucket_name" class="storage-field">
-              <div class="storage-field__label">{{ t("storage_settings.bucketName") }}</div>
-              <div class="storage-field__value">{{ storageData.bucket_name }}</div>
+              <div class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:mb-[3px] tw:font-medium">{{ t("storage_settings.bucketName") }}</div>
+              <div class="storage-field__value tw:text-[#6b7280] tw:break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.bucket_name }}</div>
             </div>
             <div v-if="storageData.region" class="storage-field">
-              <div class="storage-field__label">{{ t("storage_settings.region") }}</div>
-              <div class="storage-field__value">{{ storageData.region }}</div>
+              <div class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:mb-[3px] tw:font-medium">{{ t("storage_settings.region") }}</div>
+              <div class="storage-field__value tw:break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.region }}</div>
             </div>
             <div v-if="storageData.server_url && !isCloud" class="storage-field">
-              <div class="storage-field__label">{{ t("storage_settings.serverUrl") }}</div>
-              <div class="storage-field__value">{{ storageData.server_url }}</div>
+              <div class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:mb-[3px] tw:font-medium">{{ t("storage_settings.serverUrl") }}</div>
+              <div class="storage-field__value tw:break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.server_url }}</div>
             </div>
             <div v-if="storageData.access_key" class="storage-field">
-              <div class="storage-field__label">{{ t("storage_settings.accessKey") }}</div>
-              <div class="storage-field__value">{{ storageData.access_key }}</div>
+              <div class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:mb-[3px] tw:font-medium">{{ t("storage_settings.accessKey") }}</div>
+              <div class="storage-field__value tw:break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.access_key }}</div>
             </div>
             <div v-if="storageData.secret_key" class="storage-field">
-              <div class="storage-field__label">{{ t("storage_settings.secretKey") }}</div>
-              <div class="storage-field__value">{{ storageData.secret_key }}</div>
+              <div class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:mb-[3px] tw:font-medium">{{ t("storage_settings.secretKey") }}</div>
+              <div class="storage-field__value tw:break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.secret_key }}</div>
             </div>
             <div v-if="storageData.role_arn" class="storage-field">
-              <div class="storage-field__label">{{ t("storage_settings.roleArn") }}</div>
-              <div class="storage-field__value" style="word-break: break-all;">{{ storageData.role_arn }}</div>
+              <div class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:mb-[3px] tw:font-medium">{{ t("storage_settings.roleArn") }}</div>
+              <div class="storage-field__value tw:break-all" style="font-size: 0.9rem; color: var(--o2-text-primary); word-break: break-all;">{{ storageData.role_arn }}</div>
             </div>
           </div>
         </OCardSection>
@@ -237,11 +239,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OCardSection v-if="configTimestamps">
           <div class="tw:flex" style="gap: 40px;">
             <div v-if="configTimestamps.created_at" class="tw:flex tw:items-center" style="gap: 6px;">
-              <span class="storage-field__label" style="margin-bottom: 0;">{{ t("storage_settings.createdAt") }}</span>
+              <span class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:font-medium" style="margin-bottom: 0;">{{ t("storage_settings.createdAt") }}</span>
               <span class="tw:text-sm">{{ configTimestamps.created_at }}</span>
             </div>
             <div v-if="configTimestamps.updated_at" class="tw:flex tw:items-center" style="gap: 6px;">
-              <span class="storage-field__label" style="margin-bottom: 0;">{{ t("storage_settings.updatedAt") }}</span>
+              <span class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:font-medium" style="margin-bottom: 0;">{{ t("storage_settings.updatedAt") }}</span>
               <span class="tw:text-sm">{{ configTimestamps.updated_at }}</span>
             </div>
           </div>
@@ -410,410 +412,17 @@ onMounted(() => {
 });
 </script>
 
-<style lang="scss" scoped>
-// ── Hero page ─────────────────────────────────────────────────────────────────
-.hero-page {
-  display: flex;
-  flex-direction: column;
-  min-height: calc(100vh - var(--navbar-height) - 100px);
-
-  &__body {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 56px;
-    flex: 1;
-    padding: 72px 80px;
-  }
-
-  // ── Left ────────────────────────────────────────────────────────────────
-  &__left {
-    flex: 1;
-    max-width: 480px;
-  }
-
-  &__eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 1.2px;
-    text-transform: none;
-    color: var(--q-primary);
-    background: rgba(66, 133, 244, 0.1);
-    border: 1px solid rgba(66, 133, 244, 0.25);
-    padding: 4px 10px;
-    border-radius: 20px;
-    margin-bottom: 20px;
-  }
-
-  &__headline {
-    font-size: 2.6rem;
-    font-weight: 700;
-    line-height: 1.2;
-    letter-spacing: -0.6px;
-    color: #111827;
-    margin-bottom: 18px;
-
-    .hero-page--dark & {
-      color: #f1f1f5;
-    }
-  }
-
-  &__brand-text {
-    color: var(--q-primary);
-  }
-
-  &__brand-logo {
-    width: 28px;
-    height: 22px;
-    object-fit: contain;
-    display: inline-block;
-    vertical-align: middle;
-    position: relative;
-    top: -2px;
-  }
-
-  &__sub {
-    font-size: 0.97rem;
-    line-height: 1.7;
-    color: #6b7280;
-    margin-bottom: 36px;
-    max-width: 400px;
-
-    .hero-page--dark & {
-      color: #9ca3af;
-    }
-  }
-
-  &__actions {
-    margin-bottom: 28px;
-  }
-
-  // provider logos tw:inline beneath the CTA
-  &__inline-providers {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  &__inline-label {
-    font-size: 0.8rem;
-    font-weight: 500;
-    letter-spacing: 0px;
-    color: #aaa;
-    white-space: nowrap;
-
-    .hero-page--dark & {
-      color: #666;
-    }
-  }
-
-  &__inline-logos {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  &__inline-logo-wrap {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    cursor: default;
-    opacity: 0.7;
-    transition: opacity 0.15s;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-
-  &__inline-logo {
-    width: 28px;
-    height: 28px;
-    max-width: 28px;
-    max-height: 28px;
-    object-fit: contain;
-    display: block;
-  }
-
-  // ── Right ────────────────────────────────────────────────────────────────
-  &__right {
-    width: 340px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
+<style>
+.hero-page__inline-logo-wrap:hover {
+  opacity: 1;
 }
 
-.hero-cta-btn {
-  height: 44px;
-  padding: 0 28px;
-  font-size: 0.95rem;
-  font-weight: 600;
+.feature-card:hover {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
 }
 
-// ── Feature cards (right side) ────────────────────────────────────────────────
-.feature-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 20px 22px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 1);
-  border: 1px solid rgba(0, 0, 0, 0.07);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-
-  &:hover {
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
-    transform: translateY(-1px);
-  }
-
-  &--dark {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-  }
-
-  &__icon-box {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    background: rgba(66, 133, 244, 0.08);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-
-    &--dark {
-      background: rgba(66, 133, 244, 0.15);
-    }
-  }
-
-  &__icon {
-    color: var(--q-primary);
-    opacity: 0.85;
-  }
-
-  &__content {
-    padding-top: 2px;
-    flex: 1;
-  }
-
-  &__title {
-    font-size: 0.92rem;
-    font-weight: 700;
-    color: #111827;
-    margin-bottom: 5px;
-
-    .feature-card--dark & {
-      color: #f3f4f6;
-    }
-  }
-
-  &__desc {
-    font-size: 0.8rem;
-    color: #6b7280;
-    line-height: 1.55;
-
-    .feature-card--dark & {
-      color: #9ca3af;
-    }
-  }
-}
-
-// ── Enterprise empty state ────────────────────────────────────────────────────
-.ent-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: calc(100vh - var(--navbar-height) - 160px);
-  padding: 48px 24px;
-  text-align: center;
-
-  // double-ring: outer halo
-  &__icon-outer {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    border: 1px dashed rgba(66, 133, 244, 0.25);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 28px;
-
-    .ent-empty--dark & {
-      border-color: rgba(66, 133, 244, 0.3);
-    }
-  }
-
-  // inner solid ring
-  &__icon-inner {
-    width: 68px;
-    height: 68px;
-    border-radius: 50%;
-    background: rgba(66, 133, 244, 0.09);
-    border: 1.5px solid rgba(66, 133, 244, 0.22);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &--dark {
-      background: rgba(66, 133, 244, 0.18);
-      border-color: rgba(66, 133, 244, 0.35);
-    }
-  }
-
-  &__icon {
-    color: var(--q-primary);
-    opacity: 0.85;
-  }
-
-  &__title {
-    font-size: 1.2rem;
-    font-weight: 700;
-    letter-spacing: -0.2px;
-    color: #111827;
-    margin-bottom: 10px;
-
-    .ent-empty--dark & {
-      color: #f1f1f5;
-    }
-  }
-
-  &__desc {
-    font-size: 0.88rem;
-    line-height: 1.65;
-    color: #6b7280;
-    max-width: 400px;
-    margin-bottom: 24px;
-
-    .ent-empty--dark & {
-      color: #9ca3af;
-    }
-  }
-
-  // fact chips "row"
-  &__chips {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-bottom: 32px;
-  }
-
-  &__chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #6b7280;
-    background: #f3f4f6;
-    border: 1px solid #e5e7eb;
-    border-radius: 20px;
-    padding: 4px 12px;
-
-    &--dark {
-      color: #9ca3af;
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.1);
-    }
-  }
-
-  &__btn {
-    height: 40px;
-    padding: 0 24px;
-    font-size: 0.92rem;
-    font-weight: 600;
-    margin-bottom: 36px;
-  }
-
-  &__providers {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  &__providers-label {
-    font-size: 0.78rem;
-    font-weight: 500;
-    color: #aaa;
-    white-space: nowrap;
-
-    .ent-empty--dark & {
-      color: #666;
-    }
-  }
-
-  &__providers-logos {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  &__logo-wrap {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    cursor: default;
-    opacity: 0.65;
-    transition: opacity 0.15s;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-
-  &__logo {
-    width: 28px;
-    height: 28px;
-    max-width: 28px;
-    max-height: 28px;
-    object-fit: contain;
-    display: block;
-  }
-}
-
-// ── Configured card ───────────────────────────────────────────────────────────
-.storage-card {
-  border-radius: 12px;
-
-  &--dark {
-    background: #1e1e1e;
-  }
-}
-
-.storage-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px 32px;
-}
-
-.storage-field {
-  &__label {
-    font-size: 0.75rem;
-    color: #6b7280;
-    text-transform: capitalize;
-    margin-bottom: 3px;
-    font-weight: 500;
-  }
-
-  &__value {
-    font-size: 0.9rem;
-    color: var(--o2-text-primary);
-    word-break: break-all;
-  }
+.ent-empty__logo-wrap:hover {
+  opacity: 1;
 }
 </style>

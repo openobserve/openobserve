@@ -273,9 +273,7 @@
                   <span class="sd-versions__label"
                     >v{{ row.version }}</span
                   >
-                  <OTag type="booleanState" value="enabled">{{
-                    t("onlineEvals.scorer.detail.activeVersionChip")
-                  }}</OTag>
+                  <OTag type="activeVersionFlag" value="active" />
                 </div>
                 <div v-if="updatedAt" class="sd-versions__meta">
                   {{ t("onlineEvals.scorer.detail.lastUpdated") }}

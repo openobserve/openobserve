@@ -25,7 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:text-xs text-weight-medium tw:mb-1">
         Full Text Search ({{ fieldsByType.fts.length }})
       </div>
-      <div class="performance-fields-container bordered-scroll-area" :class="store.state.theme === 'dark' ? 'bordered-scroll-area-dark' : 'bordered-scroll-area-light'">
+      <div
+        class="tw:p-2 tw:max-h-50 tw:overflow-y-auto tw:border tw:rounded"
+        :class="store.state.theme === 'dark' ? 'tw:border-[#3a3a3a] tw:bg-[#1e1e1e]' : 'tw:border-(--o2-border) tw:bg-[#f5f5f5]'"
+      >
         <OTag
           v-for="field in fieldsByType.fts"
           :key="field.name"
@@ -52,7 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:text-xs text-weight-medium tw:mb-1">
         Secondary Index ({{ fieldsByType.secondaryIndex.length }})
       </div>
-      <div class="performance-fields-container bordered-scroll-area" :class="store.state.theme === 'dark' ? 'bordered-scroll-area-dark' : 'bordered-scroll-area-light'">
+      <div
+        class="tw:p-2 tw:max-h-50 tw:overflow-y-auto tw:border tw:rounded"
+        :class="store.state.theme === 'dark' ? 'tw:border-[#3a3a3a] tw:bg-[#1e1e1e]' : 'tw:border-(--o2-border) tw:bg-[#f5f5f5]'"
+      >
         <OTag
           v-for="field in fieldsByType.secondaryIndex"
           :key="field.name"
@@ -125,29 +131,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.performance-fields-description {
-  color: var(--o2-text-muted);
-}
-
-.bordered-scroll-area {
-  border: 1px solid;
-  border-radius: 4px;
-}
-
-.bordered-scroll-area-light {
-  border-color: #e0e0e0;
-  background-color: #f5f5f5;
-}
-
-.bordered-scroll-area-dark {
-  border-color: #3a3a3a;
-  background-color: #1e1e1e;
-}
-
-.performance-fields-container {
-  padding: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-</style>

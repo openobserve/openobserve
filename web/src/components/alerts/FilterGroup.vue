@@ -1,12 +1,15 @@
-<template>
+﻿<template>
     <!-- Preview Section (only for root level) -->
     <div v-if="depth === 0 && showSqlPreview && previewString"
-         class="tw:mb-2 tw:p-2 tw:rounded tw:border tw:w-full tw:max-h-[3.2em] tw:overflow-y-auto tw:bg-surface-panel tw:border-border-default">
+         class="tw:mb-2 tw:p-2 tw:rounded tw:border tw:w-full tw:max-h-[3.2em] tw:overflow-y-auto"
+         :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-gray-700' : 'tw:bg-gray-50 tw:border-gray-300'">
       <div class="tw:flex tw:items-start tw:gap-1 tw:min-w-0">
-        <span class="tw:font-medium tw:text-xs tw:flex-shrink-0 tw:leading-[1.3] tw:text-text-primary">
+        <span class="tw:font-medium tw:text-xs tw:flex-shrink-0 tw:leading-[1.3]"
+              :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'">
           Preview:
         </span>
-        <span class="tw:text-[10px] tw:font-mono tw:leading-[1.3] tw:min-w-0 tw:break-words tw:text-text-secondary">
+        <span class="tw:text-[10px] tw:font-mono tw:leading-[1.3] tw:min-w-0 tw:break-words"
+              :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">
           {{ previewString }}
         </span>
       </div>
@@ -14,7 +17,7 @@
 
     <div :class="[`  tw:px-2 tw:mb-2 el-border el-border-radius `,
         'tw:mt-4',
-        store.state.isAiChatEnabled ? 'tw:w-full' : 'xl:tw:w-fit'
+        store.state.isAiChatEnabled ? 'tw:w-full' : 'tw:xl:w-fit'
     ]"
     :style="{
         opacity: computedOpacity,
@@ -48,7 +51,7 @@
 
       <!-- Group content -->
 
-      <div v-if="isOpen" class="tw:overflow-x-auto group-container">
+      <div v-if="isOpen" class="tw:overflow-x-auto group-container" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
         <!-- Items in group (V2 uses 'conditions' array) -->
         <div class="tw:ml-2 tw:whitespace-nowrap " v-for="(item, index) in props.group.conditions" :key="index">
           <FilterGroup
@@ -486,79 +489,39 @@ defineExpose({
 
   </script>
 
-  <style lang="scss">
+  <style>
 
-    .condition-container {
-        overflow-x: auto;
-        max-width: 900px;
+    .group-container.dark-mode-group {
+      scrollbar-color: #818181 var(--o2-primary-background); /* thumb color, track color */
     }
 
+    .group-container.light-mode-group {
+      scrollbar-color: #999 #ffffff;
+    }
 
-    .group-tabs {
-      position: relative;
+    /* For more control using WebKit scrollbar styling */
+    .group-container::-webkit-scrollbar {
+      width: 8px;
+      height: 4px !important;
+    }
 
+    .group-container.dark-mode-group::-webkit-scrollbar-track {
+      background: red;
+    }
+
+    .group-container.dark-mode-group::-webkit-scrollbar-thumb {
+      background-color: #b10000;
       border-radius: 4px;
-      overflow: hidden;
-      bottom: 12px;
-      .q-tab{
-        height: 24px !important;
-        min-height: 24px !important;
-        width: 50px !important;
-        min-width: 50px !important;
-      }
-      .q-tab__label{
-        font-size: 10px !important;
-      }
-    }
-  .group-container {
-    scrollbar-color: var(--o2-text-muted) var(--o2-primary-background);
-  }
-
-/* For more control using WebKit scrollbar styling */
-.group-container::-webkit-scrollbar {
-  width: 8px;
-  height: 4px !important;
-}
-
-.group-container::-webkit-scrollbar-track {
-  background: var(--o2-primary-background);
-}
-
-.group-container::-webkit-scrollbar-thumb {
-  background-color: var(--o2-text-muted);
-  border-radius: 4px;
-}
-
-  .group-tabs {
-      border: 1px solid $border-color;
-      background-color: transparent !important;
-    .q-tab--active {
-      background-color: var(--o2-primary-btn-bg);
-      color: $white;
     }
 
-      .q-tab__indicator {
-        display: none;
-      }
-
-  
-
-    .q-tab--inactive {
-      background-color: var(--o2-inactive-tab-bg);
+    .group-container.light-mode-group::-webkit-scrollbar-track {
+      background: #ffffff;
     }
 
-    .q-tab{
-          &:hover:not(.q-tab--active) {
-    background-color: color-mix(in srgb, var(--o2-tab-bg) 70%, var(--o2-theme-mode) 50%);
-  }
-
-    &:hover.q-tab--active {
-      background-color: var(--o2-primary-btn-bg) !important;
+    .group-container.light-mode-group::-webkit-scrollbar-thumb {
+      background-color: #999;
+      border-radius: 4px;
     }
-      }
-    }
-    
-
 
   </style>
   

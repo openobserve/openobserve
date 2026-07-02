@@ -118,12 +118,13 @@ describe("TraceHeader", () => {
 
     it("should have correct default height", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("trace-header-container");
+      expect(headerContainer.classes()).toContain("tw:h-7.5");
     });
 
     it("should have sticky positioning", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("trace-header-container");
+      expect(headerContainer.classes()).toContain("tw:sticky");
+      expect(headerContainer.classes()).toContain("tw:top-0");
     });
   });
 
@@ -165,10 +166,7 @@ describe("TraceHeader", () => {
 
     it("should have correct avatar properties", () => {
       const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
-      expect(resizeBtn.classes()).toContain("resize-btn");
-      expect(resizeBtn.classes()).toContain("tw:bg-[var(--o2-primary)]");
-      // tw:text-white was removed from the resize button in favour of inheriting
-      // the icon colour — assert the remaining identity classes instead.
+      expect(resizeBtn.classes()).toContain("tw:bg-(--o2-primary)");
       expect(resizeBtn.classes()).toContain("tw:rounded-full");
     });
   });
@@ -228,7 +226,8 @@ describe("TraceHeader", () => {
 
     it("should have correct z-index for first tic", () => {
       const firstTic = wrapper.find('[data-test="trace-header-tic-line-0"]');
-      expect(firstTic.classes()).toContain("trace-tic-first");
+      expect(firstTic.classes()).toContain("tw:z-5");
+      expect(firstTic.classes()).toContain("tw:hidden");
     });
 
     it("should have correct z-index for other tics", () => {
@@ -244,8 +243,14 @@ describe("TraceHeader", () => {
   describe("Theme support", () => {
     it("should apply light theme by default", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("tw:bg-surface-panel");
-      expect(headerContainer.classes()).toContain("trace-header-container");
+      expect(headerContainer.classes()).toContain(
+        "tw:bg-[color-mix(in_srgb,currentColor_5%,transparent)]",
+      );
+      const ticLines = wrapper.findAll('[data-test^="trace-header-tic-line-"]');
+      ticLines.forEach((tic) => {
+        expect(tic.classes()).toContain("tw:bg-[#cacaca]");
+        expect(tic.classes()).not.toContain("tw:bg-[#3c3c3c]");
+      });
     });
 
     it("should apply dark theme when store theme is dark", async () => {
@@ -279,9 +284,12 @@ describe("TraceHeader", () => {
         },
       });
 
-      const headerContainer = darkWrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("tw:bg-surface-panel");
-      expect(headerContainer.classes()).toContain("trace-header-container");
+      const ticLines = darkWrapper.findAll(
+        '[data-test^="trace-header-tic-line-"]',
+      );
+      ticLines.forEach((tic) => {
+        expect(tic.classes()).toContain("tw:bg-[#3c3c3c]");
+      });
 
       darkWrapper.unmount();
     });
@@ -321,7 +329,7 @@ describe("TraceHeader", () => {
         '[data-test^="trace-header-tic-line-"]',
       );
       ticLines.forEach((tic) => {
-        expect(tic.classes()).toContain("bg-dark-tic");
+        expect(tic.classes()).toContain("tw:bg-[#3c3c3c]");
       });
 
       darkWrapper.unmount();
@@ -355,7 +363,7 @@ describe("TraceHeader", () => {
 
     it("should have correct cursor style for resize button", () => {
       const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
-      expect(resizeBtn.classes()).toContain("resize-btn");
+      expect(resizeBtn.classes()).toContain("tw:cursor-col-resize");
     });
   });
 
@@ -454,7 +462,9 @@ describe("TraceHeader", () => {
 
     it("should have correct header background class", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("header-bg");
+      expect(headerContainer.classes()).toContain(
+        "tw:bg-[color-mix(in_srgb,currentColor_5%,transparent)]",
+      );
     });
 
     it("should have correct operation name section classes", () => {
@@ -608,9 +618,10 @@ describe("TraceHeader", () => {
       );
     });
 
-    it("should have proper ARIA attributes for resize button", () => {
-      const resizeBtn = wrapper.find(".resize-btn");
+    it("should expose the resize button as an interactive element", () => {
+      const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
       expect(resizeBtn.exists()).toBe(true);
+      expect(resizeBtn.classes()).toContain("tw:cursor-col-resize");
     });
   });
 

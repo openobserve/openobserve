@@ -841,7 +841,7 @@ test.describe("dashboard filter testcases", () => {
     await page.getByText("Add Group").click();
 
     // Wait for first group to be created
-    await page.locator('.group[style*="--group-index: 1"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="dashboard-group"][style*="--group-index: 1"]').waitFor({ state: "visible" });
 
     // Add first condition in group 1
     await pm.dashboardFilter.addNestedGroupFilterCondition(
@@ -857,13 +857,13 @@ test.describe("dashboard filter testcases", () => {
 
     // Add nested group inside group 1
     await page
-      .locator('.group[style*="--group-index: 1"]')
+      .locator('[data-test="dashboard-group"][style*="--group-index: 1"]')
       .locator('[data-test="dashboard-add-condition-add"]')
       .click();
     await page.getByText("Add Group").last().click();
 
     // Wait for nested group to be created
-    await page.locator('.group[style*="--group-index: 2"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="dashboard-group"][style*="--group-index: 2"]').waitFor({ state: "visible" });
 
     // Add condition in nested group 2
     await pm.dashboardFilter.addNestedGroupFilterCondition(

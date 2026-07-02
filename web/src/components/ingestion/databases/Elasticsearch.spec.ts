@@ -138,7 +138,7 @@ describe('Elasticsearch.vue Comprehensive Coverage', () => {
       wrapper = createWrapper();
       const docLink = wrapper.find('a');
       expect(docLink.classes()).toContain('tw:text-text-link');
-      expect(docLink.classes()).toContain('hover:tw:text-text-link-hover');
+      expect(docLink.classes()).toContain('tw:hover:text-text-link-hover');
       expect(docLink.classes()).toContain('tw:underline');
       expect(docLink.classes()).toContain('tw:font-medium');
     });
@@ -372,7 +372,7 @@ describe('Elasticsearch.vue Comprehensive Coverage', () => {
       const link = wrapper.find('a');
       expect(link.attributes('target')).toBe('_blank');
       expect(link.classes()).toContain('tw:text-text-link');
-      expect(link.classes()).toContain('hover:tw:text-text-link-hover');
+      expect(link.classes()).toContain('tw:hover:text-text-link-hover');
     });
   });
 

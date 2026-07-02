@@ -7,8 +7,8 @@ the Free Software Foundation, either version 3 of the License, or
 
 <template>
   <div
-    class="online-evals"
-    :class="{ 'online-evals--embedded': hideTabBar }"
+    class="tw:flex tw:flex-col tw:gap-2.5 tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-0 tw:pt-1 tw:px-2.5 tw:pb-2.5 tw:text-(--o2-text)"
+    :class="{ 'tw:h-full! tw:p-0! tw:gap-0!': hideTabBar }"
     data-test="online-evals-page"
   >
     <!-- Full-page forms (jobs / scorers) -->
@@ -54,9 +54,9 @@ the Free Software Foundation, either version 3 of the License, or
     />
 
     <template v-else>
-      <div v-if="!hideTabBar" class="online-evals__header card-container">
+      <div v-if="!hideTabBar" class="online-evals__header card-container tw:flex tw:items-center tw:justify-between tw:gap-4 tw:min-h-17 tw:py-2.5 tw:px-4 tw:shrink-0 tw:bg-(--o2-card-bg)">
         <div>
-          <h1>{{ t("onlineEvals.title") }}</h1>
+          <h1 class="tw:m-0 tw:text-[var(--text-lg)] tw:font-semibold tw:text-[var(--color-text-heading)] tw:[letter-spacing:0]">{{ t("onlineEvals.title") }}</h1>
         </div>
       </div>
 
@@ -168,13 +168,13 @@ the Free Software Foundation, either version 3 of the License, or
         </template>
       </AppPageHeader>
 
-      <section class="online-evals__content card-container">
-        <div v-if="!hideTabBar" class="online-evals__tabs">
+      <section class="online-evals__content card-container tw:flex tw:flex-1 tw:flex-col tw:min-h-0 tw:overflow-hidden tw:bg-(--o2-card-bg)">
+        <div v-if="!hideTabBar" class="online-evals__tabs tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:py-0 tw:px-3.5 tw:bg-transparent tw:border-b tw:border-(--o2-border)">
           <button
             v-for="tab in tabs"
             :key="tab.value"
-            class="online-evals__tab"
-            :class="{ 'is-active': activeTab === tab.value }"
+            class="online-evals__tab tw:inline-flex tw:items-center tw:gap-1.75 tw:h-9.5 tw:py-0 tw:px-3.5 tw:bg-transparent tw:border-0 tw:border-b-2 tw:border-b-transparent tw:text-(--o2-text-muted) tw:cursor-pointer tw:font-semibold tw:text-[13px]"
+            :class="activeTab === tab.value ? 'is-active tw:text-[var(--o2-text)] tw:border-b-[var(--o2-brand)] tw:-mb-px' : ''"
             type="button"
             @click="activeTab = tab.value"
           >
@@ -182,7 +182,7 @@ the Free Software Foundation, either version 3 of the License, or
           </button>
         </div>
 
-        <div class="online-evals__body">
+        <div class="online-evals__body tw:flex tw:flex-1 tw:min-h-0">
           <QualityPage
             v-if="activeTab === 'quality'"
             ref="qualityPageRef"
@@ -1229,102 +1229,10 @@ async function performDelete() {
 }
 </script>
 
-<style lang="scss">
-.online-evals {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  height: calc(100vh - var(--navbar-height));
-  min-height: 0;
-  padding: 4px 10px 10px;
-  color: var(--o2-text);
-}
-
-// When rendered inside the AI Observability shell, the AppPageHeader at the
-// top spans flush to the edges (matching LLM Insights / Sessions), so the
-// outer container drops its padding and gap — the header owns the top strip,
-// and the inner section's children handle their own internal padding.
-.online-evals--embedded {
-  height: 100%;
-  padding: 0;
-  gap: 0;
-}
-
-.online-evals__header,
-.online-evals__content {
-  background: var(--o2-card-bg);
-}
-
-.online-evals__content {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.online-evals__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 68px;
-  padding: 10px 16px;
-  flex-shrink: 0;
-}
-
-.online-evals__header h1 {
-  margin: 0;
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--color-text-heading);
-  letter-spacing: 0;
-}
-
-.online-evals__tabs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  padding: 0 14px;
-  background: transparent;
-  border-bottom: 1px solid var(--o2-border);
-}
-
-.online-evals__tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 38px;
-  padding: 0 14px;
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  color: var(--o2-text-muted);
-  cursor: pointer;
-  font: 600 13px var(--o2-font);
-}
-
-.online-evals__tab.is-active {
-  color: var(--o2-text);
-  border-bottom-color: var(--o2-brand);
-  margin-bottom: -1px;
-}
-
-.online-evals__body {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-.eval-form-page__side {
-  min-width: 0;
-  overflow: auto;
-  padding: 18px;
-  border-left: 1px solid var(--o2-border);
-  background: var(--o2-bg-secondary);
-}
-
+<!-- Non-scoped @media-only rule: responsive override for the form side rail
+     (.eval-form-page__side is used by ScorerTestPanel). Kept as a plain style
+     block per the "don't convert @media to tw:" rule. -->
+<style>
 @media (max-width: 960px) {
   .eval-form-page__side {
     border-left: 0;

@@ -413,28 +413,17 @@ export class AlertCreationWizard {
         // ==================== ALERT SETTINGS ====================
         // SQL tab: threshold row uses data-test="alert-trigger-operator-select" (not alert-threshold-operator-select)
         // The visible "Alert if No. of events" row lives directly on the SQL query config panel.
-        const thresholdSection = this.page.locator('.alert-condition-row').filter({ hasText: 'No. of events' }).first();
-        await thresholdSection.waitFor({ state: 'visible', timeout: 10000 });
+        const thresholdOperator = this.page.locator('[data-test="alert-trigger-operator-select"]').first();
+        await thresholdOperator.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Threshold section visible');
 
-        const thresholdOperator = thresholdSection.locator('.alert-v3-select').first();
-        await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
-        await thresholdOperator.click({ force: true });
-        await this.page.locator('[data-test$="-popover"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        let operatorSelected = false;
-        try {
-            await this.page.getByRole('option', { name: '>=', exact: true }).click({ timeout: 5000 });
-            operatorSelected = true;
-        } catch {
-            testLogger.warn('Role option not found, trying popover fallback');
-        }
-        if (!operatorSelected) {
-            await this.page.locator('[data-test$="-popover"]').getByText('>=', { exact: true }).click({ timeout: 3000 });
-        }
+        await thresholdOperator.click();
+        await this.page.locator('[data-test="alert-trigger-operator-select-popover"]').first().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[data-test="alert-trigger-operator-select-option"][data-test-value=">="]').first().click();
         testLogger.info('Set threshold operator: >=');
 
-        // SQL threshold OInput has no data-test — scope to the section's number input
-        const thresholdInput = thresholdSection.locator('input[type="number"]').first();
+        // SQL threshold OInput → fill the auto-derived `-field` native input variant.
+        const thresholdInput = this.page.locator('[data-test="alert-trigger-threshold-input-field"]').first();
         await thresholdInput.waitFor({ state: 'visible', timeout: 5000 });
         await thresholdInput.fill('1');
         testLogger.info('Set threshold value: 1');

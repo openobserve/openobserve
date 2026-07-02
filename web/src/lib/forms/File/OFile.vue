@@ -94,6 +94,11 @@ function emitFiles(fileList: FileList | File[] | null) {
 function handleChange(event: Event) {
   const target = event.target as HTMLInputElement;
   emitFiles(target.files);
+  // Reset the native input so picking the *same* file again still fires
+  // `change`. Browsers suppress the event when the selected path is unchanged;
+  // the component's state lives entirely in `modelValue`, so clearing the raw
+  // input here is safe and keeps re-selection working after an external clear.
+  target.value = "";
 }
 
 function handleClear(event?: Event) {
@@ -256,12 +261,12 @@ const wrapperClasses = computed(() => [
 
       <div
         v-else
-        class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-wrap tw:gap-1.5 tw:items-center"
+        class="o-file-chips tw:flex-1 tw:min-w-0 tw:flex tw:flex-nowrap tw:gap-1.5 tw:items-center tw:overflow-x-auto"
       >
         <span
           v-for="(file, i) in files"
           :key="`${file.name}-${i}`"
-          class="tw:inline-flex tw:items-center tw:gap-1 tw:rounded-md tw:bg-file-chip-bg tw:text-file-chip-text tw:px-2 tw:py-0.5 tw:text-xs tw:max-w-full"
+          class="tw:inline-flex tw:items-center tw:gap-1 tw:rounded-md tw:bg-file-chip-bg tw:text-file-chip-text tw:px-2 tw:py-0.5 tw:text-xs tw:max-w-[12rem] tw:shrink-0"
           :data-test="`o-file-chip-${i}`"
         >
           <span class="tw:truncate" :title="`${file.name} (${formatSize(file.size)})`">
@@ -337,3 +342,15 @@ const wrapperClasses = computed(() => [
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Single-line file chips: keep horizontal scrolling but hide the scrollbar so
+   the row stays a clean one-line input regardless of how many files are chosen. */
+.o-file-chips {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge legacy */
+}
+.o-file-chips::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+</style>

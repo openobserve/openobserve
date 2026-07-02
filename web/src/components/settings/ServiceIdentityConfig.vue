@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full service-identity-config tw:mt-2">
+  <div class="tw:w-full service-identity-config tw:mt-2 tw:bg-(--o2-card-bg)">
     <!-- Loading State -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
       <OSpinner size="sm" />
@@ -356,12 +356,7 @@ const loadConfig = async () => {
 loadConfig();
 </script>
 
-<style scoped lang="scss">
-.service-identity-config {
-  // Match parent card-container background
-  background: var(--o2-card-bg);
-}
-
+<style>
 :deep(.section-header) {
   font-weight: 600;
 }
@@ -377,5 +372,4 @@ loadConfig();
 :deep(.text-caption) {
   color: var(--o2-text-primary);
 }
-
 </style>

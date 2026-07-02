@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span v-if="!expanded">
         {{ visibleFields }}
         <span
-          class="expand-link"
+          class="expand-link tw:text-(--q-primary) tw:cursor-pointer tw:font-medium tw:px-1 tw:hover:underline"
           @click="expanded = true"
         >
           ... {{ hiddenCount }} more ▼
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span v-else>
         {{ fieldsText }}
         <span
-          class="expand-link"
+          class="expand-link tw:text-(--q-primary) tw:cursor-pointer tw:font-medium tw:px-1 tw:hover:underline"
           @click="expanded = false"
         >
           ▲ collapse
@@ -118,18 +118,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.collapsible-projection {
-  .expand-link {
-    color: var(--q-primary);
-    cursor: pointer;
-    font-weight: 500;
-    text-decoration: none;
-    padding: 0 4px;
-
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-}
-</style>

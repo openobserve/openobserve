@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,12 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-query-config">
-    <div class="step-content card-container">
+  <div class="step-query-config tw:w-full tw:min-w-0 tw:h-full tw:overflow-auto tw:mx-auto" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+    <div class="step-content tw:rounded-lg tw:min-h-full tw:w-full tw:min-w-0 tw:overflow-hidden tw:box-border tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]">
       <!-- Section header -->
-      <div class="section-header">
-        <div class="section-header-accent" />
-        <span class="section-header-title">{{ t('alerts.queryConfig.sectionTitle') }}</span>
+      <div class="section-header tw:flex tw:items-center tw:gap-0 tw:py-2.5 tw:px-3"
+        :class="store.state.theme === 'dark'
+          ? 'tw:border-b tw:border-[#343434]'
+          : 'tw:border-b tw:border-[#eeeeee]'">
+        <div class="section-header-accent tw:w-0.75 tw:h-4 tw:rounded-sm tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
+        <span class="section-header-title tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-[var(--color-text-primary)]">{{ t('alerts.queryConfig.sectionTitle') }}</span>
       </div>
       <div class="tw:px-3 tw:py-2 tw:min-w-0 tw:w-full tw:box-border">
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
@@ -63,13 +66,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div>
 
           <!-- Section 1: Alert condition sentence — scheduled only -->
-          <div v-if="isRealTime === 'false'" class="alert-condition-rows">
+          <div v-if="isRealTime === 'false'" class="tw:flex tw:flex-col tw:gap-0">
 
             <!-- LOGS/TRACES -->
             <template v-if="isEventBased">
               <!-- Alert if row -->
-              <div class="alert-condition-row" data-test="alert-if-row-logs">
-                <span class="condition-label">{{ t('alerts.threshold') }}*</span>
+              <div class="tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]" data-test="alert-if-row-logs">
+                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[90px] tw:shrink-0">{{ t('alerts.threshold') }}*</span>
                 <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-2">
                   <div class="tw:min-w-[130px] tw:max-w-[180px]">
                     <OSelect
@@ -83,13 +86,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <!-- "of [field]" shown for measure modes -->
                   <template v-if="selectedFunction !== 'total_events'">
-                    <span class="condition-text">{{ t('alerts.conditionOf') }}</span>
+                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">{{ t('alerts.conditionOf') }}</span>
                     <OSelect
                       v-model="logMeasureColumn"
                       :options="numericColumns"
                       searchable
                       :placeholder="t('alerts.placeholders.selectColumn')"
-                      :class="['tw:min-w-[140px] tw:max-w-[200px]', columnSelectError ? 'column-select-error' : '']"
+                      :error="columnSelectError"
+                      :class="['tw:min-w-[140px] tw:max-w-[200px]']"
                       @update:model-value="columnSelectError = false; onLogMeasureColumnChange($event)"
                     />
                   </template>
@@ -115,12 +119,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error-message="triggerThresholdError"
                       @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     />
-                    <span v-if="streamName" class="condition-text">{{ t('alerts.matchingTypeFound', { type: streamType === 'traces' ? 'traces' : 'logs' }) }}</span>
+                    <span v-if="streamName" class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">{{ t('alerts.matchingTypeFound', { type: streamType === 'traces' ? 'traces' : 'logs' }) }}</span>
                   </template>
 
                   <!-- MEASURE mode -->
                   <template v-else>
-                    <span class="condition-text">{{ t('alerts.conditionIs') }}</span>
+                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">{{ t('alerts.conditionIs') }}</span>
                     <OSelect
                       v-model="conditionOperator"
                       :options="numericOperators"
@@ -143,8 +147,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- group by row (hidden for count mode) -->
-              <div v-if="selectedFunction !== 'total_events'" class="alert-condition-row" data-test="alert-group-by-row">
-                <span class="condition-label tw:font-bold">
+              <div v-if="selectedFunction !== 'total_events'" class="tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]" data-test="alert-group-by-row">
+                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[90px] tw:shrink-0">
                   {{ t('alerts.groupBy') }}
                   <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" :delay="300" side="top" />
                 </span>
@@ -159,7 +163,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
-                        class="alert-v3-select"
                         style="min-width: 120px; max-width: 180px;"
                         :data-test="`alert-group-by-select-${index}`"
                         @update:model-value="onLogGroupByChange"
@@ -167,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="ghost"
                         size="icon-circle-sm"
-                        class="tw:text-gray-400 hover:tw:text-red-500"
+                        class="tw:text-gray-400 tw:hover:text-red-500"
                         @click="deleteLogGroupByColumn(index)"
                       >
                         <OIcon name="close" size="sm" />
@@ -187,8 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- no. of groups row — visible only when group-by fields are added -->
-              <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="alert-condition-row" data-test="alert-having-groups-row">
-                <span class="condition-label tw:font-bold">
+              <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]" data-test="alert-having-groups-row">
+                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[90px] tw:shrink-0">
                   {{ t('alerts.queryConfig.havingGroups') }}
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
@@ -215,8 +218,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- METRICS -->
             <template v-else>
               <!-- Alert if row -->
-              <div class="alert-condition-row">
-                <span class="condition-label">{{ t('alerts.threshold') }}*</span>
+              <div class="tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
+                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[90px] tw:shrink-0">{{ t('alerts.threshold') }}*</span>
                 <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-2">
                   <div class="tw:min-w-[130px] tw:max-w-[180px]">
                     <OSelect
@@ -224,7 +227,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :options="logFunctionOptions"
                       labelKey="label"
                       valueKey="value"
-                      class="alert-v3-select"
                       @update:model-value="onMetricFunctionChange"
                     />
                     <OTooltip :content="logFunctionOptions.find((o: any) => o.value === selectedFunction)?.tooltip || ''" :delay="400" />
@@ -232,23 +234,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- "of [field]" hidden for count mode -->
                   <template v-if="selectedFunction !== 'total_events'">
-                    <span class="condition-text">{{ t('alerts.conditionOf') }}</span>
+                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">{{ t('alerts.conditionOf') }}</span>
                     <div style="position: relative; display: inline-flex;">
                       <OSelect
                         v-model="inputData.aggregation.having.column"
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
+                        :error="columnSelectError"
                         :readonly="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
                         :disable="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
                         @update:model-value="columnSelectError = false; emitAggregationUpdate()"
-                        class="alert-v3-select"
-                        :class="columnSelectError ? 'column-select-error' : ''"
                         style="min-width: 140px; max-width: 200px;"
                       />
                       <OTooltip v-if="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" :content="t('alerts.metricsValueFieldTooltip')" :delay="300" side="bottom" />
                     </div>
-                    <span class="condition-text">{{ t('alerts.conditionIs') }}</span>
+                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">{{ t('alerts.conditionIs') }}</span>
                   </template>
 
                   <!-- Count mode for metrics -->
@@ -257,20 +258,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="triggerOperator"
                       :options="numericOperators"
                       :searchable="false"
-                      class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onTriggerOperatorChange"
                     />
                     <OInput
                       v-model="triggerThreshold"
                       type="number"
-                      class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
                       :error="!!triggerThresholdError"
                       :error-message="triggerThresholdError"
                       @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     />
-                    <span class="condition-text">{{ t('alerts.matchingMetricsFound') }}</span>
+                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">{{ t('alerts.matchingMetricsFound') }}</span>
                   </template>
 
                   <!-- Measure mode for metrics -->
@@ -279,7 +278,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="conditionOperator"
                       :options="numericOperators"
                       :searchable="false"
-                      class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onConditionOperatorChange"
                     />
@@ -287,7 +285,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="conditionValue"
                       type="number"
                       :placeholder="t('alerts.placeholders.value')"
-                      class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
                       :error="!!conditionValueError"
                       :error-message="conditionValueError"
@@ -298,8 +295,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- group by row — hidden for count mode -->
-              <div v-if="inputData.aggregation && selectedFunction !== 'total_events'" class="alert-condition-row">
-                <span class="condition-label tw:font-bold">
+              <div v-if="inputData.aggregation && selectedFunction !== 'total_events'" class="tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
+                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[90px] tw:shrink-0">
                   {{ t('alerts.groupBy') }}
                   <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" :delay="300" side="top" />
                 </span>
@@ -314,14 +311,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
-                        class="alert-v3-select"
                         style="min-width: 120px; max-width: 180px;"
                         @update:model-value="emitAggregationUpdate"
                       />
                       <OButton
                         variant="ghost"
                         size="icon-circle-sm"
-                        class="tw:text-gray-400 hover:tw:text-red-500"
+                        class="tw:text-gray-400 tw:hover:text-red-500"
                         @click="deleteGroupByColumn(index)"
                       >
                         <OIcon name="close" size="sm" />
@@ -340,8 +336,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- no. of groups row — visible only when group-by fields are added -->
-              <div v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields" class="alert-condition-row">
-                <span class="condition-label tw:font-bold">
+              <div v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields" class="tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
+                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[90px] tw:shrink-0">
                   {{ t('alerts.queryConfig.havingGroups') }}
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
@@ -366,8 +362,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <!-- Check every row -->
-            <div class="alert-condition-row tw:!tw:items-start">
-              <span class="condition-label" style="line-height: 28px;">
+            <div class="tw:flex tw:items-center
+             tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
+              <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[90px] tw:shrink-0" style="line-height: 28px;">
                 Check every *
                 <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
               </span>
@@ -378,7 +375,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OInput
                       v-model="checkEveryFrequency"
                       type="number"
-                      class="alert-v3-input"
                       style="min-width: 100px; max-width: 100px;"
                       min="1"
                       :error="!!checkEveryFrequencyError"
@@ -391,7 +387,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-else>
                     <OInput
                       v-model="cronExpression"
-                      class="alert-v3-input"
                       placeholder="0 */10 * * * *"
                       style="min-width: 100px; max-width: 100px;"
                       @update:model-value="onCronExpressionChange"
@@ -405,7 +400,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     labelKey="label"
                     valueKey="value"
                     :searchable="false"
-                    class="alert-v3-select frequency-unit-select"
                     style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
                   />
@@ -418,7 +412,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="filteredTimezones"
                         searchable
                         placeholder="timezone"
-                        class="alert-v3-select"
                         style="min-width: 150px; max-width: 150px;"
                         @update:model-value="onCronTimezoneChange"
                       />
@@ -431,7 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </template>
 
-                  <span class="condition-text">on these</span>
+                  <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">on these</span>
                   <div
                     class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle tw:px-2 tw:py-0.5 tw:rounded-md tw:transition-colors tw:bg-surface-panel hover:tw:bg-primary-50"
                     @click="toggleFilters"
@@ -439,24 +432,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="filter-alt"
                       size="xs"
-                      :class="filterCount > 0 ? 'tw:text-[var(--q-primary)]' : 'tw:text-text-secondary'"
+                      :class="filterCount > 0
+                        ? 'tw:text-[var(--q-primary)]'
+                        : (store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500')"
                     />
                     <span class="tw:text-xs tw:font-semibold"
-                          :class="filterCount > 0 ? 'tw:text-[var(--q-primary)]' : 'tw:text-text-secondary'">
+                          :class="filterCount > 0
+                            ? 'tw:text-[var(--q-primary)]'
+                            : (store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-600')">
                       filters
                     </span>
                     <span v-if="filterCount > 0"
-                          class="tw:text-[11px] tw:px-1.5 tw:py-0 tw:rounded-full tw:font-bold tw:leading-5 tw:bg-badge-primary-soft-bg tw:text-badge-primary-soft-text">
+                          class="tw:text-[11px] tw:px-1.5 tw:py-0 tw:rounded-full tw:font-bold tw:leading-5"
+                          :class="store.state.theme === 'dark' ? 'tw:bg-blue-800 tw:text-blue-200' : 'tw:bg-blue-100 tw:text-blue-700'">
                       {{ filterCount }}
                     </span>
                     <OIcon
                       :name="showFilters ? 'expand-more' : 'chevron-right'"
                       size="sm"
-                      class="tw:text-text-secondary"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                     />
                     <!-- Review your SQL query hint -->
                     <span v-if="generatedSqlQuery && !showFilters"
-                          class="tw:text-xs tw:italic tw:ml-1 tw:whitespace-nowrap sql-query-hint tw:text-text-secondary">
+                          class="tw:text-xs tw:italic tw:ml-1 tw:whitespace-nowrap tw:cursor-help tw:underline tw:decoration-dotted tw:underline-offset-[2px]"
+                          :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
                       view the alert query
                       <OTooltip :delay="200" side="bottom">
                         <template #content>
@@ -468,7 +467,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Cron description + error -->
-                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:ml-0 tw:italic tw:text-text-secondary">
+                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:ml-0 tw:italic"
+                     :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
                   {{ cronDescription }}
                 </div>
                 <div v-if="frequencyMode === 'cron' && cronError" class="tw:text-red-500 tw:text-[11px] tw:ml-0">
@@ -507,24 +507,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="filter-alt"
                   size="xs"
-                  :class="filterCount > 0 ? 'tw:text-[var(--q-primary)]' : 'tw:text-text-secondary'"
+                  :class="filterCount > 0
+                    ? 'tw:text-[var(--q-primary)]'
+                    : (store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500')"
                 />
                 <span class="tw:text-xs tw:font-semibold"
-                      :class="filterCount > 0 ? 'tw:text-[var(--q-primary)]' : 'tw:text-text-secondary'">
+                      :class="filterCount > 0
+                        ? 'tw:text-[var(--q-primary)]'
+                        : (store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-600')">
                   filters
                 </span>
                 <span v-if="filterCount > 0"
-                      class="tw:text-[11px] tw:px-1.5 tw:py-0 tw:rounded-full tw:font-bold tw:leading-5 tw:bg-badge-primary-soft-bg tw:text-badge-primary-soft-text">
+                      class="tw:text-[11px] tw:px-1.5 tw:py-0 tw:rounded-full tw:font-bold tw:leading-5"
+                      :class="store.state.theme === 'dark' ? 'tw:bg-blue-800 tw:text-blue-200' : 'tw:bg-blue-100 tw:text-blue-700'">
                   {{ filterCount }}
                 </span>
                 <OIcon
                   :name="showFilters ? 'expand-more' : 'chevron-right'"
                   size="sm"
-                  class="tw:text-text-secondary"
+                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                 />
                 <!-- Review your SQL query hint -->
                 <span v-if="generatedSqlQuery && !showFilters"
-                      class="tw:text-xs tw:italic tw:ml-1 tw:whitespace-nowrap sql-query-hint tw:text-text-secondary">
+                      class="tw:text-xs tw:italic tw:ml-1 tw:whitespace-nowrap tw:cursor-help tw:underline tw:decoration-dotted tw:underline-offset-[2px]"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
                   view the alert query
                   <OTooltip :delay="200" side="bottom">
                     <template #content>
@@ -565,10 +571,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- SQL/PromQL pane — with its own header -->
               <div style="display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;"
                 :style="{ width: showVrl && localTab === 'sql' ? '50%' : '100%' }">
-                <div class="inline-editor-header tw:flex tw:items-center tw:justify-between">
+                <div class="tw:flex tw:items-center tw:justify-between tw:shrink-0 tw:h-9 tw:px-2.5"
+                  :class="store.state.theme === 'dark' ? 'tw:bg-white/4 tw:border-b tw:border-[#2d3748]' : 'tw:bg-gray-100 tw:border-b tw:border-[#e5e7eb]'">
                   <div class="tw:flex tw:items-center tw:gap-2">
-                    <div class="pane-accent-bar pane-accent-bar--primary" />
-                    <span class="inline-editor-title">{{ localTab === 'sql' ? t('alerts.sqlEditor') : t('alerts.promqlEditor') }}</span>
+                    <div class="tw:w-0.75 tw:h-3.5 tw:rounded-sm tw:shrink-0 tw:bg-(--q-primary)" />
+                    <span class="tw:text-xs tw:font-semibold">{{ localTab === 'sql' ? t('alerts.sqlEditor') : t('alerts.promqlEditor') }}</span>
                   </div>
                   <!-- fx toggle shown here only when VRL is not yet enabled -->
                   <OSwitch
@@ -607,11 +614,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- VRL pane — with its own header, side-by-side with SQL pane -->
               <div v-if="showVrl && localTab === 'sql'"
                 style="display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; width: 50%;"
-                class="tw:border-l tw:border-border-default">
-                <div class="inline-editor-header tw:flex tw:items-center tw:justify-between">
+                :style="{ borderLeft: store.state.theme === 'dark' ? '1px solid #2d3748' : '1px solid #e5e7eb' }">
+                <div class="tw:flex tw:items-center tw:justify-between tw:shrink-0 tw:h-9 tw:px-2.5"
+                  :class="store.state.theme === 'dark' ? 'tw:bg-white/4 tw:border-b tw:border-[#2d3748]' : 'tw:bg-gray-100 tw:border-b tw:border-[#e5e7eb]'">
                   <div class="tw:flex tw:items-center tw:gap-2">
-                    <div class="pane-accent-bar pane-accent-bar--secondary" />
-                    <span class="inline-editor-title">VRL Editor</span>
+                    <div class="tw:w-0.75 tw:h-3.5 tw:rounded-sm tw:shrink-0 tw:bg-(--q-secondary)" />
+                    <span class="tw:text-xs tw:font-semibold">VRL Editor</span>
                   </div>
                   <div class="tw:flex tw:items-center tw:gap-1">
                     <OSelect
@@ -620,7 +628,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       labelKey="name"
                       valueKey="name"
                       clearable
-                      class="mini-select alert-v3-select"
                       style="width: 130px;"
                       :placeholder="t('alerts.placeholders.savedFunctions')"
                       @update:model-value="(name: any) => { const fn = functionsList.find((f: any) => f.name === name); if (fn) vrlFunctionContent = fn.function || fn.body || ''; }"
@@ -664,8 +671,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Status bar — outside overflow:hidden so borders render correctly -->
           <div
             v-if="localTab !== 'promql'"
-            class="inline-sql-status-bar"
-            :class="[inlineStatusState]"
+            class="inline-sql-status-bar tw:relative tw:h-[22px] tw:shrink-0 tw:text-[13px] tw:font-medium tw:cursor-default"
+            :class="[inlineStatusState, store.state.theme === 'dark' ? 'sql-status-bar--dark' : 'sql-status-bar--light']"
           >
             <div class="sql-status-bar__inner">
               <template v-if="inlineStatusState === 'sql-status-bar--error'">
@@ -685,11 +692,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- SQL/PromQL condition rows (scheduled only): Check every + Alert if in one block -->
-          <div v-if="isRealTime === 'false'" class="alert-condition-rows tw:mt-2 tw:px-1">
+          <div v-if="isRealTime === 'false'" class="tw:flex tw:flex-col tw:gap-0 tw:mt-2 tw:px-1">
 
             <!-- Check every -->
-            <div class="alert-condition-row tw:!tw:items-start">
-              <span class="condition-label sql-promql-label" style="line-height: 28px;">
+            <div class="tw:flex tw:items-start tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
+              <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[160px] tw:w-[160px] tw:shrink-0" style="line-height: 28px;">
                 Check every *
                 <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
               </span>
@@ -699,7 +706,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OInput
                       v-model="checkEveryFrequency"
                       type="number"
-                      class="alert-v3-input"
                       style="min-width: 100px; max-width: 100px;"
                       min="1"
                       :error="!!checkEveryFrequencyError"
@@ -711,7 +717,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-else>
                     <OInput
                       v-model="cronExpression"
-                      class="alert-v3-input"
                       placeholder="0 */10 * * * *"
                       style="min-width: 100px; max-width: 100px;"
                       @update:model-value="onCronExpressionChange"
@@ -723,7 +728,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     labelKey="label"
                     valueKey="value"
                     :searchable="false"
-                    class="alert-v3-select frequency-unit-select"
                     style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
                   />
@@ -734,7 +738,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="filteredTimezones"
                         searchable
                         placeholder="timezone"
-                        class="alert-v3-select"
                         style="min-width: 150px; max-width: 150px;"
                         @update:model-value="onCronTimezoneChange"
                       />
@@ -747,7 +750,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </template>
                 </div>
-                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:italic tw:text-text-secondary">
+                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:italic"
+                     :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
                   {{ cronDescription }}
                 </div>
                 <div v-if="frequencyMode === 'cron' && cronError" class="tw:text-red-500 tw:text-[11px]">
@@ -757,14 +761,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- SQL: Alert if No. of events -->
-            <div v-if="localTab === 'sql'" class="alert-condition-row">
-              <span class="condition-label sql-promql-label">{{ t('alerts.alertIfNoOfEvents') }} *</span>
+            <div v-if="localTab === 'sql'" class="tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
+              <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[160px] tw:w-[160px] tw:shrink-0">{{ t('alerts.alertIfNoOfEvents') }} *</span>
               <div class="tw:flex tw:items-center tw:gap-2">
                 <OSelect
                   v-model="triggerOperator"
                   :options="numericOperators"
                   :searchable="false"
-                  class="alert-v3-select"
                   data-test="alert-trigger-operator-select"
                   style="min-width: 70px; max-width: 120px;"
                   @update:model-value="onTriggerOperatorChange"
@@ -772,7 +775,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OInput
                   v-model="triggerThreshold"
                   type="number"
-                  class="alert-v3-input"
+                  data-test="alert-trigger-threshold-input"
                   style="min-width: 60px; max-width: 80px;"
                   min="1"
                   :error="!!triggerThresholdError"
@@ -785,8 +788,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- PromQL: Alert if the value is + Having series -->
             <template v-if="localTab === 'promql' && promqlCondition">
-              <div class="alert-condition-row">
-                <span class="condition-label sql-promql-label">{{ t('alerts.alertIfValueIs') }} *
+              <div class="tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
+                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[160px] tw:w-[160px] tw:shrink-0">{{ t('alerts.alertIfValueIs') }} *
                   <OTooltip content="Alert when the PromQL expression evaluates to this condition for a time series. Example: &gt;= 100 triggers when the result is 100 or more." :delay="300" side="top" />
                 </span>
                 <div class="tw:flex tw:items-center tw:gap-2">
@@ -794,7 +797,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="promqlCondition.operator"
                     :options="numericOperators"
                     :searchable="false"
-                    class="alert-v3-select"
                     data-test="alert-threshold-operator-select"
                     style="min-width: 70px; max-width: 120px;"
                     :error="!!promqlOperatorError"
@@ -804,7 +806,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OInput
                     v-model.number="promqlCondition.value"
                     type="number"
-                    class="alert-v3-input"
                     data-test="alert-threshold-value-input"
                     style="min-width: 60px; max-width: 120px;"
                     :debounce="300"
@@ -814,8 +815,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div class="alert-condition-row">
-                <span class="condition-label sql-promql-label">{{ t('alerts.havingSeries') }} *
+              <div class="tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
+                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[160px] tw:w-[160px] tw:shrink-0">{{ t('alerts.havingSeries') }} *
                   <OTooltip content="Minimum number of time series that must satisfy the condition above to trigger the alert." :delay="300" side="top" />
                 </span>
                 <div class="tw:flex tw:items-center tw:gap-2">
@@ -823,14 +824,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="triggerOperator"
                     :options="numericOperators"
                     :searchable="false"
-                    class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
                   />
                   <OInput
                     v-model="triggerThreshold"
                     type="number"
-                    class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
                     :error="!!triggerThresholdError"
@@ -2292,7 +2291,8 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
+<style>
+/* placeholder overlay — child selector must stay */
 .query-editor-placeholder-overlay {
   position: absolute;
   top: 0;
@@ -2320,353 +2320,74 @@ export default defineComponent({
   color: #718096;
 }
 
-.step-query-config {
-  width: 100%;
-  min-width: 0;
-  height: 100%;
-  margin: 0 auto;
-  overflow: auto;
-
-  .step-content {
-    border-radius: 8px;
-    min-height: 100%;
-    width: 100%;
-    min-width: 0;
-    overflow: hidden;
-    box-sizing: border-box;
-  }
-
-  .step-content {
-    background-color: var(--color-surface-overlay);
-    border: 1px solid var(--color-border-default);
-  }
-  .section-header {
-    border-bottom: 1px solid var(--color-border-default);
-  }
-  .section-header-title {
-    color: var(--color-text-primary);
-  }
-  .section-header-accent {
-    background: var(--q-primary);
-  }
-}
-
-.section-header {
+/* status bar child/compound selectors — cannot be inlined */
+.inline-sql-status-bar .sql-status-bar__inner {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
-  gap: 0;
-  padding: 10px 12px;
-}
-
-.section-header-accent {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-
-.section-header-title {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.preview-box {
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-
-  .preview-header {
-    border-bottom: 1px solid;
-    flex-shrink: 0;
-  }
-
-  .preview-title {
-    font-weight: 600;
-    font-size: 14px;
-  }
-
-  .preview-content {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-  }
-
-  .preview-code {
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-    font-size: 12px;
-    margin: 0;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-  }
-
-  &.dark-mode-preview {
-    background-color: #181a1b;
-    border: 1px solid #343434;
-
-    .preview-header {
-      background-color: #212121;
-      border-bottom-color: #343434;
-    }
-
-    .preview-title {
-      color: #ffffff;
-    }
-
-    .preview-code {
-      color: #e0e0e0;
-    }
-  }
-
-  &.light-mode-preview {
-    background-color: #f5f5f5;
-    border: 1px solid #e6e6e6;
-
-    .preview-header {
-      background-color: #ffffff;
-      border-bottom-color: #e6e6e6;
-    }
-
-    .preview-title {
-      color: #3d3d3d;
-    }
-
-    .preview-code {
-      color: #3d3d3d;
-    }
-  }
-}
-
-.inline-editor-pane {
-  border-radius: 8px;
-  overflow: hidden;
-
-  &--light { border: 1px solid #e5e7eb; }
-  &--dark  { border: 1px solid #2d3748; }
-}
-
-.inline-editor-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  gap: 5px;
   padding: 0 10px;
-  flex-shrink: 0;
-  height: 36px;
-  background-color: var(--color-surface-panel);
-  border-bottom: 1px solid var(--color-border-default);
+  overflow: hidden;
 }
 
-.inline-editor-title {
-  font-size: 12px;
-  font-weight: 600;
+.inline-sql-status-bar .sql-status-bar__msg {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
 }
 
-.inline-sql-status-bar {
-  position: relative;
-  height: 22px;
-  flex-shrink: 0;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: default;
+.inline-sql-status-bar.sql-status-bar--hint    { background: #f3f4f6; color: #6b7280; }
+.inline-sql-status-bar.sql-status-bar--idle    { background: #f3f4f6; color: #6b7280; }
+.inline-sql-status-bar.sql-status-bar--error   { background: rgba(239, 68, 68, 0.08); color: #ef4444; cursor: pointer; }
 
-  .sql-status-bar__inner {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 0 10px;
-    overflow: hidden;
-  }
-
-  .sql-status-bar__msg {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-    flex: 1;
-  }
-
-  border-left: 1px solid var(--color-border-default);
-  border-right: 1px solid var(--color-border-default);
-  border-bottom: 1px solid var(--color-border-default);
+.inline-sql-status-bar.sql-status-bar--light {
+  border-left: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
   border-bottom-left-radius: 8px;
   border-bottom-right-radius: 8px;
-
-  &.sql-status-bar--hint    { background: var(--color-surface-panel); color: var(--color-text-secondary); }
-  &.sql-status-bar--idle    { background: var(--color-surface-panel); color: var(--color-text-secondary); }
-  &.sql-status-bar--error   { background: rgba(239, 68, 68, 0.08); color: var(--o2-negative); cursor: pointer; }
+}
+.inline-sql-status-bar.sql-status-bar--dark {
+  border-left: 1px solid #2d3748;
+  border-right: 1px solid #2d3748;
+  border-bottom: 1px solid #2d3748;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+.inline-sql-status-bar.sql-status-bar--dark.sql-status-bar--hint,
+.inline-sql-status-bar.sql-status-bar--dark.sql-status-bar--idle {
+  background: rgba(255, 255, 255, 0.04);
+  color: #d1d5db;
 }
 
-.pane-accent-bar {
-  width: 3px;
-  height: 14px;
-  border-radius: 2px;
-  flex-shrink: 0;
-
-  &--primary   { background: var(--q-primary); }
-  &--secondary { background: var(--q-secondary); }
-}
-
-.condition-label-hint {
-  font-weight: 500;
-  opacity: 0.7;
-  font-size: 12px;
-}
-
-.sql-query-hint {
-  cursor: help;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-underline-offset: 2px;
-}
-
-// Override Quasar tooltip background for SQL preview
+/* global tooltip selectors */
 :global(.sql-preview-tooltip) {
   background: #1e1e1e !important;
   padding: 0 !important;
   border-radius: 6px !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-
-  .hljs {
-    background: #1e1e1e !important;
-    border-radius: 6px;
-  }
 }
 
-.editor-dialog-card {
-  background-color: var(--q-dark-page);
-}
-
-.editor-text-title {
-  font-weight: 600;
-  font-size: 16px;
-}
-
-.no-output-before-run-query {
-  border-radius: 8px;
-}
-
-.dark-mode {
-  .no-output-before-run-query {
-    background-color: #1a1a1a;
-  }
-}
-
-.light-mode {
-  .no-output-before-run-query {
-    background-color: #f9fafb;
-  }
-}
-
-// Condition rows layout
-.alert-condition-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.alert-condition-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
+:global(.sql-preview-tooltip) .hljs {
+  background: #1e1e1e !important;
   border-radius: 6px;
-  font-size: 13px;
 }
 
-.condition-label {
-  font-weight: 700;
-  font-size: 13px;
-  white-space: nowrap;
-  min-width: 90px;
-  flex-shrink: 0;
+/* descendant color overrides for condition labels/text */
+.light-mode .condition-label {
+  color: rgba(0, 0, 0, 0.8);
+}
+.light-mode .condition-text {
+  color: rgba(0, 0, 0, 0.7);
 }
 
-.condition-text {
-  font-weight: 600;
-  font-size: 13px;
-  white-space: nowrap;
+.dark-mode .condition-label {
+  color: rgba(255, 255, 255, 0.9);
 }
-
-.set-threshold-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 2px 10px;
-  border-radius: 999px;
-  border: 1px dashed color-mix(in srgb, var(--q-primary) 50%, transparent);
-  color: var(--q-primary);
-  cursor: pointer;
-  user-select: none;
-  opacity: 0.65;
-  transition: opacity 0.15s ease, background 0.15s ease;
-
-  &:hover {
-    opacity: 1;
-    background: color-mix(in srgb, var(--q-primary) 10%, transparent);
-  }
-}
-
-.light-mode {
-  .condition-label {
-    color: rgba(0, 0, 0, 0.8);
-  }
-  .condition-text {
-    color: rgba(0, 0, 0, 0.7);
-  }
-}
-
-.dark-mode {
-  .condition-label {
-    color: rgba(255, 255, 255, 0.9);
-  }
-  .condition-text {
-    color: rgba(255, 255, 255, 0.75);
-  }
-}
-
-
-.ai-hover-btn {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
-  transition: background 0.3s ease, box-shadow 0.3s ease;
-
-  &:hover {
-    background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
-    box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
-  }
-
-  &.ai-btn-active {
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
-  }
-}
-
-.dark-mode-chat-container {
-  background-color: #1f2937;
-  border-left: 1px solid #374151;
-}
-
-.light-mode-chat-container {
-  background-color: #ffffff;
-  border-left: 1px solid #e5e7eb;
-}
-
-// Fixed label width for SQL/PromQL condition rows so inputs align
-.sql-promql-label {
-  min-width: 160px;
-  width: 160px;
-}
-
-// Column select error state (aggregation measure column)
-.alert-v3-select.column-select-error {
-  :deep(.q-field__control) {
-    border: 1px solid #ef5350 !important;
-    border-radius: 4px !important;
-    background: rgba(239, 83, 80, 0.05) !important;
-  }
+.dark-mode .condition-text {
+  color: rgba(255, 255, 255, 0.75);
 }
 </style>

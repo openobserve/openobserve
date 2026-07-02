@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="tags-title tw:font-bold tw:ml-1">{{ t("rum.tags") }}</div>
+    <div class="tw:text-base tw:font-bold tw:ml-1">{{ t("rum.tags") }}</div>
     <div class="tw:flex tw:items-center">
       <div class="tw:mr-4 tw:items-center">
         <img
@@ -214,9 +214,3 @@ const getLocation = () => {
   return props.error.geo_info_country + ", " + props.error.geo_info_city;
 };
 </script>
-
-<style lang="scss" scoped>
-.tags-title {
-  font-size: 16px;
-}
-</style>

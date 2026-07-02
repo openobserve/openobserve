@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-else class="tw:pb-8">
     <!-- Search bar -->
     <div
-      class="config-search-wrapper tw:sticky"
+      class="tw:sticky tw:p-1 tw:top-0 tw:z-20 tw:bg-(--o2-card-bg-solid) tw:border-b tw:border-solid tw:border-(--o2-border-color)"
       data-test="dashboard-config-search-wrapper"
     >
       <div class="tw:flex tw:flex-nowrap tw:items-center" style="gap: 4px">
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- No results empty state -->
     <div
       v-if="searchQuery && !anySectionVisible"
-      class="config-no-results column tw:items-center tw:py-4"
+      class="column tw:items-center tw:py-4 tw:text-center"
       data-test="dashboard-config-no-results"
     >
       <OIcon name="search-off" size="md" class="tw:mb-1 tw:text-gray-400" />
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionGeneral')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <div
           v-show="isConfigOptionVisible('general', 'description')"
           class="tw:max-w-[300px]"
@@ -147,9 +147,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 showTimePicker ||
                 (panelTimeRange !== null && panelTimeRange !== undefined)
               "
-              class="tw:flex tw:items-center tw:flex-nowrap panel-time-picker-container"
+              class="tw:flex tw:items-center tw:flex-nowrap tw:overflow-visible"
             >
-              <div class="panel-time-picker-btn">
+              <div class="panel-time-picker-btn tw:flex-[1_1_0] tw:min-w-0 tw:overflow-visible">
                 <DateTimePickerDashboard
                   ref="panelTimePickerRef"
                   v-model="pickerValue"
@@ -157,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :hide-relative-timezone="true"
                   menu-align="end"
                   data-test="dashboard-config-panel-time-picker"
+                  class="tw:w-fit tw:min-w-0 tw:max-w-full tw:overflow-hidden"
                 />
                 <OTooltip :content="formattedPickerValue" max-width="320px" />
               </div>
@@ -209,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionPromqlTable')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <PromQLChartConfig
           :chart-type="dashboardPanelData.data.type"
           :is-config-option-visible="isConfigOptionVisible"
@@ -235,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionGeographic')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <PromQLChartConfig :chart-type="dashboardPanelData.data.type" />
       </div>
     </OCollapsible>
@@ -253,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionLegend')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body o2-input">
+      <div class="o2-input tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <OSwitch
           v-if="shouldShowLegendsToggle(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'show-legends')"
@@ -292,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Legend Width + unit selector -->
           <div
             v-if="shouldShowLegendWidth(dashboardPanelData)"
-            class="tw:flex tw:items-end tw:justify-between tw:gap-1.5 tw:w-full tw:min-w-0"
+            class="tw:flex tw:items-end tw:justify-between tw:gap-[6px] tw:w-full tw:min-w-0"
           >
             <OInput
               v-model.number="legendWidthValue"
@@ -303,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex-1 tw:min-w-0"
             />
             <div
-              class="tw:flex tw:items-center tw:gap-1 tw:mt-[0.5625rem] tw:shrink-0"
+              class="tw:flex tw:items-center tw:gap-1 tw:mt-[9px] tw:shrink-0"
               v-if="shouldShowLegendWidthUnitContainer(dashboardPanelData)"
             >
               <OButton
@@ -344,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Legend Height + unit selector -->
           <div
             v-if="shouldShowLegendHeight(dashboardPanelData)"
-            class="tw:flex tw:items-end tw:justify-between tw:gap-1.5 tw:w-full tw:min-w-0"
+            class="tw:flex tw:items-end tw:justify-between tw:gap-[6px] tw:w-full tw:min-w-0"
           >
             <OInput
               v-model.number="legendHeightValue"
@@ -355,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex-1 tw:min-w-0"
             />
             <div
-              class="tw:flex tw:items-center tw:gap-1 tw:mt-[0.5625rem] tw:shrink-0"
+              class="tw:flex tw:items-center tw:gap-1 tw:mt-[9px] tw:shrink-0"
               v-if="shouldShowLegendHeightUnitContainer(dashboardPanelData)"
             >
               <OButton
@@ -453,7 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-promql-legend"
         >
           <template v-slot:label>
-            <div class="tw:flex tw:items-center all-pointer-events">
+            <div class="tw:flex tw:items-center">
               {{ t("dashboard.legendLabel") }}
               <div>
                 <OIcon
@@ -483,7 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionData')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body o2-input">
+      <div class="o2-input tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <OSelect
           v-show="isConfigOptionVisible('data', 'unit')"
           v-model="dashboardPanelData.data.config.unit"
@@ -729,7 +730,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionAxis')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <OInput
           v-if="shouldShowAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'axis-width')"
@@ -831,7 +832,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionLabels')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <OSelect
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('labels', 'label-position')"
@@ -943,7 +944,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionLineStyle')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body o2-input">
+      <div class="o2-input tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <OSelect
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('lineStyle', 'symbol')"
@@ -1004,7 +1005,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionTable')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <OSwitch
           v-show="isConfigOptionVisible('table', 'wrap')"
           v-model="dashboardPanelData.data.config.wrap_table_cells"
@@ -1084,7 +1085,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionPivotTable')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <OSwitch
           v-if="!promqlMode && isPivotMode"
           v-show="isConfigOptionVisible('pivotTable', 'pivot-show-row-totals')"
@@ -1214,7 +1215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <ValueMapping />
       </div>
     </OCollapsible>
@@ -1242,7 +1243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="config-section-body hide-child-title">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <OverrideConfig
           :dashboardPanelData="dashboardPanelData"
           :panelData="panelData"
@@ -1267,7 +1268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionMap')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body o2-input">
+      <div class="o2-input tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <div v-if="dashboardPanelData.data.type == 'maps'">
           <OSelect
             v-model="dashboardPanelData.data.config.map_type.type"
@@ -1456,7 +1457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionGauge')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <OInput
           v-show="isConfigOptionVisible('gauge', 'gauge-min')"
           v-model.number="
@@ -1521,7 +1522,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionLayout')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <div v-show="isConfigOptionVisible('layout', 'trellis-layout')">
           <OSelect
             :label="t('dashboard.trellisLayout')"
@@ -1650,7 +1651,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionColors')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <ColorPaletteDropDown />
         <ColorBySeries :colorBySeriesData="panelData" />
       </div>
@@ -1683,7 +1684,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <Drilldown :variablesData="variablesData" />
       </div>
     </OCollapsible>
@@ -1721,7 +1722,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <CustomDateTimePicker
           modelValue="0m"
           :isFirstEntry="true"
@@ -1788,7 +1789,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <MarkLineConfig />
       </div>
     </OCollapsible>
@@ -1807,7 +1808,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionBackground')"
       class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="config-section-body">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <BackGroundColorConfig />
       </div>
     </OCollapsible>
@@ -2725,87 +2726,17 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-:deep(.selectedLabel span) {
-  text-transform: none !important;
-}
-
-.space {
-  margin-top: 10px;
-  margin-bottom: 10px;
-}
-
-.input-disabled-overlay {
-  :deep(input) {
-    opacity: 0.5;
-    cursor: not-allowed;
-    pointer-events: none;
-  }
-
-  :deep(.q-field__label) {
-    opacity: 1 !important;
-    pointer-events: auto !important;
-  }
-}
-
-// Ensure label icons are always interactive
-:deep(.q-field__label) {
-  pointer-events: auto !important;
-}
-
-.config-legend-input {
-  min-width: 80px;
-}
-
-.panel-time-picker-container {
-  overflow: visible;
-}
-
-.panel-time-picker-btn {
+<style>
+.panel-time-picker-btn .date-time-button .date-time-label {
   flex: 1 1 0;
   min-width: 0;
-  overflow: visible;
-
-  :deep(.date-time-button) {
-    width: fit-content;
-    min-width: 0 !important;
-    max-width: 100%;
-    overflow: hidden;
-
-    .date-time-label {
-      flex: 1 1 0;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .date-time-arrow {
-      flex-shrink: 0;
-      font-size: 18px !important;
-    }
-  }
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.config-search-wrapper {
-  padding: 4px 4px;
-  top: 0;
-  z-index: 20;
-  background-color: var(--o2-card-bg-solid);
-  border-bottom: 1px solid var(--o2-border-color);
-}
-
-.config-section-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 8px 8px;
-  margin-left: 12px;
-  overflow-x: hidden;
-  box-sizing: border-box;
-}
-
-.config-no-results {
-  text-align: center;
+.panel-time-picker-btn .date-time-button .date-time-arrow {
+  flex-shrink: 0;
+  font-size: 18px !important;
 }
 </style>

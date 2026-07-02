@@ -541,8 +541,35 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default" },
   },
 
+  // Latency percentile row labels (ServiceGraphEdgeSidePanel baseline table) —
+  // fixed P50/P95/P99 markers. Registry-driven so the component needs no slot.
+  percentileTag: {
+    mode: "plain",
+    shape: "pill",
+    size: "md",
+    values: {
+      p50: { variant: "default-soft", label: "P50" },
+      p95: { variant: "default-soft", label: "P95" },
+      p99: { variant: "default-soft", label: "P99" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Report-row markers (ReportList) — report format + preview flag.
   // png→primary-outline, preview→default-outline. pill + md; label is the slot.
+  // Alert template origin — prebuilt vs custom. i18n labels via labelKey so the
+  // component needs no slot (was dimensionKey/fieldTag + hardcoded t() slots).
+  templateOrigin: {
+    mode: "plain",
+    shape: "rounded",
+    size: "sm",
+    values: {
+      prebuilt: { variant: "blue-soft", labelKey: "alert_templates.prebuiltBadge" },
+      custom: { variant: "default-soft", labelKey: "alert_templates.customBadge" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   reportTag: {
     mode: "plain",
     shape: "pill",
@@ -705,6 +732,32 @@ export const BADGE_GROUPS = {
       default: { variant: "default", labelKey: "alert_destinations.templateDefaultBadge" },
     },
     fallback: { variant: "default" },
+  },
+
+  // "Active version" marker in scorer / score-config version lists — dot +
+  // success. i18n label lives in the registry (labelKey) so the component needs
+  // no slot or per-instance :label. Was booleanState value="enabled" + t() slot.
+  activeVersionFlag: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      active: {
+        variant: "success-soft",
+        labelKey: "onlineEvals.scoreConfig.detail.activeVersionChip",
+      },
+    },
+    fallback: { variant: "success-soft" },
+  },
+
+  // Default LLM-provider marker (LlmProvidersSettings) — dot + success, i18n
+  // label via labelKey. Was booleanState value="yes" + :label="t()".
+  providerDefaultFlag: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      default: { variant: "success-soft", labelKey: "llmProviders.defaultBadge" },
+    },
+    fallback: { variant: "success-soft" },
   },
 
   // Readonly marker (AddDestination) — single fixed neutral flag. Named-colour
@@ -1185,8 +1238,14 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      draft: { variant: "default-soft" },
-      editing: { variant: "blue-soft" },
+      draft: {
+        variant: "default-soft",
+        labelKey: "onlineEvals.job.preview.statusDraft",
+      },
+      editing: {
+        variant: "blue-soft",
+        labelKey: "onlineEvals.job.preview.statusEditing",
+      },
     },
     fallback: { variant: "default-soft" },
   },

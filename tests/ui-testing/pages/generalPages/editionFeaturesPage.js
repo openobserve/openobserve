@@ -58,17 +58,17 @@ export class EditionFeaturesPage {
 
     // Dialog
     this.dialog = page.locator('[data-test="enterprise-upgrade-dialog"]');
-    this.heroTitle = this.dialog.locator('.hero-title');
-    this.offerBadge = this.dialog.locator('.offer-badge');
-    this.primaryButton = this.dialog.locator('.download-btn');
-    this.learnMoreButton = this.dialog.locator('.learn-more-btn');
-    this.featuresTitle = this.dialog.locator('.features-header h4');
-    this.featureItems = this.dialog.locator('.feature-list-item');
+    this.heroTitle = this.dialog.locator('[data-test="enterprise-upgrade-hero-title"]');
+    this.offerBadge = this.dialog.locator('[data-test="enterprise-upgrade-offer-badge"]');
+    this.primaryButton = this.dialog.locator('[data-test="enterprise-upgrade-download-btn"]');
+    this.learnMoreButton = this.dialog.locator('[data-test="enterprise-upgrade-learn-more-btn"]');
+    this.featuresTitle = this.dialog.locator('[data-test="enterprise-upgrade-features-title"]');
+    this.featureItems = this.dialog.locator('[data-test="enterprise-upgrade-feature-item"]');
   }
 
   getFeatureItem(name) {
     return this.featureItems.filter({
-      has: this.page.locator('.feature-name', { hasText: name }),
+      has: this.page.locator('[data-test="enterprise-upgrade-feature-name"]', { hasText: name }),
     });
   }
 
@@ -109,12 +109,12 @@ export class EditionFeaturesPage {
   async expectFeatureCard({ name, beta, ha }) {
     const item = this.getFeatureItem(name);
     await expect(item, `Feature card "${name}" should be visible`).toBeVisible();
-    await expect(item.locator('.external-link-icon'), `"${name}" should show external link icon`).toBeVisible();
+    await expect(item.locator('[data-test="enterprise-upgrade-feature-external-link"]'), `"${name}" should show external link icon`).toBeVisible();
     if (beta) {
-      await expect(item.locator('[data-test="feature-beta-badge"]'), `"${name}" should show BETA badge`).toBeVisible();
+      await expect(item.locator('[data-test="enterprise-upgrade-feature-beta-badge"]'), `"${name}" should show BETA badge`).toBeVisible();
     }
     if (ha) {
-      await expect(item.locator('[data-test="feature-ha-badge"]'), `"${name}" should show HA badge`).toBeVisible();
+      await expect(item.locator('[data-test="enterprise-upgrade-feature-ha-badge"]'), `"${name}" should show HA badge`).toBeVisible();
     }
   }
 

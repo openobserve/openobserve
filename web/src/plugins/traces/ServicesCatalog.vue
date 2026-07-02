@@ -665,6 +665,13 @@ function deriveStatus(
   return "healthy";
 }
 
+function statusBadgeClass(status: string): string {
+  if (status === "critical") return "tw:text-(--o2-service-health-critical)";
+  if (status === "warning") return "tw:text-(--o2-service-health-warning)";
+  if (status === "degraded") return "tw:text-(--o2-service-health-degraded)";
+  return "tw:text-(--o2-service-health-healthy)";
+}
+
 function errorRateClass(rate: number): string {
   if (rate > 10) return "tw:text-red-500 tw:font-medium";
   if (rate > 5) return "tw:text-orange-500";
@@ -919,14 +926,3 @@ onUnmounted(() => {
   }
 });
 </script>
-
-<style lang="scss" scoped>
-@import "@/styles/pagination.scss";
-
-:deep(.services-catalog-table-container) {
-  .container {
-    border-radius: 0 !important;
-  }
-}
-
-</style>

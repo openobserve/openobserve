@@ -13,26 +13,26 @@ See the License for the specific language governing permissions and
 limitations under the License. -->
 
 <template>
-  <div data-test="destination-test-result" class="o2-test-result">
+  <div data-test="destination-test-result" class="tw:mt-3">
     <!-- Success State -->
     <div
       v-if="result && result.success"
       data-test="test-result-success"
-      class="o2-test-success"
+      class="tw:flex tw:gap-3 tw:py-3 tw:px-4 tw:rounded tw:border-l-[3px] tw:border-solid tw:border-(--q-positive) tw:bg-[rgba(76,175,80,0.08)] tw:dark:bg-[rgba(76,175,80,0.12)]"
     >
-      <div class="result-icon">
+      <div class="tw:shrink-0 tw:pt-[2px] tw:text-(--q-positive)">
         <OIcon name="check-circle" size="md" />
       </div>
-      <div class="result-content">
-        <div data-test="test-success-message" class="result-title">
+      <div class="tw:flex-1 tw:min-w-0">
+        <div data-test="test-success-message" class="tw:text-[13px] tw:font-medium tw:leading-[1.4] tw:mb-1">
           {{ t('alerts.testSuccessMessage') }}
         </div>
-        <div data-test="test-success-timestamp" class="result-meta">
+        <div data-test="test-success-timestamp" class="tw:text-[11px] tw:text-(--q-text-secondary) tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
           {{ formatTimestamp(result.timestamp) }}
           <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
           </OTag>
-          <span v-if="result.responseTime" class="response-time">
+          <span v-if="result.responseTime" class="tw:font-['Monaco','Consolas','Courier_New',monospace] tw:text-(--q-text-secondary)">
             {{ result.responseTime }}ms
           </span>
         </div>
@@ -43,27 +43,27 @@ limitations under the License. -->
     <div
       v-else-if="result && !result.success"
       data-test="test-result-failure"
-      class="o2-test-failure"
+      class="tw:flex tw:gap-3 tw:py-3 tw:px-4 tw:rounded tw:border-l-[3px] tw:border-solid tw:border-(--q-negative) tw:bg-[rgba(244,67,54,0.08)] tw:dark:bg-[rgba(244,67,54,0.12)]"
     >
-      <div class="result-icon">
+      <div class="tw:shrink-0 tw:pt-[2px] tw:text-(--q-negative)">
         <OIcon name="error" size="md" />
       </div>
-      <div class="result-content">
-        <div data-test="test-failure-message" class="result-title">
+      <div class="tw:flex-1 tw:min-w-0">
+        <div data-test="test-failure-message" class="tw:text-[13px] tw:font-medium tw:leading-[1.4] tw:mb-1">
           {{ getFailureMessage(result) }}
         </div>
-        <div v-if="result.timestamp" data-test="test-failure-timestamp" class="result-meta">
+        <div v-if="result.timestamp" data-test="test-failure-timestamp" class="tw:text-[11px] tw:text-(--q-text-secondary) tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
           {{ formatTimestamp(result.timestamp) }}
           <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
           </OTag>
-          <span v-if="result.responseTime" class="response-time">
+          <span v-if="result.responseTime" class="tw:font-['Monaco','Consolas','Courier_New',monospace] tw:text-(--q-text-secondary)">
             {{ result.responseTime }}ms
           </span>
         </div>
 
         <!-- Suggested Fix -->
-        <div v-if="getSuggestedFix(result)" class="result-suggestion">
+        <div v-if="getSuggestedFix(result)" class="result-suggestion tw:flex tw:items-start tw:gap-2 tw:mt-2 tw:p-2 tw:bg-[rgba(255,193,7,0.1)] tw:dark:bg-[rgba(255,193,7,0.15)] tw:rounded-[3px] tw:text-[11px] tw:text-(--q-text) tw:leading-[1.4]">
           <OIcon name="lightbulb" size="sm" />
           <span>{{ getSuggestedFix(result) }}</span>
         </div>
@@ -73,35 +73,35 @@ limitations under the License. -->
           v-if="result.error || result.responseBody"
           v-model="errorDetailsOpen"
           data-test="test-failure-details-expansion"
-          class="error-expansion"
+          class="tw:mt-2 tw:bg-transparent"
         >
           <template #trigger>
-            <div class="expansion-header">
+            <div class="tw:flex tw:items-center tw:text-(--q-text-secondary) tw:text-[11px]">
               <OIcon name="info" size="xs" class="tw:mr-1" />
               <span class="tw:text-xs">{{ t('alerts.viewDetails') }}</span>
             </div>
           </template>
 
-          <div data-test="test-failure-details" class="error-details-content">
-            <div v-if="result.error" data-test="test-error-message" class="error-item">
-              <div class="error-label">{{ t('alerts.error') }}</div>
-              <div class="error-value">{{ result.error }}</div>
+          <div data-test="test-failure-details" class="tw:pt-2">
+            <div v-if="result.error" data-test="test-error-message" class="error-item tw:mb-3">
+              <div class="tw:text-[10px] tw:font-semibold tw:uppercase tw:tracking-[0.5px] tw:text-(--q-text-secondary) tw:mb-1">{{ t('alerts.error') }}</div>
+              <div class="tw:text-[11px] tw:text-(--q-text) tw:leading-[1.5] tw:break-words">{{ result.error }}</div>
             </div>
 
-            <div v-if="result.statusCode" data-test="test-http-status" class="error-item">
-              <div class="error-label">{{ t('alerts.httpStatus') }}</div>
-              <div class="error-value">{{ result.statusCode }} {{ getStatusText(result.statusCode) }}</div>
+            <div v-if="result.statusCode" data-test="test-http-status" class="error-item tw:mb-3">
+              <div class="tw:text-[10px] tw:font-semibold tw:uppercase tw:tracking-[0.5px] tw:text-(--q-text-secondary) tw:mb-1">{{ t('alerts.httpStatus') }}</div>
+              <div class="tw:text-[11px] tw:text-(--q-text) tw:leading-[1.5] tw:break-words">{{ result.statusCode }} {{ getStatusText(result.statusCode) }}</div>
             </div>
 
-            <div v-if="result.responseBody" data-test="test-response-body" class="error-item">
-              <div class="error-label">{{ t('alerts.responseBody') }}</div>
-              <pre class="error-code">{{ formatResponseBody(result.responseBody) }}</pre>
+            <div v-if="result.responseBody" data-test="test-response-body" class="error-item tw:mb-3">
+              <div class="tw:text-[10px] tw:font-semibold tw:uppercase tw:tracking-[0.5px] tw:text-(--q-text-secondary) tw:mb-1">{{ t('alerts.responseBody') }}</div>
+              <pre class="tw:bg-[rgba(0,0,0,0.05)] tw:dark:bg-[rgba(255,255,255,0.05)] tw:border tw:border-[rgba(0,0,0,0.1)] tw:dark:border-[rgba(255,255,255,0.1)] tw:rounded-[3px] tw:p-2 tw:font-['Monaco','Consolas','Courier_New',monospace] tw:text-[10px] tw:leading-[1.5] tw:max-h-[150px] tw:overflow-y-auto tw:m-0 tw:whitespace-pre tw:text-(--q-text)">{{ formatResponseBody(result.responseBody) }}</pre>
             </div>
           </div>
         </OCollapsible>
 
         <!-- Retry Button -->
-        <div class="result-actions">
+        <div class="tw:mt-3 tw:pt-2 tw:border-t tw:border-[rgba(0,0,0,0.08)] tw:dark:border-[rgba(255,255,255,0.08)]">
           <OButton
             data-test="test-retry-button"
             variant="ghost-primary"
@@ -119,16 +119,16 @@ limitations under the License. -->
     <div
       v-else-if="isLoading"
       data-test="test-result-loading"
-      class="o2-test-loading"
+      class="tw:flex tw:gap-3 tw:py-3 tw:px-4 tw:rounded tw:border-l-[3px] tw:border-solid tw:border-(--q-primary) tw:bg-[rgba(33,150,243,0.08)] tw:dark:bg-[rgba(33,150,243,0.12)]"
     >
-      <div class="result-icon">
+      <div class="tw:shrink-0 tw:pt-[2px] tw:text-(--q-primary)">
         <OSpinner size="xs" />
       </div>
-      <div class="result-content">
-        <div class="result-title">
+      <div class="tw:flex-1 tw:min-w-0">
+        <div class="tw:text-[13px] tw:font-medium tw:leading-[1.4] tw:mb-1">
           {{ t('alerts.testInProgress') }}
         </div>
-        <div class="result-meta">
+        <div class="tw:text-[11px] tw:text-(--q-text-secondary) tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
           {{ t('alerts.sendingNotification') }}
         </div>
       </div>
@@ -138,10 +138,10 @@ limitations under the License. -->
     <div
       v-else
       data-test="test-result-idle"
-      class="o2-test-idle"
+      class="tw:flex tw:items-center tw:gap-2 tw:py-[10px] tw:px-3 tw:rounded tw:bg-[rgba(0,0,0,0.02)] tw:dark:bg-[rgba(255,255,255,0.02)] tw:border tw:border-[rgba(0,0,0,0.08)] tw:dark:border-[rgba(255,255,255,0.08)]"
     >
       <OIcon name="info" size="sm" />
-      <span class="idle-text">
+      <span class="tw:text-[11px] tw:text-(--q-text-secondary) tw:leading-[1.4]">
         {{ t('alerts.testIdleMessage') }}
       </span>
     </div>
@@ -317,208 +317,3 @@ function getSuggestedFix(result: TestResult): string | null {
   return null;
 }
 </script>
-
-<style scoped lang="scss">
-.o2-test-result {
-  margin-top: 12px;
-
-  .o2-test-success,
-  .o2-test-failure,
-  .o2-test-loading {
-    display: flex;
-    gap: 12px;
-    padding: 12px 16px;
-    border-radius: 4px;
-    border-left: 3px solid;
-    background-color: var(--q-field-bg);
-  }
-
-  .o2-test-success {
-    border-left-color: var(--q-positive);
-    background-color: rgba(76, 175, 80, 0.08);
-
-    .result-icon {
-      color: var(--q-positive);
-    }
-  }
-
-  .o2-test-failure {
-    border-left-color: var(--q-negative);
-    background-color: rgba(244, 67, 54, 0.08);
-
-    .result-icon {
-      color: var(--q-negative);
-    }
-  }
-
-  .o2-test-loading {
-    border-left-color: var(--q-primary);
-    background-color: rgba(33, 150, 243, 0.08);
-
-    .result-icon {
-      color: var(--q-primary);
-    }
-  }
-
-  .result-icon {
-    flex-shrink: 0;
-    padding-top: 2px;
-  }
-
-  .result-content {
-    flex: 1;
-    min-width: 0;
-
-    .result-title {
-      font-size: 13px;
-      font-weight: 500;
-      line-height: 1.4;
-      margin-bottom: 4px;
-    }
-
-    .result-meta {
-      font-size: 11px;
-      color: var(--q-text-secondary);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-
-      .response-time {
-        font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
-        color: var(--q-text-secondary);
-      }
-    }
-
-    .result-suggestion {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      margin-top: 8px;
-      padding: 8px;
-      background-color: rgba(255, 193, 7, 0.1);
-      border-radius: 3px;
-      font-size: 11px;
-      color: var(--q-text);
-      line-height: 1.4;
-}
-
-    .error-expansion {
-      margin-top: 8px;
-      background-color: transparent;
-
-      .expansion-header {
-        display: flex;
-        align-items: center;
-        color: var(--q-text-secondary);
-        font-size: 11px;
-      }
-    }
-
-    .error-details-content {
-      padding: 8px 0 0 0;
-
-      .error-item {
-        margin-bottom: 12px;
-
-        &:last-child {
-          margin-bottom: 0;
-        }
-
-        .error-label {
-          font-size: 10px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: var(--q-text-secondary);
-          margin-bottom: 4px;
-        }
-
-        .error-value {
-          font-size: 11px;
-          color: var(--q-text);
-          line-height: 1.5;
-          word-break: break-word;
-        }
-
-        .error-code {
-          background-color: rgba(0, 0, 0, 0.05);
-          border: 1px solid rgba(0, 0, 0, 0.1);
-          border-radius: 3px;
-          padding: 8px;
-          font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
-          font-size: 10px;
-          line-height: 1.5;
-          max-height: 150px;
-          overflow-y: auto;
-          margin: 0;
-          white-space: pre;
-          color: var(--q-text);
-        }
-      }
-    }
-
-    .result-actions {
-      margin-top: 12px;
-      padding-top: 8px;
-      border-top: 1px solid rgba(0, 0, 0, 0.08);
-    }
-  }
-
-  .o2-test-idle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    border-radius: 4px;
-    background-color: rgba(0, 0, 0, 0.02);
-    border: 1px solid rgba(0, 0, 0, 0.08);
-.idle-text {
-      font-size: 11px;
-      color: var(--q-text-secondary);
-      line-height: 1.4;
-    }
-  }
-}
-
-// Dark theme adjustments
-body.body--dark {
-  .o2-test-result {
-    .o2-test-success,
-    .o2-test-failure,
-    .o2-test-loading {
-      background-color: rgba(255, 255, 255, 0.03);
-    }
-
-    .o2-test-success {
-      background-color: rgba(76, 175, 80, 0.12);
-    }
-
-    .o2-test-failure {
-      background-color: rgba(244, 67, 54, 0.12);
-    }
-
-    .o2-test-loading {
-      background-color: rgba(33, 150, 243, 0.12);
-    }
-
-    .result-suggestion {
-      background-color: rgba(255, 193, 7, 0.15);
-    }
-
-    .error-code {
-      background-color: rgba(255, 255, 255, 0.05);
-      border-color: rgba(255, 255, 255, 0.1);
-    }
-
-    .o2-test-idle {
-      background-color: rgba(255, 255, 255, 0.02);
-      border-color: rgba(255, 255, 255, 0.08);
-    }
-
-    .result-actions {
-      border-top-color: rgba(255, 255, 255, 0.08);
-    }
-  }
-}
-</style>

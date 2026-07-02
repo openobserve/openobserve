@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <EvalListShell
     data-test="scorer"
     :show-empty="showNoProvidersState"
@@ -100,21 +100,22 @@
         </template>
 
         <template #cell-produces="{ row }">
-          <span class="sr-mono-cell">{{ producesLabel(row) || "—" }}</span>
+          <span class="tw:font-mono tw:text-xs">{{ producesLabel(row) || "—" }}</span>
         </template>
 
         <template #cell-version="{ row }">
-          <span class="sr-mono-cell">v{{ row.version }}</span>
+          <span class="tw:font-mono tw:text-xs">v{{ row.version }}</span>
         </template>
 
         <template #cell-usedBy="{ row }">
-          <span class="sr-mono-cell">{{ usedByText(row) }}</span>
+          <span class="tw:font-mono tw:text-xs">{{ usedByText(row) }}</span>
         </template>
 
         <template #cell-actions="{ row }">
           <div class="tw:flex tw:items-center actions-container">
             <OButton
               :data-test="`scorer-list-${row.name}-edit-btn`"
+              data-row-action="edit"
               variant="ghost"
               size="icon-sm"
               :title="t('onlineEvals.actions.edit')"
@@ -131,6 +132,7 @@
             />
             <OButton
               :data-test="`scorer-list-${row.name}-delete-btn`"
+              data-row-action="delete"
               variant="ghost-destructive"
               size="icon-sm"
               :title="t('onlineEvals.actions.delete')"
@@ -333,10 +335,3 @@ function usedByText(row: Scorer) {
   return t("onlineEvals.scorer.usedByJobs", { count });
 }
 </script>
-
-<style lang="scss">
-.sr-mono-cell {
-  font-size: 12px;
-}
-
-</style>

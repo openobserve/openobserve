@@ -42,3 +42,4 @@ const label = computed(() =>
     : t("traces.success"),
 );
 </script>
+

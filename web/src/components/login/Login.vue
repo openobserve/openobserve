@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div v-if="showSSO && showInternalLogin" class="tw:py-3 tw:text-center">
           <a
-            class="tw:cursor-pointer login-internal-link tw:py-3"
+            class="tw:cursor-pointer tw:py-3 tw:hover:text-[#595959]"
             style="text-decoration: underline"
             data-test="login-as-internal-user"
             @click="loginAsInternalUser = !loginAsInternalUser"
@@ -450,17 +450,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss">
-.login-internal-link {
-  &:hover {
-    color: #595959;
-  }
-}
-
-.my-card {
-  width: 400px;
-}
-</style>
-
-

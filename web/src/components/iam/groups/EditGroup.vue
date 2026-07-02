@@ -347,5 +347,3 @@ const cancelEditGroup = () => {
   );
 };
 </script>
-
-<style scoped></style>

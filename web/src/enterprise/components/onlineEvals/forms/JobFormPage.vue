@@ -1,5 +1,5 @@
-<template>
-  <form class="job-form" @submit.prevent="save(false)">
+﻿<template>
+  <form class="job-form tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:gap-2.5" @submit.prevent="save(false)">
     <AppPageHeader
       :back="{
         label: t('onlineEvals.job.backTo'),
@@ -27,20 +27,20 @@
       </template>
     </AppPageHeader>
 
-    <div class="job-form__body">
-      <div class="job-form__main">
+    <div class="job-form__body tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:flex tw:gap-2">
+      <div class="job-form__main tw:flex-[6.5] tw:min-w-0 tw:min-h-0 tw:overflow-auto tw:flex tw:flex-col tw:gap-2 tw:p-2">
         <!-- Target -->
-        <section class="job-section card-container">
-          <div class="section-header">
-            <div class="section-header-accent" />
-            <span class="section-header-title">{{ t("onlineEvals.job.targetSection") }}</span>
+        <section class="card-container tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:overflow-hidden tw:shrink-0">
+          <div class="tw:flex tw:items-center tw:py-[10px] tw:px-3 tw:border-b tw:border-(--color-border-default,var(--o2-border))">
+            <div class="tw:w-[3px] tw:h-4 tw:rounded-[2px] tw:mr-2 tw:shrink-0 tw:bg-(--q-primary)" />
+            <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.targetSection") }}</span>
           </div>
-          <div class="job-section__body">
+          <div class="tw:flex tw:flex-col tw:gap-3 tw:py-3.5 tw:px-4">
           <div class="job-field">
-            <label class="job-field__label">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
               {{ t("onlineEvals.job.nameLabel") }}
-              <span class="job-field__req">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="job-field__lock" />
+              <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="tw:ml-1.5 tw:text-(--color-text-secondary,var(--o2-text-secondary))" />
             </label>
             <OInput
               v-model.trim="form.name"
@@ -52,10 +52,10 @@
           </div>
 
           <div class="job-field">
-            <label class="job-field__label">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
               {{ t("onlineEvals.job.streamLabel") }}
-              <span class="job-field__req">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="job-field__lock" />
+              <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="tw:ml-1.5 tw:text-(--color-text-secondary,var(--o2-text-secondary))" />
             </label>
             <OSelect
               v-model="form.stream"
@@ -68,7 +68,7 @@
           </div>
 
           <div class="job-field job-field--desc">
-            <label class="job-field__label">{{ t("onlineEvals.job.descriptionLabel") }}</label>
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">{{ t("onlineEvals.job.descriptionLabel") }}</label>
             <OInput
               v-model.trim="form.description"
               type="textarea"
@@ -82,12 +82,12 @@
         </section>
 
         <!-- Scorers + Filter + Mapping -->
-        <section class="job-section card-container">
-          <div class="section-header">
-            <div class="section-header-accent" />
-            <span class="section-header-title">{{ t("onlineEvals.job.scorersSection") }}</span>
+        <section class="card-container tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:overflow-hidden tw:shrink-0">
+          <div class="tw:flex tw:items-center tw:py-[10px] tw:px-3 tw:border-b tw:border-(--color-border-default,var(--o2-border))">
+            <div class="tw:w-[3px] tw:h-4 tw:rounded-[2px] tw:mr-2 tw:shrink-0 tw:bg-(--q-primary)" />
+            <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</span>
           </div>
-          <div class="job-section__body">
+          <div class="tw:flex tw:flex-col tw:gap-3 tw:py-3.5 tw:px-4">
           <JobScorerPicker
             v-model="form.scorerIds"
             :scorers="scorers"
@@ -107,28 +107,28 @@
         </section>
 
         <!-- Sampling -->
-        <section class="job-section card-container">
-          <div class="section-header">
-            <div class="section-header-accent" />
-            <span class="section-header-title">{{ t("onlineEvals.job.stepper.sampling") }}</span>
+        <section class="card-container tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:overflow-hidden tw:shrink-0">
+          <div class="tw:flex tw:items-center tw:py-[10px] tw:px-3 tw:border-b tw:border-(--color-border-default,var(--o2-border))">
+            <div class="tw:w-[3px] tw:h-4 tw:rounded-[2px] tw:mr-2 tw:shrink-0 tw:bg-(--q-primary)" />
+            <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</span>
           </div>
-          <div class="job-section__body">
-          <div class="job-field-row">
+          <div class="tw:flex tw:flex-col tw:gap-3 tw:py-3.5 tw:px-4">
+          <div class="job-field-row tw:grid tw:grid-cols-2 tw:max-[1100px]:grid-cols-1 tw:gap-[14px]">
             <div class="job-field">
-              <label class="job-field__label">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
+              <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
               <OSelect
                 v-model="form.samplingMode"
                 :options="samplingModeOptions"
                 size="md"
                 data-test="job-form-sampling-mode-select"
               />
-              <div class="job-field__help">{{ t("onlineEvals.job.samplingHelp") }}</div>
+              <div class="job-field__help tw:text-[11.5px] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:mt-1">{{ t("onlineEvals.job.samplingHelp") }}</div>
             </div>
 
             <div class="job-field">
-              <label class="job-field__label">
+              <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
                 {{ t("onlineEvals.job.samplingValueLabel") }}
-                <span v-if="form.samplingMode !== 'all'" class="job-field__req">*</span>
+                <span v-if="form.samplingMode !== 'all'" class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
               </label>
               <OInput
                 v-model="form.samplingValue"
@@ -136,7 +136,7 @@
                 :disabled="form.samplingMode === 'all'"
                 data-test="job-form-sampling-value-input"
               />
-              <div class="job-field__help">
+              <div class="job-field__help tw:text-[11.5px] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:mt-1">
                 {{ form.samplingMode === 'all'
                   ? t("onlineEvals.job.samplingValueAllHelp")
                   : t("onlineEvals.job.samplingValueHelp") }}
@@ -157,7 +157,7 @@
       />
     </div>
 
-    <footer class="job-form__foot">
+    <footer class="tw:sticky tw:bottom-0 tw:flex tw:items-center tw:justify-end tw:gap-2 tw:px-5.5 tw:py-3 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] tw:shrink-0 tw:z-1">
       <OButton
         data-test="job-form-cancel-btn"
         type="button"
@@ -445,52 +445,10 @@ async function save(activateAfter = false) {
 }
 </script>
 
-<style lang="scss" scoped>
-.job-form {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  gap: 10px;
-}
-
-// AddAlert "single pane" layout: flex 6.5 form column / flex 3.5 preview rail
-// (the rail's left border is the only divider — no heavy grid gap + shadows).
-.job-form__body {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  gap: 8px;
-}
-
-// Left column — scrollable stack of card sections.
-.job-form__main {
-  flex: 6.5;
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px;
-}
-
-.job-form__foot {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 22px;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
-  flex-shrink: 0;
-  z-index: 1;
-}
-
+<style lang="scss">
+// Layout, spacing, colors, and text styling are Tailwind utilities in the
+// template. Only descendant/`:deep` selectors (targeting child-component
+// internals) and the responsive @media block remain here.
 .job-form__main :deep(textarea) {
   max-height: 200px;
   overflow-y: auto;
@@ -498,85 +456,6 @@ async function save(activateAfter = false) {
 
 .job-form__main .job-field--desc :deep(textarea) {
   max-height: 120px;
-}
-
-// Section card — bg comes from .card-container; we add the border + radius so
-// each section reads as a discrete card (AddAlert pattern).
-.job-section {
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  overflow: hidden;
-  // In the column flex container the sections must NOT shrink — otherwise they
-  // get squeezed to fit the viewport and `overflow: hidden` clips their content
-  // (lost Description, hidden filter conditions). Natural height + column scroll.
-  flex-shrink: 0;
-}
-
-// Accent-bar section header — copied from AddAlert.vue's `.section-header`
-// (replaces the old numbered "01/02/03" badges).
-.section-header {
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border-default, var(--o2-border));
-}
-
-.section-header-accent {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  margin-right: 8px;
-  flex-shrink: 0;
-  background: var(--q-primary);
-}
-
-.section-header-title {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--color-text-primary, currentColor);
-}
-
-.job-section__body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px 16px;
-}
-
-.job-field {
-  margin-bottom: 0;
-}
-
-.job-field__label {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  margin-bottom: 4px;
-}
-
-.job-field__req {
-  color: var(--o2-status-error-text);
-  margin-left: 2px;
-}
-
-.job-field__help {
-  font-size: 11.5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  margin-top: 4px;
-}
-
-.job-field-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.job-field__lock {
-  margin-left: 6px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 @media (max-width: 1100px) {

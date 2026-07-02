@@ -19,16 +19,6 @@
           <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
         </template>
         <template #actions>
-          <OInput
-            v-model="searchQuery"
-            class="tw:w-50"
-            :placeholder="t('llmProviders.searchPlaceholder')"
-            data-test="llm-providers-search-input"
-          >
-            <template #icon-left>
-              <OIcon name="search" size="sm" />
-            </template>
-          </OInput>
           <OButton
             data-test="llm-providers-add-btn"
             variant="primary"
@@ -62,7 +52,7 @@
         />
       </div>
 
-      <div v-else class="tw:flex-1 tw:min-h-0 tw:p-4">
+      <div v-else class="tw:flex-1 tw:min-h-0">
         <OTable
           data-test="llm-providers-table"
           :data="filteredProviders"
@@ -82,6 +72,14 @@
           class="tw:w-full tw:h-full"
           @row-click="(row: any) => openEdit(row)"
         >
+          <template #toolbar>
+            <OSearchInput
+              v-model="searchQuery"
+              class="tw:flex-1"
+              :placeholder="t('llmProviders.searchPlaceholder')"
+              data-test="llm-providers-search-input"
+            />
+          </template>
           <template #empty>
             <OEmptyState
               size="hero"
@@ -96,19 +94,18 @@
           </template>
 
           <template #cell-endpoint="{ row }">
-            <span class="llmp-mono">{{ row.endpoint || endpointFallback(row) }}</span>
+            <span class="tw:font-mono tw:text-xs">{{ row.endpoint || endpointFallback(row) }}</span>
           </template>
 
           <template #cell-defaultModel="{ row }">
-            <span class="llmp-mono">{{ defaultModelOf(row) || "—" }}</span>
+            <span class="tw:font-mono tw:text-xs">{{ defaultModelOf(row) || "—" }}</span>
           </template>
 
           <template #cell-isDefault="{ row }">
             <OTag
               v-if="booleanOf(row, 'isDefault', 'is_default')"
-              type="booleanState"
-              value="yes"
-              :label="t('llmProviders.defaultBadge')"
+              type="providerDefaultFlag"
+              value="default"
             />
             <span v-else class="tw:text-text-primary">—</span>
           </template>
@@ -117,6 +114,7 @@
             <div class="tw:flex tw:items-center actions-container">
               <OButton
                 :data-test="`llm-providers-${row.name}-edit-btn`"
+                data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('onlineEvals.actions.edit')"
@@ -125,6 +123,7 @@
               />
               <OButton
                 :data-test="`llm-providers-${row.name}-delete-btn`"
+                data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
                 :title="t('onlineEvals.actions.delete')"
@@ -153,10 +152,9 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
@@ -386,36 +384,3 @@ async function performDelete() {
   }
 }
 </script>
-
-<style lang="scss" scoped>
-.llmp-type-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 7px;
-  border-radius: 3px;
-  font: 600 11px/1.5 inherit;
-  background: color-mix(in srgb, var(--o2-status-info-text) 14%, transparent);
-  color: var(--o2-status-info-text);
-  text-transform: lowercase;
-}
-
-.llmp-default-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 7px;
-  border-radius: 3px;
-  font: 600 10px/1.5 inherit;
-  background: color-mix(in srgb, var(--o2-status-success-text) 14%, transparent);
-  color: var(--o2-status-success-text);
-  text-transform: uppercase;
-}
-
-.llmp-mono {
-  font-size: 12px;
-}
-
-.llmp-muted {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-</style>

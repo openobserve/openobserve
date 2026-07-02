@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        another card-container would render same-bg-on-same-bg and the
        inner cards would visually disappear (no border contrast). -->
   <div
-    class="llm-insights-dashboard tw:h-full tw:flex tw:flex-col"
+    class="tw:bg-transparent tw:h-full tw:flex tw:flex-col tw:px-2.5"
   >
     <!-- Toolbar: Stream/Agent mode tab (left) + the matching picker (right) —
          hidden when no streams are available. Padding lives on the toolbar +
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="kpi-card card-container tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem]"
+          class="card-container tw:rounded-lg tw:flex tw:flex-col tw:px-3.5 tw:pt-2.5 tw:pb-2.5 tw:gap-1 tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
         >
           <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
@@ -193,16 +193,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-else>
             <div class="tw:flex tw:flex-col tw:gap-[0.25rem]">
-              <div class="kpi-label tw:text-[0.7rem] tw:leading-normal tw:font-semibold tw:mb-[0.25rem]">
+              <div class="tw:text-[0.7rem] tw:leading-normal tw:font-semibold tw:mb-[0.25rem] tw:text-(--o2-text-muted)">
                 {{ card.label }}
               </div>
               <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
-                <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]">
+                <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-(--o2-text-primary)">
                   {{ card.value }}
                 </span>
                 <span
                   v-if="card.unit"
-                  class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
+                  class="tw:text-[0.8rem] tw:font-semibold tw:text-(--o2-text-secondary)"
                 >
                   {{ card.unit }}
                 </span>
@@ -839,24 +839,3 @@ onUnmounted(() => {
   cancelAll();
 });
 </script>
-
-<style lang="scss" scoped>
-// Page wrapper stays transparent so each inner card-container (KPI tiles
-// + trend panels) stands out against the surrounding page bg. The
-// previous solid-card-bg here matched the inner card-container bg and
-// erased every border / shadow.
-.llm-insights-dashboard {
-  background: transparent;
-}
-
-.kpi-card {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-  transition: box-shadow 0.2s ease;
-
-  &:hover {
-    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
-  }
-}
-
-</style>
