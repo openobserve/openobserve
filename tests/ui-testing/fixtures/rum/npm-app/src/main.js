@@ -3,7 +3,7 @@
 // This is the NPM counterpart to the CDN sample's `oo-rum.js`. It imports the
 // published packages, initializes RUM + Logs, and then installs `window.OO_RUM`
 // / `window.OO_LOGS` shims so the SHARED sample interactions in
-// `examples/cdn-rum-sample/app.js` run UNCHANGED (that app.js was written for
+// `fixtures/rum/cdn-sample/app.js` run UNCHANGED (that app.js was written for
 // the CDN async-loader stub which exposes an `.onReady()` queue).
 //
 // Config is injected by the fixture server as `window.__OO_CONFIG__` before this

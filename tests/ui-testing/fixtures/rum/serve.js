@@ -1,6 +1,6 @@
 // RUM E2E fixture server
 // --------------------------------------------------------------------------
-// Serves the existing `examples/cdn-rum-sample` app AS-IS so a real browser can
+// Serves the committed `fixtures/rum/cdn-sample` app AS-IS so a real browser can
 // load the LIVE CDN RUM/Logs bundles and emit genuine SDK beacons. The ONLY
 // thing this server rewrites is the OpenObserve config block inside `oo-rum.js`
 // (clientToken / site / organizationIdentifier / insecureHTTP / service /
@@ -19,7 +19,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const SAMPLE_DIR = path.resolve(__dirname, '../../../../examples/cdn-rum-sample');
+const SAMPLE_DIR = path.resolve(__dirname, 'cdn-sample');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',

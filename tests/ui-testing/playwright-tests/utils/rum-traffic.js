@@ -1,6 +1,6 @@
 // Shared RUM traffic generation for the sample fixture app.
 // --------------------------------------------------------------------------
-// Drives the deterministic interactions in examples/cdn-rum-sample/app.js so
+// Drives the deterministic interactions in fixtures/rum/cdn-sample/app.js so
 // the SDK emits a known set of signals (custom action, info/error logs, an
 // uncaught error, a resource fetch), then navigates to force a batch flush.
 // Reused by the CDN, NPM and RUM-page data-flow specs so the generated event
