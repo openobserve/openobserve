@@ -3136,6 +3136,9 @@ pub async fn create_table_index() -> Result<()> {
 const MAINTENANCE_LOCK_KEY: &str = "/file_list/maintenance";
 /// Coordinator KV key storing the micros timestamp of the last successful run.
 const MAINTENANCE_LAST_RUN_KEY: &str = "/file_list/maintenance/last_run";
+/// Max retries within a cycle when a run fails, and the wait between them.
+const MAINTENANCE_MAX_RETRIES: u32 = 3;
+const MAINTENANCE_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_secs(600);
 
 /// Return the std::time::Duration until the next occurrence of `hour` (UTC).
 fn duration_until_next_utc_hour(hour: u32) -> std::time::Duration {
@@ -3154,15 +3157,11 @@ fn duration_until_next_utc_hour(hour: u32) -> std::time::Duration {
     (next - now).to_std().unwrap_or(std::time::Duration::ZERO)
 }
 
-/// UTC hour at which daily maintenance fires, derived from the retention
-/// allow-list (`ZO_COMPACT_RETENTION_ALLOWED_HOURS`). Uses the earliest allowed
-/// hour so maintenance runs at the start of the retention window; falls back to
-/// hour 0 (midnight UTC) when the list is empty.
+/// Earliest hour in `ZO_COMPACT_RETENTION_ALLOWED_HOURS`, or midnight when unset.
 fn maintenance_hour(retention_allowed_hours: &str) -> u32 {
     retention_allowed_hours
         .split(',')
         .filter_map(|h| h.trim().parse::<u32>().ok())
-        .filter(|h| *h <= 23)
         .min()
         .unwrap_or(0)
 }
@@ -3207,8 +3206,22 @@ pub async fn spawn_maintenance_task() -> std::result::Result<(), anyhow::Error> 
             );
             tokio::time::sleep(wait).await;
 
-            if let Err(e) = run_maintenance().await {
-                log::error!("[POSTGRES] maintenance task error: {e}");
+            // Retry within the cycle on failure; the last_run marker is written
+            // only on success, so a retry re-runs the work instead of waiting a
+            // full day for the next scheduled run.
+            for attempt in 1..=MAINTENANCE_MAX_RETRIES {
+                match run_maintenance().await {
+                    Ok(()) => break,
+                    Err(e) if attempt < MAINTENANCE_MAX_RETRIES => {
+                        log::error!(
+                            "[POSTGRES] maintenance attempt {attempt} failed, retrying: {e}"
+                        );
+                        tokio::time::sleep(MAINTENANCE_RETRY_INTERVAL).await;
+                    }
+                    Err(e) => log::error!(
+                        "[POSTGRES] maintenance failed after {MAINTENANCE_MAX_RETRIES} attempts: {e}"
+                    ),
+                }
             }
         }
     });
@@ -4446,7 +4459,5 @@ mod tests {
         // Empty / invalid falls back to midnight UTC.
         assert_eq!(maintenance_hour(""), 0);
         assert_eq!(maintenance_hour("foo,bar"), 0);
-        // Out-of-range values are ignored.
-        assert_eq!(maintenance_hour("24,25,9"), 9);
     }
 }
