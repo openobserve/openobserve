@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 200px; height: 200px; margin-top: 20vh"
         alt=""
       />
-      <div class="tw:m-0 no-org-selected" >{{ t("ticket.noOrganizationSelected") }}</div>
-      <div class="tw:m-0 select-org-msg">{{ t("ticket.selectOrganizationForQuota") }}</div>
+      <div data-test="no-organization-selected-title" class="tw:m-0 tw:text-[18px] tw:font-semibold">{{ t("ticket.noOrganizationSelected") }}</div>
+      <div data-test="no-organization-selected-message" class="tw:m-0 tw:text-sm tw:font-normal tw:leading-5 tw:text-[#7F7777]">{{ t("ticket.selectOrganizationForQuota") }}</div>
     </div>
   </template>
   
@@ -44,16 +44,4 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     },
   });
   </script>
-  <style scoped lang="scss">
-    .no-org-selected {
-      font-size: 18px;
-      font-weight: 600;
-    }
-    .select-org-msg{
-        font-size: 14px;
-        font-weight: 400;
-        line-height: 20px;
-        color: #7F7777;
-    }
-  </style>
   

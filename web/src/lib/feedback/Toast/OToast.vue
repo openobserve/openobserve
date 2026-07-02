@@ -329,7 +329,7 @@ onUnmounted(() => {
         aria-hidden="true"
       >
         <div
-          :class="['tw:h-full tw:w-full tw:origin-left toast-progress-fill', progressBarColorClasses[variant ?? 'default']]"
+          :class="['tw:h-full tw:w-full tw:origin-left tw:[animation:toast-shrink_linear_forwards]', progressBarColorClasses[variant ?? 'default']]"
           :style="{
             animationDuration: `${timeout}ms`,
             animationPlayState: isPaused ? 'paused' : 'running',
@@ -340,11 +340,7 @@ onUnmounted(() => {
   </ToastRoot>
 </template>
 
-<style scoped>
-.toast-progress-fill {
-  animation: toast-shrink linear forwards;
-}
-
+<style>
 @keyframes toast-shrink {
   from {
     transform: scaleX(1);

@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="source-maps-container card-container tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
   >
     <!-- Filters Section -->
-    <div class="filters-section tw:p-3">
+    <div class="tw:p-3 tw:bg-(--q-background)">
       <div class="tw:flex tw:justify-between tw:items-end">
       <div class="tw:flex tw:gap-4 tw:items-end">
           <!-- Version Filter -->
@@ -99,12 +99,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:w-full"
         >
           <template #expansion="{ row }">
-            <div class="expanded-details tw:p-3">
+            <div class="tw:p-3 tw:bg-(--q-background) tw:border-t tw:border-(--q-border-color,var(--o2-border))">
               <div class="tw:text-sm tw:font-medium tw:mb-2">
                 Source Map Files ({{ row.files.length }})
               </div>
               <ul
-                class="tw:rounded tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md"
+                class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md"
                 style="max-height: 400px; overflow-y: auto;"
               >
                 <li
@@ -115,11 +115,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                     <span class="tw:block tw:text-xs tw:text-muted-foreground">Source File</span>
-                    <span class="text-code tw:text-sm">{{ file.source_file_name }}</span>
+                    <span class="tw:font-[SF_Mono,Monaco,Inconsolata,'Fira_Code','Droid_Sans_Mono',monospace] tw:break-all tw:text-sm">{{ file.source_file_name }}</span>
                   </div>
                   <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                     <span class="tw:block tw:text-xs tw:text-muted-foreground">Source Map File</span>
-                    <span class="text-code tw:text-sm">{{ file.source_map_file_name }}</span>
+                    <span class="tw:font-[SF_Mono,Monaco,Inconsolata,'Fira_Code','Droid_Sans_Mono',monospace] tw:break-all tw:text-sm">{{ file.source_map_file_name }}</span>
                   </div>
                 </li>
               </ul>
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-uploaded_at="{ row }">
-            <div class="tw:cursor-pointer">{{ formatTimestamp(row.uploaded_at) }}</div>
+            <div class="tw:cursor-pointer tw:hover:bg-black/3 tw:dark:hover:bg-white/5">{{ formatTimestamp(row.uploaded_at) }}</div>
           </template>
 
           <template #cell-actions="{ row }">
@@ -501,39 +501,3 @@ onMounted(async () => {
   fetchSourceMaps();
 });
 </script>
-
-<style lang="scss" scoped>
-.source-maps-container {
-  height: 100%;
-  overflow-y: auto;
-}
-
-.filters-section {
-  background-color: var(--q-background);
-}
-
-.text-code {
-  font-family: "SF Mono", "Monaco", "Inconsolata", "Fira Code", "Droid Sans Mono", monospace;
-  font-size: 12px;
-  word-break: break-all;
-}
-
-.cursor-pointer {
-  cursor: pointer;
-
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-  }
-}
-
-:deep(.q-dark) {
-  .cursor-pointer:hover {
-    background-color: rgba(255, 255, 255, 0.05);
-  }
-}
-
-.expanded-details {
-  background-color: var(--q-background);
-  border-top: 1px solid var(--q-border-color, #e0e0e0);
-}
-</style>

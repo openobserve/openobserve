@@ -172,7 +172,9 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>.o2-table-hide-header :deep(thead) {
+<style>
+/* Hides OTable's thead — deep structural override, must stay in CSS */
+.o2-table-hide-header thead {
   display: none;
 }
 </style>

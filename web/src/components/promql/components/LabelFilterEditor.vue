@@ -1,14 +1,18 @@
 <template>
-  <div class="label-filter-editor">
+  <div data-test="promql-labelfilter-editor">
     <div style="display: flex; flex-direction: row" class="tw:pl-2">
-      <div class="layout-name">{{ t("panel.labelFilters") }}</div>
-      <span class="layout-separator">:</span>
-      <div class="axis-container scroll tw:flex">
+      <div
+        data-test="promql-labelfilter-editor-label"
+        class="tw:text-sm tw:whitespace-nowrap tw:flex tw:items-center tw:min-w-21.5"
+      >{{ t("panel.labelFilters") }}</div>
+      <span class="tw:flex tw:items-center tw:ml-0.5 tw:mr-0.5">:</span>
+      <div class="tw:m-0.5 tw:flex tw:gap-2 tw:flex-wrap tw:items-center scroll">
         <!-- Label Filter Items -->
         <div
           v-for="(label, index) in props.labels"
           :key="index"
-          class="label-filter-item"
+          data-test="promql-labelfilter-item"
+          class="tw:flex tw:items-center"
         >
           <OButtonGroup class="axis-field" radius="sm">
             <ODropdown>
@@ -24,7 +28,7 @@
                 </OButton>
               </template>
               <div
-                class="label-filter-editor-dropdown tw:p-4"
+                class="tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
                 :data-test="`promql-label-filter-${index}-menu`"
               >
                 <div style="width: 350px">
@@ -250,39 +254,3 @@ const getOperatorHint = (op: string): string => {
   }
 };
 </script>
-
-<style scoped lang="scss">
-.layout-name {
-  font-size: 14px;
-  white-space: nowrap;
-  min-width: 86px;
-  display: flex;
-  align-items: center;
-}
-
-.layout-separator {
-  display: flex;
-  align-items: center;
-  margin-left: 2px;
-  margin-right: 2px;
-}
-
-.axis-container {
-  margin: 2px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.label-filter-item {
-  display: flex;
-  align-items: center;
-}
-
-.label-filter-editor-dropdown {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
-}
-</style>

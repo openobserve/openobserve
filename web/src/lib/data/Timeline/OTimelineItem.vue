@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed } from "vue";
 import type { TimelineItemProps, TimelineItemSlots, TimelineItemVariant } from "./OTimelineItem.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -35,7 +35,7 @@ const isOIcon = computed<boolean>(() =>
 </script>
 
 <template>
-  <li class="tw:relative tw:flex tw:gap-4 tw:pb-6 last:tw:pb-0">
+  <li class="tw:relative tw:flex tw:gap-4 tw:pb-6 tw:last:pb-0">
     <!-- Left column: dot + vertical connector line -->
     <div class="tw:relative tw:flex tw:flex-col tw:items-center tw:shrink-0">
       <!-- Dot / icon circle -->

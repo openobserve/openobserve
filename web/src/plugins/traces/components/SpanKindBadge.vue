@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 <template>
   <span
     v-if="abbrev"
-    class="span-kind-badge"
-    :class="`span-kind-badge--${kindClass}`"
+    class="tw:inline-flex tw:items-center tw:justify-center tw:text-[0.6rem] tw:font-bold tw:tracking-[0.03em] tw:rounded-[0.2rem] tw:py-[0.075rem] tw:px-[0.25rem] tw:mr-[0.25rem] tw:shrink-0 tw:leading-none tw:cursor-default"
+    :class="kindColorClasses"
     :data-test="`trace-tree-span-kind-badge-${kindClass}`"
   >
     {{ abbrev }}
@@ -53,46 +53,21 @@ const abbrev = computed(() => {
       return "";
   }
 });
+
+const kindColorClasses = computed(() => {
+  switch (kindClass.value) {
+    case "client":
+      return "tw:text-(--o2-span-kind-client-text) tw:bg-(--o2-span-kind-client-bg)";
+    case "server":
+      return "tw:text-(--o2-span-kind-server-text) tw:bg-(--o2-span-kind-server-bg)";
+    case "producer":
+      return "tw:text-(--o2-span-kind-producer-text) tw:bg-(--o2-span-kind-producer-bg)";
+    case "consumer":
+      return "tw:text-(--o2-span-kind-consumer-text) tw:bg-(--o2-span-kind-consumer-bg)";
+    case "internal":
+      return "tw:text-(--o2-span-kind-internal-text) tw:bg-(--o2-span-kind-internal-bg)";
+    default:
+      return "";
+  }
+});
 </script>
-
-<style scoped>
-.span-kind-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  border-radius: 0.2rem;
-  padding: 0.075rem 0.25rem;
-  margin-right: 0.25rem;
-  flex-shrink: 0;
-  line-height: 1;
-  cursor: default;
-}
-
-.span-kind-badge--client {
-  color: var(--o2-span-kind-client-text);
-  background: var(--o2-span-kind-client-bg);
-}
-
-.span-kind-badge--server {
-  color: var(--o2-span-kind-server-text);
-  background: var(--o2-span-kind-server-bg);
-}
-
-.span-kind-badge--producer {
-  color: var(--o2-span-kind-producer-text);
-  background: var(--o2-span-kind-producer-bg);
-}
-
-.span-kind-badge--consumer {
-  color: var(--o2-span-kind-consumer-text);
-  background: var(--o2-span-kind-consumer-bg);
-}
-
-.span-kind-badge--internal {
-  color: var(--o2-span-kind-internal-text);
-  background: var(--o2-span-kind-internal-bg);
-}
-</style>

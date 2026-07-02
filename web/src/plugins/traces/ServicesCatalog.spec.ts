@@ -1483,25 +1483,25 @@ describe("ServicesCatalog", () => {
   describe("status badges", () => {
     it("should apply correct badge class for healthy status", () => {
       expect(wrapper?.vm?.statusBadgeClass("healthy")).toBe(
-        "o2-status-badge--success",
+        "tw:text-(--o2-service-health-healthy)",
       );
     });
 
     it("should apply correct badge class for degraded status", () => {
       expect(wrapper?.vm?.statusBadgeClass("degraded")).toBe(
-        "o2-status-badge--degraded",
+        "tw:text-(--o2-service-health-degraded)",
       );
     });
 
     it("should apply correct badge class for warning status", () => {
       expect(wrapper?.vm?.statusBadgeClass("warning")).toBe(
-        "o2-status-badge--warning",
+        "tw:text-(--o2-service-health-warning)",
       );
     });
 
     it("should apply correct badge class for critical status", () => {
       expect(wrapper?.vm?.statusBadgeClass("critical")).toBe(
-        "o2-status-badge--error",
+        "tw:text-(--o2-service-health-critical)",
       );
     });
 

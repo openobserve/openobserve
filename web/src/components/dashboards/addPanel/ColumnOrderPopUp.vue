@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -56,11 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(column, index) in editColumnOrder"
           :key="`column-${index}`"
-          class="column-order-row"
+          class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:mb-1 tw:border-b tw:border-[#cccccc70] tw:transition-colors tw:hover:bg-black/[0.02] tw:last:border-b-0 tw:dark:border-b-[rgba(255,255,255,0.12)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
           :data-test="`column-order-row-${index}`"
         >
           <!-- Drag handle -->
-          <div class="drag-handle" data-test="dashboard-column-order-drag-handle">
+          <div class="tw:cursor-move tw:px-1 tw:mr-2 tw:flex tw:items-center" data-test="dashboard-column-order-drag-handle">
             <OIcon
               name="drag-indicator"
               size="md"
@@ -69,13 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Column number -->
-          <div class="column-number" data-test="dashboard-column-order-column-number">{{ index + 1 }}.</div>
+          <div class="tw:min-w-8 tw:font-medium tw:text-[13px] tw:text-[#666] tw:dark:text-[#aaa]" data-test="dashboard-column-order-column-number">{{ index + 1 }}.</div>
 
           <!-- Column name -->
-          <div class="column-name" data-test="dashboard-column-order-column-name">{{ column }}</div>
+          <div class="tw:flex-1 tw:font-medium tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-[13px]" data-test="dashboard-column-order-column-name">{{ column }}</div>
 
           <!-- Actions -->
-          <div class="column-actions" data-test="dashboard-column-order-column-actions">
+          <div class="tw:flex tw:gap-0.5 tw:ml-2" data-test="dashboard-column-order-column-actions">
             <OButton
               variant="ghost"
               size="icon"
@@ -221,67 +221,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.column-order-row {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid #cccccc70;
-  transition: background-color 0.2s;
-
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.02);
-  }
-
-  &:last-child {
-    border-bottom: none;
-  }
-
-  .drag-handle {
-    cursor: move;
-    padding: 2px 4px;
-    margin-right: 8px;
-    display: flex;
-    align-items: center;
-  }
-
-  .column-number {
-    min-width: 32px;
-    color: #666;
-    font-weight: 500;
-    font-size: 13px;
-  }
-
-  .column-name {
-    flex: 1;
-    font-weight: 500;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 13px;
-  }
-
-  .column-actions {
-    display: flex;
-    gap: 2px;
-    margin-left: 8px;
-  }
-}
-
-// Dark mode support
-.body--dark {
-  .column-order-row {
-    border-bottom-color: rgba(255, 255, 255, 0.12);
-
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-
-    .column-number {
-      color: #aaa;
-    }
-  }
-}
-</style>

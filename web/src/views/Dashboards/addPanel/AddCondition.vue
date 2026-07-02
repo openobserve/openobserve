@@ -1,14 +1,14 @@
 <template>
-  <div class="condition">
+  <div class="condition tw:flex tw:items-center tw:gap-2">
     <OSelect
       v-if="conditionIndex !== 0"
       v-model="condition.logicalOperator"
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
-      class="condition-logical-operator"
+      class="condition-logical-operator tw:w-fit tw:max-w-[8rem]"
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
-    <OButtonGroup class="axis-field" radius="sm">
+    <OButtonGroup class="axis-field tw:shrink-0" radius="sm">
       <ODropdown
         @update:open="(v: boolean) => v && loadFilterItem(condition.column)"
       >
@@ -22,7 +22,7 @@
             {{ computedLabel(condition) }}
           </OButton>
         </template>
-        <div class="add-condition-dropdown tw:p-4 tw:w-72">
+        <div class="tw:p-4 tw:w-72">
           <div style="display: flex; align-items: center; gap: 4px">
             <StreamFieldSelect
               class="tw:w-full"
@@ -46,11 +46,13 @@
                   <OTab
                     name="list"
                     :label="t('common.list')"
+                    class="tw:flex-1"
                     :data-test="`dashboard-add-condition-list-${conditionIndex}`"
                   ></OTab>
                   <OTab
                     name="condition"
                     :label="t('common.condition')"
+                    class="tw:flex-1"
                     :data-test="`dashboard-add-condition-condition-${conditionIndex}`"
                   ></OTab>
                 </OTabs>
@@ -104,6 +106,7 @@
       <OButton
         variant="outline"
         size="icon-chip"
+        class="tw:shrink-0"
         @click="$emit('remove-condition')"
         data-test="dashboard-add-condition-remove"
         icon-left="close"
@@ -278,55 +281,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.condition {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.add-condition-dropdown {
-  :deep(.q-virtual-scroll__content) {
-    padding: 0.5rem;
-  }
-
-  :deep(.o-tab) {
-    flex: 1;
-  }
-}
-
-.condition-logical-operator {
-  width: fit-content;
-  max-width: 8rem;
-}
-
-:deep(.condition-logical-operator .q-field__control) {
-  min-height: 26px !important;
-  height: 26px !important;
-  padding: 0px 0px 0px 5px !important;
-  vertical-align: middle !important;
-  margin-top: 4px;
-  /* Nudge up slightly to align with buttons */
-}
-
-:deep(.condition-logical-operator .q-field__native) {
-  min-height: 26px !important;
-  height: 26px !important;
-  padding: 0px 0px 0px 0px !important;
-}
-
-:deep(.condition-logical-operator .q-field__append) {
-  min-height: 26px !important;
-  height: 26px !important;
-  padding: 0px 0px 0px 0px !important;
-}
-
-:deep(.q-panel) {
-  overflow: visible !important;
-}
-
-:deep(.o2-custom-select-dashboard .q-field__bottom) {
-  padding-top: 8px !important;
-}
-</style>

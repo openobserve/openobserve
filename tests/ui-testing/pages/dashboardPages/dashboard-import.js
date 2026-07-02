@@ -219,7 +219,9 @@ export default class DashboardImport {
   }
 
   // Wait until the editor contains a token (e.g. '"dashboardId":')
-  async waitForEditorContains(token, kind = "file", timeout = 15000) {
+  // URL imports fetch a remote dashboard JSON over the network, which can take
+  // noticeably longer than a local file read — give them a larger default window.
+  async waitForEditorContains(token, kind = "file", timeout = kind === "url" ? 30000 : 15000) {
     await expect(async () => {
       const text = await this.readEditorText(kind);
       if (!text.includes(token)) {

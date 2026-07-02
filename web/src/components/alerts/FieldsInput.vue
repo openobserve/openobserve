@@ -167,10 +167,3 @@ const addApiHeader = () => {
 
 </script>
 
-<style lang="scss">
-.add-field {
-}
-
-.alerts-condition-action {
-}
-</style>

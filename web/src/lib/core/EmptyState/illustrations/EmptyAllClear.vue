@@ -95,7 +95,7 @@ withDefaults(
 );
 </script>
 
-<style scoped>
+<style>
 .es-badge,
 .es-spark {
   transform-box: fill-box;

@@ -18,26 +18,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md tw:px-4 tw:pt-3" style="min-height: inherit; overflow: auto">
     <div v-if="!isChildOrg" class="tw:flex tw:justify-between tw:items-center">
       <div>
-        <h1 class="page-title">{{ t("billing.title") }}</h1>
-        <p class="page-subtitle">{{ t("billing.subtitle") }}</p>
+        <h1 class="tw:text-2xl tw:font-bold tw:leading-9 tw:text-(--o2-text-heading) tw:mt-0 tw:mr-0 tw:mb-2 tw:ml-0 tw:block">{{ t("billing.title") }}</h1>
+        <p class="tw:text-base tw:font-semibold tw:leading-[1.375rem] tw:text-(--o2-text-secondary) tw:m-0 tw:block">{{ t("billing.subtitle") }}</p>
       </div>
     </div>
     <!-- Managed billing empty state for child orgs -->
     <div
       v-if="isChildOrg"
-      class="managed-empty"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center tw:min-h-[calc(100vh-var(--navbar-height)-200px)] tw:py-12 tw:px-6"
       data-test="plans-managed-billing-panel"
     >
-      <div class="managed-empty__icon-outer">
-        <div class="managed-empty__icon-inner">
-          <OIcon name="account-balance" size="lg" class="managed-empty__icon" />
+      <div class="tw:w-[100px] tw:h-[100px] tw:rounded-full tw:border tw:border-dashed tw:border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] tw:flex tw:items-center tw:justify-center tw:mb-7">
+        <div class="tw:w-[68px] tw:h-[68px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] tw:border-[1.5px] tw:border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] tw:border-solid tw:flex tw:items-center tw:justify-center">
+          <OIcon name="account-balance" size="lg" class="tw:text-(--color-primary-600) tw:opacity-85" />
         </div>
       </div>
 
-      <div class="managed-empty__title">
+      <div class="tw:text-[1.2rem] tw:font-bold tw:tracking-[-0.2px] tw:mb-[10px]">
         {{ t("billing.billingGroup.plansManagedTitle") }}
       </div>
-      <div class="managed-empty__desc">
+      <div class="tw:text-[0.88rem] tw:leading-[1.65] tw:opacity-65 tw:max-w-[440px] tw:mb-6">
         {{
           t("billing.billingGroup.plansManagedDescription", {
             name: membership?.payer_org_name,
@@ -46,16 +46,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
       </div>
 
-      <div class="managed-empty__chips">
-        <span class="managed-empty__chip">
+      <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:justify-center tw:mb-8">
+        <span class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-xs tw:font-medium tw:opacity-85 tw:bg-[color-mix(in_srgb,currentColor_6%,transparent)] tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.1)) tw:rounded-[20px] tw:py-1 tw:px-3">
           <OIcon name="receipt-long" size="xs" />
           {{ t("billing.billingGroup.chipConsolidatedBill") }}
         </span>
-        <span class="managed-empty__chip">
+        <span class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-xs tw:font-medium tw:opacity-85 tw:bg-[color-mix(in_srgb,currentColor_6%,transparent)] tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.1)) tw:rounded-[20px] tw:py-1 tw:px-3">
           <OIcon name="lock" size="xs" />
           {{ t("billing.billingGroup.chipPlanManaged") }}
         </span>
-        <span class="managed-empty__chip">
+        <span class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-xs tw:font-medium tw:opacity-85 tw:bg-[color-mix(in_srgb,currentColor_6%,transparent)] tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.1)) tw:rounded-[20px] tw:py-1 tw:px-3">
           <OIcon name="description" size="xs" />
           {{ t("billing.billingGroup.chipNoInvoices") }}
         </span>
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OButton
         variant="primary"
-        class="managed-empty__btn"
+        class="tw:h-10 tw:py-0 tw:px-6 tw:font-semibold"
         data-test="plans-view-org-group-btn"
         @click="goToOrgGroup"
       >
@@ -77,11 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <trial-period class="tw:mb-3" currentPage="billing"></trial-period>
     <!-- AI Credits card -->
     <div v-if="aiUsage" class="tw:grid tw:grid-cols-1 tw:gap-4 tw:w-full tw:mb-4">
-      <div class="feature-card">
-        <div class="tile-content tw:text-center tw:flex tw:flex-col tw:justify-between">
+      <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:shadow-none tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] tw:dark:bg-[var(--o2-card-background)] tw:dark:border-[var(--o2-border)]">
+        <div class="tw:min-h-full tw:rounded-lg tw:transition-all tw:duration-300 tw:ease-[cubic-bezier(0.4,0,0.2,1)] tw:text-center tw:flex tw:flex-col tw:justify-between">
           <div class="tw:flex tw:flex-col tw:justify-between">
             <div class="tw:flex tw:justify-between tw:items-center">
-              <div class="usage-tile-title">{{ t("billing.aiCredits") }}</div>
+              <div class="tw:text-base tw:font-medium tw:leading-5 tw:text-(--o2-text-heading) tw:text-left">{{ t("billing.aiCredits") }}</div>
               <div style="opacity: 0.8;">
                 <img :src="aiIcon" />
               </div>
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :variant="aiUsageRatio >= 1 ? 'danger' : aiUsageRatio >= 0.9 ? 'warning' : 'default'"
             />
           </div>
-          <div class="usage-data-to-display tw:flex tw:items-end">
+          <div class="tw:text-2xl tw:font-semibold tw:leading-7 tw:text-(--o2-text-heading) tw:text-left tw:flex tw:items-end">
             {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
           </div>
           <div v-if="aiUsage.mode === 'exhausted'" class="tw:text-red-500 tw:mt-2" style="font-size: 13px;">
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         store.state.selectedOrganization.hasOwnProperty('note') &&
         store.state.selectedOrganization.note
       "
-      class="tw:flex tw:justify-start warning-message tw:text-red-500 tw:text-xl tw:font-semibold tw:pl-6 tw:pb-4"
+      class="tw:flex tw:justify-start tw:items-center tw:gap-2 tw:text-red-500 tw:text-xl tw:font-semibold tw:pl-6 tw:pb-4"
     >
       <OIcon name="warning" size="sm" class="tw:pt-2" />
       >{{ store.state.selectedOrganization.note }}
@@ -463,153 +463,3 @@ export default defineComponent({
   },
 });
 </script>
-<style lang="scss" scoped>
-.page-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 2.25rem;
-  color: var(--o2-text-heading);
-  margin: 0 0 0.5rem 0;
-  display: block;
-}
-
-.page-subtitle {
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.375rem;
-  color: var(--o2-text-secondary);
-  margin: 0;
-  display: block;
-}
-
-.subtitle {
-  color: $primary;
-}
-
-.feature-card {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.5rem;
-  padding: 1rem;
-  box-shadow: none;
-  transition: box-shadow 0.2s ease;
-}
-
-.feature-card:hover {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.body--dark .feature-card {
-  background: var(--o2-card-background);
-  border-color: var(--o2-border);
-}
-
-.tile-content {
-  min-height: 100%;
-  border-radius: 0.5rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.usage-tile-title {
-  font-size: 1rem;
-  font-weight: 500;
-  line-height: 1.25rem;
-  color: var(--o2-text-heading);
-  text-align: left;
-}
-
-.usage-data-to-display {
-  font-size: 1.5rem;
-  font-weight: 600;
-  line-height: 1.75rem;
-  color: var(--o2-text-heading);
-  text-align: left;
-}
-
-.warning-message {
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.plans-grid {
-  width: 100%;
-}
-
-.plans-grid > * {
-  width: 100%;
-  min-width: 0;
-}
-
-.managed-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  min-height: calc(100vh - var(--navbar-height) - 200px);
-  padding: 48px 24px;
-
-  &__icon-outer {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    border: 1px dashed color-mix(in srgb, var(--color-primary-600) 30%, transparent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 28px;
-  }
-  &__icon-inner {
-    width: 68px;
-    height: 68px;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--color-primary-600) 10%, transparent);
-    border: 1.5px solid color-mix(in srgb, var(--color-primary-600) 24%, transparent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  &__icon {
-    color: var(--color-primary-600);
-    opacity: 0.85;
-  }
-  &__title {
-    font-size: 1.2rem;
-    font-weight: 700;
-    letter-spacing: -0.2px;
-    margin-bottom: 10px;
-  }
-  &__desc {
-    font-size: 0.88rem;
-    line-height: 1.65;
-    opacity: 0.65;
-    max-width: 440px;
-    margin-bottom: 24px;
-  }
-  &__chips {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-bottom: 32px;
-  }
-  &__chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    opacity: 0.85;
-    background: color-mix(in srgb, currentColor 6%, transparent);
-    border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.1));
-    border-radius: 20px;
-    padding: 4px 12px;
-  }
-  &__btn {
-    height: 40px;
-    padding: 0 24px;
-    font-weight: 600;
-  }
-}
-</style>

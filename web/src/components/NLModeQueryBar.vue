@@ -1,5 +1,5 @@
 <template>
-  <div class="nl-mode-query-bar tw:w-full">
+  <div class="tw:w-full tw:flex tw:flex-col tw:gap-2">
     <!-- Compact Layout: Editor only (toggle/button provided by parent) -->
     <template v-if="layout === 'editor-only'">
       <CodeQueryEditor
@@ -25,13 +25,14 @@
         <!-- NL Mode Toggle (always visible when AI enabled and enterprise) -->
         <div
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-          class="toolbar-toggle-container element-box-shadow"
+          class="tw:flex tw:items-center tw:gap-2 tw:py-1 tw:px-2 tw:rounded element-box-shadow"
+          style="background-color: var(--q-dark-page)"
         >
           <OSwitch
             :data-test="`${dataTestPrefix}-nlp-mode-toggle`"
             v-model="nlpMode"
           />
-          <img :src="nlpIcon" alt="NL Mode" class="toolbar-icon" />
+          <img :src="nlpIcon" alt="NL Mode" class="tw:w-5 tw:h-5" />
           <OTooltip :content="t('nlMode.toggle')" side="top" />
         </div>
 
@@ -58,13 +59,13 @@
 
           <!-- Dropdown (optional - for enterprise features) -->
           <template v-if="showDropdown">
-            <OSeparator class="tw:h-[29px] tw:w-[1px]" />
+            <OSeparator class="tw:h-7.25 tw:w-px" />
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
                   variant="ghost"
                   size="icon-xs"
-                  class="tw:h-[29px] search-button-dropdown"
+                  class="tw:h-7.25 search-button-dropdown"
                   :class="dropdownClasses"
                 >
                   <OIcon name="arrow-drop-down" size="sm" />
@@ -85,7 +86,7 @@
               <!-- AI Mode: Custom actions (slot) -->
               <template v-else>
                 <slot name="dropdown-actions">
-                  <div class="tw:min-w-[140px] tw:p-2 tw:text-xs tw:text-center tw:text-dropdown-item-text">
+                  <div class="tw:min-w-35 tw:p-2 tw:text-xs tw:text-center tw:text-dropdown-item-text">
                     {{ t('nlMode.noAdditionalOptions') }}
                   </div>
                 </slot>
@@ -100,13 +101,13 @@
         <!-- AI Input Bar (shown in NL Mode) -->
         <div
           v-if="isAIMode"
-          class="ai-input-bar tw:p-3"
+          class="tw:p-3 tw:bg-[linear-gradient(135deg,rgba(139,92,246,0.05)_0%,rgba(236,72,153,0.05)_100%)] tw:border-b tw:border-(--o2-border-color)"
         >
           <!-- Show streaming status with spinner -->
-          <div v-if="isGenerating" class="ai-bar-streaming tw:flex tw:items-center tw:gap-2">
-            <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+          <div v-if="isGenerating" class="ai-bar-streaming tw:flex tw:items-center tw:gap-2 tw:bg-white tw:rounded-lg tw:py-2 tw:px-3 tw:text-(--q-primary)">
+            <img :src="nlpIcon" alt="AI" class="tw:w-5 tw:h-5" />
             <OSpinner variant="dots" size="xs" />
-            <span class="tw:text-sm">{{ aiStatusText || t('search.analyzingQuery') }}</span>
+            <span class="tw:text-sm tw:text-[#666]">{{ aiStatusText || t('search.analyzingQuery') }}</span>
           </div>
           <!-- Normal input when not generating -->
           <OInput
@@ -118,7 +119,7 @@
             @keydown.enter="handleAIInputEnter"
           >
             <template v-slot:icon-left>
-              <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+              <img :src="nlpIcon" alt="AI" class="tw:w-5 tw:h-5" />
             </template>
           </OInput>
         </div>
@@ -240,9 +241,9 @@ const buttonClasses = computed(() => {
   ];
 
   if (isAIMode.value) {
-    classes.push('o2-ai-generate-button');
+    classes.push('tw:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! tw:text-white! tw:border-none! tw:text-[0.6875rem]! tw:font-semibold! tw:leading-[1rem]! tw:transition-all! tw:duration-300! tw:ease-[ease]! tw:shadow-[0_0.25rem_0.9375rem_0_rgba(139,92,246,0.3)]! tw:px-3! tw:w-[92px]! tw:hover:shadow-[0_0.375rem_1.25rem_0_rgba(139,92,246,0.5)]! tw:hover:-translate-y-px tw:active:translate-y-0');
   } else {
-    classes.push('o2-run-query-button', 'o2-color-primary');
+    classes.push('tw:w-[92px]!', 'o2-color-primary');
   }
 
   if (props.borderRadius === 'enterprise') {
@@ -429,99 +430,3 @@ defineExpose({
 });
 </script>
 
-<style scoped>
-.nl-mode-query-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.toolbar-toggle-container {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  background-color: var(--q-dark-page);
-}
-
-.toolbar-icon {
-  width: 20px;
-  height: 20px;
-}
-
-/* AI Generate Button Styling (matches O2 AI Assistant - purple gradient) */
-.o2-ai-generate-button {
-  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
-  color: white !important;
-  border: none !important;
-  font-size: 0.6875rem !important; /* 11px */
-  font-weight: 600 !important;
-  line-height: 1rem !important; /* 16px */
-  transition: all 0.3s ease !important;
-  box-shadow: 0 0.25rem 0.9375rem 0 rgba(139, 92, 246, 0.3) !important; /* 0 4px 15px */
-  padding: 0 0.75rem !important; /* 0 12px */
-  width: 92px !important; /* Fixed width to prevent layout shift */
-}
-
-.o2-ai-generate-button:hover {
-  box-shadow: 0 0.375rem 1.25rem 0 rgba(139, 92, 246, 0.5) !important; /* 0 6px 20px */
-  transform: translateY(-1px);
-}
-
-.o2-ai-generate-button:active {
-  transform: translateY(0);
-}
-
-/* Run Query Button - Fixed width to match AI button and prevent layout shift */
-.o2-run-query-button {
-  width: 92px !important; /* Same as AI button */
-}
-
-/* AI Input Bar Styling (matches logs page) */
-.ai-input-bar {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
-  border-bottom: 1px solid var(--o2-border-color);
-}
-
-.ai-input-field :deep(.q-field__control) {
-  background: white;
-  border-radius: 8px;
-  padding: 4px 8px;
-}
-
-/* Remove focus border */
-.ai-input-field :deep(.q-field__control::before),
-.ai-input-field :deep(.q-field__control::after) {
-  border: none !important;
-}
-
-.ai-input-field :deep(.q-field__prepend) {
-  padding-right: 8px;
-}
-
-/* Streaming status display (matches O2 AI assistant style) */
-.ai-bar-streaming {
-  background: white;
-  border-radius: 8px;
-  padding: 8px 12px;
-  color: var(--q-primary);
-}
-
-.ai-bar-streaming span {
-  color: #666;
-}
-
-/* Dark mode styling */
-.q-dark .ai-input-field :deep(.q-field__control) {
-  background: var(--q-dark);
-}
-
-.q-dark .ai-bar-streaming {
-  background: var(--q-dark);
-}
-
-.q-dark .ai-bar-streaming span {
-  color: #ccc;
-}
-</style>

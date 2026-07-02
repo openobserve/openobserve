@@ -97,7 +97,7 @@ const alignClassFor = (col: Column<any, any>): string => {
     <tr
       v-for="r in rowCount"
       :key="`o2-skel-${r}`"
-      class="o2-skel-row"
+      class="o2-skel-row tw:opacity-0 tw:[animation:o2-skel-row-in_320ms_ease-out_forwards]"
       :style="{
         animationDelay: `${(r - 1) * 40}ms`,
         height: 'var(--o2-table-row-height)',
@@ -140,14 +140,14 @@ const alignClassFor = (col: Column<any, any>): string => {
           <span
             v-for="a in actionCountFor(col)"
             :key="`a-${r}-${c}-${a}`"
-            :class="['o2-skel-pill tw:inline-block tw:shrink-0', actionDimsFor(col)]"
+            :class="['o2-skel-pill tw:inline-block tw:shrink-0 tw:[background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] tw:[background-size:200%_100%] tw:[animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]', actionDimsFor(col)]"
             aria-hidden="true"
           />
         </span>
         <!-- Data column → chunky rounded bar with shimmer; td text-align positions it -->
         <span
           v-else
-          class="o2-skel-pill tw:inline-block tw:h-3 tw:rounded-md tw:align-middle"
+          class="o2-skel-pill tw:inline-block tw:h-3 tw:rounded-md tw:align-middle tw:[background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] tw:[background-size:200%_100%] tw:[animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
           :style="{ width: `${cellWidth(r - 1, c)}%` }"
           aria-hidden="true"
         />
@@ -156,23 +156,7 @@ const alignClassFor = (col: Column<any, any>): string => {
   </tbody>
 </template>
 
-<style scoped>
-.o2-skel-row {
-  opacity: 0;
-  animation: o2-skel-row-in 320ms ease-out forwards;
-}
-
-.o2-skel-pill {
-  background: linear-gradient(
-    90deg,
-    var(--color-skeleton-base) 0%,
-    var(--color-skeleton-highlight) 50%,
-    var(--color-skeleton-base) 100%
-  );
-  background-size: 200% 100%;
-  animation: o2-skel-shimmer 1.5s ease-in-out infinite;
-}
-
+<style>
 @keyframes o2-skel-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }

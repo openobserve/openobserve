@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="filterQuery"
             class="tw:flex-1"
             :placeholder="t('template.search')"
+            data-test="template-list-search-input"
           />
         </template>
         <template #empty>
@@ -102,13 +103,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>{{ row.name }}</span>
             <span
               v-if="row.isPrebuilt"
-              class="dimension-badge badge-blue"
+              class="tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:border tw:border-[#1d4ed8] tw:text-inherit tw:dark:text-white tw:dark:border-[#93c5fd]"
               :title="t('alert_templates.prebuiltBadgeHint')"
               data-test="alert-template-prebuilt-badge"
             >{{ t('alert_templates.prebuiltBadge') }}</span>
             <span
               v-else
-              class="dimension-badge"
+              class="tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:border tw:border-[#d1d5db] tw:text-inherit tw:dark:text-white tw:dark:border-[#4b5563]"
               data-test="alert-template-custom-badge"
             >{{ t('alert_templates.customBadge') }}</span>
           </div>
@@ -121,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-sm"
             @click.stop="exportTemplate(row)"
             data-test="destination-export"
+            data-row-action="export"
           >
             <OIcon name="download" size="sm" />
           </OButton>
@@ -132,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.edit')"
             :disabled="row.isPrebuilt"
             @click="editTemplate(row)"
+            data-row-action="edit"
           >
             <OIcon name="edit" size="sm" />
           </OButton>
@@ -142,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-sm"
             :title="t('alert_templates.clone')"
             @click="cloneTemplate(row)"
+            data-row-action="duplicate"
           >
             <OIcon name="content-copy" size="sm" />
           </OButton>
@@ -153,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.delete')"
             :disabled="row.isPrebuilt"
             @click="conformDeleteDestination(row)"
+            data-row-action="delete"
           >
             <OIcon name="delete" size="sm" />
           </OButton>
@@ -234,6 +239,8 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const AddTemplate = defineAsyncComponent(
@@ -590,41 +597,22 @@ const bulkDeleteTemplates = () => {
       }
     });
 };
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcuts([
+  {
+    id: "alertTemplatesAdd",
+    handler: () => { if (!isInputFocused()) editTemplate(null); },
+  },
+  {
+    id: "alertTemplatesRefresh",
+    handler: () => { if (!isInputFocused()) getTemplates(); },
+  },
+  {
+    id: "alertTemplatesFocusSearch",
+    handler: () => {
+      focusSearchInput("template-list-search-input");
+    },
+  },
+]);
+
 </script>
-<style lang="scss" scoped>
-// Badge style copied from ModelPricingList.vue so the "Prebuilt" / "Default"
-// labels match the LLM-pricing list visually.
-.dimension-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  border: 1px solid #d1d5db;
-  color: inherit;
-}
-
-.badge-blue {
-  border: 1px solid #1d4ed8;
-}
-
-.badge-green {
-  border: 1px solid #065f46;
-}
-
-:global(body.body--dark) .dimension-badge {
-  color: #ffffff;
-  border-color: #4b5563;
-}
-
-:global(body.body--dark) .badge-blue {
-  border-color: #93c5fd;
-}
-
-:global(body.body--dark) .badge-green {
-  border-color: #6ee7b7;
-}
-</style>

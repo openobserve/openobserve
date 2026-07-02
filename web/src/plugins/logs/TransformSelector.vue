@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="(item, i) in filteredTransformOptions"
                 :key="'transform-' + item?.name"
                 :data-test="`logs-search-saved-transform-item-${item?.name}`"
-                class="tw:border-b saved-view-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                class="tw:border-b saved-view-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
                 @click="selectTransform(item, true)"
               >
                 <span class="tw:text-sm tw:flex-1 tw:min-w-0">{{ item.name }}</span>
@@ -335,9 +335,3 @@ const getTransformLabelTooltip = computed(() => {
 });
 </script>
 
-<style scoped lang="scss">
-@import "@/styles/logs/transform-selector.scss";
-.save-transform-btn {
-  border-left: 1px solid var(--o2-border-color);
-}
-</style>

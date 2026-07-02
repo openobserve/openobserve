@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="tw:flex tw:flex-col tw:h-full tw:flex-nowrap searchdetaildialog">
+  <OCard class="tw:flex tw:flex-col tw:h-full tw:flex-nowrap tw:w-[74vw]">
     <OCardSection role="header">
       <div class="tw:flex tw:items-center tw:flex-nowrap">
         <div class="tw:flex tw:flex-col">
@@ -52,10 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="detail-list tw:px-0 tw:py-0 tw:flex tw:flex-col tw:divide-y tw:divide-border"
             >
               <li class="detail-item list-head tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
-                <div class="detail-section tw:font-bold tw:w-1/4 tw:break-all">
+                <div class="tw:font-bold tw:w-1/4 tw:break-all">
                   {{ t("search.sourceName") }}
                 </div>
-                <div class="detail-section tw:font-bold tw:w-3/4 tw:break-all">
+                <div class="tw:font-bold tw:w-3/4 tw:break-all">
                   {{ t("search.sourceValue") }}
                 </div>
               </li>
@@ -65,8 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="value"
                 class="detail-item list-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
               >
-                <div class="detail-section tw:w-1/4 tw:break-all">{{ value }}</div>
-                <div class="detail-section tw:w-3/4 tw:break-all">{{ key }}</div>
+                <div class="tw:w-1/4 tw:break-all">{{ value }}</div>
+                <div class="tw:w-3/4 tw:break-all">{{ key }}</div>
               </li>
               <li class="detail-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"></li>
             </ul>
@@ -127,15 +127,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-.searchdetaildialog {
-  width: 74vw;
-}
-.detail-section {
-  word-break: break-all;
-}
-.indexDetailsContainer .detail-list .detail-item {
-  height: auto;
-}
-</style>
