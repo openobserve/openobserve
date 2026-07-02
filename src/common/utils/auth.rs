@@ -1059,6 +1059,7 @@ where
             || path_is_bulk_operation
             // for license the function itself with do a perm check
             || (url_len == 1 && path.contains("license"))
+            || (url_len == 2 && path.contains("/license/refresh"))
             // service_streams APIs are org-level, not stream-specific
             || path.contains("/service_streams/_analytics")
             || path.contains("/service_streams/_correlate")

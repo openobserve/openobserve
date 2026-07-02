@@ -11,6 +11,10 @@ const licenseServer = {
         const url = `/api/license`;
         return http().post(url, { key: licenseKey });
     },
+    refresh_license_limits: () => {
+        const url = `/api/license/refresh`;
+        return http().post(url, { });
+    },
 };
 
 export default licenseServer;
