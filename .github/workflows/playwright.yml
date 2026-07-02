@@ -149,7 +149,7 @@ jobs:
     needs: [build_binary]
     if: ${{ !cancelled() && needs.build_binary.result == 'success' }}
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
       actions: read
@@ -1049,7 +1049,7 @@ jobs:
     needs: [ui_integration_tests, merge_reports]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
       actions: read  # reads run/job timings from the Actions API
@@ -1106,7 +1106,7 @@ jobs:
     needs: [ui_integration_tests, merge_reports]
     if: ${{ !cancelled() && needs.ui_integration_tests.result == 'failure' && needs.merge_reports.result == 'success' }}
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
       actions: read  # download-artifact fetches the merged-report artifact
@@ -1249,7 +1249,7 @@ jobs:
   playwright_summary:
     timeout-minutes: 5
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions: {}
     needs:
       [
