@@ -75,7 +75,6 @@ pub struct MoveSyntheticsRequestBody {
 
 // ── Results API ───────────────────────────────────────────────────────────────
 
-
 #[utoipa::path(
     get,
     path = "/{org_id}/synthetics/{id}/results",

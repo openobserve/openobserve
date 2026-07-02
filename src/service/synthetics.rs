@@ -131,7 +131,6 @@ fn safe_ident(s: &str) -> String {
         .collect()
 }
 
-
 pub async fn list_results(
     org_id: &str,
     monitor_id: &str,
