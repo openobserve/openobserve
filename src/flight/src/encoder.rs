@@ -16,6 +16,7 @@
 use arrow::{
     array::RecordBatch,
     compute::BatchCoalescer,
+    datatypes::DataType,
     ipc::{
         MessageHeader,
         writer::{CompressionContext, DictionaryTracker, IpcDataGenerator, IpcWriteOptions},
@@ -36,6 +37,8 @@ pub struct FlightDataEncoder {
     /// Reused across chunks; lazily initialised, so a custom-message-only encoder never allocates
     /// it.
     compression_context: CompressionContext,
+    /// Whether the chunk schema contains any Dictionary column
+    schema_has_dict: Option<bool>,
 }
 
 impl FlightDataEncoder {
@@ -44,6 +47,7 @@ impl FlightDataEncoder {
             options,
             max_flight_data_size,
             compression_context: CompressionContext::default(),
+            schema_has_dict: None,
         }
     }
 
@@ -61,19 +65,26 @@ impl FlightDataEncoder {
     /// Encode one chunk into FlightData message(s): split by `max_flight_data_size`, then IPC +
     /// ZSTD.
     ///
-    /// Fresh [`DictionaryTracker`] per call: `BatchCoalescer` may rebuild a dictionary's values
-    /// per chunk, so a shared tracker could wrongly skip re-sending a changed dictionary.
+    /// Uses a fresh [`DictionaryTracker`] so each chunk re-sends its dictionaries; chunks from
+    /// different partitions can interleave while sharing the same dict ids.
     pub fn encode_chunk(&mut self, chunk: RecordBatch) -> Result<Vec<FlightData>> {
         let data_gen = IpcDataGenerator::default();
         let mut dictionary_tracker = DictionaryTracker::new(false);
-        // Populate the tracker's dict ids (a no-op without Dictionary columns) so `encode()` finds
-        // them; the returned schema bytes are unused (the leader knows the schema).
         let schema = chunk.schema();
-        let _ = data_gen.schema_to_bytes_with_dictionary_tracker(
-            &schema,
-            &mut dictionary_tracker,
-            &self.options,
-        );
+        let has_dict = *self.schema_has_dict.get_or_insert_with(|| {
+            schema
+                .fields()
+                .iter()
+                .any(|f| dtype_has_dictionary(f.data_type()))
+        });
+        if has_dict {
+            // Seed dict ids for `encode()`; the schema bytes are unused.
+            let _ = data_gen.schema_to_bytes_with_dictionary_tracker(
+                &schema,
+                &mut dictionary_tracker,
+                &self.options,
+            );
+        }
         let mut flight_data = Vec::new();
         for batch in split_batch_for_grpc_response(chunk, self.max_flight_data_size) {
             let (encoded_dictionaries, encoded_batch) = data_gen.encode(
@@ -86,6 +97,25 @@ impl FlightDataEncoder {
             flight_data.push(encoded_batch.into());
         }
         Ok(flight_data)
+    }
+}
+
+/// True if the type contains a Dictionary, including nested fields.
+fn dtype_has_dictionary(dt: &DataType) -> bool {
+    match dt {
+        DataType::Dictionary(..) => true,
+        DataType::List(f)
+        | DataType::LargeList(f)
+        | DataType::ListView(f)
+        | DataType::LargeListView(f)
+        | DataType::FixedSizeList(f, _)
+        | DataType::Map(f, _)
+        | DataType::RunEndEncoded(_, f) => dtype_has_dictionary(f.data_type()),
+        DataType::Struct(fields) => fields.iter().any(|f| dtype_has_dictionary(f.data_type())),
+        DataType::Union(fields, _) => fields
+            .iter()
+            .any(|(_, f)| dtype_has_dictionary(f.data_type())),
+        _ => false,
     }
 }
 
@@ -244,8 +274,7 @@ mod tests {
         CustomMessage::ScanStats(scan_stats)
     }
 
-    /// Encode all coalesced chunks, building a fresh encoder per chunk exactly like the do_get
-    /// `spawn_blocking` path does.
+    /// Encode coalesced chunks; dictionary handling matches the production path.
     fn encode_all(
         options: &IpcWriteOptions,
         max_flight_data_size: usize,
@@ -380,6 +409,25 @@ mod tests {
     fn test_chunk_coalescer_new() {
         let coalescer = ChunkCoalescer::new();
         assert!(coalescer.coalescer.is_none());
+    }
+
+    #[test]
+    fn test_dtype_has_dictionary_nested() {
+        let dict = DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8));
+        assert!(dtype_has_dictionary(&dict));
+
+        // dictionary nested inside struct > list must be found
+        let nested = DataType::Struct(Fields::from(vec![Field::new(
+            "inner",
+            DataType::List(Arc::new(Field::new("item", dict, true))),
+            true,
+        )]));
+        assert!(dtype_has_dictionary(&nested));
+
+        assert!(!dtype_has_dictionary(&DataType::Utf8));
+        assert!(!dtype_has_dictionary(&DataType::Struct(Fields::from(
+            vec![Field::new("s", DataType::Utf8, true),]
+        ))));
     }
 
     #[test]

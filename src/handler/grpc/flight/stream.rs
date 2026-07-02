@@ -23,7 +23,7 @@ use flight::{common::PreCustomMessage, encoder::FlightDataEncoder};
 use futures::{Stream, StreamExt};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{sync::mpsc, task::JoinSet};
 use tracing::info_span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -93,16 +93,16 @@ impl FlightEncoderStreamBuilder {
         let child_span = info_span!("grpc:search:flight:execute_physical_plan");
         let _ = child_span.set_parent(span.context());
 
-        let (source, handles) = if partitions.len() == 1 {
+        let (source, tasks) = if partitions.len() == 1 {
             // one partition: no parallelism to gain, poll inline (no task, no channel)
             let inner = partitions.into_iter().next().unwrap();
             let stream =
                 PartitionEncoderStream::new(inner, self.options.clone(), self.max_flight_data_size);
-            (FlightSource::Inline(Box::new(stream)), Vec::new())
+            (FlightSource::Inline(Box::new(stream)), JoinSet::new())
         } else {
             // one task per partition, merged over the channel
             let cap = (partitions.len() * 2).max(2);
-            let mut handles = Vec::with_capacity(partitions.len());
+            let mut tasks = JoinSet::new();
             let (tx, rx) = mpsc::channel::<Result<Vec<FlightData>, FlightError>>(cap);
             for inner in partitions {
                 let tx = tx.clone();
@@ -111,7 +111,7 @@ impl FlightEncoderStreamBuilder {
                     self.options.clone(),
                     self.max_flight_data_size,
                 );
-                handles.push(tokio::spawn(async move {
+                tasks.spawn(async move {
                     while let Some(item) = stream.next().await {
                         let is_err = item.is_err();
                         if tx.send(item).await.is_err() {
@@ -121,9 +121,9 @@ impl FlightEncoderStreamBuilder {
                             break;
                         }
                     }
-                }));
+                });
             }
-            (FlightSource::Channel(rx), handles)
+            (FlightSource::Channel(rx), tasks)
         };
 
         FlightEncoderStream {
@@ -139,7 +139,7 @@ impl FlightEncoderStreamBuilder {
                 start: self.start,
                 span,
                 child_span,
-                handles,
+                tasks,
                 defer_lock: self.defer_lock,
             },
             log: EventLog::new(config::get_config().common.print_key_event),
@@ -175,8 +175,8 @@ struct StreamContext {
     start: std::time::Instant,
     span: tracing::Span,
     child_span: tracing::Span,
-    /// per-partition encoder tasks.
-    handles: Vec<JoinHandle<()>>,
+    /// per-partition encoder tasks; drained so panics fail the stream.
+    tasks: JoinSet<()>,
     /// set only for super cluster follower leader.
     defer_lock: Option<DeferredLock>,
 }
@@ -281,19 +281,32 @@ impl Stream for FlightEncoderStream {
     ) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
         loop {
-            // 1. yield any already-encoded output
+            // 1. reap completed encoder tasks and surface panics promptly.
+            while let Poll::Ready(Some(result)) = this.ctx.tasks.poll_join_next(cx) {
+                if let Err(e) = result {
+                    log::error!(
+                        "[trace_id {}] flight->search: partition encoder task failed: {e:?}, is_super: {}, took: {} ms",
+                        this.ctx.trace_id,
+                        this.ctx.is_super,
+                        this.ctx.start.elapsed().as_millis()
+                    );
+                    return this.fail(format!("partition encoder task failed: {e}"));
+                }
+            }
+
+            // 2. yield any already-encoded output
             if let Some(data) = this.queue.pop_front() {
                 this.log.on_message(&this.ctx.trace_id, this.ctx.is_super);
                 return Poll::Ready(Some(Ok(data)));
             }
 
-            // 2. fully finished
+            // 3. fully finished
             if this.done {
                 this.log.on_end(&this.ctx.trace_id, this.ctx.is_super);
                 return Poll::Ready(None);
             }
 
-            // 3. pull the next encoded FlightData from the partition encoder(s)
+            // 4. pull the next encoded FlightData from the partition encoder(s)
             match this.poll_source(cx) {
                 Poll::Ready(Some(Ok(group))) => {
                     // before the first data, emit early-emit custom messages
@@ -319,6 +332,10 @@ impl Stream for FlightEncoderStream {
                     return this.fail(e);
                 }
                 Poll::Ready(None) => {
+                    // All senders are gone; finish only after every task is reaped.
+                    if !this.ctx.tasks.is_empty() {
+                        return Poll::Pending;
+                    }
                     if let Err(e) = this.encode_custom_messages() {
                         return this.fail(e);
                     }
@@ -334,10 +351,8 @@ impl Stream for FlightEncoderStream {
 impl Drop for FlightEncoderStream {
     fn drop(&mut self) {
         let ctx = &mut self.ctx;
-        // stop the partition tasks before clearing the session data they may still read.
-        for handle in &ctx.handles {
-            handle.abort();
-        }
+        // Stop partition tasks before clearing session data they may still read.
+        ctx.tasks.abort_all();
 
         let trace_id = &ctx.trace_id;
         let is_super = ctx.is_super;
@@ -513,6 +528,40 @@ mod tests {
             decoded,
             (0..total).collect::<Vec<_>>(),
             "no rows may be lost across partitions"
+        );
+    }
+
+    // A panicked partition task must fail the stream, not return a truncated OK.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_multi_partition_task_panic_fails_stream() {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
+
+        let ok_batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from((0..100).collect::<Vec<i32>>()))],
+        )
+        .unwrap();
+        let ok_partition: SendableRecordBatchStream = Box::pin(RecordBatchStreamAdapter::new(
+            schema.clone(),
+            futures::stream::iter(vec![Ok(ok_batch)]),
+        ));
+        let panic_partition: SendableRecordBatchStream = Box::pin(RecordBatchStreamAdapter::new(
+            schema.clone(),
+            futures::stream::poll_fn(
+                |_cx| -> Poll<Option<datafusion::error::Result<RecordBatch>>> {
+                    panic!("boom in partition")
+                },
+            ),
+        ));
+
+        let stream = FlightEncoderStreamBuilder::new(IpcWriteOptions::default(), 33554432)
+            .build(vec![ok_partition, panic_partition], tracing::Span::none());
+
+        let result: Result<Vec<FlightData>, tonic::Status> = stream.try_collect().await;
+        let err = result.expect_err("panicked partition task must fail the stream");
+        assert!(
+            err.message().contains("panic"),
+            "error should mention the panic: {err}"
         );
     }
 
@@ -693,7 +742,7 @@ mod tests {
 
         // one partition -> inline source, no tasks
         assert!(matches!(stream.source, FlightSource::Inline(_)));
-        assert!(stream.ctx.handles.is_empty());
+        assert!(stream.ctx.tasks.is_empty());
 
         let fds: Vec<FlightData> = stream.try_collect().await.unwrap();
         let dicts = std::collections::HashMap::new();
