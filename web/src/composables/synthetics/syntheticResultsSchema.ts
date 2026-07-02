@@ -32,7 +32,7 @@
 export const SYNTHETIC_RESULTS_STREAM = "synthetics_results";
 
 export const SYNTHETIC_FIELDS = {
-  monitorId: "monitor_id",
+  monitorId: "synthetics_id",
   status: "status", // raw values mapped via STATUS_VALUES below
   timestamp: "_timestamp", // microseconds (OpenObserve convention)
   duration: "response_time_ms", // milliseconds
