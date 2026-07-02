@@ -60,15 +60,11 @@
           :data-test="`score-config-detail-tab-${tab.id}`"
         >
           <span>{{ tab.label }}</span>
-          <span
+          <OTag
             v-if="tab.count != null"
-            class="tw:inline-flex tw:items-center tw:justify-center tw:px-[0.375rem] tw:min-w-[1.125rem] tw:h-[1rem] tw:rounded-full tw:text-[0.625rem] tw:font-semibold"
-            :class="
-              activeTab === tab.id
-                ? 'tw:bg-[color-mix(in_srgb,var(--color-primary-600,#3f7994)_18%,transparent)] tw:text-[var(--color-primary-600,#3f7994)]'
-                : 'tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] tw:text-[var(--color-text-secondary)]'
-            "
-            >{{ tab.count }}</span
+            type="countChip"
+            :value="activeTab === tab.id ? 'primary' : 'neutral'"
+            >{{ tab.count }}</OTag
           >
         </OTab>
       </OTabs>
@@ -86,7 +82,7 @@
             <dl class="scd-kv">
               <dt>{{ t("onlineEvals.scoreConfig.detail.dataTypeLabel") }}</dt>
               <dd>
-                <span class="scd-type-chip" :class="`scd-type-chip--${dataType}`">{{ dataType }}</span>
+                <OTag type="evalDataType" :value="dataType" />
               </dd>
 
               <template v-if="dataType === 'numeric' && numericRange">
@@ -96,8 +92,8 @@
 
               <template v-if="dataType === 'categorical' && categories.length">
                 <dt>{{ t("onlineEvals.scoreConfig.detail.categoriesLabel") }}</dt>
-                <dd>
-                  <span v-for="cat in categories" :key="cat" class="scd-tag">{{ cat }}</span>
+                <dd class="tw:flex tw:flex-wrap tw:gap-1.5">
+                  <OTag v-for="cat in categories" :key="cat" type="fieldTag" value="soft">{{ cat }}</OTag>
                 </dd>
               </template>
 
@@ -111,9 +107,7 @@
           <section class="scd-section">
             <h4 class="scd-section__title">
               {{ t("onlineEvals.scoreConfig.detail.thresholdSection") }}
-              <span v-if="!healthyLabel" class="scd-section__chip">
-                {{ t("onlineEvals.scoreConfig.detail.noThreshold") }}
-              </span>
+              <OTag v-if="!healthyLabel" type="thresholdFlag" value="notdeclared" />
             </h4>
             <div v-if="healthyLabel" class="scd-threshold">
               <span class="scd-threshold__sign">{{ thresholdSign }}</span>
@@ -130,12 +124,11 @@
             <dl class="scd-kv">
               <dt>{{ t("onlineEvals.scoreConfig.detail.statusLabel") }}</dt>
               <dd>
-                <span class="scd__status" :class="{ 'scd__status--inactive': !isActive }">
-                  <span class="scd__status-dot" />
+                <OTag type="booleanState" :value="isActive ? 'enabled' : 'disabled'">
                   {{ isActive
                     ? t("onlineEvals.scoreConfig.detail.statusActive")
                     : t("onlineEvals.scoreConfig.detail.statusInactive") }}
-                </span>
+                </OTag>
               </dd>
               <dt>{{ t("onlineEvals.scoreConfig.detail.versionLabel") }}</dt>
               <dd>v{{ row.version }}</dd>
@@ -154,7 +147,7 @@
             <li class="scd-versions__item scd-versions__item--active">
               <div class="scd-versions__head">
                 <span class="scd-versions__label">v{{ row.version }}</span>
-                <span class="scd-versions__chip">{{ t("onlineEvals.scoreConfig.detail.activeVersionChip") }}</span>
+                <OTag type="booleanState" value="enabled">{{ t("onlineEvals.scoreConfig.detail.activeVersionChip") }}</OTag>
               </div>
               <div v-if="updatedAt" class="scd-versions__meta">
                 {{ t("onlineEvals.scoreConfig.detail.lastUpdated") }}
@@ -182,9 +175,7 @@
                 <div class="scd-used-card__main">
                   <div class="scd-used-card__row">
                     <span class="scd-used-card__name">{{ scorer.name }}</span>
-                    <span class="scd-used-card__type" :class="`scd-used-card__type--${scorerTypeOf(scorer)}`">
-                      {{ scorerTypeLabel(scorerTypeOf(scorer)) }}
-                    </span>
+                    <OTag type="scorerType" :value="scorerTypeOf(scorer)" />
                     <span class="scd-used-card__version">v{{ scorer.version }}</span>
                   </div>
                 </div>
@@ -203,6 +194,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -326,12 +318,6 @@ const tabs = computed(() => [
 function scorerTypeOf(s: Scorer): "llm_judge" | "remote" {
   const raw = valueOf<string>(s, "scorerType", "scorer_type") ?? "llm_judge";
   return raw === "remote" ? "remote" : "llm_judge";
-}
-
-function scorerTypeLabel(type: "llm_judge" | "remote"): string {
-  return type === "remote"
-    ? t("onlineEvals.scoreConfig.detail.scorerTypeRemote")
-    : t("onlineEvals.scoreConfig.detail.scorerTypeLlmJudge");
 }
 
 function formatTimestamp(microsOrMs: number): string {

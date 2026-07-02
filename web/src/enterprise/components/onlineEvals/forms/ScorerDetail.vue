@@ -108,15 +108,11 @@
           :data-test="`scorer-detail-tab-${tab.id}`"
         >
           <span>{{ tab.label }}</span>
-          <span
+          <OTag
             v-if="tab.count != null"
-            class="tw:inline-flex tw:items-center tw:justify-center tw:px-[0.375rem] tw:min-w-[1.125rem] tw:h-[1rem] tw:rounded-full tw:text-[0.625rem] tw:font-semibold"
-            :class="
-              activeTab === tab.id
-                ? 'tw:bg-[color-mix(in_srgb,var(--color-primary-600,#3f7994)_18%,transparent)] tw:text-[var(--color-primary-600,#3f7994)]'
-                : 'tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] tw:text-[var(--color-text-secondary)]'
-            "
-            >{{ tab.count }}</span
+            type="countChip"
+            :value="activeTab === tab.id ? 'primary' : 'neutral'"
+            >{{ tab.count }}</OTag
           >
         </OTab>
       </OTabs>
@@ -154,13 +150,9 @@
           <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
             <dl class="sd-kv">
               <dt>{{ t("onlineEvals.scorer.detail.scorerTypeLabel") }}</dt>
-              <dd>
-                <span
-                  class="sd-type-chip"
-                  :class="`sd-type-chip--${scorerType}`"
-                  >{{ scorerTypeLabel }}</span
-                >
-                <span class="sd-version-chip">v{{ row.version }}</span>
+              <dd class="tw:flex tw:flex-wrap tw:items-center tw:gap-1.5">
+                <OTag type="scorerType" :value="scorerType" />
+                <OTag type="fieldTag" value="soft">v{{ row.version }}</OTag>
               </dd>
 
               <template v-if="scorerType === 'llm_judge'">
@@ -227,13 +219,10 @@
                   ? t("onlineEvals.scorer.detail.promptSection")
                   : t("onlineEvals.scorer.detail.requestTemplateSection")
               }}
-              <span
-                v-if="variables.length"
-                class="tw:inline-flex tw:items-center tw:px-[0.3125rem] tw:rounded-[0.1875rem] tw:text-[0.625rem] tw:font-semibold tw:text-[var(--color-text-secondary)] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
-              >
+              <OTag v-if="variables.length" type="fieldTag" value="soft">
                 {{ variables.length }}
                 {{ t("onlineEvals.scorer.detail.variablesSuffix") }}
-              </span>
+              </OTag>
             </h4>
             <pre class="sd-code" data-test="scorer-detail-template">{{
               row.template
@@ -284,9 +273,9 @@
                   <span class="sd-versions__label"
                     >v{{ row.version }}</span
                   >
-                  <span class="sd-versions__chip">{{
+                  <OTag type="booleanState" value="enabled">{{
                     t("onlineEvals.scorer.detail.activeVersionChip")
-                  }}</span>
+                  }}</OTag>
                 </div>
                 <div v-if="updatedAt" class="sd-versions__meta">
                   {{ t("onlineEvals.scorer.detail.lastUpdated") }}
@@ -353,13 +342,7 @@
               }}</span>
             </template>
             <template #cell-status="{ row }">
-              <span
-                class="sd-status-cell"
-                :class="`sd-status-cell--${row.status}`"
-              >
-                <span class="sd-status-cell__dot" />
-                {{ row.status }}
-              </span>
+              <OTag type="evalRunStatus" :value="row.status" />
             </template>
           </OTable>
         </template>
@@ -409,6 +392,7 @@ import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

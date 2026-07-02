@@ -16,17 +16,11 @@
       </template>
       <!-- Scorer-type badge sits inline, immediately after the title. -->
       <template #title-trail>
-        <OBadge
-          :variant="form.scorerType === 'remote' ? 'success-soft' : 'blue-soft'"
-          size="sm"
+        <OTag
+          type="scorerType"
+          :value="form.scorerType"
           data-test="scorer-form-type-badge"
-        >
-          {{
-            form.scorerType === "remote"
-              ? t("onlineEvals.scorer.badgeRemote")
-              : t("onlineEvals.scorer.badgeLlm")
-          }}
-        </OBadge>
+        />
       </template>
       <template #actions>
         <OButton
@@ -690,7 +684,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
   type ExtraMetadataField,

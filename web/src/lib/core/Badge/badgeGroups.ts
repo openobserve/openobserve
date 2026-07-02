@@ -536,6 +536,7 @@ export const BADGE_GROUPS = {
       primarysoft: { variant: "primary-soft" },
       primarysoftsm: { variant: "primary-soft", size: "sm" },
       primary: { variant: "primary" },
+      outlinesm: { variant: "default-outline", size: "sm" },
     },
     fallback: { variant: "default" },
   },
@@ -850,6 +851,7 @@ export const BADGE_GROUPS = {
   scorerType: {
     mode: "plain",
     shape: "pill",
+    size: "sm",
     values: {
       remote: { variant: "teal-soft" },
       code: { variant: "purple-soft" },
@@ -867,6 +869,19 @@ export const BADGE_GROUPS = {
       boolean: { variant: "teal-soft" },
       numeric: { variant: "blue-soft" },
     },
+  },
+
+  // Threshold-declaration flag (Score Config detail → Healthy threshold section).
+  // Muted, extra-small, rounded — its own group so the xs/rounded sizing stays
+  // scoped here and never leaks into the shared `fieldTag` chips.
+  thresholdFlag: {
+    mode: "plain",
+    shape: "rounded",
+    size: "xs",
+    values: {
+      notdeclared: { variant: "default-soft", labelKey: "onlineEvals.scoreConfig.detail.noThreshold" },
+    },
+    fallback: { variant: "default-soft" },
   },
 
   // LLM observation type — plain, PILL. Mirrors the in-component map that used
@@ -1139,9 +1154,22 @@ export const BADGE_GROUPS = {
   },
 
   // Quality-config health — dot.
+  // LLM session outcome (derived from error_count) — dot + soft colour, mirrors
+  // the old manual statusBadgeClass/statusDotClass in SessionsList.
+  sessionStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      ok: { variant: "success-soft", label: "Ok" },
+      error: { variant: "error-soft", label: "Error" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   qualityStatus: {
     mode: "dot",
     shape: "pill",
+    class: "tw:!bg-transparent tw:!p-0 tw:!ring-0",
     values: {
       healthy: { variant: "success-soft" },
       warn: { variant: "warning-soft" },

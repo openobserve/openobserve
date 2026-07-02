@@ -390,11 +390,9 @@ describe("SessionsList — sessions table", () => {
     const wrapper = await mountComponent();
     const statusCell = wrapper.find('[data-test="sessions-list-status-sess-ok"]');
     expect(statusCell.exists()).toBe(true);
-    expect(statusCell.text()).toContain("ok");
-    // ok status uses healthy (green) CSS classes
-    expect(statusCell.classes().join(" ")).toContain(
-      "tw:text-[var(--o2-service-health-healthy,#16a34a)]",
-    );
+    // Migrated to <OTag type="sessionStatus">: registry label + success-soft variant.
+    expect(statusCell.text()).toContain("Ok");
+    expect(statusCell.classes().join(" ")).toContain("badge-success");
   });
 
   it("status badge shows 'error' status for error sessions", async () => {
@@ -409,11 +407,9 @@ describe("SessionsList — sessions table", () => {
       '[data-test="sessions-list-status-sess-err"]',
     );
     expect(statusCell.exists()).toBe(true);
-    expect(statusCell.text()).toContain("error");
-    // error status uses critical CSS class
-    expect(statusCell.classes().join(" ")).toContain(
-      "tw:text-[var(--o2-service-health-critical)]",
-    );
+    // Migrated to <OTag type="sessionStatus">: registry label + error-soft variant.
+    expect(statusCell.text()).toContain("Error");
+    expect(statusCell.classes().join(" ")).toContain("badge-error");
   });
 
   it("token column renders input → output (Σ total) format", async () => {
