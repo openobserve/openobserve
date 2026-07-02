@@ -25,6 +25,7 @@ use sea_orm::{
     Statement, Value, sea_query::Expr,
 };
 use serde::Serialize;
+use svix_ksuid::KsuidLike as _;
 
 use super::entity::synthetics_jobs::{Column, Entity};
 use crate::errors;
@@ -47,7 +48,7 @@ pub struct EnqueueParams<'a> {
 
 #[derive(Debug, Serialize)]
 pub struct LeasedRow {
-    pub id: i64,
+    pub id: String,
     pub synthetics_id: String,
     pub synthetics_name: String,
     pub org_id: String,
@@ -64,7 +65,7 @@ pub struct LeasedRow {
 /// Returned by `dead_letter_expired` for each job that exhausted all retries.
 #[derive(Debug)]
 pub struct DeadLetteredRow {
-    pub id: i64,
+    pub id: String,
     pub synthetics_id: String,
     pub synthetics_name: String,
     pub org_id: String,
@@ -75,15 +76,17 @@ pub struct DeadLetteredRow {
 // ── Scheduler: enqueue ────────────────────────────────────────────────────────
 
 /// Inserts one pending check row. ON CONFLICT DO NOTHING prevents double-scheduling.
+/// Returns the KSUID assigned to the new job (or empty string on conflict-skip).
 pub async fn enqueue<C: ConnectionTrait>(
     conn: &C,
     p: EnqueueParams<'_>,
-) -> Result<(), errors::Error> {
+) -> Result<String, errors::Error> {
+    let id = svix_ksuid::Ksuid::new(None, None).to_string();
     let sql = r#"
         INSERT INTO synthetics_jobs
-            (synthetics_id, synthetics_name, org_id, location, pool, browser_engine, device,
+            (id, synthetics_id, synthetics_name, org_id, location, pool, browser_engine, device,
              scheduled_ts, valid_until, status, attempts)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 0)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, 0)
         ON CONFLICT (synthetics_id, location, pool, device, scheduled_ts) DO NOTHING
     "#;
 
@@ -91,6 +94,7 @@ pub async fn enqueue<C: ConnectionTrait>(
         conn.get_database_backend(),
         sql,
         [
+            Value::from(id.clone()),
             Value::from(p.synthetics_id),
             Value::from(p.synthetics_name),
             Value::from(p.org_id),
@@ -108,13 +112,13 @@ pub async fn enqueue<C: ConnectionTrait>(
     ))
     .await?;
 
-    Ok(())
+    Ok(id)
 }
 
 /// Gets a single pending check by its ID. Used by the job API `resolve` endpoint.
 pub async fn get_by_id<C: ConnectionTrait>(
     conn: &C,
-    id: i64,
+    id: &str,
 ) -> Result<Option<LeasedRow>, errors::Error> {
     let sql = r#"
         SELECT id, synthetics_id, synthetics_name, org_id, location, pool,
@@ -126,7 +130,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
         .query_all(Statement::from_sql_and_values(
             conn.get_database_backend(),
             sql,
-            [Value::from(id)],
+            [Value::from(id.to_owned())],
         ))
         .await?;
 
@@ -184,7 +188,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
     let lease_expires_at = now_us + lease_secs * 1_000_000;
 
     // Step 1: pick candidate IDs.
-    let ids: Vec<i64> = Entity::find()
+    let ids: Vec<String> = Entity::find()
         .select_only()
         .column(Column::Id)
         .filter(Column::Pool.eq(pool))
@@ -192,7 +196,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
         .filter(Column::ValidUntil.gt(now_us))
         .order_by_asc(Column::ScheduledTs)
         .limit(limit as u64)
-        .into_tuple::<i64>()
+        .into_tuple::<String>()
         .all(conn)
         .await?;
 
@@ -239,13 +243,13 @@ pub async fn lease_batch<C: ConnectionTrait>(
 
 /// Deletes a leased row when the probe successfully POSTs its result.
 /// Returns true if the row was found and deleted.
-pub async fn ack_delete<C: ConnectionTrait>(conn: &C, job_id: i64) -> Result<bool, errors::Error> {
+pub async fn ack_delete<C: ConnectionTrait>(conn: &C, job_id: &str) -> Result<bool, errors::Error> {
     let sql = "DELETE FROM synthetics_jobs WHERE id = $1";
     let res = conn
         .execute(Statement::from_sql_and_values(
             conn.get_database_backend(),
             sql,
-            [Value::from(job_id)],
+            [Value::from(job_id.to_owned())],
         ))
         .await?;
     Ok(res.rows_affected() > 0)
@@ -307,7 +311,7 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
         .into_iter()
         .filter_map(|row| {
             Some(DeadLetteredRow {
-                id: row.try_get("", "id").ok()?,
+                id: row.try_get::<String>("", "id").ok()?,
                 synthetics_id: row.try_get("", "synthetics_id").ok()?,
                 synthetics_name: row.try_get("", "synthetics_name").ok()?,
                 org_id: row.try_get("", "org_id").ok()?,
@@ -318,7 +322,7 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
         .collect();
 
     // Step 2: mark them all dead.
-    let ids: Vec<Value> = dead.iter().map(|r| Value::from(r.id)).collect();
+    let ids: Vec<Value> = dead.iter().map(|r| Value::from(r.id.clone())).collect();
     let placeholders: String = ids
         .iter()
         .enumerate()
@@ -381,7 +385,7 @@ mod tests {
     #[test]
     fn test_leased_row_fields() {
         let row = LeasedRow {
-            id: 42,
+            id: "2MNfNTxePfZ1pnY5gKVLkwsVRXv".to_string(),
             synthetics_id: "mon-1".to_string(),
             synthetics_name: "Login Flow".to_string(),
             org_id: "org1".to_string(),
@@ -393,7 +397,7 @@ mod tests {
             valid_until: 1750000300000000,
             attempts: 1,
         };
-        assert_eq!(row.id, 42);
+        assert_eq!(row.id, "2MNfNTxePfZ1pnY5gKVLkwsVRXv");
         assert_eq!(row.synthetics_id, "mon-1");
         assert_eq!(row.synthetics_name, "Login Flow");
         assert_eq!(row.attempts, 1);

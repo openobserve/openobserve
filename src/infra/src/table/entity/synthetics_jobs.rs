@@ -5,8 +5,8 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "synthetics_jobs")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = true)]
-    pub id: i64,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: String,
     pub synthetics_id: String,
     pub synthetics_name: String,
     pub org_id: String,
@@ -37,7 +37,7 @@ mod tests {
     #[test]
     fn test_model_construction() {
         let m = Model {
-            id: 1,
+            id: "2MNfNTxePfZ1pnY5gKVLkwsVRXv".to_string(),
             synthetics_id: "mon-1".to_string(),
             synthetics_name: "Login Flow".to_string(),
             org_id: "org1".to_string(),
@@ -53,7 +53,7 @@ mod tests {
             lease_expires_at: None,
             attempts: 0,
         };
-        assert_eq!(m.id, 1);
+        assert_eq!(m.id, "2MNfNTxePfZ1pnY5gKVLkwsVRXv");
         assert_eq!(m.synthetics_id, "mon-1");
         assert_eq!(m.synthetics_name, "Login Flow");
         assert_eq!(m.status, 0);

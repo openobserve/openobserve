@@ -70,9 +70,8 @@ fn create_synthetics_jobs_table() -> TableCreateStatement {
         .if_not_exists()
         .col(
             ColumnDef::new(SyntheticsJobs::Id)
-                .big_integer()
+                .string_len(27)
                 .not_null()
-                .auto_increment()
                 .primary_key(),
         )
         .col(
@@ -214,7 +213,7 @@ mod tests {
             &create_synthetics_jobs_table().to_string(PostgresQueryBuilder),
             r#"
                 CREATE TABLE IF NOT EXISTS "synthetics_jobs" (
-                "id" bigint NOT NULL PRIMARY KEY AUTO_INCREMENT,
+                "id" varchar(27) NOT NULL PRIMARY KEY,
                 "synthetics_id" varchar(256) NOT NULL,
                 "synthetics_name" varchar(256) NOT NULL DEFAULT '',
                 "org_id" varchar(100) NOT NULL,
@@ -250,7 +249,7 @@ mod tests {
             &create_synthetics_jobs_table().to_string(SqliteQueryBuilder),
             r#"
                 CREATE TABLE IF NOT EXISTS "synthetics_jobs" (
-                "id" bigint NOT NULL PRIMARY KEY AUTOINCREMENT,
+                "id" varchar(27) NOT NULL PRIMARY KEY,
                 "synthetics_id" varchar(256) NOT NULL,
                 "synthetics_name" varchar(256) NOT NULL DEFAULT '',
                 "org_id" varchar(100) NOT NULL,
