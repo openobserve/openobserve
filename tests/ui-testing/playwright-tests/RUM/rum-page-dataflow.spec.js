@@ -17,7 +17,6 @@
 
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
 const { startFixtureServer } = require('../../fixtures/rum/serve.js');
 const { getOrCreateRumToken } = require('../utils/rum-token-api.js');
 const { resolveCdnSdkVersion } = require('../utils/rum-sdk-version.js');
@@ -102,22 +101,15 @@ test.describe('RUM Page Data Flow', { tag: '@enterprise' }, () => {
   test('Sessions page lists the session recorded in this run', {
     tag: ['@rum', '@dataflow', '@ui', '@P0'],
   }, async ({ page }) => {
-    const pm = new PageManager(page);
-
-    await page.goto(`${BASE}/web/rum/sessions?org_identifier=${ORG}`);
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-    await pm.rumPage.openDateTimePicker();
-    await pm.rumPage.selectPastOneHour();
-
     // Scope the list to THIS run's session — the filter is applied to the
     // _rumdata sessions query, so any row that comes back is our recording.
-    await page
-      .locator('#session-replay-query-editor .inputarea')
-      .fill(`service='${SERVICE}'`);
-
-    await page.locator('[data-test="sessions-run-query-button"]').click();
-    await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
+    // Passed via the URL (?query= is base64, restored on mount) instead of
+    // typing into the Monaco editor, which is racy while the editor boots.
+    const filter = Buffer.from(`service='${SERVICE}'`).toString('base64');
+    await page.goto(
+      `${BASE}/web/rum/sessions?period=1h&query=${encodeURIComponent(filter)}&org_identifier=${ORG}`,
+    );
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     await expect(page.locator('[data-test="rum-sessions-table"]')).toBeVisible({ timeout: 15000 });
     // Session aggregation can lag ingestion; poll for the filtered row.
