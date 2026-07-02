@@ -20,6 +20,26 @@ export class ReportsPage {
     this.titleInput = page.locator("[aria-label='Title *']");
     this.recipientsInput = page.locator("[aria-label='Recipients *']");
     this.saveButton = page.locator('[data-test="add-report-save-btn"]');
+
+    // ── Report Format section (CSV media type feature) ─────────────────────
+    this.reportFormatSection = page.locator('[data-test="add-report-format-section"]');
+    this.reportTypeSelect = page.locator('[data-test="add-report-type-select"]');
+    this.reportTypeTrigger = page.locator('[data-test="add-report-type-select"] [data-test-selected-value]');
+    this.reportTypePopover = page.locator('[data-test="add-report-type-select-popover"]');
+    // OSelect always stamps data-test-value on options (unconditional), but
+    // data-test-concatenated attrs are only emitted when OSelect receives a
+    // direct data-test prop. This instance lacks it — match by value only.
+    this.reportTypeOption = (value) => page.locator(`[data-test-value="${value}"]`).first();
+    this.attachmentTypeSelect = page.locator('[data-test="add-report-attachment-type-select"]');
+    this.customDimensionsSection = page.locator('[data-test="add-report-custom-dimensions-section"]');
+    this.pngNoteBanner = page.locator('[data-test="add-report-png-note"]');
+
+    // ── Report-list search + edit shims (v0.80.0-compatible) ───────────────
+    // The generated CSV spec expects `reportSearchInputField` + `editReportBtn`
+    // helpers (introduced on main). Wire them to the v0.80.0 selectors.
+    this.reportSearchInputField = page.locator('[data-test="report-list-search-input"]');
+    this.editReportBtn = (reportName) => page.locator(`[data-test="report-list-${reportName}-edit-report"]`);
+
     this.successAlert = page.getByRole('alert').nth(1);
     this.dateTimeButton = dateTimeButtonLocator;
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
@@ -343,8 +363,74 @@ async notAvailableReport(reportName) {
   await this.page.locator('[data-test="report-list-search-input"]').fill(reportName);
   await this.page.waitForSelector('[data-test="report-list-table"]');
   await expect(this.page.locator('[data-test="report-list-table"]')).toContainText('No data available');
- 
+
 }
+
+  // ── Report Format section helpers (CSV media type feature) ──────────────
+
+  async selectReportType(value) {
+    // Open the report type dropdown by clicking the trigger.
+    // NOTE: This OSelect lacks a direct `data-test` prop (the attribute is on
+    // the parent <div> instead), so the popover and option children do NOT have
+    // data-test-concatenated attributes. We locate options by data-test-value
+    // instead, which OSelect always renders unconditionally.
+    await this.reportTypeTrigger.waitFor({ state: 'visible', timeout: 10000 });
+    await this.reportTypeTrigger.click();
+    const opt = this.reportTypeOption(value);
+    await opt.waitFor({ state: 'visible', timeout: 10000 });
+    await opt.click();
+    await opt.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await this.page.waitForTimeout(300);
+  }
+
+  async selectDashboardDefaults(dashboardName) {
+    await this.createReportFolderInput();
+    await this.createReportDashboardInput(dashboardName);
+    await this.createReportDashboardTabInput();
+  }
+
+  async expectReportFormatSectionVisible() {
+    await expect(this.reportFormatSection).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectAttachmentTypeVisible() {
+    await expect(this.attachmentTypeSelect).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectAttachmentTypeHidden() {
+    await expect(this.attachmentTypeSelect).not.toBeVisible({ timeout: 5000 });
+  }
+
+  async expectCustomDimensionsVisible() {
+    await expect(this.customDimensionsSection).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectCustomDimensionsHidden() {
+    await expect(this.customDimensionsSection).not.toBeVisible({ timeout: 5000 });
+  }
+
+  async expectPngNoteVisible() {
+    await expect(this.pngNoteBanner).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectPngNoteHidden() {
+    await expect(this.pngNoteBanner).not.toBeVisible({ timeout: 5000 });
+  }
+
+  async expectReportTypeOptionVisible(value) {
+    await this.reportTypeTrigger.waitFor({ state: 'visible', timeout: 10000 });
+    await this.reportTypeTrigger.click();
+    const opt = this.reportTypeOption(value);
+    await expect(opt).toBeVisible({ timeout: 5000 });
+    await this.page.keyboard.press('Escape');
+    await opt.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+  }
+
+  async expectReportTypeOptionSelected(value) {
+    const labelMap = { csv: 'CSV (Data)', pdf: 'PDF (default)', png: 'PNG (Image)' };
+    const expectedLabel = labelMap[value] || value;
+    await expect(this.reportTypeTrigger).toContainText(expectedLabel, { timeout: 10000 });
+  }
 
 }
 
