@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div :key="store.state.selectedOrganization.identifier" class="tw:h-full">
+  <div :key="store.state.selectedOrganization.identifier" class="h-full">
     <div
       ref="fullscreenDiv"
       :class="[
@@ -25,16 +25,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           fullscreen: isFullscreen,
           'print-mode-container': store.state.printMode,
         },
-        store.state.printMode === true ? 'tw:pb-6' : '',
+        store.state.printMode === true ? 'pb-6' : '',
       ]"
-      class="tw:h-full"
+      class="h-full"
     >
       <PageLayout
         :main-panel="false"
         :header-class="
           isFullscreen || store.state.printMode === true
-            ? 'stickyHeader fullscreenHeader tw:bg-surface-panel'
-            : 'tw:shrink-0'
+            ? 'stickyHeader fullscreenHeader bg-surface-panel'
+            : 'shrink-0'
         "
       >
         <template #header>
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? { label: t('dashboard.header'), onClick: goBackToDashboardList, dataTest: 'dashboard-back-btn' }
                 : undefined
             "
-            class="tw:px-4 tw:border-b tw:border-border-default"
+            class="px-4 border-b border-border-default"
           >
           <template #title>
             <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('panel.add')" />
             </OButton>
             <!-- <DateTimePicker 
-            class="tw:ml-2"
+            class="ml-2"
             ref="refDateTime"
             v-model="selectedDate"
           /> -->
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="selectedDate"
               v-show="store.state.printMode === false"
               ref="dateTimePicker"
-              class="dashboard-icons tw:h-[30px] tw:[transition:all_0.2s_ease]"
+              class="dashboard-icons h-[30px] [transition:all_0.2s_ease]"
               size="sm"
               v-model="selectedDate"
               :initialTimezone="initialTimezone"
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               @trigger="refreshData"
-              class="dashboard-icons hideOnPrintMode tw:h-[30px] tw:[transition:all_0.2s_ease]"
+              class="dashboard-icons hideOnPrintMode h-[30px] [transition:all_0.2s_ease]"
               size="sm"
             />
             <OButton
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <RenderDashboardCharts
         :frame="false"
-        :class="store.state.printMode ? '' : 'tw:flex-1 tw:min-h-0'"
+        :class="store.state.printMode ? '' : 'flex-1 min-h-0'"
         :key="
           currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey
         "

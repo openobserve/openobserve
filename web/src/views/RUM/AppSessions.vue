@@ -15,17 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="sessions_page tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+  <div class="sessions_page flex flex-col flex-1 min-h-0 overflow-hidden">
     <template v-if="isSessionReplayEnabled">
       <div>
-        <div class="card-container tw:border-b tw:border-border-default tw:py-[0.375rem] tw:px-[0.375rem]">
-          <div class="tw:flex tw:items-start tw:gap-1">
+        <div class="card-container border-b border-border-default py-[0.375rem] px-[0.375rem]">
+          <div class="flex items-start gap-1">
             <!-- Query editor (flex-grow to fill available space) -->
-            <div class="tw:flex-1 tw:min-w-0 tw:relative">
+            <div class="flex-1 min-w-0 relative">
               <query-editor
                 ref="sessionQueryEditorRef"
                 editor-id="session-replay-query-editor"
-                :class="['tw:border', 'tw:solid', 'tw:border-[var(--o2-border-color)]', 'tw:p-[0.25rem]', 'tw:rounded-[0.375rem]', 'tw:overflow-y-auto', queryEditorHeight]"
+                :class="['border', 'solid', 'border-[var(--o2-border-color)]', 'p-[0.25rem]', 'rounded-[0.375rem]', 'overflow-y-auto', queryEditorHeight]"
                 v-model:query="sessionState.data.editorValue"
                 :debounce-time="300"
                 :keywords="effectiveKeywords"
@@ -36,14 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="!sessionState.data.editorValue && !editorFocused"
-                class="tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:pt-0.75 tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
+                class="absolute top-0 left-0 right-0 bottom-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
               >
-                <span class="tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:dark:text-[#718096] tw:whitespace-nowrap tw:overflow-hidden tw:[text-overflow:ellipsis]">{{ editorPlaceholder }}</span>
+                <span class="font-mono text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] dark:text-[#718096] whitespace-nowrap overflow-hidden [text-overflow:ellipsis]">{{ editorPlaceholder }}</span>
               </div>
             </div>
 
             <!-- Controls on the right -->
-            <div class="tw:flex tw:items-start tw:gap-1 tw:shrink-0">
+            <div class="flex items-start gap-1 shrink-0">
               <syntax-guide />
               <date-time
                 auto-apply
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm-toolbar"
                 :title="t('metrics.runQuery')"
                 @click="runQuery"
-                class="tw:shrink-0"
+                class="shrink-0"
               >
                 {{ t("metrics.runQuery") }}
               </OButton>
@@ -75,13 +75,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div><!-- end card-container -->
       </div><!-- end toolbar wrapper -->
       <OSplitter
-        class="logs-horizontal-splitter tw:flex-1 tw:min-h-0"
+        class="logs-horizontal-splitter flex-1 min-h-0"
         v-model="splitterModel"
         unit="px"
         :horizontal="false"
       >
         <template #before>
-          <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto tw:border-r tw:border-border-default">
+          <div class="card-container p-[0.325rem] h-full overflow-auto border-r border-border-default">
             <SearchFieldList
               :fields="streamFields"
               :time-stamp="{
@@ -98,8 +98,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #after>
-          <div class="tw:h-full">
-            <div class="card-container tw:h-full">
+          <div class="h-full">
+            <div class="card-container h-full">
                 <OTable
                   :data="tableRows"
                   :columns="tableColumns"
@@ -109,9 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   virtual-scroll
                   :dense="false"
                   :row-height="54"
-                  class="tw:h-full"
+                  class="h-full"
                   data-test="rum-sessions-table"
-                  row-class="tw:cursor-pointer"
+                  row-class="cursor-pointer"
                   @row-click="handleRowClick"
                   @scroll-end="handleScrollEnd"
                   :show-global-filter="false"
@@ -124,15 +124,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="play-circle-filled"
                       size="md"
-                      class="tw:cursor-pointer session-play-icon tw:text-[var(--o2-icon-color)] tw:hover:text-[var(--o2-primary-btn-bg)]"
+                      class="cursor-pointer session-play-icon text-[var(--o2-icon-color)] hover:text-[var(--o2-primary-btn-bg)]"
                     />
                   </template>
                   <template #cell-error_count="{ row }">
                     <span
-                      class="tw:tabular-nums"
+                      class="tabular-nums"
                       :class="(row.error_count || 0) > 0
-                        ? 'tw:text-badge-error-soft-text tw:font-medium'
-                        : 'tw:text-text-primary'"
+                        ? 'text-badge-error-soft-text font-medium'
+                        : 'text-text-primary'"
                     >{{ row.error_count || 0 }}</span>
                   </template>
                   <template #cell-frustration_count="{ row }">
@@ -154,12 +154,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div class="card-container">
-        <div class="tw:p-4 enable-rum tw:max-w-[64rem]">
-          <div class="tw:pb-4">
-            <div class="tw:text-left tw:text-xl tw:font-semibold tw:font-bold tw:pb-3">
+        <div class="p-4 enable-rum max-w-[64rem]">
+          <div class="pb-4">
+            <div class="text-left text-xl font-semibold font-bold pb-3">
               {{ t("rum.discoverSessionTitle") }}
             </div>
-            <div class="tw:text-base tw:font-medium">
+            <div class="text-base font-medium">
               {{ t("rum.discoverSessionMessage") }}
             </div>
             <div>
@@ -274,9 +274,9 @@ const completeQuery = computed(() => {
 // Dynamic editor height based on content lines
 const queryEditorHeight = computed(() => {
   const lines = (sessionState.data.editorValue.match(/\n/g) || []).length + 1;
-  if (lines === 1) return 'tw:h-[2rem]!';
-  if (lines === 2) return 'tw:h-[3.5rem]!';
-  return 'tw:h-[5rem]!'; // 3+ lines, capped at 5rem (approx 3 lines)
+  if (lines === 1) return 'h-[2rem]!';
+  if (lines === 2) return 'h-[3.5rem]!';
+  return 'h-[5rem]!'; // 3+ lines, capped at 5rem (approx 3 lines)
 });
 
 const isMounted = ref(false);

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <PageLayout
     :key="store.state.selectedOrganization.identifier"
     :main-panel="false"
-    :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+    :header-class="'shrink-0 px-4 border-b border-border-default'"
   >
     <!-- ── Page header (row 1) ──────────────────────────────────────
          The breadcrumb path now lives in the top chrome bar (published
@@ -49,9 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="importDashboard"
             data-test="dashboard-import-custom"
           >
-            <div class="tw:flex tw:flex-col">
+            <div class="flex flex-col">
               <span>{{ t('dashboard.importCustom') }}</span>
-              <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
+              <span class="text-xs text-dropdown-item-text opacity-60"
                 >{{ t('dashboard.importCustomDesc') }}</span
               >
             </div>
@@ -60,9 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="showAddDashboardFromGitHub = true"
             data-test="dashboard-import-templates"
           >
-            <div class="tw:flex tw:flex-col">
+            <div class="flex flex-col">
               <span>{{ t('dashboard.importTemplates') }}</span>
-              <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
+              <span class="text-xs text-dropdown-item-text opacity-60"
                 >{{ t('dashboard.importTemplatesDesc') }}</span
               >
             </div>
@@ -83,10 +83,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Folder rail + table — matches the Alerts/Reports layout. -->
-    <div class="tw:flex-1 tw:flex tw:min-h-0">
+    <div class="flex-1 flex min-h-0">
       <!-- Left: shared folder list (same component as Alerts/Reports) -->
-      <div class="tw:shrink-0 tw:h-full" :style="{ width: 230 + 'px' }">
-        <div class="tw:h-full">
+      <div class="shrink-0 h-full" :style="{ width: 230 + 'px' }">
+        <div class="h-full">
           <FolderList
             type="dashboards"
             @update:activeFolderId="updateActiveFolderId"
@@ -94,8 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- Right: dashboards table -->
-      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
-        <div class="tw:h-full card-container">
+      <div class="flex-1 min-w-0 h-full">
+        <div class="h-full card-container">
           <OTable
             ref="oTableRef"
             :data="dashboards"
@@ -120,8 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Toolbar inside the table frame: scoped search (fills the bar) + refresh -->
             <template #toolbar>
-              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-                <div class="tw:flex-1 tw:min-w-0">
+              <div class="flex items-center gap-2 w-full">
+                <div class="flex-1 min-w-0">
                   <OInput
                     v-model="dynamicQueryModel"
                     :placeholder="
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :clearable="searchAcrossFolders"
                     @clear="clearSearchHistory"
                     data-test="dashboard-search"
-                    class="tw:w-full"
+                    class="w-full"
                   >
                     <template #icon-left>
                       <OIcon name="search" size="sm" />
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OToggleGroup
                         :model-value="searchAcrossFolders ? 'all' : 'this'"
                         type="single"
-                        class="tw:self-center tw:mr-1"
+                        class="self-center mr-1"
                         @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                       >
                         <OToggleGroupItem
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-name="{ row, value }">
               <span
-                class="tw:text-text-primary"
+                class="text-text-primary"
                 :data-test="`dashboard-name-cell-${value}`"
                 :title="value"
                 >{{ value }}</span
@@ -186,14 +186,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-identifier="{ value }">
               <span
-                class="tw:font-mono tw:text-xs tw:text-text-primary"
+                class="font-mono text-xs text-text-primary"
                 :title="value"
                 >{{ value }}</span
               >
             </template>
             <template #cell-description="{ value }">
               <span
-                class="tw:text-text-primary"
+                class="text-text-primary"
                 :title="value"
                 >{{ value || "—" }}</span
               >
@@ -211,16 +211,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="tw:inline-flex tw:items-center tw:gap-1 tw:max-w-full tw:px-2 tw:py-0.5 tw:rounded-full tw:bg-surface-subtle tw:text-text-primary tw:text-xs tw:leading-5 tw:transition-colors tw:outline-none tw:hover:bg-surface-subtle-hover tw:hover:text-text-primary tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
+                class="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full bg-surface-subtle text-text-primary text-xs leading-5 transition-colors outline-none hover:bg-surface-subtle-hover hover:text-text-primary focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
-                <span class="tw:truncate">{{ row.folder }}</span>
+                <span class="truncate">{{ row.folder }}</span>
               </button>
             </template>
             <template #cell-actions="{ row }">
               <span
-                class="row-actions tw:flex tw:items-center tw:justify-center tw:gap-0.5"
+                class="row-actions flex items-center justify-center gap-0.5"
               >
                 <OButton
                   v-if="row.actions == 'true'"
@@ -270,24 +270,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #bottom>
               <div
-                class="tw:flex tw:w-full tw:justify-between tw:items-center tw:py-1"
+                class="flex w-full justify-between items-center py-1"
               >
                 <div
-                  class="o2-table-footer-title tw:flex tw:items-center tw:gap-2 tw:shrink-0"
+                  class="o2-table-footer-title flex items-center gap-2 shrink-0"
                 >
-                  <span class="tw:text-text-primary">{{
+                  <span class="text-text-primary">{{
                     resultTotal || 0
                   }}</span>
-                  <span class="tw:text-text-secondary">{{
+                  <span class="text-text-secondary">{{
                     t("dashboard.header")
                   }}</span>
                 </div>
                 <div
                   v-if="selectedIds.length > 0"
-                  class="bulk-action-bar tw:flex tw:items-center tw:gap-2"
+                  class="bulk-action-bar flex items-center gap-2"
                 >
                   <span
-                    class="tw:text-sm tw:text-text-primary tw:mr-1"
+                    class="text-sm text-text-primary mr-1"
                     >{{ selectedIds.length }} selected</span
                   >
                   <OButton

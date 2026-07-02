@@ -13,10 +13,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="overview-tab tw:flex tw:flex-col tw:gap-0 tw:pt-[0.625rem] tw:pr-[0.875rem] tw:pb-[0.625rem] tw:pl-[0.625rem] tw:h-full tw:overflow-y-auto tw:text-(--o2-text-primary)">
+  <div class="overview-tab flex flex-col gap-0 pt-[0.625rem] pr-[0.875rem] pb-[0.625rem] pl-[0.625rem] h-full overflow-y-auto text-(--o2-text-primary)">
     <!-- Header: refresh + time picker -->
-    <div class="tw:flex tw:justify-end tw:mb-4">
-      <div class="tw:flex tw:items-center tw:gap-2">
+    <div class="flex justify-end mb-4">
+      <div class="flex items-center gap-2">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
           :loading="isLoading"
@@ -40,32 +40,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ACTIVE INCIDENTS (enterprise / cloud only) -->
     <section
       v-if="isIncidentsEnabled && incidents.length > 0"
-      class="tw:mb-5"
+      class="mb-5"
     >
-      <div class="tw:flex tw:items-center tw:justify-between tw:mb-2 tw:pl-1">
-        <div class="tw:text-sm tw:font-medium tw:tracking-[0.01em] tw:text-(--o2-text-primary)">
+      <div class="flex items-center justify-between mb-2 pl-1">
+        <div class="text-sm font-medium tracking-[0.01em] text-(--o2-text-primary)">
           {{ t('overview.activeIncidents') }}
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:min-w-5 tw:h-5 tw:px-[0.3rem] tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-semibold tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text) tw:border tw:border-[0.0625em] tw:border-(--o2-warning) tw:ml-[0.375rem] tw:align-middle">{{ incidentsTotal }}</span>
-          <span v-if="incidentsTotal > incidents.length" class="tw:ml-2 tw:text-xs tw:font-normal tw:text-(--o2-text-muted) tw:align-middle">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
+          <span class="inline-flex items-center justify-center min-w-5 h-5 px-[0.3rem] rounded-[0.625rem] text-[0.6875rem] font-semibold bg-(--o2-status-warning-bg) text-(--o2-status-warning-text) border border-[0.0625em] border-(--o2-warning) ml-[0.375rem] align-middle">{{ incidentsTotal }}</span>
+          <span v-if="incidentsTotal > incidents.length" class="ml-2 text-xs font-normal text-(--o2-text-muted) align-middle">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
         </div>
-        <button class="tw:text-xs tw:font-medium tw:text-(--o2-primary-color) tw:bg-none tw:border-none tw:p-0 tw:cursor-pointer tw:whitespace-nowrap tw:transition-opacity tw:duration-150 tw:opacity-80 tw:hover:opacity-100 tw:hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-(--o2-primary-color) bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
       </div>
-      <div class="tw:flex tw:flex-col tw:border tw:border-[0.0625em] tw:border-(--o2-border-color) tw:rounded-[0.375rem] tw:overflow-hidden">
+      <div class="flex flex-col border border-[0.0625em] border-(--o2-border-color) rounded-[0.375rem] overflow-hidden">
         <div
           v-for="inc in incidents"
           :key="inc.id"
-          class="ov-alert-row ov-table-row tw:flex tw:items-center tw:gap-3 tw:py-[0.625rem] tw:px-[0.875rem] tw:bg-(--o2-card-bg-solid) tw:transition-[background] tw:duration-150 tw:hover:bg-(--o2-hover-gray)"
+          class="ov-alert-row ov-table-row flex items-center gap-3 py-[0.625rem] px-[0.875rem] bg-(--o2-card-bg-solid) transition-[background] duration-150 hover:bg-(--o2-hover-gray)"
           :class="incidentRowClass(inc.severity)"
         >
-          <span class="tw:shrink-0 tw:flex tw:items-center" :class="incidentIconClass(inc.severity)">
+          <span class="shrink-0 flex items-center" :class="incidentIconClass(inc.severity)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
               <path d="M12 8v4m0 4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
           </span>
-          <div class="tw:flex-1 tw:min-w-0">
-            <div class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary) tw:flex tw:items-center tw:flex-wrap tw:gap-1">
-              <span class="tw:inline-block tw:text-[0.625rem] tw:leading-5 tw:font-bold tw:py-[0.1rem] tw:px-[0.35rem] tw:rounded-[0.2rem] tw:tracking-[0.04em]" :class="severityBadgeClass(inc.severity)">
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-(--o2-text-primary) flex items-center flex-wrap gap-1">
+              <span class="inline-block text-[0.625rem] leading-5 font-bold py-[0.1rem] px-[0.35rem] rounded-[0.2rem] tracking-[0.04em]" :class="severityBadgeClass(inc.severity)">
                 {{ (inc.severity || 'P4').toUpperCase() }}
               </span>
               {{ inc.title || t('overview.untitledIncident') }}
@@ -73,19 +73,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span
                   v-for="[key, val] in sortedDimensions(inc.group_values)"
                   :key="key"
-                  class="tw:inline-flex tw:items-center tw:gap-[0.125em] tw:py-[0.125em] tw:px-[0.5em] tw:rounded-[0.75em] tw:text-[0.6875em] tw:leading-5 tw:font-semibold tw:mx-[0.125em] tw:max-w-[11.25em] tw:overflow-hidden"
+                  class="inline-flex items-center gap-[0.125em] py-[0.125em] px-[0.5em] rounded-[0.75em] text-[0.6875em] leading-5 font-semibold mx-[0.125em] max-w-[11.25em] overflow-hidden"
                   :class="dimColorClass(key)"
                   :title="`${key}=${val}`"
-                ><span class="tw:inline-block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">{{ shortDimKey(key) }}: {{ val }}</span></span>
+                ><span class="inline-block overflow-hidden text-ellipsis whitespace-nowrap">{{ shortDimKey(key) }}: {{ val }}</span></span>
               </template>
             </div>
           </div>
-          <div class="tw:flex tw:items-center tw:shrink-0 tw:gap-[0.3rem] tw:whitespace-nowrap tw:w-48">
-            <span class="tw:text-xs tw:text-(--o2-text-muted) tw:min-w-[4.5rem]">{{ relativeTime_(inc.first_alert_at) }}</span>
-            <span class="tw:text-xs tw:text-(--o2-text-muted)">·</span>
-            <span class="tw:text-xs tw:font-normal tw:text-(--o2-text-primary)">{{ inc.alert_count }} alerts</span>
+          <div class="flex items-center shrink-0 gap-[0.3rem] whitespace-nowrap w-48">
+            <span class="text-xs text-(--o2-text-muted) min-w-[4.5rem]">{{ relativeTime_(inc.first_alert_at) }}</span>
+            <span class="text-xs text-(--o2-text-muted)">·</span>
+            <span class="text-xs font-normal text-(--o2-text-primary)">{{ inc.alert_count }} alerts</span>
           </div>
-          <span class="ov-investigate-hover tw:shrink-0 tw:whitespace-nowrap">
+          <span class="ov-investigate-hover shrink-0 whitespace-nowrap">
             <OButton
               variant="ghost-primary"
               size="sm"
@@ -99,20 +99,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </section>
 
     <!-- SERVICES (enterprise only — needs service graph data) -->
-    <section v-if="isEnterpriseOrCloud && services.length > 0" class="tw:mb-5">
-      <div class="tw:flex tw:items-center tw:justify-between tw:mb-2 tw:pl-1">
-        <div class="tw:text-sm tw:font-medium tw:tracking-[0.01em] tw:text-(--o2-text-primary)">
+    <section v-if="isEnterpriseOrCloud && services.length > 0" class="mb-5">
+      <div class="flex items-center justify-between mb-2 pl-1">
+        <div class="text-sm font-medium tracking-[0.01em] text-(--o2-text-primary)">
           {{ t('overview.services') }}
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:min-w-5 tw:h-5 tw:px-[0.3rem] tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-semibold tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text) tw:border tw:border-[0.0625em] tw:border-(--o2-warning) tw:ml-[0.375rem] tw:align-middle">{{ services.length }}</span>
-          <span v-if="servicePanelVisible && selectedService" class="tw:text-xs tw:font-normal tw:text-(--o2-text-muted) tw:ml-1">
-            — viewing <strong class="tw:font-semibold tw:text-(--o2-text-primary)">{{ selectedService.label ?? selectedService.id }}</strong>
+          <span class="inline-flex items-center justify-center min-w-5 h-5 px-[0.3rem] rounded-[0.625rem] text-[0.6875rem] font-semibold bg-(--o2-status-warning-bg) text-(--o2-status-warning-text) border border-[0.0625em] border-(--o2-warning) ml-[0.375rem] align-middle">{{ services.length }}</span>
+          <span v-if="servicePanelVisible && selectedService" class="text-xs font-normal text-(--o2-text-muted) ml-1">
+            — viewing <strong class="font-semibold text-(--o2-text-primary)">{{ selectedService.label ?? selectedService.id }}</strong>
           </span>
         </div>
-        <button class="tw:text-xs tw:font-medium tw:text-(--o2-primary-color) tw:bg-none tw:border-none tw:p-0 tw:cursor-pointer tw:whitespace-nowrap tw:transition-opacity tw:duration-150 tw:opacity-80 tw:hover:opacity-100 tw:hover:underline" @click="goToServiceGraph">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-(--o2-primary-color) bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToServiceGraph">{{ t('overview.viewAll') }} →</button>
       </div>
-      <div class="tw:flex tw:items-stretch tw:gap-2">
+      <div class="flex items-stretch gap-2">
         <button
-          class="tw:shrink-0 tw:w-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer tw:border tw:border-[0.0625em] tw:border-(--o2-border-color) tw:rounded-lg tw:bg-(--o2-card-bg-solid) tw:text-(--o2-text-secondary) tw:shadow-[0_1px_3px_rgba(0,0,0,0.06)] tw:transition-all tw:duration-150 tw:hover:not-disabled:bg-(--o2-hover-gray) tw:hover:not-disabled:text-(--o2-text-primary) tw:hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] tw:hover:not-disabled:-translate-y-px tw:active:not-disabled:translate-y-0 tw:active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] tw:disabled:opacity-25 tw:disabled:cursor-not-allowed tw:disabled:shadow-none"
+          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-(--o2-border-color) rounded-lg bg-(--o2-card-bg-solid) text-(--o2-text-secondary) shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-(--o2-hover-gray) hover:not-disabled:text-(--o2-text-primary) hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
           :disabled="!svcScrollCanLeft"
           @click="scrollServices(-1)"
         >
@@ -120,17 +120,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
-        <div ref="svcGridRef" class="ov-service-grid tw:flex tw:flex-row tw:gap-2 tw:overflow-x-auto tw:flex-1 tw:[scrollbar-width:none]" @scroll="onSvcScroll">
+        <div ref="svcGridRef" class="ov-service-grid flex flex-row gap-2 overflow-x-auto flex-1 [scrollbar-width:none]" @scroll="onSvcScroll">
         <div
           v-for="svc in services"
           :key="svc.id"
-          class="tw:py-3 tw:px-[0.875rem] tw:rounded-[0.375rem] tw:border tw:border-[0.0625em] tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:transition-[background] tw:duration-150 tw:basis-40 tw:grow-0 tw:shrink-0 tw:min-w-40 tw:max-w-40 tw:cursor-pointer tw:hover:bg-(--o2-hover-gray)"
-          :class="[serviceCardClass(svc), { 'tw:bg-(--o2-hover-gray) tw:outline tw:outline-[0.125em] tw:outline-(--o2-primary-color) tw:[outline-offset:-0.0625em]': selectedService?.id === svc.id && servicePanelVisible }]"
+          class="py-3 px-[0.875rem] rounded-[0.375rem] border border-[0.0625em] border-(--o2-border-color) bg-(--o2-card-bg-solid) transition-[background] duration-150 basis-40 grow-0 shrink-0 min-w-40 max-w-40 cursor-pointer hover:bg-(--o2-hover-gray)"
+          :class="[serviceCardClass(svc), { 'bg-(--o2-hover-gray) outline outline-[0.125em] outline-(--o2-primary-color) [outline-offset:-0.0625em]': selectedService?.id === svc.id && servicePanelVisible }]"
           @click="goToService(svc)"
         >
-          <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
-            <span class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary) tw:flex-1 tw:min-w-0 tw:block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:cursor-default" :title="svc.label ?? svc.id">{{ svc.label }}</span>
-            <span class="tw:inline-flex tw:items-center tw:shrink-0 tw:ml-1">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-(--o2-text-primary) flex-1 min-w-0 block overflow-hidden text-ellipsis whitespace-nowrap cursor-default" :title="svc.label ?? svc.id">{{ svc.label }}</span>
+            <span class="inline-flex items-center shrink-0 ml-1">
               <OButton
                 variant="ghost-muted"
                 size="icon"
@@ -144,28 +144,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </span>
           </div>
-          <div class="tw:flex tw:flex-col tw:gap-1 tw:mt-2">
-            <div class="tw:flex tw:items-baseline tw:justify-between tw:gap-2">
-              <span class="tw:text-[0.625rem] tw:font-semibold tw:tracking-[0.06em] tw:uppercase tw:text-(--o2-text-muted)">{{ t('overview.colErrorRate') }}</span>
-              <span class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary)" :class="svc.errorFlag ? 'tw:text-(--o2-status-error-text)' : ''">
+          <div class="flex flex-col gap-1 mt-2">
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="text-[0.625rem] font-semibold tracking-[0.06em] uppercase text-(--o2-text-muted)">{{ t('overview.colErrorRate') }}</span>
+              <span class="text-sm font-medium text-(--o2-text-primary)" :class="svc.errorFlag ? 'text-(--o2-status-error-text)' : ''">
                 {{ svc.error_rate != null ? svc.error_rate.toFixed(1) + '%' : '—' }}
               </span>
             </div>
-            <div class="tw:flex tw:items-baseline tw:justify-between tw:gap-2">
-              <span class="tw:text-[0.625rem] tw:font-semibold tw:tracking-[0.06em] tw:uppercase tw:text-(--o2-text-muted)">{{ t('overview.colLatency') }}</span>
-              <span class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary)" :class="svc.latencyFlag ? 'tw:text-(--o2-status-warning-text)' : ''">
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="text-[0.625rem] font-semibold tracking-[0.06em] uppercase text-(--o2-text-muted)">{{ t('overview.colLatency') }}</span>
+              <span class="text-sm font-medium text-(--o2-text-primary)" :class="svc.latencyFlag ? 'text-(--o2-status-warning-text)' : ''">
                 {{ svc.latencyMultiplier ? svc.latencyMultiplier + 'x' : '—' }}
               </span>
             </div>
-            <div class="tw:flex tw:items-baseline tw:justify-between tw:gap-2">
-              <span class="tw:text-[0.625rem] tw:font-semibold tw:tracking-[0.06em] tw:uppercase tw:text-(--o2-text-muted)">{{ t('overview.colReqs') }}</span>
-              <span class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary)">{{ formatReqRate(svc.requests) }}</span>
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="text-[0.625rem] font-semibold tracking-[0.06em] uppercase text-(--o2-text-muted)">{{ t('overview.colReqs') }}</span>
+              <span class="text-sm font-medium text-(--o2-text-primary)">{{ formatReqRate(svc.requests) }}</span>
             </div>
           </div>
         </div>
         </div>
         <button
-          class="tw:shrink-0 tw:w-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer tw:border tw:border-[0.0625em] tw:border-(--o2-border-color) tw:rounded-lg tw:bg-(--o2-card-bg-solid) tw:text-(--o2-text-secondary) tw:shadow-[0_1px_3px_rgba(0,0,0,0.06)] tw:transition-all tw:duration-150 tw:hover:not-disabled:bg-(--o2-hover-gray) tw:hover:not-disabled:text-(--o2-text-primary) tw:hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] tw:hover:not-disabled:-translate-y-px tw:active:not-disabled:translate-y-0 tw:active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] tw:disabled:opacity-25 tw:disabled:cursor-not-allowed tw:disabled:shadow-none"
+          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-(--o2-border-color) rounded-lg bg-(--o2-card-bg-solid) text-(--o2-text-secondary) shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-(--o2-hover-gray) hover:not-disabled:text-(--o2-text-primary) hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
           :disabled="!svcScrollCanRight"
           @click="scrollServices(1)"
         >
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isEnterpriseOrCloud && selectedService">
       <div
         v-if="servicePanelVisible"
-        class="tw:fixed tw:inset-0 tw:z-[99] tw:bg-transparent"
+        class="fixed inset-0 z-[99] bg-transparent"
         @click="closeServicePanel"
       />
       <ServiceGraphNodeSidePanel
@@ -195,34 +195,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- ACTIVE ANOMALIES -->
-    <section v-if="anomalies.length > 0" class="tw:mb-5">
-      <div class="tw:flex tw:items-center tw:justify-between tw:mb-2 tw:pl-1">
-        <div class="tw:text-sm tw:font-medium tw:tracking-[0.01em] tw:text-(--o2-text-primary)">
+    <section v-if="anomalies.length > 0" class="mb-5">
+      <div class="flex items-center justify-between mb-2 pl-1">
+        <div class="text-sm font-medium tracking-[0.01em] text-(--o2-text-primary)">
           {{ t('overview.activeAnomalies') }}
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:min-w-5 tw:h-5 tw:px-[0.3rem] tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-semibold tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text) tw:border tw:border-[0.0625em] tw:border-(--o2-warning) tw:ml-[0.375rem] tw:align-middle">{{ anomalies.length }}</span>
+          <span class="inline-flex items-center justify-center min-w-5 h-5 px-[0.3rem] rounded-[0.625rem] text-[0.6875rem] font-semibold bg-(--o2-status-warning-bg) text-(--o2-status-warning-text) border border-[0.0625em] border-(--o2-warning) ml-[0.375rem] align-middle">{{ anomalies.length }}</span>
         </div>
-        <button class="tw:text-xs tw:font-medium tw:text-(--o2-primary-color) tw:bg-none tw:border-none tw:p-0 tw:cursor-pointer tw:whitespace-nowrap tw:transition-opacity tw:duration-150 tw:opacity-80 tw:hover:opacity-100 tw:hover:underline" @click="goToAnomalies">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-(--o2-primary-color) bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAnomalies">{{ t('overview.viewAll') }} →</button>
       </div>
-      <div class="tw:flex tw:flex-col tw:gap-[0.375rem]">
+      <div class="flex flex-col gap-[0.375rem]">
         <div
           v-for="item in anomalies"
           :key="item.id"
-          class="ov-alert-row tw:flex tw:items-center tw:gap-3 tw:py-[0.625rem] tw:px-[0.875rem] tw:rounded-[0.375rem] tw:border tw:border-[0.0625em] tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:transition-[background] tw:duration-150 tw:hover:bg-(--o2-hover-gray)"
+          class="ov-alert-row flex items-center gap-3 py-[0.625rem] px-[0.875rem] rounded-[0.375rem] border border-[0.0625em] border-(--o2-border-color) bg-(--o2-card-bg-solid) transition-[background] duration-150 hover:bg-(--o2-hover-gray)"
           :class="severityRowClass(item.severity)"
         >
-          <span class="tw:shrink-0 tw:flex tw:items-center" :class="severityIconClass(item.severity)">
+          <span class="shrink-0 flex items-center" :class="severityIconClass(item.severity)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </span>
-          <div class="tw:flex-1 tw:min-w-0">
-            <div class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary) tw:flex tw:items-center tw:flex-wrap tw:gap-1 tw:[row-gap:0.25rem]">
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-(--o2-text-primary) flex items-center flex-wrap gap-1 [row-gap:0.25rem]">
               {{ item.title }}
-              <span class="tw:text-xs tw:text-(--o2-text-muted) tw:font-normal tw:mx-[0.1rem]">·</span>
-              <span class="tw:text-xs tw:text-(--o2-text-muted) tw:font-normal">{{ item.description }}</span>
+              <span class="text-xs text-(--o2-text-muted) font-normal mx-[0.1rem]">·</span>
+              <span class="text-xs text-(--o2-text-muted) font-normal">{{ item.description }}</span>
             </div>
           </div>
-          <span class="ov-investigate-hover tw:shrink-0 tw:whitespace-nowrap">
+          <span class="ov-investigate-hover shrink-0 whitespace-nowrap">
             <OButton
               variant="ghost-primary"
               size="sm"
@@ -236,29 +236,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </section>
 
     <!-- RECENT EVENTS (alert firing feed) -->
-    <section v-if="recentEvents.length > 0" class="tw:mb-5">
-      <div class="tw:flex tw:items-center tw:justify-between tw:mb-2 tw:pl-1">
-        <div class="tw:text-sm tw:font-medium tw:tracking-[0.01em] tw:text-(--o2-text-primary)">
+    <section v-if="recentEvents.length > 0" class="mb-5">
+      <div class="flex items-center justify-between mb-2 pl-1">
+        <div class="text-sm font-medium tracking-[0.01em] text-(--o2-text-primary)">
           {{ t('overview.recentEvents') }}
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:min-w-5 tw:h-5 tw:px-[0.3rem] tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-semibold tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text) tw:border tw:border-[0.0625em] tw:border-(--o2-warning) tw:ml-[0.375rem] tw:align-middle">{{ recentEvents.length }}</span>
+          <span class="inline-flex items-center justify-center min-w-5 h-5 px-[0.3rem] rounded-[0.625rem] text-[0.6875rem] font-semibold bg-(--o2-status-warning-bg) text-(--o2-status-warning-text) border border-[0.0625em] border-(--o2-warning) ml-[0.375rem] align-middle">{{ recentEvents.length }}</span>
         </div>
-        <button class="tw:text-xs tw:font-medium tw:text-(--o2-primary-color) tw:bg-none tw:border-none tw:p-0 tw:cursor-pointer tw:whitespace-nowrap tw:transition-opacity tw:duration-150 tw:opacity-80 tw:hover:opacity-100 tw:hover:underline" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-(--o2-primary-color) bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
       </div>
-      <div class="tw:flex tw:flex-col tw:gap-0 tw:border tw:border-[0.0625em] tw:border-(--o2-border-color) tw:rounded-[0.375rem] tw:overflow-hidden tw:bg-(--o2-card-bg-solid)">
+      <div class="flex flex-col gap-0 border border-[0.0625em] border-(--o2-border-color) rounded-[0.375rem] overflow-hidden bg-(--o2-card-bg-solid)">
         <div
           v-for="ev in recentEvents"
           :key="ev.id"
-          class="ov-event-row tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-[0.875rem] tw:border-b tw:border-b-[0.0625em] tw:border-b-(--o2-border-color) tw:text-[0.8125rem] tw:transition-[background] tw:duration-150 tw:hover:bg-(--o2-hover-gray)"
+          class="ov-event-row flex items-center gap-3 py-2 px-[0.875rem] border-b border-b-[0.0625em] border-b-(--o2-border-color) text-[0.8125rem] transition-[background] duration-150 hover:bg-(--o2-hover-gray)"
         >
-          <span class="tw:shrink-0 tw:text-[0.6875rem] tw:font-semibold tw:py-[0.15rem] tw:px-[0.4rem] tw:rounded-[0.2rem] tw:tracking-[0.03em]" :class="ev.typeLabel === 'Failed' ? 'tw:bg-(--o2-status-error-bg) tw:text-(--o2-status-error-text) tw:font-bold' : ev.typeLabel === 'Error' ? 'tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text)' : 'tw:bg-(--o2-status-error-bg) tw:text-(--o2-status-error-text)'">
+          <span class="shrink-0 text-[0.6875rem] font-semibold py-[0.15rem] px-[0.4rem] rounded-[0.2rem] tracking-[0.03em]" :class="ev.typeLabel === 'Failed' ? 'bg-(--o2-status-error-bg) text-(--o2-status-error-text) font-bold' : ev.typeLabel === 'Error' ? 'bg-(--o2-status-warning-bg) text-(--o2-status-warning-text)' : 'bg-(--o2-status-error-bg) text-(--o2-status-error-text)'">
             {{ ev.typeLabel }}
           </span>
-          <span class="tw:font-medium tw:text-(--o2-text-primary) tw:whitespace-nowrap tw:min-w-[7.5em] tw:max-w-[12.5em] tw:overflow-hidden tw:text-ellipsis">{{ ev.service }}</span>
-          <span class="tw:flex-1 tw:text-(--o2-text-muted) tw:truncate">{{ ev.description }}</span>
-          <span v-if="ev.failCount > 1" class="tw:shrink-0 tw:text-[0.6875rem] tw:font-bold tw:text-(--o2-status-error-text) tw:bg-(--o2-status-error-bg) tw:border tw:border-[0.0625em] tw:border-(--o2-negative) tw:rounded-[0.75rem] tw:py-[0.1rem] tw:px-[0.4rem] tw:whitespace-nowrap" :title="`Failed ${ev.failCount} times in this window`">
+          <span class="font-medium text-(--o2-text-primary) whitespace-nowrap min-w-[7.5em] max-w-[12.5em] overflow-hidden text-ellipsis">{{ ev.service }}</span>
+          <span class="flex-1 text-(--o2-text-muted) truncate">{{ ev.description }}</span>
+          <span v-if="ev.failCount > 1" class="shrink-0 text-[0.6875rem] font-bold text-(--o2-status-error-text) bg-(--o2-status-error-bg) border border-[0.0625em] border-(--o2-negative) rounded-[0.75rem] py-[0.1rem] px-[0.4rem] whitespace-nowrap" :title="`Failed ${ev.failCount} times in this window`">
             ×{{ ev.failCount }}
           </span>
-          <span class="tw:shrink-0 tw:text-(--o2-text-muted) tw:text-xs tw:whitespace-nowrap">{{ ev.timeAgo }}</span>
+          <span class="shrink-0 text-(--o2-text-muted) text-xs whitespace-nowrap">{{ ev.timeAgo }}</span>
         </div>
       </div>
     </section>
@@ -275,44 +275,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #description>{{ t('overview.allClearDesc') }}</template>
       <template #actions>
         <!-- View alerts -->
-        <button type="button" class="ov-action-card tw:group tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-alerts-card" @click="goToAlertList">
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150 tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text) tw:group-hover:bg-(--o2-primary-color) tw:group-hover:text-(--o2-primary-foreground)">
+        <button type="button" class="ov-action-card group relative flex items-center gap-3 w-64 max-w-full min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-(--color-border-default) bg-(--color-surface-base) shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-(--color-primary-400) hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-alerts-card" @click="goToAlertList">
+          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-(--o2-status-warning-bg) text-(--o2-status-warning-text) group-hover:bg-(--o2-primary-color) group-hover:text-(--o2-primary-foreground)">
             <OIcon name="notifications" size="md" />
           </span>
-          <span class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
-            <span class="tw:text-(length:--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionAlerts') }}</span>
-            <span class="tw:text-(length:--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionAlertsDesc') }}</span>
+          <span class="flex-1 min-w-0 flex flex-col gap-[0.125rem]">
+            <span class="text-(length:--text-sm) font-semibold text-(--color-text-primary) truncate">{{ t('overview.emptyActionAlerts') }}</span>
+            <span class="text-(length:--text-xs) text-(--color-text-secondary) leading-[1.4]">{{ t('overview.emptyActionAlertsDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150 tw:group-hover:translate-x-[0.125rem] tw:group-hover:text-(--color-primary-600)" />
+          <OIcon name="chevron-right" size="sm" class="shrink-0 text-(--color-text-disabled) transition-[transform,color] duration-150 group-hover:translate-x-[0.125rem] group-hover:text-(--color-primary-600)" />
         </button>
         <!-- Explore logs -->
-        <button type="button" class="ov-action-card tw:group tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-logs-card" @click="goToLogs">
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150 tw:bg-(--o2-status-info-bg) tw:text-(--o2-status-info-text) tw:group-hover:bg-(--o2-primary-color) tw:group-hover:text-(--o2-primary-foreground)">
+        <button type="button" class="ov-action-card group relative flex items-center gap-3 w-64 max-w-full min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-(--color-border-default) bg-(--color-surface-base) shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-(--color-primary-400) hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-logs-card" @click="goToLogs">
+          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-(--o2-status-info-bg) text-(--o2-status-info-text) group-hover:bg-(--o2-primary-color) group-hover:text-(--o2-primary-foreground)">
             <OIcon name="search" size="md" />
           </span>
-          <span class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
-            <span class="tw:text-(length:--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionLogs') }}</span>
-            <span class="tw:text-(length:--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionLogsDesc') }}</span>
+          <span class="flex-1 min-w-0 flex flex-col gap-[0.125rem]">
+            <span class="text-(length:--text-sm) font-semibold text-(--color-text-primary) truncate">{{ t('overview.emptyActionLogs') }}</span>
+            <span class="text-(length:--text-xs) text-(--color-text-secondary) leading-[1.4]">{{ t('overview.emptyActionLogsDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150 tw:group-hover:translate-x-[0.125rem] tw:group-hover:text-(--color-primary-600)" />
+          <OIcon name="chevron-right" size="sm" class="shrink-0 text-(--color-text-disabled) transition-[transform,color] duration-150 group-hover:translate-x-[0.125rem] group-hover:text-(--color-primary-600)" />
         </button>
         <!-- Explore traces -->
-        <button type="button" class="ov-action-card tw:group tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-traces-card" @click="goToTraces">
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150 tw:bg-(--o2-status-info-bg) tw:text-(--o2-status-info-text) tw:group-hover:bg-(--o2-primary-color) tw:group-hover:text-(--o2-primary-foreground)">
+        <button type="button" class="ov-action-card group relative flex items-center gap-3 w-64 max-w-full min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-(--color-border-default) bg-(--color-surface-base) shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-(--color-primary-400) hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-traces-card" @click="goToTraces">
+          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-(--o2-status-info-bg) text-(--o2-status-info-text) group-hover:bg-(--o2-primary-color) group-hover:text-(--o2-primary-foreground)">
             <OIcon name="account-tree" size="md" />
           </span>
-          <span class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
-            <span class="tw:text-(length:--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionTraces') }}</span>
-            <span class="tw:text-(length:--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionTracesDesc') }}</span>
+          <span class="flex-1 min-w-0 flex flex-col gap-[0.125rem]">
+            <span class="text-(length:--text-sm) font-semibold text-(--color-text-primary) truncate">{{ t('overview.emptyActionTraces') }}</span>
+            <span class="text-(length:--text-xs) text-(--color-text-secondary) leading-[1.4]">{{ t('overview.emptyActionTracesDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150 tw:group-hover:translate-x-[0.125rem] tw:group-hover:text-(--color-primary-600)" />
+          <OIcon name="chevron-right" size="sm" class="shrink-0 text-(--color-text-disabled) transition-[transform,color] duration-150 group-hover:translate-x-[0.125rem] group-hover:text-(--color-primary-600)" />
         </button>
       </template>
     </OEmptyState>
 
     <!-- Loading skeleton (standard O2 wave shimmer) -->
-    <div v-if="isLoading" class="tw:flex tw:flex-col tw:gap-2 tw:py-2 tw:px-0">
-      <OSkeleton v-for="i in 3" :key="i" class="tw:h-[3.25em]" />
+    <div v-if="isLoading" class="flex flex-col gap-2 py-2 px-0">
+      <OSkeleton v-for="i in 3" :key="i" class="h-[3.25em]" />
     </div>
 
     <!-- Alert History Drawer — opened from anomaly Investigate button -->
@@ -753,18 +753,18 @@ const shortDimKey = (key: string): string =>
 
 // Full Tailwind class strings per named color — complete strings so Tailwind can scan them
 const DIM_BORDER_CLASSES: Record<string, string> = {
-  blue:   "tw:border tw:border-[0.0625em] tw:border-(--o2-status-info-text)",
-  green:  "tw:border tw:border-[0.0625em] tw:border-(--o2-positive)",
-  yellow: "tw:border tw:border-[0.0625em] tw:border-(--o2-warning)",
-  pink:   "tw:border tw:border-[0.0625em] tw:border-(--o2-negative)",
-  purple: "tw:border tw:border-[0.0625em] tw:border-(--o2-primary-color)",
-  orange: "tw:border tw:border-[0.0625em] tw:border-(--o2-status-warning-text)",
-  cyan:   "tw:border tw:border-[0.0625em] tw:border-(--o2-positive)",
-  indigo: "tw:border tw:border-[0.0625em] tw:border-(--o2-theme-color)",
-  teal:   "tw:border tw:border-[0.0625em] tw:border-(--o2-positive)",
-  red:    "tw:border tw:border-[0.0625em] tw:border-(--o2-negative)",
-  amber:  "tw:border tw:border-[0.0625em] tw:border-(--o2-warning)",
-  gray:   "tw:border tw:border-[0.0625em] tw:border-(--o2-border-color)",
+  blue:   "border border-[0.0625em] border-(--o2-status-info-text)",
+  green:  "border border-[0.0625em] border-(--o2-positive)",
+  yellow: "border border-[0.0625em] border-(--o2-warning)",
+  pink:   "border border-[0.0625em] border-(--o2-negative)",
+  purple: "border border-[0.0625em] border-(--o2-primary-color)",
+  orange: "border border-[0.0625em] border-(--o2-status-warning-text)",
+  cyan:   "border border-[0.0625em] border-(--o2-positive)",
+  indigo: "border border-[0.0625em] border-(--o2-theme-color)",
+  teal:   "border border-[0.0625em] border-(--o2-positive)",
+  red:    "border border-[0.0625em] border-(--o2-negative)",
+  amber:  "border border-[0.0625em] border-(--o2-warning)",
+  gray:   "border border-[0.0625em] border-(--o2-border-color)",
 };
 
 // Dimension key → named color (aliases share the same color name)
@@ -798,38 +798,38 @@ const dimColorClass = (key: string): string => {
 
 const severityRowClass = (severity: string) =>
   severity === "critical"
-    ? "tw:border-l-[0.1875em] tw:border-l-(--o2-negative)"
-    : "tw:border-l-[0.1875em] tw:border-l-(--o2-warning)";
+    ? "border-l-[0.1875em] border-l-(--o2-negative)"
+    : "border-l-[0.1875em] border-l-(--o2-warning)";
 
 const severityIconClass = (severity: string) =>
-  severity === "critical" ? "tw:text-(--o2-negative)" : "tw:text-(--o2-warning)";
+  severity === "critical" ? "text-(--o2-negative)" : "text-(--o2-warning)";
 
 const incidentRowClass = (severity: string) => {
   const s = (severity ?? "").toLowerCase();
-  if (s === "p1") return "tw:border-l-(--o2-negative)";
-  if (s === "p2") return "tw:border-l-(--o2-warning)";
-  return "tw:border-l-(--o2-status-info-text)";
+  if (s === "p1") return "border-l-(--o2-negative)";
+  if (s === "p2") return "border-l-(--o2-warning)";
+  return "border-l-(--o2-status-info-text)";
 };
 
 const incidentIconClass = (severity: string) => {
   const s = (severity ?? "").toLowerCase();
-  if (s === "p1") return "tw:text-(--o2-negative)";
-  if (s === "p2") return "tw:text-(--o2-warning)";
-  return "tw:text-(--o2-status-info-text)";
+  if (s === "p1") return "text-(--o2-negative)";
+  if (s === "p2") return "text-(--o2-warning)";
+  return "text-(--o2-status-info-text)";
 };
 
 const severityBadgeClass = (sev: string): string => {
   const s = (sev || "p4").toLowerCase();
-  if (s === "p1") return "tw:bg-(--o2-status-error-bg) tw:text-(--o2-status-error-text) tw:border tw:border-[0.0625em] tw:border-(--o2-negative)";
-  if (s === "p2") return "tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text) tw:border tw:border-[0.0625em] tw:border-(--o2-warning)";
-  if (s === "p3") return "tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text) tw:border tw:border-[0.0625em] tw:border-(--o2-warning)";
-  return "tw:bg-(--o2-status-info-bg) tw:text-(--o2-status-info-text) tw:border tw:border-[0.0625em] tw:border-(--o2-status-info-text)";
+  if (s === "p1") return "bg-(--o2-status-error-bg) text-(--o2-status-error-text) border border-[0.0625em] border-(--o2-negative)";
+  if (s === "p2") return "bg-(--o2-status-warning-bg) text-(--o2-status-warning-text) border border-[0.0625em] border-(--o2-warning)";
+  if (s === "p3") return "bg-(--o2-status-warning-bg) text-(--o2-status-warning-text) border border-[0.0625em] border-(--o2-warning)";
+  return "bg-(--o2-status-info-bg) text-(--o2-status-info-text) border border-[0.0625em] border-(--o2-status-info-text)";
 };
 
 const serviceCardClass = (svc: any) => {
-  if (svc.errorFlag && svc.error_rate >= 5) return "tw:border-l-[0.1875em] tw:border-l-(--o2-negative)";
-  if (svc.errorFlag || svc.latencyFlag) return "tw:border-l-[0.1875em] tw:border-l-(--o2-warning)";
-  return "tw:border-l-[0.1875em] tw:border-l-(--o2-positive)";
+  if (svc.errorFlag && svc.error_rate >= 5) return "border-l-[0.1875em] border-l-(--o2-negative)";
+  if (svc.errorFlag || svc.latencyFlag) return "border-l-[0.1875em] border-l-(--o2-warning)";
+  return "border-l-[0.1875em] border-l-(--o2-positive)";
 };
 
 // ── Navigation ───────────────────────────────────────────────────────────────
