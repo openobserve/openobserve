@@ -1753,7 +1753,6 @@ describe("TraceDetailsSidebar", async () => {
           mockSpan.span_id,
         );
       } else {
-        console.log("Copy button not found, skipping test");
       }
     });
 

@@ -148,7 +148,6 @@ const saveRole = () => {
         variant: "error",
       });
       }
-      console.log(err);
     });
     track("Button Click", {
       button: "Save Role",

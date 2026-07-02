@@ -51,9 +51,6 @@ const useLocalStorage = (
 
     return value;
   } catch (e) {
-    console.log(
-      `Error: Error in UseLocalStorage for key: ${key}, error-message : ${e}`,
-    );
   }
 };
 
@@ -61,7 +58,6 @@ export const getSessionStorageVal = (key: string) => {
   try {
     return window.sessionStorage.getItem(key);
   } catch (e) {
-    console.log(`Error: Error while pull sessionstorage value ${key}`);
   }
 };
 
@@ -69,7 +65,6 @@ export const deleteSessionStorageVal = (key: string) => {
   try {
     return sessionStorage.removeItem(key);
   } catch (e) {
-    console.log(`Error: Error while pull sessionstorage value ${key}`);
   }
 };
 
@@ -86,7 +81,6 @@ export const useLocalOrganization = (val: any = {}, isDelete = false) => {
       return organizationDataLocal;
     }
   } catch (e) {
-    console.log(`Error: Error in useLocalOrganization: ${e}`);
     return ref({});
   }
 };

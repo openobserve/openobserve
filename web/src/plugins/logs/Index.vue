@@ -923,7 +923,6 @@ export default defineComponent({
         refreshHistogramChart();
         showJobScheduler.value = true;
       } catch (e) {
-        console.log(e);
       }
     };
 
@@ -1420,7 +1419,6 @@ export default defineComponent({
           searchBarRef.value.updateQuery();
         }
       } catch (e) {
-        console.log("Logs : Error in setQuery ", e);
       }
     };
 

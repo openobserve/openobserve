@@ -222,7 +222,6 @@ const getGroupDetails = () => {
 
   getGroup(groupName, store.state.selectedOrganization.identifier)
     .then((res) => {
-      console.log(res,'res in get group')
       groupDetails.value = {
         ...res.data,
         group_name: res.data.name,
@@ -230,7 +229,6 @@ const getGroupDetails = () => {
       groupsState.groups[groupName] = groupDetails.value;
     })
     .catch((err) => {
-      console.log(err);
       toast({
         message: err?.message || "Group not found or has been deleted. Redirecting to groups list.",
         variant: "error",

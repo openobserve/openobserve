@@ -410,7 +410,6 @@ export default defineComponent({
                 variant: "error",
                 message: "Invalid username or password",
               });
-              console.log(e);
             });
         } catch (e) {
           submitting.value = false;
@@ -418,7 +417,6 @@ export default defineComponent({
             variant: "warning",
             message: "Please fill all the fields and try again.",
           });
-          console.log(e);
         }
       }
     };

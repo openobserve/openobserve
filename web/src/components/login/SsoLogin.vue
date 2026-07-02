@@ -101,6 +101,5 @@ const isSubmitting = ref(false);
 const showLoginInput = ref(false);
 
 const onSignIn = () => {
-  console.log("onSignIn");
 };
 </script>

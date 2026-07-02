@@ -509,9 +509,7 @@ const loadAnomalies = async () => {
         return;
       }
       const configById = new Map(configs.map((c: any) => [c.id ?? c.anomaly_id, c]));
-      console.log("[OverviewTab] fetching bulk anomaly history", { org, configs: configs.length });
       const bulkRes = await anomalyService.getAllHistory(org, 20);
-      console.log("[OverviewTab] bulk anomaly history response", bulkRes.data);
       const bulkConfigs: any[] = bulkRes.data?.configs ?? [];
       // Merge bulk history hits with config metadata
       rawHits = bulkConfigs.map((entry: any) => ({

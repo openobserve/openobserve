@@ -2552,9 +2552,6 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
 
     // Log cache usage for debugging
     if (cachedPanels.length > 0) {
-      console.log(
-        `[TelemetryCorrelationDashboard] Reused ${cachedPanels.length} cached panel(s), generated ${newPanels.length} new panel(s)`,
-      );
     }
   } catch (err: any) {
     console.error(
@@ -3416,10 +3413,6 @@ watch(
       pendingDimensions.value = { ...newDimensions };
       activeDimensions.value = { ...newDimensions };
 
-      console.log(
-        "[TelemetryCorrelationDashboard] Updated dimensions from props:",
-        newDimensions,
-      );
     }
   },
   { immediate: true, deep: true },

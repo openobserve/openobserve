@@ -833,10 +833,6 @@ export default defineComponent({
     };
 
     const showCorrelation = () => {
-      console.log(
-        "[DetailTable] showCorrelation called, emitting with modelValue:",
-        props.modelValue,
-      );
       // Emit the original modelValue (not flattened rowData) as it has _timestamp
       emit("show-correlation", props.modelValue);
     };

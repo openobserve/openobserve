@@ -188,7 +188,6 @@ const setupRoles = async () => {
       updateTable();
     })
     .catch((err) => {
-      console.log(err);
     })
     .finally(() => {
       loading.value = false;
@@ -241,7 +240,6 @@ const showConfirmDialog = async (row: any) => {
   } catch (err) {
     // If the count lookup fails, keep the generic static warning rather than
     // blocking the delete.
-    console.log(err);
   }
 };
 
@@ -272,7 +270,6 @@ const openBulkDeleteDialog = async () => {
         count: userCount,
       });
     } catch (err) {
-      console.log(err);
     }
   } else {
     bulkDeleteImpactMessage.value = t("iam.rolesPage.bulkDelete.impact");

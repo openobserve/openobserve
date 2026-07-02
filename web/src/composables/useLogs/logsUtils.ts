@@ -548,7 +548,6 @@ export const logsUtils = () => {
         }
       }
     } catch (err) {
-      console.log("Error while calculation column width");
     }
 
     max += 24; // 24px padding

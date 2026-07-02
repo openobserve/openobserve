@@ -60,7 +60,6 @@ const persist = () => {
     );
   } catch (e) {
     // localStorage may be unavailable (private mode / quota) — pins stay in-memory.
-    console.log(`Error persisting toolbar pins: ${e}`);
   }
 };
 

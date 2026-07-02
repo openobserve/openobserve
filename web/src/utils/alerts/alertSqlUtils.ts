@@ -28,7 +28,6 @@ export const getParser = (sqlQuery: string, context: SqlUtilsContext): boolean =
     // In catch block we are returning true, as we just wanted to validate if user have added * in the query to select all columns
     // select field from default // here default is not wrapped in "" so node sql parser will throw error as default is a reserved keyword. But our Backend supports this query without quotes
     // Query will be validated in the backend
-    console.log(error);
     return true;
   }
 };
@@ -123,7 +122,6 @@ export const addHavingClauseToQuery = (
       );
 
       if (conditionPattern.test(sqlified)) {
-        console.log('HAVING clause with same condition already exists in AST, skipping addition');
         return sqlified; // Return the query as-is
       }
 
@@ -194,13 +192,11 @@ function fallbackHavingInsertion(
     );
 
     if (existingConditionPattern.test(sqlQuery)) {
-      console.log('HAVING clause with same condition already exists, skipping addition');
       return sqlQuery; // Return unchanged
     }
 
     // Find the existing HAVING clause and append with AND
     // Match HAVING ... up to ORDER BY/LIMIT/OFFSET or end of string
-    console.log('Appending new condition to existing HAVING clause');
     return sqlQuery.replace(
       /(having\s+.+?)(\s+(?:order\s+by|limit|offset)|$)/i,
       `$1 AND ${yAxisColumn} ${operator} ${threshold}$2`

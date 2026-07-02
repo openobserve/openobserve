@@ -749,7 +749,6 @@ const getSummary = (org_id: any) => {
       dismiss();
     })
     .catch((err) => {
-      console.log(err);
       dismiss();
       toast({
         variant: "error",
@@ -1070,7 +1069,6 @@ const refreshConfig = async () => {
     const res: any = await configService.get_config();
     store.dispatch("setConfig", res.data);
   } catch (error) {
-    console.log(error);
   }
 };
 

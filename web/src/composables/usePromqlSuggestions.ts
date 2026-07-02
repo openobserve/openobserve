@@ -231,7 +231,6 @@ const usePromqlSuggestions = () => {
           }
         });
     } catch (e) {
-      console.log(e);
     }
   };
 

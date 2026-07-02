@@ -294,7 +294,6 @@ const setupGroups = async () => {
       updateTable();
     })
     .catch((err) => {
-      console.log(err);
     })
     .finally(() => {
       loading.value = false;
@@ -348,7 +347,6 @@ const showConfirmDialog = async (row: any) => {
     deleteImpactMessage.value = t("iam.groupsPage.delete.impact", { count });
   } catch (err) {
     // If the count lookup fails, keep the generic warning rather than blocking.
-    console.log(err);
   }
 };
 
@@ -377,7 +375,6 @@ const openBulkDeleteDialog = async () => {
         count,
       });
     } catch (err) {
-      console.log(err);
     }
   } else {
     bulkDeleteImpactMessage.value = t("iam.groupsPage.bulkDelete.impact");

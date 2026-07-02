@@ -197,7 +197,6 @@ export default defineComponent({
           }, 800);
         })
         .catch((e: any) => {
-          console.log("Error while fetching organizations", e);
           if (e.response?.status === 403) {
             signout();
           }

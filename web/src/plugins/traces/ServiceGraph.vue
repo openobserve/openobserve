@@ -1451,7 +1451,6 @@ export default defineComponent({
           );
         }
       } else {
-        console.log("[ServiceGraph] Click not on a node or edge, ignoring");
       }
     };
 

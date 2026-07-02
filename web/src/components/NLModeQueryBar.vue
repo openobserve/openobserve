@@ -306,7 +306,6 @@ const handleAIInputEnter = async () => {
 
   // Check if user wants to execute the query instead of generating a new one
   if (currentQuery && currentQuery.trim() && isExecutionIntent(naturalLanguage)) {
-    console.log('[NLModeQueryBar] Execution intent detected, running query instead of generating');
     aiInputText.value = ''; // Clear input
     emit('run-query'); // Trigger query execution
     return;
@@ -314,7 +313,6 @@ const handleAIInputEnter = async () => {
 
   // Call the CodeQueryEditor's handleGenerateSQL method directly
   if (editorRef.value && typeof editorRef.value.handleGenerateSQL === 'function') {
-    console.log('[NLModeQueryBar] Generating query from natural language:', naturalLanguage);
     try {
       aiStatusText.value = t('search.generatingQuery');
       await editorRef.value.handleGenerateSQL(naturalLanguage);
@@ -347,7 +345,6 @@ const handleButtonClick = async () => {
 
     // Check if user wants to execute the query instead of generating a new one
     if (currentQuery && currentQuery.trim() && isExecutionIntent(naturalLanguage)) {
-      console.log('[NLModeQueryBar] Execution intent detected, running query instead of generating');
       aiInputText.value = ''; // Clear input
       emit('run-query'); // Trigger query execution
       return;
@@ -360,7 +357,6 @@ const handleButtonClick = async () => {
 
     // Call the CodeQueryEditor's handleGenerateSQL method directly
     if (editorRef.value && typeof editorRef.value.handleGenerateSQL === 'function') {
-      console.log('[NLModeQueryBar] Generating query from natural language:', naturalLanguage);
       try {
         aiStatusText.value = t('search.generatingQuery');
         await editorRef.value.handleGenerateSQL(naturalLanguage);
@@ -391,7 +387,6 @@ const handleGenerationEnd = () => {
 };
 
 const handleGenerationSuccess = ({ type, message }: any) => {
-  console.log('[NLModeQueryBar] Generation success:', { type, message });
 
   // Show success message in AI status
   aiStatusText.value = '✓ ' + t('search.queryGeneratedSuccess');

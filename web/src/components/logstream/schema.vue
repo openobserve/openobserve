@@ -1337,7 +1337,6 @@ export default defineComponent({
         })
         .catch((err: any) => {
           loadingState.value = false;
-          console.log(err);
           toast({
             message: err.message,
             variant: "error",
@@ -1553,7 +1552,6 @@ export default defineComponent({
         })
         .catch((err) => {
           loadingState.value = false;
-          console.log(err);
         });
     };
 

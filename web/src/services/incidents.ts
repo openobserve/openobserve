@@ -215,13 +215,6 @@ const incidents = {
       // Filter dimensions to only include disambiguation fields
       filteredDimensions = filterDimensionsForCorrelation(allDimensions, identityConfig);
 
-      console.log("[incidents] Dimension filtering for incident correlation:", {
-        incident_id: incident.id,
-        original_count: Object.keys(allDimensions).length,
-        filtered_count: Object.keys(filteredDimensions).length,
-        original: allDimensions,
-        filtered: filteredDimensions
-      });
     } catch (err) {
       console.warn("[incidents] Failed to load identity config for dimension filtering, using all dimensions:", err);
     }

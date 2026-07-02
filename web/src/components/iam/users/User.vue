@@ -1185,7 +1185,6 @@ export default defineComponent({
         })
         .catch((error) => {
           dismiss();
-          console.log(error);
         });
 
       segment.track("Button Click", {

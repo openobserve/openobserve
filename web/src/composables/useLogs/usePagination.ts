@@ -710,7 +710,6 @@ export const usePagination = () => {
         searchObj.data.queryResults.partitionDetail = partitionDetail;
       }
     } catch (e: any) {
-      console.log("Error while refreshing partition pagination", e);
       notificationMsg.value = "Error while refreshing partition pagination.";
       return false;
     }
@@ -834,7 +833,6 @@ export const usePagination = () => {
       }
       // console.log("searchObj.data.queryResults.pagination", searchObj.data.queryResults.pagination);
     } catch (e: any) {
-      console.log("Error while refreshing pagination", e);
       notificationMsg.value = "Error while refreshing pagination.";
       return false;
     }

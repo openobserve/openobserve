@@ -1814,7 +1814,6 @@ const updateCron = () => {
       minutes = Number(minutes.toString());
     }
   } catch (err) {
-    console.log(err);
     return;
   }
 
@@ -2382,7 +2381,6 @@ async function getStreamList() {
     // Mark this stream type as loaded
     loadedStreamTypes.value.add(selectedStreamType.value);
   } catch (err) {
-    console.log(err);
     streams.value = [];
     filteredStreams.value = [];
   } finally {
@@ -2545,7 +2543,6 @@ const handleSidebarEvent = (event: string, value: any) => {
     pipelineEditorRef.value.setValue(newQuery);
     updateQueryValue(newQuery);
   } else {
-    console.log("Could not find editor instance");
   }
 };
 const updateDateChange = (date: any) => {
