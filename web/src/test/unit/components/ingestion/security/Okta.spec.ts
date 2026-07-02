@@ -115,8 +115,8 @@ describe("Okta.vue", () => {
       const wrapper = mountComponent();
 
       const link = wrapper.find("a");
-      expect(link.classes()).toContain("tw:text-text-link");
-      expect(link.classes()).toContain("tw:underline");
+      expect(link.classes()).toContain("text-text-link");
+      expect(link.classes()).toContain("underline");
     });
   });
 });
