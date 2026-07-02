@@ -491,6 +491,13 @@ export default defineComponent({
       () => jsonStr.value,
       (newVal) => {
         emit("update:jsonStr", newVal);
+        // Editor emptied → clear the selected file(s) too, so the file input
+        // stays in sync with the editor (mirrors the file→editor clear above).
+        if (newVal === "" && jsonFiles.value) {
+          jsonFiles.value = null;
+          jsonArrayOfObj.value = [];
+          emit("update:jsonArray", jsonArrayOfObj.value);
+        }
       },
     );
 
