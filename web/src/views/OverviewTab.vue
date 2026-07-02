@@ -1117,8 +1117,8 @@ watch(isIncidentsEnabled, (enabled) => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 100%;
+  height: 100%;
   border-radius: 0.5rem;
   transition: background-color 150ms, color 150ms;
 }
