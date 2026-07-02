@@ -325,11 +325,6 @@ export default defineComponent({
           await new Promise((resolve) => setTimeout(resolve, 500));
         }
 
-        console.log("Creating dashboard:", {
-          orgId,
-          folderId,
-          title: dashboardTitle,
-        });
 
         // Add the dashboard to the Microsoft folder
         await dashboardsService.create(orgId, dashboardData, folderId);

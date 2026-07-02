@@ -318,7 +318,6 @@ import CallReceived from "~icons/material-symbols/call-received";
 import Inbox from "~icons/material-symbols/inbox-outline";
 import StarRate from "~icons/material-symbols/star-rate-outline";
 import CardMembership from "~icons/material-symbols/card-membership-outline";
-import PersonPinCircle from "~icons/material-symbols/person-pin-circle-outline";
 import Domain from "~icons/material-symbols/domain";
 import DataArray from "~icons/material-symbols/data-array";
 import Mouse from "~icons/material-symbols/mouse-outline";
@@ -640,7 +639,6 @@ export const iconRegistry = {
   "inbox": Inbox,
   "star-rate": StarRate,
   "card-membership": CardMembership,
-  "person-pin-circle": PersonPinCircle,
   "domain": Domain,
   "data-array": DataArray,
   "mouse": Mouse,
