@@ -88,7 +88,7 @@
           <div class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</div>
           <OInput
             v-model.trim="form.endpoint"
-            :placeholder="t('onlineEvals.provider.endpointPlaceholder')"
+            :placeholder="endpointPlaceholder"
             size="sm"
             data-test="provider-form-endpoint-input"
           />
@@ -215,6 +215,24 @@ const providerTypeOptions = computed(() => [
   { label: "OpenAI-compatible", value: "openai_compatible" },
   { label: "Other", value: "other" },
 ]);
+
+// Default API endpoint for each provider type, shown as a placeholder to hint
+// the expected URL. Providers without a canonical public endpoint (self-hosted
+// or generic) fall back to the static i18n placeholder.
+const DEFAULT_ENDPOINTS: Record<string, string> = {
+  openai: "https://api.openai.com/v1",
+  deepseek: "https://api.deepseek.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
+  azure_openai: "https://{resource}.openai.azure.com/openai/deployments/{deployment}",
+  ollama: "http://localhost:11434/v1",
+  vllm: "http://localhost:8000/v1",
+};
+
+const endpointPlaceholder = computed(
+  () =>
+    DEFAULT_ENDPOINTS[form.value.providerType] ||
+    t("onlineEvals.provider.endpointPlaceholder"),
+);
 
 function initForm(row: Provider | null) {
   if (!row) {
