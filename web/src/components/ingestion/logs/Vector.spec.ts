@@ -467,7 +467,7 @@ describe("Vector.vue Comprehensive Coverage", () => {
     it("should render template structure correctly", () => {
       wrapper = createWrapper();
       const template = wrapper.html();
-      expect(template).toContain('tw:p-3');
+      expect(template).toContain('p-3');
       expect(template).toContain('copy-content-mock');
     });
   });

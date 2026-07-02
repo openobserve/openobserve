@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:relative tw:w-full tw:h-full tw:flex tw:flex-col" v-bind="$attrs">
+  <div class="relative w-full h-full flex flex-col" v-bind="$attrs">
     <div
       data-test="query-editor"
-      class="logs-query-editor tw:flex-1 tw:min-h-0 tw:bg-(--o2-card-bg)"
+      class="logs-query-editor flex-1 min-h-0 bg-(--o2-card-bg)"
       ref="editorRef"
       :id="editorId"
     />
@@ -27,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showAiIcon && !disableAi"
       variant="sidebar-toggle"
       size="icon-toolbar"
-      class="tw:absolute! tw:top-2 tw:right-2 tw:z-10 tw:bg-(--o2-bg-primary) tw:border tw:border-(--o2-border-color) tw:transition-all tw:duration-200 tw:hover:bg-(--color-button-outline-hover-bg) tw:hover:border-[var(--o2-color-primary)]"
-      :class="nlpMode ? 'tw:bg-[var(--o2-color-primary-light)] tw:border-[var(--o2-color-primary)]' : ''"
+      class="absolute! top-2 right-2 z-10 bg-(--o2-bg-primary) border border-(--o2-border-color) transition-all duration-200 hover:bg-(--color-button-outline-hover-bg) hover:border-[var(--o2-color-primary)]"
+      :class="nlpMode ? 'bg-[var(--o2-color-primary-light)] border-[var(--o2-color-primary)]' : ''"
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >
       <OIcon size="md">
-        <img :src="aiIcon" alt="AI" class="tw:w-4.5 tw:h-4.5" />
+        <img :src="aiIcon" alt="AI" class="w-4.5 h-4.5" />
       </OIcon>
       <OTooltip side="top" align="center">
         <template #content>{{ disableAiReason || t(nlpMode ? 'search.nlpModeEnabled' : 'search.nlpModeLabel') }}</template>

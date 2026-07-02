@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="alert-history-summary tw:h-full tw:w-full">
+  <div class="alert-history-summary h-full w-full">
     <OTable
       data-test="alert-history-summary-table"
       :data="historyRows"
@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       filter-mode="client"
       :default-columns="false"
       :show-global-filter="false"
-      class="tw:h-full"
+      class="h-full"
     >
       <template #cell-alert_name="{ row }">
         <div
-          class="tw:flex tw:items-center tw:cursor-pointer"
+          class="flex items-center cursor-pointer"
           @click="openDrawer(row)"
         >
-          <span class="tw:font-medium">{{ row.alert_name }}</span>
+          <span class="font-medium">{{ row.alert_name }}</span>
         </div>
       </template>
 
@@ -58,9 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #empty>
-        <div class="tw:w-full tw:text-center tw:py-8">
-          <OIcon name="history" size="xl" class="tw:text-text-primary" />
-          <div class="tw:mt-2 tw:text-text-primary">
+        <div class="w-full text-center py-8">
+          <OIcon name="history" size="xl" class="text-text-primary" />
+          <div class="mt-2 text-text-primary">
             {{ t("alerts.noHistoryData") }}
           </div>
         </div>
@@ -169,12 +169,12 @@ const getStateColorClass = (state: string) => {
   switch (state.toLowerCase()) {
     case "firing":
     case "error":
-      return "tw:text-[var(--o2-negative)]";
+      return "text-[var(--o2-negative)]";
     case "ok":
     case "completed":
-      return "tw:text-[var(--o2-positive)]";
+      return "text-[var(--o2-positive)]";
     default:
-      return "tw:text-gray-500";
+      return "text-gray-500";
   }
 };
 

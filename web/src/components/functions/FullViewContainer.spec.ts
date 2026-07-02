@@ -72,13 +72,13 @@ describe('FullViewContainer.vue', () => {
     it('applies light theme styles by default', () => {
       wrapper = createWrapper();
       const container = wrapper.find('div');
-      expect(container.classes()).toContain('tw:bg-gray-200');
+      expect(container.classes()).toContain('bg-gray-200');
     });
 
     it('applies dark theme styles when theme is dark', () => {
       wrapper = createWrapper({}, { theme: 'dark' });
       const container = wrapper.find('div');
-      expect(container.classes()).toContain('tw:bg-gray-500');
+      expect(container.classes()).toContain('bg-gray-500');
     });
 
     it('shows expand icon when showExpandIcon is true', () => {
@@ -169,9 +169,9 @@ describe('FullViewContainer.vue', () => {
     });
 
     it('applies custom label class', () => {
-      wrapper = createWrapper({ labelClass: 'tw:text-red-500' });
+      wrapper = createWrapper({ labelClass: 'text-red-500' });
       const label = wrapper.find('.tw\\:text-\\[14px\\]');
-      expect(label.classes()).toContain('tw:text-red-500');
+      expect(label.classes()).toContain('text-red-500');
     });
   });
 
@@ -179,25 +179,25 @@ describe('FullViewContainer.vue', () => {
     it('applies correct text color for light theme', () => {
       wrapper = createWrapper({}, { theme: 'light' });
       const label = wrapper.find('.tw\\:text-\\[14px\\]');
-      expect(label.classes()).toContain('tw:text-gray-500');
+      expect(label.classes()).toContain('text-gray-500');
     });
 
     it('applies correct text color for dark theme', () => {
       wrapper = createWrapper({}, { theme: 'dark' });
       const label = wrapper.find('.tw\\:text-\\[14px\\]');
-      expect(label.classes()).toContain('tw:text-gray-100');
+      expect(label.classes()).toContain('text-gray-100');
     });
 
     it('applies correct icon color for light theme', () => {
       wrapper = createWrapper({}, { theme: 'light' });
       const icon = wrapper.find('.OIcon-stub');
-      expect(icon.classes()).toContain('tw:text-gray-500');
+      expect(icon.classes()).toContain('text-gray-500');
     });
 
     it('applies correct icon color for dark theme', () => {
       wrapper = createWrapper({}, { theme: 'dark' });
       const icon = wrapper.find('.OIcon-stub');
-      expect(icon.classes()).toContain('tw:text-gray-100');
+      expect(icon.classes()).toContain('text-gray-100');
     });
   });
 
@@ -243,15 +243,15 @@ describe('FullViewContainer.vue', () => {
     it('applies rotation transform when expanded', () => {
       wrapper = createWrapper({ isExpanded: true });
       const icon = wrapper.find('.OIcon-stub');
-      expect(icon.classes()).toContain('tw:transform');
-      expect(icon.classes()).toContain('tw:rotate-180');
+      expect(icon.classes()).toContain('transform');
+      expect(icon.classes()).toContain('rotate-180');
     });
 
     it('does not apply rotation transform when collapsed', () => {
       wrapper = createWrapper({ isExpanded: false });
       const icon = wrapper.find('.OIcon-stub');
-      expect(icon.classes()).not.toContain('tw:transform');
-      expect(icon.classes()).not.toContain('tw:rotate-180');
+      expect(icon.classes()).not.toContain('transform');
+      expect(icon.classes()).not.toContain('rotate-180');
     });
   });
 
@@ -272,13 +272,13 @@ describe('FullViewContainer.vue', () => {
     it('applies cursor pointer class to icon', () => {
       wrapper = createWrapper();
       const icon = wrapper.find('.OIcon-stub');
-      expect(icon.classes()).toContain('tw:cursor-pointer');
+      expect(icon.classes()).toContain('cursor-pointer');
     });
 
     it('applies transition class to icon', () => {
       wrapper = createWrapper();
       const icon = wrapper.find('.OIcon-stub');
-      expect(icon.classes()).toContain('tw:transition-all');
+      expect(icon.classes()).toContain('transition-all');
     });
   });
 
@@ -453,7 +453,7 @@ describe('FullViewContainer.vue', () => {
     it('applies correct base container classes', () => {
       wrapper = createWrapper();
       const container = wrapper.find('div');
-      expect(container.classes()).toContain('tw:py-[2px]');
+      expect(container.classes()).toContain('py-[2px]');
     });
 
     it('applies correct flex layout classes', () => {
@@ -465,7 +465,7 @@ describe('FullViewContainer.vue', () => {
     it('applies correct label styling classes', () => {
       wrapper = createWrapper();
       const label = wrapper.find('.tw\\:text-\\[14px\\]');
-      expect(label.classes()).toContain('tw:font-bold');
+      expect(label.classes()).toContain('font-bold');
     });
 
     it('maintains correct component structure', () => {
@@ -488,7 +488,7 @@ describe('FullViewContainer.vue', () => {
       const icon = wrapper.find('.OIcon-stub');
       const label = wrapper.find('.tw\\:text-\\[14px\\]');
 
-      expect(icon.classes()).toContain('tw:cursor-pointer');
+      expect(icon.classes()).toContain('cursor-pointer');
       // Label should be clickable when showExpandIcon is true
       expect(wrapper.exists()).toBe(true);
     });

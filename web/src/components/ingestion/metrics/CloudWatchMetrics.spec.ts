@@ -412,8 +412,8 @@ describe("CloudWatchMetrics", () => {
       wrapper = createWrapper();
       const link = wrapper.find('a[href*="aws.amazon.com"]');
       expect(link.attributes('target')).toBe('_blank');
-      expect(link.attributes('class')).toContain('tw:text-text-link');
-      expect(link.attributes('class')).toContain('tw:underline');
+      expect(link.attributes('class')).toContain('text-text-link');
+      expect(link.attributes('class')).toContain('underline');
     });
 
     it("should render documentation link text", () => {

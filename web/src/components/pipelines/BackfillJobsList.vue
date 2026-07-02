@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="backfill-jobs-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="flex flex-col h-full min-h-0"
   >
     <!-- Filters live in the shell header (Functions.vue #o2-page-actions),
          next to the "Pipelines › Backfill Jobs" breadcrumb.
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         placeholder="Status"
         clearable
         searchable
-        class="tw:w-[150px]"
+        class="w-[150px]"
         data-test="status-filter"
       />
       <OSelect
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         placeholder="Pipeline"
         clearable
         searchable
-        class="tw:w-[250px]"
+        class="w-[250px]"
         data-test="pipeline-filter"
       />
       <OButton
@@ -67,8 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </Teleport>
 
     <!-- Jobs Table -->
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="tw:rounded-lg tw:h-full">
+    <div class="flex-1 min-h-0 overflow-hidden">
+      <div class="rounded-lg h-full">
           <OTable
             ref="qTableRef"
             :frame="false"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filter-mode="client"
             :show-global-filter="false"
             width="100%"
-            class="tw:w-full tw:h-full"
+            class="w-full h-full"
             data-test="backfill-jobs-table"
           >
             <!-- Empty State -->
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Bottom footer -->
             <template #bottom="{ totalRows }">
               <div
-                class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4 tw:py-2"
+                class="flex items-center font-bold text-[14px] mr-4 py-2"
               >
                 {{ totalRows }} Backfill Job{{ totalRows === 1 ? "" : "s" }}
               </div>
@@ -109,14 +109,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Pipeline Name Column -->
             <template #cell-pipeline_name="{ row }">
-              <div class="tw:font-medium">
+              <div class="font-medium">
                 {{ row.pipeline_name || row.pipeline_id }}
               </div>
             </template>
 
             <!-- Time Range Column -->
             <template #cell-time_range="{ row }">
-              <div class="tw:text-xs">
+              <div class="text-xs">
                 {{
                   formatTimeRange(row.start_time, row.end_time)
                 }}
@@ -125,8 +125,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Progress Column -->
             <template #cell-progress_percent="{ row }">
-              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-                <div class="tw:flex-1 tw:relative">
+              <div class="flex items-center gap-2 w-full">
+                <div class="flex-1 relative">
                   <OProgressBar
                     :value="row.progress_percent / 100"
                     variant="default"
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="row.chunks_total"
-                  class="tw:text-xs tw:text-text-primary tw:whitespace-nowrap tw:pr-8"
+                  class="text-xs text-text-primary whitespace-nowrap pr-8"
                 >
                   {{ row.chunks_completed || 0 }}/{{
                     row.chunks_total
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Actions Column -->
             <template #cell-actions="{ row }">
-              <div class="tw:flex tw:items-center tw:justify-center">
+              <div class="flex items-center justify-center">
                 <OButton
                   v-if="canPauseJob(row)"
                   variant="ghost-destructive"
@@ -266,23 +266,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div v-if="errorDialogData">
-        <div class="tw:mb-3">
-          <div class="tw:text-xs tw:text-gray-400">Job ID</div>
-          <div class="tw:text-sm text-weight-medium">
+        <div class="mb-3">
+          <div class="text-xs text-gray-400">Job ID</div>
+          <div class="text-sm text-weight-medium">
             {{ errorDialogData.job_id }}
           </div>
         </div>
 
-        <div class="tw:mb-3">
-          <div class="tw:text-xs tw:text-gray-400">Pipeline</div>
-          <div class="tw:text-sm">
+        <div class="mb-3">
+          <div class="text-xs text-gray-400">Pipeline</div>
+          <div class="text-sm">
             {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
           </div>
         </div>
 
         <div>
-          <div class="tw:text-xs tw:text-gray-400 tw:mb-2">Error Message</div>
-          <div class="tw:p-3 tw:rounded-md tw:bg-[rgba(239,68,68,0.08)] tw:border-l-[3px] tw:border-l-[#ef4444] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:whitespace-pre-wrap tw:wrap-break-word tw:text-[#991b1b]">
+          <div class="text-xs text-gray-400 mb-2">Error Message</div>
+          <div class="p-3 rounded-md bg-[rgba(239,68,68,0.08)] border-l-[3px] border-l-[#ef4444] font-mono text-[13px] leading-[1.6] whitespace-pre-wrap wrap-break-word text-[#991b1b]">
             {{ errorDialogData.error }}
           </div>
         </div>

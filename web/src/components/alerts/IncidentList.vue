@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="incident-list" class="tw:h-full">
+  <div data-test="incident-list" class="h-full">
     <PageLayout
-      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+      :header-class="'shrink-0 px-4 border-b border-border-default'"
     >
       <!-- Row 1: standard header — title + actions only. Search moved into the
            table's own toolbar below. -->
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @row-click="viewIncident"
       >
         <template #toolbar>
-          <div class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:w-full">
+          <div class="flex items-center justify-between gap-2 w-full">
             <OToggleGroup
               :model-value="statusFilter"
               @update:model-value="(v) => filterByStatus(v as string)"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
             <OSearchInput
               v-model="searchQuery"
-              class="tw:w-64"
+              class="w-64"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
               clearable
@@ -109,23 +109,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ row.severity }}</OBadge>
         </template>
         <template #cell-title="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-1">
+          <div class="flex items-center gap-1">
             <span>
               {{ row.title || formatDimensions(row.group_values) }}
             </span>
           </div>
         </template>
         <template #cell-dimensions="{ row }">
-          <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-1 tw:min-w-0 tw:overflow-hidden">
+          <div class="flex flex-nowrap items-center gap-1 min-w-0 overflow-hidden">
             <span
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
-              class="tw:inline-flex tw:min-w-0"
+              class="inline-flex min-w-0"
             >
-              <OBadge :variant="getDimensionVariant(key)" size="sm" class="tw:min-w-0 tw:!p-0 tw:overflow-hidden">
-                <span class="tw:inline-flex tw:items-stretch tw:min-w-0">
-                  <span class="tw:ps-2.5 tw:pe-1 tw:py-1.5 tw:shrink-0 tw:whitespace-nowrap tw:bg-current/8 tw:opacity-90">{{ key }}</span>
-                  <span class="tw:ps-1 tw:pe-2.5 tw:py-1.5 tw:truncate tw:min-w-0 tw:font-semibold">{{ value }}</span>
+              <OBadge :variant="getDimensionVariant(key)" size="sm" class="min-w-0 !p-0 overflow-hidden">
+                <span class="inline-flex items-stretch min-w-0">
+                  <span class="ps-2.5 pe-1 py-1.5 shrink-0 whitespace-nowrap bg-current/8 opacity-90">{{ key }}</span>
+                  <span class="ps-1 pe-2.5 py-1.5 truncate min-w-0 font-semibold">{{ value }}</span>
                 </span>
               </OBadge>
               <OTooltip :delay="300" :content="key + '=' + value" />
@@ -134,17 +134,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="getSortedDimensions(row.group_values).length > 2"
               variant="default-soft"
               size="sm"
-              class="tw:shrink-0"
+              class="shrink-0"
             >
               +{{ getSortedDimensions(row.group_values).length - 2 }} more
               <OTooltip :delay="300" :max-width="'28rem'">
                 <template #content>
-                  <div class="tw:space-y-1">
+                  <div class="space-y-1">
                     <div
                       v-for="[key, value] in getSortedDimensions(row.group_values).slice(2)"
                       :key="key"
                     >
-                      <span class="tw:inline-block tw:overflow-hidden tw:truncate">{{ key }}</span>=<span class="tw:inline-block tw:overflow-hidden tw:truncate">{{ value }}</span>
+                      <span class="inline-block overflow-hidden truncate">{{ key }}</span>=<span class="inline-block overflow-hidden truncate">{{ value }}</span>
                     </div>
                   </div>
                 </template>
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:justify-end tw:items-center">
+          <div class="flex justify-end items-center">
             <OButton
               v-if="row.status === 'open'"
               variant="ghost-warning"
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Empty state -->
         <template #empty>
-          <div v-if="!loading" class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full">
+          <div v-if="!loading" class="flex items-center justify-center w-full h-full">
             <OEmptyState
               size="hero"
               preset="no-incidents"
@@ -202,8 +202,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Bottom -->
         <template #bottom>
-          <div class="tw:flex tw:w-full tw:justify-between tw:items-center tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
+          <div class="flex w-full justify-between items-center h-[48px]">
+            <div class="o2-table-footer-title flex items-center w-[100px] mr-md">
               {{ visibleIncidents.length }} {{ visibleIncidents.length === 1 ? 'Incident' : 'Incidents' }}
             </div>
           </div>

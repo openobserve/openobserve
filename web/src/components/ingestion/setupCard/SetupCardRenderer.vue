@@ -587,7 +587,7 @@ function fireConfetti() {
               <OIcon name="info-outline" size="sm" /> {{ step.note }}
             </p>
 
-            <div v-if="step.pills?.length" class="pill-list tw:mt-2">
+            <div v-if="step.pills?.length" class="pill-list mt-2">
               <OBadge
                 v-for="p in step.pills"
                 :key="p"
@@ -600,7 +600,7 @@ function fireConfetti() {
             <!-- Live status bar + fix box on the detection-anchor step -->
             <template v-if="step.detectionAnchor">
               <div
-                class="statusbar tw:mt-3"
+                class="statusbar mt-3"
                 :class="detect.state.value"
                 data-test="ai-c-statusbar"
               >
@@ -672,7 +672,7 @@ function fireConfetti() {
                 </OButton>
               </div>
 
-              <div v-if="showFixHint" class="fixbox tw:mt-3">
+              <div v-if="showFixHint" class="fixbox mt-3">
                 <div class="fixbox-h">
                   <OIcon name="warning" size="sm" /> Most Likely Fix —
                   {{ extras.fixTitle || "Instrument Before Importing The Client" }}
@@ -728,7 +728,7 @@ function fireConfetti() {
           <div class="acc-body">
             <template v-if="extras.installs?.length">
               Installs via pip and verifies imports:
-              <div class="pill-list tw:mt-2">
+              <div class="pill-list mt-2">
                 <OBadge
                   v-for="p in extras.installs"
                   :key="p"
@@ -739,10 +739,10 @@ function fireConfetti() {
               </div>
             </template>
             <template v-if="extras.envVars?.length">
-              <div class="tw:mt-3">
+              <div class="mt-3">
                 Writes these keys to <code>./.env</code> (idempotent):
               </div>
-              <div class="pill-list tw:mt-2">
+              <div class="pill-list mt-2">
                 <OBadge
                   v-for="p in extras.envVars"
                   :key="p"
@@ -785,7 +785,7 @@ function fireConfetti() {
           rel="noopener noreferrer"
           >{{ content.provider.name }} →</a
         >
-        <span v-if="content.slackUrl" class="tw:ml-auto"
+        <span v-if="content.slackUrl" class="ml-auto"
           >Stuck?
           <a
             :href="safeHttpUrl(content.slackUrl)"

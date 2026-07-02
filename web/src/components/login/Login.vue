@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="card-container tw:w-[100vw] tw:h-[100vh]">
-    <div style="max-width: 400px; padding-top: 100px" class="tw:mx-auto tw:p-3">
+  <div class="card-container w-[100vw] h-[100vh]">
+    <div style="max-width: 400px; padding-top: 100px" class="mx-auto p-3">
       <div
-        class="tw:flex tw:justify-center tw:text-center"
+        class="flex justify-center text-center"
         v-if="
           (config.isEnterprise == 'true' &&
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
@@ -33,10 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
             store.state.zoConfig?.custom_logo_text != ''
           "
-          class="tw:text-xl tw:font-semibold tw:font-bold tw:p-0 tw:cursor-pointer tw:mr-2 tw:w-full"
+          class="text-xl font-semibold font-bold p-0 cursor-pointer mr-2 w-full"
           >{{ store.state.zoConfig.custom_logo_text }}</span
         >
-        <span class="tw:w-full tw:flex tw:justify-center">
+        <span class="w-full flex justify-center">
           <img
             v-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
       </div>
-      <div class="tw:flex tw:justify-center tw:mb-4" v-else>
+      <div class="flex justify-center mb-4" v-else>
         <img
           class="appLogo"
           style="height: auto"
@@ -82,16 +82,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="autoRedirectDexLogin">
         <p>
           Redirecting to SSO login page. If you are not redirected, please
-          <a href="#" @click="loginWithSSo" class="tw:cursor-pointer tw:underline">click here</a>.
+          <a href="#" @click="loginWithSSo" class="cursor-pointer underline">click here</a>.
         </p>
       </div>
 
       <div v-else>
-        <div style="font-size: 22px" class="tw:w-full tw:text-center tw:pb-3">
+        <div style="font-size: 22px" class="w-full text-center pb-3">
           Login
         </div>
 
-        <div v-if="showSSO" class="tw:flex tw:justify-center">
+        <div v-if="showSSO" class="flex justify-center">
           <OButton
             data-test="sso-login-btn"
             variant="primary"
@@ -100,21 +100,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="loginWithSSo"
           >
             <div
-              class="tw:flex tw:items-center tw:justify-center tw:w-full tw:text-center tw:relative"
+              class="flex items-center justify-center w-full text-center relative"
             >
               <img
-                class="tw:absolute"
+                class="absolute"
                 style="width: 30px; left: 16px"
                 :src="getImageURL('images/common/sso.svg')"
               />
-              <span class="tw:text-center"> Login with SSO</span>
+              <span class="text-center"> Login with SSO</span>
             </div>
           </OButton>
         </div>
 
-        <div v-if="showSSO && showInternalLogin" class="tw:py-3 tw:text-center">
+        <div v-if="showSSO && showInternalLogin" class="py-3 text-center">
           <a
-            class="tw:cursor-pointer tw:py-3 tw:hover:text-[#595959]"
+            class="cursor-pointer py-3 hover:text-[#595959]"
             style="text-decoration: underline"
             data-test="login-as-internal-user"
             @click="loginAsInternalUser = !loginAsInternalUser"
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
           class="login-inputs"
         >
-          <div class="tw:flex tw:flex-col tw:gap-3">
+          <div class="flex flex-col gap-3">
             <OInput
               v-model="name"
               data-cy="login-user-id"

@@ -1,5 +1,5 @@
 ﻿<template>
-  <div data-test="llm-providers-settings" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+  <div data-test="llm-providers-settings" class="flex flex-col h-full min-h-0">
     <ProviderFormPage
       v-if="formPage"
       :org-id="orgId"
@@ -13,7 +13,7 @@
       <AppPageHeader
         icon="smart-toy"
         :subtitle="'LLM providers for online evaluations'"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="shrink-0 px-4 border-b border-border-default"
       >
         <template #title>
           <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
@@ -30,13 +30,13 @@
         </template>
       </AppPageHeader>
 
-      <div v-if="isLoading" class="tw:flex tw:flex-1 tw:items-center tw:justify-center">
+      <div v-if="isLoading" class="flex flex-1 items-center justify-center">
         <OSpinner size="md" />
       </div>
 
       <div
         v-else-if="!providers.length"
-        class="tw:flex tw:flex-1 tw:items-center tw:justify-center"
+        class="flex flex-1 items-center justify-center"
       >
         <!-- First-run state — uses the same `no-llm-providers` preset the
              OTable's #empty slot uses for the filtered case, so the empty
@@ -52,7 +52,7 @@
         />
       </div>
 
-      <div v-else class="tw:flex-1 tw:min-h-0">
+      <div v-else class="flex-1 min-h-0">
         <OTable
           data-test="llm-providers-table"
           :data="filteredProviders"
@@ -69,13 +69,13 @@
           :page-size="20"
           :page-size-options="[20, 50, 100]"
           width="100%"
-          class="tw:w-full tw:h-full"
+          class="w-full h-full"
           @row-click="(row: any) => openEdit(row)"
         >
           <template #toolbar>
             <OSearchInput
               v-model="searchQuery"
-              class="tw:flex-1"
+              class="flex-1"
               :placeholder="t('llmProviders.searchPlaceholder')"
               data-test="llm-providers-search-input"
             />
@@ -90,15 +90,15 @@
             />
           </template>
           <template #cell-type="{ row }">
-            <span class="tw:inline-flex tw:items-center tw:gap-1 tw:py-[1px] tw:px-[7px] tw:rounded-[3px] tw:font-semibold tw:text-[11px] tw:leading-[1.5] tw:bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)] tw:text-(--o2-status-info-text) tw:lowercase">{{ providerTypeOf(row) || "—" }}</span>
+            <span class="inline-flex items-center gap-1 py-[1px] px-[7px] rounded-[3px] font-semibold text-[11px] leading-[1.5] bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)] text-(--o2-status-info-text) lowercase">{{ providerTypeOf(row) || "—" }}</span>
           </template>
 
           <template #cell-endpoint="{ row }">
-            <span class="tw:font-mono tw:text-xs">{{ row.endpoint || endpointFallback(row) }}</span>
+            <span class="font-mono text-xs">{{ row.endpoint || endpointFallback(row) }}</span>
           </template>
 
           <template #cell-defaultModel="{ row }">
-            <span class="tw:font-mono tw:text-xs">{{ defaultModelOf(row) || "—" }}</span>
+            <span class="font-mono text-xs">{{ defaultModelOf(row) || "—" }}</span>
           </template>
 
           <template #cell-isDefault="{ row }">
@@ -108,11 +108,11 @@
               value="yes"
               :label="t('llmProviders.defaultBadge')"
             />
-            <span v-else class="tw:text-text-primary">—</span>
+            <span v-else class="text-text-primary">—</span>
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="tw:flex tw:items-center actions-container">
+            <div class="flex items-center actions-container">
               <OButton
                 :data-test="`llm-providers-${row.name}-edit-btn`"
                 variant="ghost"

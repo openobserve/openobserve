@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+  <div class="rounded-md p-0 h-full flex flex-col">
     <!-- Standard page header: title + actions only. Search moved into the
          table's own toolbar (built-in global filter). -->
     <AppPageHeader
       :title="t('iam.roles')"
       icon="shield"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #subtitle>
         <span data-test="iam-roles-subtitle">
@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="card-container h-full">
         <RoleTable
           data-test="iam-roles-table-section"
           :data="rows"

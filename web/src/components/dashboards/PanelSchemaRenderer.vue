@@ -70,13 +70,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-else-if="panelSchema.type == 'html'"
-          class="tw:flex tw:flex-col column"
+          class="flex flex-col column"
           style="width: 100%; height: 100%; flex: 1"
         >
           <HTMLRenderer
             :htmlContent="panelSchema.htmlContent"
             style="width: 100%; height: 100%"
-            class="tw:flex tw:flex-col"
+            class="flex flex-col"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -84,13 +84,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else-if="panelSchema.type == 'markdown'"
-          class="tw:flex tw:flex-col column"
+          class="flex flex-col column"
           style="width: 100%; height: 100%; flex: 1"
         >
           <MarkdownRenderer
             :markdownContent="panelSchema.markdownContent"
             style="width: 100%; height: 100%"
-            class="tw:flex tw:flex-col"
+            class="flex flex-col"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="panelSchema.type == 'custom_chart'"
           :data="panelData"
           style="width: 100%; height: 100%"
-          class="tw:flex tw:flex-col"
+          class="flex flex-col"
           @error="errorDetail = $event"
         />
         <ChartRenderer
@@ -159,14 +159,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="noData"
         :backdrop="false"
         data-test="no-data"
-        class="noData tw:absolute! tw:inset-0 tw:w-full tw:h-full tw:!min-h-0 tw:!p-2 tw:[container-type:size]"
+        class="noData absolute! inset-0 w-full h-full !min-h-0 !p-2 [container-type:size]"
       />
       <div
         v-if="
           errorDetail?.message &&
           !panelSchema?.error_config?.custom_error_handeling
         "
-        class="tw:absolute tw:top-[20%] tw:w-full tw:h-[80%] tw:overflow-hidden tw:text-center tw:text-ellipsis"
+        class="absolute top-[20%] w-full h-[80%] overflow-hidden text-center text-ellipsis"
         data-test="panel-schema-renderer-error-message"
       >
         <OIcon size="md" name="warning" />
@@ -185,13 +185,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !panelSchema?.error_config?.default_data_on_error &&
           panelSchema?.error_config?.custom_error_message
         "
-        class="tw:absolute tw:top-[20%] tw:w-full tw:h-[80%] tw:overflow-hidden tw:text-center tw:text-ellipsis"
+        class="absolute top-[20%] w-full h-[80%] overflow-hidden text-center text-ellipsis"
         data-test="panel-schema-renderer-custom-error-message"
       >
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
       <div
-        class="tw:flex"
+        class="flex"
         style="position: absolute; top: 0px; width: 100%; z-index: 999"
       >
         <LoadingProgress
@@ -201,10 +201,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="tw:absolute tw:z-9999999 tw:min-w-50 tw:py-1 tw:px-0 tw:hidden tw:whitespace-nowrap tw:top-0 tw:left-0 tw:rounded tw:border tw:border-(--o2-border) tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
+        class="absolute z-9999999 min-w-50 py-1 px-0 hidden whitespace-nowrap top-0 left-0 rounded border border-(--o2-border) shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
         :class="{
-          'tw:group/menu tw:bg-[#2c2c2c] tw:border-[#404040] tw:shadow-[0_2px_8px_rgba(0,0,0,0.4)] crosslink-drilldown-menu--dark': store.state.theme === 'dark',
-          'tw:bg-white': store.state.theme !== 'dark',
+          'group/menu bg-[#2c2c2c] border-[#404040] shadow-[0_2px_8px_rgba(0,0,0,0.4)] crosslink-drilldown-menu--dark': store.state.theme === 'dark',
+          'bg-white': store.state.theme !== 'dark',
         }"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
@@ -222,16 +222,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
           <div
-            class="tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:transition-colors tw:duration-200 tw:text-sm tw:text-[#333] tw:hover:bg-[#f5f5f5] tw:active:bg-(--o2-border) tw:group-[.crosslink-drilldown-menu--dark]/menu:text-[var(--o2-border)] tw:group-[.crosslink-drilldown-menu--dark]/menu:hover:bg-[#383838] tw:group-[.crosslink-drilldown-menu--dark]/menu:active:bg-[#444444]"
+            class="flex items-center py-2 px-4 cursor-pointer transition-colors duration-200 text-sm text-[#333] hover:bg-[#f5f5f5] active:bg-(--o2-border) group-[.crosslink-drilldown-menu--dark]/menu:text-[var(--o2-border)] group-[.crosslink-drilldown-menu--dark]/menu:hover:bg-[#383838] group-[.crosslink-drilldown-menu--dark]/menu:active:bg-[#444444]"
             :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >
             <OIcon
               size="xs"
-              class="tw:mr-2"
+              class="mr-2"
               :name="drilldown._isCrossLink ? 'open-in-new' : 'link'"
             />
-            <span class="tw:select-none">{{ drilldown.name }}</span>
+            <span class="select-none">{{ drilldown.name }}</span>
           </div>
         </template>
       </div>
@@ -250,11 +250,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           overflow-wrap: break-word;
           z-index: 9999999;
         "
-        :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-bg-card-dark,#1a1a1a)' : 'tw:bg-white'"
+        :class="store.state.theme === 'dark' ? 'bg-(--o2-bg-card-dark,#1a1a1a)' : 'bg-white'"
         ref="annotationPopupRef"
       >
         <div
-          class="tw:px-2 tw:py-1"
+          class="px-2 py-1"
           style="
             display: flex;
             flex-direction: row;
@@ -1590,7 +1590,7 @@ export default defineComponent({
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {
-        return "tw:overflow-auto";
+        return "overflow-auto";
       }
 
       return "";

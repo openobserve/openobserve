@@ -16,17 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:h-full tw:flex tw:flex-col tw:rounded-lg tw:overflow-hidden"
+    class="h-full flex flex-col rounded-lg overflow-hidden"
     @mouseover="() => (isCurrentlyHoveredPanel = true)"
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
     :data-test="`dashboard-panel-container`"
     :data-test-panel-id="props.data.id"
     :data-test-panel-title="props.data.title"
   >
-    <div :class="{ 'tw:shrink-0': !viewOnly && !simplifiedPanelView }">
+    <div :class="{ 'shrink-0': !viewOnly && !simplifiedPanelView }">
       <div
-        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:py-1 tw:px-2 tw:border-b tw:border-border-subtle tw:rounded-t-lg"
-        :class="{ 'tw:border-b-transparent': isPanelLoading }"
+        class="flex flex-nowrap items-center w-full min-h-7 py-1 px-2 border-b border-border-subtle rounded-t-lg"
+        :class="{ 'border-b-transparent': isPanelLoading }"
         data-test="dashboard-panel-bar"
       >
         <OIcon
@@ -36,12 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           :title="props.data.title"
-          class="tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis tw:text-[0.8125rem] tw:font-medium tw:text-(--color-text-primary) tw:tracking-[0.02em]"
+          class="whitespace-nowrap overflow-hidden text-ellipsis text-[0.8125rem] font-medium text-(--color-text-primary) tracking-[0.02em]"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
         </div>
-        <div class="tw:flex-1" />
+        <div class="flex-1" />
 
         <!-- Show Legends button -->
         <OButton
@@ -92,11 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           name="info-outline"
           size="sm"
-          class="tw:cursor-pointer"
+          class="cursor-pointer"
           data-test="dashboard-panel-description-info"
         >
           <OTooltip side="bottom" align="end" max-width="13.75rem">
-            <template #content><div class="tw:whitespace-pre-wrap">{{ props.data.description }}</div></template>
+            <template #content><div class="whitespace-pre-wrap">{{ props.data.description }}</div></template>
           </OTooltip>
         </OIcon>
         <OButton
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('DeletePanel')"
           >
             <template #icon-left
-              ><OIcon name="delete-outline" size="sm" class="tw:text-current!"
+              ><OIcon name="delete-outline" size="sm" class="text-current!"
             /></template>
             {{ t("panel.deletePanel") }}
           </ODropdownItem>
@@ -296,11 +296,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Panel-Level Variables (shown below drag-allow section) -->
-    <div class="tw:shrink-0">
+    <div class="shrink-0">
       <slot name="panel-variables"></slot>
     </div>
 
-    <div class="tw:flex-1 tw:min-h-0">
+    <div class="flex-1 min-h-0">
       <PanelSchemaRenderer
         :panelSchema="props.data"
         :selectedTimeObj="props.selectedTimeDate"

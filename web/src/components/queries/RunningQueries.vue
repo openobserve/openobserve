@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="isMetaOrg"
-    class="tw:rounded-md tw:p-0 tw:flex tw:flex-col tw:h-full"
+    class="rounded-md p-0 flex flex-col h-full"
   >
-    <div class="tw:flex-none">
+    <div class="flex-none">
       <div class="card-container">
         <div
-          class="tw:flex tw:flex-col tw:px-4 tw:py-3 tw:border-b-[1px]"
+          class="flex flex-col px-4 py-3 border-b-[1px]"
           style="position: sticky; top: 0; z-index: 1000;"
         >
           <!-- Standard section header: title + actions only. Filters live in the
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('queries.runningQueries')"
             icon="query-stats"
             :subtitle="'Inspect and cancel running queries'"
-            class="tw:-mx-4 tw:px-4 tw:border-b tw:border-border-default tw:mb-3"
+            class="-mx-4 px-4 border-b border-border-default mb-3"
           >
             <template #actions>
               <OButton
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </AppPageHeader>
           <div
             data-test="running-queries-filter-container"
-            class="tw:flex tw:justify-start tw:items-center tw:gap-3"
+            class="flex justify-start items-center gap-3"
           >
             <OToggleGroup
               :model-value="selectedQueryTypeTab"
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="searchFieldOptions"
                 labelKey="label"
                 valueKey="value"
-                class="tw:p-0 tw:w-[140px]"
+                class="p-0 w-[140px]"
                 data-test="running-queries-search-fields-select"
                 @update:model-value="filterQuery = ''"
               />
@@ -80,19 +80,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('queries.search')"
               data-test="running-queries-search-input"
             />
-            <div v-else class="o2-select-input o2-input tw:w-[250px]">
+            <div v-else class="o2-select-input o2-input w-[250px]">
               <OSelect
                 v-model="filterQuery"
                 placeholder="Select option"
                 :options="otherFieldOptions"
                 labelKey="label"
                 valueKey="value"
-                class="no-border search-input tw:w-[250px]"
+                class="no-border search-input w-[250px]"
                 data-test="running-queries-search-input"
               />
             </div>
           </div>
-          <div class="tw:flex tw:justify-end tw:items-center tw:gap-4 tw:mt-3">
+          <div class="flex justify-end items-center gap-4 mt-3">
             <OToggleGroup
               v-if="selectedQueryTypeTab === 'all'"
               :model-value="selectedSearchType"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ searchTypeLabels[visual] ?? visual }}
               </OToggleGroupItem>
             </OToggleGroup>
-            <span class="tw:text-xs tw:font-bold">
+            <span class="text-xs font-bold">
               Last Data Refresh Time: {{ lastRefreshed }}
             </span>
           </div>
@@ -116,12 +116,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="tw:flex-1 tw:min-h-0">
-      <div class="tw:w-full tw:h-full">
-        <div class="card-container tw:h-full">
+    <div class="flex-1 min-h-0">
+      <div class="w-full h-full">
+        <div class="card-container h-full">
           <div
             v-show="selectedQueryTypeTab === 'all'"
-            class="tw:h-full"
+            class="h-full"
             data-test="running-queries-all-queries-list"
           >
             <RunningQueriesList
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-show="selectedQueryTypeTab === 'summary'"
-            class="tw:h-full"
+            class="h-full"
             data-test="running-queries-summary-list"
           >
             <SummaryList

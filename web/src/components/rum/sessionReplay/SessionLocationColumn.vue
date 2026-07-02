@@ -15,27 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:justify-center tw:gap-2 tw:leading-tight tw:min-w-0 tw:h-full">
-    <div class="tw:flex tw:items-center tw:flex-nowrap tw:min-w-0">
-      <span :class="`fi fi-${column.country_iso_code} tw:mr-1.5 tw:shrink-0`" />
-      <div class="tw:text-xs tw:truncate">{{ column.country }}</div>
+  <div class="flex flex-col justify-center gap-2 leading-tight min-w-0 h-full">
+    <div class="flex items-center flex-nowrap min-w-0">
+      <span :class="`fi fi-${column.country_iso_code} mr-1.5 shrink-0`" />
+      <div class="text-xs truncate">{{ column.country }}</div>
     </div>
-    <div class="tw:flex tw:items-center tw:flex-nowrap tw:min-w-0 tw:text-xs tw:text-text-secondary">
-      <span class="tw:truncate">{{ column.city || "Unknown" }}</span>
+    <div class="flex items-center flex-nowrap min-w-0 text-xs text-text-secondary">
+      <span class="truncate">{{ column.city || "Unknown" }}</span>
       <OIcon
         data-test="circle-icon"
         name="circle"
         size="xs"
-        class="tw:mx-1.5 tw:text-gray-400 tw:shrink-0"
+        class="mx-1.5 text-gray-400 shrink-0"
       />
-      <span class="tw:truncate">{{ column.browser }}</span>
+      <span class="truncate">{{ column.browser }}</span>
       <OIcon
         data-test="circle-icon"
         name="circle"
         size="xs"
-        class="tw:mx-1.5 tw:text-gray-400 tw:shrink-0"
+        class="mx-1.5 text-gray-400 shrink-0"
       />
-      <span class="tw:truncate">{{ column.os }}</span>
+      <span class="truncate">{{ column.os }}</span>
     </div>
   </div>
 </template>

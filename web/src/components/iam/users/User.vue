@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+  <div class="rounded-md p-0 h-full flex flex-col">
     <!-- Standard page header: title + actions only. The user search moved into
          the table's own toolbar (built-in global filter) per the layout system. -->
     <AppPageHeader
       :title="t('iam.basicUsers')"
       :subtitle="t('user.subtitle')"
       icon="person"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
         <member-invitation
@@ -44,8 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="card-container h-full">
         <OTable
           :key="tableKey"
           :frame="false"
@@ -71,12 +71,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+            <div class="flex items-center gap-2 w-full">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('user.search')"
                 data-test="user-list-search-input"
-                class="tw:flex-1"
+                class="flex-1"
               />
             </div>
           </template>
@@ -95,13 +95,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
           <template #cell-auth="{ row }">
             <OTag v-if="row.auth_type" type="authType" :value="row.auth_type" />
-            <span v-else class="tw:text-text-primary">—</span>
+            <span v-else class="text-text-primary">—</span>
           </template>
 
           <!-- Roles badges — typed userRole tags for built-in roles, custom
                roles keep their original casing via an untyped tag. -->
           <template #cell-roles="{ row }">
-            <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-1">
+            <div class="flex flex-wrap items-center gap-1">
               <OTag
                 v-for="(roleName, idx) in (row.roles || [])"
                 :key="`${roleName}-${idx}`"
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Single-role column (open-source). Built-in role gets a typed
                userRole tag; the "(Invited)" suffix becomes a pending tag. -->
           <template #cell-role="{ row }">
-            <span class="tw:inline-flex tw:items-center tw:gap-1">
+            <span class="inline-flex items-center gap-1">
               <OTag
                 type="userRole"
                 :value="String(row.role || '').replace(/\s*\(Invited\)\s*$/i, '')"
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title tw:text-text-primary">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || 'Organization Members') : t('iam.basicUsers') }}</span>
+            <span class="o2-table-footer-title text-text-primary">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || 'Organization Members') : t('iam.basicUsers') }}</span>
             <OButton
               v-if="selectedUsers.length > 0"
               data-test="users-list-delete-users-btn"

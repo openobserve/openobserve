@@ -119,9 +119,9 @@ describe('Python.vue Comprehensive Coverage', () => {
     it('should apply correct styling to documentation links', () => {
       wrapper = createWrapper();
       const links = wrapper.findAll('a');
-      expect(links[0].classes()).toContain('tw:text-text-link');
-      expect(links[0].classes()).toContain('tw:hover:text-text-link-hover');
-      expect(links[0].classes()).toContain('tw:underline');
+      expect(links[0].classes()).toContain('text-text-link');
+      expect(links[0].classes()).toContain('hover:text-text-link-hover');
+      expect(links[0].classes()).toContain('underline');
     });
 
     it('should render documentation section text', () => {

@@ -1,15 +1,15 @@
 <template>
   <div
-    class="tw:h-[calc(100vh-3.75rem)] tw:flex tw:min-h-0"
-    :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-primary-background)' : ''"
+    class="h-[calc(100vh-3.75rem)] flex min-h-0"
+    :class="store.state.theme === 'dark' ? 'bg-(--o2-primary-background)' : ''"
   >
-    <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:min-w-0">
-      <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+    <div class="flex flex-col flex-1 min-h-0 min-w-0">
+      <div class="flex flex-col flex-1 min-h-0">
         <query-editor
           data-test="common-json-editor"
           ref="queryEditorRef"
           editor-id="common-json-editor"
-          class="tw:flex-1 tw:min-h-0 tw:h-full"
+          class="flex-1 min-h-0 h-full"
           :debounceTime="300"
           v-model:query="jsonContent"
           language="json"
@@ -21,17 +21,17 @@
       <div
         v-if="validationErrors.length > 0"
         data-test="common-json-editor-validation-errors"
-        class="tw:p-3 tw:text-red-500 tw:shrink-0 tw:max-h-50 tw:overflow-y-auto"
+        class="p-3 text-red-500 shrink-0 max-h-50 overflow-y-auto"
       >
-        <div class="tw:font-bold tw:mb-2">Please fix the following issues:</div>
-        <ul class="tw:ml-3">
+        <div class="font-bold mb-2">Please fix the following issues:</div>
+        <ul class="ml-3">
           <li v-for="(error, index) in validationErrors" :key="index">
             {{ error }}
           </li>
         </ul>
       </div>
 
-      <div class="tw:flex tw:justify-end tw:gap-2 tw:p-3 tw:shrink-0">
+      <div class="flex justify-end gap-2 p-3 shrink-0">
         <OButton
           variant="outline"
           size="sm-action"
@@ -49,11 +49,11 @@
     <!-- o2aichat enabled -->
     <div
       v-if="store.state.isAiChatEnabled"
-      class="tw:ml-2 tw:w-[25vw] tw:h-full"
+      class="ml-2 w-[25vw] h-full"
       :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
     >
       <O2AIChat
-        class="tw:h-full"
+        class="h-full"
         :is-open="store.state.isAiChatEnabled"
         @close="store.state.isAiChatEnabled = false"
       />

@@ -16,15 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
-    <div v-if="!showAddDialog" class="tw:flex tw:flex-col tw:h-full">
+  <div class="rounded-md flex flex-col h-full p-0">
+    <div v-if="!showAddDialog" class="flex flex-col h-full">
       <!-- Standard section header: title + actions only. Search moved into the
            table's own toolbar below. -->
       <AppPageHeader
         :title="t('cipherKey.header')"
         icon="key"
         :subtitle="'Encryption keys for sensitive fields'"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="shrink-0 px-4 border-b border-border-default"
       >
         <template #actions>
           <OButton
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </AppPageHeader>
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="card-container flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
         :data="visibleRows"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar>
           <OSearchInput
             v-model="filterQuery"
-            class="tw:flex-1"
+            class="flex-1"
             :placeholder="t('cipherKey.search')"
           />
         </template>
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`cipherkey-list-${row.name}-update`"
             variant="ghost"
             size="icon-sm"
-            class="tw:ml-1"
+            class="ml-1"
             :title="t('common.edit')"
             @click="editCipherKey(row)"
             icon-left="edit"
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`cipherkey-list-${row.name}-delete`"
             variant="ghost-destructive"
             size="icon-sm"
-            class="tw:ml-1"
+            class="ml-1"
             :title="t('common.delete')"
             @click="confirmDeleteCipherKey(row)"
             icon-left="delete"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedKeys.length > 0"
           #bottom
         >
-          <span class="tw:text-xs tw:text-text-primary tw:font-medium">
+          <span class="text-xs text-text-primary font-medium">
             {{ selectedKeys.length }} selected
           </span>
           <OButton

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:px-1 tw:py-0.5 tw:rounded tw:text-[10px] tw:font-semibold tw:uppercase tw:mr-1.5"
+    class="px-1 py-0.5 rounded text-[10px] font-semibold uppercase mr-1.5"
     :class="getEventTypeClass(type)"
     :data-test="dataTest"
   >
@@ -37,13 +37,13 @@ withDefaults(defineProps<Props>(), {
 const getEventTypeClass = (type: string) => {
   const classes: { [key: string]: string } = {
     error:
-      "tw:bg-red-100 tw:text-red-700 tw:border tw:border-solid tw:border-red-300",
+      "bg-red-100 text-red-700 border border-solid border-red-300",
     action:
-      "tw:bg-blue-100 tw:text-blue-700 tw:border tw:border-solid tw:border-blue-300",
-    view: "tw:bg-green-100 tw:text-green-700 tw:border tw:border-solid tw:border-green-300",
+      "bg-blue-100 text-blue-700 border border-solid border-blue-300",
+    view: "bg-green-100 text-green-700 border border-solid border-green-300",
     resource:
-      "tw:bg-purple-100 tw:text-purple-700 tw:border tw:border-solid tw:border-purple-300",
+      "bg-purple-100 text-purple-700 border border-solid border-purple-300",
   };
-  return classes[type] || "tw:bg-gray-200 tw:text-gray-500-700";
+  return classes[type] || "bg-gray-200 text-gray-500-700";
 };
 </script>

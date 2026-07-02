@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="['json-field-renderer', isValidJSON ? 'tw:font-mono tw:text-xs tw:leading-[1.5]' : '']"
+    :class="['json-field-renderer', isValidJSON ? 'font-mono text-xs leading-[1.5]' : '']"
     data-test="json-field-renderer"
   >
     <div v-if="parsedData === null || parsedData === undefined">
@@ -26,36 +26,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Array of primitives: ["a", "b", "c"] -> render as lines -->
       <div
         v-if="isArrayOfPrimitives"
-        class="tw:flex tw:flex-col"
+        class="flex flex-col"
         data-test="json-array-items"
       >
         <div
           v-for="(item, index) in definedItems"
           :key="index"
-          class="tw:py-[2px]"
+          class="py-[2px]"
           data-test="json-array-item"
         >
           <span :style="{ color: getValueColor(item) }">{{ formatValue(item) }}</span>
         </div>
       </div>
       <!-- Array of objects: [{"user": "admin"}, ...] -> render each object -->
-      <div v-else class="tw:flex tw:flex-col" data-test="json-array-objects">
+      <div v-else class="flex flex-col" data-test="json-array-objects">
         <div
           v-for="(item, index) in definedItems"
           :key="index"
-          class="tw:py-[2px] tw:break-words"
+          class="py-[2px] break-words"
         >
           <span v-if="typeof item === 'object' && item !== null">
-            <span class="tw:text-[#9ca3af]">{</span>
+            <span class="text-[#9ca3af]">{</span>
             <template v-for="(val, key) in getDefinedEntries(item)" :key="key">
-              <span class="tw:inline">
-                <span class="tw:font-medium" :style="{ color: keyColor }" data-test="json-key">{{ key }}</span>
-                <span class="tw:text-[#9ca3af]">: </span>
-                <span class="tw:break-words" :style="{ color: getValueColor(val) }" data-test="json-value">{{ formatValue(val) }}</span>
+              <span class="inline">
+                <span class="font-medium" :style="{ color: keyColor }" data-test="json-key">{{ key }}</span>
+                <span class="text-[#9ca3af]">: </span>
+                <span class="break-words" :style="{ color: getValueColor(val) }" data-test="json-value">{{ formatValue(val) }}</span>
               </span>
-              <span v-if="!isLastDefinedEntry(item, key)" class="tw:text-[#9ca3af]">, </span>
+              <span v-if="!isLastDefinedEntry(item, key)" class="text-[#9ca3af]">, </span>
             </template>
-            <span class="tw:text-[#9ca3af]">}</span>
+            <span class="text-[#9ca3af]">}</span>
           </span>
           <span v-else :style="{ color: getValueColor(item) }">{{ formatValue(item) }}</span>
         </div>
@@ -64,19 +64,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Single object: {"key": "value"} -> render key-value pairs -->
     <div
       v-else-if="typeof parsedData === 'object'"
-      class="tw:break-words"
+      class="break-words"
       data-test="json-object"
     >
-      <span class="tw:text-[#9ca3af]">{</span>
+      <span class="text-[#9ca3af]">{</span>
       <template v-for="(val, key, idx) in definedObjectEntries" :key="key">
-        <span class="tw:inline">
-          <span class="tw:font-medium" :style="{ color: keyColor }" data-test="json-key">{{ key }}</span>
-          <span class="tw:text-[#9ca3af]">: </span>
-          <span class="tw:break-words" :style="{ color: getValueColor(val) }" data-test="json-value">{{ formatValue(val) }}</span>
+        <span class="inline">
+          <span class="font-medium" :style="{ color: keyColor }" data-test="json-key">{{ key }}</span>
+          <span class="text-[#9ca3af]">: </span>
+          <span class="break-words" :style="{ color: getValueColor(val) }" data-test="json-value">{{ formatValue(val) }}</span>
         </span>
-        <span v-if="idx < definedObjectKeys.length - 1" class="tw:text-[#9ca3af]">, </span>
+        <span v-if="idx < definedObjectKeys.length - 1" class="text-[#9ca3af]">, </span>
       </template>
-      <span class="tw:text-[#9ca3af]">}</span>
+      <span class="text-[#9ca3af]">}</span>
     </div>
     <!-- Primitive value: only apply JSON coloring if the value was valid JSON -->
     <div v-else>

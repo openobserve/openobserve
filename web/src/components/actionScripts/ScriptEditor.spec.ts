@@ -321,12 +321,12 @@ describe('ScriptEditor.vue', () => {
 
       const editorSection = wrapper.find('[data-test="test-function-input-editor-section"]');
       expect(editorSection.exists()).toBe(true);
-      expect(editorSection.classes()).toContain('tw:border-[1px]');
-      expect(editorSection.classes()).toContain('tw:border-gray-200');
-      expect(editorSection.classes()).toContain('tw:h-[calc(100%-30px)]');
-      expect(editorSection.classes()).toContain('tw:relative');
-      expect(editorSection.classes()).toContain('tw:rounded-md');
-      expect(editorSection.classes()).toContain('tw:overflow-hidden');
+      expect(editorSection.classes()).toContain('border-[1px]');
+      expect(editorSection.classes()).toContain('border-gray-200');
+      expect(editorSection.classes()).toContain('h-[calc(100%-30px)]');
+      expect(editorSection.classes()).toContain('relative');
+      expect(editorSection.classes()).toContain('rounded-md');
+      expect(editorSection.classes()).toContain('overflow-hidden');
     });
 
     it('query editor has correct CSS classes', async () => {

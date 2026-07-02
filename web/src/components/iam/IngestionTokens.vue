@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+  <div class="rounded-md p-0 h-full flex flex-col">
     <!-- Standard section header: title + description + Create action. -->
     <AppPageHeader
       icon="key"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #title>
-        <span class="tw:inline-flex tw:items-center tw:gap-1.5">
+        <span class="inline-flex items-center gap-1.5">
           <span data-test="ingestion-tokens-title-text">{{ t('ingestion.tokenManagementTitle') }}</span>
           <!-- Full explanation lives in this info tooltip; the subtitle below is a
                truncated preview so neither overruns the Create action button. -->
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="info-outline"
               size="sm"
-              class="tw:text-text-secondary tw:cursor-help"
+              class="text-text-secondary cursor-help"
               data-test="ingestion-tokens-info-icon"
             />
             <OTooltip :content="t('ingestion.orgLevelExplanation')" max-width="360px"/>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <!-- Short summary subtitle; the full explanation is in the title info tooltip. -->
       <template #subtitle>
-        <span class="tw:truncate tw:min-w-0 tw:leading-normal">{{ t('ingestion.orgLevelSummary') }}</span>
+        <span class="truncate min-w-0 leading-normal">{{ t('ingestion.orgLevelSummary') }}</span>
       </template>
       <template #actions>
         <OButton
@@ -53,8 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </AppPageHeader>
 
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="card-container h-full">
         <OTable
           :frame="false"
           :data="tokens"
@@ -70,11 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filter-mode="client"
         >
           <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+            <div class="flex items-center gap-2 w-full">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('ingestion.searchToken', 'Search tokens')"
-                class="tw:flex-1"
+                class="flex-1"
               />
             </div>
           </template>
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-name="{ row }">
-            <span class="tw:font-medium">{{ row.name }}</span>
+            <span class="font-medium">{{ row.name }}</span>
           </template>
 
           <!-- Copy yields a ready-to-paste "Basic base64(name:token)" credential
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OInput
         v-model="newTokenDescription"
         :label="t('ingestion.tokenDescriptionLabel')"
-        class="tw:mt-4"
+        class="mt-4"
       />
     </ODialog>
 
@@ -152,21 +152,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showRevealedDialog = false"
     >
       <!-- Primary: the ready-to-paste Authorization credential. -->
-      <div class="tw:mb-1 tw:text-xs tw:font-medium tw:text-text-primary">
+      <div class="mb-1 text-xs font-medium text-text-primary">
         {{ t('ingestion.authHeaderLabel') }}
       </div>
       <div
-        class="tw:p-2.5 tw:border tw:border-dashed tw:rounded tw:border-gray-400 tw:mb-1"
-        :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'tw:bg-gray-100'"
+        class="p-2.5 border border-dashed rounded border-gray-400 mb-1"
+        :class="store.state.theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'"
       >
         <code
-          class="tw:break-all tw:font-mono tw:text-sm"
+          class="break-all font-mono text-sm"
         >{{ revealedBasicAuth }}</code>
       </div>
-      <div class="tw:mb-3 tw:text-xs tw:text-text-secondary">
+      <div class="mb-3 text-xs text-text-secondary">
         {{ t('ingestion.authHeaderHelp') }}
       </div>
-      <div class="tw:flex tw:justify-end tw:gap-2">
+      <div class="flex justify-end gap-2">
         <OButton
           variant="outline"
           size="sm-action"
@@ -252,7 +252,7 @@ export default defineComponent({
         hideable: true,
         size: COL.name,
         minSize: 160,
-        meta: { align: "left", cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!', flex: true },
+        meta: { align: "left", cellClass: 'pl-4!', headerClass: 'pl-4!', flex: true },
       },
       {
         id: "token",

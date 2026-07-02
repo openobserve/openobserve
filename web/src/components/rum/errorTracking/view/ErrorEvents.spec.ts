@@ -340,7 +340,7 @@ describe("ErrorEvents", () => {
       const col = wrapper.vm.columns.find((c: any) => c.id === "description");
 
       // Assert
-      expect(col.meta.cellClass).toBe("tw:max-w-[60vw]");
+      expect(col.meta.cellClass).toBe("max-w-[60vw]");
     });
 
     it("sets the level column cellClass to render a bordered cell", () => {
@@ -349,7 +349,7 @@ describe("ErrorEvents", () => {
 
       // Assert
       expect(col.meta.cellClass).toBe(
-        "tw:border tw:border-[var(--o2-border)]",
+        "border border-[var(--o2-border)]",
       );
     });
   });

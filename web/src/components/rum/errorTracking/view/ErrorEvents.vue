@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:mt-4">
+  <div class="mt-4">
     <div
       data-test="error-events-title"
-      class="tw:text-base tw:font-bold tw:mb-2 tw:ml-1"
+      class="text-base font-bold mb-2 ml-1"
     >{{ t("rum.events") }}</div>
     <OTable
       :data="error.events || []"
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="index"
       pagination="none"
       :show-global-filter="false"
-      class="tw:w-full"
+      class="w-full"
     >
       <template #cell-type="{ row }">
         <ErrorTypeIcons :column="row" />
@@ -87,14 +87,14 @@ const columns = ref<OTableColumnDef[]>([
     cell: " ",
     sortable: true,
     size: COL.description,
-    meta: { align: "left", cellClass: "tw:max-w-[60vw]", autoWidth: true },
+    meta: { align: "left", cellClass: "max-w-[60vw]", autoWidth: true },
   },
   {
     id: "level",
     header: t("rum.level"),
     accessorFn: (row: any) => (row["type"] === "error" ? "error" : "info"),
     size: COL.status,
-    meta: { align: "left", cellClass: "tw:border tw:border-[var(--o2-border)]" },
+    meta: { align: "left", cellClass: "border border-[var(--o2-border)]" },
   },
   {
     id: "timestamp",

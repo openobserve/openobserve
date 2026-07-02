@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:mt-4">
-    <div class="tw:text-base tw:font-bold tw:mb-2 tw:ml-1">{{ t("rum.sessionReplay") }}</div>
-    <div class="tw:flex">
+  <div class="mt-4">
+    <div class="text-base font-bold mb-2 ml-1">{{ t("rum.sessionReplay") }}</div>
+    <div class="flex">
       <template v-for="(value, tag) in getSessionTags" :key="tag.tag">
         <ErrorTag :tag="{ key: tag, value }" />
       </template>
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OButton
       variant="primary"
       size="sm-action"
-      class="tw:mt-2.5"
+      class="mt-2.5"
       icon-left="play-circle"
       :title="t('rum.viewSessionReplay')"
       @click="playSessionReplay"

@@ -1,5 +1,5 @@
 <template>
-  <div class="tw:w-full tw:flex tw:flex-col tw:gap-2">
+  <div class="w-full flex flex-col gap-2">
     <!-- Compact Layout: Editor only (toggle/button provided by parent) -->
     <template v-if="layout === 'editor-only'">
       <CodeQueryEditor
@@ -21,23 +21,23 @@
     <!-- Full Layout: Toggle + Editor + Button -->
     <template v-else>
       <!-- NL Mode Toggle Bar -->
-      <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+      <div class="flex items-center gap-2 mb-2">
         <!-- NL Mode Toggle (always visible when AI enabled and enterprise) -->
         <div
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-          class="tw:flex tw:items-center tw:gap-2 tw:py-1 tw:px-2 tw:rounded element-box-shadow"
+          class="flex items-center gap-2 py-1 px-2 rounded element-box-shadow"
           style="background-color: var(--q-dark-page)"
         >
           <OSwitch
             :data-test="`${dataTestPrefix}-nlp-mode-toggle`"
             v-model="nlpMode"
           />
-          <img :src="nlpIcon" alt="NL Mode" class="tw:w-5 tw:h-5" />
+          <img :src="nlpIcon" alt="NL Mode" class="w-5 h-5" />
           <OTooltip :content="t('nlMode.toggle')" side="top" />
         </div>
 
         <!-- Action Buttons (always present) -->
-        <div class="tw:flex tw:gap-2 tw:ml-auto">
+        <div class="flex gap-2 ml-auto">
           <!-- Main Action Button: Run Query / Ask AI -->
           <OButton
             :data-test="`${dataTestPrefix}-action-btn`"
@@ -52,20 +52,20 @@
             <OIcon
               v-if="showIcon"
               :name="isAIMode ? 'auto-awesome' : 'search'" size="sm"
-              class="tw:mr-1"
+              class="mr-1"
             />
             {{ isAIMode ? aiButtonLabel : normalButtonLabel }}
           </OButton>
 
           <!-- Dropdown (optional - for enterprise features) -->
           <template v-if="showDropdown">
-            <OSeparator class="tw:h-7.25 tw:w-px" />
+            <OSeparator class="h-7.25 w-px" />
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
                   variant="ghost"
                   size="icon-xs"
-                  class="tw:h-7.25 search-button-dropdown"
+                  class="h-7.25 search-button-dropdown"
                   :class="dropdownClasses"
                 >
                   <OIcon name="arrow-drop-down" size="sm" />
@@ -86,7 +86,7 @@
               <!-- AI Mode: Custom actions (slot) -->
               <template v-else>
                 <slot name="dropdown-actions">
-                  <div class="tw:min-w-35 tw:p-2 tw:text-xs tw:text-center tw:text-dropdown-item-text">
+                  <div class="min-w-35 p-2 text-xs text-center text-dropdown-item-text">
                     {{ t('nlMode.noAdditionalOptions') }}
                   </div>
                 </slot>
@@ -97,17 +97,17 @@
       </div>
 
       <!-- Query Editor with AI Input Bar -->
-      <div class="tw:w-full">
+      <div class="w-full">
         <!-- AI Input Bar (shown in NL Mode) -->
         <div
           v-if="isAIMode"
-          class="tw:p-3 tw:bg-[linear-gradient(135deg,rgba(139,92,246,0.05)_0%,rgba(236,72,153,0.05)_100%)] tw:border-b tw:border-(--o2-border-color)"
+          class="p-3 bg-[linear-gradient(135deg,rgba(139,92,246,0.05)_0%,rgba(236,72,153,0.05)_100%)] border-b border-(--o2-border-color)"
         >
           <!-- Show streaming status with spinner -->
-          <div v-if="isGenerating" class="ai-bar-streaming tw:flex tw:items-center tw:gap-2 tw:bg-white tw:rounded-lg tw:py-2 tw:px-3 tw:text-(--q-primary)">
-            <img :src="nlpIcon" alt="AI" class="tw:w-5 tw:h-5" />
+          <div v-if="isGenerating" class="ai-bar-streaming flex items-center gap-2 bg-white rounded-lg py-2 px-3 text-(--q-primary)">
+            <img :src="nlpIcon" alt="AI" class="w-5 h-5" />
             <OSpinner variant="dots" size="xs" />
-            <span class="tw:text-sm tw:text-[#666]">{{ aiStatusText || t('search.analyzingQuery') }}</span>
+            <span class="text-sm text-[#666]">{{ aiStatusText || t('search.analyzingQuery') }}</span>
           </div>
           <!-- Normal input when not generating -->
           <OInput
@@ -119,7 +119,7 @@
             @keydown.enter="handleAIInputEnter"
           >
             <template v-slot:icon-left>
-              <img :src="nlpIcon" alt="AI" class="tw:w-5 tw:h-5" />
+              <img :src="nlpIcon" alt="AI" class="w-5 h-5" />
             </template>
           </OInput>
         </div>
@@ -235,15 +235,15 @@ const isAIMode = computed(() => nlpMode.value || isNaturalLanguageDetected.value
 // Computed: Button classes
 const buttonClasses = computed(() => {
   const classes = [
-    'tw:p-0',
-    `tw:h-[${props.height}]`,
+    'p-0',
+    `h-[${props.height}]`,
     'element-box-shadow',
   ];
 
   if (isAIMode.value) {
-    classes.push('tw:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! tw:text-white! tw:border-none! tw:text-[0.6875rem]! tw:font-semibold! tw:leading-[1rem]! tw:transition-all! tw:duration-300! tw:ease-[ease]! tw:shadow-[0_0.25rem_0.9375rem_0_rgba(139,92,246,0.3)]! tw:px-3! tw:w-[92px]! tw:hover:shadow-[0_0.375rem_1.25rem_0_rgba(139,92,246,0.5)]! tw:hover:-translate-y-px tw:active:translate-y-0');
+    classes.push('bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! text-white! border-none! text-[0.6875rem]! font-semibold! leading-[1rem]! transition-all! duration-300! ease-[ease]! shadow-[0_0.25rem_0.9375rem_0_rgba(139,92,246,0.3)]! px-3! w-[92px]! hover:shadow-[0_0.375rem_1.25rem_0_rgba(139,92,246,0.5)]! hover:-translate-y-px active:translate-y-0');
   } else {
-    classes.push('tw:w-[92px]!', 'o2-color-primary');
+    classes.push('w-[92px]!', 'o2-color-primary');
   }
 
   if (props.borderRadius === 'enterprise') {

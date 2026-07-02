@@ -15,15 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:m-3 tw:mt-1" :key="rumToken">
+  <div class="m-3 mt-1" :key="rumToken">
     <div v-if="rumToken">
-      <div class="tw:text-xl tw:font-semibold tw:mt-1" data-test="rumweb-title-text">
+      <div class="text-xl font-semibold mt-1" data-test="rumweb-title-text">
         {{ t("ingestion.npmStepTitle") }}
       </div>
-      <OSeparator class="tw:my-2" />
+      <OSeparator class="my-2" />
 
       <SanitizedHtmlRenderer
-        class="tw:text-base tw:font-medium tw:mt-1"
+        class="text-base font-medium mt-1"
         :htmlContent="npmStep1"
       />
 
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <br />
       <SanitizedHtmlRenderer
-        class="tw:text-base tw:font-medium tw:mt-1"
+        class="text-base font-medium mt-1"
         :htmlContent="npmStep2"
       />
       <CopyContent
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :displayContent="displayConfiguration"
       ></CopyContent>
     </div>
-    <div v-else class="tw:mt-1">
+    <div v-else class="mt-1">
       {{ t("ingestion.generateRUMTokenMessage") }}
     </div>
   </div>

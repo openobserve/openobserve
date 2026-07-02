@@ -15,21 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
-    <div v-if="!showImportTemplate && !showTemplateEditor" class="tw:flex tw:flex-col tw:h-full">
+  <div class="rounded-md flex flex-col h-full p-0">
+    <div v-if="!showImportTemplate && !showTemplateEditor" class="flex flex-col h-full">
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
       <AppPageHeader
         :title="t('alert_templates.header')"
         icon="description"
         :subtitle="'Reusable alert message templates'"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="shrink-0 px-4 border-b border-border-default"
       >
         <template #actions>
           <OToggleGroup
             :model-value="activeTab"
             @update:model-value="(v: any) => { activeTab = v; }"
             data-test="template-list-tabs"
-            class="tw:mr-2"
+            class="mr-2"
           >
             <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
               <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </template>
       </AppPageHeader>
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="card-container flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
         data-test="alert-templates-list-table"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar>
           <OSearchInput
             v-model="filterQuery"
-            class="tw:flex-1"
+            class="flex-1"
             :placeholder="t('template.search')"
           />
         </template>
@@ -98,17 +98,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-name="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="flex items-center gap-2">
             <span>{{ row.name }}</span>
             <span
               v-if="row.isPrebuilt"
-              class="tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:border tw:border-[#1d4ed8] tw:text-inherit tw:dark:text-white tw:dark:border-[#93c5fd]"
+              class="inline-flex items-center gap-0.5 py-0.5 px-2 rounded-md text-[11px] font-medium whitespace-nowrap border border-[#1d4ed8] text-inherit dark:text-white dark:border-[#93c5fd]"
               :title="t('alert_templates.prebuiltBadgeHint')"
               data-test="alert-template-prebuilt-badge"
             >{{ t('alert_templates.prebuiltBadge') }}</span>
             <span
               v-else
-              class="tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:border tw:border-[#d1d5db] tw:text-inherit tw:dark:text-white tw:dark:border-[#4b5563]"
+              class="inline-flex items-center gap-0.5 py-0.5 px-2 rounded-md text-[11px] font-medium whitespace-nowrap border border-[#d1d5db] text-inherit dark:text-white dark:border-[#4b5563]"
               data-test="alert-template-custom-badge"
             >{{ t('alert_templates.customBadge') }}</span>
           </div>
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-actions="{ row }">
           <OButton
             title="Export Template"
-            class="tw:ml-1"
+            class="ml-1"
             variant="ghost"
             size="icon-sm"
             @click.stop="exportTemplate(row)"
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             :data-test="`alert-template-list-${row.name}-update-template`"
-            class="tw:ml-1"
+            class="ml-1"
             variant="ghost"
             size="icon-sm"
             :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.edit')"
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             :data-test="`alert-template-list-${row.name}-clone-template`"
-            class="tw:ml-1"
+            class="ml-1"
             variant="ghost"
             size="icon-sm"
             :title="t('alert_templates.clone')"
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             :data-test="`alert-template-list-${row.name}-delete-template`"
-            class="tw:ml-1"
+            class="ml-1"
             variant="ghost"
             size="icon-sm"
             :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.delete')"
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedTemplates.length > 0"
           #bottom
         >
-          <span class="tw:text-xs tw:text-text-primary">
+          <span class="text-xs text-text-primary">
             {{ selectedTemplates.length }} selected
           </span>
           <OButton

@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
+  <div class="rounded-md flex flex-col h-full p-0">
     <template v-if="!showImportRegexPatternDialog">
     <!-- Standard section header: title + actions only. Search moved to toolbar. -->
     <AppPageHeader
       :title="t('regex_patterns.title')"
       icon="pattern"
       :subtitle="'Reusable regex patterns for redaction'"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
         <OButton
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("regex_patterns.create_pattern") }}</OButton>
       </template>
     </AppPageHeader>
-    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+    <div class="card-container flex-1 min-h-0 overflow-hidden">
     <OTable
       :frame="false"
       data-test="regex-pattern-list-table"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #toolbar>
         <OSearchInput
           v-model="filterQuery"
-          class="tw:flex-1"
+          class="flex-1"
           :placeholder="t('regex_patterns.search')"
         />
       </template>
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTimeCell :value="row.updated_at" unit="iso" :timezone="store.state.timezone" />
       </template>
       <template #cell-actions="{ row }">
-        <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+        <div class="flex items-center gap-1 justify-center">
           <OButton
             :data-test="`regex-pattern-list-${row.id}-export-regex-pattern`"
             variant="ghost"
@@ -119,8 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #bottom>
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <span class="tw:text-xs tw:text-text-primary tw:font-medium">
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-text-primary font-medium">
             {{ resultTotal }} {{ t("regex_patterns.bottom_header") }}
           </span>
           <OButton

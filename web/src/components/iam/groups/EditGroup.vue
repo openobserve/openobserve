@@ -15,18 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="edit-group-section" class="tw:flex tw:flex-col tw:h-full">
+  <div data-test="edit-group-section" class="flex flex-col h-full">
     <!-- Sub-page header: the listing's icon becomes a Back button (→ Groups). -->
     <AppPageHeader
       :title="groupDetails.group_name"
       :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     />
     <div
       data-test="edit-group-section-title"
-      class="tw:px-2.5 tw:pt-2.5 tw:pb-[0.625rem] tw:flex-shrink-0"
+      class="px-2.5 pt-2.5 pb-[0.625rem] flex-shrink-0"
     >
-    <div class="card-container tw:py-3">
+    <div class="card-container py-3">
     <AppTabs
       data-test="edit-group-tabs"
       :tabs="tabs"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     </div>
     </div>
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+    <div class="flex-1 min-h-0 overflow-hidden">
       <GroupUsers
         v-show="activeTab === 'users'"
         :groupUsers="groupDetails.users"
@@ -63,10 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       data-test="edit-group-footer"
-    class="tw:flex tw:justify-end tw:w-full tw:flex-shrink-0"
+    class="flex justify-end w-full flex-shrink-0"
       style="z-index: 2"
     >
-      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2 tw:border-t tw:border-border-default">
+      <div class="card-container w-full py-2 px-3 justify-end flex gap-2 border-t border-border-default">
       <OButton
         data-test="edit-group-cancel-btn"
         variant="outline"

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
+  <div class="rounded-md flex flex-col h-full p-0">
     <!-- Full-page Import View -->
     <ImportModelPricing
       v-if="showImportModelPricingPage"
@@ -30,17 +30,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <TestModelMatchDialog v-model="showTestMatchDialog" />
 
     <!-- Main List View -->
-    <div v-if="!showImportModelPricingPage" class="tw:flex tw:flex-col tw:h-full">
+    <div v-if="!showImportModelPricingPage" class="flex flex-col h-full">
       <!-- List View Header -->
       <!-- Standard section header: title + actions only. Tabs + search moved
            into the table toolbar below. -->
-      <AppPageHeader icon="paid" :subtitle="'LLM model cost configuration'" class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default">
+      <AppPageHeader icon="paid" :subtitle="'LLM model cost configuration'" class="shrink-0 px-4 border-b border-border-default">
         <template #title>
           {{ t("modelPricing.header") }}
           <OButton
             variant="ghost"
             size="icon-sm"
-            class="tw:-ml-1"
+            class="-ml-1"
             data-test="model-pricing-info-btn"
           >
             <OIcon name="info-outline" size="sm" />
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </AppPageHeader>
 
       <!-- List Table -->
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="card-container flex-1 min-h-0 overflow-hidden">
       <OTable
         ref="qTableRef"
         :frame="false"
@@ -113,8 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Toolbar: Built-in/Custom tabs + search -->
         <template #toolbar>
-          <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-            <div class="app-tabs-container tw:h-9">
+          <div class="flex items-center gap-2 w-full">
+            <div class="app-tabs-container h-9">
               <app-tabs
                 class="tabs-selection-container"
                 :tabs="tabOptions"
@@ -124,15 +124,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OSearchInput
               v-model="filterQuery"
-              class="tw:ml-auto tw:w-64"
+              class="ml-auto w-64"
               :placeholder="t('modelPricing.searchPlaceholder')"
             />
           </div>
         </template>
         <template #tree-warning="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-2 tw:py-1 tw:text-sm tw:leading-none">
-            <OIcon name="warning-amber" size="sm" class="tw:text-[#f59e0b] tw:opacity-85" />
-            <span class="tw:leading-tight">
+          <div class="flex items-center gap-2 py-1 text-sm leading-none">
+            <OIcon name="warning-amber" size="sm" class="text-[#f59e0b] opacity-85" />
+            <span class="leading-tight">
               {{
                 t("modelPricing.shadowedWarningBanner", { name: row.name })
               }}
@@ -140,14 +140,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-name="{ row }">
-          <div class="tw:flex tw:items-center tw:flex-nowrap tw:relative tw:z-[2] tw:min-h-[24px]">
+          <div class="flex items-center flex-nowrap relative z-[2] min-h-[24px]">
             <span
               v-if="getSource(row) === 'built_in'"
-              class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1"
+              class="shrink-0 cursor-default inline-flex mr-1"
             >
               <img
                 :src="ooLogo"
-                class="tw:w-[16px] tw:h-[16px]"
+                class="w-[16px] h-[16px]"
                 alt="OpenObserve"
               />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
@@ -158,48 +158,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 (getSource(row) === 'org' &&
                   row.org_id !== orgIdentifier)
               "
-              class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1"
+              class="shrink-0 cursor-default inline-flex mr-1"
             >
               <OIcon
                 name="corporate-fare"
                 size="sm"
-                class="tw:text-[#757575] tw:dark:text-[#bdbdbd]"
+                class="text-[#757575] dark:text-[#bdbdbd]"
                />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
             </span>
             <span
               v-else
-              class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1"
+              class="shrink-0 cursor-default inline-flex mr-1"
             >
               <OIcon
                 name="person"
                 size="sm"
-                class="tw:text-[#757575] tw:dark:text-[#bdbdbd]"
+                class="text-[#757575] dark:text-[#bdbdbd]"
                />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
             </span>
-            <div class="tw:truncate tw:w-full tw:block">{{ row.name }}</div>
+            <div class="truncate w-full block">{{ row.name }}</div>
           </div>
         </template>
         <template #cell-match_pattern="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-1 tw:min-w-0">
+          <div class="flex items-center gap-1 min-w-0">
             <code
-              class="tw:text-xs tw:block tw:max-w-full tw:bg-[rgba(0,0,0,0.04)] tw:border tw:border-(--o2-border-color) tw:py-[2px] tw:px-[6px] tw:rounded tw:text-inherit tw:dark:bg-[rgba(255,255,255,0.05)]"
-              :class="{ 'tw:opacity-50 tw:[text-decoration:line-through] tw:[text-decoration-color:currentColor]': isChildRow(row) }"
+              class="text-xs block max-w-full bg-[rgba(0,0,0,0.04)] border border-(--o2-border-color) py-[2px] px-[6px] rounded text-inherit dark:bg-[rgba(255,255,255,0.05)]"
+              :class="{ 'opacity-50 [text-decoration:line-through] [text-decoration-color:currentColor]': isChildRow(row) }"
               >{{ row.match_pattern }}</code
             >
             <OIcon
               v-if="isChildRow(row)"
               name="warning-amber"
               size="xs"
-              class="tw:shrink-0 tw:text-[#f59e0b] tw:opacity-85"
+              class="shrink-0 text-[#f59e0b] opacity-85"
             >
               <OTooltip side="top" align="center" :content="t('modelPricing.shadowedTooltip', { name: getParentName(row) })" />
             </OIcon>
           </div>
         </template>
         <template #cell-pricing="{ row }">
-          <div class="tw:flex tw:flex-wrap tw:gap-1">
+          <div class="flex flex-wrap gap-1">
             <template
               v-if="
                 getDefaultTier(row) &&
@@ -209,26 +209,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-for="(price, key) in getVisiblePrices(row)"
                 :key="key"
-                class="tw:inline-flex tw:items-center tw:gap-[2px] tw:py-[2px] tw:px-2 tw:rounded-md tw:text-[11px] tw:font-normal tw:whitespace-nowrap tw:border"
+                class="inline-flex items-center gap-[2px] py-[2px] px-2 rounded-md text-[11px] font-normal whitespace-nowrap border"
                 :class="[
                   getPriceKeyColorClass(key as string),
                   store.state.theme === 'dark'
-                    ? 'tw:text-white tw:border-[#4b5563]'
-                    : 'tw:text-inherit tw:border-[#d1d5db]',
+                    ? 'text-white border-[#4b5563]'
+                    : 'text-inherit border-[#d1d5db]',
                 ]"
               >
-                <span class="tw:font-medium">{{
+                <span class="font-medium">{{
                   formatPriceKey(key as string)
                 }}</span
                 >=<span>{{ formatPerMillion(price as number) }}</span>
               </span>
               <span
                 v-if="getOverflowCount(row) > 0"
-                class="tw:inline-flex tw:items-center tw:gap-[2px] tw:py-[2px] tw:px-2 tw:rounded-md tw:text-[11px] tw:whitespace-nowrap tw:border-0 tw:font-medium tw:cursor-pointer"
+                class="inline-flex items-center gap-[2px] py-[2px] px-2 rounded-md text-[11px] whitespace-nowrap border-0 font-medium cursor-pointer"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:bg-[#4b5563] tw:text-[#d1d5db]'
-                    : 'tw:bg-[#e5e7eb] tw:text-[#6b7280]'
+                    ? 'bg-[#4b5563] text-[#d1d5db]'
+                    : 'bg-[#e5e7eb] text-[#6b7280]'
                 "
                 @click.stop="openPricingDialog(row)"
               >
@@ -236,11 +236,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("modelPricing.overflowMore") }}
                 <OTooltip>
                   <template #content>
-                    <div class="tw:min-w-[240px]">
-                      <div class="tw:font-bold tw:text-[13px] tw:mb-[3px]">
+                    <div class="min-w-[240px]">
+                      <div class="font-bold text-[13px] mb-[3px]">
                         {{ row.name }}
                       </div>
-                      <table class="tw:w-full tw:border-collapse pricing-breakdown-table">
+                      <table class="w-full border-collapse pricing-breakdown-table">
                         <thead>
                           <tr>
                             <th>{{ t("modelPricing.usageType") }}</th>
@@ -266,11 +266,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </span>
             </template>
-            <span v-else class="tw:text-text-primary">&mdash;</span>
+            <span v-else class="text-text-primary">&mdash;</span>
           </div>
         </template>
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-1 tw:justify-end">
+          <div class="flex items-center gap-1 justify-end">
             <template v-if="!isReadOnly(row)">
               <OButton
                 :variant="
@@ -326,19 +326,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #empty>
           <div
-            class="tw:w-full tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-y-3"
+            class="w-full flex flex-col items-center justify-center gap-y-3"
           >
-            <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="tw:text-gray-400" />
-            <div class="tw:text-base tw:font-medium tw:text-gray-400 tw:mt-2">
+            <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="text-gray-400" />
+            <div class="text-base font-medium text-gray-400 mt-2">
               {{ t("modelPricing.noModels") }}
             </div>
-            <div class="tw:text-xs tw:text-gray-400">
+            <div class="text-xs text-gray-400">
               {{ t("modelPricing.noModelsDesc") }}
             </div>
             <OButton
               variant="primary"
               size="sm"
-              class="tw:self-center"
+              class="self-center"
               @click="openEditor(null)"
               data-test="model-pricing-empty-add-btn"
             >
@@ -348,9 +348,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #bottom="scope">
-          <div class="tw:flex tw:items-center tw:w-full tw:h-[48px] tw:gap-x-2">
+          <div class="flex items-center w-full h-[48px] gap-x-2">
             <div
-              class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px]"
+              class="o2-table-footer-title flex items-center w-[100px]"
             >
               {{ t("modelPricing.modelsCount", { count: resultTotal }) }}
             </div>
@@ -388,11 +388,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header-left>
         <span
             v-if="getSource(pricingDialogRow) === 'built_in'"
-            class="tw:shrink-0 tw:cursor-default tw:inline-flex"
+            class="shrink-0 cursor-default inline-flex"
           >
             <img
               :src="ooLogo"
-              class="tw:w-[18px] tw:h-[18px]"
+              class="w-[18px] h-[18px]"
               alt="OpenObserve"
             />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
@@ -404,42 +404,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 (getSource(pricingDialogRow) === 'org' &&
                   pricingDialogRow.org_id !== orgIdentifier))
             "
-            class="tw:shrink-0 tw:cursor-default tw:inline-flex"
+            class="shrink-0 cursor-default inline-flex"
           >
             <OIcon
               name="corporate-fare"
               size="sm"
-              class="tw:text-[#757575] tw:dark:text-[#bdbdbd]"
+              class="text-[#757575] dark:text-[#bdbdbd]"
              />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
           </span>
           <span
             v-else
-            class="tw:shrink-0 tw:cursor-default tw:inline-flex"
+            class="shrink-0 cursor-default inline-flex"
           >
             <OIcon
               name="person"
               size="sm"
-              class="tw:text-[#757575] tw:dark:text-[#bdbdbd]"
+              class="text-[#757575] dark:text-[#bdbdbd]"
              />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
           </span>
       </template>
 
-      <div class="tw:p-3 tw:flex-1 tw:overflow-y-auto">
+      <div class="p-3 flex-1 overflow-y-auto">
         <div v-if="pricingDialogRow">
-          <div class="tw:mb-4">
-            <div class="tw:text-xs tw:font-semibold tw:mb-[6px] tw:text-[#555] tw:dark:text-[#aaa]">
+          <div class="mb-4">
+            <div class="text-xs font-semibold mb-[6px] text-[#555] dark:text-[#aaa]">
               {{ t("modelPricing.colPattern") }}
             </div>
-            <code class="tw:text-xs tw:block tw:bg-[rgba(0,0,0,0.04)] tw:border tw:border-(--o2-border-color) tw:py-[2px] tw:px-[6px] tw:rounded tw:text-inherit tw:text-[13px] tw:px-[10px] tw:py-[6px] tw:whitespace-pre-wrap tw:break-all tw:max-h-[300px] tw:overflow-y-auto tw:dark:bg-[rgba(255,255,255,0.05)]">{{
+            <code class="text-xs block bg-[rgba(0,0,0,0.04)] border border-(--o2-border-color) py-[2px] px-[6px] rounded text-inherit text-[13px] px-[10px] py-[6px] whitespace-pre-wrap break-all max-h-[300px] overflow-y-auto dark:bg-[rgba(255,255,255,0.05)]">{{
               pricingDialogRow.match_pattern
             }}</code>
           </div>
-          <OSeparator class="tw:mb-4" />
+          <OSeparator class="mb-4" />
 
           <div>
-            <div class="tw:text-xs tw:font-semibold tw:mb-[6px] tw:text-[#555] tw:mt-2 pricing-section-label">
+            <div class="text-xs font-semibold mb-[6px] text-[#555] mt-2 pricing-section-label">
               {{ t("modelPricing.colPricing") }}
             </div>
             <div
@@ -448,9 +448,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   getDefaultTier(pricingDialogRow)?.prices || {},
                 ).length
               "
-              class="tw:mt-2 tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:overflow-hidden"
+              class="mt-2 border border-(--o2-border-color) rounded-lg overflow-hidden"
             >
-              <table class="tw:w-full tw:border-collapse pricing-panel-table">
+              <table class="w-full border-collapse pricing-panel-table">
                 <thead>
                   <tr>
                     <th>{{ t("modelPricing.usageType") }}</th>
@@ -470,7 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </tbody>
               </table>
             </div>
-            <span v-else class="tw:text-gray-400">&mdash;</span>
+            <span v-else class="text-gray-400">&mdash;</span>
           </div>
         </div>
       </div>
@@ -741,7 +741,7 @@ function sortedPriceEntries(
   });
 }
 
-/** Return the first N prices to display tw:inline as chips. */
+/** Return the first N prices to display inline as chips. */
 const MAX_VISIBLE_PRICES = 2;
 function getVisiblePrices(model: any): Record<string, number> {
   const tier = getDefaultTier(model);
@@ -751,7 +751,7 @@ function getVisiblePrices(model: any): Record<string, number> {
   );
 }
 
-/** How many prices are tw:hidden behind the overflow "+N" chip. */
+/** How many prices are hidden behind the overflow "+N" chip. */
 function getOverflowCount(model: any): number {
   const tier = getDefaultTier(model);
   if (!tier?.prices) return 0;

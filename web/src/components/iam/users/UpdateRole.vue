@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-model="orgMemberData.first_name"
           :label="t('user.name')"
-          class="tw:py-3 showLabelOnTop"
+          class="py-3 showLabelOnTop"
           readonly
         />
 
@@ -37,12 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="roleOptions"
           :error="!!roleError"
           :error-message="roleError"
-          class="tw:pt-3 tw:pb-2 showLabelOnTop"
+          class="pt-3 pb-2 showLabelOnTop"
           data-test="iam-update-role-select"
           @update:model-value="roleError = ''"
         />
 
-        <div class="tw:flex tw:justify-center tw:mt-4 tw:gap-2">
+        <div class="flex justify-center mt-4 gap-2">
           <OButton
             @click="$emit('update:open', false)"
             variant="outline"

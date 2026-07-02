@@ -127,8 +127,8 @@ describe('ScriptToolbar.vue', () => {
 
       expect(backBtn.exists()).toBe(true);
       expect(backBtn.attributes('title')).toBe('Go Back');
-      // The back button uses Tailwind tw: prefix classes, not bare cursor-pointer
-      expect(backBtn.classes()).toContain('tw:cursor-pointer');
+      // The back button uses Tailwind  prefix classes, not bare cursor-pointer
+      expect(backBtn.classes()).toContain('cursor-pointer');
     });
 
     it('renders name input field', () => {
@@ -368,11 +368,11 @@ describe('ScriptToolbar.vue', () => {
       const toolbar = wrapper.find('[data-test="add-script-toolbar"]');
       
       expect(toolbar.exists()).toBe(true);
-      expect(toolbar.classes()).toContain('tw:pb-1.5');
-      expect(toolbar.classes()).toContain('tw:w-full');
-      expect(toolbar.classes()).toContain('tw:flex');
-      expect(toolbar.classes()).toContain('tw:justify-between');
-      expect(toolbar.classes()).toContain('tw:items-center');
+      expect(toolbar.classes()).toContain('pb-1.5');
+      expect(toolbar.classes()).toContain('w-full');
+      expect(toolbar.classes()).toContain('flex');
+      expect(toolbar.classes()).toContain('justify-between');
+      expect(toolbar.classes()).toContain('items-center');
     });
 
     it('has correct left section structure', () => {
@@ -387,8 +387,8 @@ describe('ScriptToolbar.vue', () => {
       const actionsSection = wrapper.find('[data-test="add-script-actions"]');
 
       expect(actionsSection.exists()).toBe(true);
-      expect(actionsSection.classes()).toContain('tw:flex');
-      expect(actionsSection.classes()).toContain('tw:items-center');
+      expect(actionsSection.classes()).toContain('flex');
+      expect(actionsSection.classes()).toContain('items-center');
     });
   });
 
