@@ -350,13 +350,52 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
       page.locator('[data-test^="o2-table-row-"]', { hasText: SERVICE }),
     ).toHaveCount(0, { timeout: 15000 });
 
+    // Prove the deletion server-side before touching the UI again: the group
+    // must vanish from the list API. Failing here means the backend DELETE is
+    // broken — a much more precise signal than a missing message in the UI.
+    await expect
+      .poll(async () => {
+        const res = await page.request.get(
+          `${BASE}/api/${ORG}/sourcemaps?service=${SERVICE}&version=${VERSION}&env=${ENV}`,
+          { headers: { Authorization: authHeader() } },
+        );
+        if (!res.ok()) return -res.status();
+        return (await res.json()).length;
+      }, { timeout: 15000, intervals: [500, 1000, 2000] })
+      .toBe(0);
+
     // Fresh page load -> in-memory translation cache is empty, so the Pretty
     // tab re-translates and must now report sourcemaps as unavailable.
+    // Register the response watcher BEFORE navigating so the translate call is
+    // captured no matter when the tab component fires it.
+    const translatePromise = page
+      .waitForResponse((r) => r.url().includes('/sourcemaps/stacktrace'), { timeout: 120000 })
+      .catch(() => null);
     await openErrorDetail(page, SERVICE);
     await page.getByRole('tab', { name: 'Pretty' }).click();
+
+    const translateRes = await translatePromise;
+    expect(translateRes, 'Pretty tab should fire a translate request').toBeTruthy();
+    const translateBody = await translateRes.json().catch(() => null);
+    testLogger.info('Translate response after sourcemaps delete', {
+      status: translateRes.status(),
+      body: translateBody,
+    });
+    // After deletion the backend must not resolve any frame to original source.
+    const traces = Array.isArray(translateBody?.stacktrace)
+      ? translateBody.stacktrace
+      : [translateBody?.stacktrace].filter(Boolean);
+    const frames = traces.flatMap((t) => t?.stack || []);
+    expect(
+      frames.every((f) => !f.source_info),
+      `no frame may carry source_info after delete, got: ${JSON.stringify(frames)}`,
+    ).toBe(true);
+
     await expect(
       page
-        .getByText('Source Maps Not Available')
+        .locator('[data-test="rum-pretty-stack-trace-unavailable"]')
+        .or(page.locator('[data-test="rum-pretty-stack-trace-error"]'))
+        .or(page.getByText('Source Maps Not Available'))
         .or(page.getByText(/Unable to translate stack trace/i))
         .first(),
     ).toBeVisible({ timeout: 30000 });
