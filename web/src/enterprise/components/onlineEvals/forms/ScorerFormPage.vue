@@ -1,62 +1,55 @@
 <template>
   <form class="scorer-form" @submit.prevent="save">
-    <div class="scorer-form__top">
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="arrow-back-ios-new"
-        data-test="scorer-form-back-btn"
-        :title="t('onlineEvals.scorer.backTo')"
-        @click="$emit('cancel')"
-      />
-      <h1 class="scorer-form__title">{{ titleText }}</h1>
-      <span class="scorer-form__subtitle">
-        {{
-          form.scorerType === "remote"
-            ? t("onlineEvals.scorer.subtitleRemote")
-            : t("onlineEvals.scorer.subtitleLlm")
-        }}
-      </span>
-      <div class="scorer-form__top-spacer" />
-      <span class="scorer-form__badge" :class="`scorer-form__badge--${form.scorerType}`">
-        {{
-          form.scorerType === "remote"
-            ? t("onlineEvals.scorer.badgeRemote")
-            : t("onlineEvals.scorer.badgeLlm")
-        }}
-      </span>
-      <button
-        type="button"
-        class="scorer-form__close"
-        :aria-label="t('onlineEvals.buttons.cancel')"
-        data-test="scorer-form-close-btn"
-        @click="$emit('cancel')"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+    <!-- Shared page header (same as JobFormPage) so the two eval forms read
+         identically: Back pill in the module-icon slot, title, and the
+         scorer-type badge + close button in #actions. -->
+    <AppPageHeader
+      :back="{
+        label: t('onlineEvals.scorer.backTo'),
+        onClick: () => $emit('cancel'),
+        dataTest: 'scorer-form-back-btn',
+      }"
+      class="card-container tw:px-3 tw:border-b tw:border-border-default"
+    >
+      <template #title>
+        <span data-test="scorer-form-title">{{ titleText }}</span>
+      </template>
+      <!-- Scorer-type badge sits inline, immediately after the title. -->
+      <template #title-trail>
+        <OBadge
+          :variant="form.scorerType === 'remote' ? 'success-soft' : 'blue-soft'"
+          size="sm"
+          data-test="scorer-form-type-badge"
         >
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
-    </div>
+          {{
+            form.scorerType === "remote"
+              ? t("onlineEvals.scorer.badgeRemote")
+              : t("onlineEvals.scorer.badgeLlm")
+          }}
+        </OBadge>
+      </template>
+      <template #actions>
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="close"
+          :aria-label="t('onlineEvals.buttons.cancel')"
+          :title="t('onlineEvals.buttons.cancel')"
+          data-test="scorer-form-close-btn"
+          @click="$emit('cancel')"
+        />
+      </template>
+    </AppPageHeader>
 
     <div class="scorer-form__body">
       <div class="scorer-form__main">
         <!-- Section 01: Identity -->
-        <section class="scorer-section">
-          <div class="scorer-section__head">
-            <span class="scorer-section__num">01</span>
-            <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.identitySection") }}</h3>
+        <section class="scorer-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.scorer.identitySection") }}</span>
           </div>
+          <div class="scorer-section__body">
 
           <div class="scorer-field">
             <label class="scorer-field__label">
@@ -129,14 +122,16 @@
               </span>
             </div>
           </div>
+          </div>
         </section>
 
         <!-- Section 02: LLM Judge configuration -->
-        <section v-if="form.scorerType === 'llm_judge'" class="scorer-section">
-          <div class="scorer-section__head">
-            <span class="scorer-section__num">02</span>
-            <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.judgeSection") }}</h3>
+        <section v-if="form.scorerType === 'llm_judge'" class="scorer-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.scorer.judgeSection") }}</span>
           </div>
+          <div class="scorer-section__body">
 
           <div class="scorer-field">
             <label class="scorer-field__label">
@@ -333,14 +328,16 @@
             </div>
 
           </div>
+          </div>
         </section>
 
         <!-- Section 02: Endpoint -->
-        <section v-else class="scorer-section">
-          <div class="scorer-section__head">
-            <span class="scorer-section__num">02</span>
-            <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.endpointSection") }}</h3>
+        <section v-else class="scorer-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.scorer.endpointSection") }}</span>
           </div>
+          <div class="scorer-section__body">
 
           <div class="scorer-field">
             <label class="scorer-field__label">
@@ -402,14 +399,16 @@
               />
             </div>
           </div>
+          </div>
         </section>
 
         <!-- Section 03: Authentication -->
-        <section v-if="form.scorerType === 'remote'" class="scorer-section">
-          <div class="scorer-section__head">
-            <span class="scorer-section__num">03</span>
-            <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.authSection") }}</h3>
+        <section v-if="form.scorerType === 'remote'" class="scorer-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.scorer.authSection") }}</span>
           </div>
+          <div class="scorer-section__body">
 
           <div class="scorer-field">
             <label class="scorer-field__label">
@@ -503,17 +502,19 @@
               </div>
             </div>
           </div>
+          </div>
         </section>
 
         <!-- Section 04: Custom headers -->
-        <section v-if="form.scorerType === 'remote'" class="scorer-section">
-          <div class="scorer-section__head">
-            <span class="scorer-section__num">04</span>
-            <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.headersSection") }}</h3>
+        <section v-if="form.scorerType === 'remote'" class="scorer-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.scorer.headersSection") }}</span>
             <span class="scorer-section__head-aside">
               {{ t("onlineEvals.scorer.remoteHeaders.subtitle") }}
             </span>
           </div>
+          <div class="scorer-section__body">
 
           <div class="scorer-field">
             <div
@@ -566,14 +567,16 @@
               </button>
             </div>
           </div>
+          </div>
         </section>
 
         <!-- Section 05: Request body template -->
-        <section v-if="form.scorerType === 'remote'" class="scorer-section">
-          <div class="scorer-section__head">
-            <span class="scorer-section__num">05</span>
-            <h3 class="scorer-section__title">{{ t("onlineEvals.scorer.requestBodySection") }}</h3>
+        <section v-if="form.scorerType === 'remote'" class="scorer-section card-container">
+          <div class="section-header">
+            <div class="section-header-accent" />
+            <span class="section-header-title">{{ t("onlineEvals.scorer.requestBodySection") }}</span>
           </div>
+          <div class="scorer-section__body">
 
           <div class="scorer-field scorer-field--request-body">
             <label class="scorer-field__label">
@@ -597,6 +600,7 @@
                 class="scorer-prompt-vars__chip scorer-mono"
               >{{ formatTemplateVariable(v) }}</span>
             </div>
+          </div>
           </div>
         </section>
       </div>
@@ -685,6 +689,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
   type ExtraMetadataField,
@@ -1286,96 +1292,23 @@ async function save() {
   gap: 10px;
 }
 
-.scorer-form__top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 8px 14px;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
-  flex-shrink: 0;
-}
-
-.scorer-form__title {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  letter-spacing: 0.005em;
-  white-space: nowrap;
-}
-
-.scorer-form__subtitle {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.scorer-form__top-spacer {
-  flex: 1;
-  min-width: 8px;
-}
-
-.scorer-form__badge {
-  padding: 3px 8px;
-  border-radius: 4px;
-  font: 700 11px inherit;
-  background: color-mix(in srgb, var(--color-text-primary) 10%, transparent);
-  color: var(--color-text-primary, currentColor);
-  white-space: nowrap;
-}
-
-.scorer-form__badge--llm_judge {
-  background: color-mix(in srgb, var(--o2-status-info-text) 14%, transparent);
-  color: var(--o2-status-info-text);
-}
-
-.scorer-form__badge--remote {
-  background: color-mix(in srgb, var(--o2-status-success-text) 14%, transparent);
-  color: var(--o2-status-success-text);
-}
-
-.scorer-form__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.scorer-form__close:hover {
-  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
-  color: var(--color-primary-600, #3F7994);
-}
-
 .scorer-form__body {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
-  gap: 10px;
+  display: flex;
+  gap: 8px;
 }
 
 .scorer-form__main {
+  flex: 6.5;
   min-width: 0;
+  min-height: 0;
   overflow: auto;
-  padding: 18px 24px 24px;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
 }
 
 .scorer-form__foot {
@@ -1406,40 +1339,44 @@ async function save() {
 .scorer-form__main .scorer-field--request-body :deep(textarea) { max-height: 280px; }
 
 .scorer-section {
-  margin-bottom: 24px;
+  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
-.scorer-section__head {
+.section-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-default, var(--o2-border));
 }
 
-.scorer-section__num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-weight: 700;
-  font-size: 11px;
+.section-header-accent {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  margin-right: 8px;
+  flex-shrink: 0;
+  background: var(--q-primary);
 }
 
-.scorer-section__title {
-  margin: 0;
-  font-size: 14px;
+.section-header-title {
+  font-size: 13px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--color-text-primary, currentColor);
 }
 
+.scorer-section__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
 .scorer-field {
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .scorer-field__label {
@@ -1794,7 +1731,10 @@ async function save() {
 
 @media (max-width: 1100px) {
   .scorer-form__body {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+  .scorer-form__main {
+    flex: 1 1 auto;
   }
 }
 </style>

@@ -207,6 +207,7 @@ const isSaving = ref(false);
 
 const providerTypeOptions = computed(() => [
   { label: "OpenAI", value: "openai" },
+  { label: "DeepSeek", value: "deepseek" },
   { label: "Anthropic", value: "anthropic" },
   { label: "Azure OpenAI", value: "azure_openai" },
   { label: "Ollama", value: "ollama" },

@@ -60,10 +60,17 @@ jobs:
     #     verifies bug ISSUES, and a PR number would confuse the engine downstream. The
     #     org-member gate is the trust boundary for the PAT — a stranger's comment fails this
     #     `if:`, so the dispatch step (and therefore the PAT) never runs.
+    # The `!github.event.issue.pull_request` check excludes PR comments (the field is set on
+    # PRs, undefined on regular issues). We intentionally use the truthy-negation pattern —
+    # the earlier `== null` comparison silently evaluated to false for undefined fields in
+    # GHA expression context, causing every legitimate /verify-bug comment on an issue to be
+    # gated out (caller job showed `skipped` with an empty steps array; see the "why not the
+    # equals-null" note below). This mirrors the truthy pattern e2e-council-caller.yml uses
+    # in the opposite direction (that caller REQUIRES a PR).
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
-       github.event.issue.pull_request == null &&
+       !github.event.issue.pull_request &&
        github.event.comment.body == '/verify-bug' &&
        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest

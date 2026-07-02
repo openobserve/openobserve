@@ -110,10 +110,6 @@
           <span class="sr-mono-cell">{{ usedByText(row) }}</span>
         </template>
 
-        <template #cell-lastRun>
-          <span class="sr-muted-cell">—</span>
-        </template>
-
         <template #cell-actions="{ row }">
           <div class="tw:flex tw:items-center actions-container">
             <OButton
@@ -260,13 +256,6 @@ const columns = computed(() => [
     meta: { align: "right" },
   },
   {
-    id: "lastRun",
-    header: t("onlineEvals.scorer.columns.lastRun"),
-    sortable: false,
-    size: COL.date,
-    meta: { align: "left" },
-  },
-  {
     id: "actions",
     header: t("onlineEvals.scorer.columns.actions"),
     sortable: false,
@@ -363,8 +352,4 @@ function usedByText(row: Scorer) {
   font-size: 12px;
 }
 
-.sr-muted-cell {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-}
 </style>
