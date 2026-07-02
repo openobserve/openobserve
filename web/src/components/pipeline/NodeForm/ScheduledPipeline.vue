@@ -2544,7 +2544,6 @@ const handleSidebarEvent = (event: string, value: any) => {
     // Set the new value
     pipelineEditorRef.value.setValue(newQuery);
     updateQueryValue(newQuery);
-  } else {
   }
 };
 const updateDateChange = (date: any) => {

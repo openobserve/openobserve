@@ -1450,7 +1450,6 @@ export default defineComponent({
             params.data.name,
           );
         }
-      } else {
       }
     };
 

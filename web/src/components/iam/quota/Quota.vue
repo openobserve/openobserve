@@ -1149,6 +1149,7 @@ export default defineComponent({
         document.body.appendChild(a);
         a.click();
       } catch (error) {
+        console.log(error);
       }
     };
 

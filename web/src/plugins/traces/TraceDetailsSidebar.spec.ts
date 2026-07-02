@@ -1752,7 +1752,6 @@ describe("TraceDetailsSidebar", async () => {
         expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
           mockSpan.span_id,
         );
-      } else {
       }
     });
 
