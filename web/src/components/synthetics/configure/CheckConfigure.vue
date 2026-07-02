@@ -5,6 +5,7 @@ import CheckDetails from './CheckDetails.vue'
 import CheckScheduleAlert from './CheckScheduleAlert.vue'
 import CheckLocations from './CheckLocations.vue'
 import CheckRUM from './CheckRUM.vue'
+import CheckCapture from './CheckCapture.vue'
 
 defineProps<{
   check: BrowserCheck
@@ -50,6 +51,12 @@ function handleUpdate(value: BrowserCheck) {
         :check="check"
         :check-type="checkType"
         data-test="synthetics-check-configure-rum"
+        @update:check="handleUpdate"
+      />
+      <CheckCapture
+        v-if="(checkType ?? 'browser') === 'browser'"
+        :check="check"
+        data-test="synthetics-check-configure-capture"
         @update:check="handleUpdate"
       />
     </div>

@@ -32,7 +32,7 @@ function buildFrequency(s: BrowserCheckSchedule): BrowserCheckFrequency {
 
 export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<string, unknown> {
   const {
-    journey, schedule, rum, auth, variables, secrets, headers, cookies, notifications,
+    journey, schedule, rum, capture, auth, variables, secrets, headers, cookies, notifications,
     url, folder, browserDevices, retries, waitBeforeRetrySecs, cooldownMins, alertIfFails,
     tz_offset,
     ...rest
@@ -95,7 +95,11 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
       steps: journeyToWireSteps(journey),
       browser_devices: browserDevices ?? [{ browser: 'chromium', device: 'laptop_large' }],
       timeout_ms: 30000,
-      capture: { screenshot: 'on_fail', trace: 'on_fail', video: 'off' },
+      capture: {
+        screenshot: capture?.screenshot ?? 'on-fail',
+        trace: capture?.trace ?? 'on-fail',
+        video: 'off',
+      },
       ...(secrets?.length && { secrets: secrets.map(({ id: _id, ...s }) => s) }),
       ...(headers?.length && { headers: headers.map(({ id: _id, ...h }) => h) }),
       ...(cookies?.length && { cookies: cookies.map(({ id: _id, ...c }) => c) }),
@@ -168,6 +172,11 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     rum: {
       collect: collect_rum_data ?? true,
       sessionReplay: session_replay ?? false,
+    },
+
+    capture: {
+      screenshot: config?.capture?.screenshot ?? 'on-fail',
+      trace: config?.capture?.trace ?? 'on-fail',
     },
 
     schedule: mapFrequencyToSchedule(frequency, start),

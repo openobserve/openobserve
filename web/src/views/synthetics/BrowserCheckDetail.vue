@@ -58,6 +58,7 @@ const check = ref<BrowserCheck>({
   locations: ['us-east-1'],
   notifications: { destinations: [], silenceMinutes: 60 },
   rum: { collect: true, sessionReplay: false },
+  capture: { screenshot: 'on-fail' as const, trace: 'on-fail' as const },
 })
 
 const enabled = computed({

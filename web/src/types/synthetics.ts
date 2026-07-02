@@ -194,6 +194,10 @@ export interface BrowserCheck {
     destinations: string[]
   }
   rum: { collect: boolean; sessionReplay: boolean }
+  capture: {
+    screenshot: 'always' | 'on-fail' | 'off'
+    trace: 'always' | 'on-fail' | 'off'
+  }
   auth?: {
     type: 'basic'
     username: string

@@ -161,6 +161,7 @@ const check = ref<BrowserCheck>({
   cooldownMins: 5,
   notifications: { destinations: [] },
   rum: { collect: true, sessionReplay: false },
+  capture: { screenshot: 'on-fail' as const, trace: 'on-fail' as const },
   variables: [],
 })
 
