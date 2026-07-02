@@ -21,9 +21,9 @@ const variantClasses: Record<
   string
 > = {
   default:
-    "tw:text-dropdown-item-text tw:data-[highlighted]:bg-dropdown-item-hover-bg",
+    "text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg",
   destructive:
-    "tw:text-dropdown-item-destructive-text tw:data-[highlighted]:bg-dropdown-item-destructive-hover-bg",
+    "text-dropdown-item-destructive-text data-[highlighted]:bg-dropdown-item-destructive-hover-bg",
 };
 </script>
 
@@ -32,12 +32,12 @@ const variantClasses: Record<
     :disabled="disabled"
     :text-value="textValue"
     :class="[
-      'tw:relative tw:flex tw:items-center tw:gap-2',
-      'tw:w-full tw:px-3 tw:py-1.5 tw:rounded-md',
-      'tw:cursor-pointer tw:select-none tw:outline-none',
-      'tw:transition-colors tw:duration-150',
+      'relative flex items-center gap-2',
+      'w-full px-3 py-1.5 rounded-md',
+      'cursor-pointer select-none outline-none',
+      'transition-colors duration-150',
       variantClasses[variant],
-      'tw:data-[disabled]:text-dropdown-item-disabled tw:data-[disabled]:cursor-not-allowed',
+      'data-[disabled]:text-dropdown-item-disabled data-[disabled]:cursor-not-allowed',
     ]"
     @select="(e) => emit('select', e)"
   >

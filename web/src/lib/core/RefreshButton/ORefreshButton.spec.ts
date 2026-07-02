@@ -54,7 +54,7 @@ describe("ORefreshButton", () => {
   it("uses idle dot color when no lastRunAt", () => {
     const wrapper = mount(ORefreshButton, { global: globalConfig });
     const dot = wrapper.find(".tw\\:rounded-full");
-    expect(dot.classes()).toContain("tw:bg-refresh-dot-idle");
+    expect(dot.classes()).toContain("bg-refresh-dot-idle");
   });
 
   it("uses fresh dot color when lastRunAt < 30s ago", () => {
@@ -63,7 +63,7 @@ describe("ORefreshButton", () => {
       global: globalConfig,
     });
     const dot = wrapper.find(".tw\\:rounded-full");
-    expect(dot.classes()).toContain("tw:bg-refresh-dot-fresh");
+    expect(dot.classes()).toContain("bg-refresh-dot-fresh");
   });
 
   it("uses stale dot color when lastRunAt is 30s–5min ago", () => {
@@ -72,7 +72,7 @@ describe("ORefreshButton", () => {
       global: globalConfig,
     });
     const dot = wrapper.find(".tw\\:rounded-full");
-    expect(dot.classes()).toContain("tw:bg-refresh-dot-stale");
+    expect(dot.classes()).toContain("bg-refresh-dot-stale");
   });
 
   it("uses critical dot color when lastRunAt > 5min ago", () => {
@@ -81,7 +81,7 @@ describe("ORefreshButton", () => {
       global: globalConfig,
     });
     const dot = wrapper.find(".tw\\:rounded-full");
-    expect(dot.classes()).toContain("tw:bg-refresh-dot-critical");
+    expect(dot.classes()).toContain("bg-refresh-dot-critical");
   });
 
   it("uses idle dot color when loading=true regardless of lastRunAt", () => {
@@ -90,7 +90,7 @@ describe("ORefreshButton", () => {
       global: globalConfig,
     });
     const dot = wrapper.find(".tw\\:rounded-full");
-    expect(dot.classes()).toContain("tw:bg-refresh-dot-idle");
+    expect(dot.classes()).toContain("bg-refresh-dot-idle");
   });
 
   // --- emits ---

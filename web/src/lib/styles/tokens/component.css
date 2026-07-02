@@ -1263,7 +1263,7 @@
   --color-skeleton-highlight: var(--color-skeleton-highlight);
   --color-skeleton-shimmer: var(--color-skeleton-shimmer);
 
-  /* OText typography colours (so tw:text-typography-* utilities generate) */
+  /* OText typography colours (so text-typography-* utilities generate) */
   --color-typography-page-title:  var(--color-typography-page-title);
   --color-typography-section:     var(--color-typography-section);
   --color-typography-panel-title: var(--color-typography-panel-title);
@@ -1458,7 +1458,7 @@ body {
  * Element typography resets must live in `@layer base` so Tailwind utilities
  * (which live in `@layer utilities`) can override them. Unlayered rules beat
  * any layered rule regardless of specificity, so leaving these outside a layer
- * would silently suppress utilities like `tw:mb-4` / `tw:text-base` applied to
+ * would silently suppress utilities like `mb-4` / `text-base` applied to
  * bare <p>/<h2>/… elements.
  */
 @layer base {

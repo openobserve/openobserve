@@ -53,7 +53,7 @@ const dot = computed(() => props.dot ?? resolved.value.dot);
 
 <template>
   <!-- Empty value: a plain dash in PRIMARY text (never the disabled grey). -->
-  <span v-if="isEmpty" class="tw:text-text-primary">{{ emptyLabel }}</span>
+  <span v-if="isEmpty" class="text-text-primary">{{ emptyLabel }}</span>
   <OBadge
     v-else
     :variant="variant"

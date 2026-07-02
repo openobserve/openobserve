@@ -91,15 +91,15 @@ describe("OBadge", () => {
 
   it("applies default variant classes when no variant specified", () => {
     const wrapper = mount(OBadge, { slots: { default: "x" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:bg-badge-default-solid-bg");
-    expect(wrapper.classes().join(" ")).toContain("tw:text-badge-default-solid-text");
+    expect(wrapper.classes().join(" ")).toContain("bg-badge-default-solid-bg");
+    expect(wrapper.classes().join(" ")).toContain("text-badge-default-solid-text");
   });
 
   it.each([
-    ["primary", "tw:bg-badge-primary-solid-bg"],
-    ["success", "tw:bg-badge-success-solid-bg"],
-    ["warning", "tw:bg-badge-warning-solid-bg"],
-    ["error",   "tw:bg-badge-error-solid-bg"],
+    ["primary", "bg-badge-primary-solid-bg"],
+    ["success", "bg-badge-success-solid-bg"],
+    ["warning", "bg-badge-warning-solid-bg"],
+    ["error",   "bg-badge-error-solid-bg"],
   ] as const)("applies %s solid variant classes", (variant, expectedClass) => {
     const wrapper = mount(OBadge, {
       props: { variant },
@@ -109,26 +109,26 @@ describe("OBadge", () => {
   });
 
   it.each([
-    ["default-outline", "tw:text-badge-default-ol-text"],
-    ["primary-outline", "tw:text-badge-primary-ol-text"],
-    ["success-outline", "tw:text-badge-success-ol-text"],
-    ["warning-outline", "tw:text-badge-warning-ol-text"],
-    ["error-outline",   "tw:text-badge-error-ol-text"],
+    ["default-outline", "text-badge-default-ol-text"],
+    ["primary-outline", "text-badge-primary-ol-text"],
+    ["success-outline", "text-badge-success-ol-text"],
+    ["warning-outline", "text-badge-warning-ol-text"],
+    ["error-outline",   "text-badge-error-ol-text"],
   ] as const)("applies %s outline variant classes", (variant, expectedClass) => {
     const wrapper = mount(OBadge, {
       props: { variant },
       slots: { default: "x" },
     });
     expect(wrapper.classes().join(" ")).toContain(expectedClass);
-    expect(wrapper.classes().join(" ")).toContain("tw:bg-transparent");
+    expect(wrapper.classes().join(" ")).toContain("bg-transparent");
   });
 
   it.each([
-    ["default-soft", "tw:bg-badge-default-soft-bg"],
-    ["primary-soft", "tw:bg-badge-primary-soft-bg"],
-    ["success-soft", "tw:bg-badge-success-soft-bg"],
-    ["warning-soft", "tw:bg-badge-warning-soft-bg"],
-    ["error-soft",   "tw:bg-badge-error-soft-bg"],
+    ["default-soft", "bg-badge-default-soft-bg"],
+    ["primary-soft", "bg-badge-primary-soft-bg"],
+    ["success-soft", "bg-badge-success-soft-bg"],
+    ["warning-soft", "bg-badge-warning-soft-bg"],
+    ["error-soft",   "bg-badge-error-soft-bg"],
   ] as const)("applies %s soft variant classes", (variant, expectedClass) => {
     const wrapper = mount(OBadge, {
       props: { variant },
@@ -141,7 +141,7 @@ describe("OBadge", () => {
 
   it("applies md size classes by default", () => {
     const wrapper = mount(OBadge, { slots: { default: "x" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:px-2.5");
+    expect(wrapper.classes().join(" ")).toContain("px-2.5");
   });
 
   it("applies sm size classes", () => {
@@ -149,7 +149,7 @@ describe("OBadge", () => {
       props: { size: "sm" },
       slots: { default: "x" },
     });
-    expect(wrapper.classes().join(" ")).toContain("tw:px-2");
+    expect(wrapper.classes().join(" ")).toContain("px-2");
   });
 
   // ── Root element tag ────────────────────────────────────────────────────
@@ -235,7 +235,7 @@ describe("OBadge", () => {
       props: { disabled: true },
       slots: { default: "x" },
     });
-    expect(wrapper.classes().join(" ")).toContain("tw:opacity-40");
+    expect(wrapper.classes().join(" ")).toContain("opacity-40");
   });
 
   // ── Accessibility ───────────────────────────────────────────────────────

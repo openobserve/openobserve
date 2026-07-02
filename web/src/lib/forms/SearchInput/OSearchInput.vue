@@ -45,7 +45,7 @@ const iconSize = computed(() => (props.size === "xs" ? "xs" : "sm"));
       <OIcon
         name="search"
         :size="iconSize"
-        class="tw:cursor-pointer"
+        class="cursor-pointer"
       />
     </template>
   </OInput>

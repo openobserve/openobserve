@@ -38,7 +38,7 @@ const props = defineProps<{
   statusBarColor?: string;
   /** Enable hover-visible copy button on cells */
   enableCellCopy?: boolean;
-  /** Per-cell tw:inline style function */
+  /** Per-cell inline style function */
   getCellStyle?: (params: {
     columnId: string;
     row: any;
@@ -105,8 +105,8 @@ const showTreeWarning = computed(() =>
  */
 const treeConnectorX = computed(() => {
   const selectionWidth = props.selectionEnabled ? TABLE_CHECKBOX_COL_WIDTH : 0;
-  const expansionWidth = props.expansionEnabled ? 32 : 0; // tw:w-8
-  const cellPaddingLeft = 8; // tw:px-2
+  const expansionWidth = props.expansionEnabled ? 32 : 0; // w-8
+  const cellPaddingLeft = 8; // px-2
   const halfChevron = 9; // 18px / 2
   const parentDepth = treeMeta.value?.depth ?? 0;
   return (
@@ -132,15 +132,15 @@ function onDblclick(event: MouseEvent) {
     ref="rowRef"
     :data-test="`o2-table-row-${row.index}`"
     :class="[
-      'tw:group/row',
-      'tw:transition-colors tw:duration-150',
-      clickable ? 'tw:cursor-pointer' : '',
-      'tw:hover:bg-table-row-hover-bg',
+      'group/row',
+      'transition-colors duration-150',
+      clickable ? 'cursor-pointer' : '',
+      'hover:bg-table-row-hover-bg',
       isRowSelected
-        ? 'tw:bg-table-row-selected-bg'
+        ? 'bg-table-row-selected-bg'
         : '',
       !isRowSelected && isStriped
-        ? 'tw:bg-table-row-striped-bg'
+        ? 'bg-table-row-striped-bg'
         : '',
       rowClass,
     ]"
@@ -151,7 +151,7 @@ function onDblclick(event: MouseEvent) {
     <!-- Status bar color indicator -->
     <td
       v-if="statusBarColor"
-      class="tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:p-0 tw:border-0 tw:z-10"
+      class="absolute left-0 inset-y-0 w-1 p-0 border-0 z-10"
       :style="{ backgroundColor: statusBarColor }"
       data-test="o2-table-status-bar"
     />
@@ -159,7 +159,7 @@ function onDblclick(event: MouseEvent) {
     <!-- Expand button cell -->
     <td
       v-if="expansionEnabled"
-      :class="['tw:w-4 tw:min-w-4 tw:px-0 tw:text-center tw:align-middle', bordered ? 'tw:border-b tw:border-table-row-divider' : '']"
+      :class="['w-4 min-w-4 px-0 text-center align-middle', bordered ? 'border-b border-table-row-divider' : '']"
       data-test="o2-table-expand-cell"
     >
       <OTableExpandButton
@@ -174,14 +174,14 @@ function onDblclick(event: MouseEvent) {
     <td
       v-if="selectionEnabled"
       :class="[
-        'tw:text-left tw:align-middle',
-        bordered ? 'tw:border-b tw:border-table-row-divider' : '',
-        isRowSelectable && !isRowSelectable(row.original) ? 'tw:cursor-not-allowed' : '',
+        'text-left align-middle',
+        bordered ? 'border-b border-table-row-divider' : '',
+        isRowSelectable && !isRowSelectable(row.original) ? 'cursor-not-allowed' : '',
       ]"
       :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
       data-test="o2-table-select-cell"
     >
-      <div class="tw:flex tw:items-center tw:justify-start">
+      <div class="flex items-center justify-start">
         <OTableSelectCheckbox
           :model-value="isRowSelected ?? false"
           :row-id="String(row.index)"
@@ -223,17 +223,17 @@ function onDblclick(event: MouseEvent) {
   <tr
     v-if="showTreeWarning"
     :data-test="`o2-table-tree-warning-${row.index}`"
-    class="tw:bg-(--color-warning-surface,rgba(251,191,36,0.08))"
+    class="bg-(--color-warning-surface,rgba(251,191,36,0.08))"
   >
     <td
       :colspan="row.getVisibleCells().length + (expansionEnabled ? 1 : 0) + (selectionEnabled ? 1 : 0)"
       :class="[
-        'o2-table-tree-warning-cell tw:relative',
-        bordered ? 'tw:border-b tw:border-table-row-divider' : '',
+        'o2-table-tree-warning-cell relative',
+        bordered ? 'border-b border-table-row-divider' : '',
       ]"
       :style="{ '--o2-tree-connector-x': treeConnectorX + 'px' }"
     >
-      <div class="tw:relative tw:z-1 tw:flex tw:items-center tw:justify-center">
+      <div class="relative z-1 flex items-center justify-center">
         <slot name="tree-warning" :row="row.original" />
       </div>
     </td>
@@ -243,11 +243,11 @@ function onDblclick(event: MouseEvent) {
   <tr
     v-if="hasExpansionSlot && isExpanded"
     :data-test="`o2-table-expanded-row-${row.index}`"
-    class="tw:bg-table-row-expanded-bg"
+    class="bg-table-row-expanded-bg"
   >
     <td
       :colspan="row.getVisibleCells().length + (expansionEnabled ? 1 : 0) + (selectionEnabled ? 1 : 0)"
-      :class="bordered ? 'tw:border-b tw:border-table-row-divider' : ''"
+      :class="bordered ? 'border-b border-table-row-divider' : ''"
     >
       <slot name="expansion" :row="row.original" />
     </td>

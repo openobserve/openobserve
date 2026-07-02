@@ -66,7 +66,7 @@ describe("OInnerLoading", () => {
       global: { stubs: { transition: false } },
     });
     const overlay = wrapper.find("[role='status']");
-    expect(overlay.classes()).toContain("tw:absolute");
-    expect(overlay.classes()).toContain("tw:inset-0");
+    expect(overlay.classes()).toContain("absolute");
+    expect(overlay.classes()).toContain("inset-0");
   });
 });

@@ -14,26 +14,26 @@ const clampedValue = computed(() => Math.min(1, Math.max(0, props.value)));
 const percentage = computed(() => `${clampedValue.value * 100}%`);
 
 const sizeClasses: Record<NonNullable<ProgressBarProps["size"]>, string> = {
-  xs: "tw:h-1",    // 4px
-  sm: "tw:h-2",    // 8px
-  md: "tw:h-3",    // 12px
-  lg: "tw:h-5",    // 20px
+  xs: "h-1",    // 4px
+  sm: "h-2",    // 8px
+  md: "h-3",    // 12px
+  lg: "h-5",    // 20px
 };
 
 const variantFillClasses: Record<NonNullable<ProgressBarProps["variant"]>, string> = {
-  default: "tw:bg-progress-bar-default",
-  warning: "tw:bg-progress-bar-warning",
-  danger:  "tw:bg-progress-bar-danger",
+  default: "bg-progress-bar-default",
+  warning: "bg-progress-bar-warning",
+  danger:  "bg-progress-bar-danger",
 };
 
 const trackClasses = computed(() => [
-  "tw:relative tw:w-full tw:rounded-full tw:overflow-hidden tw:bg-progress-bar-track",
+  "relative w-full rounded-full overflow-hidden bg-progress-bar-track",
   sizeClasses[props.size ?? "sm"],
 ]);
 
 const fillClasses = computed(() => [
-  "tw:h-full tw:rounded-full tw:transition-[width] tw:duration-300 tw:ease-out",
-  "tw:flex tw:items-center tw:justify-center tw:overflow-hidden",
+  "h-full rounded-full transition-[width] duration-300 ease-out",
+  "flex items-center justify-center overflow-hidden",
   variantFillClasses[props.variant ?? "default"],
 ]);
 </script>
@@ -52,7 +52,7 @@ const fillClasses = computed(() => [
     >
       <span
         v-if="$slots.default"
-        class="tw:text-progress-bar-label tw:text-xs tw:font-semibold tw:leading-none tw:select-none"
+        class="text-progress-bar-label text-xs font-semibold leading-none select-none"
       >
         <slot />
       </span>

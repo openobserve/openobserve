@@ -91,32 +91,32 @@ describe('OTabPanels', () => {
 
   // --- scroll prop ---
 
-  it('applies tw:overflow-hidden by default (scroll="none")', () => {
+  it('applies overflow-hidden by default (scroll="none")', () => {
     const wrapper = mountTabPanels()
-    expect(wrapper.classes()).toContain('tw:overflow-hidden')
+    expect(wrapper.classes()).toContain('overflow-hidden')
   })
 
-  it('applies tw:overflow-auto when scroll="auto"', () => {
+  it('applies overflow-auto when scroll="auto"', () => {
     const wrapper = mountTabPanels({ scroll: 'auto' })
-    expect(wrapper.classes()).toContain('tw:overflow-auto')
-    expect(wrapper.classes()).not.toContain('tw:overflow-hidden')
+    expect(wrapper.classes()).toContain('overflow-auto')
+    expect(wrapper.classes()).not.toContain('overflow-hidden')
   })
 
-  it('applies tw:overflow-y-auto when scroll="y"', () => {
+  it('applies overflow-y-auto when scroll="y"', () => {
     const wrapper = mountTabPanels({ scroll: 'y' })
-    expect(wrapper.classes()).toContain('tw:overflow-y-auto')
-    expect(wrapper.classes()).not.toContain('tw:overflow-hidden')
+    expect(wrapper.classes()).toContain('overflow-y-auto')
+    expect(wrapper.classes()).not.toContain('overflow-hidden')
   })
 
   // --- grow prop ---
 
-  it('does not add tw:flex-1 by default', () => {
+  it('does not add flex-1 by default', () => {
     const wrapper = mountTabPanels()
-    expect(wrapper.classes()).not.toContain('tw:flex-1')
+    expect(wrapper.classes()).not.toContain('flex-1')
   })
 
-  it('adds tw:flex-1 when grow is true', () => {
+  it('adds flex-1 when grow is true', () => {
     const wrapper = mountTabPanels({ grow: true })
-    expect(wrapper.classes()).toContain('tw:flex-1')
+    expect(wrapper.classes()).toContain('flex-1')
   })
 })
