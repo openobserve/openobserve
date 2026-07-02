@@ -255,6 +255,7 @@ test.describe("Logs Visualization State Persistence testcases", () => {
 
     // 2. Assert Visualize tab content is visible on first load.
     await pm.logsPage.expectVisualizeTabContentVisible();
+    await pm.logsPage.expectLogsSearchResultNotVisible();
 
     testLogger.info('URL param Visualize tab restoration test completed');
   });
@@ -272,6 +273,7 @@ test.describe("Logs Visualization State Persistence testcases", () => {
 
     // 2. Assert Build query page is visible on first load.
     await pm.logsPage.expectBuildQueryPageVisible();
+    await pm.logsPage.expectLogsSearchResultNotVisible();
 
     testLogger.info('URL param Build tab restoration test completed');
   });

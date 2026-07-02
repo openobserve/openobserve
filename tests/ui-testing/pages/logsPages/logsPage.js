@@ -1043,6 +1043,7 @@ export class LogsPage {
         await option.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
         // Click the checkbox to ADD to the multi-selection (not replace it).
         const streamCheckbox = option.first().locator('[data-select-checkbox]');
+        await streamCheckbox.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
         if (await streamCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
             await streamCheckbox.click();
             testLogger.info(`Added ${streamName} to stream selection via checkbox`);
