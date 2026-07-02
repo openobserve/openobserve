@@ -510,6 +510,10 @@ pub async fn notify_check_result(
         return;
     }
 
+    // TODO: enforce alert_if_fails (consecutive failure count) and cooldown_mins (silence period).
+    // Requires a persistent state store keyed by (org_id, synthetics_id) tracking consecutive
+    // failure count and last-notified-at timestamp. Until then every failed run fires a notification.
+
     use config::meta::destinations::Module;
 
     let vars: &[(&str, &str)] = &[
