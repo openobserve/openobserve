@@ -373,6 +373,7 @@ jobs:
                 "rum-negative.spec.js",
                 "rum-onboarding-snippets.spec.js",
                 "sourcemap-ui.spec.js",
+                "sourcemap-upload-pretty.spec.js",
               ]
           # rum-token.spec.js RESETS the org RUM token; running it beside the
           # dataflow specs (workers run files in parallel) would 401 their

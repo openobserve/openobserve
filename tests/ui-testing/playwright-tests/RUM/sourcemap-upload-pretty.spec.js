@@ -44,6 +44,11 @@ const NOMAP_SERVICE = `e2e-smap-nomap-${RUN_ID}`;
 const VERSION = '1.0.0-e2e';
 const ENV = 'e2e';
 
+/** Escape all regex metacharacters (incl. backslash) so a literal string is safe inside RegExp. */
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function authHeader() {
   return `Basic ${Buffer.from(
     `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`,
@@ -261,7 +266,7 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
 
     // Translation resolves to the ORIGINAL file + line from the sourcemap.
     const prettyFrame = page.getByText(
-      new RegExp(`${manifest.originalSourcePath.replace(/[./]/g, '\\$&')}:${err.expected.line}:`),
+      new RegExp(`${escapeRegex(manifest.originalSourcePath)}:${err.expected.line}:`),
     );
     await expect(prettyFrame.first()).toBeVisible({ timeout: 30000 });
 

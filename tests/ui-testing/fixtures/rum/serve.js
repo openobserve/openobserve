@@ -47,10 +47,13 @@ function templateSdkVersion(source, version) {
  * by key with a targeted regex so the rest of the sample code is untouched.
  */
 function templateOoRum(source, cfg) {
+  // JSON.stringify produces a fully-escaped double-quoted JS string literal
+  // (handles quotes, backslashes and control chars); the replacer FUNCTION
+  // form keeps `$` sequences in values from being treated as patterns.
   const set = (src, key, value) =>
     src.replace(
       new RegExp(`(${key}\\s*:\\s*)(['"]).*?\\2`),
-      `$1'${String(value).replace(/'/g, "\\'")}'`,
+      (_match, prefix) => prefix + JSON.stringify(String(value)),
     );
 
   let out = source;
