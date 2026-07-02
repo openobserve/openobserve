@@ -42,6 +42,7 @@ tracing.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true
 reqwest.workspace = true
+url.workspace = true
 tonic.workspace = true
 opentelemetry.workspace = true
 tracing-opentelemetry.workspace = true

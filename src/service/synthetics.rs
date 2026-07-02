@@ -26,7 +26,7 @@ use config::{
         stream::StreamType,
         synthetics::{
             BucketStatus, CheckResult, CheckStatus, ListResultsParams, ListResultsResponse,
-            StatusBucket, SyntheticStatus, SyntheticSummary,
+            ScreenshotRef, StatusBucket, SyntheticStatus, SyntheticSummary,
         },
     },
 };
@@ -112,6 +112,20 @@ fn parse_result(h: &serde_json::Value) -> Option<CheckResult> {
             _ => config::meta::synthetics::TriggerType::Scheduled,
         },
         checked_at: h.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
+        screenshot_refs: h
+            .get("screenshot_refs")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default(),
+        trace_ref: h
+            .get("trace_ref")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from),
+        rum_session_id: h
+            .get("rum_session_id")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from),
     })
 }
 
@@ -120,6 +134,46 @@ fn safe_ident(s: &str) -> String {
         .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
         .take(128)
         .collect()
+}
+
+pub async fn get_artifact_key(
+    org_id: &str,
+    synthetics_id: &str,
+    job_id: i64,
+    artifact_type: &str,   // "screenshot" or "trace"
+    step_id: Option<&str>, // required for screenshot
+) -> anyhow::Result<Option<String>> {
+    let now = config::utils::time::now_micros();
+    let start_time = now - 90 * ONE_DAY_US;
+    let sid = safe_ident(synthetics_id);
+    let sql = format!(
+        "SELECT screenshot_refs, trace_ref FROM \"{STREAM}\" \
+         WHERE _timestamp >= {start_time} AND _timestamp <= {now} \
+           AND synthetics_id = '{sid}' AND job_id = {job_id} LIMIT 1"
+    );
+    let req = build_req(sql, start_time, now, 1, 0);
+    let resp = run_search(org_id, &req).await?;
+    let Some(hit) = resp.hits.first() else {
+        return Ok(None);
+    };
+    match artifact_type {
+        "trace" => Ok(hit
+            .get("trace_ref")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from)),
+        "screenshot" => {
+            let Some(step) = step_id else {
+                return Ok(None);
+            };
+            let refs: Vec<ScreenshotRef> = hit
+                .get("screenshot_refs")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            Ok(refs.into_iter().find(|r| r.step_id == step).map(|r| r.key))
+        }
+        _ => Ok(None),
+    }
 }
 
 pub async fn list_results(

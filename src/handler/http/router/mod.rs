@@ -992,7 +992,12 @@ pub fn service_routes() -> Router {
             // Synthetics — job API (no org prefix; authenticated via o2syn_ token)
             .route("/synthetics/jobs/resolve", post(synthetics::job_resolve))
             .route("/synthetics/jobs/lease", post(synthetics::job_lease))
-            .route("/synthetics/jobs/ack", post(synthetics::job_ack));
+            .route("/synthetics/jobs/ack", post(synthetics::job_ack))
+            .route(
+                "/synthetics/jobs/artifact-urls",
+                post(synthetics::job_artifact_urls),
+            )
+            .route("/synthetics/jobs/upload", post(synthetics::job_upload));
     }
 
     #[cfg(feature = "cloud")]

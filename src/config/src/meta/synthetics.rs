@@ -410,6 +410,12 @@ pub struct SyntheticListResponse {
 
 // ── Results API types (from synthetics_results stream) ────────────────────────
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
+pub struct ScreenshotRef {
+    pub step_id: String,
+    pub key: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CheckResult {
     pub job_id: i64,
@@ -423,6 +429,11 @@ pub struct CheckResult {
     pub device: Option<String>,
     pub trigger_type: TriggerType,
     pub checked_at: i64,
+    // artifact keys — object store paths, never presigned URLs
+    #[serde(default)]
+    pub screenshot_refs: Vec<ScreenshotRef>,
+    pub trace_ref: Option<String>,
+    pub rum_session_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

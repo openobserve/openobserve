@@ -146,6 +146,13 @@ pub async fn get_result(Path((org_id, id, job_id)): Path<(String, String, String
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ArtifactQuery {
+    #[serde(rename = "type")]
+    pub artifact_type: String,
+    pub step: Option<String>,
+}
+
 #[utoipa::path(
     get,
     path = "/{org_id}/synthetics/{id}/results/{job_id}/artifact",
@@ -158,20 +165,125 @@ pub async fn get_result(Path((org_id, id, job_id)): Path<(String, String, String
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Monitor ID"),
         ("job_id" = i64, Path, description = "Job ID"),
+        ("type" = String, Query, description = "Artifact type: screenshot or trace"),
+        ("step" = Option<String>, Query, description = "Step ID (required for screenshot)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 501, description = "Not implemented"),
+        (status = 302, description = "Redirect to presigned URL"),
+        (status = 404, description = "Not found"),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn get_artifact_url(
-    Path((_org_id, _id, _job_id)): Path<(String, String, String)>,
+    Path((org_id, id, job_id)): Path<(String, String, String)>,
+    Query(query): Query<ArtifactQuery>,
 ) -> Response {
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(serde_json::json!({"message": "artifact storage not yet implemented"})),
+    let job_id: i64 = match job_id.parse() {
+        Ok(v) => v,
+        Err(_) => return MetaHttpResponse::bad_request("invalid job_id"),
+    };
+
+    let key = match crate::service::synthetics::get_artifact_key(
+        &org_id,
+        &id,
+        job_id,
+        &query.artifact_type,
+        query.step.as_deref(),
     )
-        .into_response()
+    .await
+    {
+        Ok(Some(k)) => k,
+        Ok(None) => return MetaHttpResponse::not_found("artifact not found"),
+        Err(e) => {
+            tracing::error!("[synthetics] get_artifact_key: {e}");
+            return MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                e.to_string(),
+            )
+            .into_response();
+        }
+    };
+
+    if config::is_local_disk_storage() {
+        // serve file bytes directly
+        match infra::storage::get_bytes("default", &key).await {
+            Ok(bytes) => {
+                let content_type = if query.artifact_type == "screenshot" {
+                    "image/png"
+                } else {
+                    "application/zip"
+                };
+                (
+                    StatusCode::OK,
+                    [(axum::http::header::CONTENT_TYPE, content_type)],
+                    bytes,
+                )
+                    .into_response()
+            }
+            Err(e) => {
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    } else {
+        let expires = std::time::Duration::from_secs(5 * 60);
+        match infra::storage::presign_url(&key, reqwest::Method::GET, expires).await {
+            Ok(url) => axum::response::Redirect::temporary(url.as_str()).into_response(),
+            Err(e) => {
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+}
+
+pub async fn job_artifact_urls(Json(body): Json<serde_json::Value>) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match serde_json::from_value::<
+            o2_enterprise::enterprise::synthetics::job_api::ArtifactUrlsRequest,
+        >(body)
+        {
+            Ok(req) => {
+                match o2_enterprise::enterprise::synthetics::job_api::artifact_urls(req).await {
+                    Ok(resp) => MetaHttpResponse::json(resp),
+                    Err(e) => {
+                        tracing::error!("[synthetics] artifact_urls: {e}");
+                        MetaHttpResponse::error(
+                            StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                            e.to_string(),
+                        )
+                        .into_response()
+                    }
+                }
+            }
+            Err(e) => MetaHttpResponse::bad_request(e.to_string()),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = body;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+pub async fn job_upload(
+    Query(params): Query<std::collections::HashMap<String, String>>,
+    body: axum::body::Bytes,
+) -> Response {
+    let key = match params.get("key") {
+        Some(k) => k.clone(),
+        None => return MetaHttpResponse::bad_request("missing key param"),
+    };
+    match infra::storage::put("default", &key, body.into()).await {
+        Ok(_) => MetaHttpResponse::ok("uploaded"),
+        Err(e) => {
+            tracing::error!("[synthetics] job_upload: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
+        }
+    }
 }
 
 #[utoipa::path(
