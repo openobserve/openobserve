@@ -17,6 +17,7 @@ import OSelect from '@/lib/forms/Select/OSelect.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
+import OSpinner from '@/lib/feedback/Spinner/OSpinner.vue'
 
 const props = defineProps<{
   step: BrowserStep
@@ -156,15 +157,15 @@ const stepNumberClass = computed(() => {
   if (!props.replayDotState) return 'tw:w-6! tw:text-center tw:text-sm tw:tabular-nums tw:text-[var(--o2-text-muted)]'
   switch (props.replayDotState) {
     case 'active':
-      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-timeline-dot-primary)] tw:text-[var(--color-badge-primary-soft-text)] tw:border tw:border-[var(--color-badge-primary-soft-text)] tw:text-white tw:text-xs tw:font-bold'
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-badge-primary-soft-bg)] tw:text-[var(--color-badge-primary-soft-text)] tw:border tw:border-[var(--color-badge-primary-soft-text)] tw:text-white tw:text-xs tw:font-semi-bold'
     case 'pass':
-      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-badge-success-soft-bg)] tw:text-[var(--color-badge-success-soft-text)] tw:border tw:border-[var(--color-badge-success-soft-text)] tw:text-xs tw:font-bold'
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-badge-success-soft-bg)] tw:text-[var(--color-badge-success-soft-text)] tw:border tw:border-[var(--color-badge-success-soft-text)] tw:text-xs tw:font-semi-bold'
     case 'fail':
-      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-badge-error-soft-bg)] tw:text-[var(--color-badge-error-soft-text)] tw:border tw:border-[var(--color-badge-error-soft-text)]  tw:text-xs tw:font-bold'
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-badge-error-soft-bg)] tw:text-[var(--color-badge-error-soft-text)] tw:border tw:border-[var(--color-badge-error-soft-text)]  tw:text-xs tw:font-semi-bold'
     case 'skip':
-      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-badge-default-soft-bg)] tw:text-[var(--color-badge-default-soft-text)] tw:border tw:border-[var(--color-badge-default-soft-text)]  tw:text-xs tw:font-bold'
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-badge-default-soft-bg)] tw:text-[var(--color-badge-default-soft-text)] tw:border tw:border-[var(--color-badge-default-soft-text)]  tw:text-xs tw:font-semi-bold'
     default:
-      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:border tw:border-[var(--o2-border)] tw:text-[var(--o2-text-muted)] tw:border tw:border-[var(--o2-text-muted)]  tw:text-xs tw:font-bold'
+      return 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:border tw:border-[var(--o2-border)] tw:text-[var(--o2-text-muted)] tw:border tw:border-[var(--o2-text-muted)]  tw:text-xs tw:font-semi-bold'
   }
 })
 
@@ -266,7 +267,7 @@ function toggleExpanded() {
           :data-test="replayDotState ? `synthetics-journey-step-dot-${index}` : undefined"
           :aria-label="replayDotState ? `Step ${index + 1} ${replayDotState}` : undefined"
         >
-          <span v-if="stepNumberSpinning" class="tw:animate-spin tw:inline-block" aria-hidden="true">⟳</span>
+          <OSpinner v-if="stepNumberSpinning" variant="ring" size="xs" class="tw:text-[var(--o2-primary-color)]" />
           <template v-else>{{ index + 1 }}</template>
         </span>
       </span>

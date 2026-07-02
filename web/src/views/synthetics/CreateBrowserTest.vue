@@ -250,6 +250,7 @@ function onDeleteSelected() {
 /** Local unwraps so the template can read these without `.value`. */
 const replayPhase = computed(() => recorder.replayPhase.value)
 const stepResults = computed(() => recorder.stepResults)
+const activeStepId = computed(() => recorder.activeStepId.value)
 const blockedReason = computed<'incognito' | null>(() =>
   recorder.replayPhase.value === 'idle' &&
   recorder.replayResult.value != null &&
@@ -503,6 +504,7 @@ function onClearResults() {
             :auto-record="autoRecord"
             :replay-phase="replayPhase"
             :step-results="stepResults"
+            :active-step-id="activeStepId"
             :blocked-reason="blockedReason"
             class="tw:h-full! tw:border-t! tw:border-border-default!"
             @need-extension-setup="onNeedExtensionSetup"

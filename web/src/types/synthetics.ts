@@ -145,6 +145,7 @@ export type RecorderPushPayload =
   | { method: 'recordingStarted'; tabId: number; url: string }
   | { method: 'recordingStopped'; totalSteps: number }
   | { method: 'stepReplayResult'; stepId: string; stepName?: string; passed: boolean; duration_ms: number; error?: string; structuredError?: StructuredError }
+  | { method: 'stepReplayStarted'; stepId: string; stepName?: string }
 
 /** Live data push: `{ type:'synthetics-recorder', recordingId, payload }`. */
 export interface RecorderPortMessage {

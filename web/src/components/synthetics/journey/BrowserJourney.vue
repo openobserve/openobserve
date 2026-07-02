@@ -23,6 +23,8 @@ const props = defineProps<{
   replayPhase?: ReplayPhase
   /** Per-step replay results, keyed by step id. Owned by the parent. */
   stepResults?: Map<string, StepReplayResult>
+  /** Id of the step currently being executed (set by stepReplayStarted). */
+  activeStepId?: string | null
   /** When true, show the incognito blocked warning in the toolbar area. */
   blockedReason?: 'incognito' | null
 }>()
@@ -82,6 +84,8 @@ function stepDotState(stepId: string): StepDotState | undefined {
   if (result) {
     return result.passed ? 'pass' : 'fail'
   }
+  // Currently executing step
+  if (props.activeStepId === stepId) return 'active'
   const stepIndex = props.modelValue.findIndex((s) => s.id === stepId)
   if (firstFailedIndex.value >= 0 && stepIndex > firstFailedIndex.value) return 'skip'
   if (props.replayPhase === 'running') return 'pending'
@@ -479,7 +483,7 @@ function openChromeExtensions() {
     <!-- Replay failed banner -->
     <div
       v-else-if="replayPhase === 'failed'"
-      class="tw:flex tw:items-start tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--color-badge-error-soft-bg)] tw:border tw:border-badge-error-ol-border/50"
+      class="tw:flex tw:items-start tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--color-badge-error-soft-bg)] tw:border tw:border-badge-error-ol-border/30"
       role="alert"
       data-test="synthetics-journey-failed-banner"
     >

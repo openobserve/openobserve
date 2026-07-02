@@ -45,6 +45,7 @@ const useSyntheticsRecorder = () => {
   const replayResult = ref<ReplayResponse | null>(null)
   const replayPhase = ref<ReplayPhase>('idle')
   const stepResults = reactive<Map<string, StepReplayResult>>(new Map())
+  const activeStepId = ref<string | null>(null)
 
   let port: ChromePort | null = null
 
@@ -126,7 +127,10 @@ const useSyntheticsRecorder = () => {
           error: payload.error,
           structuredError: payload.structuredError,
         })
-        console.log("Step Results ----", stepResults, stepResults.size)
+        activeStepId.value = null
+        break
+      case 'stepReplayStarted':
+        activeStepId.value = payload.stepId
         break
       // setSources / elementPicked: not consumed yet
     }
@@ -223,6 +227,7 @@ const useSyntheticsRecorder = () => {
     error.value = ''
     replayResult.value = null
     stepResults.clear()
+    activeStepId.value = null
     replayPhase.value = 'running'
     isReplaying.value = true
 
@@ -277,6 +282,7 @@ const useSyntheticsRecorder = () => {
     replayResult,
     replayPhase,
     stepResults,
+    activeStepId,
     detectExtension,
     startRecording,
     stopRecording,
