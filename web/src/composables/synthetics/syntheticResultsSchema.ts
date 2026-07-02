@@ -77,6 +77,8 @@ export interface SyntheticRun {
   device: string;
   /** Failure reason for `down` runs (empty for passing runs). */
   error: string;
+  /** KSUID job identifier — used to fetch run detail and artifacts. */
+  jobId: string;
 }
 
 export interface SyntheticBucket {
@@ -202,7 +204,7 @@ ORDER BY ts`;
 /** Most-recent runs for the Runs table. */
 export function buildRunsSql(monitorId: string, limit: number): string {
   const id = escapeSqlLiteral(monitorId);
-  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.error} as error
+  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.error} as error, job_id
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'
 ORDER BY ${F.timestamp} DESC
@@ -239,6 +241,7 @@ export function mapRun(rawHit: Record<string, unknown>): SyntheticRun {
     location: str(rawHit.location),
     device: str(rawHit.device),
     error: str(rawHit.error),
+    jobId: str(rawHit.job_id),
   };
 }
 

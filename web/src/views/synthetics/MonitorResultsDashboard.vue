@@ -104,7 +104,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           :footer-title="t('synthetics.results.runs')"
           :empty-message="t('synthetics.results.noRuns')"
+          :row-class="() => 'tw:cursor-pointer'"
           data-test="synthetic-monitor-results-runs-table"
+          @row-click="openRunDetail"
         >
           <template #cell-status="{ row }">
             <div class="tw:flex tw:flex-col tw:gap-[0.125rem]">
@@ -137,6 +139,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
       </section>
     </div>
+
+    <RunDetailDrawer
+      v-if="selectedRun"
+      :run="selectedRun"
+      :check-id="props.monitorId"
+      :open="drawerOpen"
+      @close="drawerOpen = false"
+    />
   </div>
 </template>
 
@@ -147,6 +157,7 @@ import * as echarts from "echarts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import KpiSparkline from "@/plugins/traces/KpiSparkline.vue";
+import RunDetailDrawer from "@/components/synthetics/results/RunDetailDrawer.vue";
 import {
   splitDuration,
 } from "@/plugins/traces/llmInsightsDashboard.utils";
@@ -234,11 +245,38 @@ interface RunRow {
   location: string;
   device: string;
   error: string;
+  jobId: string;
 }
 
 const runRows = computed<RunRow[]>(() =>
   runs.value.map((r, i) => ({ id: `${r.timestamp}-${i}`, ...r })),
 );
+
+// ── Run detail drawer ─────────────────────────────────────────────────────
+const drawerOpen = ref(false);
+const selectedRun = ref<{
+  job_id: string; synthetics_id: string; location: string; pool: string;
+  status: "up" | "warning" | "down" | "error"; response_time_ms: number;
+  error?: string; browser_engine?: string; device?: string;
+  checked_at: number; screenshot_refs: { step_id: string; key: string }[]; trace_ref?: string;
+} | null>(null);
+
+function openRunDetail(row: RunRow) {
+  selectedRun.value = {
+    job_id: row.jobId,
+    synthetics_id: props.monitorId,
+    location: row.location,
+    pool: "",
+    status: row.status === "passed" ? "up" : "down",
+    response_time_ms: row.durationMs,
+    error: row.error || undefined,
+    device: row.device || undefined,
+    checked_at: row.timestamp * 1000,
+    screenshot_refs: [],
+    trace_ref: undefined,
+  };
+  drawerOpen.value = true;
+}
 
 const runColumns = computed<OTableColumnDef[]>(() => [
   { id: "status", header: t("synthetics.results.status"), accessorKey: "status", size: 120, minSize: 100, sortable: true },
