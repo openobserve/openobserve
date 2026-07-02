@@ -163,7 +163,7 @@ const resolvedSize = computed(() => props.size ?? "md");
         :aria-invalid="hasError || undefined"
         :class="[
           'o2-slider-input',
-          'tw:relative tw:z-10 tw:w-full tw:bg-transparent tw:appearance-none',
+          'tw:relative tw:z-10 tw:w-full tw:bg-transparent tw:appearance-none tw:m-0',
           'tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-slider-focus-ring tw:rounded-full tw:transition-[box-shadow] tw:duration-150',
           trackHeight[resolvedSize],
           disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
@@ -208,10 +208,7 @@ const resolvedSize = computed(() => props.size ?? "md");
   </div>
 </template>
 
-<style scoped>
-.o2-slider-input {
-  margin: 0;
-}
+<style>
 .o2-slider-input::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;

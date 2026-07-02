@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -52,8 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="sm"
           :class="[
-            noBorder ? 'syntax-guide-no-border' : 'tw:ml-1',
+            noBorder ? 'tw:display-none!' : 'tw:ml-1',
             sqlmode ? 'sql-mode' : 'normal-mode',
+            noBorder ? 'tw:border-0! tw:bg-transparent! tw:p-0! tw:m-0! tw:w-full tw:justify-start tw:hover:bg-transparent!' : '',
           ]"
           class="tw:h-4.5!"
         >
@@ -124,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="hover:tw:underline text-primary"
+                    class="tw:hover:underline text-primary"
                     >click here</a
                   >.
                 </li>
@@ -212,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="hover:tw:underline text-primary"
+                    class="tw:hover:underline text-primary"
                     >click here</a
                   >.
                 </li>
@@ -268,31 +269,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-@import "@/styles/logs/syntax-guide.scss";
-
-.syntax-guide-no-border {
-  border: none !important;
-  background: transparent !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  width: 100%;
-  justify-content: flex-start;
-
-  :deep(.q-btn__content) {
-    padding: 0 !important;
-    gap: 0;
-    justify-content: flex-start;
-    width: 100%;
-}
-
-  &:hover {
-    background: transparent !important;
-  }
-
-  &:before {
-    display: none !important;
-  }
-}
-</style>

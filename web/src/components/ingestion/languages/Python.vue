@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -35,10 +35,10 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
       <div class="tw:font-medium">Check further documentation at:</div>
       <ol class="tw:list-decimal tw:pl-5 tw:mt-1">
         <li class="tw:py-0.5">
-          <a :href="docURL" target="_blank" rel="noopener noreferrer" class="tw:text-text-link hover:tw:text-text-link-hover tw:underline">Python</a>
+          <a :href="docURL" target="_blank" rel="noopener noreferrer" class="tw:text-text-link tw:hover:text-text-link-hover tw:underline">Python</a>
         </li>
         <li class="tw:py-0.5">
-          <a :href="docURLFastAPI" target="_blank" rel="noopener noreferrer" class="tw:text-text-link hover:tw:text-text-link-hover tw:underline">FastAPI</a>
+          <a :href="docURLFastAPI" target="_blank" rel="noopener noreferrer" class="tw:text-text-link tw:hover:text-text-link-hover tw:underline">FastAPI</a>
         </li>
       </ol>
     </div>

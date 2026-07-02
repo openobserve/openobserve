@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Jobs Table -->
     <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+      <div class="tw:rounded-lg tw:h-full">
           <OTable
             ref="qTableRef"
             :frame="false"
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div>
           <div class="tw:text-xs tw:text-gray-400 tw:mb-2">Error Message</div>
-          <div class="error-message-box">
+          <div class="tw:p-3 tw:rounded-md tw:bg-[rgba(239,68,68,0.08)] tw:border-l-[3px] tw:border-l-[#ef4444] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:whitespace-pre-wrap tw:wrap-break-word tw:text-[#991b1b]">
             {{ errorDialogData.error }}
           </div>
         </div>
@@ -659,28 +659,3 @@ const formatTimestamp = (timestamp?: number) => {
 };
 </script>
 
-<style scoped lang="scss">
-.card-container {
-  border-radius: 8px;
-}
-
-.backfill-error-slot {
-  display: inline-block;
-  width: 32px;
-  height: 32px;
-  vertical-align: middle;
-}
-
-.error-message-box {
-  padding: 12px;
-  border-radius: 6px;
-  background: rgba(239, 68, 68, 0.08);
-  border-left: 3px solid #ef4444;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: #991b1b;
-}
-</style>

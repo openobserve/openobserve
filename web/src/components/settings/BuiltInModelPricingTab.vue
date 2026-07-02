@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="built-in-model-pricing-container card-container">
+  <div class="built-in-model-pricing-container card-container tw:h-full tw:flex tw:flex-col">
     <!-- Search and Filter Bar -->
-    <div class="filters-bar tw:p-3">
+    <div class="filters-bar tw:p-3 tw:shrink-0 tw:border-b tw:border-(--q-color-separator)">
       <div class="tw:flex tw:items-center tw:justify-between tw:flex-wrap">
         <!-- Text search -->
         <div class="tw:flex tw:gap-3">
@@ -105,10 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (a.condition ? 1 : 0) - (b.condition ? 1 : 0),
               )"
               :key="idx"
-              class="tier-row"
+              class="tier-row tw:py-px"
               :class="{ 'tier-conditional': !!tier.condition }"
             >
-              <div class="tier-name tw:text-xs">
+              <div class="tier-name tw:text-[11px] tw:font-semibold tw:text-[#555] tw:mb-px" :class="tier.condition ? 'tw:text-[#888]' : ''">
                 <span v-if="tier.condition">
                   {{ tier.name }}
                   <span style="font-weight: 400; color: var(--o2-text-muted)">
@@ -119,11 +119,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <span v-else>{{ tier.name }}</span>
               </div>
-              <div class="tier-prices">
+              <div class="tw:flex tw:gap-0.75 tw:flex-wrap tw:items-center">
                 <span
                   v-for="[key, price] in sortedPriceEntries(tier.prices)"
                   :key="key"
-                  class="price-chip"
+                  class="tw:inline-flex tw:items-center tw:px-1.5 tw:py-px tw:rounded-[6px] tw:text-[11px] tw:font-semibold tw:whitespace-nowrap tw:text-[#555] tw:border tw:border-[#ccc] tw:dark:text-[#bbb] tw:dark:border-[#555]"
                 >
                   {{ fmtKey(key) }}: ${{ fmtPrice(price) }}
                 </span>
@@ -383,62 +383,11 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.built-in-model-pricing-container {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-.filters-bar {
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--q-color-separator);
-}
-.models-list {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-/* Tier pricing rows */
-.tier-row {
-  padding: 1px 0;
-  & + .tier-row {
-    border-top: 1px dashed #e0e0e0;
-    margin-top: 2px;
-    padding-top: 2px;
-  }
-}
-.tier-name {
-  font-size: 11px;
-  font-weight: 600;
-  color: #555;
-  margin-bottom: 1px;
-}
-.tier-conditional .tier-name {
-  color: #888;
-}
-.tier-prices {
-  display: flex;
-  gap: 3px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-.price-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 6px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  color: #555;
-  border: 1px solid #ccc;
-}
-
-body.body--dark {
-  .price-chip {
-    color: #bbb;
-    border-color: #555;
-  }
+<style>
+/* Tier pricing rows — sibling selector not convertible to tw: */
+.tier-row + .tier-row {
+  border-top: 1px dashed var(--o2-border);
+  margin-top: 2px;
+  padding-top: 2px;
 }
 </style>

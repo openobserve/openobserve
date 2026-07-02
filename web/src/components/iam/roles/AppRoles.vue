@@ -326,5 +326,3 @@ const bulkDeleteUserRoles = async () => {
 
 
 </script>
-
-<style scoped></style>

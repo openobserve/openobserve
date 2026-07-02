@@ -242,7 +242,7 @@ describe("FieldList.vue", () => {
         },
       });
 
-      const groupHeader = wrapper.find(".field-group-header");
+      const groupHeader = wrapper.find('[data-test="logs-page-field-list-group-header-schema"]');
       expect(groupHeader.exists()).toBe(true);
     });
 
@@ -260,7 +260,7 @@ describe("FieldList.vue", () => {
         },
       });
 
-      await wrapper.find(".field-group-header").trigger("click");
+      await wrapper.find('[data-test="logs-page-field-list-group-header-schema"]').trigger("click");
       expect(wrapper.emitted("toggle-group")).toBeTruthy();
       expect(wrapper.emitted("toggle-group")?.[0]).toEqual(["schema"]);
     });
@@ -518,7 +518,7 @@ describe("FieldList.vue", () => {
         },
       });
 
-      const groupHeader = wrapper.find(".field-group-header");
+      const groupHeader = wrapper.find('[data-test="logs-page-field-list-group-header-schema"]');
       expect(groupHeader.exists()).toBe(true);
       expect(groupHeader.text()).toContain("Fields");
     });
@@ -541,7 +541,7 @@ describe("FieldList.vue", () => {
         },
       });
 
-      const groupHeader = wrapper.find(".field-group-header");
+      const groupHeader = wrapper.find('[data-test="logs-page-field-list-group-header-schema"]');
       expect(groupHeader.exists()).toBe(true);
       expect(groupHeader.text()).toContain("Fields");
     });

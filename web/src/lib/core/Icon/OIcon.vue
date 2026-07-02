@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import type { IconProps, IconSlots } from "./OIcon.types";
 import { computed } from "vue";
 import { iconRegistry } from "./OIcon.icons";
@@ -53,7 +53,7 @@ const isDestructiveIcon = computed<boolean>(() =>
     :class="[
       sizeClasses[size],
       isDestructiveIcon
-        ? 'tw:text-[var(--o2-destructive,#dc2626)] tw:rounded tw:transition-colors hover:tw:bg-[var(--color-error-100,#fee2e2)]'
+        ? 'tw:text-[var(--o2-destructive,#dc2626)] tw:rounded tw:transition-colors tw:hover:bg-[var(--color-error-100,#fee2e2)]'
         : '',
     ]"
     :data-destructive-icon="isDestructiveIcon ? 'true' : undefined"

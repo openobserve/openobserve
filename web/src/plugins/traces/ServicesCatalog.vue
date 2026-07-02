@@ -665,10 +665,10 @@ function deriveStatus(
 }
 
 function statusBadgeClass(status: string): string {
-  if (status === "critical") return "o2-status-badge--error";
-  if (status === "warning") return "o2-status-badge--warning";
-  if (status === "degraded") return "o2-status-badge--degraded";
-  return "o2-status-badge--success";
+  if (status === "critical") return "tw:text-(--o2-service-health-critical)";
+  if (status === "warning") return "tw:text-(--o2-service-health-warning)";
+  if (status === "degraded") return "tw:text-(--o2-service-health-degraded)";
+  return "tw:text-(--o2-service-health-healthy)";
 }
 
 function errorRateClass(rate: number): string {
@@ -925,27 +925,3 @@ onUnmounted(() => {
   }
 });
 </script>
-
-<style lang="scss" scoped>
-@import "@/styles/pagination.scss";
-
-:deep(.services-catalog-table-container) {
-  .container {
-    border-radius: 0 !important;
-  }
-}
-
-// Table status badges — use service-health colors for consistency with ServiceGraph
-.o2-status-badge--success {
-  color: var(--o2-service-health-healthy);
-}
-.o2-status-badge--degraded {
-  color: var(--o2-service-health-degraded);
-}
-.o2-status-badge--warning {
-  color: var(--o2-service-health-warning);
-}
-.o2-status-badge--error {
-  color: var(--o2-service-health-critical);
-}
-</style>

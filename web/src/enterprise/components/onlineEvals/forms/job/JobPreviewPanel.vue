@@ -1,36 +1,36 @@
 <template>
-  <aside class="job-preview">
-    <section class="job-preview__card">
-      <header class="job-preview__card-head">
+  <aside class="tw:min-w-0 tw:overflow-auto tw:p-4.5 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
+    <section class="tw:py-[14px] tw:px-4 tw:mb-3 tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
+      <header class="tw:flex tw:items-center tw:gap-[6px] tw:mb-[6px] tw:text-(--color-text-secondary,var(--o2-text-secondary))">
         <OIcon name="visibility" size="xs" />
-        <h3 class="job-preview__card-title">{{ t("onlineEvals.job.preview.title") }}</h3>
+        <span class="tw:m-0 tw:text-[0.8125rem] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.preview.title") }}</span>
       </header>
-      <p v-if="!stream" class="job-preview__card-hint">
+      <div v-if="!stream" class="tw:m-0 tw:text-text-secondary tw:text-xs tw:leading-normal">
         {{ t("onlineEvals.job.preview.hint") }}
-      </p>
-      <p v-else-if="!filterReady" class="job-preview__card-hint">
+      </div>
+      <div v-else-if="!filterReady" class="tw:m-0 tw:text-text-secondary tw:text-xs tw:leading-normal">
         {{ t("onlineEvals.job.preview.matchedIncomplete") }}
-      </p>
-      <p v-else-if="matchedLoading" class="job-preview__card-hint">
+      </div>
+      <div v-else-if="matchedLoading" class="tw:m-0 tw:text-text-secondary tw:text-xs tw:leading-normal">
         {{ t("onlineEvals.job.preview.matchedLoading") }}
-      </p>
-      <p v-else-if="matchedError" class="job-preview__match-error">
+      </div>
+      <div v-else-if="matchedError" class="tw:m-0 tw:text-xs tw:text-(--o2-status-error-text,#c62828)">
         {{ t("onlineEvals.job.preview.matchedError") }}
-      </p>
-      <div v-else class="job-preview__match">
-        <span class="job-preview__match-count">{{ formattedCount }}</span>
-        <span class="job-preview__match-suffix">
+      </div>
+      <div v-else class="tw:flex tw:items-baseline tw:gap-1.5">
+        <span class="tw:text-2xl tw:font-bold tw:text-(--color-text-primary,currentColor) tw:[font-variant-numeric:tabular-nums]">{{ formattedCount }}</span>
+        <span class="tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">
           {{ t("onlineEvals.job.preview.matchedSuffix") }}
         </span>
       </div>
     </section>
 
-    <section class="job-preview__card">
-      <header class="job-preview__card-head">
+    <section class="tw:py-[14px] tw:px-4 tw:mb-0 tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
+      <header class="tw:flex tw:items-center tw:gap-[6px] tw:mb-[6px] tw:text-(--color-text-secondary,var(--o2-text-secondary))">
         <OIcon name="info" size="xs" />
-        <h3 class="job-preview__card-title">{{ t("onlineEvals.job.preview.summaryTitle") }}</h3>
+        <span class="tw:m-0 tw:text-[0.8125rem] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.preview.summaryTitle") }}</span>
       </header>
-      <dl class="job-preview__dl">
+      <dl class="tw:grid tw:grid-cols-[96px_1fr] tw:gap-x-3 tw:gap-y-2 tw:m-0 tw:text-xs [&_dt]:tw:text-text-secondary [&_dd]:tw:m-0 [&_dd]:tw:text-text-primary">
         <dt>{{ t("onlineEvals.job.preview.summaryName") }}</dt>
         <dd>{{ name || t("onlineEvals.job.preview.emptyValue") }}</dd>
         <dt>{{ t("onlineEvals.job.preview.summaryType") }}</dt>
@@ -38,8 +38,12 @@
         <dt>{{ t("onlineEvals.job.preview.summaryStatus") }}</dt>
         <dd>
           <span
-            class="job-preview__status"
-            :class="mode === 'edit' ? 'job-preview__status--editing' : 'job-preview__status--draft'"
+            class="tw:inline-flex tw:items-center tw:gap-[5px] tw:py-0.5 tw:px-2 tw:rounded-full tw:text-[11px] tw:font-semibold"
+            :class="
+              mode === 'edit'
+                ? 'tw:bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)] tw:text-(--o2-status-info-text)'
+                : 'tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] tw:text-(--color-text-secondary,var(--o2-text-secondary))'
+            "
           >
             {{
               mode === "edit"
@@ -87,108 +91,3 @@ const formattedCount = computed(() =>
   matchedCount.value == null ? "—" : matchedCount.value.toLocaleString(),
 );
 </script>
-
-<style lang="scss" scoped>
-// Right rail (AddAlert pattern): a left-border divider separates it from the
-// form column; cards stack with a gap. No floating-card bg/shadow.
-.job-preview {
-  flex: 3.5;
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  border-left: 1px solid var(--color-border-default, var(--o2-border));
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.job-preview__card {
-  padding: 14px 16px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  background: var(--color-card-bg);
-}
-
-.job-preview__card-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.job-preview__card-title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-}
-
-.job-preview__card-hint {
-  margin: 0;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.job-preview__match {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.job-preview__match-count {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--color-text-primary, currentColor);
-  font-variant-numeric: tabular-nums;
-}
-
-.job-preview__match-suffix {
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.job-preview__match-error {
-  margin: 0;
-  font-size: 12px;
-  color: var(--o2-status-error-text, #c62828);
-}
-
-.job-preview__dl {
-  display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 8px 12px;
-  margin: 0;
-  font-size: 12px;
-}
-
-.job-preview__dl dt {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.job-preview__dl dd {
-  margin: 0;
-  color: var(--color-text-primary, currentColor);
-}
-
-.job-preview__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font: 600 11px inherit;
-}
-
-.job-preview__status--draft {
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.job-preview__status--editing {
-  background: color-mix(in srgb, var(--o2-status-info-text) 14%, transparent);
-  color: var(--o2-status-info-text);
-}
-</style>

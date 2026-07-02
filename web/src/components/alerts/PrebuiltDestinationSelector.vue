@@ -15,25 +15,25 @@ limitations under the License. -->
 <template>
   <div data-test="prebuilt-destination-selector" class="destination-selector">
     <!-- Destination Type Grid -->
-    <div class="selector-grid">
+    <div class="selector-grid tw:grid tw:gap-3 tw:mb-4 tw:[grid-template-columns:repeat(auto-fill,minmax(8.75rem,1fr))]">
       <div
         v-for="type in filteredDestinationTypes"
         :key="type.id"
         data-test="destination-type-card"
         :data-type="type.id"
-        class="destination-card"
-        :class="{ selected: selectedType === type.id }"
+        class="destination-card tw:group/dest-card tw:relative tw:py-5 tw:px-3 tw:border-2 tw:border-[var(--o2-border-color)] tw:rounded-xl tw:cursor-pointer tw:transition-all tw:duration-300 tw:[min-height:7.5rem] tw:flex tw:flex-col tw:hover:-translate-y-0.5 tw:hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] tw:hover:border-[var(--o2-primary-color)]"
+        :class="selectedType === type.id ? 'selected tw:border-[var(--o2-primary-color)] tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]' : 'tw:bg-[var(--o2-card-bg)]'"
         @click="selectType(type.id)"
       >
         <!-- Card Content -->
-        <div class="card-content">
+        <div class="card-content tw:flex tw:flex-col tw:items-center tw:text-center tw:h-full tw:relative">
           <!-- Icon/Image -->
-          <div class="card-icon">
+          <div data-test="destination-type-icon" class="tw:mb-2 tw:text-[var(--o2-icon-color)] tw:group-[.selected]/dest-card:text-[var(--o2-primary-color)]">
             <img
               v-if="type.image"
               :src="type.image"
               :alt="type.name"
-              class="destination-logo"
+              class="destination-logo tw:w-6 tw:h-6 tw:[object-fit:contain]"
             />
             <OIcon
               v-else
@@ -43,20 +43,20 @@ limitations under the License. -->
           </div>
 
           <!-- Name -->
-          <h3 data-test="destination-type-name" class="card-title">
+          <div data-test="destination-type-name" class="card-title tw:text-[0.8125rem] tw:font-medium tw:mt-1 tw:mb-0 tw:text-[var(--o2-text-primary)] tw:[line-height:1.3] tw:text-center">
             {{ type.name }}
-          </h3>
+          </div>
 
           <!-- Description -->
-          <p data-test="destination-type-description" class="card-description">
+          <div data-test="destination-type-description" class="card-description tw:text-[0.6875rem] tw:text-[var(--o2-text-secondary)] tw:mt-1 tw:mb-0 tw:[line-height:1.2] tw:grow tw:text-center tw:hidden">
             {{ type.description }}
-          </p>
+          </div>
         </div>
 
         <!-- Selection Indicator -->
         <div
           v-if="selectedType === type.id"
-          class="check-icon"
+          class="check-icon tw:absolute tw:top-[0.375rem] tw:right-[0.375rem] tw:w-5 tw:h-5 tw:rounded-full tw:overflow-hidden tw:bg-[var(--o2-positive)] tw:text-white tw:flex tw:items-center tw:justify-center tw:z-[1]"
         >
           <OIcon name="check" size="xs" />
         </div>
@@ -66,26 +66,26 @@ limitations under the License. -->
       <div
         data-test="destination-type-card"
         data-type="custom"
-        class="destination-card custom-card"
-        :class="{ selected: selectedType === 'custom' }"
+        class="destination-card custom-card tw:group/dest-card tw:relative tw:py-5 tw:px-3 tw:border-2 tw:border-[var(--o2-border-color)] tw:border-dashed tw:rounded-xl tw:cursor-pointer tw:transition-all tw:duration-300 tw:[min-height:7.5rem] tw:flex tw:flex-col tw:hover:-translate-y-0.5 tw:hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] tw:hover:border-[var(--o2-primary-color)]"
+        :class="selectedType === 'custom' ? 'selected tw:border-[var(--o2-primary-color)] tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]' : 'tw:bg-[var(--o2-card-bg)]'"
         @click="selectType('custom')"
       >
-        <div class="card-content">
-          <div class="card-icon">
+        <div class="card-content tw:flex tw:flex-col tw:items-center tw:text-center tw:h-full tw:relative">
+          <div data-test="destination-type-icon" class="tw:mb-2 tw:text-[var(--o2-icon-color)] tw:group-[.selected]/dest-card:text-[var(--o2-primary-color)]">
             <OIcon name="settings" size="md" />
           </div>
-          <h3 data-test="destination-type-name" class="card-title">
+          <div data-test="destination-type-name" class="card-title tw:text-[0.8125rem] tw:font-medium tw:mt-1 tw:mb-0 tw:text-[var(--o2-text-primary)] tw:[line-height:1.3] tw:text-center">
             {{ t('alerts.customDestination') }}
-          </h3>
-          <p data-test="destination-type-description" class="card-description">
+          </div>
+          <div data-test="destination-type-description" class="card-description tw:text-[0.6875rem] tw:text-[var(--o2-text-secondary)] tw:mt-1 tw:mb-0 tw:[line-height:1.2] tw:grow tw:text-center tw:hidden">
             {{ t('alerts.customDestinationDescription') }}
-          </p>
+          </div>
         </div>
 
         <!-- Selection Indicator -->
         <div
           v-if="selectedType === 'custom'"
-          class="check-icon"
+          class="check-icon tw:absolute tw:top-[0.375rem] tw:right-[0.375rem] tw:w-5 tw:h-5 tw:rounded-full tw:overflow-hidden tw:bg-[var(--o2-positive)] tw:text-white tw:flex tw:items-center tw:justify-center tw:z-[1]"
         >
           <OIcon name="check" size="xs" />
         </div>
@@ -153,105 +153,10 @@ function getIconName(icon: string): string {
 }
 </script>
 
-<style scoped lang="scss">
-.destination-selector {
-  .selector-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(8.75rem, 1fr));
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-  }
-
-  .destination-card {
-    position: relative;
-    padding: 1.25rem 0.75rem;
-    border: 0.125rem solid var(--o2-border-color);
-    border-radius: 0.75rem;
-    background: var(--o2-card-bg);
-    cursor: pointer;
-    transition: all 0.3s ease;
-    min-height: 7.5rem;
-    display: flex;
-    flex-direction: column;
-
-    &:hover {
-      transform: translateY(-0.125rem);
-      box-shadow: 0 0.25rem 0.75rem rgba(25, 118, 210, 0.15);
-      border-color: var(--q-primary);
-    }
-
-    &.selected {
-      border-color: var(--q-primary);
-      background: color-mix(in srgb, var(--q-primary) 10%, var(--o2-card-bg));
-      box-shadow: 0 0.25rem 1rem rgba(25, 118, 210, 0.2);
-
-      .card-icon {
-        color: var(--q-primary);
-      }
-    }
-
-    &.custom-card {
-      border-style: dashed;
-    }
-
-    .card-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      height: 100%;
-      position: relative;
-    }
-
-    .card-icon {
-      margin-bottom: 0.5rem;
-      color: var(--o2-icon-color);
-
-      .destination-logo {
-        width: 1.5rem;
-        height: 1.5rem;
-        object-fit: contain;
-      }
-    }
-
-    .card-title {
-      font-size: 0.8125rem;
-      font-weight: 500;
-      margin: 0.25rem 0 0 0;
-      color: var(--q-text-primary);
-      line-height: 1.3;
-      text-align: center;
-    }
-
-    .card-description {
-      font-size: 0.6875rem;
-      color: var(--q-text-secondary);
-      margin: 0.25rem 0 0 0;
-      line-height: 1.2;
-      flex-grow: 1;
-      text-align: center;
-      display: none; // Hide description to save space
-
-      @media (min-width: 75rem) {
-        display: block; // Show on larger screens
-      }
-    }
-
-    .check-icon {
-      position: absolute;
-      top: 0.375rem;
-      right: 0.375rem;
-      width: 1.25rem;
-      height: 1.25rem;
-      border-radius: 50%;
-      overflow: hidden;
-      background: var(--o2-positive);
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1;
-    }
+<style>
+@media (min-width: 75rem) {
+  .destination-selector .destination-card .card-description {
+    display: block;
   }
 }
 </style>

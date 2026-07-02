@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen', 'tw:h-screen', 'tw:flex', 'tw:flex-col']"
   >
-    <header class="o2-app-header tw:shrink-0">
+    <header class="o2-app-header tw:shrink-0" :class="store.state.printMode === true ? 'tw:hidden' : ''">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
       <div
         v-if="config.isCloud === 'true'"
@@ -1257,19 +1257,10 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-@import "../styles/app.scss";
-</style>
 
-<style lang="scss" scoped>
-// Print mode — hide header + sidebar, show body overflow
-.printMode {
-  :global(body) {
-    overflow: auto !important;
-  }
-
-  .o2-app-header {
-    display: none;
-  }
+<style>
+/* Print mode — hide header + sidebar, show body overflow */
+.printMode body {
+  overflow: auto !important;
 }
 </style>

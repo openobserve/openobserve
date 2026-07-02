@@ -16,23 +16,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="error_details tw:w-[40vw]">
-    <div @click="handleErrorTypeClick" class="error_type tw:cursor-pointer">
+    <div
+      data-test="error-detail-error-type"
+      @click="handleErrorTypeClick"
+      class="tw:text-base tw:text-[var(--o2-info)] tw:capitalize tw:cursor-pointer"
+    >
       {{ column.error_type || "Error" }}
     </div>
     <div
-      class="error_message tw:cursor-pointer tw:truncate tw:mt-1"
+      class="tw:text-sm tw:cursor-pointer tw:truncate tw:mt-1"
       :title="column.error_message"
     >
       {{ column.error_message }}
     </div>
-    <div class="error_time tw:flex tw:items-center tw:mt-1">
+    <div class="tw:text-xs tw:flex tw:items-center tw:mt-1">
       <span class="tw:mr-3 tw:text-gray-500"> {{ column.service }}</span>
       <div
         class="tw:mr-3"
         :class="
           column.error_handling === 'unhandled'
-            ? 'unhandled_error text-red-6 tw:px-1'
-            : 'handled_error tw:text-gray-500'
+            ? 'text-red-6 tw:px-1 tw:border tw:border-[rgb(246,68,68)] tw:rounded'
+            : 'tw:text-gray-500'
         "
       >
         {{ column.error_handling }}
@@ -69,28 +73,3 @@ const handleErrorTypeClick = () => {
   });
 };
 </script>
-
-<style lang="scss" scoped>
-.error_type {
-  font-size: 1rem;
-  color: $info;
-  text-transform: capitalize;
-}
-
-.error_description {
-  font-size: 0.875rem;
-}
-
-.error_message {
-  font-size: 0.875rem;
-}
-
-.error_time {
-  font-size: 0.75rem;
-}
-
-.unhandled_error {
-  border: 1px solid rgb(246, 68, 68);
-  border-radius: 0.25rem;
-}
-</style>

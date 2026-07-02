@@ -296,6 +296,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-/* Add any custom styles here if needed */
-</style>

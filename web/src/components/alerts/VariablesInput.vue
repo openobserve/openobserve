@@ -127,18 +127,3 @@ const addVariable = () => {
   emits("add:variable");
 };
 </script>
-
-<style lang="scss">
-.add-variable {
-}
-
-.variables-input {
-}
-
-.input-bg-dark .q-field__control{
-  background-color: #181a1b !important;
-}
-.input-bg-light .q-field__control{
-  background-color: #ffffff !important;
-}
-</style>

@@ -583,7 +583,7 @@ function onHorizCancel() {
         :aria-invalid="hasError || undefined"
         :class="[
           'o2-range-input',
-          'tw:absolute tw:left-0 tw:right-0 tw:w-full tw:bg-transparent tw:appearance-none',
+          'tw:absolute tw:left-0 tw:right-0 tw:w-full tw:bg-transparent tw:appearance-none tw:m-0 tw:pointer-events-none',
           minZClass,
           'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-slider-focus-ring tw:rounded-full',
           trackHeight[resolvedSize],
@@ -607,7 +607,7 @@ function onHorizCancel() {
         :aria-invalid="hasError || undefined"
         :class="[
           'o2-range-input',
-          'tw:absolute tw:left-0 tw:right-0 tw:w-full tw:bg-transparent tw:appearance-none',
+          'tw:absolute tw:left-0 tw:right-0 tw:w-full tw:bg-transparent tw:appearance-none tw:m-0 tw:pointer-events-none',
           maxZClass,
           'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-slider-focus-ring tw:rounded-full',
           trackHeight[resolvedSize],
@@ -672,11 +672,7 @@ function onHorizCancel() {
   </div>
 </template>
 
-<style scoped>
-.o2-range-input {
-  margin: 0;
-  pointer-events: none;
-}
+<style>
 .o2-range-input::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;

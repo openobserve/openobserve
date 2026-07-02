@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DashboardHeader :title="title" backButton @back="close">
       </DashboardHeader>
 
-      <div class="scrollable-content">
+      <div
+        class="tw:overflow-y-auto tw:px-[3px] tw:max-h-[calc(100vh-170px)] tw:[scrollbar-width:thin] tw:[&::-webkit-scrollbar]:w-[6px] tw:[&::-webkit-scrollbar]:bg-transparent tw:[&::-webkit-scrollbar-thumb]:rounded"
+        :class="store.state.theme === 'dark' ? 'tw:[scrollbar-color:#4b5563_transparent] tw:[&::-webkit-scrollbar-thumb]:bg-[#4b5563]' : 'tw:[scrollbar-color:#d1d5db_transparent] tw:[&::-webkit-scrollbar-thumb]:bg-[#d1d5db]'"
+      >
         <OForm
           greedy
           ref="addVariableForm"
@@ -218,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <template #content>
                       {{ t('dashboard.filterInfoTooltip') }}
-                      <span class="bg-highlight">$variableName</span>.
+                      <span class="bg-highlight" :class="store.state.theme === 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'">$variableName</span>.
                     </template>
                   </OTooltip>
                 </div>
@@ -243,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         filterNameErrors[index as number] = '';
                       "
                       data-test="dashboard-query-values-filter-name-selector"
-                      class="tw:flex-[2] tw:min-w-0"
+                      class="tw:flex-2 tw:min-w-0"
                     >
                       <template #empty>
                         <span class="tw:italic tw:text-gray-400"
@@ -290,14 +293,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :items="dashboardVariablesFilterItems"
                       search-regex="(?:^|[^$])\$?(\w+)"
                       :debounce="1000"
-                      class="tw:flex-[2] tw:min-w-0"
+                      class="tw:flex-2 tw:min-w-0"
                       placeholder="Enter Value"
                       :data-test="`dashboard-query-values-filter-value-selector-${index}`"
                     />
                     <OButton
                       variant="ghost"
                       size="icon"
-                      class="tw:flex-shrink-0"
+                      class="tw:shrink-0"
                       @click="removeFilter(index)"
                       :data-test="`dashboard-variable-adhoc-close-${index}`"
                       icon-left="close"
@@ -324,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-          <div class="textbox" v-if="['constant'].includes(variableData.type)">
+          <div class="tw:mt-3" v-if="['constant'].includes(variableData.type)">
             <OInput
               v-model="variableData.value"
               :label="t('dashboard.ValueOfVariable') + ' *'"
@@ -334,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-variable-constant-value"
             />
           </div>
-          <div class="textbox" v-if="['textbox'].includes(variableData.type)">
+          <div class="tw:mt-3" v-if="['textbox'].includes(variableData.type)">
             <OInput
               v-model="variableData.value"
               :label="t('dashboard.DefaultValue')"
@@ -433,8 +436,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- default value for multi select variables -->
           <!-- it can be first value or all values -->
           <div v-if="['query_values'].includes(variableData.type)">
-            <div class="button-group multi-select-default-value-toggle">
-              <div class="multi-select-default-value">{{ t('dashboard.byDefaultSelect') }}</div>
+            <div class="tw:mt-1.5 tw:mb-1.5">
+              <div class="tw:mt-1.25 tw:mb-1.25 tw:text-sm tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-[#999999]' : 'tw:text-[#666666]'">{{ t('dashboard.byDefaultSelect') }}</div>
               <OToggleGroup
                 :model-value="variableData.selectAllValueForMultiSelect"
                 @update:model-value="
@@ -540,7 +543,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OForm>
       </div>
-      <div class="sticky-footer">
+      <div
+        class="tw:sticky tw:bottom-0 tw:left-0 tw:w-full tw:pt-3 tw:pb-2 tw:px-0 tw:flex tw:justify-center tw:gap-4 tw:z-10 tw:border-t"
+        :class="store.state.theme === 'dark' ? 'tw:border-t-[#333] tw:[box-shadow:rgb(20,20,20)_0px_-4px_7px_0px]' : 'tw:border-t-[#eee] tw:[box-shadow:rgb(240,240,240)_0px_-4px_7px_0px]'"
+      >
         <OButton
           variant="outline"
           size="sm-action"
@@ -1704,82 +1710,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-:deep(.no-case .q-field__native > :first-child) {
-  text-transform: none !important;
-}
-
-// .textbox {
-//   margin-top: 5px;
-//   margin-bottom: 5px;
-// }
-
-.theme-dark .bg-highlight {
-  background-color: #747474;
-}
-
-.theme-light .bg-highlight {
-  background-color: #e7e6e6;
-}
-
-.multi-select-default-value-toggle {
-}
-.multi-select-default-value {
-  margin-top: 5px;
-  margin-bottom: 5px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #666666;
-}
-
-.q-field--with-bottom {
-  padding-bottom: 0 !important;
-}
-.scrollable-content {
-  overflow-y: auto;
-  padding-inline: 3px;
-  max-height: calc(100vh - 190px);
-  &::-webkit-scrollbar {
-    width: 6px;
-    background: transparent;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: #d1d5db;
-    border-radius: 4px;
-  }
-  scrollbar-width: thin;
-  scrollbar-color: #d1d5db transparent;
-}
-.sticky-footer {
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  padding: 12px 0 8px 0;
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  z-index: 10;
-  border-top: 1px solid #eee;
-  box-shadow: rgb(240, 240, 240) 0px -4px 7px 0px;
-}
-
-.theme-dark {
-  .sticky-footer {
-    border-top: 1px solid #333;
-    box-shadow: rgb(20, 20, 20) 0px -4px 7px 0px;
-  }
-
-  .multi-select-default-value {
-    color: #999;
-  }
-
-  .scrollable-content {
-    &::-webkit-scrollbar-thumb {
-      background: #4b5563;
-    }
-    scrollbar-color: #4b5563 transparent;
-  }
-}
-</style>
