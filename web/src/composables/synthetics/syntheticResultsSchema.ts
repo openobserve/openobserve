@@ -112,7 +112,8 @@ function str(value: unknown): string {
 
 /** Map a raw status field value onto the typed (semantic) RunStatus. */
 function toRunStatus(raw: unknown): RunStatus {
-  return str(raw) === STATUS_VALUES.failed ? "failed" : "passed";
+  // Only "up" counts as passed; "down", "error", "warning", or any unknown value is failed.
+  return str(raw) === STATUS_VALUES.passed ? "passed" : "failed";
 }
 
 /**
@@ -166,7 +167,7 @@ export function buildKpiSql(monitorId: string): string {
   return `SELECT
   COUNT(*) as total_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
-  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.failed}') as failed_runs,
+  COUNT(*) FILTER (WHERE ${F.status} != '${STATUS_VALUES.passed}') as failed_runs,
   COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'`;
@@ -191,7 +192,7 @@ export function buildHistogramSql(monitorId: string, interval: string): string {
   COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration,
   COUNT(*) as total_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
-  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.failed}') as failed_runs
+  COUNT(*) FILTER (WHERE ${F.status} != '${STATUS_VALUES.passed}') as failed_runs
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'
 GROUP BY ts
