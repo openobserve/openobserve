@@ -4,7 +4,10 @@ use infra::table::workflows::{self, Workflow, WorkflowError, WorkflowRunErrors};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::service::pipeline::batch_execution::{ExecutablePipeline, WorkflowResult};
+use crate::service::{
+    db,
+    pipeline::batch_execution::{ExecutablePipeline, WorkflowResult},
+};
 
 #[derive(Serialize, Deserialize)]
 pub struct InputMap {
@@ -157,7 +160,7 @@ pub async fn execute_workflow(
         };
         // workflow has already run, so not much point in returning error because
         // we couldn't save the errors to db, log and ignore
-        if let Err(e) = workflows::save_workflow_errors(errors).await {
+        if let Err(e) = db::workflows::save_workflow_errors(errors).await {
             log::error!(
                 "[Workflows] : error saving workflow run errors for run id {run_id} for workflow {org_id}/{id} in db : {e}"
             );

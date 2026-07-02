@@ -23,7 +23,7 @@ use super::{
 };
 use crate::db::{ORM_CLIENT, connect_to_orm};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct Workflow {
     pub id: String,
     pub org_id: String,
@@ -36,13 +36,13 @@ pub struct Workflow {
     pub edges: Vec<Edge>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct WorkflowError {
     pub node_id: String,
     pub error: Vec<String>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct WorkflowRunErrors {
     pub id: i32,
     pub org_id: String,
