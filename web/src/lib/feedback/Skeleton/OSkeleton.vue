@@ -15,7 +15,7 @@ const shapeClasses: Record<NonNullable<SkeletonProps["type"]>, string> = {
 
 const animationClasses: Record<NonNullable<SkeletonProps["animation"]>, string> = {
   pulse: "tw:animate-pulse",
-  wave: "tw:skeleton-wave",
+  wave: "tw:skeleton-wave tw:relative tw:overflow-hidden",
   none: "",
 };
 
@@ -36,7 +36,7 @@ const classes = computed(() => [
   />
 </template>
 
-<style scoped>
+<style>
 /*
   translateX shimmer — fundamentally more natural than background-position.
 
@@ -50,11 +50,6 @@ const classes = computed(() => [
   • The shimmer beam is a 105° tilted gradient — a slight diagonal makes it
     read as a gloss catch, not a mechanical wipe.
 */
-.tw\:skeleton-wave {
-  position: relative;
-  overflow: hidden;
-}
-
 .tw\:skeleton-wave::after {
   content: "";
   position: absolute;

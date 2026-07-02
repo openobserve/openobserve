@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -219,17 +219,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Status (derived from error_count) -->
         <template #cell-status="{ row }">
-          <span
-            class="tw:rounded tw:px-[0.5rem] tw:py-[0.125rem] tw:inline-flex tw:items-center tw:gap-[0.25rem] tw:w-fit tw:text-[0.7rem] tw:font-semibold tw:capitalize"
-            :class="statusBadgeClass(row.status)"
+          <OTag
+            type="sessionStatus"
+            :value="row.status"
             :data-test="`sessions-list-status-${row.sessionId}`"
-          >
-            <span
-              class="tw:w-[6px] tw:h-[6px] tw:rounded-full"
-              :class="statusDotClass(row.status)"
-            />
-            {{ row.status }}
-          </span>
+          />
         </template>
       </OTable>
   </div>
@@ -242,6 +236,7 @@ import { useStore } from "vuex";
 import { formatDate } from "@/utils/date";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import useStreams from "@/composables/useStreams";
 import { useSessions, type SessionRow } from "./composables/useSessions";
@@ -497,23 +492,6 @@ function formatTokens(n: number): string {
   return `${t.value}${t.unit}`;
 }
 
-function statusBadgeClass(s: SessionRow["status"]): string {
-  switch (s) {
-    case "error":
-      return "tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_12%,transparent)] tw:text-[var(--o2-service-health-critical)]";
-    default:
-      return "tw:bg-[color-mix(in_srgb,var(--o2-service-health-healthy,#16a34a)_12%,transparent)] tw:text-[var(--o2-service-health-healthy,#16a34a)]";
-  }
-}
-
-function statusDotClass(s: SessionRow["status"]): string {
-  switch (s) {
-    case "error":
-      return "tw:bg-[var(--o2-service-health-critical)]";
-    default:
-      return "tw:bg-emerald-500";
-  }
-}
 
 // Load the trace-stream list at most once per mount. Both the initial mount
 // and the (parent-driven) session load await the SAME promise, so a load can

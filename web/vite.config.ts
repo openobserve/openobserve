@@ -188,13 +188,7 @@ export default defineConfig({
     }),
     isTesting && monacoEditorTestResolver(),
   ].filter(Boolean),
-  css: {
-    preprocessorOptions: {
-      scss: {
-        additionalData: `@use '@/styles/legacy-variables' as *;\n`,
-      },
-    },
-  },
+  css: {},
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

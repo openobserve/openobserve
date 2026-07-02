@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   FlameGraphView - Flame graph visualization using ECharts
   Displays spans as hierarchical blocks where width = duration
 -->
@@ -138,7 +138,7 @@
     <!-- Resize handle -->
     <div
       v-if="sidebarVisible"
-      class="tw:h-1 tw:cursor-row-resize tw:bg-[var(--o2-border)] hover:tw:bg-[var(--o2-primary-color)] tw:flex-shrink-0 tw:transition-colors"
+      class="tw:h-1 tw:cursor-row-resize tw:bg-[var(--o2-border)] tw:hover:bg-[var(--o2-primary-color)] tw:flex-shrink-0 tw:transition-colors"
       style="min-height: 4px"
       data-test="flame-graph-resizer"
       @mousedown="startResize"
@@ -606,6 +606,3 @@ watch(
 // Resizer is now handled by useResizer composable
 
 </script>
-
-<style scoped lang="scss">
-</style>

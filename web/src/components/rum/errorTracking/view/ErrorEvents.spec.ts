@@ -145,7 +145,7 @@ describe("ErrorEvents", () => {
   describe("title display", () => {
     it("displays 'Events' title via the tags-title element", () => {
       // Act
-      const title = wrapper.find(".tags-title");
+      const title = wrapper.find('[data-test="error-events-title"]');
 
       // Assert
       expect(title.exists()).toBe(true);
@@ -335,20 +335,22 @@ describe("ErrorEvents", () => {
       expect(col.meta.cellClass).toBe("error-type");
     });
 
-    it("sets cellClass='description-column' for the description column", () => {
+    it("sets the description column cellClass to constrain its width", () => {
       // Act
       const col = wrapper.vm.columns.find((c: any) => c.id === "description");
 
       // Assert
-      expect(col.meta.cellClass).toBe("description-column");
+      expect(col.meta.cellClass).toBe("tw:max-w-[60vw]");
     });
 
-    it("sets cellClass='error-level' for the level column", () => {
+    it("sets the level column cellClass to render a bordered cell", () => {
       // Act
       const col = wrapper.vm.columns.find((c: any) => c.id === "level");
 
       // Assert
-      expect(col.meta.cellClass).toBe("error-level");
+      expect(col.meta.cellClass).toBe(
+        "tw:border tw:border-[var(--o2-border)]",
+      );
     });
   });
 

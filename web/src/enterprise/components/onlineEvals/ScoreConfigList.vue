@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <EvalListShell
     data-test="score-config"
     :show-empty="false"
@@ -58,27 +58,25 @@
         </template>
 
         <template #cell-type="{ row }">
-          <OBadge :variant="dataTypeBadgeVariant(dataTypeOf(row))" size="sm">
-            {{ dataTypeOf(row) }}
-          </OBadge>
+          <OTag type="evalDataType" :value="dataTypeOf(row)" />
         </template>
 
         <template #cell-rangeValues="{ row }">
-          <span class="sc-mono-cell">{{ rangeOrValues(row) }}</span>
+          <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs">{{ rangeOrValues(row) }}</span>
         </template>
 
         <template #cell-healthy="{ row }">
-          <span class="sc-mono-cell tw:font-semibold">{{ healthyDisplay(row) }}</span>
+          <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs tw:font-semibold">{{ healthyDisplay(row) }}</span>
         </template>
 
         <template #cell-version="{ row }">
-          <span class="sc-version-cell">
-            <span class="sc-version-cell__dot" />v{{ row.version }}
+          <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs">
+            <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-(--o2-status-success-text) tw:inline-block" />v{{ row.version }}
           </span>
         </template>
 
         <template #cell-usedBy="{ row }">
-          <span class="sc-mono-cell">{{ usedByText(row) }}</span>
+          <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs">{{ usedByText(row) }}</span>
         </template>
 
         <template #cell-created="{ row }">
@@ -106,6 +104,7 @@
           <div class="tw:flex tw:items-center actions-container">
             <OButton
               :data-test="`score-config-list-${row.name}-edit-btn`"
+              data-row-action="edit"
               variant="ghost"
               size="icon-sm"
               :title="t('onlineEvals.actions.edit')"
@@ -122,6 +121,7 @@
             />
             <OButton
               :data-test="`score-config-list-${row.name}-delete-btn`"
+              data-row-action="delete"
               variant="ghost-destructive"
               size="icon-sm"
               :title="t('onlineEvals.actions.delete')"
@@ -139,7 +139,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -186,16 +186,6 @@ function handleBulkExport() {
   emit("export-bulk", ids);
 }
 
-// Map a score-config data type to a neutral design-system OBadge soft variant
-// (numeric → blue, categorical → purple, boolean → teal). Data types are just
-// labels, so use neutral palette colors rather than semantic success/warning
-// variants that would imply a good/bad meaning.
-function dataTypeBadgeVariant(type: DataType | string) {
-  if (type === "categorical") return "purple-soft" as const;
-  if (type === "boolean") return "teal-soft" as const;
-  return "blue-soft" as const; // numeric
-}
-
 const typeOptions = computed(() => [
   { label: t("onlineEvals.scoreConfig.allTypes"), value: null },
   { label: t("onlineEvals.scoreConfig.dataTypes.numeric"), value: "numeric" },
@@ -217,7 +207,8 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.name"),
     accessorKey: "name",
     sortable: true,
-    size: 200,
+    size: COL.name,
+    minSize: 160,
     // `flex` (not `autoWidth`): fills leftover width on load AND stays
     // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
     meta: { align: "left" },
@@ -373,30 +364,11 @@ function formatDateShort(value: number) {
   if (!value) return "—";
   return formatDate(value, "YYYY-MM-DD HH:mm:ss");
 }
+
+function dtypeChipClass(dataType: string): string {
+  if (dataType === 'numeric') return 'tw:bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)] tw:text-(--o2-status-info-text)';
+  if (dataType === 'categorical') return 'tw:bg-[color-mix(in_srgb,var(--o2-status-warning-text)_14%,transparent)] tw:text-(--o2-status-warning-text)';
+  if (dataType === 'boolean') return 'tw:bg-[color-mix(in_srgb,var(--o2-status-success-text)_14%,transparent)] tw:text-(--o2-status-success-text)';
+  return '';
+}
 </script>
-
-<style lang="scss">
-.sc-mono-cell {
-  font-size: 12px;
-}
-
-.sc-version-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-}
-
-.sc-version-cell__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 99px;
-  background: var(--o2-status-success-text);
-  display: inline-block;
-}
-
-.sc-version-cell__muted {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-weight: 400;
-}
-</style>

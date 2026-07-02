@@ -187,7 +187,9 @@ describe("VideoPlayer", () => {
     });
 
     it("should render the playback_bar element", () => {
-      expect(wrapper.find('[class*="playback_bar"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="video-player-playback-bar"]').exists(),
+      ).toBe(true);
     });
   });
 
@@ -335,7 +337,9 @@ describe("VideoPlayer", () => {
     });
 
     it("should not throw when the playback bar is clicked", async () => {
-      const playbackBar = wrapper.find('[class*="playback_bar"]');
+      const playbackBar = wrapper.find(
+        '[data-test="video-player-playback-bar"]',
+      );
       expect(playbackBar.exists()).toBe(true);
 
       await expect(playbackBar.trigger("click")).resolves.not.toThrow();
@@ -520,7 +524,9 @@ describe("VideoPlayer", () => {
     });
 
     it("should render event markers in the playback bar", () => {
-      const eventMarkers = frustrationWrapper.findAll('[class*="progressTime"]');
+      const eventMarkers = frustrationWrapper.findAll(
+        '[data-test="video-player-event-marker"]',
+      );
 
       expect(eventMarkers.length).toBeGreaterThan(0);
     });

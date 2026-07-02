@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="tw:flex tw:gap-3 tw:items-end">
-        <div class="col-auto claim-parser-select">
+        <div class="col-auto claim-parser-select tw:min-w-100">
           <OSelect
             v-model="claimParserFunction"
             :options="functionOptions"
@@ -77,12 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :width="40"
       >
         <div class="tw:p-4 tw:text-sm">
-          <div class="tw:mb-4 tw:p-4 info-box">
+          <div class="tw:mb-4 tw:p-4 tw:rounded" :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a]' : 'tw:bg-[#f5f5f5]'">
             <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionInputTitle") }}</div>
             <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
           </div>
 
-          <div class="tw:mb-4 tw:p-4 info-box">
+          <div class="tw:mb-4 tw:p-4 tw:rounded" :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a]' : 'tw:bg-[#f5f5f5]'">
             <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
             <div class="tw:mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
             <div class="tw:ml-4">
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Recent Errors Section -->
-          <div v-if="claimParserFunction" class="tw:p-4 info-box error-section">
+          <div v-if="claimParserFunction" class="tw:p-4 tw:rounded tw:border-l-[3px]" :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a] tw:border-l-[#ff6b6b]' : 'tw:bg-[#f5f5f5] tw:border-l-[#c10015]'">
             <div class="tw:flex tw:items-center tw:mb-2">
               <div class="tw:flex-1 tw:font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
               <div>
@@ -116,11 +116,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("settings.noRecentErrors") }}
             </div>
 
-            <div v-else class="error-list">
+            <div v-else class="error-list tw:max-h-100 tw:overflow-y-auto">
               <div
                 v-for="(error, index) in recentErrors.slice(0, 3)"
                 :key="index"
-                class="error-item tw:p-2 tw:mb-1"
+                class="tw:p-2 tw:mb-1 tw:rounded tw:border-l-2"
+                :class="store.state.theme === 'dark' ? 'tw:bg-[#2a1f1f] tw:border-l-[#ff6b6b]' : 'tw:bg-[#fff9f9] tw:border-l-[#ff9e9e]'"
               >
                 <div class="tw:flex tw:items-start tw:mb-1">
                   <OIcon name="error" size="xs" class="tw:mr-1 tw:mt-1" />
@@ -129,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tw:text-xs" style="color: var(--o2-text-muted)">{{ formatTimestamp(error._timestamp) }}</div>
                   </div>
                 </div>
-                <div class="tw:text-xs error-message">{{ error.error }}</div>
+                <div class="tw:text-xs tw:wrap-break-word" :class="store.state.theme === 'dark' ? 'tw:text-[#ccc]' : 'tw:text-[#666]'">{{ error.error }}</div>
               </div>
 
               <!-- Show More Button -->
@@ -167,18 +168,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:text-base tw:font-bold tw:mb-3">
         {{ t("settings.domainAndAllowedUsers") }}
       </div>
-      
+
       <div class="tw:flex tw:gap-x-2 tw:items-center">
-          <OInput
-            data-test="domain-management-new-domain-input"
-            v-model="newDomain"
-            class="domain-input"
-            @keydown.enter="addDomain"
-            :placeholder="t('settings.domainPlaceholder')"
-            :error="!!domainError"
-            :error-message="domainError"
-            @update:model-value="domainError = ''"
-          />
+          <!-- Fixed-width wrapper: OInput fills its parent (w-full), so
+               constraining the parent sizes the input without overriding it. -->
+          <div class="tw:w-[18.75rem] tw:shrink-0">
+            <OInput
+              data-test="domain-management-new-domain-input"
+              v-model="newDomain"
+              class="domain-input"
+              @keydown.enter="addDomain"
+              :placeholder="t('settings.domainPlaceholder')"
+              :error="!!domainError"
+              :error-message="domainError"
+              @update:model-value="domainError = ''"
+            />
+          </div>
           <OButton
             data-test="domain-management-add-domain-btn"
             variant="primary"
@@ -200,15 +205,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Domain List -->
     <div v-if="domains.length > 0" class="tw:mb-4">
       <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
-        <div 
+        <div
           v-if="domain && domain.name"
-          class="domain-card tw:mb-1"
+          class="tw:mb-1 tw:border tw:border-(--o2-border) tw:rounded-lg"
+          :class="store.state.theme === 'dark' ? 'tw:border-[#444] tw:bg-[#1e1e1e]' : 'tw:bg-white'"
         >
-          <div class="domain-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
-          <div
-            :data-test="`domain-management-domain-name-${domain.name}`"
-            class="tw:text-base tw:font-bold"
-          >{{ domain.name }}</div>
+          <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2 tw:border-b tw:border-b-(--o2-border) tw:rounded-t-lg" :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a] tw:border-b-[#444]' : 'tw:bg-[#f5f5f5]'">
+          <div class="tw:text-base tw:font-bold" :data-test="`domain-management-domain-name-${domain.name}`">{{ domain.name }}</div>
           <OButton
             icon-left="close"
             variant="ghost-destructive"
@@ -236,20 +239,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ORadioGroup>
 
           <!-- Info message for all users -->
-          <div 
+          <div
             v-if="domain.allowAllUsers"
-            class="tw:p-2 tw:bg-blue-50 tw:text-blue-700 tw:rounded tw:mb-3"
+            class="tw:p-2 tw:rounded tw:mb-3"
+            :class="store.state.theme === 'dark' ? 'tw:bg-[#1a2535] tw:text-blue-300' : 'tw:bg-blue-50 tw:text-blue-700'"
           >
             {{ t("settings.allUsersAllowedMessage", { domain: '@'+domain.name }) }}
           </div>
 
           <!-- Specific users section -->
-          <div v-if="!domain.allowAllUsers" class="specific-users-section">
+          <div v-if="!domain.allowAllUsers" class="specific-users-section tw:ml-6">
               <div class="tw:flex tw:gap-x-2 tw:items-end">
                 <OInput
                   v-model="domain.newEmail"
                   :label="t('settings.emailPlaceholder', { domain: '@' + domain.name })"
-                  class="email-input"
+                  class="email-input tw:min-w-62.5"
                   @keydown.enter="addEmail(domain)"
                 />
                 <OButton
@@ -262,10 +266,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Email List -->
             <div v-if="domain.allowedEmails && domain.allowedEmails.length > 0">
-              <div 
+              <div
                 v-for="(email, emailIndex) in domain.allowedEmails"
                 :key="email"
-                class="email-item tw:flex tw:items-center tw:justify-between tw:p-2 tw:mb-1"
+                class="tw:flex tw:items-center tw:justify-between tw:p-2 tw:mb-1 tw:rounded tw:border tw:border-(--o2-border)"
+                :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a] tw:border-[#444]' : 'tw:bg-[#f9f9f9]'"
               >
                 <div class="tw:text-sm">{{ email }}</div>
                 <OButton
@@ -285,7 +290,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       data-test="domain-management-no-domain-message"
-      class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mt-3 tw:mb-4 tw:w-full tw:text-center tw:p-4 domain-card"
+      class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mt-3 tw:mb-4 tw:w-full tw:text-center tw:p-4 tw:border tw:border-(--o2-border) tw:rounded-lg"
+      :class="store.state.theme === 'dark' ? 'tw:border-[#444] tw:bg-[#1e1e1e]' : 'tw:bg-white'"
     >
       {{ t("settings.noDomainMessage") }}
     </div>
@@ -464,33 +470,33 @@ const isValidDomain = (domain: any): boolean => {
   // Handle null, undefined, and non-string inputs
   if (domain === null || domain === undefined) return true; // Empty is valid
   if (typeof domain !== 'string') return false; // Non-strings are invalid
-  
+
   // Handle empty strings - empty is valid, but whitespace-only is not
   const trimmed = domain.trim();
   if (!trimmed) return domain.length === 0; // Empty string is valid, whitespace-only is not
-  
+
   // Security: Check for potentially malicious content (more targeted patterns)
   const maliciousPatterns = [
-    '<script', '</script', 'javascript:', 'DROP TABLE', 'SELECT FROM', 'INSERT INTO', 
+    '<script', '</script', 'javascript:', 'DROP TABLE', 'SELECT FROM', 'INSERT INTO',
     'UPDATE SET', 'DELETE FROM', 'UNION SELECT', '--', '/*', '*/', '\0', '\n', '\r'
   ];
-  
+
   const upperDomain = trimmed.toUpperCase();
   if (maliciousPatterns.some(pattern => upperDomain.includes(pattern.toUpperCase()))) {
     return false;
   }
-  
+
   // Length validation (DNS limit is 253 characters)
   if (trimmed.length > 253) return false;
-  
+
   // Remove trailing dot if present (valid in DNS)
   const cleanDomain = trimmed.endsWith('.') ? trimmed.slice(0, -1) : trimmed;
-  
+
   // Improved domain validation that properly handles hyphens and edge cases
   // Domain parts can contain letters, numbers, and hyphens (but not start/end with hyphens)
   // Each label can be 1-63 characters, and the domain must have at least one dot
   const domainRegex = /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
-  
+
   try {
     return domainRegex.test(cleanDomain);
   } catch (error) {
@@ -502,30 +508,30 @@ const isValidEmail = (email: any, domain: any): boolean => {
   // Handle null, undefined, and non-string inputs
   if (email === null || email === undefined || typeof email !== 'string') return false;
   if (domain === null || domain === undefined || typeof domain !== 'string') return false;
-  
+
   // Handle empty strings
   if (!email.trim() || !domain.trim()) return false;
-  
+
   // Security: Check for potentially malicious content
   const maliciousPatterns = [
     '<', '>', 'script', 'javascript:', 'DROP', 'SELECT', 'INSERT', 'UPDATE', 'DELETE',
     'UNION', 'CREATE', 'ALTER', 'TABLE', 'FROM', '--', '/*', '*/', "'", '"',
     '\0', '\n', '\r', '\t'
   ];
-  
+
   const upperEmail = email.toUpperCase();
   if (maliciousPatterns.some(pattern => upperEmail.includes(pattern.toUpperCase()))) {
     return false;
   }
-  
+
   // Length validation (practical email limit)
   if (email.length > 254 || domain.length > 253) return false;
-  
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  
+
   try {
     if (!emailRegex.test(email)) return false;
-    
+
     // Check if email belongs to the domain
     return email.toLowerCase().endsWith(`@${domain.toLowerCase()}`);
   } catch (error) {
@@ -542,7 +548,7 @@ const addDomain = () => {
     domainError.value = t("settings.invalidDomain") || "Please enter a valid domain (e.g. example.com)";
     return;
   }
-  
+
   // Check if domain already exists
   if (domains.some(d => d.name.toLowerCase() === newDomain.value.toLowerCase())) {
     toast({
@@ -795,7 +801,7 @@ const viewAllErrors = () => {
 
 const saveChanges = async () => {
   saving.value = true;
-  
+
   try {
     // Validate all domains have proper configuration
     for (const domain of domains) {
@@ -843,106 +849,3 @@ const resetForm = () => {
 };
 </script>
 
-<style scoped lang="scss">
-.claim-parser-select {
-  min-width: 400px;
-}
-
-.info-box {
-  background-color: #f5f5f5;
-  border-radius: 4px;
-}
-
-.domain-input {
-  width: 300px;
-}
-
-.email-input {
-  min-width: 250px;
-}
-
-.function-select {
-  max-width: 500px;
-}
-
-.domain-card {
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  background: white;
-}
-
-.domain-header {
-  background: #f5f5f5;
-  border-bottom: 1px solid #e0e0e0;
-  border-radius: 8px 8px 0 0;
-}
-
-.specific-users-section {
-  margin-left: 24px;
-}
-
-.email-item {
-  background: #f9f9f9;
-  border-radius: 4px;
-  border: 1px solid #e0e0e0;
-}
-
-.error-section {
-  border-left: 3px solid #c10015;
-}
-
-.error-list {
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.error-item {
-  background: #fff9f9;
-  border-radius: 4px;
-  border-left: 2px solid #ff9e9e;
-}
-
-.error-message {
-  color: #666;
-  word-break: break-word;
-}
-
-.body--dark {
-  .info-box {
-    background-color: #2a2a2a;
-  }
-
-  .domain-card {
-    border-color: #444;
-    background: #1e1e1e;
-  }
-
-  .domain-header {
-    background: #2a2a2a;
-    border-bottom-color: #444;
-  }
-
-  .email-item {
-    background: #2a2a2a;
-    border-color: #444;
-  }
-
-  .error-section {
-    border-left-color: #ff6b6b;
-  }
-
-  .error-item {
-    background: #2a1f1f;
-    border-left-color: #ff6b6b;
-  }
-
-  .error-message {
-    color: #ccc;
-  }
-}
-</style>
-<style lang="scss">
-.domain_management .q-field__bottom {
-  padding-left: 0px;
-}
-</style>

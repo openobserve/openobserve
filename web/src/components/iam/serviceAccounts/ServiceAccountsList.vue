@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="filterQuery"
                   :placeholder="t('serviceAccounts.search')"
                   class="tw:flex-1"
+                  data-test="iam-service-accounts-search-input"
                 />
               </div>
             </template>
@@ -90,10 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-email="{ row }">
               <template v-if="row.is_system">
                 <span data-test="service-accounts-system-account-label" class="text-weight-medium">{{ row.first_name }}</span>
-                <OBadge data-test="service-accounts-system-badge" variant="primary-outline" size="sm" class="tw:ml-2">system</OBadge>
+                <OTag data-test="service-accounts-system-badge" type="serviceAccountKind" value="system" class="tw:ml-2" />
               </template>
               <template v-else>
-                <span :data-test="`service-accounts-email-${row.email}`">{{ row.email }}</span>
+                <span :data-test="`service-accounts-email-${row.email}`"><OUserCell :value="row.email" /></span>
               </template>
             </template>
 
@@ -103,10 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-token="{ row }">
-              <span
+              <OCodeCell
                 :data-test="`service-accounts-token-${row.email}`"
-                class="tw:font-mono tw:text-xs tw:text-text-secondary"
-              >{{ row.token || '—' }}</span>
+                :value="row.token || '—'"
+                :copy="false"
+              />
             </template>
 
             <template #cell-created_at="{ row }">
@@ -122,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="service-accounts-system-managed-badge"
                   class="tw:inline-flex tw:items-center tw:gap-1"
                 >
-                  <OBadge variant="default" size="sm">{{ t('serviceAccounts.row.managedBy') }}</OBadge>
+                  <OTag type="serviceAccountKind" value="managed" />
                   <OTooltip :content="t('serviceAccounts.row.managedByTooltip')" />
                 </span>
               </template>
@@ -137,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   data-test="service-accounts-edit"
+                  data-row-action="edit"
                   :title="t('serviceAccounts.update')"
                   variant="ghost"
                   size="icon-sm"
@@ -145,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   data-test="service-accounts-delete"
+                  data-row-action="delete"
                   :title="t('serviceAccounts.deleteServiceAccount')"
                   variant="ghost"
                   size="icon-sm"
@@ -375,7 +379,9 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -405,9 +411,11 @@ import { computed } from "vue";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { OEmptyState, AddServiceAccount, ConfirmDialog, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge, OSearchInput, OTabs, OTab, OTabPanels, OTabPanel },
+  components: { OEmptyState, AddServiceAccount, ConfirmDialog, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OTag, OCodeCell, OUserCell, OSearchInput, OTabs, OTab, OTabPanels, OTabPanel },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
@@ -904,6 +912,24 @@ export default defineComponent({
     };
 
 
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "iamServiceAccountsAdd",
+        handler: () => { if (!isInputFocused()) addRoutePush({}); },
+      },
+      {
+        id: "iamServiceAccountsRefresh",
+        handler: () => { if (!isInputFocused()) getServiceAccountsUsers(); },
+      },
+      {
+        id: "iamServiceAccountsFocusSearch",
+        handler: () => {
+          focusSearchInput("iam-service-accounts-search-input");
+        },
+      },
+    ]);
     return {
       t,
       router,
@@ -968,5 +994,4 @@ export default defineComponent({
   },
 });
 </script>
-
 

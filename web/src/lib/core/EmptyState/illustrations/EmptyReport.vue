@@ -70,7 +70,7 @@ withDefaults(
 );
 </script>
 
-<style scoped>
+<style>
 .es-plane {
   transform-box: view-box;
   animation: es-fly 4s ease-in-out infinite;

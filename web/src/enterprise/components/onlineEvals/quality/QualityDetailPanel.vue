@@ -1,5 +1,5 @@
-<template>
-  <section class="qdp" data-test="quality-detail-panel">
+﻿<template>
+  <section class="tw:flex tw:flex-col tw:gap-3 tw:px-5 tw:pt-4 tw:pb-6 tw:min-h-full tw:overflow-auto" data-test="quality-detail-panel">
     <!-- Title row + type badge + version + description moved up into the
          ODrawer header (QualityPage) so the panel content starts straight
          from the KPI tiles without a duplicated identification block. -->
@@ -26,14 +26,14 @@
       <!-- KPI tiles reuse the exact card layout + text styles as the LLM
            Sessions detail page (.kpi-card) so the AI module stays visually
            consistent across pages. -->
-      <div class="qdp__kpis">
+      <div class="tw:grid tw:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] tw:gap-2.5">
         <div
           v-for="kpi in kpis"
           :key="kpi.id"
-          class="kpi-card tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem]"
+          class="kpi-card tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem] tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:transition-shadow tw:duration-200"
           :data-test="`quality-detail-kpi-${kpi.id}`"
         >
-          <div class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]">
+          <div class="tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]">
             {{ kpiTitle(kpi) }}
           </div>
           <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
@@ -44,14 +44,14 @@
         </div>
       </div>
 
-      <section v-if="dataType === 'numeric'" class="qdp-chart card-container">
-        <header class="qdp-chart__head">
-          <h4 class="qdp-chart__title">
+      <section v-if="dataType === 'numeric'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
+        <header class="tw:mb-[6px]">
+          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">
             {{ t("onlineEvals.quality.detail.trendTitle") }}
-            <span class="qdp-chart__subtitle">— {{ config.name }}</span>
+            <span class="tw:font-normal tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:text-[11px]">— {{ config.name }}</span>
           </h4>
         </header>
-        <div class="qdp-chart__body qdp-chart__body--lg">
+        <div class="tw:h-[260px]">
           <QualityTrendChart
             v-if="numericTrend.length > 0"
             :points="numericTrend"
@@ -62,15 +62,15 @@
             :legend-p95="t('onlineEvals.quality.detail.legendP95')"
             :legend-threshold-fmt="t('onlineEvals.quality.detail.legendThreshold')"
           />
-          <p v-else class="qdp-chart__empty">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'numeric'" class="qdp-chart card-container">
-        <header class="qdp-chart__head">
-          <h4 class="qdp-chart__title">{{ t("onlineEvals.quality.detail.distributionTitle") }}</h4>
+      <section v-if="dataType === 'numeric'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
+        <header class="tw:mb-[6px]">
+          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.quality.detail.distributionTitle") }}</h4>
         </header>
-        <div class="qdp-chart__body">
+        <div class="tw:h-[220px]">
           <QualityDistributionChart
             v-if="numericDistribution.length > 0"
             :buckets="numericDistribution"
@@ -78,33 +78,33 @@
             :legend-healthy="t('onlineEvals.quality.detail.legendHealthy')"
             :legend-unhealthy="t('onlineEvals.quality.detail.legendUnhealthy')"
           />
-          <p v-else class="qdp-chart__empty">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'boolean'" class="qdp-chart card-container">
-        <header class="qdp-chart__head">
-          <h4 class="qdp-chart__title">
+      <section v-if="dataType === 'boolean'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
+        <header class="tw:mb-[6px]">
+          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">
             {{ t("onlineEvals.quality.detail.passRateTitle") }}
-            <span class="qdp-chart__subtitle">— {{ config.name }}</span>
+            <span class="tw:font-normal tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:text-[11px]">— {{ config.name }}</span>
           </h4>
         </header>
-        <div class="qdp-chart__body qdp-chart__body--lg">
+        <div class="tw:h-[260px]">
           <QualityBooleanTrendChart
             v-if="booleanTrendSeries.length > 0"
             :series="booleanTrendSeries"
             :points="booleanTrend"
             :legend-pass-rate="t('onlineEvals.quality.detail.legendHealthy')"
           />
-          <p v-else class="qdp-chart__empty">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'boolean'" class="qdp-chart card-container">
-        <header class="qdp-chart__head">
-          <h4 class="qdp-chart__title">{{ t("onlineEvals.quality.detail.trueFalseTitle") }}</h4>
+      <section v-if="dataType === 'boolean'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
+        <header class="tw:mb-[6px]">
+          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.quality.detail.trueFalseTitle") }}</h4>
         </header>
-        <div class="qdp-chart__body qdp-chart__body--sm">
+        <div class="tw:h-[120px]">
           <QualityBooleanBarsChart
             v-if="booleanCounts.trueCount + booleanCounts.falseCount > 0"
             :true-count="booleanCounts.trueCount"
@@ -112,21 +112,21 @@
             :legend-true="`true (${booleanCounts.trueCount})`"
             :legend-false="`false (${booleanCounts.falseCount})`"
           />
-          <p v-else class="qdp-chart__empty">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'categorical'" class="qdp-chart card-container">
-        <header class="qdp-chart__head">
-          <h4 class="qdp-chart__title">{{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}</h4>
+      <section v-if="dataType === 'categorical'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
+        <header class="tw:mb-[6px]">
+          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}</h4>
         </header>
-        <div class="qdp-chart__body qdp-chart__body--lg">
+        <div class="tw:h-[260px]">
           <QualityCategoryBarsChart
             v-if="categoricalRows.length > 0"
             :rows="categoricalRows"
             :healthy-categories="healthyCategories"
           />
-          <p v-else class="qdp-chart__empty">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
     </template>
@@ -215,22 +215,8 @@ function formatKpi(kpi: DetailKpi): string {
 }
 </script>
 
-<style lang="scss" scoped>
-.qdp {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  // The panel now renders inside an ODrawer body whose own padding is
-  // intentionally minimal, so the content sat flush against the drawer
-  // edges. Add comfortable horizontal + vertical padding so titles,
-  // KPI cards, and charts breathe inside the panel.
-  padding: 16px 20px 24px;
-  // Fill the drawer body's full height (it's a flex-1 block, not a flex
-  // container) so the empty state's `flex: 1` has room to expand and center
-  // vertically. Populated panels just scroll past it as before.
-  min-height: 100%;
-  overflow: auto;
-}
+<style>
+/* ::before pseudo-element for KPI accent bar — cannot inline */
 
 .qdp__loading {
   display: flex;
@@ -253,67 +239,10 @@ function formatKpi(kpi: DetailKpi): string {
   justify-content: center;
 }
 
-.qdp__kpis {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-}
-
-// Mirrors the LLM Sessions detail page card chrome (border/bg/hover) so the
-// AI module's KPI tiles look identical across pages.
-.kpi-card {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-  transition: box-shadow 0.2s ease;
-}
-
+/* Hover shadow on KPI tiles — pseudo-class cannot be inlined. Mirrors the
+ * LLM Sessions detail page card chrome so the AI module's KPI tiles look
+ * identical across pages. */
 .kpi-card:hover {
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
-}
-
-.qdp-chart {
-  padding: 12px 14px 14px;
-  background: var(--o2-card-bg);
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-}
-
-.qdp-chart__head {
-  margin-bottom: 6px;
-}
-
-.qdp-chart__title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-}
-
-.qdp-chart__subtitle {
-  font-weight: 400;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 11px;
-}
-
-.qdp-chart__body {
-  height: 220px;
-}
-
-.qdp-chart__body--lg {
-  height: 260px;
-}
-
-.qdp-chart__body--sm {
-  height: 120px;
-}
-
-.qdp-chart__empty {
-  margin: 0;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 </style>

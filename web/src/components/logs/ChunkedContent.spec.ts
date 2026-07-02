@@ -88,7 +88,11 @@ describe("ChunkedContent", () => {
       });
 
       await flushPromises();
-      expect(wrapper.find(".chunked-content").exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="logs-chunked-content-container"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should render LogsHighLighting stub", async () => {

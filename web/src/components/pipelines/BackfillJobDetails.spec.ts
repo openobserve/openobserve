@@ -285,7 +285,7 @@ describe("BackfillJobDetails – canCancelJob computed", () => {
   });
 });
 
-describe("BackfillJobDetails – getStatusColor", () => {
+describe("BackfillJobDetails – getStatusKey", () => {
   let wrapper: ReturnType<typeof createWrapper>;
 
   beforeEach(async () => {
@@ -294,31 +294,16 @@ describe("BackfillJobDetails – getStatusColor", () => {
     await flushPromises();
   });
 
-  it("returns 'success' for status 'running'", () => {
-    expect((wrapper.vm as any).getStatusColor("running")).toBe("success");
+  it("passes the raw status through as the registry value key", () => {
+    for (const s of ["running", "completed", "failed", "pending", "canceled"]) {
+      expect((wrapper.vm as any).getStatusKey(s)).toBe(s);
+    }
   });
 
-  it("returns 'success' for status 'completed'", () => {
-    expect((wrapper.vm as any).getStatusColor("completed")).toBe("success");
-  });
-
-  it("returns 'error' for status 'failed'", () => {
-    expect((wrapper.vm as any).getStatusColor("failed")).toBe("error");
-  });
-
-  it("returns 'warning' for status 'pending'", () => {
-    expect((wrapper.vm as any).getStatusColor("pending")).toBe("warning");
-  });
-
-  it("returns 'default' for status 'canceled'", () => {
-    expect((wrapper.vm as any).getStatusColor("canceled")).toBe("default");
-  });
-
-  it("returns 'error' when deletionStatus is an object with 'failed' key", () => {
-    const result = (wrapper.vm as any).getStatusColor("running", {
-      failed: "some error",
-    });
-    expect(result).toBe("error");
+  it("maps a failed deletion overlay to the 'deletionfailed' key", () => {
+    expect(
+      (wrapper.vm as any).getStatusKey("running", { failed: "some error" }),
+    ).toBe("deletionfailed");
   });
 });
 

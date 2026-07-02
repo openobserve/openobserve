@@ -1,5 +1,5 @@
-<template>
-  <form class="scorer-form" @submit.prevent="save">
+﻿<template>
+  <form class="scorer-form tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:gap-2.5" @submit.prevent="save">
     <!-- Shared page header (same as JobFormPage) so the two eval forms read
          identically: Back pill in the module-icon slot, title, and the
          scorer-type badge + close button in #actions. -->
@@ -10,23 +10,18 @@
         dataTest: 'scorer-form-back-btn',
       }"
       class="card-container tw:px-3 tw:border-b tw:border-border-default"
+      style="flex-shrink: 0"
     >
       <template #title>
         <span data-test="scorer-form-title">{{ titleText }}</span>
       </template>
       <!-- Scorer-type badge sits inline, immediately after the title. -->
       <template #title-trail>
-        <OBadge
-          :variant="form.scorerType === 'remote' ? 'success-soft' : 'blue-soft'"
-          size="sm"
+        <OTag
+          type="scorerType"
+          :value="form.scorerType"
           data-test="scorer-form-type-badge"
-        >
-          {{
-            form.scorerType === "remote"
-              ? t("onlineEvals.scorer.badgeRemote")
-              : t("onlineEvals.scorer.badgeLlm")
-          }}
-        </OBadge>
+        />
       </template>
       <template #actions>
         <OButton
@@ -41,21 +36,20 @@
       </template>
     </AppPageHeader>
 
-    <div class="scorer-form__body">
-      <div class="scorer-form__main">
+    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:grid tw:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] tw:max-[1100px]:grid-cols-1 tw:gap-2.5">
+      <div class="scorer-form__main tw:min-w-0 tw:overflow-auto tw:p-[18px_24px_24px] tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
         <!-- Section 01: Identity -->
-        <section class="scorer-section card-container">
-          <div class="section-header">
-            <div class="section-header-accent" />
-            <span class="section-header-title">{{ t("onlineEvals.scorer.identitySection") }}</span>
+        <section class="tw:mb-6">
+          <div class="tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border) tw:mb-3">
+            <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary) tw:font-bold tw:text-[11px] tw:font-mono">01</span>
+            <h3 class="tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary)">{{ t("onlineEvals.scorer.identitySection") }}</h3>
           </div>
-          <div class="scorer-section__body">
 
-          <div class="scorer-field">
-            <label class="scorer-field__label">
+          <div class="tw:mb-3">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.scorer.nameLabel") }}
-              <span class="scorer-field__req">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="scorer-field__lock" />
+              <span class="tw:text-(--o2-status-error-text) tw:ml-[2px]">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="tw:ml-1.5 tw:text-(--color-text-secondary)" />
             </label>
             <OInput
               v-model.trim="form.name"
@@ -66,8 +60,8 @@
             />
           </div>
 
-          <div class="scorer-field scorer-field--desc">
-            <label class="scorer-field__label">
+          <div class="tw:mb-3">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.scorer.descriptionLabel") }}
             </label>
             <OInput
@@ -80,11 +74,11 @@
             />
           </div>
 
-          <div class="scorer-field">
-            <label class="scorer-field__label">
+          <div class="tw:mb-3">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.scorer.producesScoreConfigLabel") }}
-              <span class="scorer-field__req">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="scorer-field__lock" />
+              <span class="tw:text-(--o2-status-error-text) tw:ml-[2px]">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="tw:ml-1.5 tw:text-(--color-text-secondary)" />
             </label>
             <OSelect
               v-model="form.producesScoreConfigId"
@@ -95,56 +89,54 @@
               data-test="scorer-form-score-config-select"
               @update:modelValue="handleScoreConfigSelection"
             />
-            <div class="scorer-field__help">{{ t("onlineEvals.scorer.producesScoreHelp") }}</div>
+            <div class="tw:text-[11.5px] tw:text-(--color-text-secondary) tw:mt-1">{{ t("onlineEvals.scorer.producesScoreHelp") }}</div>
 
-            <div v-if="selectedScoreConfig" class="scorer-preview">
-              <span class="scorer-preview__dot" />
-              <span class="scorer-preview__label">
+            <div v-if="selectedScoreConfig" class="tw:flex tw:items-center tw:flex-wrap tw:gap-[6px_10px] tw:p-[8px_12px] tw:mt-2 tw:border tw:border-[color-mix(in_srgb,var(--o2-status-info-text)_25%,transparent)] tw:rounded-md tw:bg-[color-mix(in_srgb,var(--o2-status-info-text)_8%,transparent)] tw:text-xs tw:text-(--color-text-primary)">
+              <span class="tw:w-2 tw:h-2 tw:rounded-full tw:bg-(--o2-status-info-text) tw:shrink-0" />
+              <span class="tw:font-medium">
                 {{ t("onlineEvals.scorer.selectedPrefix") }}
-                <strong class="scorer-mono">{{ selectedScoreConfig.name }}</strong>
+                <strong class="tw:font-mono">{{ selectedScoreConfig.name }}</strong>
               </span>
-              <span class="scorer-preview__sep">·</span>
-              <span class="scorer-preview__meta">
+              <span class="tw:text-(--color-text-secondary)">·</span>
+              <span class="tw:text-(--color-text-secondary)">
                 {{ t("onlineEvals.scorer.typeLabel") }}
-                <span class="scorer-mono">{{ dataTypeOf(selectedScoreConfig) }}</span>
+                <span class="tw:font-mono">{{ dataTypeOf(selectedScoreConfig) }}</span>
               </span>
               <template v-if="selectedRange">
-                <span class="scorer-preview__sep">·</span>
-                <span class="scorer-preview__meta">
+                <span class="tw:text-(--color-text-secondary)">·</span>
+                <span class="tw:text-(--color-text-secondary)">
                   {{ t("onlineEvals.scorer.rangeLabel") }}
-                  <span class="scorer-mono">{{ selectedRange }}</span>
+                  <span class="tw:font-mono">{{ selectedRange }}</span>
                 </span>
               </template>
-              <span class="scorer-preview__sep">·</span>
-              <span class="scorer-preview__meta">
+              <span class="tw:text-(--color-text-secondary)">·</span>
+              <span class="tw:text-(--color-text-secondary)">
                 {{ t("onlineEvals.scorer.healthyLabel") }}
-                <span class="scorer-mono">{{ selectedHealthy }}</span>
+                <span class="tw:font-mono">{{ selectedHealthy }}</span>
               </span>
             </div>
-          </div>
           </div>
         </section>
 
         <!-- Section 02: LLM Judge configuration -->
-        <section v-if="form.scorerType === 'llm_judge'" class="scorer-section card-container">
-          <div class="section-header">
-            <div class="section-header-accent" />
-            <span class="section-header-title">{{ t("onlineEvals.scorer.judgeSection") }}</span>
+        <section v-if="form.scorerType === 'llm_judge'" class="tw:mb-6">
+          <div class="tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border) tw:mb-3">
+            <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary) tw:font-bold tw:text-[11px] tw:font-mono">02</span>
+            <h3 class="tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary)">{{ t("onlineEvals.scorer.judgeSection") }}</h3>
           </div>
-          <div class="scorer-section__body">
 
-          <div class="scorer-field">
-            <label class="scorer-field__label">
+          <div class="tw:mb-3">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.scorer.providerLabel") }}
-              <span class="scorer-field__req">*</span>
+              <span class="tw:text-(--o2-status-error-text) tw:ml-[2px]">*</span>
             </label>
-            <div class="scorer-field__row">
+            <div class="tw:flex tw:items-center tw:gap-2">
               <OSelect
                 v-model="form.providerId"
                 :options="providerOptions"
                 :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
                 size="md"
-                class="scorer-field__row-grow"
+                class="tw:flex-1 tw:min-w-0"
                 data-test="scorer-form-provider-select"
               />
               <OButton
@@ -158,30 +150,30 @@
               />
             </div>
 
-            <div v-if="selectedProvider" class="scorer-preview">
-              <span class="scorer-preview__dot" />
-              <span class="scorer-preview__meta">
+            <div v-if="selectedProvider" class="tw:flex tw:items-center tw:flex-wrap tw:gap-[6px_10px] tw:p-[8px_12px] tw:mt-2 tw:border tw:border-[color-mix(in_srgb,var(--o2-status-info-text)_25%,transparent)] tw:rounded-md tw:bg-[color-mix(in_srgb,var(--o2-status-info-text)_8%,transparent)] tw:text-xs tw:text-(--color-text-primary)">
+              <span class="tw:w-2 tw:h-2 tw:rounded-full tw:bg-(--o2-status-info-text) tw:shrink-0" />
+              <span class="tw:text-(--color-text-secondary)">
                 {{ t("onlineEvals.scorer.endpointLabel") }}
-                <span class="scorer-mono">{{ providerEndpoint(selectedProvider) }}</span>
+                <span class="tw:font-mono">{{ providerEndpoint(selectedProvider) }}</span>
               </span>
-              <span class="scorer-preview__sep">·</span>
-              <span class="scorer-preview__meta">
+              <span class="tw:text-(--color-text-secondary)">·</span>
+              <span class="tw:text-(--color-text-secondary)">
                 {{ t("onlineEvals.scorer.defaultModelPreviewLabel") }}
-                <span class="scorer-mono">{{ defaultModelOf(selectedProvider) || "—" }}</span>
+                <span class="tw:font-mono">{{ defaultModelOf(selectedProvider) || "—" }}</span>
               </span>
-              <span class="scorer-preview__sep">·</span>
-              <span class="scorer-preview__meta">
+              <span class="tw:text-(--color-text-secondary)">·</span>
+              <span class="tw:text-(--color-text-secondary)">
                 {{ t("onlineEvals.scorer.authLabel") }}
-                <span class="scorer-mono">{{ t("onlineEvals.scorer.authConfigured") }}</span>
+                <span class="tw:font-mono">{{ t("onlineEvals.scorer.authConfigured") }}</span>
               </span>
             </div>
 
-            <div class="scorer-field__help">
+            <div class="tw:text-[11.5px] tw:text-(--color-text-secondary) tw:mt-1">
               <i18n-t keypath="onlineEvals.scorer.providerHelp" tag="span">
                 <template #settingsLink>
                   <router-link
                     :to="{ name: 'llmProviders' }"
-                    class="scorer-field__help-link"
+                    class="scorer-field__help-link tw:text-(--color-primary-600) tw:font-semibold tw:no-underline tw:hover:underline"
                     target="_blank"
                   >
                     {{ t("onlineEvals.scorer.providerHelpSettingsLink") }}
@@ -191,8 +183,8 @@
             </div>
           </div>
 
-          <div class="scorer-field">
-            <label class="scorer-field__label">{{ t("onlineEvals.scorer.modelLabel") }}</label>
+          <div class="tw:mb-3">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">{{ t("onlineEvals.scorer.modelLabel") }}</label>
             <OInput
               v-model.trim="form.model"
               :placeholder="t('onlineEvals.scorer.modelPlaceholder')"
@@ -201,10 +193,10 @@
             />
           </div>
 
-          <div class="scorer-field scorer-field--prompt">
-            <label class="scorer-field__label">
+          <div class="tw:mb-3 tw:flex tw:flex-col tw:gap-[14px]">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.scorer.promptLabel") }}
-              <span class="scorer-field__req">*</span>
+              <span class="tw:text-(--o2-status-error-text) tw:ml-[2px]">*</span>
             </label>
             <OInput
               v-model="form.template"
@@ -213,17 +205,17 @@
               :rows="8"
               data-test="scorer-form-prompt-input"
             />
-            <div class="scorer-prompt-vars">
-              <span class="scorer-prompt-vars__label">
+            <div class="tw:flex tw:items-center tw:flex-wrap tw:gap-1.5 tw:mt-1.5 tw:text-[11.5px]">
+              <span class="tw:text-(--color-text-secondary)">
                 {{ t("onlineEvals.scorer.promptVariablesLabel") }}
               </span>
               <span
                 v-for="v in promptVariables"
                 :key="v"
-                class="scorer-prompt-vars__chip scorer-mono"
+                class="tw:py-[1px] tw:px-1.5 tw:rounded-[3px] tw:text-[11px] tw:font-mono tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] tw:text-(--color-text-primary)"
               >{{ formatTemplateVariable(v) }}</span>
             </div>
-            <div class="scorer-field__help">
+            <div class="tw:text-[11.5px] tw:text-(--color-text-secondary) tw:mt-1">
               {{
                 t("onlineEvals.scorer.promptHelp", {
                   inputVar: formatTemplateVariable("input"),
@@ -233,35 +225,35 @@
             </div>
           </div>
 
-          <div class="scorer-field scorer-field--extras">
-            <label class="scorer-extras__toggle">
+          <div class="tw:mb-3 tw:flex tw:flex-col tw:gap-[14px]">
+            <label class="tw:flex tw:items-start tw:gap-2 tw:cursor-pointer">
               <input
                 v-model="form.includeReasoning"
                 type="checkbox"
                 data-test="scorer-form-include-reasoning"
               />
               <span>
-                <strong>{{ t("onlineEvals.scorer.includeReasoningLabel") }}</strong>
-                <small>{{ t("onlineEvals.scorer.includeReasoningHint") }}</small>
+                <strong class="tw:block tw:text-xs tw:text-(--color-text-primary)">{{ t("onlineEvals.scorer.includeReasoningLabel") }}</strong>
+                <small class="tw:block tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.scorer.includeReasoningHint") }}</small>
               </span>
             </label>
 
-            <div class="scorer-extras__head">
-              <div class="scorer-extras__head-text">
-                <strong>{{ t("onlineEvals.scorer.extraFieldsLabel") }}</strong>
-                <span class="scorer-extras__optional">
+            <div class="tw:flex tw:justify-between tw:items-baseline tw:gap-3">
+              <div class="tw:flex tw:flex-col tw:gap-0.5">
+                <strong class="tw:text-xs tw:font-semibold">{{ t("onlineEvals.scorer.extraFieldsLabel") }}</strong>
+                <span class="tw:text-[10px] tw:font-semibold tw:text-(--color-text-muted) tw:uppercase tw:tracking-[0.04em]">
                   {{ t("onlineEvals.scorer.extraFieldsOptional") }}
                 </span>
-                <small>{{ t("onlineEvals.scorer.extraFieldsHint") }}</small>
+                <small class="tw:block tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.scorer.extraFieldsHint") }}</small>
               </div>
             </div>
 
             <div
               v-if="form.extraMetadataFields.length"
-              class="scorer-extras__table"
+              class="tw:flex tw:flex-col tw:gap-1.5 tw:border tw:border-(--color-border) tw:rounded-md tw:p-[8px_10px] tw:bg-(--color-card-bg-solid)"
               data-test="scorer-form-extra-fields"
             >
-              <div class="scorer-extras__row scorer-extras__row--head">
+              <div class="tw:grid tw:grid-cols-[minmax(120px,1fr)_110px_minmax(140px,2fr)_28px] tw:gap-2 tw:items-center tw:text-[10px] tw:font-semibold tw:uppercase tw:tracking-[0.04em] tw:text-(--color-text-muted)">
                 <span>{{ t("onlineEvals.scorer.extraFields.colName") }}</span>
                 <span>{{ t("onlineEvals.scorer.extraFields.colType") }}</span>
                 <span>{{ t("onlineEvals.scorer.extraFields.colDescription") }}</span>
@@ -270,7 +262,7 @@
               <div
                 v-for="(field, idx) in form.extraMetadataFields"
                 :key="idx"
-                class="scorer-extras__row"
+                class="tw:grid tw:grid-cols-[minmax(120px,1fr)_110px_minmax(140px,2fr)_28px] tw:gap-2 tw:items-center"
               >
                 <OInput
                   v-model.trim="field.name"
@@ -293,7 +285,7 @@
                 />
                 <button
                   type="button"
-                  class="scorer-extras__remove"
+                  class="tw:w-6 tw:h-6 tw:border-0 tw:bg-transparent tw:text-(--color-text-secondary) tw:text-base tw:cursor-pointer tw:rounded tw:hover:bg-[color-mix(in_srgb,var(--o2-status-error-text)_12%,transparent)] tw:hover:text-(--o2-status-error-text)"
                   :aria-label="t('onlineEvals.buttons.remove')"
                   :data-test="`scorer-form-extra-field-remove-${idx}`"
                   @click="removeExtraField(idx)"
@@ -303,23 +295,23 @@
               </div>
             </div>
 
-            <div class="scorer-extras__actions">
+            <div class="tw:flex tw:justify-between tw:gap-3">
               <button
                 type="button"
-                class="scorer-extras__add"
+                class="tw:border-0 tw:bg-transparent tw:py-1 tw:px-0 tw:text-xs tw:font-semibold tw:text-(--o2-primary-btn-bg) tw:cursor-pointer tw:disabled:text-(--color-text-muted) tw:disabled:cursor-not-allowed"
                 :disabled="form.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
                 data-test="scorer-form-extra-field-add"
                 @click="addExtraField"
               >
                 {{ t("onlineEvals.scorer.extraFields.addButton") }}
-                <span class="scorer-extras__count">
+                <span class="tw:font-normal tw:text-(--color-text-secondary) tw:ml-1">
                   ({{ form.extraMetadataFields.length }} / {{ MAX_EXTRA_FIELDS }})
                 </span>
               </button>
 
               <button
                 type="button"
-                class="scorer-extras__preview"
+                class="scorer-extras__preview tw:border-0 tw:bg-transparent tw:py-1 tw:px-0 tw:text-xs tw:font-semibold tw:text-(--o2-primary-btn-bg) tw:cursor-pointer"
                 data-test="scorer-form-preview-schema"
                 @click="previewOutputSchema"
               >
@@ -328,23 +320,21 @@
             </div>
 
           </div>
-          </div>
         </section>
 
         <!-- Section 02: Endpoint -->
-        <section v-else class="scorer-section card-container">
-          <div class="section-header">
-            <div class="section-header-accent" />
-            <span class="section-header-title">{{ t("onlineEvals.scorer.endpointSection") }}</span>
+        <section v-else class="tw:mb-6">
+          <div class="tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border) tw:mb-3">
+            <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary) tw:font-bold tw:text-[11px] tw:font-mono">02</span>
+            <h3 class="tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary)">{{ t("onlineEvals.scorer.endpointSection") }}</h3>
           </div>
-          <div class="scorer-section__body">
 
-          <div class="scorer-field">
-            <label class="scorer-field__label">
+          <div class="tw:mb-3">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.scorer.remoteUrlLabel") }}
-              <span class="scorer-field__req">*</span>
+              <span class="tw:text-(--o2-status-error-text) tw:ml-[2px]">*</span>
             </label>
-            <div class="scorer-url-bar">
+            <div class="scorer-url-bar tw:grid tw:grid-cols-[104px_minmax(0,1fr)] tw:gap-0">
               <OSelect
                 v-model="form.httpMethod"
                 size="md"
@@ -361,9 +351,9 @@
             </div>
           </div>
 
-          <div class="scorer-field scorer-field--triple">
-            <div class="scorer-field__col">
-              <label class="scorer-field__label">
+          <div class="tw:mb-3 tw:grid tw:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] tw:gap-3">
+            <div class="tw:flex tw:flex-col tw:gap-1.5">
+              <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
                 {{ t("onlineEvals.scorer.remoteTimeoutLabel") }}
               </label>
               <OInput
@@ -374,8 +364,8 @@
                 data-test="scorer-form-remote-timeout"
               />
             </div>
-            <div class="scorer-field__col">
-              <label class="scorer-field__label">
+            <div class="tw:flex tw:flex-col tw:gap-1.5">
+              <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
                 {{ t("onlineEvals.scorer.remoteRetriesLabel") }}
               </label>
               <OInput
@@ -386,8 +376,8 @@
                 data-test="scorer-form-remote-retries"
               />
             </div>
-            <div class="scorer-field__col">
-              <label class="scorer-field__label">
+            <div class="tw:flex tw:flex-col tw:gap-1.5">
+              <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
                 {{ t("onlineEvals.scorer.remoteBackoffLabel") }}
               </label>
               <OSelect
@@ -399,19 +389,17 @@
               />
             </div>
           </div>
-          </div>
         </section>
 
         <!-- Section 03: Authentication -->
-        <section v-if="form.scorerType === 'remote'" class="scorer-section card-container">
-          <div class="section-header">
-            <div class="section-header-accent" />
-            <span class="section-header-title">{{ t("onlineEvals.scorer.authSection") }}</span>
+        <section v-if="form.scorerType === 'remote'" class="tw:mb-6">
+          <div class="tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border) tw:mb-3">
+            <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary) tw:font-bold tw:text-[11px] tw:font-mono">03</span>
+            <h3 class="tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary)">{{ t("onlineEvals.scorer.authSection") }}</h3>
           </div>
-          <div class="scorer-section__body">
 
-          <div class="scorer-field">
-            <label class="scorer-field__label">
+          <div class="tw:mb-3">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.scorer.remoteAuthLabel") }}
             </label>
             <OSelect
@@ -424,10 +412,10 @@
             />
           </div>
 
-          <div v-if="form.authType === 'bearer'" class="scorer-field">
-            <label class="scorer-field__label">
+          <div v-if="form.authType === 'bearer'" class="tw:mb-3">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
-              <span class="scorer-field__req">*</span>
+              <span class="tw:text-(--o2-status-error-text) tw:ml-[2px]">*</span>
             </label>
             <OInput
               v-model.trim="form.authBearerToken"
@@ -436,16 +424,16 @@
               type="password"
               data-test="scorer-form-remote-auth-bearer-token"
             />
-            <div class="scorer-field__help">
+            <div class="tw:text-[11.5px] tw:text-(--color-text-secondary) tw:mt-1">
               {{ t("onlineEvals.scorer.remoteAuth.encryptedHint") }}
             </div>
           </div>
 
-          <div v-if="form.authType === 'basic'" class="scorer-field scorer-field--row">
-            <div class="scorer-field__half">
-              <label class="scorer-field__label">
+          <div v-if="form.authType === 'basic'" class="tw:mb-3 tw:grid tw:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] tw:gap-3">
+            <div class="tw:flex tw:flex-col tw:gap-1.5">
+              <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.usernameLabel") }}
-                <span class="scorer-field__req">*</span>
+                <span class="tw:text-(--o2-status-error-text) tw:ml-[2px]">*</span>
               </label>
               <OInput
                 v-model.trim="form.authBasicUsername"
@@ -454,10 +442,10 @@
                 data-test="scorer-form-remote-auth-basic-username"
               />
             </div>
-            <div class="scorer-field__half">
-              <label class="scorer-field__label">
+            <div class="tw:flex tw:flex-col tw:gap-1.5">
+              <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.passwordLabel") }}
-                <span class="scorer-field__req">*</span>
+                <span class="tw:text-(--o2-status-error-text) tw:ml-[2px]">*</span>
               </label>
               <OInput
                 v-model.trim="form.authBasicPassword"
@@ -466,17 +454,17 @@
                 type="password"
                 data-test="scorer-form-remote-auth-basic-password"
               />
-              <div class="scorer-field__help">
+              <div class="tw:text-[11.5px] tw:text-(--color-text-secondary) tw:mt-1">
                 {{ t("onlineEvals.scorer.remoteAuth.encryptedHint") }}
               </div>
             </div>
           </div>
 
-          <div v-if="form.authType === 'api_key'" class="scorer-field scorer-field--row">
-            <div class="scorer-field__half">
-              <label class="scorer-field__label">
+          <div v-if="form.authType === 'api_key'" class="tw:mb-3 tw:grid tw:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] tw:gap-3">
+            <div class="tw:flex tw:flex-col tw:gap-1.5">
+              <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.headerNameLabel") }}
-                <span class="scorer-field__req">*</span>
+                <span class="tw:text-(--o2-status-error-text) tw:ml-[2px]">*</span>
               </label>
               <OInput
                 v-model.trim="form.authApiKeyHeaderName"
@@ -485,10 +473,10 @@
                 data-test="scorer-form-remote-auth-apikey-header"
               />
             </div>
-            <div class="scorer-field__half">
-              <label class="scorer-field__label">
+            <div class="tw:flex tw:flex-col tw:gap-1.5">
+              <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
-                <span class="scorer-field__req">*</span>
+                <span class="tw:text-(--o2-status-error-text) tw:ml-[2px]">*</span>
               </label>
               <OInput
                 v-model.trim="form.authApiKeyToken"
@@ -497,32 +485,30 @@
                 type="password"
                 data-test="scorer-form-remote-auth-apikey-token"
               />
-              <div class="scorer-field__help">
+              <div class="tw:text-[11.5px] tw:text-(--color-text-secondary) tw:mt-1">
                 {{ t("onlineEvals.scorer.remoteAuth.encryptedHint") }}
               </div>
             </div>
           </div>
-          </div>
         </section>
 
         <!-- Section 04: Custom headers -->
-        <section v-if="form.scorerType === 'remote'" class="scorer-section card-container">
-          <div class="section-header">
-            <div class="section-header-accent" />
-            <span class="section-header-title">{{ t("onlineEvals.scorer.headersSection") }}</span>
-            <span class="scorer-section__head-aside">
+        <section v-if="form.scorerType === 'remote'" class="tw:mb-6">
+          <div class="tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border) tw:mb-3">
+            <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary) tw:font-bold tw:text-[11px] tw:font-mono">04</span>
+            <h3 class="tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary)">{{ t("onlineEvals.scorer.headersSection") }}</h3>
+            <span class="tw:ml-auto tw:text-[11.5px] tw:text-(--color-text-secondary) tw:italic">
               {{ t("onlineEvals.scorer.remoteHeaders.subtitle") }}
             </span>
           </div>
-          <div class="scorer-section__body">
 
-          <div class="scorer-field">
+          <div class="tw:mb-3">
             <div
               v-if="form.customHeaders.length"
-              class="scorer-headers"
+              class="tw:flex tw:flex-col tw:gap-1.5 tw:border tw:border-(--color-border) tw:rounded-md tw:p-[8px_10px] tw:bg-(--color-card-bg-solid)"
               data-test="scorer-form-remote-headers"
             >
-              <div class="scorer-headers__row scorer-headers__row--head">
+              <div class="tw:grid tw:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] tw:gap-1.5 tw:items-center tw:text-[10px] tw:font-semibold tw:uppercase tw:tracking-[0.04em] tw:text-(--color-text-muted)">
                 <span>{{ t("onlineEvals.scorer.remoteHeaders.colName") }}</span>
                 <span>{{ t("onlineEvals.scorer.remoteHeaders.colValue") }}</span>
                 <span aria-hidden="true" />
@@ -530,7 +516,7 @@
               <div
                 v-for="(header, idx) in form.customHeaders"
                 :key="idx"
-                class="scorer-headers__row"
+                class="tw:grid tw:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] tw:gap-1.5 tw:items-center"
               >
                 <OInput
                   v-model.trim="header.key"
@@ -546,7 +532,7 @@
                 />
                 <button
                   type="button"
-                  class="scorer-extras__remove"
+                  class="tw:w-6 tw:h-6 tw:border-0 tw:bg-transparent tw:text-(--color-text-secondary) tw:text-base tw:cursor-pointer tw:rounded tw:hover:bg-[color-mix(in_srgb,var(--o2-status-error-text)_12%,transparent)] tw:hover:text-(--o2-status-error-text)"
                   :aria-label="t('onlineEvals.buttons.remove')"
                   :data-test="`scorer-form-remote-header-remove-${idx}`"
                   @click="removeCustomHeader(idx)"
@@ -556,10 +542,10 @@
               </div>
             </div>
 
-            <div class="scorer-extras__actions">
+            <div class="tw:flex tw:justify-between tw:gap-3">
               <button
                 type="button"
-                class="scorer-extras__add"
+                class="tw:border-0 tw:bg-transparent tw:py-1 tw:px-0 tw:text-xs tw:font-semibold tw:text-(--o2-primary-btn-bg) tw:cursor-pointer"
                 data-test="scorer-form-remote-header-add"
                 @click="addCustomHeader"
               >
@@ -567,21 +553,19 @@
               </button>
             </div>
           </div>
-          </div>
         </section>
 
         <!-- Section 05: Request body template -->
-        <section v-if="form.scorerType === 'remote'" class="scorer-section card-container">
-          <div class="section-header">
-            <div class="section-header-accent" />
-            <span class="section-header-title">{{ t("onlineEvals.scorer.requestBodySection") }}</span>
+        <section v-if="form.scorerType === 'remote'" class="tw:mb-6">
+          <div class="tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border) tw:mb-3">
+            <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary) tw:font-bold tw:text-[11px] tw:font-mono">05</span>
+            <h3 class="tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary)">{{ t("onlineEvals.scorer.requestBodySection") }}</h3>
           </div>
-          <div class="scorer-section__body">
 
-          <div class="scorer-field scorer-field--request-body">
-            <label class="scorer-field__label">
+          <div class="tw:mb-3">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.scorer.requestBodyLabel") }}
-              <span class="scorer-field__req">*</span>
+              <span class="tw:text-(--o2-status-error-text) tw:ml-[2px]">*</span>
             </label>
             <OInput
               v-model="form.template"
@@ -590,17 +574,16 @@
               :rows="10"
               data-test="scorer-form-request-body-input"
             />
-            <div class="scorer-prompt-vars">
-              <span class="scorer-prompt-vars__label">
+            <div class="tw:flex tw:items-center tw:flex-wrap tw:gap-1.5 tw:mt-1.5 tw:text-[11.5px]">
+              <span class="tw:text-(--color-text-secondary)">
                 {{ t("onlineEvals.scorer.promptVariablesLabel") }}
               </span>
               <span
                 v-for="v in promptVariables"
                 :key="v"
-                class="scorer-prompt-vars__chip scorer-mono"
+                class="tw:py-[1px] tw:px-1.5 tw:rounded-[3px] tw:text-[11px] tw:font-mono tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] tw:text-(--color-text-primary)"
               >{{ formatTemplateVariable(v) }}</span>
             </div>
-          </div>
           </div>
         </section>
       </div>
@@ -617,7 +600,7 @@
       />
     </div>
 
-    <footer class="scorer-form__foot">
+    <footer class="tw:sticky tw:bottom-0 tw:flex tw:items-center tw:justify-end tw:gap-2 tw:px-5.5 tw:py-3 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] tw:shrink-0 tw:z-1">
       <OButton
         data-test="scorer-form-cancel-btn"
         type="button"
@@ -644,19 +627,19 @@
       size="md"
       :title="t('onlineEvals.scorer.extraFields.schemaTitle')"
     >
-      <p v-if="isLoadingSchemaPreview" class="scorer-schema-dialog__state">
+      <p v-if="isLoadingSchemaPreview" class="tw:m-0 tw:p-3 tw:text-xs tw:text-(--color-text-secondary)">
         {{ t("onlineEvals.scorer.extraFields.schemaLoading") }}
       </p>
       <p
         v-else-if="schemaPreviewError"
-        class="scorer-schema-dialog__state scorer-schema-dialog__state--error"
+        class="tw:m-0 tw:p-3 tw:text-xs tw:text-(--o2-status-error-text)"
       >
         {{ schemaPreviewError }}
       </p>
-      <pre v-else class="scorer-schema-dialog__code">{{ schemaPreview }}</pre>
+      <pre class="tw:m-0 tw:max-h-[60vh] tw:overflow-auto tw:p-3 tw:rounded-md tw:bg-(--color-card-bg-solid) tw:border tw:border-(--color-border) tw:font-normal tw:text-xs tw:font-(family-name:--o2-font-mono) tw:text-(--color-text-primary) tw:whitespace-pre tw:[tab-size:2]" v-else>{{ schemaPreview }}</pre>
 
       <template #footer>
-        <div class="scorer-schema-dialog__footer">
+        <div class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:w-full">
           <OButton
             data-test="scorer-form-schema-copy-btn"
             variant="outline"
@@ -690,7 +673,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
   type ExtraMetadataField,
@@ -1283,458 +1266,30 @@ async function save() {
 }
 </script>
 
-<style lang="scss" scoped>
-.scorer-form {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  gap: 10px;
+<style>
+/* The global `label:not(.o-input-label)` rule (unlayered) overrides these
+   field labels' `tw:text-(--color-text-primary)`/`font-semibold`/`text-xs`
+   utilities, graying them out. This higher-specificity selector restores the
+   dark primary color + weight/size, matching main's scoped `.scorer-field__label`. */
+.scorer-form__main label:not(.o-input-label) {
+  color: var(--color-text-primary, currentColor);
+  font-weight: 600;
+  font-size: 12px;
 }
 
-.scorer-form__body {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  gap: 8px;
-}
-
-.scorer-form__main {
-  flex: 6.5;
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px;
-}
-
-.scorer-form__foot {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 22px;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
-  flex-shrink: 0;
-  z-index: 1;
-}
-
-/* Cap all textareas in the form so they scroll internally instead of pushing layout */
-.scorer-form__main :deep(textarea) {
+.scorer-form__main textarea {
   max-height: 280px;
   overflow-y: auto;
 }
 
-/* Specific per-field caps that match each field's role */
-.scorer-form__main .scorer-field--desc :deep(textarea) { max-height: 120px; }
-.scorer-form__main .scorer-field--prompt :deep(textarea) { max-height: 280px; }
-.scorer-form__main .scorer-field--schema :deep(textarea) { max-height: 220px; }
-.scorer-form__main .scorer-field--request-body :deep(textarea) { max-height: 280px; }
-
-.scorer-section {
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border-default, var(--o2-border));
-}
-
-.section-header-accent {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  margin-right: 8px;
-  flex-shrink: 0;
-  background: var(--q-primary);
-}
-
-.section-header-title {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--color-text-primary, currentColor);
-}
-
-.scorer-section__body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px 16px;
-}
-
-.scorer-field {
-  margin-bottom: 0;
-}
-
-.scorer-field__label {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  margin-bottom: 4px;
-}
-
-.scorer-field__req {
-  color: var(--o2-status-error-text);
-  margin-left: 2px;
-}
-
-.scorer-field__lock {
-  margin-left: 6px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.scorer-field__help {
-  font-size: 11.5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  margin-top: 4px;
-}
-
-.scorer-field__row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.scorer-field__row-grow {
-  flex: 1;
-  min-width: 0;
-}
-
-.scorer-field__help-link {
-  color: var(--color-primary-600, #3F7994);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.scorer-field__help-link:hover {
-  text-decoration: underline;
-}
-
-.scorer-mono {
-}
-
-.scorer-preview {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-  padding: 8px 12px;
-  margin-top: 8px;
-  border: 1px solid color-mix(in srgb, var(--o2-status-info-text) 25%, transparent);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--o2-status-info-text) 8%, transparent);
-  font-size: 12px;
-  color: var(--color-text-primary, currentColor);
-}
-
-.scorer-preview__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--o2-status-info-text);
-  flex-shrink: 0;
-}
-
-.scorer-preview__label {
-  font-weight: 500;
-}
-
-.scorer-preview__sep {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.scorer-preview__meta {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.scorer-preview__meta .scorer-mono {
-  color: var(--color-text-primary, currentColor);
-  font-weight: 600;
-}
-
-.scorer-prompt-vars {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-  font-size: 11.5px;
-}
-
-.scorer-prompt-vars__label {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.scorer-prompt-vars__chip {
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
-  color: var(--color-text-primary, currentColor);
-}
-
-.scorer-field--extras {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.scorer-extras__toggle {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.scorer-extras__toggle strong {
-  display: block;
-  font-size: 12px;
-  color: var(--color-text-primary, currentColor);
-}
-
-.scorer-extras__toggle small {
-  display: block;
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.scorer-extras__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.scorer-extras__head-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.scorer-extras__head-text strong {
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.scorer-extras__head-text small {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.scorer-extras__optional {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--color-text-muted, var(--o2-text-muted));
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.scorer-extras__table {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border: 1px solid var(--color-border, var(--o2-border));
-  border-radius: 6px;
-  padding: 8px 10px;
-  background: var(--color-card-bg-solid, var(--o2-card-bg-solid));
-}
-
-.scorer-extras__row {
-  display: grid;
-  grid-template-columns: minmax(120px, 1fr) 110px minmax(140px, 2fr) 28px;
-  gap: 8px;
-  align-items: center;
-}
-
-.scorer-extras__row--head {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted, var(--o2-text-muted));
-}
-
-.scorer-extras__row .has-error :deep(input) {
-  border-color: var(--o2-status-error-text);
-}
-
-.scorer-extras__remove {
-  width: 24px;
-  height: 24px;
-  border: none;
-  background: transparent;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 16px;
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-.scorer-extras__remove:hover {
-  background: color-mix(in srgb, var(--o2-status-error-text) 12%, transparent);
-  color: var(--o2-status-error-text);
-}
-
-.scorer-extras__actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.scorer-extras__add,
-.scorer-extras__preview {
-  border: none;
-  background: transparent;
-  padding: 4px 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--o2-primary-btn-bg);
-  cursor: pointer;
-}
-
-.scorer-extras__add:disabled {
-  color: var(--color-text-muted, var(--o2-text-muted));
-  cursor: not-allowed;
-}
-
-.scorer-extras__count {
-  font-weight: 400;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  margin-left: 4px;
-}
-
-.scorer-url-bar {
-  display: grid;
-  grid-template-columns: 104px minmax(0, 1fr);
-  gap: 0;
-}
-
-.scorer-url-bar :deep(.o-select__trigger),
-.scorer-url-bar :deep(select) {
+.scorer-url-bar .o-select__trigger,
+.scorer-url-bar select {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
 
-.scorer-url-bar :deep(input) {
+.scorer-url-bar input {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
-}
-
-.scorer-auth__row {
-  margin-top: 8px;
-}
-
-.scorer-auth__grid {
-  display: grid;
-  grid-template-columns: minmax(140px, 1fr) minmax(0, 2fr);
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.scorer-headers {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border: 1px solid var(--color-border, var(--o2-border));
-  border-radius: 6px;
-  padding: 8px 10px;
-  background: var(--color-card-bg-solid, var(--o2-card-bg-solid));
-}
-
-.scorer-headers__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 28px;
-  gap: 6px;
-  align-items: center;
-}
-
-.scorer-headers__row--head {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted, var(--o2-text-muted));
-}
-
-.scorer-field--row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
-}
-
-.scorer-field--triple {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
-}
-
-.scorer-field__half,
-.scorer-field__col {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.scorer-section__head-aside {
-  margin-left: auto;
-  font-size: 11.5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-style: italic;
-}
-
-.scorer-schema-dialog__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-}
-
-.scorer-schema-dialog__code {
-  margin: 0;
-  max-height: 60vh;
-  overflow: auto;
-  padding: 12px;
-  border-radius: 6px;
-  background: var(--color-card-bg-solid, var(--o2-card-bg-solid));
-  border: 1px solid var(--color-border, var(--o2-border));
-  font: 400 12px var(--o2-font-mono);
-  color: var(--color-text-primary, currentColor);
-  white-space: pre;
-  tab-size: 2;
-}
-
-.scorer-schema-dialog__state {
-  margin: 0;
-  padding: 12px;
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.scorer-schema-dialog__state--error {
-  color: var(--o2-status-error-text);
-}
-
-@media (max-width: 1100px) {
-  .scorer-form__body {
-    flex-direction: column;
-  }
-  .scorer-form__main {
-    flex: 1 1 auto;
-  }
 }
 </style>

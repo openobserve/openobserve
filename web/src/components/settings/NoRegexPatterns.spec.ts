@@ -87,13 +87,13 @@ describe("NoRegexPatterns", () => {
 
     it("should render the no data message", () => {
       const wrapper = createWrapper();
-      const titleText = wrapper.find(".title-text");
+      const titleText = wrapper.find('[data-test="no-regex-patterns-title"]');
       expect(titleText.exists()).toBe(true);
     });
 
     it("should render the subtitle message", () => {
       const wrapper = createWrapper();
-      const subtitleText = wrapper.find(".subtitle-text");
+      const subtitleText = wrapper.find('[data-test="no-regex-patterns-subtitle"]');
       expect(subtitleText.exists()).toBe(true);
     });
   });
@@ -120,7 +120,7 @@ describe("NoRegexPatterns", () => {
   describe("Button interactions", () => {
     it("should emit create-new-regex-pattern when Create New is clicked", async () => {
       const wrapper = createWrapper();
-      const createNewText = wrapper.find(".create-new-text");
+      const createNewText = wrapper.find('[data-test="no-regex-patterns-create-new"]');
       
       await createNewText.trigger("click");
       
@@ -154,9 +154,9 @@ describe("NoRegexPatterns", () => {
     it("should provide meaningful text content", () => {
       const wrapper = createWrapper();
 
-      const titleText = wrapper.find(".title-text");
-      const subtitleText = wrapper.find(".subtitle-text");
-      const createNewText = wrapper.find(".create-new-text");
+      const titleText = wrapper.find('[data-test="no-regex-patterns-title"]');
+      const subtitleText = wrapper.find('[data-test="no-regex-patterns-subtitle"]');
+      const createNewText = wrapper.find('[data-test="no-regex-patterns-create-new"]');
       // OButton replaces q-btn; find import button by stub selector
       const importButton = wrapper.find('[data-test-stub="o-button"]');
 
@@ -180,7 +180,7 @@ describe("NoRegexPatterns", () => {
 
     it("should handle multiple rapid clicks on create new", async () => {
       const wrapper = createWrapper();
-      const createNewText = wrapper.find(".create-new-text");
+      const createNewText = wrapper.find('[data-test="no-regex-patterns-create-new"]');
       
       // Simulate multiple rapid clicks
       await createNewText.trigger("click");
@@ -208,7 +208,7 @@ describe("NoRegexPatterns", () => {
       const wrapper = createWrapper();
       
       // Test behavior by triggering actions and checking emissions
-      const createNewText = wrapper.find(".create-new-text");
+      const createNewText = wrapper.find('[data-test="no-regex-patterns-create-new"]');
       createNewText.trigger("click");
       expect(wrapper.emitted("create-new-regex-pattern")).toBeTruthy();
       
@@ -232,7 +232,7 @@ describe("NoRegexPatterns", () => {
       // The t() function should be called with the correct key
       expect(wrapper.vm.t).toBeDefined();
       
-      const titleText = wrapper.find(".title-text");
+      const titleText = wrapper.find('[data-test="no-regex-patterns-title"]');
       expect(titleText.exists()).toBe(true);
       // The actual text will depend on the i18n translations
     });

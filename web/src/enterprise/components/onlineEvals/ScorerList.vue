@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <EvalListShell
     data-test="scorer"
     :show-empty="showNoProvidersState"
@@ -93,27 +93,29 @@
         </template>
 
         <template #cell-type="{ row }">
-          <OBadge :variant="scorerTypeBadgeVariant(scorerTypeOf(row))" size="sm">
-            {{ scorerTypeLabel(scorerTypeOf(row)) }}
-          </OBadge>
+          <OTag
+            type="scorerType"
+            :value="scorerTypeOf(row)"
+          />
         </template>
 
         <template #cell-produces="{ row }">
-          <span class="sr-mono-cell">{{ producesLabel(row) || "—" }}</span>
+          <span class="tw:font-mono tw:text-xs">{{ producesLabel(row) || "—" }}</span>
         </template>
 
         <template #cell-version="{ row }">
-          <span class="sr-mono-cell">v{{ row.version }}</span>
+          <span class="tw:font-mono tw:text-xs">v{{ row.version }}</span>
         </template>
 
         <template #cell-usedBy="{ row }">
-          <span class="sr-mono-cell">{{ usedByText(row) }}</span>
+          <span class="tw:font-mono tw:text-xs">{{ usedByText(row) }}</span>
         </template>
 
         <template #cell-actions="{ row }">
           <div class="tw:flex tw:items-center actions-container">
             <OButton
               :data-test="`scorer-list-${row.name}-edit-btn`"
+              data-row-action="edit"
               variant="ghost"
               size="icon-sm"
               :title="t('onlineEvals.actions.edit')"
@@ -130,6 +132,7 @@
             />
             <OButton
               :data-test="`scorer-list-${row.name}-delete-btn`"
+              data-row-action="delete"
               variant="ghost-destructive"
               size="icon-sm"
               :title="t('onlineEvals.actions.delete')"
@@ -161,7 +164,7 @@ import type {
 } from "@/services/online-evals.service";
 import { entityId, scorerTypeOf, valueOf } from "./utils/evalEntity";
 import EvalListShell from "./EvalListShell.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
 
 const props = defineProps<{
@@ -308,20 +311,6 @@ function onEmptyAction(id?: string) {
   }
 }
 
-function scorerTypeLabel(type: ScorerType) {
-  if (type === "remote") return t("onlineEvals.scorer.badgeRemote");
-  return t("onlineEvals.scorer.badgeLlm");
-}
-
-// Map a scorer type to a neutral design-system OBadge soft variant
-// (llm_judge → blue, remote → teal, code → purple). Types are just labels,
-// so use neutral palette colors rather than semantic success/warning variants.
-function scorerTypeBadgeVariant(type: ScorerType | string) {
-  if (type === "remote") return "teal-soft" as const;
-  if (type === "code") return "purple-soft" as const;
-  return "blue-soft" as const; // llm_judge
-}
-
 function producesLabel(row: Scorer) {
   const id = String(
     valueOf(row, "producesScoreConfigId", "produces_score_config_id") || "",
@@ -346,10 +335,3 @@ function usedByText(row: Scorer) {
   return t("onlineEvals.scorer.usedByJobs", { count });
 }
 </script>
-
-<style lang="scss">
-.sr-mono-cell {
-  font-size: 12px;
-}
-
-</style>
