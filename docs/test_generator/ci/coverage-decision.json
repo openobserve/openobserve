@@ -1,0 +1,13 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Reports/reportCsvMediaType.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Reports/reportsScheduleNow.spec.js",
+    "tests/ui-testing/playwright-tests/Reports/reports-form-validation.spec.js",
+    "tests/ui-testing/playwright-tests/Reports/reportFolders.spec.js",
+    "tests/ui-testing/playwright-tests/Reports/reports-bulk-operations.spec.js",
+    "tests/ui-testing/playwright-tests/Reports/reportsScheduleLater.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "No existing Reports spec covers the CSV report media type feature. The other Reports specs test general CRUD, scheduling, folders, bulk ops, and form validation — none exercise the report-type dropdown or CSV selection behavior. A new dedicated spec is warranted for this self-contained feature area."
+}

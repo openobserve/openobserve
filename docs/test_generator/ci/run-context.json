@@ -1,0 +1,25 @@
+{
+  "feature_slug": "report-csv-media-type",
+  "feature_title": "Dashboard Report CSV Media Type",
+  "area": "Reports",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "reportCsvMediaType.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Reports/reportCsvMediaType.spec.js",
+  "playwright_group": "Reports",
+  "source_files": [
+    "web/src/components/reports/CreateReport.vue",
+    "web/src/views/Dashboards/RenderDashboardCharts.vue",
+    "web/src/utils/panelDownloadRegistry.ts",
+    "web/src/composables/dashboard/usePanelActions.ts",
+    "web/src/components/dashboards/PanelSchemaRenderer.vue",
+    "web/src/components/dashboards/PanelContainer.vue",
+    "web/src/components/dashboards/panels/TableRenderer.vue",
+    "web/src/ts/interfaces/report.ts",
+    "src/config/src/meta/dashboards/reports.rs"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
