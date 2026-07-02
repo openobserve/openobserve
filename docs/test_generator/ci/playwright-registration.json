@@ -1,6 +1,0 @@
-{
-  "group": "Logs-Core",
-  "spec_filename": "logsVisualizePersistence.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}

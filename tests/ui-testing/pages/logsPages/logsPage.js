@@ -1018,6 +1018,10 @@ export class LogsPage {
         testLogger.info(`Adding stream to selection: ${streamName}`);
         // Open the OSelect popover via the trigger button (same pattern as
         // selectStream), then fill the ListboxFilter search input.
+        // IMPORTANT: The stream selector uses rowClickSingleSelect=true — clicking
+        // the option row REPLACES the selection. To ADD a stream to the existing
+        // selection we must click the CHECKBOX (data-select-checkbox) within the
+        // option, not the option row itself.
         const trigger = this.page.locator(this.indexDropDownTrigger).first();
         const popover = this.page.locator(this.indexDropDownPopover);
         const search = this.page.locator(this.indexDropDownSearch);
@@ -1033,14 +1037,22 @@ export class LogsPage {
             await search.press('Backspace').catch(() => {});
             await search.fill(streamName);
         }
-        await this.page.waitForTimeout(1000);
         const option = this.page.locator(
             `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
         );
-        if (await option.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+        await option.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+        // Click the checkbox to ADD to the multi-selection (not replace it).
+        const streamCheckbox = option.first().locator('[data-select-checkbox]');
+        if (await streamCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await streamCheckbox.click();
+            testLogger.info(`Added ${streamName} to stream selection via checkbox`);
+        } else if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
             await option.first().click();
-            testLogger.info(`Selected additional stream: ${streamName}`);
+            testLogger.info(`Added ${streamName} to stream selection (row click fallback)`);
         }
+        // Close the popover after selection
+        await popover.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     async expectTimestampColumnVisible() {
@@ -8969,7 +8981,8 @@ export class LogsPage {
         await expect(toggle).toBeVisible({ timeout: 10000 });
         const isDisabled = await toggle.isDisabled().catch(() => false);
         const hasAriaDisabled = await toggle.getAttribute('aria-disabled').catch(() => null);
-        expect(isDisabled || hasAriaDisabled === 'true').toBeTruthy();
+        const hasDataDisabled = await toggle.getAttribute('data-disabled').catch(() => null);
+        expect(isDisabled || hasAriaDisabled === 'true' || hasDataDisabled === '').toBeTruthy();
         testLogger.info('Visualize toggle is disabled');
     }
 

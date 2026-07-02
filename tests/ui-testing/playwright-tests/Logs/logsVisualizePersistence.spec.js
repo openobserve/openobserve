@@ -229,8 +229,8 @@ test.describe("Logs Visualization State Persistence testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing Visualize toggle disabled with multi-stream selection');
 
-    // 1. Select two streams (overriding the single-stream selection from beforeEach).
-    await pm.logsPage.selectIndexAndStreamJoin();
+    // 1. Add _rumdata to the current selection (e2e_automate already selected in beforeEach).
+    await pm.logsPage.addStreamToSelection('_rumdata');
 
     // 2. Run query to load results.
     await pm.logsPage.applyQueryAndWaitForSearchResponse();
