@@ -449,7 +449,7 @@ function openChromeExtensions() {
     <!-- Replay running banner -->
     <div
       v-if="replayPhase === 'running'"
-      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--o2-primary-50)] tw:border tw:border-[var(--o2-primary-200)]"
+      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--color-badge-primary-soft-bg)] tw:border tw:border-[var(--o2-border-color)]"
       role="status"
       data-test="synthetics-journey-replay-banner"
     >
