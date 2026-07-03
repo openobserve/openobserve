@@ -2,7 +2,9 @@ name: Playwright Regression Tests
 
 on:
   schedule:
-    - cron: '30 3,7,11,15,19,23 * * *'  # Every 4 hrs from 9 AM IST (3:30, 7:30, 11:30, 15:30, 19:30, 23:30 UTC)
+    # Daytime IST only (9 AM, 1 PM, 5 PM, 9 PM IST) — the 1 AM and 5 AM IST slots were
+    # dropped: main rarely moves overnight, so those runs mostly re-tested unchanged code.
+    - cron: '30 3,7,11,15 * * *'  # 9 AM, 1 PM, 5 PM, 9 PM IST (3:30, 7:30, 11:30, 15:30 UTC)
   workflow_dispatch:
 
 concurrency:
