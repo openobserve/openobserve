@@ -814,7 +814,7 @@ async fn merge_files(
         ));
     }
     let new_file_key =
-        super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
+        super::generate_ingester_storage_file_key(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
         "[INGESTER:JOB:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
         retain_file_list.len(),

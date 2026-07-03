@@ -150,9 +150,7 @@ pub async fn merge_parquet_files(
         Ok(())
     });
 
-    // Ingesters always produce parquet; compactors may convert those files to the
-    // configured storage format.
-    let file_format = merge_output_file_format(is_ingester, cfg.common.file_format);
+    let file_format = merge_output_file_format(stream_type, is_ingester, cfg.common.file_format);
     let buf = match file_format {
         FileFormat::Parquet => {
             write_parquet(
@@ -177,9 +175,13 @@ pub async fn merge_parquet_files(
     Ok(MergeParquetResult::Single(buf, metadata))
 }
 
-fn merge_output_file_format(is_ingester: bool, configured: FileFormat) -> FileFormat {
+fn merge_output_file_format(
+    stream_type: StreamType,
+    is_ingester: bool,
+    configured: FileFormat,
+) -> FileFormat {
     if is_ingester {
-        FileFormat::Parquet
+        FileFormat::for_ingester_stream(stream_type, configured)
     } else {
         configured
     }
@@ -285,17 +287,21 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_output_file_format_keeps_vortex_out_of_ingester() {
+    fn test_merge_output_file_format_uses_parquet_for_ingester_metrics() {
         assert_eq!(
-            merge_output_file_format(true, FileFormat::Vortex),
+            merge_output_file_format(StreamType::Metrics, true, FileFormat::Vortex),
             FileFormat::Parquet
         );
         assert_eq!(
-            merge_output_file_format(false, FileFormat::Vortex),
+            merge_output_file_format(StreamType::Logs, true, FileFormat::Vortex),
             FileFormat::Vortex
         );
         assert_eq!(
-            merge_output_file_format(false, FileFormat::Parquet),
+            merge_output_file_format(StreamType::Metrics, false, FileFormat::Vortex),
+            FileFormat::Vortex
+        );
+        assert_eq!(
+            merge_output_file_format(StreamType::Logs, false, FileFormat::Parquet),
             FileFormat::Parquet
         );
     }

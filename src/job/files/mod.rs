@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
+    FileFormat,
     cluster::{LOCAL_NODE, is_offline},
     ider,
     meta::stream::StreamType,
@@ -54,7 +55,7 @@ async fn clean_empty_dirs() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub fn generate_storage_file_name(
+pub fn generate_ingester_storage_file_key(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -76,7 +77,9 @@ pub fn generate_storage_file_name(
     } else {
         format!("{}/{}", &file_name[..file_name_pos], id)
     };
-    let file_format = config::FileFormat::Parquet.extension();
+    let file_format =
+        FileFormat::for_ingester_stream(stream_type, config::get_config().common.file_format)
+            .extension();
     format!("files/{stream_key}/{file_date}/{file_name}{file_format}")
 }
 
@@ -84,20 +87,21 @@ pub fn generate_storage_file_name(
 mod tests {
     use config::meta::stream::StreamType;
 
-    use super::generate_storage_file_name;
+    use super::generate_ingester_storage_file_key;
 
     #[test]
-    fn test_ingester_storage_file_name_uses_parquet_extension() {
-        let file_name = generate_storage_file_name(
+    fn test_ingester_metrics_storage_file_name_uses_parquet_extension() {
+        let file_name = generate_ingester_storage_file_key(
             "default",
-            StreamType::Logs,
+            StreamType::Metrics,
             "quickstart",
             "0/2026/07/02/12/hash/service_name=ingester/source.json",
         );
 
         assert!(
-            file_name
-                .starts_with("files/default/logs/quickstart/2026/07/02/12/service_name=ingester/")
+            file_name.starts_with(
+                "files/default/metrics/quickstart/2026/07/02/12/service_name=ingester/"
+            )
         );
         assert!(file_name.ends_with(".parquet"));
         assert!(!file_name.ends_with(".vortex"));

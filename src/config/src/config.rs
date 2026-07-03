@@ -36,7 +36,10 @@ use serde::{Deserialize, Serialize};
 use sha256::digest;
 
 use crate::{
-    meta::{cluster, stream::QueryPartitionStrategy},
+    meta::{
+        cluster,
+        stream::{QueryPartitionStrategy, StreamType},
+    },
     utils::sysinfo,
 };
 
@@ -562,6 +565,14 @@ impl std::str::FromStr for FileFormat {
 }
 
 impl FileFormat {
+    pub fn for_ingester_stream(stream_type: StreamType, configured: Self) -> Self {
+        if stream_type == StreamType::Metrics {
+            Self::Parquet
+        } else {
+            configured
+        }
+    }
+
     pub fn extension(&self) -> &'static str {
         match self {
             Self::Parquet => FILE_EXT_PARQUET,
@@ -3778,6 +3789,22 @@ mod tests {
     fn test_file_format_extension() {
         assert_eq!(FileFormat::Parquet.extension(), ".parquet");
         assert_eq!(FileFormat::Vortex.extension(), ".vortex");
+    }
+
+    #[test]
+    fn test_file_format_for_ingester_stream() {
+        assert_eq!(
+            FileFormat::for_ingester_stream(StreamType::Metrics, FileFormat::Vortex),
+            FileFormat::Parquet
+        );
+        assert_eq!(
+            FileFormat::for_ingester_stream(StreamType::Logs, FileFormat::Vortex),
+            FileFormat::Vortex
+        );
+        assert_eq!(
+            FileFormat::for_ingester_stream(StreamType::Traces, FileFormat::Parquet),
+            FileFormat::Parquet
+        );
     }
 
     #[test]
