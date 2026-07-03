@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="menuOpen"
       side="bottom"
       :align="menuAlign"
-      :z-index="10000000"
+      :z-index="10001"
       content-class="tw:p-1"
       @update:open="onMenuOpenChange"
     >
