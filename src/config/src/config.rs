@@ -36,7 +36,10 @@ use serde::{Deserialize, Serialize};
 use sha256::digest;
 
 use crate::{
-    meta::{cluster, stream::QueryPartitionStrategy},
+    meta::{
+        cluster,
+        stream::{QueryPartitionStrategy, StreamType},
+    },
     utils::sysinfo,
 };
 
@@ -562,6 +565,14 @@ impl std::str::FromStr for FileFormat {
 }
 
 impl FileFormat {
+    pub fn for_ingester_stream(stream_type: StreamType, configured: Self) -> Self {
+        if stream_type == StreamType::Metrics {
+            Self::Parquet
+        } else {
+            configured
+        }
+    }
+
     pub fn extension(&self) -> &'static str {
         match self {
             Self::Parquet => FILE_EXT_PARQUET,
@@ -1697,8 +1708,6 @@ pub struct Limit {
     pub wal_runtime_worker_num: usize, // equals to mem_table_bucket_num if 0
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
     pub calculate_stats_interval: u64,
-    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT_SECS", default = 600)] // seconds
-    pub calculate_stats_step_limit_secs: i64,
     #[env_config(name = "ZO_HTTP_SHUTDOWN_TIMEOUT", default = 5)] // seconds
     pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_HTTP_SLOW_LOG_THRESHOLD", default = 5)] // seconds
@@ -2756,14 +2765,6 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.schema_max_fields_to_enable_uds = cfg.limit.udschema_max_fields;
     }
 
-    // check for calculate stats
-    if cfg.limit.calculate_stats_step_limit_secs < 1 {
-        cfg.limit.calculate_stats_step_limit_secs = 600;
-    }
-    if cfg.limit.calculate_stats_step_limit_secs > 86400 {
-        cfg.limit.calculate_stats_step_limit_secs = 86400;
-    }
-
     // migrate deprecated *_file_retention ENVs to *_query_retention for backward compatibility
     // if the user explicitly set a non-hourly file retention, apply it to query retention
     if cfg.limit.logs_file_retention != "hourly" && cfg.limit.logs_query_retention == "hourly" {
@@ -3788,6 +3789,22 @@ mod tests {
     fn test_file_format_extension() {
         assert_eq!(FileFormat::Parquet.extension(), ".parquet");
         assert_eq!(FileFormat::Vortex.extension(), ".vortex");
+    }
+
+    #[test]
+    fn test_file_format_for_ingester_stream() {
+        assert_eq!(
+            FileFormat::for_ingester_stream(StreamType::Metrics, FileFormat::Vortex),
+            FileFormat::Parquet
+        );
+        assert_eq!(
+            FileFormat::for_ingester_stream(StreamType::Logs, FileFormat::Vortex),
+            FileFormat::Vortex
+        );
+        assert_eq!(
+            FileFormat::for_ingester_stream(StreamType::Traces, FileFormat::Parquet),
+            FileFormat::Parquet
+        );
     }
 
     #[test]

@@ -900,6 +900,22 @@ ORDER BY _time ASC`
     const chartContainer = pm.dashboardPanelActions.getChartRendererCanvas();
     await expect(chartContainer).toBeVisible({ timeout: 15000 });
 
+    // A freshly-added panel auto-runs a DEFAULT-stream query (against _o2_service_graph,
+    // which is empty) when it first opens, BEFORE the custom-SQL query fires on Apply.
+    // If that empty default query resolves AFTER the custom query it overwrites the
+    // result and the panel gets stuck on the no-data overlay — a last-writer race that
+    // no timeout can recover (verified: the overlay never clears in a lost-race run).
+    // Re-apply the now-stable custom query (the default query only fires on panel open,
+    // so re-Apply fires the custom query alone) until the chart actually paints.
+    const noDataOverlay = pm.dashboardPanelActions.getNoDataLocator();
+    await expect(async () => {
+      if (await noDataOverlay.isVisible()) {
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender();
+      }
+      await expect(noDataOverlay).not.toBeVisible({ timeout: 8000 });
+    }).toPass({ timeout: 90000, intervals: [1000] });
+
     // Wait for canvas inside the chart-renderer (ECharts renders asynchronously).
     // The CASE WHEN query returns zero-valued counts which still produce chart lines.
     const canvas = chartContainer.locator('canvas').first();
@@ -909,7 +925,7 @@ ORDER BY _time ASC`
     const boundingBox = await chartContainer.boundingBox();
     expect(boundingBox.width).toBeGreaterThan(100);
     expect(boundingBox.height).toBeGreaterThan(50);
-    await expect(pm.dashboardPanelActions.getNoDataLocator()).not.toBeVisible();
+    await expect(noDataOverlay).not.toBeVisible();
 
     // Save panel and cleanup
     await pm.dashboardPanelActions.savePanel();

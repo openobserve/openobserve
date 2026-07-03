@@ -3558,6 +3558,8 @@ export default defineComponent({
         id: 'aiChatClose',
         key: 'escape',
         description: 'Close AI chat',
+        // Escape must close the chat even while typing a message in its input.
+        allowInInput: true,
         handler: () => {
           if (store.state.isAiChatEnabled) {
             store.dispatch('setIsAiChatEnabled', false);
