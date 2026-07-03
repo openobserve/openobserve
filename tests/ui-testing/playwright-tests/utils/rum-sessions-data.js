@@ -17,6 +17,11 @@ const testLogger = require('./test-logger.js');
 // Session definitions — designed to cover every health / type / device path
 // ---------------------------------------------------------------------------
 
+// Append a unique run-id so sessions from parallel workers and re-runs don't
+// accumulate in the shared stream (which would corrupt bounce / is_active
+// detection that depends on per-session event counts and time windows).
+const RUN_ID = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
 const BROWSERS = {
   desktop: [
     { family: 'Chrome', version: '120.0.0', os: 'Mac OS', os_version: '14.0', device: 'Desktop' },
@@ -75,31 +80,31 @@ const LOCATIONS = [
  */
 const SESSION_DEFS = [
   // --- clean / engaged / desktop ---
-  { id: 'sess-clean-eng-desk-01', user: 'alice@test.com', errorCount: 0, frustrationCount: 0, isBounce: false, isActive: true,  deviceClass: 'desktop', events: 12 },
-  { id: 'sess-clean-eng-desk-02', user: 'bob@test.com',   errorCount: 0, frustrationCount: 0, isBounce: false, isActive: false, deviceClass: 'desktop', events: 8 },
+  { id: `sess-cln-eng-dsk-01-${RUN_ID}`, user: 'alice@test.com', errorCount: 0, frustrationCount: 0, isBounce: false, isActive: true,  deviceClass: 'desktop', events: 12 },
+  { id: `sess-cln-eng-dsk-02-${RUN_ID}`, user: 'bob@test.com',   errorCount: 0, frustrationCount: 0, isBounce: false, isActive: false, deviceClass: 'desktop', events: 8 },
   // --- clean / engaged / mobile ---
-  { id: 'sess-clean-eng-mob-01',  user: 'carol@test.com', errorCount: 0, frustrationCount: 0, isBounce: false, isActive: false, deviceClass: 'mobile',  events: 6 },
+  { id: `sess-cln-eng-mob-01-${RUN_ID}`,  user: 'carol@test.com', errorCount: 0, frustrationCount: 0, isBounce: false, isActive: false, deviceClass: 'mobile',  events: 6 },
   // --- clean / bounced / desktop ---
-  { id: 'sess-clean-bnc-desk-01', user: 'dave@test.com',  errorCount: 0, frustrationCount: 0, isBounce: true,  isActive: false, deviceClass: 'desktop', events: 1 },
-  { id: 'sess-clean-bnc-desk-02', user: 'eve@test.com',   errorCount: 0, frustrationCount: 0, isBounce: true,  isActive: false, deviceClass: 'desktop', events: 0 },
+  { id: `sess-cln-bnc-dsk-01-${RUN_ID}`, user: 'dave@test.com',  errorCount: 0, frustrationCount: 0, isBounce: true,  isActive: false, deviceClass: 'desktop', events: 1 },
+  { id: `sess-cln-bnc-dsk-02-${RUN_ID}`, user: 'eve@test.com',   errorCount: 0, frustrationCount: 0, isBounce: true,  isActive: false, deviceClass: 'desktop', events: 0 },
   // --- clean / bounced / tablet ---
-  { id: 'sess-clean-bnc-tab-01',  user: 'frank@test.com', errorCount: 0, frustrationCount: 0, isBounce: true,  isActive: false, deviceClass: 'tablet',  events: 1 },
+  { id: `sess-cln-bnc-tab-01-${RUN_ID}`,  user: 'frank@test.com', errorCount: 0, frustrationCount: 0, isBounce: true,  isActive: false, deviceClass: 'tablet',  events: 1 },
   // --- errors / engaged / desktop ---
-  { id: 'sess-err-eng-desk-01',   user: 'grace@test.com', errorCount: 3, frustrationCount: 0, isBounce: false, isActive: false, deviceClass: 'desktop', events: 15, errorMessage: 'TypeError: Cannot read property of undefined' },
-  { id: 'sess-err-eng-desk-02',   user: 'heidi@test.com', errorCount: 1, frustrationCount: 0, isBounce: false, isActive: false, deviceClass: 'desktop', events: 7,  errorMessage: 'TypeError: Cannot read property of undefined' }, // same msg for cluster (needs 3, will combine with sess-err-eng-mob-01)
+  { id: `sess-err-eng-dsk-01-${RUN_ID}`,   user: 'grace@test.com', errorCount: 3, frustrationCount: 0, isBounce: false, isActive: false, deviceClass: 'desktop', events: 15, errorMessage: 'TypeError: Cannot read property of undefined' },
+  { id: `sess-err-eng-dsk-02-${RUN_ID}`,   user: 'heidi@test.com', errorCount: 1, frustrationCount: 0, isBounce: false, isActive: false, deviceClass: 'desktop', events: 7,  errorMessage: 'TypeError: Cannot read property of undefined' }, // same msg for cluster
   // --- errors / bounced / mobile ---
-  { id: 'sess-err-bnc-mob-01',    user: 'ivan@test.com',  errorCount: 2, frustrationCount: 0, isBounce: true,  isActive: false, deviceClass: 'mobile',  events: 1,  errorMessage: 'ReferenceError: x is not defined' },
+  { id: `sess-err-bnc-mob-01-${RUN_ID}`,    user: 'ivan@test.com',  errorCount: 2, frustrationCount: 0, isBounce: true,  isActive: false, deviceClass: 'mobile',  events: 1,  errorMessage: 'ReferenceError: x is not defined' },
   // --- errors / engaged / mobile ---
-  { id: 'sess-err-eng-mob-01',    user: 'judy@test.com',  errorCount: 1, frustrationCount: 0, isBounce: false, isActive: false, deviceClass: 'mobile',  events: 9,  errorMessage: 'TypeError: Cannot read property of undefined' }, // same error message → cluster
+  { id: `sess-err-eng-mob-01-${RUN_ID}`,    user: 'judy@test.com',  errorCount: 1, frustrationCount: 0, isBounce: false, isActive: false, deviceClass: 'mobile',  events: 9,  errorMessage: 'TypeError: Cannot read property of undefined' }, // same error message → cluster
   // --- frustrated / engaged / desktop ---
-  { id: 'sess-frus-eng-desk-01',  user: 'karl@test.com',  errorCount: 0, frustrationCount: 2, isBounce: false, isActive: false, deviceClass: 'desktop', events: 11, frustrationTarget: '#submit-btn' },
-  { id: 'sess-frus-eng-desk-02',  user: 'lisa@test.com',  errorCount: 0, frustrationCount: 1, isBounce: false, isActive: false, deviceClass: 'desktop', events: 5,  frustrationTarget: '#checkout-btn' },
+  { id: `sess-frs-eng-dsk-01-${RUN_ID}`,  user: 'karl@test.com',  errorCount: 0, frustrationCount: 2, isBounce: false, isActive: false, deviceClass: 'desktop', events: 11, frustrationTarget: '#submit-btn' },
+  { id: `sess-frs-eng-dsk-02-${RUN_ID}`,  user: 'lisa@test.com',  errorCount: 0, frustrationCount: 1, isBounce: false, isActive: false, deviceClass: 'desktop', events: 5,  frustrationTarget: '#checkout-btn' },
   // --- frustrated / engaged / mobile / active ---
-  { id: 'sess-frus-eng-mob-01',   user: 'mike@test.com',  errorCount: 0, frustrationCount: 2, isBounce: false, isActive: true,  deviceClass: 'mobile',  events: 20, frustrationTarget: '#submit-btn' }, // same target for cluster
+  { id: `sess-frs-eng-mob-01-${RUN_ID}`,   user: 'mike@test.com',  errorCount: 0, frustrationCount: 2, isBounce: false, isActive: true,  deviceClass: 'mobile',  events: 20, frustrationTarget: '#submit-btn' }, // same target for cluster
   // --- frustrated+errors / engaged / desktop ---
-  { id: 'sess-errfrus-eng-desk',  user: 'nina@test.com',  errorCount: 1, frustrationCount: 2, isBounce: false, isActive: false, deviceClass: 'desktop', events: 14, errorMessage: 'RangeError: Maximum call stack', frustrationTarget: '#submit-btn' },
+  { id: `sess-efr-eng-dsk-${RUN_ID}`,  user: 'nina@test.com',  errorCount: 1, frustrationCount: 2, isBounce: false, isActive: false, deviceClass: 'desktop', events: 14, errorMessage: 'RangeError: Maximum call stack', frustrationTarget: '#submit-btn' },
   // --- clean / engaged / desktop (extra for query count stability) ---
-  { id: 'sess-clean-eng-desk-03', user: 'olga@test.com',  errorCount: 0, frustrationCount: 0, isBounce: false, isActive: false, deviceClass: 'desktop', events: 10 },
+  { id: `sess-cln-eng-dsk-03-${RUN_ID}`, user: 'olga@test.com',  errorCount: 0, frustrationCount: 0, isBounce: false, isActive: false, deviceClass: 'desktop', events: 10 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -108,7 +113,14 @@ const SESSION_DEFS = [
 
 /**
  * Build _rumdata events for one session.
- * Each session gets one primary "action" event per definition row; bounces get fewer.
+ *
+ * The AppSessions SQL query uses:
+ *   SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count
+ *   SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events
+ *
+ * So we MUST emit separate type='error' events (not just an error_count field)
+ * and enough total events so that bounce detection works:
+ *   is_bounce = (events <= 1) || (time_spent < 10s)
  */
 function buildRumdataEvents(sessionDef) {
   const now = Date.now();
@@ -117,18 +129,15 @@ function buildRumdataEvents(sessionDef) {
   const sessionStart = now - 120_000; // 2 min ago
   const events = [];
 
-  // Always emit at least one "action" event to represent the session summary row.
-  // The query in AppSessions uses aggregations grouped by session_id, so one event
-  // per session is sufficient for the table.
-  events.push({
-    _timestamp: sessionStart,
-    type: 'action',
+  const makeBaseEvent = (type, ts, extraFields = {}) => ({
+    _timestamp: ts,
+    type,
     session_id: sessionDef.id,
     session_has_replay: true,
-    error_count: sessionDef.errorCount,
-    action_frustration_type: sessionDef.frustrationCount > 0 ? ['rage_click', 'dead_click'][sessionDef.frustrationCount % 2] : null,
-    action_target_name: sessionDef.frustrationTarget || null,
-    error_message: sessionDef.errorMessage || null,
+    error_count: 0,
+    action_frustration_type: null,
+    action_target_name: null,
+    error_message: null,
     view_url: `http://example.com/page${Math.floor(Math.random() * 5) + 1}`,
     view_id: `view-${sessionDef.id}`,
     resource_url: `http://example.com/page${Math.floor(Math.random() * 5) + 1}`,
@@ -148,7 +157,30 @@ function buildRumdataEvents(sessionDef) {
     user_agent_device: browser.device,
     user_agent_browser_version: browser.version,
     user_agent_os_version: browser.os_version,
+    ...extraFields,
   });
+
+  // Emit separate type='error' events for the error_count aggregation.
+  for (let i = 0; i < sessionDef.errorCount; i++) {
+    events.push(makeBaseEvent('error', sessionStart + i * 2000, {
+      error_message: sessionDef.errorMessage || `Error in ${sessionDef.id}`,
+    }));
+  }
+
+  // Emit action events so total rows for this session match the intended
+  // event count. Bounced sessions keep exactly 1 row (events=1 → is_bounce).
+  const desiredTotal = sessionDef.isBounce ? 1 : Math.max(sessionDef.events || 1, 2);
+  const actionCount = Math.max(desiredTotal - sessionDef.errorCount, 0);
+
+  for (let i = 0; i < actionCount; i++) {
+    const isFrustrated = sessionDef.frustrationCount > 0 && i === 0;
+    events.push(makeBaseEvent('action', sessionStart + i * 11000, {
+      action_frustration_type: isFrustrated
+        ? (sessionDef.frustrationCount % 2 === 0 ? 'dead_click' : 'rage_click')
+        : null,
+      action_target_name: isFrustrated ? (sessionDef.frustrationTarget || null) : null,
+    }));
+  }
 
   return events;
 }

@@ -119,7 +119,10 @@ export class RumPage {
     }
 
     async selectPastOneHour() {
-        const pastHourOption = this.page.locator('text=Past 1 Hour').or(this.page.locator('text=Past 1 hour'));
+        // The CustomDateTimePicker renders relative-time buttons with
+        // data-test="date-time-relative-{value}-{unit}-btn".  "1 hour" is
+        // [data-test="date-time-relative-1-h-btn"].
+        const pastHourOption = this.page.locator('[data-test="date-time-relative-1-h-btn"]');
         await pastHourOption.click();
         await this.page.waitForTimeout(1000);
     }

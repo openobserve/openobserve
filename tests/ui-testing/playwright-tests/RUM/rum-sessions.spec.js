@@ -132,12 +132,14 @@ test.describe("RUM Sessions Health & Metrics Dashboard", () => {
     // Assert navigation to session viewer
     await pm.rumPage.expectNavigatedToSessionViewer();
 
-    // Verify query params include start_time, end_time, org_identifier
+    // Verify query params include start_time and end_time, and URL path
+    // contains the session viewer route with a session id.
+    // (org_identifier is carried by session state, not the URL query params.)
     const params = pm.rumPage.getCurrentSearchParams();
     testLogger.info(`Session viewer params: ${JSON.stringify(params)}`);
     await expect(params.start_time).toBeTruthy();
     await expect(params.end_time).toBeTruthy();
-    await expect(params.org_identifier).toBeTruthy();
+    await expect(page.url()).toMatch(/\/web\/rum\/sessions\/view\/[^/?]+/);
 
     testLogger.info('P0.3 completed — session row navigation verified');
   });
@@ -377,6 +379,9 @@ test.describe("RUM Sessions Health & Metrics Dashboard", () => {
 
     // Apply "Bounced" type segment to isolate bounce sessions
     await pm.rumPage.clickTypeSegment('bounced');
+
+    // Verify the segment toggle registered.
+    await pm.rumPage.expectSegmentActive('type', 'bounced');
 
     // Our ingested data includes 4 bounce sessions — at least one should appear
     const bouncedCount = await pm.rumPage.getSessionsTableRowCount();

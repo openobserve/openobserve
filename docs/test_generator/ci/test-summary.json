@@ -1,9 +1,0 @@
-[
-  { "title": "P0.4: Run Query button executes query refresh", "action": "extend", "verifies": "rowCount > 0 after Run Query refresh (was vacuous >=0)" },
-  { "title": "P1.1: Multiple segment filters compose (AND logic)", "action": "extend", "verifies": "composed AND filter row count is ≤ initial unfiltered count" },
-  { "title": "P1.6: DateTime range change triggers auto-refresh", "action": "extend", "verifies": "initial count > 0 and wider range count ≥ initial count after Past 1 Hour" },
-  { "title": "P2.1: Bounced session shows bounced label and no sparkline", "action": "extend", "verifies": "bounced label visible AND activity sparkline NOT visible for bounced sessions" },
-  { "title": "P2.3: Health cell shows correct badge (error, frustration, clean)", "action": "extend", "verifies": "at least one health tag type was found (unconditional fallback assertion)" },
-  { "title": "P2.4: Insight banner — apply button sets health segment", "action": "extend", "verifies": "insight banner apply sets health segment; skips via test.skip() when banner absent" },
-  { "title": "P2.5: Insight banner — filter button adds error_message to query", "action": "extend", "verifies": "error_message query param present in URL after insight filter click; skips via test.skip() when absent" }
-]
