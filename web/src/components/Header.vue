@@ -35,18 +35,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <!-- Custom logo text -->
-      <span
+      <a
         v-if="
           store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
           store.state.zoConfig?.custom_logo_text != ''
         "
-        class="tw:text-xl tw:font-semibold tw:font-bold tw:p-0 tw:cursor-pointer tw:mr-2 tw:flex tw:items-center"
-        @click="goToHome"
-        >{{ store.state.zoConfig.custom_logo_text }}</span
+        :href="homeUrl"
+        @click.prevent="goToHome"
+        class="tw:text-xl tw:font-semibold tw:font-bold tw:p-0 tw:cursor-pointer tw:mr-2 tw:flex tw:items-center tw:no-underline tw:text-inherit"
+        >{{ store.state.zoConfig.custom_logo_text }}</a
       >
 
       <!-- Custom logo image - shows appropriate logo based on current theme -->
-      <div class="tw:flex tw:items-center">
+      <a :href="homeUrl" @click.prevent="goToHome" class="tw:inline-flex tw:items-center">
         <!-- Dark mode: Show dark logo, fallback to light logo -->
         <img
           v-if="
@@ -88,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
           style="max-width: 150px; max-height: 32px"
         />
-      </div>
+      </a>
 
       <!-- OpenObserve logo (shown alongside custom logo if configured) -->
       <div
