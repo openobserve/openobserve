@@ -11,16 +11,28 @@
  * beforeAll, then verifies through the authenticated UI.
  *
  * Prerequisites:
- *   - OpenObserve ENTERPRISE build on ZO_BASE_URL (default http://localhost:5080)
- *   - Network access to the live CDN bundle; cross-origin RUM ingestion allowed
+ *   - OpenObserve build on ZO_BASE_URL (default http://localhost:5080); the
+ *     RUM ingest/token/search routes are part of the standard (OSS) router.
+ *   - Network access to the CDN bundle; cross-origin RUM ingestion allowed
+ *
+ * Data cleanup: rows are written to the shared _rumdata/_rumlog/_sessionreplay
+ * streams. OpenObserve has no row-level delete API, and dropping those shared
+ * org-wide streams would destroy other data, so rows cannot be removed here.
+ * Every row is namespaced with a unique per-run `service`, so reruns never
+ * cross-assert, and stream retention ages the rows out.
  */
 
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
+const PageManager = require('../../pages/page-manager.js');
 const { startFixtureServer } = require('../../fixtures/rum/serve.js');
 const { getOrCreateRumToken } = require('../utils/rum-token-api.js');
 const { resolveCdnSdkVersion } = require('../utils/rum-sdk-version.js');
-const { driveRumSampleInteractions } = require('../utils/rum-traffic.js');
+const {
+  driveRumSampleInteractions,
+  attachCdnAssetTracker,
+  waitForRumSdkReady,
+} = require('../utils/rum-traffic.js');
 const { waitForStreamRows } = require('../utils/rum-stream-verify.js');
 
 const ORG = process.env.ORGNAME || 'default';
@@ -33,12 +45,25 @@ const SERVICE = `e2e-rum-page-${RUN_ID}`;
 // The SDK session generated for this run — captured in beforeAll and used to
 // assert the Sessions page lists exactly this recording.
 let sessionId = null;
+// False when the live CDN never delivered the lazy recorder chunk — without
+// it the SDK cannot record replay, events never carry session_has_replay, and
+// the Sessions page (which filters on that flag) can never list the session.
+// That is a CDN provisioning issue, not an OpenObserve regression → skip.
+let replayCapable = false;
 
-test.describe('RUM Page Data Flow', { tag: '@enterprise' }, () => {
+test.describe('RUM Page Data Flow', () => {
+  // SERIAL IS REQUIRED: beforeAll generates ONE session whose id (module
+  // state) both tests assert against; with fullyParallel workers each test
+  // would re-run beforeAll in its own process, regenerating data and losing
+  // the shared sessionId.
   test.describe.configure({ mode: 'serial' });
 
+  test.beforeEach(async ({}, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+  });
+
   test.beforeAll(async ({ browser }) => {
-    // 1) token + CDN SDK version (browser-sdk README → RUM_SDK_VERSION → pinned)
+    // 1) token + CDN SDK version (probed best-effort; falls back to the pin)
     const tokenPage = await browser.newPage();
     const rumToken = await getOrCreateRumToken(tokenPage);
     const sdkVersion = await resolveCdnSdkVersion(tokenPage);
@@ -60,84 +85,97 @@ test.describe('RUM Page Data Flow', { tag: '@enterprise' }, () => {
 
     const genContext = await browser.newContext();
     const app = await genContext.newPage();
+    const cdn = attachCdnAssetTracker(app);
     await app.goto(server.url, { waitUntil: 'domcontentloaded' });
     await app
       .waitForResponse((r) => r.url().includes('browsersdk.openobserve.ai') && r.url().includes('openobserve-rum'), { timeout: 30000 })
       .catch(() => testLogger.warn('CDN rum bundle response not observed'));
-    await app.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    // Explicit SDK readiness (real SDK objects replace the loader stubs).
+    await waitForRumSdkReady(app);
+    // Replay recording only starts once the LAZY recorder chunk arrives from
+    // the CDN — and only events emitted after that carry session_has_replay,
+    // which the Sessions page filters on. Wait for it BEFORE interacting.
+    await expect
+      .poll(() => cdn.chunkLoaded('recorder'), { timeout: 20000, intervals: [1000, 2000] })
+      .toBe(true)
+      .catch(() => {});
+    replayCapable = cdn.chunkLoaded('recorder');
+    if (!replayCapable) {
+      testLogger.warn('CDN recorder chunk unavailable — Sessions page assertions will be skipped', {
+        failures: cdn.failures,
+      });
+    }
     await driveRumSampleInteractions(app);
-    await genContext.close();
-    await server.close();
 
-    // 3) wait for the data to be searchable before hitting the UI
-    const tokenPage2 = await browser.newPage();
-    const hits = await waitForStreamRows(tokenPage2, {
+    // 3) wait for the data to be searchable — while the app (and the SDK's
+    // retry loop) is still alive, mirroring the CDN/NPM dataflow specs.
+    const hits = await waitForStreamRows(app, {
       sql: `SELECT * FROM "_rumdata" WHERE service = '${SERVICE}'`,
       minRows: 1,
       timeoutMs: 45000,
     });
     sessionId = hits[0]?.session_id || null;
-    expect(sessionId, 'generated RUM events should carry a session_id').toBeTruthy();
 
-    // 4) the session RECORDING must land too: replay segments in _sessionreplay.
-    // The Sessions page only lists sessions with session_has_replay set, so
-    // this is the precondition for the UI assertion below.
-    const replayRows = await waitForStreamRows(tokenPage2, {
-      sql: `SELECT * FROM "_sessionreplay" WHERE session_id = '${sessionId}'`,
-      minRows: 1,
-      timeoutMs: 45000,
-    });
-    await tokenPage2.close();
-    expect(replayRows.length, `_sessionreplay should contain segments for session ${sessionId}`)
-      .toBeGreaterThan(0);
+    // 4) the session RECORDING must land too: replay segments in
+    // _sessionreplay. The Sessions page only lists sessions with
+    // session_has_replay set, so this is the precondition for the UI
+    // assertion below.
+    const replayRows = replayCapable && sessionId
+      ? await waitForStreamRows(app, {
+          sql: `SELECT * FROM "_sessionreplay" WHERE session_id = '${sessionId}'`,
+          minRows: 1,
+          timeoutMs: 45000,
+        })
+      : [];
+
+    await genContext.close();
+    await server.close();
+
+    expect(sessionId, 'generated RUM events should carry a session_id').toBeTruthy();
+    if (replayCapable) {
+      expect(replayRows.length, `_sessionreplay should contain segments for session ${sessionId}`)
+        .toBeGreaterThan(0);
+    }
     testLogger.info('RUM page dataflow setup complete', {
       service: SERVICE,
       sessionId,
+      replayCapable,
       rumRows: hits.length,
       replayRows: replayRows.length,
     });
   });
 
   test('Sessions page lists the session recorded in this run', {
-    tag: ['@rum', '@dataflow', '@ui', '@P0'],
+    tag: ['@rum', '@rumPageDataflow', '@dataflow', '@ui', '@P0'],
   }, async ({ page }) => {
+    // Sessions are listed only when their events carry session_has_replay —
+    // impossible when the CDN never served the recorder chunk (external).
+    test.skip(!replayCapable, 'CDN recorder chunk unavailable this run (external dependency)');
+
+    const pm = new PageManager(page);
+
     // Scope the list to THIS run's session — the filter is applied to the
     // _rumdata sessions query, so any row that comes back is our recording.
-    // Passed via the URL (?query= is base64, restored on mount) instead of
-    // typing into the Monaco editor, which is racy while the editor boots.
-    const filter = Buffer.from(`service='${SERVICE}'`).toString('base64');
-    await page.goto(
-      `${BASE}/web/rum/sessions?period=1h&query=${encodeURIComponent(filter)}&org_identifier=${ORG}`,
-    );
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-    await expect(page.locator('[data-test="rum-sessions-table"]')).toBeVisible({ timeout: 15000 });
+    await pm.rumSessionsPage.gotoSessionsList({ service: SERVICE, period: '1h' });
+    await pm.rumSessionsPage.expectSessionsTableVisible();
     // Session aggregation can lag ingestion; poll for the filtered row.
-    await expect
-      .poll(async () => page.locator('[data-test^="o2-table-row-"]').count(), {
-        timeout: 60000,
-        intervals: [2000, 3000, 5000],
-      })
-      .toBeGreaterThan(0);
+    await pm.rumSessionsPage.waitForSessionRowsPresent();
 
     // Opening the row must land on the session viewer for the exact session
     // captured during generation — proves the listed row IS the new recording.
-    await page.locator('[data-test^="o2-table-row-"]').first().click();
-    await expect(page).toHaveURL(new RegExp(`/rum/sessions/view/${sessionId}`), { timeout: 15000 });
+    await pm.rumSessionsPage.openFirstSession();
+    await pm.rumSessionsPage.expectSessionViewerFor(sessionId);
   });
 
   test('Performance page renders its summary without a stuck loading state', {
-    tag: ['@rum', '@dataflow', '@ui', '@P1'],
+    tag: ['@rum', '@rumPageDataflow', '@dataflow', '@ui', '@P1'],
   }, async ({ page }) => {
-    await page.goto(`${BASE}/web/rum/performance?org_identifier=${ORG}`);
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    const pm = new PageManager(page);
 
-    await expect(page.locator('[data-test="rum-performance-refresh"]')).toBeVisible({ timeout: 15000 });
-    await page.locator('[data-test="rum-performance-refresh"]').click();
+    await pm.rumPerformancePage.gotoPerformance();
+    await pm.rumPerformancePage.clickRefresh();
 
     // The loading indicator must resolve (not hang) after refresh.
-    await expect(page.locator('[data-test="performance-summary-loading-indicator"]')).toBeHidden({
-      timeout: 30000,
-    });
+    await pm.rumPerformancePage.expectSummaryLoadingResolved();
   });
 });

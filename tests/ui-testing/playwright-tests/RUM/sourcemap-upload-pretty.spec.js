@@ -3,10 +3,17 @@
  *
  * Proves the full sourcemap pipeline with a DETERMINISTIC committed fixture
  * (fixtures/sourcemaps): a tiny app minified once with esbuild whose
- * generated→original mappings are calibrated in manifest.json.
+ * generated→original mappings are calibrated in manifest.json. The upload
+ * ZIPs are generated AT TEST TIME (utils/zip-builder.js) from the committed,
+ * diffable dist/ text files — no opaque .zip binaries in the repo.
  *
- *   1. Upload the fixture sourcemaps ZIP through the real Upload UI.
- *   2. Verify the Source Maps list shows the uploaded group.
+ *   1. Upload the fixture sourcemaps group (API, in beforeAll — the Upload
+ *      FORM itself, required-field validation and the upload happy path are
+ *      already covered by GeneralTests/rum-form-validation.spec.js and are
+ *      NOT repeated here).
+ *   2. Verify the Source Maps list shows the group; verify the backend
+ *      contracts unique to this suite: invalid-zip rejection and duplicate
+ *      rejection surfacing through the real Upload UI.
  *   3. Ingest synthetic RUM errors whose stacks point at known positions in
  *      the minified bundle.
  *   4. Verify the error detail page's Pretty tab renders ORIGINAL source
@@ -21,20 +28,28 @@
  *
  * Additive to sourcemap-ui.spec.js (kept untouched), which covers generic
  * Error Tracking display with globally-ingested errors.
+ *
+ * Prerequisites:
+ *   - OpenObserve build on ZO_BASE_URL (default http://localhost:5080); the
+ *     sourcemaps + RUM search routes are part of the standard (OSS) router.
  */
 
 const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
+const testLogger = require('../utils/test-logger.js');
+const PageManager = require('../../pages/page-manager.js');
 const { waitForStreamRows } = require('../utils/rum-stream-verify.js');
+const { rumTestContext, basicAuthHeader } = require('../utils/rum-env.js');
+const { buildZip, createTempFile } = require('../utils/zip-builder.js');
 
-const ORG = process.env.ORGNAME || 'default';
-const BASE = process.env.ZO_BASE_URL || 'http://localhost:5080';
+// Validated env context (org-id allowlist, plain-HTTP guard, least-privilege
+// account preference) — shared with every other RUM util via rum-env.js.
+const { orgId: ORG, baseUrl: BASE, email, password } = rumTestContext();
+const AUTH_HEADER = basicAuthHeader(email, password);
 
 const FIXTURE_DIR = path.resolve(__dirname, '../../fixtures/sourcemaps');
 const manifest = require(path.join(FIXTURE_DIR, 'manifest.json'));
-const ZIP_PATH = path.join(FIXTURE_DIR, manifest.zip);
-const INVALID_ZIP_PATH = path.join(FIXTURE_DIR, manifest.invalidZip);
 
 const RUN_ID = Date.now();
 // Unique per run: duplicate uploads are rejected by the backend, so a stable
@@ -51,16 +66,10 @@ const DELMAP_SERVICE = `e2e-smap-del-${RUN_ID}`;
 const VERSION = '1.0.0-e2e';
 const ENV = 'e2e';
 
-/** Escape all regex metacharacters (incl. backslash) so a literal string is safe inside RegExp. */
-function escapeRegex(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function authHeader() {
-  return `Basic ${Buffer.from(
-    `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`,
-  ).toString('base64')}`;
-}
+// Generated at test time from the committed dist/ text files (see beforeAll).
+let zipBuffer;
+let zipPath;
+let invalidZipPath;
 
 /** Build the raw browser-style stacktrace string for a manifest error. */
 function fixtureStack(errorKey) {
@@ -94,10 +103,24 @@ function fixtureErrorEvent(errorKey, service, index = 0) {
   };
 }
 
+/** Upload the fixture sourcemaps zip for a service via the REST API. */
+async function uploadFixtureGroup(page, service) {
+  const res = await page.request.post(`${BASE}/api/${ORG}/sourcemaps`, {
+    headers: { Authorization: AUTH_HEADER },
+    multipart: {
+      service,
+      version: VERSION,
+      env: ENV,
+      file: { name: manifest.zip, mimeType: 'application/zip', buffer: zipBuffer },
+    },
+  });
+  expect(res.ok(), `sourcemaps upload for ${service} should succeed (HTTP ${res.status()})`).toBe(true);
+}
+
 /** Ingest events into _rumdata and wait until they are searchable. */
 async function ingestFixtureErrors(page, events, service) {
   const res = await page.request.post(`${BASE}/api/${ORG}/_rumdata/_json`, {
-    headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
+    headers: { Authorization: AUTH_HEADER, 'Content-Type': 'application/json' },
     data: events,
   });
   expect(res.ok(), `ingestion into _rumdata should succeed (HTTP ${res.status()})`).toBe(true);
@@ -113,38 +136,57 @@ async function ingestFixtureErrors(page, events, service) {
 }
 
 /** Open the Error Tracking list scoped to one service and drill into the first error. */
-async function openErrorDetail(page, service) {
-  const filter = Buffer.from(`service='${service}'`).toString('base64');
-  await page.goto(
-    `${BASE}/web/rum/errors?period=1h&query=${encodeURIComponent(filter)}&org_identifier=${ORG}`,
-  );
-  await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-  await expect(page.locator('[data-test="rum-app-errors-table"]')).toBeVisible({ timeout: 15000 });
-  await expect
-    .poll(async () => page.locator('[data-test^="o2-table-row-"]').count(), {
-      timeout: 30000,
-      intervals: [1000, 2000, 3000],
-    })
-    .toBeGreaterThan(0);
-
-  await page.locator('[data-test^="o2-table-row-"]').first().click();
-  await expect(page).toHaveURL(/\/rum\/errors\/view\//, { timeout: 15000 });
-  await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
+async function openErrorDetail(pm, service) {
+  await pm.rumPage.gotoErrorsList({ service, period: '1h' });
+  await pm.rumPage.expectErrorsTableVisible();
+  await pm.rumPage.waitForErrorRowsPresent();
+  await pm.rumPage.openFirstError();
 }
 
-async function fillUploadForm(page, { service, version, env, zipPath }) {
-  await page.goto(`${BASE}/web/rum/upload-source-maps?org_identifier=${ORG}`);
-  await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-  await page.locator('[data-test="rum-upload-source-maps-service-input"] input').fill(service);
-  await page.locator('[data-test="rum-upload-source-maps-version-input"] input').fill(version);
-  await page.locator('[data-test="rum-upload-source-maps-environment-input"] input').fill(env);
-  await page.locator('[data-test="rum-upload-source-maps-file-input"]').setInputFiles(zipPath);
+/** Fill + submit the Upload UI form (page objects only). */
+async function submitUploadForm(pm, { service, version, env, filePath }) {
+  await pm.rumFormValidation.navigateToUploadSourceMaps();
+  await pm.rumFormValidation.fillService(service);
+  await pm.rumFormValidation.fillVersion(version);
+  await pm.rumFormValidation.fillEnvironment(env);
+  await pm.rumFormValidation.attachFile(filePath);
+  await pm.rumFormValidation.clickUpload();
 }
 
-test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, () => {
+test.describe('Sourcemap Upload & Pretty Stack Trace', () => {
+  // SERIAL IS REQUIRED: beforeAll uploads ONE sourcemaps group that the list /
+  // duplicate / translate / Pretty tests all read, the caching test depends on
+  // the translation performed by the preceding Pretty test, and the delete
+  // flow ends the sequence by removing its dedicated group. With fullyParallel
+  // workers each test would re-run beforeAll (duplicate-upload 400s) and the
+  // order-dependent cache/delete assertions would race.
   test.describe.configure({ mode: 'serial' });
+
+  test.beforeEach(async ({}, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+  });
+
+  test.beforeAll(async ({ browser }) => {
+    // Generate the upload archives from the committed dist/ text fixtures.
+    const bundle = fs.readFileSync(path.join(FIXTURE_DIR, 'dist', manifest.bundle));
+    const map = fs.readFileSync(path.join(FIXTURE_DIR, 'dist', `${manifest.bundle}.map`));
+    zipBuffer = buildZip([
+      { name: manifest.bundle, content: bundle },
+      { name: `${manifest.bundle}.map`, content: map },
+    ]);
+    zipPath = createTempFile(manifest.zip, zipBuffer);
+    invalidZipPath = createTempFile(
+      manifest.invalidZip,
+      buildZip([{ name: 'README.txt', content: 'not a sourcemap\n' }]),
+    );
+
+    // Upload the main fixture group once via the API. The Upload FORM happy
+    // path is covered by GeneralTests/rum-form-validation.spec.js.
+    const page = await browser.newPage();
+    await uploadFixtureGroup(page, SERVICE);
+    await page.close();
+    testLogger.info('Sourcemap fixture group uploaded', { service: SERVICE });
+  });
 
   test.afterAll(async ({ browser }) => {
     // Remove the uploaded groups so local reruns and shared instances stay clean.
@@ -153,7 +195,7 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
       await page.request
         .delete(
           `${BASE}/api/${ORG}/sourcemaps?service=${service}&version=${VERSION}&env=${ENV}`,
-          { headers: { Authorization: authHeader() } },
+          { headers: { Authorization: AUTH_HEADER } },
         )
         .catch(() => {});
     }
@@ -161,72 +203,54 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
   });
 
   // ==========================================================================
-  // Upload page
+  // Upload page — backend contracts NOT covered by rum-form-validation.spec.js
   // ==========================================================================
 
   test('rejects a zip that contains no sourcemap files', {
-    tag: ['@rum', '@sourcemap', '@upload', '@P1'],
+    tag: ['@rum', '@sourcemapUpload', '@P1'],
   }, async ({ page }) => {
-    await fillUploadForm(page, { service: SERVICE, version: VERSION, env: ENV, zipPath: INVALID_ZIP_PATH });
-    await page.locator('[data-test="rum-upload-source-maps-upload-btn"]').click();
+    const pm = new PageManager(page);
+    await submitUploadForm(pm, {
+      service: `${SERVICE}-invalid`,
+      version: VERSION,
+      env: ENV,
+      filePath: invalidZipPath,
+    });
 
     // Backend 400 message must surface to the user (covers the
     // "error if no valid sourcemap file found in zip" fix).
-    await expect(page.getByText(/No valid sourcemap files found/i).first()).toBeVisible({ timeout: 15000 });
+    await pm.rumSourcemapsPage.expectUploadMessage(/No valid sourcemap files found/i);
     // Still on the upload page — nothing was stored.
-    await expect(page).toHaveURL(/upload-source-maps/);
-  });
-
-  test('shows inline validation errors when required fields are empty', {
-    tag: ['@rum', '@sourcemap', '@upload', '@P1'],
-  }, async ({ page }) => {
-    await page.goto(`${BASE}/web/rum/upload-source-maps?org_identifier=${ORG}`);
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-    await page.locator('[data-test="rum-upload-source-maps-upload-btn"]').click();
-
-    await expect(page.getByText('Service is required').first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('Version is required').first()).toBeVisible();
-  });
-
-  test('uploads the fixture sourcemaps zip successfully', {
-    tag: ['@rum', '@sourcemap', '@upload', '@P0'],
-  }, async ({ page }) => {
-    await fillUploadForm(page, { service: SERVICE, version: VERSION, env: ENV, zipPath: ZIP_PATH });
-    await page.locator('[data-test="rum-upload-source-maps-upload-btn"]').click();
-
-    await expect(page.getByText('Source maps uploaded successfully').first()).toBeVisible({ timeout: 15000 });
-    // Success navigates back to the Source Maps list.
-    await expect(page).toHaveURL(/\/rum\/source-maps/, { timeout: 15000 });
+    await pm.rumSourcemapsPage.expectOnUploadPage();
   });
 
   test('lists the uploaded sourcemaps group with service, version and env', {
-    tag: ['@rum', '@sourcemap', '@upload', '@P0'],
+    tag: ['@rum', '@sourcemapUpload', '@P0'],
   }, async ({ page }) => {
-    await page.goto(`${BASE}/web/rum/source-maps?org_identifier=${ORG}`);
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    const pm = new PageManager(page);
+    await pm.rumSourcemapsPage.gotoSourceMapsList();
 
-    const row = page.locator('[data-test^="o2-table-row-"]', { hasText: SERVICE });
-    await expect(row.first()).toBeVisible({ timeout: 15000 });
-    await expect(row.first()).toContainText(VERSION);
-    await expect(row.first()).toContainText(ENV);
+    await pm.rumSourcemapsPage.expectGroupRowVisible(SERVICE);
+    await pm.rumSourcemapsPage.expectGroupRowContains(SERVICE, [VERSION, ENV]);
 
     // Expanding the row lists the actual files extracted from the zip.
-    await row.first().click();
-    const fileItem = page.locator('[data-test="source-maps-file-item"]', {
-      hasText: manifest.bundle,
-    });
-    await expect(fileItem.first()).toBeVisible({ timeout: 10000 });
-    await expect(fileItem.first()).toContainText(`${manifest.bundle}.map`);
+    await pm.rumSourcemapsPage.expandGroupRow(SERVICE);
+    await pm.rumSourcemapsPage.expectFileItemVisible(manifest.bundle);
+    await pm.rumSourcemapsPage.expectFileItemContains(manifest.bundle, `${manifest.bundle}.map`);
   });
 
   test('rejects re-uploading the same sourcemaps as duplicates', {
-    tag: ['@rum', '@sourcemap', '@upload', '@P1'],
+    tag: ['@rum', '@sourcemapUpload', '@P1'],
   }, async ({ page }) => {
-    await fillUploadForm(page, { service: SERVICE, version: VERSION, env: ENV, zipPath: ZIP_PATH });
-    await page.locator('[data-test="rum-upload-source-maps-upload-btn"]').click();
+    const pm = new PageManager(page);
+    await submitUploadForm(pm, {
+      service: SERVICE,
+      version: VERSION,
+      env: ENV,
+      filePath: zipPath,
+    });
 
-    await expect(page.getByText(/already exists/i).first()).toBeVisible({ timeout: 15000 });
+    await pm.rumSourcemapsPage.expectUploadMessage(/already exists/i);
   });
 
   // ==========================================================================
@@ -234,11 +258,11 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
   // ==========================================================================
 
   test('translate API resolves every fixture error to its original source line', {
-    tag: ['@rum', '@sourcemap', '@api', '@P0'],
+    tag: ['@rum', '@sourcemapTranslate', '@P0'],
   }, async ({ page }) => {
     for (const [key, e] of Object.entries(manifest.errors)) {
       const res = await page.request.post(`${BASE}/api/${ORG}/sourcemaps/stacktrace`, {
-        headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
+        headers: { Authorization: AUTH_HEADER, 'Content-Type': 'application/json' },
         data: { stacktrace: fixtureStack(key), service: SERVICE, version: VERSION, env: ENV },
       });
       expect(res.ok(), `${key}: translate should succeed`).toBe(true);
@@ -261,71 +285,63 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
   // ==========================================================================
 
   test('Pretty tab shows the original source location for an ingested error', {
-    tag: ['@rum', '@sourcemap', '@pretty', '@ui', '@P0'],
+    tag: ['@rum', '@sourcemapPretty', '@ui', '@P0'],
   }, async ({ page }) => {
+    const pm = new PageManager(page);
     const err = manifest.errors.typeError;
     await ingestFixtureErrors(page, [fixtureErrorEvent('typeError', SERVICE)], SERVICE);
-    await openErrorDetail(page, SERVICE);
+    await openErrorDetail(pm, SERVICE);
 
     // Raw tab is the default and shows the MINIFIED frame.
-    await expect(page.getByRole('tab', { name: 'Raw' })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText(manifest.bundle).first()).toBeVisible();
+    await pm.rumPage.expectRawTabVisible();
+    await pm.rumPage.expectDetailContainsText(manifest.bundle);
 
-    await page.getByRole('tab', { name: 'Pretty' }).click();
+    await pm.rumPage.clickPrettyTab();
 
     // Translation resolves to the ORIGINAL file + line from the sourcemap.
-    const prettyFrame = page.getByText(
-      new RegExp(`${escapeRegex(manifest.originalSourcePath)}:${err.expected.line}:`),
-    );
-    await expect(prettyFrame.first()).toBeVisible({ timeout: 30000 });
+    await pm.rumPage.expectPrettyFrameVisible(manifest.originalSourcePath, err.expected.line);
 
     // Expanding the frame reveals the source context header (Line <l>:<c>).
-    await prettyFrame.first().click();
-    await expect(page.getByText(new RegExp(`Line ${err.expected.line}:\\d+`)).first()).toBeVisible({
-      timeout: 15000,
-    });
+    await pm.rumPage.expandPrettyFrameAndExpectSourceContext(
+      manifest.originalSourcePath,
+      err.expected.line,
+    );
   });
 
   test('Pretty tab translation is fetched once and cached across tab switches', {
-    tag: ['@rum', '@sourcemap', '@pretty', '@ui', '@P1'],
+    tag: ['@rum', '@sourcemapPretty', '@ui', '@P1'],
   }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const err = manifest.errors.typeError;
     let translateCalls = 0;
     page.on('request', (req) => {
       if (req.url().includes('/sourcemaps/stacktrace')) translateCalls += 1;
     });
 
-    await openErrorDetail(page, SERVICE);
-    await page.getByRole('tab', { name: 'Pretty' }).click();
-    await expect(
-      page.getByText(new RegExp(`sync-errors\\.js:${manifest.errors.typeError.expected.line}:`)).first(),
-    ).toBeVisible({ timeout: 30000 });
+    await openErrorDetail(pm, SERVICE);
+    await pm.rumPage.clickPrettyTab();
+    await pm.rumPage.expectPrettyFrameVisible(manifest.originalSourcePath, err.expected.line);
 
-    await page.getByRole('tab', { name: 'Raw' }).click();
-    await page.getByRole('tab', { name: 'Pretty' }).click();
-    await expect(
-      page.getByText(new RegExp(`sync-errors\\.js:${manifest.errors.typeError.expected.line}:`)).first(),
-    ).toBeVisible({ timeout: 10000 });
+    await pm.rumPage.clickRawTab();
+    await pm.rumPage.clickPrettyTab();
+    await pm.rumPage.expectPrettyFrameVisible(manifest.originalSourcePath, err.expected.line, 10000);
 
     expect(translateCalls, 'stacktrace translated once, then served from cache').toBe(1);
   });
 
   test('Pretty tab reports missing sourcemaps for an unmapped service', {
-    tag: ['@rum', '@sourcemap', '@pretty', '@ui', '@P0'],
+    tag: ['@rum', '@sourcemapPretty', '@ui', '@P0'],
   }, async ({ page }) => {
+    const pm = new PageManager(page);
     await ingestFixtureErrors(page, [fixtureErrorEvent('referenceError', NOMAP_SERVICE)], NOMAP_SERVICE);
-    await openErrorDetail(page, NOMAP_SERVICE);
+    await openErrorDetail(pm, NOMAP_SERVICE);
 
-    await page.getByRole('tab', { name: 'Pretty' }).click();
+    await pm.rumPage.clickPrettyTab();
 
     // No maps uploaded for this service -> explicit unavailable state, and it
     // must not hang in the loading state.
-    await expect(
-      page
-        .getByText('Source Maps Not Available')
-        .or(page.getByText(/Unable to translate stack trace/i))
-        .first(),
-    ).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText('Translating stack trace with source maps...')).toHaveCount(0);
+    await pm.rumPage.expectPrettyUnavailableMessage();
+    await pm.rumPage.expectPrettyLoadingResolved();
   });
 
   // ==========================================================================
@@ -333,61 +349,22 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
   // ==========================================================================
 
   test('deletes the sourcemaps group and Pretty tab falls back to unavailable', {
-    tag: ['@rum', '@sourcemap', '@upload', '@pretty', '@ui', '@P1'],
+    tag: ['@rum', '@sourcemapUpload', '@sourcemapPretty', '@ui', '@P1'],
   }, async ({ page }) => {
+    const pm = new PageManager(page);
+
     // Arrange a DEDICATED group + error for this scenario (see DELMAP_SERVICE
     // note above): translating this stack before the delete would poison the
     // backend's translation cache and keep resolving after the group is gone,
-    // making the fallback assertion flaky-by-design. Upload via API — the
-    // Upload UI itself is already covered by the earlier tests.
-    const uploadRes = await page.request.post(`${BASE}/api/${ORG}/sourcemaps`, {
-      headers: { Authorization: authHeader() },
-      multipart: {
-        service: DELMAP_SERVICE,
-        version: VERSION,
-        env: ENV,
-        file: {
-          name: manifest.zip,
-          mimeType: 'application/zip',
-          buffer: fs.readFileSync(ZIP_PATH),
-        },
-      },
-    });
-    expect(uploadRes.ok(), `delete-flow group upload should succeed (HTTP ${uploadRes.status()})`).toBe(true);
+    // making the fallback assertion flaky-by-design.
+    await uploadFixtureGroup(page, DELMAP_SERVICE);
     await ingestFixtureErrors(page, [fixtureErrorEvent('typeError', DELMAP_SERVICE)], DELMAP_SERVICE);
 
-    // Delete the group through the real UI flow. Wait for DOM readiness only —
-    // the full "load" event is flaky on slow runners and the row assertion
-    // below is the real readiness signal.
-    await page.goto(`${BASE}/web/rum/source-maps?org_identifier=${ORG}`, {
-      waitUntil: 'domcontentloaded',
-      timeout: 60000,
-    });
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    await expect(
-      page.locator('[data-test^="o2-table-row-"]', { hasText: DELMAP_SERVICE }).first(),
-    ).toBeVisible({ timeout: 15000 });
-
-    await page.locator(`[data-test="source-maps-${DELMAP_SERVICE}-delete"]`).click();
-    await expect(page.locator('[data-test="delete-source-maps-dialog"]')).toBeVisible({ timeout: 10000 });
-
-    // Confirming fires the DELETE request asynchronously and closes the dialog
-    // immediately — navigating away before the request lands ABORTS it and the
-    // group survives. Wait for the API response, then for the row removal (the
-    // UI drops the row only after the API succeeds) before moving on.
-    const deleteResponse = page.waitForResponse(
-      (r) => r.request().method() === 'DELETE' && r.url().includes('/sourcemaps'),
-      { timeout: 15000 },
-    );
-    await page
-      .locator('[data-test="delete-source-maps-dialog"]')
-      .getByRole('button', { name: /delete|confirm|ok/i })
-      .click();
-    expect((await deleteResponse).status(), 'sourcemaps DELETE should succeed').toBe(200);
-
-    await expect(
-      page.locator('[data-test^="o2-table-row-"]', { hasText: DELMAP_SERVICE }),
-    ).toHaveCount(0, { timeout: 15000 });
+    // Delete the group through the real UI flow (the page object waits for
+    // the backing DELETE response before asserting the row is gone).
+    await pm.rumSourcemapsPage.gotoSourceMapsList();
+    await pm.rumSourcemapsPage.expectGroupRowVisible(DELMAP_SERVICE);
+    await pm.rumSourcemapsPage.deleteGroupAndExpectRemoved(DELMAP_SERVICE);
 
     // Prove the deletion server-side before touching the UI again: the group
     // must vanish from the list API. Failing here means the backend DELETE is
@@ -396,7 +373,7 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
       .poll(async () => {
         const res = await page.request.get(
           `${BASE}/api/${ORG}/sourcemaps?service=${DELMAP_SERVICE}&version=${VERSION}&env=${ENV}`,
-          { headers: { Authorization: authHeader() } },
+          { headers: { Authorization: AUTH_HEADER } },
         );
         if (!res.ok()) return -res.status();
         return (await res.json()).length;
@@ -406,7 +383,7 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
     // After deletion the translate API must not resolve any frame to original
     // source (this group was never translated, so no cache can serve it).
     const translateRes = await page.request.post(`${BASE}/api/${ORG}/sourcemaps/stacktrace`, {
-      headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
+      headers: { Authorization: AUTH_HEADER, 'Content-Type': 'application/json' },
       data: {
         stacktrace: fixtureStack('typeError'),
         service: DELMAP_SERVICE,
@@ -427,15 +404,10 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', { tag: '@enterprise' }, (
 
     // UI: the Pretty tab now reports sourcemaps as unavailable — and must not
     // hang in the loading state.
-    await openErrorDetail(page, DELMAP_SERVICE);
-    await page.getByRole('tab', { name: 'Pretty' }).click();
+    await openErrorDetail(pm, DELMAP_SERVICE);
+    await pm.rumPage.clickPrettyTab();
 
-    await expect(
-      page
-        .locator('[data-test="rum-pretty-stack-trace-unavailable"]')
-        .or(page.locator('[data-test="rum-pretty-stack-trace-error"]'))
-        .first(),
-    ).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText('Translating stack trace with source maps...')).toHaveCount(0);
+    await pm.rumPage.expectPrettyUnavailableState();
+    await pm.rumPage.expectPrettyLoadingResolved();
   });
 });

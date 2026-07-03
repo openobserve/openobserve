@@ -376,6 +376,10 @@ jobs:
                 "tracesAnalyzeDimensions.spec.js",
                 "traces-autocomplete-suggestions.spec.js",
               ]
+          # The RUM ingest/token/sourcemaps routes are part of the standard
+          # (OSS) router (src/handler/http/router/mod.rs), so these specs run
+          # against the OSS binary built by this workflow. Ingestion-auth
+          # negative cases live in the API suite (tests/api-testing/tests/rum).
           - testfolder: "RUM"
             browser: "chrome"
             run_files:
@@ -383,7 +387,6 @@ jobs:
                 "rum-cdn-dataflow.spec.js",
                 "rum-npm-dataflow.spec.js",
                 "rum-page-dataflow.spec.js",
-                "rum-negative.spec.js",
                 "rum-onboarding-snippets.spec.js",
                 "sourcemap-ui.spec.js",
                 "sourcemap-upload-pretty.spec.js",

@@ -125,6 +125,36 @@ def test_rum_data_ingest_with_invalid_token_returns_403(client: OpenObserveClien
         f"invalid token should yield 403, got {resp.status_code}: {resp.text}"
 
 
+def test_rum_data_ingest_with_no_token_is_rejected(client: OpenObserveClient):
+    """POST /rum/v1/{org}/rum with NO token param is rejected (no anonymous writes)."""
+    rum_url = f"{client.base_url}rum/v1/{ORG_ID}/rum"
+    payload = {**RUM_DATA_TEMPLATE, "type": f"pytest-{uuid.uuid4()}"}
+
+    resp = requests.post(rum_url, json=payload, timeout=10)
+    assert resp.status_code in (400, 401, 403), \
+        f"anonymous RUM ingestion should be rejected, got {resp.status_code}: {resp.text}"
+
+
+def test_rum_logs_ingest_with_no_token_is_rejected(client: OpenObserveClient):
+    """POST /rum/v1/{org}/logs with NO token param is rejected (no anonymous writes)."""
+    logs_url = f"{client.base_url}rum/v1/{ORG_ID}/logs"
+    payload = {**RUM_LOG_TEMPLATE, "message": f"pytest-{uuid.uuid4()}"}
+
+    resp = requests.post(logs_url, json=payload, timeout=10)
+    assert resp.status_code in (400, 401, 403), \
+        f"anonymous RUM log ingestion should be rejected, got {resp.status_code}: {resp.text}"
+
+
+def test_rum_search_for_nonexistent_service_returns_empty(client: OpenObserveClient):
+    """Querying _rumdata for a service that never ingested returns empty hits, not an error."""
+    hits = client.search.hits(
+        f"SELECT * FROM \"_rumdata\" WHERE service = 'service-that-does-not-exist-{uuid.uuid4()}'",
+        minutes=60,
+        size=5,
+    )
+    assert hits == [], f"expected no hits for a non-existent service, got {hits!r}"
+
+
 # ----- happy path: get token, ingest log, verify via search -----
 
 

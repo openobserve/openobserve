@@ -1,6 +1,10 @@
 // rumPage.js
 import { expect } from '@playwright/test';
 
+/** Escape all regex metacharacters (incl. backslash) so a literal string is safe inside RegExp. */
+function escapeRegex(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 export class RumPage {
     constructor(page) {
@@ -19,6 +23,15 @@ export class RumPage {
         // class to a data-test attribute; the `.error-stacks` class below still exists.
         this.errorViewerContainer = '[data-test="error-viewer-container"]';
         this.errorStacksSection = '.error-stacks';
+
+        // Error detail — stack trace tabs (Raw / Pretty)
+        this.rawTab = page.getByRole('tab', { name: 'Raw' });
+        this.prettyTab = page.getByRole('tab', { name: 'Pretty' });
+        this.prettyUnavailableState = page.locator('[data-test="rum-pretty-stack-trace-unavailable"]');
+        this.prettyErrorState = page.locator('[data-test="rum-pretty-stack-trace-error"]');
+        this.prettyLoadingText = page.getByText('Translating stack trace with source maps...');
+        this.prettyUnavailableText = page.getByText('Source Maps Not Available');
+        this.prettyTranslateFailedText = page.getByText(/Unable to translate stack trace/i);
 
         // Store first error data from query response
         this.firstErrorId = null;
@@ -102,7 +115,9 @@ export class RumPage {
     }
 
     async waitForQueryExecution() {
-        await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        // Explicit readiness signal: the results table body renders once the
+        // RUM search response lands (networkidle is unreliable with streaming).
+        await this.page.waitForSelector(this.tableBody, { timeout: 15000 }).catch(() => {});
     }
 
     async expectErrorTableVisible() {
@@ -179,6 +194,116 @@ export class RumPage {
     async getFirstErrorRowText() {
         const firstRow = this.page.locator(this.tableRow).first();
         return await firstRow.textContent();
+    }
+
+    // ===== ERROR TRACKING — LIST NAVIGATION (service-scoped) =====
+
+    /**
+     * Open the Error Tracking list scoped to one service via the URL query
+     * (?query= is base64, restored on mount) instead of typing into the Monaco
+     * editor, which is racy while the editor boots.
+     */
+    async gotoErrorsList({ service = null, period = '1h' } = {}) {
+        const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const org = process.env.ORGNAME || 'default';
+        let url = `${base}/web/rum/errors?period=${period}&org_identifier=${org}`;
+        if (service) {
+            const filter = Buffer.from(`service='${service}'`).toString('base64');
+            url = `${base}/web/rum/errors?period=${period}&query=${encodeURIComponent(filter)}&org_identifier=${org}`;
+        }
+        await this.page.goto(url);
+        // The search bar is the page-loaded signal; the errors table only
+        // renders once a query has executed (auto-run when ?query= is set).
+        await expect(this.page.locator(this.dateTimeDropdown)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectErrorsTableVisible(timeoutMs = 15000) {
+        await expect(this.page.locator(this.appTableContainer)).toBeVisible({ timeout: timeoutMs });
+    }
+
+    async waitForErrorRowsPresent(timeoutMs = 30000) {
+        await expect
+            .poll(async () => this.page.locator(this.tableRow).count(), {
+                timeout: timeoutMs,
+                intervals: [1000, 2000, 3000],
+            })
+            .toBeGreaterThan(0);
+    }
+
+    /** Click the first error row and wait until the error detail view URL loads. */
+    async openFirstError() {
+        await this.page.locator(this.tableRow).first().click();
+        await expect(this.page).toHaveURL(/\/rum\/errors\/view\//, { timeout: 15000 });
+        // Detail view readiness: the viewer container is rendered.
+        await this.page.waitForSelector(this.errorViewerContainer, { timeout: 15000 });
+    }
+
+    // ===== ERROR DETAIL — RAW / PRETTY STACK TRACE TABS =====
+
+    async expectRawTabVisible() {
+        await expect(this.rawTab).toBeVisible({ timeout: 15000 });
+    }
+
+    async clickRawTab() {
+        await this.rawTab.click();
+    }
+
+    async clickPrettyTab() {
+        await this.prettyTab.click();
+    }
+
+    /** Assert the (minified) frame text — e.g. the bundle file name — is shown. */
+    async expectDetailContainsText(text) {
+        await expect(this.page.getByText(text).first()).toBeVisible({ timeout: 15000 });
+    }
+
+    /** Locator for a translated pretty frame pointing at `<originalPath>:<line>:`. */
+    prettyFrameLocator(originalPath, line) {
+        return this.page.getByText(new RegExp(`${escapeRegex(originalPath)}:${line}:`));
+    }
+
+    /** Assert the Pretty tab resolved a frame to the ORIGINAL file + line. */
+    async expectPrettyFrameVisible(originalPath, line, timeoutMs = 30000) {
+        await expect(this.prettyFrameLocator(originalPath, line).first()).toBeVisible({
+            timeout: timeoutMs,
+        });
+    }
+
+    /** Expand a translated frame and assert the source context header (Line <l>:<c>). */
+    async expandPrettyFrameAndExpectSourceContext(originalPath, line) {
+        await this.prettyFrameLocator(originalPath, line).first().click();
+        await expect(this.page.getByText(new RegExp(`Line ${line}:\\d+`)).first()).toBeVisible({
+            timeout: 15000,
+        });
+    }
+
+    /** Pretty tab's explicit "no sourcemaps" outcome (message text variants). */
+    async expectPrettyUnavailableMessage(timeoutMs = 30000) {
+        await expect(
+            this.prettyUnavailableText.or(this.prettyTranslateFailedText).first(),
+        ).toBeVisible({ timeout: timeoutMs });
+    }
+
+    /**
+     * Pretty tab's explicit unavailable/error state. Matches the data-test
+     * containers added by this change AND the visible message text, so the
+     * assertion holds against binaries built before and after the frontend
+     * gained the data-test attributes (same both-builds pattern as
+     * errorViewerContainer above).
+     */
+    async expectPrettyUnavailableState(timeoutMs = 30000) {
+        await expect(
+            this.prettyUnavailableState
+                .or(this.prettyErrorState)
+                .or(this.prettyUnavailableText)
+                .or(this.prettyTranslateFailedText)
+                .first(),
+        ).toBeVisible({ timeout: timeoutMs });
+    }
+
+    /** The translating spinner must be gone (not hung). */
+    async expectPrettyLoadingResolved() {
+        await expect(this.prettyLoadingText).toHaveCount(0);
     }
 
 }

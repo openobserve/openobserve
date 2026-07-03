@@ -8,10 +8,10 @@
     "build": "esbuild src/main.js --bundle --format=iife --outfile=dist/bundle.js"
   },
   "dependencies": {
-    "@openobserve/browser-logs": "^0.3.4",
-    "@openobserve/browser-rum": "^0.3.4"
+    "@openobserve/browser-logs": "0.3.4",
+    "@openobserve/browser-rum": "0.3.4"
   },
   "devDependencies": {
-    "esbuild": "^0.24.0"
+    "esbuild": "0.24.2"
   }
 }

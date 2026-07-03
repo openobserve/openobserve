@@ -17,7 +17,6 @@ page render.
 | `checkout.html`  | Form with validation; submit fires a RUM action + log (inputs masked in replay) |
 | `about.html`     | Static content + a broken-resource (404) error generator                   |
 | `app.js`         | Home-page button handlers                                                   |
-| `vendor/`        | Self-hosted SDK bundles **+ the Session Replay recorder chunk** (see below) |
 
 Every page's `<head>` contains the **same** async loader stub and loads
 `oo-rum.js`, so the SDK initializes on each navigation. Navigating between pages
@@ -25,53 +24,37 @@ produces a **multi-view session** with a continuous **Session Replay**.
 
 The two SDK bundles expose globals `window.OO_RUM` and `window.OO_LOGS`.
 
-## ⚠️ Why the bundles are self-hosted (`vendor/`) instead of the public CDN
+## Where the SDK bundles come from
 
-Session Replay's recorder is a **lazily-loaded chunk**, separate from the main
-bundle. The public CDN serves the main bundle fine (`200`), but **returns
-`403 AccessDenied` for the `chunks/` directory** that holds the recorder:
+Every page loads the bundles **from the live CDN**
+(`https://browsersdk.openobserve.ai/<version>/openobserve-{rum,logs}.js`) via
+the async-loader stub in `<head>`. A specific released version is pinned in the
+HTML; when the app is served by the E2E fixture server
+(`tests/ui-testing/fixtures/rum/serve.js`), the version segment can be
+rewritten to any *released* version (the CDN has no `latest` alias) and the
+`OO_CONFIG` block in `oo-rum.js` is templated with the run's token/site/org.
+
+### ⚠️ Known CDN caveat: the lazy `chunks/` directory
+
+Session Replay's recorder (and the profiler) are **lazily-loaded chunks**,
+separate from the main bundle. Historically the public CDN has served the main
+bundle fine (`200`) while **returning `403 AccessDenied` for the `chunks/`
+directory** of some releases:
 
 ```
-https://browsersdk.openobserve.ai/0.3.1/openobserve-rum.js                 -> 200  ✅
-https://browsersdk.openobserve.ai/0.3.1/chunks/recorder-…-openobserve-rum.js -> 403  ❌ AccessDenied
+https://browsersdk.openobserve.ai/<v>/openobserve-rum.js                    -> 200  ✅
+https://browsersdk.openobserve.ai/<v>/chunks/recorder-…-openobserve-rum.js -> 403  ❌ AccessDenied
 ```
 
-Result: RUM metrics work, but the browser console shows
+When that happens RUM metrics still work, but the browser console shows
 `ChunkLoadError: Loading chunk recorder failed` and **Session Replay never
 records**. This is a provisioning issue on the OpenObserve CDN, not a config
-error — nothing in `oo-rum.js` can fix it.
-
-The fix used here: **serve the bundle and its `chunks/` together from the same
-origin.** `vendor/` was copied from the npm package, which ships the recorder
-chunk:
-
-```
-vendor/
-  openobserve-rum.js                 (main bundle, v0.3.2-beta.3)
-  openobserve-logs.js
-  chunks/recorder-…-openobserve-rum.js   <- the file the CDN 403s on
-  chunks/profiler-…-openobserve-rum.js
-```
-
-Because the bundle auto-detects its own URL (`publicPath`) from the loading
-script, the recorder chunk loads from `./vendor/chunks/…` — which is present —
-and replay starts.
-
-### Re-vendor / update the bundles
-
-```bash
-# from repo root, after `npm i` in web/
-cp web/node_modules/@openobserve/browser-rum/bundle/openobserve-rum.js   tests/ui-testing/fixtures/rum/cdn-sample/vendor/
-cp web/node_modules/@openobserve/browser-rum/bundle/chunks/*.js          tests/ui-testing/fixtures/rum/cdn-sample/vendor/chunks/
-cp web/node_modules/@openobserve/browser-logs/bundle/openobserve-logs.js tests/ui-testing/fixtures/rum/cdn-sample/vendor/
-```
-
-> Always copy the **main bundle and its `chunks/` together** — the main bundle
-> embeds the exact chunk hash it will request, so mismatched versions re-break
-> the recorder.
->
-> Once the CDN serves `chunks/` publicly, you can point the loader URLs back to
-> `https://browsersdk.openobserve.ai/<version>/openobserve-{rum,logs}.js`.
+error — nothing in `oo-rum.js` can fix it. The E2E suite handles it by
+resolving the SDK version **best-effort** (probing candidates against the CDN
+and falling back to the pin — see
+`tests/ui-testing/playwright-tests/utils/rum-sdk-version.js`) and by
+**skipping the session-replay assertions with a logged warning** when the
+recorder chunk is not served, instead of failing CI on an external outage.
 
 > Need a smaller bundle without Session Replay? Use `openobserve-rum-slim.js`
 > (no recorder, no `chunks/` dependency) and remove the
@@ -143,7 +126,7 @@ arrive.
 
 ## Production checklist
 
-- Pin the SDK version (`0.3.1` here) — don't float to "latest".
+- Pin the SDK version (see the loader URLs in the HTML) — don't float to "latest".
 - Set `defaultPrivacyLevel` to `mask-user-input` or `mask` (this sample uses
   `mask-user-input`) so replays don't record sensitive input values.
 - Tune `sessionReplaySampleRate` (replay is heavy); `sessionSampleRate: 100`

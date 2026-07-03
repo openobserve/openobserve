@@ -28,6 +28,12 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
 };
 
+// Only plain x.y.z versions may be spliced into the sample sources. Anything
+// else (URLs, path segments, replacement patterns like `$&`) is rejected up
+// front rather than escaped, so no caller-provided string ever reaches a
+// string-replacement position unvalidated.
+const SDK_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
+
 /**
  * Rewrite the CDN bundle version segment in browsersdk.openobserve.ai URLs,
  * e.g. .../0.3.3/openobserve-rum.js -> .../<version>/openobserve-rum.js.
@@ -36,9 +42,14 @@ const MIME = {
  */
 function templateSdkVersion(source, version) {
   if (!version) return source;
+  if (!SDK_VERSION_PATTERN.test(version)) {
+    throw new Error(`sdkVersion must be x.y.z, got "${version}"`);
+  }
+  // Replacer FUNCTION form: the version is inserted literally, never
+  // interpreted as a $-replacement pattern.
   return source.replace(
     /(browsersdk\.openobserve\.ai\/)[^/'"]+(\/)/g,
-    `$1${version}$2`,
+    (_match, prefix, suffix) => prefix + version + suffix,
   );
 }
 
@@ -64,8 +75,13 @@ function templateOoRum(source, cfg) {
   out = set(out, 'service', cfg.service);
   out = set(out, 'env', cfg.env);
   out = set(out, 'version', cfg.version);
-  // insecureHTTP is a boolean, not a quoted string.
-  out = out.replace(/(insecureHTTP\s*:\s*)(true|false)/, `$1${cfg.insecureHTTP}`);
+  // insecureHTTP is a boolean, not a quoted string. Coerced with Boolean()
+  // and inserted via the function form so nothing user-controlled can reach a
+  // replacement-pattern position.
+  out = out.replace(
+    /(insecureHTTP\s*:\s*)(true|false)/,
+    (_match, prefix) => prefix + Boolean(cfg.insecureHTTP),
+  );
   // Test-only: force-enable profiling (default sample rate is 0) so the e2e
   // suite exercises the lazy profiler chunk download from the CDN.
   out = out.replace(/(\n(\s*)sessionSampleRate\s*:)/, '\n$2profilingSampleRate: 100,$1');
@@ -101,6 +117,10 @@ function startFixtureServer(opts) {
     applicationId: opts.applicationId || 'e2e-rum-app',
     sdkVersion: opts.sdkVersion || null,
   };
+  // Fail fast at startup instead of 500-ing per request inside the handler.
+  if (cfg.sdkVersion && !SDK_VERSION_PATTERN.test(cfg.sdkVersion)) {
+    return Promise.reject(new Error(`sdkVersion must be x.y.z, got "${cfg.sdkVersion}"`));
+  }
 
   const server = http.createServer((req, res) => {
     try {
