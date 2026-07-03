@@ -29,8 +29,6 @@
       :class="[
         horizontal ? 'o-splitter__separator--horizontal' : 'o-splitter__separator--vertical',
         'select-none',
-        'transition-colors',
-        'hover:bg-[var(--o2-border-input)]',
         'relative',
         'z-10',
         'focus:outline-2 focus:outline-(--o2-primary-color) focus:-outline-offset-2',
