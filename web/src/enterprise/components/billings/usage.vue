@@ -16,6 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
     <div class="tw:p-3 " style="height: calc(100vh - 130px); width: 100%;" >
+      <div v-if="config.isCloud == 'true'" class="tw:mb-3">
+        <AppTabs
+          class="tabs-selection-container"
+          data-test="usage-analytics-tabs"
+          :tabs="analyticsTabs"
+          :activeTab="activeAnalyticsTab"
+          @update:activeTab="(v: any) => (activeAnalyticsTab = v)"
+        />
+      </div>
+      <div v-show="activeAnalyticsTab === 'usage'">
       <div class="tw:flex tw:items-baseline tw:justify-between">
         <div class="tw:flex tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:pb-3">
           <span class="tw:my-auto tw:mx-[0.625rem] tw:text-[var(--o2-text-heading)]">{{ t("billing.totalUsage") }}</span>
@@ -239,6 +249,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="dataLoading" class="tw:text-xl tw:font-semibold text-weight-medium tw:text-center">
         <OSpinner size="md" class="tw:mx-auto tw:block tw:text-center tw:mt-3" />
       </div>
+      </div>
+      <div v-if="config.isCloud == 'true'" v-show="activeAnalyticsTab === 'analytics'">
+        <UsageAnalytics :unit="usageDataType" :can-admin="canAdmin" />
+      </div>
     </div>
   </template>
   <script lang="ts">
@@ -253,6 +267,9 @@ import { getImageURL } from "@/utils/zincutils";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import UsageAnalytics from "./UsageAnalytics.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
+import config from "@/aws-exports";
 
   let currentDate = new Date(); // Get the current date and time
 
@@ -267,6 +284,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
       ),
       CustomChartRenderer,
       OSpinner,
+      UsageAnalytics,
+      AppTabs,
     },
     setup() {
       const { t } = useI18n();
@@ -304,6 +323,12 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
         undefined as any
       );
       const selectedMember = computed(() => usageMember?.selected || "");
+      const canAdmin = computed(() => store.state?.currentuser?.role == "admin");
+      const activeAnalyticsTab = ref("usage");
+      const analyticsTabs = [
+        { label: t("billing.usageLabel"), value: "usage" },
+        { label: t("billing.usageAnalytics.tabLabel"), value: "analytics" },
+      ];
       onMounted(async () => {
         selectUsageDate();
       });
@@ -988,6 +1013,10 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
         dataRetentionIcon,
         aiIcon,
         selectedMember,
+        canAdmin,
+        activeAnalyticsTab,
+        analyticsTabs,
+        config,
       };
     },
   });
