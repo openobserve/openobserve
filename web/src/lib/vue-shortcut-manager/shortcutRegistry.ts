@@ -39,6 +39,8 @@ export interface ShortcutEntry {
   keys?: string[];
   /** Cheatsheet label override — only when not derivable from the key(s). */
   display?: string;
+  /** Fire even while a text input has focus (see `Shortcut.allowInInput`). */
+  allowInInput?: boolean;
 }
 
 export interface ShortcutGroup {
@@ -401,6 +403,7 @@ export interface ShortcutDef {
   keyForWindows?: string;
   keyForMac?: string;
   keys?: string[];
+  allowInInput?: boolean;
 }
 
 function isRegisterable(e: ShortcutEntry): boolean {
@@ -423,6 +426,7 @@ const DEFS: Map<string, ShortcutDef> = (() => {
         keyForWindows: e.keyForWindows,
         keyForMac: e.keyForMac,
         keys: e.keys,
+        allowInInput: e.allowInInput,
       });
     }
   }
