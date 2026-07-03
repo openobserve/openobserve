@@ -122,6 +122,10 @@ const treeConnectorX = computed(() => {
 });
 
 function onClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null;
+  if (target?.closest("button, a, input, select, textarea, label, [role='button']")) {
+    return;
+  }
   emit("row-click", props.row.original, event);
 }
 
@@ -148,6 +152,9 @@ const ROW_ACTION_KEYS: Record<string, string> = {
 
 const handleKeydown = (e: KeyboardEvent) => {
   if ((!isHovered.value && !isFocused.value) || isInputFocused()) return;
+  const rowEl = rowRef.value?.closest("tr");
+  const active = document.activeElement;
+  if (active && active !== rowEl && active !== document.body) return;
   // One shared window listener per row — stop the same event cascading through siblings.
   if ((e as any)._o2RowNavHandled) return;
   (e as any)._o2RowNavHandled = true;
