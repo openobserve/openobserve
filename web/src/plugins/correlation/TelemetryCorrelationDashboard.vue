@@ -274,8 +274,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <div
                     v-else
-                    class="tw:p-3 tw:text-center tw:text-xs tw:opacity-60"
+                    class="tw:text-center tw:px-2 tw:pt-3"
                   >
+                    <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
                     {{ t("search.noResult") }}
                   </div>
                 </div>
@@ -775,8 +776,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div
                   v-else
-                  class="tw:p-3 tw:text-center tw:text-xs tw:opacity-60"
+                  class="tw:text-center tw:px-2 tw:pt-3"
                 >
+                  <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
                   {{ t("search.noResult") }}
                 </div>
               </div>
@@ -1159,7 +1161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- No results message -->
-      <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
+      <div v-else class="tw:text-center tw:px-2 tw:pt-3">
+        <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
         {{ t("search.noResult") }}
       </div>
     </div>
