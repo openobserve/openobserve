@@ -72,8 +72,13 @@ jobs:
           # label needed and the merge is allowed. Deliberately NOT bypassed:
           # .github/workflows/** (workflow changes must be tested), source, config, *.txt.
           IGNORE_RE='(\.mdx?$|^docs/|\.(png|jpe?g|gif|svg|ico|webp|bmp|pdf)$|^LICENSE|^NOTICE|^CODEOWNERS$|^\.github/CODEOWNERS$|^\.github/ISSUE_TEMPLATE/|^\.github/PULL_REQUEST_TEMPLATE|^\.github/FUNDING|^\.gitignore$|^\.gitattributes$|^\.editorconfig$|^\.vscode/|^\.idea/)'
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
+          BASE="${{ github.base_ref || 'main' }}"
+          # Best-effort ensure the base ref exists locally (PRs targeting a non-main base may
+          # not have it as a remote-tracking ref yet). The empty/failure fallback below is safe.
+          git fetch origin "$BASE" --quiet 2>/dev/null || true
+          CHANGED=$(git diff --name-only "origin/$BASE" ${{ github.sha }} 2>/dev/null || true)
           if [ -z "$CHANGED" ]; then
+            # No diff, or diff unavailable → assume e2e-relevant (conservative: require label/run).
             echo "has_changes=true" >> $GITHUB_OUTPUT
           elif echo "$CHANGED" | grep -qvE "$IGNORE_RE"; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
