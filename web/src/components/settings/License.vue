@@ -9,7 +9,7 @@
     </div>
     <div
       v-else
-      class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start pb-4"
+      class="grid grid-cols-1 gap-4 items-start pb-4"
     >
       <div class="col-span-1 min-h-0">
         <div v-if="licenseData.license === null || !licenseData.license">
