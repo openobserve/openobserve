@@ -78,15 +78,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- KPI summary strip -->
       <div class="card-container tw:border-b tw:border-border-default">
         <SessionsMetricsStrip
-          :total="sessionsSummary.total"
-          :error-sessions="sessionsSummary.errorSessions"
-          :frustrated-sessions="sessionsSummary.frustratedSessions"
-          :bounced-sessions="sessionsSummary.bouncedSessions"
-          :avg-duration-ms="sessionsSummary.avgDurationMs"
-          :median-duration-ms="sessionsSummary.medianDurationMs"
+          :total="kpiMetrics.total"
+          :error-sessions="kpiMetrics.errorSessions"
+          :frustrated-sessions="kpiMetrics.frustratedSessions"
+          :bounced-sessions="kpiMetrics.bouncedSessions"
+          :bounce-base="kpiMetrics.bounceBase"
+          :avg-duration-ms="kpiMetrics.avgDurationMs"
+          :median-duration-ms="kpiMetrics.medianDurationMs"
+          :sessions-delta-pct="kpiDeltas?.sessionsPct ?? null"
+          :errors-delta="kpiDeltas?.errors ?? null"
+          :frustrated-delta="kpiDeltas?.frustrated ?? null"
           :active-card="activeMetricCard"
           @select="handleMetricSelect"
         />
+
+        <!-- One actionable insight for the current window, when one exists -->
+        <div v-if="topInsight" class="tw:px-2 tw:pb-2">
+          <SessionsInsightBanner
+            :insight="topInsight"
+            @apply="applyInsightFilter(topInsight)"
+            @filter="filterSessionsByInsightError(topInsight)"
+            @open-error-tracking="openInsightInErrorTracking(topInsight)"
+          />
+        </div>
 
         <!-- Segment filters -->
         <div
@@ -144,6 +158,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="xs"
               data-test="rum-app-sessions-type-bounced"
             >{{ t("rum.bounced") }} · {{ sessionsSummary.bouncedSessions }}</OToggleGroupItem>
+          </OToggleGroup>
+
+          <OToggleGroup
+            :model-value="deviceSegment"
+            type="single"
+            :label="t('rum.device')"
+            label-position="left"
+            @update:model-value="(v: any) => setDeviceSegment(v)"
+          >
+            <OToggleGroupItem
+              value="all"
+              size="xs"
+              data-test="rum-app-sessions-device-all"
+            >{{ t("rum.all") }}</OToggleGroupItem>
+            <OToggleGroupItem
+              value="desktop"
+              size="xs"
+              data-test="rum-app-sessions-device-desktop"
+            >{{ t("rum.desktop") }} · {{ sessionsSummary.deviceCounts.desktop }}</OToggleGroupItem>
+            <OToggleGroupItem
+              value="mobile"
+              size="xs"
+              data-test="rum-app-sessions-device-mobile"
+            >{{ t("rum.mobile") }} · {{ sessionsSummary.deviceCounts.mobile }}</OToggleGroupItem>
+            <OToggleGroupItem
+              value="tablet"
+              size="xs"
+              data-test="rum-app-sessions-device-tablet"
+            >{{ t("rum.tablet") }} · {{ sessionsSummary.deviceCounts.tablet }}</OToggleGroupItem>
           </OToggleGroup>
         </div>
       </div>
@@ -334,6 +377,7 @@ import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
 import SessionHealthCell from "@/components/rum/sessionReplay/SessionHealthCell.vue";
 import SessionsMetricsStrip from "@/components/rum/sessionReplay/SessionsMetricsStrip.vue";
+import SessionsInsightBanner from "@/components/rum/sessionReplay/SessionsInsightBanner.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -362,6 +406,7 @@ interface Session {
 
 type HealthSegment = "all" | "errors" | "frustrated" | "clean";
 type TypeSegment = "all" | "engaged" | "bounced";
+type DeviceSegment = "all" | "desktop" | "mobile" | "tablet";
 
 const HEALTH_SEGMENTS: HealthSegment[] = [
   "all",
@@ -370,6 +415,28 @@ const HEALTH_SEGMENTS: HealthSegment[] = [
   "clean",
 ];
 const TYPE_SEGMENTS: TypeSegment[] = ["all", "engaged", "bounced"];
+const DEVICE_SEGMENTS: DeviceSegment[] = [
+  "all",
+  "desktop",
+  "mobile",
+  "tablet",
+];
+
+interface WindowTotals {
+  total: number;
+  errorSessions: number;
+  frustratedSessions: number;
+  unhealthySessions: number;
+}
+
+interface SessionInsight {
+  kind: "frustration" | "error" | "errorSpike";
+  count: number;
+  target?: string;
+  view?: string;
+  message?: string;
+  rate?: number;
+}
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -572,6 +639,11 @@ const getStreamFields = () => {
           "usr_email",
           "usr_id",
           "usr_name",
+          // Frustration + insight fields — queries referencing them are only
+          // built when the stream schema actually has them.
+          "action_frustration_type",
+          "action_target_name",
+          "error_message",
         ]);
 
         // Define priority fields that should appear at the top
@@ -683,6 +755,10 @@ const getSessions = () => {
     whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
   }
 
+  // Window-level aggregates (KPI totals, deltas, insights) run in parallel
+  // with the page query and share its WHERE clause + time range.
+  fetchWindowAggregates(req, whereClause);
+
   // Query 1: Get sessions with all metrics from _rumdata (supports usr_email, usr_id, session_id filters)
   req.query.sql = `
     SELECT
@@ -784,6 +860,7 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
       max(end) as end_time,
       min(user_agent_user_agent_family) as browser,
       min(user_agent_os_family) as os,
+      min(user_agent_device_family) as device_family,
       min(ip) as ip,
       min(source) as source,
       session_id
@@ -809,6 +886,8 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
           sessionState.data.sessions[hit.session_id].end_time = hit.end_time;
           sessionState.data.sessions[hit.session_id].browser = hit.browser;
           sessionState.data.sessions[hit.session_id].os = hit.os;
+          sessionState.data.sessions[hit.session_id].device_family =
+            hit.device_family;
           sessionState.data.sessions[hit.session_id].ip = hit.ip;
           sessionState.data.sessions[hit.session_id].source = hit.source;
           sessionState.data.sessions[hit.session_id].time_spent =
@@ -826,6 +905,149 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
       });
     })
     .finally(() => isLoading.value.pop());
+};
+
+// ── Window aggregates: KPI totals, previous-window deltas, insight clusters ──
+
+const buildAggregateReq = (
+  baseReq: any,
+  sql: string,
+  window?: { startTime: number; endTime: number },
+) => {
+  const clone = JSON.parse(JSON.stringify(baseReq));
+  clone.query.sql = sql;
+  clone.query.from = 0;
+  clone.query.size = 10;
+  delete clone.aggs;
+  if (window) {
+    clone.query.start_time = window.startTime;
+    clone.query.end_time = window.endTime;
+  }
+  return clone;
+};
+
+const runAggregateQuery = (req: any) =>
+  searchService
+    .search(
+      {
+        org_identifier: store.state.selectedOrganization.identifier,
+        query: req,
+        page_type: "logs",
+      },
+      "RUM",
+    )
+    .then((res: any) => res.data?.hits || []);
+
+const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
+  windowTotals.value = null;
+  previousWindowTotals.value = null;
+  frustrationCluster.value = null;
+  errorCluster.value = null;
+
+  const hasFrustrationField = !!schemaMapping.value["action_frustration_type"];
+  const frustratedSessionsExpr = hasFrustrationField
+    ? "COUNT(DISTINCT CASE WHEN type='action' AND action_frustration_type IS NOT NULL THEN session_id END)"
+    : "0";
+  const unhealthyExpr = hasFrustrationField
+    ? "COUNT(DISTINCT CASE WHEN type='error' OR (type='action' AND action_frustration_type IS NOT NULL) THEN session_id END)"
+    : "COUNT(DISTINCT CASE WHEN type='error' THEN session_id END)";
+
+  const summarySql = `
+    SELECT
+      COUNT(DISTINCT session_id) AS total,
+      COUNT(DISTINCT CASE WHEN type='error' THEN session_id END) AS error_sessions,
+      ${frustratedSessionsExpr} AS frustrated_sessions,
+      ${unhealthyExpr} AS unhealthy_sessions
+    FROM "_rumdata"
+    WHERE ${whereClause}`;
+
+  const toTotals = (hit: any): WindowTotals => ({
+    total: hit?.total || 0,
+    errorSessions: hit?.error_sessions || 0,
+    frustratedSessions: hit?.frustrated_sessions || 0,
+    unhealthySessions: hit?.unhealthy_sessions || 0,
+  });
+
+  runAggregateQuery(buildAggregateReq(baseReq, summarySql))
+    .then((hits) => {
+      windowTotals.value = hits.length ? toTotals(hits[0]) : null;
+    })
+    .catch(() => {
+      windowTotals.value = null;
+    });
+
+  const windowLengthUs = baseReq.query.end_time - baseReq.query.start_time;
+  if (windowLengthUs > 0) {
+    runAggregateQuery(
+      buildAggregateReq(baseReq, summarySql, {
+        startTime: baseReq.query.start_time - windowLengthUs,
+        endTime: baseReq.query.start_time,
+      }),
+    )
+      .then((hits) => {
+        previousWindowTotals.value = hits.length ? toTotals(hits[0]) : null;
+      })
+      .catch(() => {
+        previousWindowTotals.value = null;
+      });
+  }
+
+  if (hasFrustrationField && schemaMapping.value["action_target_name"]) {
+    const clusterSql = `
+      SELECT
+        action_target_name AS target,
+        MIN(view_url) AS view,
+        COUNT(DISTINCT session_id) AS sessions_count
+      FROM "_rumdata"
+      WHERE ${whereClause}
+        AND type='action'
+        AND action_frustration_type IS NOT NULL
+        AND action_target_name IS NOT NULL AND action_target_name != ''
+      GROUP BY action_target_name
+      ORDER BY sessions_count DESC
+      LIMIT 1`;
+    runAggregateQuery(buildAggregateReq(baseReq, clusterSql))
+      .then((hits) => {
+        frustrationCluster.value = hits.length
+          ? {
+              kind: "frustration",
+              count: hits[0].sessions_count || 0,
+              target: hits[0].target,
+              view: hits[0].view,
+            }
+          : null;
+      })
+      .catch(() => {
+        frustrationCluster.value = null;
+      });
+  }
+
+  if (schemaMapping.value["error_message"]) {
+    const errorSql = `
+      SELECT
+        error_message AS message,
+        COUNT(DISTINCT session_id) AS sessions_count
+      FROM "_rumdata"
+      WHERE ${whereClause}
+        AND type='error'
+        AND error_message IS NOT NULL AND error_message != ''
+      GROUP BY error_message
+      ORDER BY sessions_count DESC
+      LIMIT 1`;
+    runAggregateQuery(buildAggregateReq(baseReq, errorSql))
+      .then((hits) => {
+        errorCluster.value = hits.length
+          ? {
+              kind: "error",
+              count: hits[0].sessions_count || 0,
+              message: hits[0].message,
+            }
+          : null;
+      })
+      .catch(() => {
+        errorCluster.value = null;
+      });
+  }
 };
 
 const updateDateChange = (date: any) => {
@@ -848,11 +1070,34 @@ const rows = ref<Session[]>([]);
 
 const healthSegment = ref<HealthSegment>("all");
 const typeSegment = ref<TypeSegment>("all");
+const deviceSegment = ref<DeviceSegment>("all");
+
+// Window-level aggregates (no LIMIT) so the KPI strip reflects the true
+// totals, not just the fetched page. Null until the summary query resolves.
+const windowTotals = ref<WindowTotals | null>(null);
+const previousWindowTotals = ref<WindowTotals | null>(null);
+const frustrationCluster = ref<SessionInsight | null>(null);
+const errorCluster = ref<SessionInsight | null>(null);
 
 // A session with ≤1 event or under 10s of activity counts as a bounce; a
 // session whose last replay event is within the last 5 minutes is still live.
 const BOUNCE_MAX_MS = 10_000;
 const ACTIVE_WINDOW_MS = 5 * 60_000;
+
+// Heuristic bucketing of the UA device/os family into the segment values.
+const classifyDevice = (family?: string, os?: string): DeviceSegment => {
+  const f = (family || "").toLowerCase();
+  const o = (os || "").toLowerCase();
+  if (f.includes("tablet") || f.includes("ipad")) return "tablet";
+  if (
+    f.includes("phone") ||
+    f.includes("mobile") ||
+    o === "ios" ||
+    o === "android"
+  )
+    return "mobile";
+  return "desktop";
+};
 
 const enrichedRows = computed(() =>
   rows.value.map((row: any) => ({
@@ -860,6 +1105,7 @@ const enrichedRows = computed(() =>
     is_bounce:
       (row.events ?? 0) <= 1 || (row.time_spent ?? 0) < BOUNCE_MAX_MS,
     is_active: !!row.end_time && Date.now() - row.end_time <= ACTIVE_WINDOW_MS,
+    device_type: classifyDevice(row.device_family, row.os),
   })),
 );
 
@@ -890,6 +1136,12 @@ const sessionsSummary = computed(() => {
       ? durations[mid]
       : (durations[mid - 1] + durations[mid]) / 2;
 
+  const deviceCounts = {
+    desktop: all.filter((row: any) => row.device_type === "desktop").length,
+    mobile: all.filter((row: any) => row.device_type === "mobile").length,
+    tablet: all.filter((row: any) => row.device_type === "tablet").length,
+  };
+
   return {
     total,
     errorSessions,
@@ -899,8 +1151,111 @@ const sessionsSummary = computed(() => {
     engagedSessions: total - bouncedSessions,
     avgDurationMs,
     medianDurationMs,
+    deviceCounts,
   };
 });
+
+// KPI strip metrics — window-accurate totals when the summary query resolved,
+// page-derived fallback otherwise. Duration/bounce stay page-scoped (they need
+// per-session data that only exists for fetched rows).
+const kpiMetrics = computed(() => ({
+  total: windowTotals.value?.total ?? sessionsSummary.value.total,
+  errorSessions:
+    windowTotals.value?.errorSessions ?? sessionsSummary.value.errorSessions,
+  frustratedSessions:
+    windowTotals.value?.frustratedSessions ??
+    sessionsSummary.value.frustratedSessions,
+  bouncedSessions: sessionsSummary.value.bouncedSessions,
+  bounceBase: sessionsSummary.value.total,
+  avgDurationMs: sessionsSummary.value.avgDurationMs,
+  medianDurationMs: sessionsSummary.value.medianDurationMs,
+}));
+
+// Change vs the previous window of the same length. Null when the previous
+// window has no sessions (a delta against nothing reads as noise).
+const kpiDeltas = computed(() => {
+  const current = windowTotals.value;
+  const previous = previousWindowTotals.value;
+  if (!current || !previous || previous.total === 0) return null;
+  return {
+    sessionsPct: ((current.total - previous.total) / previous.total) * 100,
+    errors: current.errorSessions - previous.errorSessions,
+    frustrated: current.frustratedSessions - previous.frustratedSessions,
+  };
+});
+
+// One insight at a time, most actionable first: a frustration cluster beats an
+// error cluster beats a rate spike. Hidden entirely when nothing clears the bar.
+const MIN_CLUSTER_SESSIONS = 3;
+const MIN_SPIKE_ERROR_SESSIONS = 5;
+
+const topInsight = computed<SessionInsight | null>(() => {
+  if (
+    frustrationCluster.value &&
+    frustrationCluster.value.count >= MIN_CLUSTER_SESSIONS
+  )
+    return frustrationCluster.value;
+  if (errorCluster.value && errorCluster.value.count >= MIN_CLUSTER_SESSIONS)
+    return errorCluster.value;
+
+  const current = windowTotals.value;
+  const previous = previousWindowTotals.value;
+  if (
+    current &&
+    previous &&
+    previous.errorSessions > 0 &&
+    current.errorSessions >= MIN_SPIKE_ERROR_SESSIONS &&
+    current.errorSessions >= previous.errorSessions * 2
+  ) {
+    return {
+      kind: "errorSpike",
+      count: current.errorSessions,
+      rate:
+        Math.round((current.errorSessions / previous.errorSessions) * 10) / 10,
+    };
+  }
+  return null;
+});
+
+const applyInsightFilter = (insight: SessionInsight) => {
+  setHealthSegment(insight.kind === "frustration" ? "frustrated" : "errors");
+};
+
+const escapeSqlString = (value: string) => value.replace(/'/g, "''");
+
+// Error cluster CTA: narrow the sessions query to THIS error — the health
+// segment alone would show every error session, not the clustered one.
+const filterSessionsByInsightError = (insight: SessionInsight) => {
+  if (!insight.message) return;
+  const condition = `error_message='${escapeSqlString(insight.message)}'`;
+  const existing = sessionState.data.editorValue.trim();
+  if (!existing.includes(condition)) {
+    sessionState.data.editorValue = existing
+      ? `${existing} AND ${condition}`
+      : condition;
+  }
+  runQuery();
+};
+
+// Jump to Error Tracking pre-filtered to this error, carrying the time range.
+const openInsightInErrorTracking = (insight: SessionInsight) => {
+  const query: any = {
+    org_identifier: store.state.selectedOrganization.identifier,
+  };
+  const date = sessionState.data.datetime;
+  if (date.valueType === "relative" && date.relativeTimePeriod) {
+    query.period = date.relativeTimePeriod;
+  } else {
+    query.from = date.startTime;
+    query.to = date.endTime;
+  }
+  if (insight.message) {
+    query.query = b64EncodeUnicode(
+      `error_message='${escapeSqlString(insight.message)}'`,
+    );
+  }
+  router.push({ name: "ErrorTracking", query });
+};
 
 const tableRows = computed(() =>
   enrichedRows.value.filter((row: any) => {
@@ -918,6 +1273,8 @@ const tableRows = computed(() =>
       return false;
     if (typeSegment.value === "bounced" && !row.is_bounce) return false;
     if (typeSegment.value === "engaged" && row.is_bounce) return false;
+    if (deviceSegment.value !== "all" && row.device_type !== deviceSegment.value)
+      return false;
     return true;
   }),
 );
@@ -943,9 +1300,16 @@ const setTypeSegment = (value: TypeSegment | undefined | null) => {
   updateUrlQueryParams();
 };
 
+const setDeviceSegment = (value: DeviceSegment | undefined | null) => {
+  deviceSegment.value =
+    value && DEVICE_SEGMENTS.includes(value) ? value : "all";
+  updateUrlQueryParams();
+};
+
 const resetSegments = () => {
   healthSegment.value = "all";
   typeSegment.value = "all";
+  deviceSegment.value = "all";
   updateUrlQueryParams();
 };
 
@@ -974,10 +1338,12 @@ const formatSessionDuration = (ms?: number) => {
   return durationFormatter(Math.round(ms / 1000));
 };
 
+// Spine colors match the logs page severity colors (statusParser STATUS_COLORS)
+// so "error red" reads the same across modules.
 const getSessionStatusColor = (row: any) => {
-  if ((row.error_count || 0) > 0) return "var(--o2-status-error-text)";
+  if ((row.error_count || 0) > 0) return "var(--o2-severity-error-color)";
   if ((row.frustration_count || 0) > 0)
-    return "var(--o2-status-warning-text)";
+    return "var(--o2-severity-warning-color)";
   return undefined;
 };
 
@@ -1075,6 +1441,13 @@ function restoreUrlQueryParams() {
   ) {
     typeSegment.value = queryParams.session_type as TypeSegment;
   }
+
+  if (
+    queryParams.device &&
+    DEVICE_SEGMENTS.includes(queryParams.device as DeviceSegment)
+  ) {
+    deviceSegment.value = queryParams.device as DeviceSegment;
+  }
 }
 
 function updateUrlQueryParams() {
@@ -1095,6 +1468,7 @@ function updateUrlQueryParams() {
   if (healthSegment.value !== "all") query["health"] = healthSegment.value;
   if (typeSegment.value !== "all")
     query["session_type"] = typeSegment.value;
+  if (deviceSegment.value !== "all") query["device"] = deviceSegment.value;
 
   query["org_identifier"] = store.state.selectedOrganization.identifier;
   router.push({ query });

@@ -576,6 +576,9 @@
   --o2-status-warning-bg: #402929;
   --o2-status-error-text: #EB938D;
   --o2-status-error-bg: #402929;
+  /* Log-severity colors — aligned with STATUS_COLORS_DARK in statusParser.ts */
+  --o2-severity-error-color: #D95C5C;
+  --o2-severity-warning-color: #D4944A;
   --o2-status-neutral-text: #9DA0A8;
   --o2-status-neutral-bg: #2B2D30;
   --o2-span-kind-client-text: #A1AFFF;

@@ -49,7 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:tabular-nums"
         >· {{ card.rate }}</span>
       </span>
-      <small class="tw:text-[var(--o2-text-caption)]">{{ card.caption }}</small>
+      <small :class="card.captionClass || 'tw:text-[var(--o2-text-caption)]'">{{
+        card.caption
+      }}</small>
     </button>
   </section>
 </template>
@@ -71,8 +73,14 @@ const props = defineProps<{
   errorSessions: number;
   frustratedSessions: number;
   bouncedSessions: number;
+  /** Denominator for the bounce rate (page-scoped total). Defaults to total. */
+  bounceBase?: number;
   avgDurationMs: number;
   medianDurationMs: number;
+  /** Change vs the previous window — null hides the delta line. */
+  sessionsDeltaPct?: number | null;
+  errorsDelta?: number | null;
+  frustratedDelta?: number | null;
   /** Card whose segment filter is currently applied ("" when none). */
   activeCard: string;
 }>();
@@ -92,6 +100,38 @@ const formatMs = (ms: number) => {
   return durationFormatter(Math.round(ms / 1000));
 };
 
+// Bounce rate is computed over the loaded page (needs per-session data),
+// so its denominator can differ from the window-accurate `total`.
+const bounceRate = computed(() => {
+  const base = props.bounceBase ?? props.total;
+  return base > 0
+    ? `${((props.bouncedSessions / base) * 100).toFixed(1)}%`
+    : "0%";
+});
+
+const signed = (value: number, suffix = "") =>
+  `${value > 0 ? "+" : ""}${value.toFixed(suffix === "%" ? 1 : 0)}${suffix}`;
+
+/** Delta caption vs the previous window; null delta → fallback caption. */
+const deltaCaption = (
+  delta: number | null | undefined,
+  fallback: string,
+  suffix = "",
+) => {
+  if (delta === null || delta === undefined || delta === 0)
+    return { caption: fallback, captionClass: "" };
+  return {
+    caption: `${signed(delta, suffix)} ${t("rum.vsPreviousPeriod")}`,
+    // More sessions is neutral; more errors/frustration is bad, fewer is good.
+    captionClass:
+      suffix === "%"
+        ? "tw:text-[var(--o2-text-caption)]"
+        : delta > 0
+          ? "tw:text-[var(--o2-status-error-text)]"
+          : "tw:text-[var(--o2-status-success-text)]",
+  };
+};
+
 const cards = computed(() => [
   {
     key: "sessions" as const,
@@ -99,7 +139,7 @@ const cards = computed(() => [
     value: props.total.toLocaleString(),
     valueClass: "tw:text-[var(--o2-text-heading)]",
     rate: "",
-    caption: t("rum.inTimeRange"),
+    ...deltaCaption(props.sessionsDeltaPct, t("rum.inTimeRange"), "%"),
     selectable: true,
   },
   {
@@ -108,10 +148,10 @@ const cards = computed(() => [
     value: props.errorSessions.toLocaleString(),
     valueClass:
       props.errorSessions > 0
-        ? "tw:text-[var(--o2-status-error-text)]"
+        ? "tw:text-[var(--o2-severity-error-color)]"
         : "tw:text-[var(--o2-text-heading)]",
     rate: rate(props.errorSessions),
-    caption: t("rum.sessionsWithErrors"),
+    ...deltaCaption(props.errorsDelta, t("rum.sessionsWithErrors")),
     selectable: true,
   },
   {
@@ -120,10 +160,10 @@ const cards = computed(() => [
     value: props.frustratedSessions.toLocaleString(),
     valueClass:
       props.frustratedSessions > 0
-        ? "tw:text-[var(--o2-status-warning-text)]"
+        ? "tw:text-[var(--o2-severity-warning-color)]"
         : "tw:text-[var(--o2-text-heading)]",
     rate: rate(props.frustratedSessions),
-    caption: t("rum.rageDeadClicks"),
+    ...deltaCaption(props.frustratedDelta, t("rum.rageDeadClicks")),
     selectable: true,
   },
   {
@@ -133,18 +173,20 @@ const cards = computed(() => [
     valueClass: "tw:text-[var(--o2-text-heading)]",
     rate: "",
     caption: `${t("rum.median")} ${formatMs(props.medianDurationMs)}`,
+    captionClass: "",
     selectable: false,
   },
   {
     key: "bounced" as const,
     label: t("rum.bounceRate"),
-    value: props.total > 0 ? rate(props.bouncedSessions) : "0%",
+    value: bounceRate.value,
     valueClass: "tw:text-[var(--o2-text-heading)]",
     rate: "",
     caption: t("rum.ofTotal", {
       count: props.bouncedSessions,
-      total: props.total,
+      total: props.bounceBase ?? props.total,
     }),
+    captionClass: "",
     selectable: true,
   },
 ]);
