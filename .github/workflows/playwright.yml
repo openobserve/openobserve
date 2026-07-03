@@ -69,9 +69,10 @@ jobs:
         run: |
           # Files that can never affect the Playwright UI suite. If EVERY changed file
           # matches one of these, the run is auto-bypassed (has_changes=false) — no 'e2e'
-          # label needed and the merge is allowed. Deliberately NOT bypassed:
-          # .github/workflows/** (workflow changes must be tested), source, config, *.txt.
-          IGNORE_RE='(\.mdx?$|^docs/|\.(png|jpe?g|gif|svg|ico|webp|bmp|pdf)$|^LICENSE|^NOTICE|^CODEOWNERS$|^\.github/CODEOWNERS$|^\.github/ISSUE_TEMPLATE/|^\.github/PULL_REQUEST_TEMPLATE|^\.github/FUNDING|^\.gitignore$|^\.gitattributes$|^\.editorconfig$|^\.vscode/|^\.idea/)'
+          # label needed and the merge is allowed. Deliberately NOT bypassed (these still
+          # trigger the suite): .github/workflows/** — INCLUDING this playwright.yml — plus
+          # source, web/, package/lock files, lint/prettier/tsconfig, and *.txt (may be fixtures).
+          IGNORE_RE='(\.(md|mdx|markdown|rst|adoc)$|^docs/|\.(png|jpe?g|gif|svg|ico|webp|bmp|pdf|mp4|mov|webm)$|^LICENSE(\.|-|$)|^NOTICE(\.|-|$)|^AUTHORS(\.|$)|^CONTRIBUTORS(\.|$)|^CHANGELOG(\.|-|$)|^\.mailmap$|^CODEOWNERS$|^\.github/CODEOWNERS$|^\.github/ISSUE_TEMPLATE/|^\.github/PULL_REQUEST_TEMPLATE|^\.github/FUNDING|^\.github/dependabot\.ya?ml$|^\.github/renovate\.json$|^\.gitignore$|^\.gitattributes$|^\.editorconfig$|\.gitkeep$|^\.husky/|^\.vscode/|^\.idea/)'
           BASE="${{ github.base_ref || 'main' }}"
           # Best-effort ensure the base ref exists locally (PRs targeting a non-main base may
           # not have it as a remote-tracking ref yet). The empty/failure fallback below is safe.
