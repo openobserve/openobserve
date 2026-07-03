@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div>
                   <div
-                    class="tw:flex tw:flex-row tw:items-center tw:gap-x-2 tw:mb-4 tw:w-full tw:min-w-0"
+                    class="tw:flex tw:flex-row tw:items-start tw:gap-x-2 tw:mb-4 tw:w-full tw:min-w-0"
                     v-for="(filter, index) in variableData.query_data.filter"
                     :key="index"
                   >
@@ -267,15 +267,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       placeholder="Enter Value"
                       :data-test="`dashboard-query-values-filter-value-selector-${index}`"
                     />
-                    <OButton
-                      variant="ghost"
-                      size="icon"
-                      class="tw:shrink-0"
-                      @click="removeFilter(index)"
-                      :data-test="`dashboard-variable-adhoc-close-${index}`"
-                      icon-left="close"
-                    >
-                    </OButton>
+                    <!-- Fixed input-height wrapper keeps the delete button
+                         centered on the input row while the row is items-start
+                         (so per-field validation errors hang below without
+                         nudging the inputs/button out of alignment). -->
+                    <div class="tw:flex tw:items-center tw:h-[2.125rem] tw:shrink-0">
+                      <OButton
+                        variant="ghost"
+                        size="icon"
+                        @click="removeFilter(index)"
+                        :data-test="`dashboard-variable-adhoc-close-${index}`"
+                        icon-left="close"
+                      >
+                      </OButton>
+                    </div>
                   </div>
                 </div>
                 <div>
