@@ -984,8 +984,10 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
-        await getOrgMembers();
-        updateUserActions();
+        // No manual refetch here: AddUser's create/update mutations already
+        // invalidate ['users', orgId], which refetches the list and re-runs
+        // updateUserActions() via the usersQuery.data watch. Refetching again
+        // would just duplicate that request.
         if (operationType == "created") {
           toast({
             message: "User added successfully.",

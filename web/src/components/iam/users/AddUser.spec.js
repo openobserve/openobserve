@@ -272,6 +272,8 @@ describe("AddUser Component", () => {
     if (wrapper && typeof wrapper.unmount === "function") {
       wrapper.unmount();
     }
+    // Clear the shared query cache so per-user roles don't leak between tests.
+    testQueryClient.clear();
     vi.clearAllMocks();
   });
 

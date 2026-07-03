@@ -303,7 +303,7 @@ export default defineComponent({
       createUserMutation,
       updateUserMutation,
       updateExistingUserMutation,
-      ensureAllUserRoles,
+      ensureUserRoles,
     } = useUsers();
     const formData: any = ref(defaultValue());
     const existingUser = ref(true);
@@ -374,27 +374,16 @@ export default defineComponent({
           password: "",
         };
         if (config.isEnterprise == "true" || config.isCloud == true) {
-          const orgId = store.state.selectedOrganization.identifier;
-          // Cache-first: the users list already fetched every user's roles in a
-          // single batched request. Reuse that cached map (keyed by raw email)
-          // instead of firing a per-user API call. If the map is fresh, no
-          // request is made; if it's stale/missing, ensureAllUserRoles refetches
-          // it once. Only when this specific user isn't present in the map do we
-          // fall back to the single getUserRoles call.
+          // Per-user, cache-first: each user's roles has its own cache key
+          // (['user-roles', orgId, email]). ensureUserRoles first seeds that
+          // entry from the list's batched roles map, so if the list already
+          // loaded this user NO request is made; otherwise it fires the single
+          // getUserRoles API once and caches it under this user's key. Reopening
+          // the same user's edit reuses it.
           const lookupEmail = newVal.rawEmail || newVal.email;
-          ensureAllUserRoles()
-            .then((rolesMap: Record<string, any>) => {
-              const cached =
-                rolesMap?.[lookupEmail] ?? rolesMap?.[newVal.email];
-              if (cached !== undefined) {
-                formData.value.custom_role = cached;
-                return;
-              }
-              return userServiece
-                .getUserRoles(orgId, lookupEmail)
-                .then((response: any) => {
-                  formData.value.custom_role = response.data;
-                });
+          ensureUserRoles(lookupEmail)
+            .then((roles: string[]) => {
+              formData.value.custom_role = roles;
             })
             .catch((error: any) => {
               console.error("Error fetching user roles:", error);

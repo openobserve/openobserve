@@ -295,6 +295,7 @@ describe("User Component", () => {
 
   afterEach(() => {
     if (wrapper && typeof wrapper.unmount === "function") wrapper.unmount();
+    testQueryClient.clear();
     vi.useRealTimers();
   });
 

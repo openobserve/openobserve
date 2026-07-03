@@ -27,15 +27,30 @@ while migrating.
 > `organizationsService.update_member_role` (a different domain/endpoint, not the
 > users API), so it was left unchanged.
 >
-> **Cache-first roles (shared list ↔ edit):** the org roles map is cached under
-> `['users', orgId, 'roles']` via `ensureAllUserRoles()` (uses
-> `queryClient.ensureQueryData` with a 5-min `staleTime`). The **list** fills this
-> cache with one batched `getAllUserRoles` call; the **edit dialog** then reuses
-> the same entry to populate `custom_role` with **no extra request** — it only
-> hits the API (`getAllUserRoles`, or a single-user `getUserRoles` fallback if the
-> user isn't in the map) when the cache is missing or stale. Because
-> `invalidateUsers()` matches by prefix, any user mutation also invalidates this
-> roles entry, so it refetches after an edit.
+> **Roles caches — two granularities, each on its own independent key:** roles are
+> a separate resource from the users list, and the two roles APIs have different
+> granularity, so each gets its own key namespace (none nested under
+> `['users', orgId]`, so `invalidateUsers()` never touches them):
+> - **Batched** (`getAllUserRoles`, the LIST) → `['user-roles-all', orgId]` via
+>   `ensureAllUserRoles()`. One call fills the whole map.
+> - **Per-user** (`getUserRoles`, the EDIT dialog) → `['user-roles', orgId, email]`
+>   via `ensureUserRoles(email)` — **each user gets its own key**. Before fetching,
+>   it **seeds** that entry from the batched map (inheriting its fetch age), so if
+>   the list already loaded this user's roles **no per-user request is made**; only
+>   a genuine miss or a stale entry fires the single `getUserRoles` call. Reopening
+>   the same user's edit reuses the entry.
+>
+> Invalidation is scoped precisely:
+> - `invalidateUsers()` → **only** the users list.
+> - `invalidateUserRoles(email?)` → the batched map, plus either that one user's
+>   per-user entry (when an email is given) or all per-user entries.
+> - Role-changing mutations (create / update / updateExisting) invalidate the list
+>   **and** roles (update/updateExisting pass the specific email); delete /
+>   bulk-delete invalidate **only** the list.
+>
+> All roles caches use a 5-min `staleTime`. Result: opening an edit dialog fires
+> **no** roles API when the list already has the data, and unrelated user
+> operations (name edit, delete) no longer disturb the roles caches.
 
 ---
 

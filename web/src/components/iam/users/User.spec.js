@@ -165,6 +165,7 @@ describe("User Component", () => {
   });
 
   afterEach(() => {
+    testQueryClient.clear();
     vi.clearAllMocks();
   });
 

@@ -27,7 +27,18 @@ import config from "@/aws-exports";
 export const usersKeys = {
   all: (orgId: string) => ["users", orgId] as const,
   detail: (orgId: string, email: string) => ["users", orgId, email] as const,
-  roles: (orgId: string) => ["users", orgId, "roles"] as const,
+  // Roles caches live under their OWN top-level namespaces (not nested under
+  // ['users', orgId]) so invalidating the users list never wipes them.
+  //
+  // Two distinct resources at two granularities:
+  //  - rolesAll: the batched getAllUserRoles map, used by the LIST.
+  //  - userRoles: one user's roles from the per-user getUserRoles API, used by
+  //    the EDIT dialog — each user gets its OWN key.
+  // The namespaces differ ("user-roles-all" vs "user-roles") so they do not
+  // prefix-collide with each other.
+  rolesAll: (orgId: string) => ["user-roles-all", orgId] as const,
+  userRoles: (orgId: string, email: string) =>
+    ["user-roles", orgId, email] as const,
 };
 
 /**
@@ -72,19 +83,28 @@ const useUsers = () => {
     enabled: computed(() => !!orgId.value),
   });
 
+  // Invalidates ONLY the users list (['users', orgId]) — not the roles caches.
   const invalidateUsers = () =>
-    // Prefix match — invalidates ['users', orgId] AND ['users', orgId, 'roles'].
     queryClient.invalidateQueries({ queryKey: usersKeys.all(orgId.value) });
 
-  // Roles for every user in the org, cached under ['users', orgId, 'roles'] and
-  // shared by BOTH the list and the edit form. `ensureQueryData` returns the
-  // cached map when it is still fresh (within staleTime) and only fires the
-  // batched `getAllUserRoles` API when the cache is missing or stale. This is
-  // the "use the cache directly, refetch only when stale" path: the list fills
-  // this cache, so opening the edit form reuses it with no extra request.
+  // Invalidates the roles caches after a mutation that changes role assignments.
+  // Always refreshes the batched map; if an email is given, only that user's
+  // per-user entry is invalidated, otherwise every per-user entry is.
+  const invalidateUserRoles = (email?: string) => {
+    queryClient.invalidateQueries({ queryKey: usersKeys.rolesAll(orgId.value) });
+    queryClient.invalidateQueries({
+      queryKey: email
+        ? usersKeys.userRoles(orgId.value, email)
+        : ["user-roles", orgId.value], // prefix → all per-user entries
+    });
+  };
+
+  // Batched roles map for the LIST — one getAllUserRoles call, cached under
+  // ['user-roles-all', orgId]. Served from cache while fresh; only refetched
+  // when missing or stale.
   const ensureAllUserRoles = (): Promise<Record<string, string[]>> =>
     queryClient.ensureQueryData({
-      queryKey: usersKeys.roles(orgId.value),
+      queryKey: usersKeys.rolesAll(orgId.value),
       queryFn: async () => {
         const res = await usersService.getAllUserRoles(orgId.value);
         return (res?.data ?? {}) as Record<string, string[]>;
@@ -92,16 +112,50 @@ const useUsers = () => {
       staleTime: 1000 * 60 * 5,
     });
 
+  // One user's roles for the EDIT dialog — its OWN key ['user-roles', orgId,
+  // email]. Reopening the same user reuses this entry. It is first seeded from
+  // the batched list map (inheriting that fetch's age), so when the list already
+  // loaded this user's roles NO per-user API call is made; only a genuine miss
+  // or a stale entry fires the single-user getUserRoles API.
+  const ensureUserRoles = (email: string): Promise<string[]> => {
+    const key = usersKeys.userRoles(orgId.value, email);
+    if (queryClient.getQueryData(key) === undefined) {
+      const batch = queryClient.getQueryState(usersKeys.rolesAll(orgId.value));
+      const seeded = batch?.data
+        ? (batch.data as Record<string, string[]>)[email]
+        : undefined;
+      if (seeded !== undefined) {
+        queryClient.setQueryData(key, seeded, {
+          updatedAt: batch?.dataUpdatedAt,
+        });
+      }
+    }
+    return queryClient.ensureQueryData({
+      queryKey: key,
+      queryFn: async () => {
+        const res = await usersService.getUserRoles(orgId.value, email);
+        return (res?.data ?? []) as string[];
+      },
+      staleTime: 1000 * 60 * 5,
+    });
+  };
+
   // ---- Mutations: each invalidates the list on success so the table refetches ----
   //
   // Create/update accept an optional `org` because the add-user dialog can
   // target a different org ("other"/encoded) than the currently selected one.
   // We always invalidate the *current* org's list — that's the table on screen.
 
+  // Role-changing mutations invalidate BOTH the list and the roles cache so the
+  // updated roles are reflected. Delete/bulk-delete only touch the list.
+
   const createUserMutation = useMutation({
     mutationFn: ({ payload, org }: { payload: any; org?: string }) =>
       usersService.create(payload, org ?? orgId.value),
-    onSuccess: () => invalidateUsers(),
+    onSuccess: () => {
+      invalidateUsers();
+      invalidateUserRoles();
+    },
   });
 
   const updateUserMutation = useMutation({
@@ -114,7 +168,10 @@ const useUsers = () => {
       payload: any;
       org?: string;
     }) => usersService.update(payload, org ?? orgId.value, email),
-    onSuccess: () => invalidateUsers(),
+    onSuccess: (_data, variables) => {
+      invalidateUsers();
+      invalidateUserRoles(variables.email);
+    },
   });
 
   // Adding an already-existing platform user to this org (role-only payload).
@@ -128,7 +185,10 @@ const useUsers = () => {
       payload: any;
       org?: string;
     }) => usersService.updateexistinguser(payload, org ?? orgId.value, email),
-    onSuccess: () => invalidateUsers(),
+    onSuccess: (_data, variables) => {
+      invalidateUsers();
+      invalidateUserRoles(variables.email);
+    },
   });
 
   const deleteUserMutation = useMutation({
@@ -147,7 +207,9 @@ const useUsers = () => {
     orgId,
     usersQuery,
     invalidateUsers,
+    invalidateUserRoles,
     ensureAllUserRoles,
+    ensureUserRoles,
     createUserMutation,
     updateUserMutation,
     updateExistingUserMutation,
