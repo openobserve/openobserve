@@ -54,14 +54,10 @@ jobs:
     name: check_main_changed
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      actions: read
+      actions: read  # for `gh run list` (last run's head_sha)
     outputs:
       should_run: ${{ steps.decide.outputs.should_run }}
     steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 1
       - id: decide
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -72,8 +68,8 @@ jobs:
             echo "::notice::Manual dispatch — running regardless of main changes."
             exit 0
           fi
-          # Scheduled runs execute on main, so HEAD is main's tip.
-          CURRENT_SHA=$(git rev-parse HEAD)
+          # On a scheduled run github.sha is main's tip, so no checkout is needed.
+          CURRENT_SHA="${{ github.sha }}"
           # head_sha of the most recent completed previous run of THIS workflow on
           # main, excluding the current run. Limit 50 so the current run is always in
           # the window even under bursty history. On any failure LAST_SHA stays empty
