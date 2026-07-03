@@ -1,9 +1,10 @@
 name: Playwright UI Tests
 
 on:
-  push:
-    branches:
-      - "main"
+  # No `push: main` trigger: the merge_group (merge-queue) run already builds and
+  # tests the exact commit that lands on main, so a post-merge push run would be a
+  # full-suite duplicate. The merge_group run is now the trusted main-ward build and
+  # also warms the shared Rust cache (see save-if on the rust-cache step below).
   pull_request:
     branches:
       - "**"
@@ -114,7 +115,9 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: playwright-release-ci
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          # Save the shared cache on merge_group runs (the main-ward build now that
+          # push:main is gone); keep the main-ref check for any non-PR fallback.
+          save-if: ${{ github.event_name == 'merge_group' || github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: |
