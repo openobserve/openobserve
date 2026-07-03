@@ -28,6 +28,11 @@ pub static BASE_TIME: Lazy<DateTime<Utc>> =
 pub static DAY_MICRO_SECS: i64 = 24 * 3600 * 1_000_000;
 pub static HOUR_MICRO_SECS: i64 = 3600 * 1_000_000;
 
+pub enum HourFormat {
+    Zero,
+    Real,
+}
+
 // check format: 1s, 1m, 1h, 1d, 1w, 1y, 1h10m30s
 static TIME_UNITS: [(char, u64); 7] = [
     ('!', 1), // ms
@@ -68,25 +73,17 @@ pub fn second_micros(n: i64) -> i64 {
 }
 
 #[inline(always)]
-pub fn get_ymdh_from_micros(n: i64) -> String {
+pub fn get_ymdh_from_micros(n: i64, hour_format: HourFormat) -> String {
     let n = if n > 0 {
         n
     } else {
         Utc::now().timestamp_micros()
     };
     let t = Utc.timestamp_nanos(n * 1000);
-    t.format("%Y/%m/%d/%H").to_string()
-}
-
-#[inline(always)]
-pub fn get_ymdh0_from_micros(n: i64) -> String {
-    let n = if n > 0 {
-        n
-    } else {
-        Utc::now().timestamp_micros()
-    };
-    let t = Utc.timestamp_nanos(n * 1000);
-    t.format("%Y/%m/%d/00").to_string()
+    match hour_format {
+        HourFormat::Zero => t.format("%Y/%m/%d/00").to_string(),
+        HourFormat::Real => t.format("%Y/%m/%d/%H").to_string(),
+    }
 }
 
 #[inline(always)]
@@ -546,14 +543,26 @@ mod tests {
 
     #[test]
     fn test_get_ymdhms_from_micros() {
-        assert_eq!(get_ymdh_from_micros(1609459200000000), "2021/01/01/00");
-        assert_eq!(get_ymdh_from_micros(1744077663427000), "2025/04/08/02");
+        assert_eq!(
+            get_ymdh_from_micros(1609459200000000, HourFormat::Real),
+            "2021/01/01/00"
+        );
+        assert_eq!(
+            get_ymdh_from_micros(1744077663427000, HourFormat::Real),
+            "2025/04/08/02"
+        );
 
-        assert_eq!(get_ymdh0_from_micros(1609459200000000), "2021/01/01/00");
-        assert_eq!(get_ymdh0_from_micros(1744077663427000), "2025/04/08/00");
+        assert_eq!(
+            get_ymdh_from_micros(1609459200000000, HourFormat::Zero),
+            "2021/01/01/00"
+        );
+        assert_eq!(
+            get_ymdh_from_micros(1744077663427000, HourFormat::Zero),
+            "2025/04/08/00"
+        );
 
         // Test with input 0 (uses current time, so we can't test the exact value)
-        let result = get_ymdh_from_micros(0);
+        let result = get_ymdh_from_micros(0, HourFormat::Real);
         assert!(!result.is_empty());
     }
 
