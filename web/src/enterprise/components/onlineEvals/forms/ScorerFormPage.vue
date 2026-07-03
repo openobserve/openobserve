@@ -919,7 +919,8 @@ function buildAuthPayload(src: ScorerForm): Record<string, any> | null {
   }
   if (kind === "basic") {
     const username = src.authBasicUsername.trim();
-    const password = src.authBasicPassword;
+    // Trim parity with the pre-migration `v-model.trim` on the password field.
+    const password = src.authBasicPassword.trim();
     if (!username || !password) return null;
     return { type: "basic", username, password };
   }
@@ -934,7 +935,9 @@ function buildAuthPayload(src: ScorerForm): Record<string, any> | null {
 
 function buildRemoteParams(src: ScorerForm): Record<string, any> {
   const params: Record<string, any> = {
-    endpoint: src.remoteEndpoint,
+    // Trim parity with the pre-migration `v-model.trim` (stray whitespace around
+    // a pasted URL should never reach the payload).
+    endpoint: src.remoteEndpoint.trim(),
     http_method: src.httpMethod || DEFAULT_HTTP_METHOD,
     timeout_ms: Number(src.timeoutMs) || DEFAULT_TIMEOUT_MS,
   };

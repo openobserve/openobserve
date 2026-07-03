@@ -3,17 +3,17 @@
 //
 // Behavior tests for ScoreConfigDialog after the OForm + Zod migration
 // (online-evals-migration.md row 68). At least one test mounts the REAL <OForm>
-// and proves the dataType-discriminated schema gates an empty/invalid submit
-// (name required + numeric min<max), and that the save() guard blocks an empty
-// categorical config with a toast (the tag-input has no inline error slot), so
-// an unwired `:schema` would be caught. Also verifies the kept dirty affordance.
+// and proves the schema gates an empty/invalid submit (name required + the
+// create-only slug pattern), while — matching origin/main pre-migration — a
+// min≥max numeric range and an empty categorical config both still save
+// (`categories: null`), so an unwired `:schema` would be caught. Also verifies
+// the kept dirty affordance.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import ScoreConfigDialog from "./ScoreConfigDialog.vue";
 import onlineEvalsService from "@/services/online-evals.service";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import i18n from "@/locales";
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
@@ -79,6 +79,34 @@ describe("ScoreConfigDialog", () => {
     expect(onlineEvalsService.scoreConfigs.create).not.toHaveBeenCalled();
   });
 
+  it("blocks submit when the name has invalid characters (must be a lowercase slug)", async () => {
+    wrapper = createWrapper();
+    // e.g. "<test>" — not a lowercase-letters/numbers/underscores identifier.
+    setField(wrapper, "name", "<test>");
+    await submit(wrapper);
+    expect(oform(wrapper).form.state.isValid).toBe(false);
+    expect(onlineEvalsService.scoreConfigs.create).not.toHaveBeenCalled();
+  });
+
+  it("does NOT enforce the name pattern in edit mode (name is immutable)", async () => {
+    wrapper = createWrapper({
+      mode: "edit",
+      row: {
+        id: "sc1",
+        entityId: "sc1",
+        // A legacy name that predates the slug rule must stay editable.
+        name: "Legacy Name",
+        version: 1,
+        dataType: "numeric",
+        numericRange: { min: 0, max: 1 },
+      },
+    });
+    setField(wrapper, "description", "updated");
+    await submit(wrapper);
+    expect(oform(wrapper).form.state.isValid).toBe(true);
+    expect(onlineEvalsService.scoreConfigs.update).toHaveBeenCalledTimes(1);
+  });
+
   it("creates a numeric score config when the schema passes", async () => {
     wrapper = createWrapper();
     setField(wrapper, "name", "faithfulness");
@@ -94,27 +122,49 @@ describe("ScoreConfigDialog", () => {
     expect(payload.numericRange).toEqual({ min: 0, max: 1 });
   });
 
-  it("rejects a numeric range where min >= max", async () => {
+  it("allows a numeric range where min >= max (no ordering rule — pre-migration parity)", async () => {
     wrapper = createWrapper();
     setField(wrapper, "name", "faithfulness");
     setField(wrapper, "min", 5);
     setField(wrapper, "max", 1);
+    // main never validated min<max, so this saves as-is.
+    await submit(wrapper);
+    expect(oform(wrapper).form.state.isValid).toBe(true);
+    expect(onlineEvalsService.scoreConfigs.create).toHaveBeenCalledTimes(1);
+    const payload = (onlineEvalsService.scoreConfigs.create as any).mock.calls[0][1];
+    expect(payload.numericRange).toEqual({ min: 5, max: 1 });
+  });
+
+  it("blocks submit when min or max is cleared (a blank number is not allowed)", async () => {
+    wrapper = createWrapper();
+    setField(wrapper, "name", "faithfulness");
+    // Clear the real min input → stored value becomes "" (not 0).
+    await wrapper.find('[data-test="score-config-min-input"] input').setValue("");
+    await flushPromises();
+    await submit(wrapper);
+    expect(oform(wrapper).form.state.isValid).toBe(false);
+    expect(onlineEvalsService.scoreConfigs.create).not.toHaveBeenCalled();
+
+    // Now clear max instead (min valid) → still blocked.
+    await wrapper.find('[data-test="score-config-min-input"] input').setValue("0");
+    await wrapper.find('[data-test="score-config-max-input"] input').setValue("");
+    await flushPromises();
     await submit(wrapper);
     expect(oform(wrapper).form.state.isValid).toBe(false);
     expect(onlineEvalsService.scoreConfigs.create).not.toHaveBeenCalled();
   });
 
-  it("blocks an empty categorical config with a toast (guard, no save)", async () => {
+  it("allows an empty categorical config (no ≥1-category guard — pre-migration parity)", async () => {
     wrapper = createWrapper();
     setField(wrapper, "name", "verdict");
     setField(wrapper, "dataType", "categorical");
-    // categories empty → schema PASSES, but the save() guard toasts + blocks.
+    // categories empty → pre-migration sent `categories: null` and saved fine.
     await submit(wrapper);
     expect(oform(wrapper).form.state.isValid).toBe(true);
-    expect(onlineEvalsService.scoreConfigs.create).not.toHaveBeenCalled();
-    expect(toast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "error", message: "Add at least one category" }),
-    );
+    expect(onlineEvalsService.scoreConfigs.create).toHaveBeenCalledTimes(1);
+    const payload = (onlineEvalsService.scoreConfigs.create as any).mock.calls[0][1];
+    expect(payload.dataType).toBe("categorical");
+    expect(payload.categories).toBeNull();
   });
 
   it("creates a categorical config once categories are provided", async () => {

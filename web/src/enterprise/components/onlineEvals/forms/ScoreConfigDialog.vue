@@ -399,7 +399,7 @@ const newCategory = ref("");
 
 // Co-located Zod schema (factory keeps messages i18n-driven). The drawer
 // unmounts/remounts per open, so building it once is safe.
-const scoreConfigSchema = makeScoreConfigSchema(t);
+const scoreConfigSchema = makeScoreConfigSchema(t, props.mode);
 
 // OWNER pattern (Rule ③): this component owns <OForm>, so it creates the form
 // with useOForm and reads it reactively via form.useStore — a SINGLE source of
@@ -554,21 +554,13 @@ function buildHealthyThreshold(v: ScoreConfigForm) {
 }
 
 // @submit handler — OForm only calls this once the schema passes (name required
-// + the dataType-discriminated min<max rule). Categories are guarded separately
-// below (toast), since the bespoke tag-input has no inline error slot. The
-// handler builds the payload from the validated `value` ONLY (no working-mirror
-// read). OForm awaits this → the Save spinner spans the save (no manual `isSaving`).
+// + the create-only slug pattern; matching main, there is NO min<max ordering
+// rule). A categorical config with zero categories is also allowed (pre-migration
+// behavior: buildCategories() just sends `categories: null`). The handler builds
+// the payload from the validated `value` ONLY (no working-mirror read). OForm
+// awaits this → the Save spinner spans the save (no manual `isSaving`).
 async function save(value: ScoreConfigForm) {
   if (!props.orgId) return;
-  // Categories are validated here, not in the schema: surface the empty case as
-  // a toast since the tag-input renders no inline error.
-  if (value.dataType === "categorical" && value.categories.length === 0) {
-    showError(
-      new Error(t("onlineEvals.scoreConfig.validation.categoryRequired")),
-      t("onlineEvals.scoreConfig.saveError"),
-    );
-    return;
-  }
   try {
     const basePayload: Record<string, any> = {
       name: value.name.trim(),

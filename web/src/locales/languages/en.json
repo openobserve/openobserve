@@ -5280,9 +5280,10 @@
       "thresholdEmptyHint": "Leaving this empty means this dimension won't contribute to quality status signals across the product. Scores will still be recorded but won't trigger issue indicators.",
       "saveError": "Failed to save score config",
       "validation": {
-        "nameRequired": "Score config name is required",
-        "minMaxOrder": "Max must be greater than min",
-        "categoryRequired": "Add at least one category"
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
       },
       "empty": {
         "title": "No Score Configs Yet",
