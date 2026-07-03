@@ -66,6 +66,7 @@
                 search-regex="(?:{([^}])(?:{.})*$|([a-zA-Z-_]+)$)"
                 label="Select Series"
                 label-position="inside"
+                required
                 :value-replace-fn="selectColorBySeriesOption"
                 :data-test="`dashboard-addpanel-config-color-by-series-series-select-${index}`"
               />

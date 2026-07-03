@@ -2461,7 +2461,7 @@
     "selectLogsMode": "Select Logs Mode:",
     "enterCustomQuery": "Custom SQL Query * :",
     "sqlQueryRequired": "SQL query is required",
-    "enterUrl": "Enter URL:",
+    "enterUrl": "Enter URL * :",
     "invalidUrl": "Invalid URL",
     "selectFolderDrilldown": "Select Folder * :",
     "noFoldersAvailable": "No folders available",
