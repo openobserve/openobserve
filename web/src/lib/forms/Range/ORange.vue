@@ -14,6 +14,12 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
+// Strip tabindex from the wrapper so it isn't an extra tab-stop before the thumbs.
+const wrapperAttrs = computed(() => {
+  const { tabindex, ...rest } = $attrs;
+  return rest;
+});
+
 const props = withDefaults(defineProps<RangeProps>(), {
   min: 0,
   max: 100,
@@ -386,7 +392,7 @@ function onHorizCancel() {
 
 <template>
   <div
-    v-bind="$attrs"
+    v-bind="wrapperAttrs"
     :class="
       vertical
         ? 'tw:flex tw:flex-row tw:h-full'

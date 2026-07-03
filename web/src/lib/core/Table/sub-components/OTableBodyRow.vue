@@ -134,6 +134,7 @@ function onDblclick(event: MouseEvent) {
 // by isHovered so only the currently hovered row responds.
 // Pages just need data-row-action="edit|delete|pause" on their action buttons.
 const isHovered = ref(false);
+const isFocused = ref(false);
 
 const ROW_ACTION_KEYS: Record<string, string> = {
   e: "edit",
@@ -146,19 +147,24 @@ const ROW_ACTION_KEYS: Record<string, string> = {
 };
 
 const handleKeydown = (e: KeyboardEvent) => {
-  if (!isHovered.value || isInputFocused()) return;
+  if ((!isHovered.value && !isFocused.value) || isInputFocused()) return;
+  // One shared window listener per row — stop the same event cascading through siblings.
+  if ((e as any)._o2RowNavHandled) return;
+  (e as any)._o2RowNavHandled = true;
 
-  // Arrow up/down — move hover focus to the adjacent row
+  // Arrow up/down — move focus to the adjacent row
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
     const tr = rowRef.value?.closest("tr");
     if (!tr) return;
-    const sibling = e.key === "ArrowDown"
-      ? tr.nextElementSibling
-      : tr.previousElementSibling;
+    let sibling = e.key === "ArrowDown" ? tr.nextElementSibling : tr.previousElementSibling;
+    while (sibling && !sibling.matches("tr[data-test^='o2-table-row-']")) {
+      sibling = e.key === "ArrowDown" ? sibling.nextElementSibling : sibling.previousElementSibling;
+    }
     if (sibling instanceof HTMLElement) {
       e.preventDefault();
-      sibling.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
-      sibling.focus();
+      isHovered.value = false;
+      if (sibling.hasAttribute("tabindex")) sibling.focus();
+      else sibling.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
     }
     return;
   }
@@ -194,17 +200,27 @@ function onRowMouseleave() {
   isHovered.value = false;
   emit("row-mouseleave", props.row.original);
 }
+
+// focus/blur don't bubble — fires for the <tr> only, not inner action buttons.
+function onRowFocus() {
+  isFocused.value = true;
+}
+function onRowBlur() {
+  isFocused.value = false;
+}
 </script>
 
 <template>
   <tr
     ref="rowRef"
     :data-test="`o2-table-row-${row.index}`"
+    :tabindex="clickable ? 0 : undefined"
     :class="[
       'tw:group/row',
       'tw:transition-colors tw:duration-150',
       clickable ? 'tw:cursor-pointer' : '',
       'tw:hover:bg-table-row-hover-bg',
+      clickable ? 'tw:focus:outline-none tw:focus-visible:bg-table-row-hover-bg' : '',
       isRowSelected
         ? 'tw:bg-table-row-selected-bg'
         : '',
@@ -218,6 +234,8 @@ function onRowMouseleave() {
     @dblclick="onDblclick"
     @mouseenter="onRowMouseenter"
     @mouseleave="onRowMouseleave"
+    @focus="onRowFocus"
+    @blur="onRowBlur"
   >
     <!-- Status bar color indicator -->
     <td
