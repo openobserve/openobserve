@@ -138,15 +138,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- D5: Warning for restricted chart types with multiple queries.
              Outlined soft-background chip (warning-soft variant + ring),
              height-aligned (h-8) with the toolbar's size="sm" buttons. -->
-        <OBadge
+        <OTag
           v-if="multiQueryWarning"
-          variant="warning-soft"
-          size="sm"
-          icon="info-outline"
-          class="dashboard-multi-query-warning tw:h-8 tw:mr-2 tw:ring-1 tw:ring-inset tw:ring-current"
+          type="warningNote"
+          class="dashboard-multi-query-warning tw:h-8 tw:mr-2"
         >
           {{ multiQueryWarning }}
-        </OBadge>
+        </OTag>
       </div>
       <div class="tw:flex tw:items-center tw:gap-3 tw:shrink-0">
         <OSwitch
@@ -348,7 +346,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
@@ -365,7 +363,7 @@ export default defineComponent({
     OIcon,
     OSplitter,
     OInput,
-    OBadge,
+    OTag,
   },
   emits: ["searchdata", "run-query"],
   methods: {

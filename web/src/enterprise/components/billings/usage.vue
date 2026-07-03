@@ -265,9 +265,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
       ChartRenderer: defineAsyncComponent(
         () => import("@/components/dashboards/panels/ChartRenderer.vue")
       ),
-      CustomChartRenderer: defineAsyncComponent(
-        () => import("@/components/dashboards/panels/CustomChartRenderer.vue")
-      ),
+      CustomChartRenderer,
       OSpinner,
     },
     setup() {

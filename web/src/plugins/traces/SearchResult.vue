@@ -51,12 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <!-- Left: count chips -->
-        <OBadge
+        <OTag
           data-test="traces-count-badge"
-          variant="default"
-          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-4)]! tw:mr-[0.6rem]"
-        >{{ `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}` }}</OBadge>
-        <OBadge
+          type="logsResultChip"
+          value="neutral"
+          class="tw:mr-[0.6rem]"
+        >{{ `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}` }}</OTag>
+        <OTag
           v-if="
             searchObj.data.queryResults.errorCount != null &&
             searchObj.data.queryResults.errorCount > 0
@@ -65,7 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="error"
           :clickable="true"
           class="tw:text-xs tw:rounded! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]!"
-          :class="!showErrorOnly ? 'tw:bg-[var(--o2-error-tag-bg)]! tw:text-[var(--o2-error-tag-text)]!' : ''"
+          :class="showErrorOnly
+            ? 'tw:bg-badge-error-solid-bg! tw:text-badge-error-solid-text!'
+            : 'tw:bg-[var(--o2-error-tag-bg)]! tw:text-[var(--o2-error-tag-text)]!'"
           @click="toggleErrorOnly"
         >
           {{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}
@@ -76,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trailing>
             <OIcon name="filter-alt" size="xs" class="tw:shrink-0" />
           </template>
-        </OBadge>
+        </OTag>
 
         <div class="tw:flex-1" />
 
@@ -212,7 +215,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -222,7 +225,7 @@ export default defineComponent({
     OTooltip,
     OSelect,
     OPagination,
-    OBadge,
+    OTag,
     TracesSearchResultList,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),

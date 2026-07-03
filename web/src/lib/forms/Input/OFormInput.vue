@@ -28,6 +28,7 @@ if (import.meta.env.DEV && !form) {
       <OInput
         v-bind="$attrs"
         :label="props.label"
+        :label-position="props.labelPosition"
         :placeholder="props.placeholder"
         :type="props.type"
         :disabled="props.disabled"

@@ -101,17 +101,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-name="{ row }">
           <div class="tw:flex tw:items-center tw:gap-2">
             <span>{{ row.name }}</span>
-            <span
+            <OTag
               v-if="row.isPrebuilt"
-              class="tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:border tw:border-[#1d4ed8] tw:text-inherit tw:dark:text-white tw:dark:border-[#93c5fd]"
+              type="templateOrigin"
+              value="prebuilt"
               :title="t('alert_templates.prebuiltBadgeHint')"
               data-test="alert-template-prebuilt-badge"
-            >{{ t('alert_templates.prebuiltBadge') }}</span>
-            <span
+            />
+            <OTag
               v-else
-              class="tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:border tw:border-[#d1d5db] tw:text-inherit tw:dark:text-white tw:dark:border-[#4b5563]"
+              type="templateOrigin"
+              value="custom"
               data-test="alert-template-custom-badge"
-            >{{ t('alert_templates.customBadge') }}</span>
+            />
           </div>
         </template>
         <template #cell-actions="{ row }">
@@ -234,6 +236,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import ImportTemplate from "./ImportTemplate.vue";

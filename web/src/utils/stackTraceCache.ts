@@ -84,11 +84,9 @@ export const getCachedTranslation = (
   if (cached) {
     const now = Date.now();
     if (now - cached.timestamp < CACHE_DURATION) {
-      console.log("Using cached translation for key:", cacheKey);
       return cached.data;
     } else {
       // Cache expired, remove it
-      console.log("Cache expired for key:", cacheKey);
       translationCache.delete(cacheKey);
     }
   }
@@ -100,7 +98,6 @@ export const setCachedTranslation = (
   cacheKey: string,
   data: StackTraceFrame[]
 ): void => {
-  console.log("Caching translation for key:", cacheKey);
   translationCache.set(cacheKey, {
     data: data,
     timestamp: Date.now(),

@@ -244,25 +244,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:cursor-pointer tw:opacity-50 tw:shrink-0"
                         @click="toggleFlappingGroup(row.timestamp)"
                       />
-                      <OBadge size="sm" variant="warning-soft" class="tw:cursor-pointer tw:shrink-0" @click="toggleFlappingGroup(row.timestamp)">
-                        ⚡ Flapping
-                      </OBadge>
+                      <OTag type="alertState" value="flapping" class="tw:cursor-pointer tw:shrink-0" @click="toggleFlappingGroup(row.timestamp)" />
                       <span class="tw:text-[11px] tw:truncate" style="color: var(--color-text-secondary)">
                         {{ row._children.length }} rows · {{ row._duration }}
                       </span>
                     </div>
                     <!-- Normal row -->
-                    <OBadge
-                      v-else
-                      size="sm"
-                      :icon="getStatusChipIcon(row.status)"
-                      :variant="getStatusChipVariant(row.status)"
-                      class="tw:cursor-default"
-                      data-test="alert-history-status-chip"
-                    >
-                      {{ formatStatus(row.status) }}
+                    <span v-else class="tw:inline-flex tw:cursor-default">
+                      <OTag
+                        type="alertState"
+                        :value="row.status"
+                        data-test="alert-history-status-chip"
+                      />
                       <OTooltip v-if="row.error" :max-width="'300px'" :content="row.error" />
-                    </OBadge>
+                    </span>
                   </template>
 
                   <template #cell-timestamp="{ row }">
@@ -491,7 +486,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -837,77 +832,6 @@ const getRowClass = (row: any) => {
     return store.state.theme === "dark" ? "tw:!bg-[#2d1b1b]" : "tw:!bg-[#fff5f5]";
   }
   return "";
-};
-
-const formatStatus = (status: string) => {
-  if (!status) return "Unknown";
-  switch (status.toLowerCase()) {
-    case "firing":
-    case "completed":
-    case "error":
-    case "anomaly":
-      return "Firing";
-    case "ok":
-    case "success":
-    case "normal":
-    case "condition_not_satisfied":
-      return "Ok";
-    case "skipped":
-      return "Skipped";
-    case "failed":
-      return "Failed";
-    case "pending":
-      return "Pending";
-    default:
-      return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ");
-  }
-};
-
-const getStatusChipIcon = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "firing":
-    case "error":
-    case "anomaly":
-      return "error-outline";
-    case "completed":
-      return "notifications-active";
-    case "ok":
-    case "success":
-    case "normal":
-    case "condition_not_satisfied":
-      return "check-circle-outline";
-    case "skipped":
-      return "block";
-    case "failed":
-      return "cancel";
-    case "pending":
-      return "schedule";
-    default:
-      return "help-outline";
-  }
-};
-
-const getStatusChipVariant = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "firing":
-    case "error":
-    case "anomaly":
-    case "completed":
-      return "error-soft";
-    case "ok":
-    case "success":
-    case "normal":
-    case "condition_not_satisfied":
-      return "success-soft";
-    case "skipped":
-      return "warning-soft";
-    case "failed":
-      return "error-soft";
-    case "pending":
-      return "primary-soft";
-    default:
-      return "default-soft";
-  }
 };
 
 const formatTimestamp = (timestamp: number) => {

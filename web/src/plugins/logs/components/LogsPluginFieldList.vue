@@ -24,11 +24,11 @@
       >
         <div class="tw:flex-1 tw:min-w-0 tw:flex tw:items-center tw:gap-1">
           <span>{{ groupName }}</span>
-          <OBadge variant="default">{{
+          <OTag type="fieldTag">{{
             (showOnlyInterestingFields
               ? interestingExpandedGroupRowsFieldCount[row.group]
               : expandGroupRowsFieldCount[row.group]) ?? 0
-          }}</OBadge>
+          }}</OTag>
         </div>
         <OButton
           v-if="(expandGroupRowsFieldCount[row.group] ?? 0) > 0"
@@ -227,7 +227,7 @@ import FieldExpansion from "@/components/common/FieldExpansion.vue";
 import FieldListPagination from "@/components/common/FieldListPagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 

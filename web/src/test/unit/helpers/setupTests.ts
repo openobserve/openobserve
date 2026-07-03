@@ -25,6 +25,17 @@ import "../../__mocks__/index";
 import { restHandlers } from "./handlers";
 import store from "./store";
 
+// Wire the badge registry's i18n resolver for tests WITHOUT pulling in vue-i18n
+// (some specs mock it). Resolve OTag `labelKey`s against the raw English JSON so
+// registry-labelled badges render real text in component tests.
+import { setBadgeTranslator } from "@/lib/core/Badge/badgeI18n";
+import enMessages from "@/locales/languages/en.json";
+setBadgeTranslator((key: string) =>
+  key
+    .split(".")
+    .reduce<any>((o, k) => (o == null ? undefined : o[k]), enMessages) ?? key,
+);
+
 
 const server = setupServer(...restHandlers);
 

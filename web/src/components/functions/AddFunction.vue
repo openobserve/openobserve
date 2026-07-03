@@ -536,7 +536,6 @@ export default defineComponent({
 
     // Unified Query Editor: Handle language change
     const handleLanguageChange = (newLanguage: 'vrl' | 'javascript') => {
-      console.log('[AddFunction] Language changed to:', newLanguage);
       // Update transType: '1' for JavaScript, '0' for VRL
       formData.value.transType = newLanguage === 'javascript' ? '1' : '0';
     };
@@ -545,7 +544,6 @@ export default defineComponent({
      * Handle NLP mode toggle from AI icon in editor
      */
     const handleToggleNlpMode = () => {
-      console.log('[AddFunction] Toggling NLP mode from AI icon');
       // UnifiedQueryEditor manages its own NLP mode state internally
     };
 
@@ -553,7 +551,6 @@ export default defineComponent({
      * Handle generation start event from UnifiedQueryEditor
      */
     const handleGenerationStart = () => {
-      console.log('[AddFunction] AI generation started');
       // Can add loading indicators here if needed
     };
 
@@ -561,7 +558,6 @@ export default defineComponent({
      * Handle generation end event from UnifiedQueryEditor
      */
     const handleGenerationEnd = () => {
-      console.log('[AddFunction] AI generation ended');
       // Can remove loading indicators here if needed
     };
 
@@ -569,13 +565,11 @@ export default defineComponent({
      * Handle successful generation from UnifiedQueryEditor
      */
     const handleGenerationSuccess = (payload: {type: string, message: string}) => {
-      console.log('[AddFunction] AI generation success:', payload.type);
       // Function code is already updated via @update:query handler
     };
 
     // Unified Query Editor: Handle Ask AI
     const handleAskAI = async (naturalLanguage: string, language: 'vrl' | 'javascript') => {
-      console.log('[AddFunction] Ask AI for language:', language, 'input:', naturalLanguage);
 
       // Enable AI chat if not already enabled
       if (!store.state.isAiChatEnabled) {

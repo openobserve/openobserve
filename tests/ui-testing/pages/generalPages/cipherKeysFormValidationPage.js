@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { expect } from '@playwright/test';
+import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
 
 export class CipherKeysFormValidationPage {
   constructor(page) {
@@ -243,8 +244,11 @@ export class CipherKeysFormValidationPage {
   // ── AddEncryptionMechanism helpers ──────────────────────────────────────────
 
   async selectEncryptionProviderType(value) {
+    // OSelect (reka-ui popover): clicking the root wrapper does NOT open the
+    // dropdown, and the trigger can open-then-close on a single click. Drive it
+    // through the shared helper (clicks the inner -trigger until aria-expanded).
     await this.encryptionProviderTypeSelect.waitFor({ state: 'visible', timeout: 10000 });
-    await this.encryptionProviderTypeSelect.click();
+    await openOSelectDropdown(this.page, this.encryptionProviderTypeSelect);
     const option = this.getSelectOptionByValue('add-cipher-key-auth-method-input', value);
     await option.waitFor({ state: 'visible' });
     await option.click();

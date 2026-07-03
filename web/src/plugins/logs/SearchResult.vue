@@ -69,49 +69,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Logs mode: structured chips -->
           <template v-if="searchObj.meta.logsVisualizeToggle !== 'patterns'">
             <template v-if="recordsChips">
-              <!-- Grey: neutral result count -->
-              <OBadge
-                variant="default"
+              <OTag
+                type="logsResultChip"
+                value="neutral"
                 data-test="logs-result-records-chip"
-                class="tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-text-4)]!"
-              >{{ recordsChips.records }}</OBadge>
-              <!-- Blue: time taken highlights query performance -->
-              <OBadge
-                variant="default"
+              >{{ recordsChips.records }}</OTag>
+              <OTag
+                type="logsResultChip"
+                value="info"
                 data-test="logs-result-time-chip"
-                class="tw:rounded! tw:bg-[var(--o2-status-info-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-status-info-text)]!"
-              >{{ recordsChips.time }}</OBadge>
-              <!-- Amber: resource/cost awareness -->
-              <OBadge
+              >{{ recordsChips.time }}</OTag>
+              <OTag
                 v-if="recordsChips.scan"
-                variant="default"
+                type="logsResultChip"
+                value="warn"
                 data-test="logs-result-scan-chip"
-                class="tw:rounded! tw:bg-[var(--o2-status-warning-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-status-warning-text)]!"
-              >{{ recordsChips.scan }}</OBadge>
+              >{{ recordsChips.scan }}</OTag>
             </template>
             <span v-else class="tw:truncate tw:min-w-0">{{ noOfRecordsTitle }}</span>
           </template>
           <!-- Patterns mode: structured chips -->
           <template v-else>
             <template v-if="patternChips">
-              <!-- Grey: event count -->
-              <OBadge
-                variant="default"
+              <OTag
+                type="logsResultChip"
+                value="neutral"
                 data-test="logs-result-events-chip"
-                class="tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-text-4)]!"
-              >{{ patternChips.events }} events</OBadge>
-              <!-- Grey: pattern count -->
-              <OBadge
-                variant="default"
+              >{{ patternChips.events }} events</OTag>
+              <OTag
+                type="logsResultChip"
+                value="neutral"
                 data-test="logs-result-patterns-chip"
-                class="tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-text-4)]!"
-              >{{ patternChips.patterns }} patterns</OBadge>
-              <!-- Blue: time taken highlights query performance -->
-              <OBadge
-                variant="default"
+              >{{ patternChips.patterns }} patterns</OTag>
+              <OTag
+                type="logsResultChip"
+                value="info"
                 data-test="logs-result-pattern-time-chip"
-                class="tw:rounded! tw:bg-[var(--o2-status-info-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-status-info-text)]!"
-              >{{ patternChips.time }} ms</OBadge>
+              >{{ patternChips.time }} ms</OTag>
             </template>
             <span v-else class="tw:truncate tw:min-w-0">{{ patternSummaryText }}</span>
           </template>
@@ -355,22 +349,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div
-            class="histogram-empty"
-            data-test="logs-search-no-data-histogram"
+          <!-- Same no-data treatment as dashboard panels (PanelSchemaRenderer);
+               inline min-height/padding overridden to fit the 6.25rem strip. -->
+          <OEmptyState
             v-else-if="
               searchObj.meta.showHistogram &&
               !searchObj.loadingHistogram &&
               !searchObj.loading
             "
-          >
-            <h6 class="tw:text-center">
-              <span class="histogram-empty__message">
-                <OIcon name="warning" size="xs"></OIcon> No
-                data found for histogram.</span
-              >
-            </h6>
-          </div>
+            size="inline"
+            icon="bar-chart"
+            title="No Data"
+            :backdrop="false"
+            data-test="logs-search-no-data-histogram"
+            class="histogram-empty tw:!min-h-0 tw:!p-2"
+          />
 
           <div
             class="histogram-empty"
@@ -715,7 +708,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -729,6 +723,7 @@ export default defineComponent({
     OTooltip,
     OSelect,
     OPagination,
+    OEmptyState,
     LoadingProgress,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
@@ -752,7 +747,7 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
-    OBadge,
+    OTag,
   },
   emits: [
     "update:scroll",

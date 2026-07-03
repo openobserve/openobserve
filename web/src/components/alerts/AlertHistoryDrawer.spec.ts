@@ -584,40 +584,6 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   describe("Helper Functions", () => {
-    it("formatStatus should normalize status to display labels", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.formatStatus("firing")).toBe("Firing");
-      expect(vm.formatStatus("ok")).toBe("Ok");
-      // error/anomaly/completed are all firing states
-      expect(vm.formatStatus("error")).toBe("Firing");
-      expect(vm.formatStatus("anomaly")).toBe("Firing");
-      expect(vm.formatStatus("completed")).toBe("Firing");
-      // condition_not_satisfied is an ok state
-      expect(vm.formatStatus("condition_not_satisfied")).toBe("Ok");
-      expect(vm.formatStatus("skipped")).toBe("Skipped");
-    });
-
-    it("formatStatus should return Unknown for empty/null input", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.formatStatus("")).toBe("Unknown");
-      expect(vm.formatStatus(null)).toBe("Unknown");
-    });
-
-    it("getStatusChipVariant should return correct variants", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.getStatusChipVariant("firing")).toBe("error-soft");
-      expect(vm.getStatusChipVariant("error")).toBe("error-soft");
-      expect(vm.getStatusChipVariant("anomaly")).toBe("error-soft");
-      expect(vm.getStatusChipVariant("ok")).toBe("success-soft");
-      expect(vm.getStatusChipVariant("success")).toBe("success-soft");
-      expect(vm.getStatusChipVariant("normal")).toBe("success-soft");
-      expect(vm.getStatusChipVariant("skipped")).toBe("warning-soft");
-      expect(vm.getStatusChipVariant("pending")).toBe("primary-soft");
-      expect(vm.getStatusChipVariant("unknown")).toBe("default-soft");
-    });
 
     it("getRowClass should return error class for error/firing status", async () => {
       await mountComponent();

@@ -240,7 +240,6 @@ export default defineConfig({
           jszip: ["jszip"],
           leaflet: ["leaflet"],
           gridstack: ["gridstack"],
-          "flag-icons": ["flag-icons"],
           "highlight.js": ["highlight.js"],
         },
         chunkFileNames: ({ name }) => {

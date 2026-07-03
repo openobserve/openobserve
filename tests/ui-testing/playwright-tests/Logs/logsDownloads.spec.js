@@ -15,7 +15,13 @@ test.describe("Logs Downloads testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     await pageManager.logsPage.selectStream("e2e_automate");
-    await pageManager.logsPage.clickRefreshButton();
+    // Selecting the stream fires an auto-search. A bare refresh-button click force-cancels
+    // that in-flight search (the button is in "Cancel query" mode while it runs), leaving
+    // the results stuck in `data-search-state="loading"` with 0 hits — the download click
+    // then reads an empty hits array and `logs-search-result-title` never becomes visible.
+    // runQueryAndWaitForResults waits for the Cancel state to clear before clicking, then
+    // waits for the search to fully complete (same fix as setupSQLMode below).
+    await pageManager.logsPage.runQueryAndWaitForResults();
     // Wait for results to load by checking the results summary text shows non-zero records
     await pageManager.logsPage.expectPaginationRowCountVisible();
   }
@@ -68,7 +74,9 @@ test.describe("Logs Downloads testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     await pageManager.logsPage.selectStream("e2e_automate");
-    await pageManager.logsPage.clickRefreshButton();
+    // See setupLogsPage: use runQueryAndWaitForResults (not a bare refresh click) so the
+    // stream-selection auto-search isn't force-cancelled into a stuck 0-hit loading state.
+    await pageManager.logsPage.runQueryAndWaitForResults();
     // Wait for results to load by checking the results summary text shows non-zero records
     await pageManager.logsPage.expectPaginationRowCountVisible();
 
