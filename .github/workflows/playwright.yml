@@ -339,6 +339,7 @@ jobs:
                 "reportFolders.spec.js",
                 "reports-bulk-operations.spec.js",
                 "reports-form-validation.spec.js",
+                "reportCsvMediaType.spec.js",
               ]
           - testfolder: "Streams"
             browser: "chrome"
