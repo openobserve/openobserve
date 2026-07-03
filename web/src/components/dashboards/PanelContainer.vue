@@ -23,7 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test-panel-id="props.data.id"
     :data-test-panel-title="props.data.title"
   >
-    <div :class="{ 'shrink-0': !viewOnly && !simplifiedPanelView }">
+    <div
+      :class="{
+        'shrink-0': !viewOnly && !simplifiedPanelView,
+        'drag-allow': !viewOnly && !simplifiedPanelView,
+      }"
+    >
       <div
         class="flex flex-nowrap items-center w-full min-h-7 py-1 px-2 border-b border-border-subtle rounded-t-lg"
         :class="{ 'border-b-transparent': isPanelLoading }"

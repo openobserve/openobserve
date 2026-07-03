@@ -133,9 +133,8 @@
                 <li
                   v-for="entry in sec.entries"
                   :key="entry.id"
-                  class="flex justify-between items-center py-1.5 px-2 rounded-md cursor-pointer transition-colors duration-100 hover:bg-[var(--o2-primary-background)]"
+                  class="flex justify-between items-center py-1.5 px-2 rounded-md transition-colors duration-100 hover:bg-[var(--o2-primary-background)]"
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
-                  @click="triggerEntry(entry)"
                 >
                   <span
                     class="text-[13px] text-[var(--o2-text-primary)] truncate leading-snug"
@@ -207,9 +206,8 @@
                 <li
                   v-for="entry in sec.entries"
                   :key="entry.id"
-                  class="flex justify-between items-center py-1.5 px-2 rounded-md cursor-pointer transition-colors duration-100 hover:bg-[var(--o2-primary-background)]"
+                  class="flex justify-between items-center py-1.5 px-2 rounded-md transition-colors duration-100 hover:bg-[var(--o2-primary-background)]"
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
-                  @click="triggerEntry(entry)"
                 >
                   <span
                     class="text-[13px] text-[var(--o2-text-primary)] truncate leading-snug"
@@ -259,12 +257,6 @@
             >?</kbd
           >
           <span>{{ t("shortcuts.footerReopen") }}</span>
-          <span class="opacity-40">·</span>
-          <kbd
-            class="inline-flex items-center justify-center h-5 px-1.5 bg-[var(--o2-card-background)] border border-[var(--o2-border)] rounded font-mono text-[11px] shadow-[0_1px_0_0_var(--o2-border)]"
-            >↵</kbd
-          >
-          <span>{{ t("shortcuts.footerRun") }}</span>
         </div>
         <div class="opacity-60">{{ t("shortcuts.footerMacHint") }}</div>
       </div>
@@ -313,8 +305,6 @@ interface DisplayEntry {
   id: string;
   /** Combo string rendered as keycaps (e.g. "ctrl+enter", "del / ⌫"). */
   display: string;
-  /** Real platform key dispatched when the row is clicked. */
-  dispatchKey: string;
   label: string;
 }
 interface DisplaySection {
@@ -336,14 +326,7 @@ function entryDisplay(e: ShortcutEntry): string {
   return e.display ?? e.keyForWindows ?? e.key ?? "";
 }
 
-/** Real key to dispatch on click — platform-resolved, first of multi-bindings. */
-function entryDispatchKey(e: ShortcutEntry, mac: boolean): string {
-  if (e.keys?.length) return e.keys[0];
-  return (mac ? e.keyForMac : e.keyForWindows) ?? e.key ?? "";
-}
-
 const allModules = computed<DisplayModule[]>(() => {
-  const mac = isMacOS();
   return SHORTCUT_MODULES.map((m) => ({
     title: t(m.titleKey),
     sections: m.pages.flatMap((pageKey) => {
@@ -355,7 +338,6 @@ const allModules = computed<DisplayModule[]>(() => {
           entries: group.shortcuts.map((s) => ({
             id: s.id,
             display: entryDisplay(s),
-            dispatchKey: entryDispatchKey(s, mac),
             label: t(s.descriptionKey),
           })),
         },
@@ -474,26 +456,6 @@ watch(open, (val) => {
 });
 
 onUnmounted(teardown);
-
-// ── Shortcut trigger ──────────────────────────────────────────────────────────
-function triggerEntry(entry: DisplayEntry) {
-  const parts = entry.dispatchKey.split("+");
-  const mainKey = parts[parts.length - 1];
-  window.dispatchEvent(
-    new KeyboardEvent("keydown", {
-      key:
-        mainKey.length === 1
-          ? mainKey
-          : mainKey.charAt(0).toUpperCase() + mainKey.slice(1),
-      ctrlKey: parts.includes("ctrl"),
-      shiftKey: parts.includes("shift"),
-      altKey: parts.includes("alt"),
-      metaKey: parts.includes("meta"),
-      bubbles: true,
-      cancelable: true,
-    }),
-  );
-}
 
 useShortcut(
   props.toggleKey,
