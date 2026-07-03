@@ -1196,11 +1196,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <!-- pr-1.5 mirrors the editor's ml-1.5 so the editor area sits at 10px on
-         the right (4px wrapper + 6px), aligning with the results panel below. -->
+         the right (4px wrapper + 6px), aligning with the results panel below.
+         data-fullscreen is a stable test hook exposing the fullscreen state
+         (the styling itself is driven by the inline `isFocused` class binding). -->
     <div
       ref="editorContainerRef"
       class="tw:flex tw:relative query-editor-container tw:w-full tw:overflow-visible"
       :class="{ 'tw:overflow-hidden! tw:bg-[var(--o2-body-primary-bg)]! tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:[box-shadow:0_0.5rem_2rem_rgba(0,0,0,0.18)]': isFocused }"
+      :data-fullscreen="isFocused ? 'true' : 'false'"
       :style="editorFullscreenStyle"
     >
       <!-- Expand / collapse button — always top-right of the full editor area -->

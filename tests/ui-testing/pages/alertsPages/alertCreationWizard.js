@@ -1704,14 +1704,29 @@ export class AlertCreationWizard {
         // The outer flex container holds both the label div and controls div as siblings
         const promqlConditionRow = promqlConditionLabel.locator('..');
 
-        // Select operator
-        const promqlOperatorSelect = promqlConditionRow.locator('.alert-v3-select').first();
-        await promqlOperatorSelect.click({ timeout: 10000 });
-        await this.page.waitForTimeout(800);
-        // Pick operator from the now-visible popover
-        const visibleMenuPromqlItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(visibleMenuPromqlItems.first()).toBeVisible({ timeout: 5000 });
-        await visibleMenuPromqlItems.filter({ hasText: operator }).first().click();
+        // Select operator — v3 UI renders this as an OSelect with a stable data-test.
+        // The old `.alert-v3-select` class was removed in PR #12764; use the data-test
+        // hook + popover pattern (same as the SQL threshold operator in this file).
+        const promqlOperatorSelect = this.page.locator('[data-test="alert-threshold-operator-select"]').first();
+        await promqlOperatorSelect.waitFor({ state: 'visible', timeout: 10000 });
+        await promqlOperatorSelect.click();
+        const promqlOperatorPopover = this.page.locator('[data-test="alert-threshold-operator-select-popover"]').first();
+        await promqlOperatorPopover.waitFor({ state: 'visible', timeout: 5000 });
+        // Pick operator by exact value; fall back to text match if data-test-value is absent.
+        const promqlOperatorOption = promqlOperatorPopover.locator(`[data-test$="-option"][data-test-value="${operator}"]`);
+        if (await promqlOperatorOption.count() > 0) {
+            await promqlOperatorOption.first().click();
+        } else {
+            const promqlOptionsByText = promqlOperatorPopover.locator('[data-test$="-option"]');
+            await expect(promqlOptionsByText.first()).toBeVisible({ timeout: 5000 });
+            // Exact match — operators overlap as substrings (">" ⊂ ">="), so anchor the
+            // regex (operator chars are regex-special and must be escaped).
+            const operatorExact = new RegExp(`^\\s*${operator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
+            const promqlOperatorMatch = promqlOptionsByText.filter({ hasText: operatorExact });
+            // Fail fast with a clear locator error instead of a 30s click timeout if nothing matches.
+            await expect(promqlOperatorMatch.first()).toBeVisible({ timeout: 5000 });
+            await promqlOperatorMatch.first().click();
+        }
         await this.page.waitForTimeout(300);
         testLogger.info('Set PromQL condition operator', { operator });
 
