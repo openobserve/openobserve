@@ -556,6 +556,7 @@ export default defineComponent({
     const router = useRouter();
 
     const homeUrl = computed(() => {
+      if (!router) return "/";
       return router.resolve({
         path: "/",
         query: {
