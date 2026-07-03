@@ -42,7 +42,7 @@
                 v-if="link._source"
                 type="crossLinkSource"
                 :value="link._source"
-                class="tw:ml-1"
+                class="ml-1"
               />
             </div>
             <!-- URL -->
@@ -55,15 +55,15 @@
               {{ link.url }}
             </div>
             <!-- Fields -->
-            <div v-if="link.fields?.length" class="tw:flex tw:flex-wrap tw:gap-1 tw:mt-1">
+            <div v-if="link.fields?.length" class="flex flex-wrap gap-1 mt-1">
               <OTag
                 v-for="(field, fIdx) in link.fields"
                 :key="fIdx"
                 type="fieldTag"
-                class="tw:max-w-[200px]"
+                class="max-w-[200px]"
                 :data-test="`cross-link-field-chip-${fIdx}`"
               >
-                <span class="tw:truncate tw:text-xs" :title="field.name">{{ field.name }}</span>
+                <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>
               </OTag>
             </div>
           </div>

@@ -1325,8 +1325,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OCardSection class="flex flex-col gap-4 p-0 border-t">
           <!-- Header section with cardinality details -->
-          <div class="tw:flex tw:items-center tw:gap-3 tw:p-4 tw:border-b">
-            <span class="tw:font-medium">Cardinality:</span>
+          <div class="flex items-center gap-3 p-4 border-b">
+            <span class="font-medium">Cardinality:</span>
             <OTag
               type="cardinalityClass"
               :value="

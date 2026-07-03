@@ -218,7 +218,7 @@ describe("PatternCard", () => {
   describe("Hover Effect", () => {
     it("should have hover transition class for hover effect", () => {
       const card = wrapper.find('[data-test="pattern-card-0"]');
-      expect(card.classes()).toContain("tw:transition-colors");
+      expect(card.classes()).toContain("transition-colors");
     });
 
     it("should have cursor-pointer class", () => {
@@ -238,8 +238,8 @@ describe("PatternCard", () => {
       // Check that the component has the hover styles applied
       expect(card.exists()).toBe(true);
       // The transition is defined via Tailwind utility classes.
-      expect(card.classes()).toContain("tw:transition-colors");
-      expect(card.classes()).toContain("tw:duration-150");
+      expect(card.classes()).toContain("transition-colors");
+      expect(card.classes()).toContain("duration-150");
     });
   });
 

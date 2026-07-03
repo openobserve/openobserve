@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="showServices ? 'expand-less' : 'expand-more'" size="sm"
               color="primary"
             />
-            <div class="tw:font-semibold tw:text-[0.9rem]" :class="stepLabelClass">Select services to monitor</div>
+            <div class="font-semibold text-[0.9rem]" :class="stepLabelClass">Select services to monitor</div>
             <OTag type="countChip" value="accent">
               {{ enabledServices.length }} /
               {{ QUICK_SETUP_SERVICES.length }} selected
@@ -336,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="font-semibold text-xs mb-1" :class="stepLabelClass">
                 Target regions to enter in "Deployment targets":
               </div>
-              <div class="tw:flex tw:flex-wrap tw:gap-1 tw:mt-1">
+              <div class="flex flex-wrap gap-1 mt-1">
                 <OTag
                   v-for="r in targetRegions"
                   :key="r"

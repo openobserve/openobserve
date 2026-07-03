@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="field"
         type="fieldNameChip"
         value="highlight"
-        class="tw:m-1"
+        class="m-1"
       >
         {{ field }}
       </OTag>
@@ -277,13 +277,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--q-dark)] tw:rounded">
+        <div class="max-h-[250px] overflow-y-auto p-2 bg-[var(--q-dark)] rounded">
           <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
             type="fieldNameChip"
             value="muted"
-            class="tw:m-1"
+            class="m-1"
           >
             {{ field }}
           </OTag>
@@ -294,13 +294,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--q-dark)] tw:rounded">
+        <div class="max-h-[250px] overflow-y-auto p-2 bg-[var(--q-dark)] rounded">
           <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
             type="fieldDiffStatus"
             :value="isNewField(field) ? 'new' : 'existing'"
-            class="tw:m-1"
+            class="m-1"
           >
             {{ field }}
             <template #trailing>
@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="isNewField(field)"
                 name="add"
                 size="xs"
-                class="tw:ml-1"
+                class="ml-1"
               />
             </template>
           </OTag>

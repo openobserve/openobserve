@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="isLLMSpan"
           type="observationType"
           :value="span.gen_ai_operation_name"
-          class="tw:mr-1 tw:normal-case!"
+          class="mr-1 normal-case!"
           data-test="trace-details-sidebar-observation-badge"
         >{{ span.gen_ai_operation_name?.charAt(0) + span.gen_ai_operation_name?.slice(1).toLowerCase() }}</OTag>
 
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Service Badge -->
           <OTag
             type="metricChip"
-            class="toolbar-chip service-chip tw:mr-[0.325rem]"
+            class="toolbar-chip service-chip mr-[0.325rem]"
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
           >
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Duration Badge -->
           <OTag
             type="metricChip"
-            class="toolbar-chip duration-chip tw:mr-[0.325rem]"
+            class="toolbar-chip duration-chip mr-[0.325rem]"
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="getTTFT"
             type="metricChip"
-            class="toolbar-chip ttft-chip tw:mr-[0.325rem]"
+            class="toolbar-chip ttft-chip mr-[0.325rem]"
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Start Time Badge -->
           <OTag
             type="metricChip"
-            class="toolbar-chip time-chip tw:mr-[0.325rem]"
+            class="toolbar-chip time-chip mr-[0.325rem]"
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="spanHttpResendCount"
             type="metricChip"
-            class="toolbar-chip resend-chip tw:mr-[0.325rem]"
+            class="toolbar-chip resend-chip mr-[0.325rem]"
             :title="`Request resent ${spanHttpResendCount} time(s)`"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="llm-chip model-chip"
             :title="span.gen_ai_response_model"
           >
-            <span class="chip-value tw:font-bold">{{ span.gen_ai_response_model }}</span>
+            <span class="chip-value font-bold">{{ span.gen_ai_response_model }}</span>
           </OTag>
 
           <!-- Token Usage Group -->
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="hasExceptionEvents.length"
             type="countChip"
             value="error"
-            class="tw:ml-0"
+            class="ml-0"
             data-test="trace-details-sidebar-tabs-error-count"
           >{{ hasExceptionEvents.length }}</OTag>
         </OTab>

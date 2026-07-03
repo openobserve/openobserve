@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="planType == planName"
         type="billingTag"
         value="subscribed"
-        class="tw:mt-2"
+        class="mt-2"
       />
     </div>
 
@@ -85,17 +85,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex justify-between p-3">
       <!-- AWS Marketplace billing - show managed externally message -->
-      <div v-if="billingProvider === 'aws'" class="tw:w-full tw:text-center">
+      <div v-if="billingProvider === 'aws'" class="w-full text-center">
         <OTag
           type="billingManagement"
           value="aws"
-          class="tw:inline-flex tw:items-center tw:gap-1"
+          class="inline-flex items-center gap-1"
         >
           <template #icon>
             <OIcon name="check-circle" size="xs" />
           </template>
         </OTag>
-        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
+        <div class="text-xs text-gray-400 mt-2">
           Billing is handled through your AWS account
         </div>
       </div>
@@ -106,13 +106,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           type="billingManagement"
           value="azure"
-          class="tw:inline-flex tw:items-center tw:gap-1"
+          class="inline-flex items-center gap-1"
         >
           <template #icon>
             <OIcon name="check-circle" size="xs" />
           </template>
         </OTag>
-        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
+        <div class="text-xs text-gray-400 mt-2">
           Billing is handled through your Azure account
         </div>
       </div>
@@ -124,13 +124,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           type="billingManagement"
           value="contract"
-          class="tw:inline-flex tw:items-center tw:gap-1"
+          class="inline-flex items-center gap-1"
         >
           <template #icon>
             <OIcon name="description" size="xs" />
           </template>
         </OTag>
-        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
+        <div class="text-xs text-gray-400 mt-2">
           Billing is handled through your contract — contact your account
           manager for changes
         </div>

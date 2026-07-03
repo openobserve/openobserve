@@ -404,7 +404,7 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     size: "md",
-    class: "tw:px-2 tw:py-3",
+    class: "px-2 py-3",
     values: {
       discount: { variant: "primary-soft", labelKey: "billing.discountTag" },
       subscribed: { variant: "primary-soft", labelKey: "billing.subscribed" },
@@ -721,7 +721,7 @@ export const BADGE_GROUPS = {
 
   // "Default" template marker (AlertsDestinationList) — fixed neutral flag.
   // Named-colour group (R5). SOLID `default` + pill + md to match the old manual
-  // chip (no size prop → md; its `tw:text-xs` class was redundant since md is
+  // chip (no size prop → md; its `text-xs` class was redundant since md is
   // already text-xs). Label stays an i18n slot at the call site.
   templateDefaultFlag: {
     mode: "plain",
@@ -780,7 +780,7 @@ export const BADGE_GROUPS = {
   destinationKind: {
     mode: "plain",
     shape: "pill",
-    class: "tw:text-xs",
+    class: "text-xs",
     values: {
       prebuilt: { variant: "primary" },
       custom: { variant: "default" },
@@ -1221,7 +1221,7 @@ export const BADGE_GROUPS = {
   qualityStatus: {
     mode: "dot",
     shape: "pill",
-    class: "tw:!bg-transparent tw:!p-0 tw:!ring-0",
+    class: "!bg-transparent !p-0 !ring-0",
     values: {
       healthy: { variant: "success-soft" },
       warn: { variant: "warning-soft" },
@@ -1313,7 +1313,7 @@ export const BADGE_GROUPS = {
   billingManagement: {
     mode: "plain",
     shape: "pill",
-    class: "tw:px-3 tw:py-2",
+    class: "px-3 py-2",
     values: {
       aws: { variant: "success-soft", label: "AWS Marketplace" },
       azure: { variant: "success-soft", label: "Azure Marketplace" },

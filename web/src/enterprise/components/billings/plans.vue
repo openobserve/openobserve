@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               type="aiMode"
               :value="aiUsage.mode"
-              class="tw:mt-2"
+              class="mt-2"
               style="width: fit-content;"
             />
           </div>

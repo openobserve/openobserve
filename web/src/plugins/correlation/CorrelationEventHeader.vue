@@ -24,9 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="sourceEvent.severity"
       type="logLevel"
       :value="sourceEvent.severity"
-      class="tw:shrink-0"
+      class="shrink-0"
     />
-    <span class="tw:text-xs tw:font-mono tw:text-typography-meta tw:shrink-0">
+    <span class="text-xs font-mono text-typography-meta shrink-0">
       {{ formatEventTimestamp(sourceEvent.timestamp) }}
     </span>
     <OSeparator
@@ -56,8 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="containerRef"
       class="flex items-center gap-3  py-2 flex-1 min-w-0"
     >
-      <span class="tw:text-2! tw:m-0 tw:text-typography-meta tw:shrink-0">Correlated by:</span>
-      <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:overflow-hidden">
+      <span class="text-2! m-0 text-typography-meta shrink-0">Correlated by:</span>
+      <div class="flex items-center gap-2 min-w-0 overflow-hidden">
         <ODimensionChip
           v-for="chip in displayedChips"
           :key="chip.key"
@@ -65,22 +65,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key-label="chip.label"
           :value="chip.value"
           :tooltip="false"
-          class="tw:min-w-0"
+          class="min-w-0"
           :data-test="`correlation-event-header-chip-${chip.key}`"
         />
 
-        <span v-if="hiddenChipCount > 0" class="tw:contents">
+        <span v-if="hiddenChipCount > 0" class="contents">
           <OTag
             type="correlationChip"
             value="overflow"
-            class="tw:cursor-default"
+            class="cursor-default"
             :data-test="`correlation-event-header-overflow-${hiddenChipCount}`"
           >
             <template v-if="hiddenChipCount !== contextChips.length">+</template>{{ hiddenChipCount }}<template v-if="hiddenChipCount === contextChips.length"> Fields</template>
           </OTag>
           <OTooltip side="top" :disabled="hiddenChipCount === 0">
             <template #content>
-              <div class="tw:flex tw:flex-col tw:items-start tw:gap-1">
+              <div class="flex flex-col items-start gap-1">
                 <ODimensionChip
                   v-for="chip in hiddenChips"
                   :key="chip.key"

@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag
                     type="exampleChip"
                     value="dim"
-                    class="tw:mx-1 tw:my-1 example-chip"
+                    class="mx-1 my-1 example-chip"
                     >k8s-cluster=prod</OTag
                   >
                 </template>
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag
                     type="exampleChip"
                     value="dim"
-                    class="tw:mx-1 tw:my-1 example-chip"
+                    class="mx-1 my-1 example-chip"
                     >k8s-deployment=api-server</OTag
                   >
                 </template>
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag
                     type="exampleChip"
                     value="value"
-                    class="tw:mx-1 tw:my-1 example-chip"
+                    class="mx-1 my-1 example-chip"
                     >prod/api-server</OTag
                   >
                 </template>

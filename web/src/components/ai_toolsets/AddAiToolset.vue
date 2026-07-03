@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="cliPreset"
                 :value="preset.id"
                 clickable
-                class="tw:cursor-pointer"
+                class="cursor-pointer"
                 :data-test="`cli-preset-${preset.id}`"
                 @click="applyPreset(preset)"
               >

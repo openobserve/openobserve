@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`destination-template-default-badge-${row.name}`"
                 type="templateDefaultFlag"
                 value="default"
-                class="tw:flex-shrink-0"
+                class="flex-shrink-0"
               />
             </div>
             <span v-else class="text-text-primary">—</span>

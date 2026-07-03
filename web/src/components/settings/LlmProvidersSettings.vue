@@ -90,7 +90,7 @@
             />
           </template>
           <template #cell-type="{ row }">
-            <OTag type="providerType" class="tw:lowercase">{{ providerTypeOf(row) || "—" }}</OTag>
+            <OTag type="providerType" class="lowercase">{{ providerTypeOf(row) || "—" }}</OTag>
           </template>
 
           <template #cell-endpoint="{ row }">

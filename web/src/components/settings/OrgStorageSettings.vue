@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-base font-medium" style="font-weight: 700; line-height: 1.3;">
                 {{ configuredProviderLabel }}
               </div>
-              <OTag type="activeFlag" class="tw:mt-1" />
+              <OTag type="activeFlag" class="mt-1" />
             </div>
           </div>
           <OButton

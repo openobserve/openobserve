@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               data-row-action="export"
-              class="tw:hidden"
+              class="hidden"
               tabindex="-1"
               aria-hidden="true"
               @click.stop="exportPipeline(row)"
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               data-row-action="delete"
-              class="tw:hidden"
+              class="hidden"
               tabindex="-1"
               aria-hidden="true"
               @click.stop="openDeleteDialog(row)"

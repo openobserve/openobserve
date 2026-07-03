@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag
                 type="rumEventType"
                 :value="filteredEvent.type"
-                class="tw:mr-3"
+                class="mr-3"
                 data-test="event-type-badge"
               />
               <template

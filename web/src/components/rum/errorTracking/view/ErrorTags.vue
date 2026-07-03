@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div data-test="error-tags-title" class="tw:text-base tw:font-bold tw:ml-1">{{ t("rum.tags") }}</div>
-    <div class="tw:flex tw:items-center">
-      <div class="tw:mr-4 tw:items-center">
+    <div data-test="error-tags-title" class="text-base font-bold ml-1">{{ t("rum.tags") }}</div>
+    <div class="flex items-center">
+      <div class="mr-4 items-center">
         <img
           :src="ip"
           alt="IP"

@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="bg-[var(--o2-text-3)] py-[0rem] w-[1px] h-[16px]"
               />
               <!-- Span Count Badge -->
-              <span class="tw:inline-flex">
+              <span class="inline-flex">
                 <OTag
                   type="logsResultChip"
                   value="neutral"
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <!-- Error Count Badge -->
-              <span class="tw:inline-flex tw:mr-[0.85rem]">
+              <span class="inline-flex mr-[0.85rem]">
                 <OTag
                   type="logsResultChip"
                   value="error"

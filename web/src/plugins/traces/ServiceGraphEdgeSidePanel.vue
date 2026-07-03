@@ -31,9 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="edge-name text-[15px] font-semibold m-0 leading-[1.2] text-[#e4e7eb] tracking-normal flex items-center gap-2 flex-wrap"
             data-test="service-graph-edge-side-panel-route"
           >
-            <span class="from-service tw:text-[#60a5fa] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">{{ selectedEdge?.from }}</span>
-            <OIcon name="arrow-forward" size="xs" class="edge-arrow tw:text-[rgba(255,255,255,0.35)] tw:shrink-0" />
-            <span class="to-service tw:text-[#a78bfa] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">{{ selectedEdge?.to }}</span>
+            <span class="from-service text-[#60a5fa] overflow-hidden text-ellipsis whitespace-nowrap">{{ selectedEdge?.from }}</span>
+            <OIcon name="arrow-forward" size="xs" class="edge-arrow text-[rgba(255,255,255,0.35)] shrink-0" />
+            <span class="to-service text-[#a78bfa] overflow-hidden text-ellipsis whitespace-nowrap">{{ selectedEdge?.to }}</span>
             <OTag type="serviceStatus" :value="edgeHealth.status">{{ edgeHealth.text }}</OTag>
           </h2>
         </div>

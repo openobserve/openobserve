@@ -15,22 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0" data-test="incident-detail-page">
-    <div class="tw:w-full tw:h-full tw:flex tw:flex-col">
+  <div class="rounded-md p-0" data-test="incident-detail-page">
+    <div class="w-full h-full flex flex-col">
     <!-- Header -->
-    <div class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-2.5 tw:h-[60px] tw:px-2.5">
-      <div class="tw:flex tw:items-center tw:gap-3 tw:flex-1">
+    <div class="flex items-center flex-nowrap card-container py-2.5 h-[60px] px-2.5">
+      <div class="flex items-center gap-3 flex-1">
         <button
           type="button"
           data-test="incident-detail-back-btn"
-          class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-9.5 tw:h-9.5 tw:rounded-[0.625rem] tw:text-text-secondary tw:transition-colors tw:hover:bg-surface-subtle tw:hover:text-text-primary tw:outline-none tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset tw:cursor-pointer"
+          class="inline-flex items-center justify-center shrink-0 w-9.5 h-9.5 rounded-[0.625rem] text-text-secondary transition-colors hover:bg-surface-subtle hover:text-text-primary outline-none focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset cursor-pointer"
           :title="t('alerts.incidents.goBack')"
           :aria-label="t('alerts.incidents.goBack')"
           @click="close"
         >
           <OIcon name="chevron-left" size="md" />
         </button>
-        <div class="tw:text-xl tw:font-semibold tw:text-text-primary">
+        <div class="text-xl font-semibold text-text-primary">
           {{ t('alerts.incidents.incident') }}
         </div>
         <!-- Incident name with colored indicator -->
@@ -63,17 +63,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Status, Severity, Alerts badges — match the soft dot-badge variant
              used in the Incident list (no heavy ring/icon). -->
         <template v-if="incidentDetails && !isEditingTitle">
-          <span class="tw:inline-flex tw:cursor-default">
+          <span class="inline-flex cursor-default">
             <OTag type="incidentStatus" :value="incidentDetails.status" />
             <OTooltip :content="t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)" />
           </span>
 
-          <span class="tw:inline-flex tw:cursor-default">
+          <span class="inline-flex cursor-default">
             <OTag type="severity" :value="incidentDetails.severity" />
             <OTooltip :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
           </span>
 
-          <span class="tw:inline-flex tw:cursor-default">
+          <span class="inline-flex cursor-default">
             <OTag type="countChip" value="alerts">{{ triggers.length }} Alerts</OTag>
             <OTooltip :content="t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'" />
           </span>
@@ -137,8 +137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Content -->
-    <div v-if="!loading && incidentDetails" class="card-container tw:flex tw:flex-col tw:overflow-hidden tw:-mt-2 tw:flex-1 tw:min-h-0">
-      <div class="tw:flex-shrink-0 tw:px-2 tw:border-b tw:border-border-default">
+    <div v-if="!loading && incidentDetails" class="card-container flex flex-col overflow-hidden -mt-2 flex-1 min-h-0">
+      <div class="flex-shrink-0 px-2 border-b border-border-default">
         <OTabs
           v-model="activeTab"
           align="left"
@@ -606,14 +606,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       Status
                     </div>
-                    <div class="tw:flex tw:gap-2 tw:flex-wrap">
+                    <div class="flex gap-2 flex-wrap">
                       <button
                         v-for="option in statusOptions"
                         :key="option.value"
                         type="button"
                         @click="editableStatus !== option.value && handleStatusChange(option.value as 'open' | 'acknowledged' | 'resolved')"
-                        class="tw:rounded-full tw:outline-none"
-                        :class="editableStatus === option.value ? 'tw:cursor-default' : 'tw:cursor-pointer'"
+                        class="rounded-full outline-none"
+                        :class="editableStatus === option.value ? 'cursor-default' : 'cursor-pointer'"
                         :data-test="`incident-manage-status-${option.value}`"
                       >
                         <OTag
@@ -633,14 +633,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       Severity
                     </div>
-                    <div class="tw:flex tw:gap-2 tw:flex-wrap">
+                    <div class="flex gap-2 flex-wrap">
                       <button
                         v-for="option in severityOptions"
                         :key="option.value"
                         type="button"
                         @click="editableSeverity !== option.value && handleSeverityChange(option.value as 'P1' | 'P2' | 'P3' | 'P4')"
-                        class="tw:rounded-full tw:outline-none"
-                        :class="editableSeverity === option.value ? 'tw:cursor-default' : 'tw:cursor-pointer'"
+                        class="rounded-full outline-none"
+                        :class="editableSeverity === option.value ? 'cursor-default' : 'cursor-pointer'"
                         :data-test="`incident-manage-severity-${option.value}`"
                       >
                         <!-- Selected → semantic severity colour; unselected → neutral grey. -->
@@ -861,8 +861,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Alert Configuration Section -->
                   <div class="space-y-2">
                       <!-- Alert Name -->
-                      <div class="tw:flex tw:flex-col tw:gap-0.5">
-                        <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                      <div class="flex flex-col gap-0.5">
+                        <span :class="'text-text-secondary'" class="text-[10px] uppercase tracking-wide">
                           Alert Name
                         </span>
                         <span :class="'text-text-primary'" class="text-sm font-medium">
@@ -871,19 +871,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <!-- Stream Type & Name -->
-                      <div class="tw:grid tw:grid-cols-2 tw:gap-2">
-                        <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                      <div class="grid grid-cols-2 gap-2">
+                        <div class="flex flex-col gap-0.5">
+                          <span :class="'text-text-secondary'" class="text-[10px] uppercase tracking-wide">
                             Stream Type
                           </span>
                           <OTag
                             type="streamType"
                             :value="alerts[selectedAlertIndex]?.stream_type || 'N/A'"
-                            class="tw:w-fit"
+                            class="w-fit"
                           />
                         </div>
-                        <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                        <div class="flex flex-col gap-0.5">
+                          <span :class="'text-text-secondary'" class="text-[10px] uppercase tracking-wide">
                             Stream Name
                           </span>
                           <span :class="'text-text-primary'" class="text-sm font-medium truncate">
@@ -893,17 +893,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <!-- Threshold & Period -->
-                      <div class="tw:grid tw:grid-cols-2 tw:gap-2">
-                        <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                      <div class="grid grid-cols-2 gap-2">
+                        <div class="flex flex-col gap-0.5">
+                          <span :class="'text-text-secondary'" class="text-[10px] uppercase tracking-wide">
                             Threshold
                           </span>
                           <span :class="'text-text-primary'" class="text-sm font-medium">
                             {{ alerts[selectedAlertIndex]?.trigger_condition?.operator || '' }} {{ alerts[selectedAlertIndex]?.trigger_condition?.threshold || 'N/A' }}
                           </span>
                         </div>
-                        <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                        <div class="flex flex-col gap-0.5">
+                          <span :class="'text-text-secondary'" class="text-[10px] uppercase tracking-wide">
                             Period
                           </span>
                           <span :class="'text-text-primary'" class="text-sm font-medium">
@@ -913,17 +913,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <!-- Frequency & Silence -->
-                      <div class="tw:grid tw:grid-cols-2 tw:gap-2">
-                        <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                      <div class="grid grid-cols-2 gap-2">
+                        <div class="flex flex-col gap-0.5">
+                          <span :class="'text-text-secondary'" class="text-[10px] uppercase tracking-wide">
                             Frequency
                           </span>
                           <span :class="'text-text-primary'" class="text-sm font-medium">
                             {{ alerts[selectedAlertIndex]?.trigger_condition?.frequency || 'N/A' }} {{ alerts[selectedAlertIndex]?.trigger_condition?.frequency_type || 'min' }}
                           </span>
                         </div>
-                        <div class="tw:flex tw:flex-col tw:gap-0.5">
-                          <span :class="'tw:text-text-secondary'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
+                        <div class="flex flex-col gap-0.5">
+                          <span :class="'text-text-secondary'" class="text-[10px] uppercase tracking-wide">
                             Silence
                           </span>
                           <span :class="'text-text-primary'" class="text-sm font-medium">

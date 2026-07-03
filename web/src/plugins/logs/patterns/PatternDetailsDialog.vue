@@ -38,10 +38,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ selectedPattern?.pattern?.description || t('search.patternDetailsTitle') }}
           </h4>
           <template v-if="selectedPattern">
-            <OTag type="countChip" value="neutral" class="tw:shrink-0">
+            <OTag type="countChip" value="neutral" class="shrink-0">
               {{ selectedTemplateTokens.length }} {{ selectedTemplateTokens.length === 1 ? 'token' : 'tokens' }}
             </OTag>
-            <OTag type="countChip" value="neutral" class="tw:shrink-0">
+            <OTag type="countChip" value="neutral" class="shrink-0">
               {{ patternWildcardCount }} {{ patternWildcardCount === 1 ? 'variable slot' : 'variable slots' }}
             </OTag>
           </template>
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-type="{ row }">
-              <div class="tw:text-left">
+              <div class="text-left">
                 <OTag
                   type="fieldType"
                   :value="row.var_type"

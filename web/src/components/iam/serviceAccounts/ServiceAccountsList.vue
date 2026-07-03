@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSearchInput
                   v-model="filterQuery"
                   :placeholder="t('serviceAccounts.search')"
-                  class="tw:flex-1"
+                  class="flex-1"
                   data-test="iam-service-accounts-search-input"
                 />
               </div>
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-email="{ row }">
               <template v-if="row.is_system">
                 <span data-test="service-accounts-system-account-label" class="text-weight-medium">{{ row.first_name }}</span>
-                <OTag data-test="service-accounts-system-badge" type="serviceAccountKind" value="system" class="tw:ml-2" />
+                <OTag data-test="service-accounts-system-badge" type="serviceAccountKind" value="system" class="ml-2" />
               </template>
               <template v-else>
                 <span :data-test="`service-accounts-email-${row.email}`"><OUserCell :value="row.email" /></span>

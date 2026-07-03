@@ -116,20 +116,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-dimensions="{ row }">
-          <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-1 tw:min-w-0 tw:overflow-hidden">
+          <div class="flex flex-nowrap items-center gap-1 min-w-0 overflow-hidden">
             <ODimensionChip
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
               :dim-key="key"
               :value="value"
               :tooltip="true"
-              class="tw:min-w-0"
+              class="min-w-0"
             />
             <OTag
               v-if="getSortedDimensions(row.group_values).length > 2"
               type="countChip"
               value="neutral"
-              class="tw:shrink-0"
+              class="shrink-0"
             >
               +{{ getSortedDimensions(row.group_values).length - 2 }} more
               <OTooltip :delay="300" :max-width="'28rem'">

@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               <div v-if="getWeakestDimension(record)" class="mb-4">
                 <div class="flex items-center gap-2 mb-2">
                   <OIcon name="trending-down" size="xs" />
-                  <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">{{ $t("traces.evaluations.weakestDimension") }}</span>
+                  <span class="text-xs font-medium text-[var(--o2-text-secondary)]">{{ $t("traces.evaluations.weakestDimension") }}</span>
                   <OTag type="evalBadge" value="weakest">{{ formatDimLabel(getWeakestDimension(record)!.dimension) }}</OTag>
                 </div>
                 <div v-if="getWeakestDimension(record)!.reasoning" class="text-sm bg-[var(--o2-border-color)] p-3 rounded-md leading-relaxed">
@@ -240,12 +240,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                     <div class="text-[10px] font-bold text-[var(--o2-text-secondary)] uppercase tracking-wider">
                       {{ formatDimLabel(dim.dimension) }}
                     </div>
-                    <!-- Pass/Fail tw:inline -->
+                    <!-- Pass/Fail inline -->
                     <OTag
                       v-if="isTemplateDimension(dim.dimension)"
                       type="evaluationVerdict"
                       :value="getDimVerdict(dim.score)"
-                      class="tw:text-[9px] tw:py-px tw:px-1"
+                      class="text-[9px] py-px px-1"
                     />
                   </div>
                   <div class="text-xs leading-relaxed text-[var(--o2-text-primary)]">
@@ -366,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                         v-if="isTemplateDimension(dim.dimension)"
                         type="evalBadge"
                         value="template"
-                        class="tw:text-[9px] tw:py-px tw:px-1"
+                        class="text-[9px] py-px px-1"
                       />
                     </div>
                     <div class="flex items-center gap-1.5">
@@ -375,9 +375,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                         v-if="isTemplateDimension(dim.dimension)"
                         type="evaluationVerdict"
                         :value="getDimVerdict(dim.score)"
-                        class="tw:text-[9px] tw:py-px tw:px-1"
+                        class="text-[9px] py-px px-1"
                       />
-                      <span class="tw:text-xs tw:font-bold tw:text-[var(--o2-text-primary)]">{{ formatScore(dim.score) }}</span>
+                      <span class="text-xs font-bold text-[var(--o2-text-primary)]">{{ formatScore(dim.score) }}</span>
                     </div>
                   </div>
                   <div class="h-1.5 w-full bg-[var(--o2-border-color)] rounded-full overflow-hidden">

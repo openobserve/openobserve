@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-sm font-semibold leading-snug">
                 {{ pattern.name }}
               </span>
-              <div class="tw:flex tw:flex-wrap tw:gap-1">
+              <div class="flex flex-wrap gap-1">
                 <OTag
                   v-for="tag in pattern.tags.slice(0, 3)"
                   :key="tag"
@@ -179,9 +179,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="tw:mb-3">
-          <div class="text-weight-bold tw:mb-1">{{ t('regex_patterns.tags') }}</div>
-          <div class="tw:flex tw:flex-wrap tw:gap-2">
+        <div class="mb-3">
+          <div class="text-weight-bold mb-1">{{ t('regex_patterns.tags') }}</div>
+          <div class="flex flex-wrap gap-2">
             <OTag
               v-for="tag in previewedPattern?.tags"
               :key="tag"

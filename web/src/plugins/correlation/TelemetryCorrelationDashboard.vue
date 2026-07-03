@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <span>{{ group.label }}</span>
                             <OTag
                               type="fieldTag"
-                              class="tw:ml-1"
+                              class="ml-1"
                             >{{ group.streams.length }}</OTag>
                           </div>
                           <div class="flex gap-1">
@@ -350,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTag
                         type="tabChip"
                         :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
-                        class="tw:ml-0.5"
+                        class="ml-0.5"
                       >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OTag>
                     </div>
                   </OTab>
@@ -722,7 +722,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span>{{ group.label }}</span>
                           <OTag
                             type="fieldTag"
-                            class="tw:ml-1"
+                            class="ml-1"
                           >{{ group.streams.length }}</OTag>
                         </div>
                         <div class="flex gap-1">
@@ -858,7 +858,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTag
                       type="tabChip"
                       :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
-                      class="tw:ml-0.5"
+                      class="ml-0.5"
                     >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OTag>
                   </div>
                 </OTab>
@@ -1016,7 +1016,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="fieldTag" value="primary">
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
               </OTag>
-              <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
+              <div class="ml-auto flex items-center gap-2">
                 <OButton
                   variant="ghost"
                   size="sm-action"
@@ -1109,7 +1109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>{{ group.label }}</span>
                 <OTag
                   type="fieldTag"
-                  class="tw:ml-1"
+                  class="ml-1"
                 >{{ group.streams.length }}</OTag>
               </div>
               <div class="flex gap-1">

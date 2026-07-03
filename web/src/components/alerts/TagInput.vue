@@ -27,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tag-input-label absolute top-4 left-3 text-base text-[rgba(0,0,0,0.6)] pointer-events-none transition-all duration-300 bg-transparent px-1 -ml-1"
         style="transition-timing-function: cubic-bezier(0.25, 0.8, 0.5, 1); transform-origin: left top;"
       >{{ label }}</label>
-      <div data-test="tags-and-input" class="tw:flex tw:flex-wrap tw:items-start tw:gap-1 tw:mt-[5px] tw:w-full tw:overflow-hidden">
+      <div data-test="tags-and-input" class="flex flex-wrap items-start gap-1 mt-[5px] w-full overflow-hidden">
         <OTag
           v-for="(tag, index) in modelValue"
           :key="index"
           :data-test="`tag-chip-${index}`"
           type="selectionChip"
-          class="tag-chip tw:m-0! tw:shrink-0 tw:grow-0 tw:basis-auto"
+          class="tag-chip m-0! shrink-0 grow-0 basis-auto"
           style="background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%)"
         >
           {{ tag }}

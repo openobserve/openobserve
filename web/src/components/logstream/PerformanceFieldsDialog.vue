@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="field.name"
           type="indexFieldType"
           value="fts"
-          class="tw:mr-1 tw:mb-1"
+          class="mr-1 mb-1"
         >
           {{ field.name }}
           <template #trailing>
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="field.name"
           type="indexFieldType"
           value="secondaryIndex"
-          class="tw:mr-1 tw:mb-1"
+          class="mr-1 mb-1"
         >
           {{ field.name }}
           <template #trailing>

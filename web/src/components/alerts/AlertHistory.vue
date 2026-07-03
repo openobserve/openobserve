@@ -264,8 +264,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ selectedRow.alert_name }}
                   </div>
                 </div>
-                <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Status</div>
+                <div class="w-1/2">
+                  <div class="text-xs text-text-secondary mb-1">Status</div>
                   <OTag type="alertState" :value="selectedRow.status" />
                 </div>
               </div>

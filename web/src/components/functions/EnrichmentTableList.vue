@@ -313,12 +313,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-xl font-semibold">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
         </div>
         <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
-          <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border">
-            <li v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" :data-test="`enrichment-url-jobs-item-${index}`" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
-              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="tw:text-sm tw:font-bold">Job {{ index + 1 }}</span>
-                <span class="tw:block tw:text-xs tw:text-muted-foreground">{{ job.url }}</span>
-                <span class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
+          <ul class="flex flex-col divide-y divide-border">
+            <li v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" :data-test="`enrichment-url-jobs-item-${index}`" class="flex items-center gap-2 p-4">
+              <div class="flex flex-col flex-1 min-w-0">
+                <span class="text-sm font-bold">Job {{ index + 1 }}</span>
+                <span class="block text-xs text-muted-foreground">{{ job.url }}</span>
+                <span class="block text-xs text-muted-foreground mt-2">
                   <OTag
                     :data-test="`enrichment-url-jobs-item-${index}-status-badge`"
                     :data-test-value="job.status"

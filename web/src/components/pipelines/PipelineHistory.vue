@@ -250,8 +250,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ selectedRow.pipeline_name }}
                 </div>
               </div>
-              <div class="tw:w-1/2">
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Status</div>
+              <div class="w-1/2">
+                <div class="text-xs text-gray-400 mb-1">Status</div>
                 <OTag type="queryStatus" :value="selectedRow.status" />
               </div>
             </div>

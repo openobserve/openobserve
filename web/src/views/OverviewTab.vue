@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-sm font-medium tracking-[0.01em] text-(--o2-text-primary)">
           {{ t('overview.activeIncidents') }}
           <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
-          <span v-if="incidentsTotal > incidents.length" class="tw:ml-2 tw:text-xs tw:font-normal tw:text-(--o2-text-muted) tw:align-middle">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
+          <span v-if="incidentsTotal > incidents.length" class="ml-2 text-xs font-normal text-(--o2-text-muted) align-middle">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
         </div>
         <button class="text-xs font-medium text-(--o2-primary-color) bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
       </div>
@@ -63,8 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <path d="M12 8v4m0 4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
           </span>
-          <div class="tw:flex-1 tw:min-w-0">
-            <div class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary) tw:flex tw:items-center tw:flex-wrap tw:gap-1">
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-(--o2-text-primary) flex items-center flex-wrap gap-1">
               <OTag type="severity" :value="(inc.severity || 'p4').toLowerCase()" />
               {{ inc.title || t('overview.untitledIncident') }}
               <template v-if="inc.group_values && Object.keys(inc.group_values).length > 0">
@@ -103,8 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-sm font-medium tracking-[0.01em] text-(--o2-text-primary)">
           {{ t('overview.services') }}
           <OTag type="countChip" value="warning">{{ services.length }}</OTag>
-          <span v-if="servicePanelVisible && selectedService" class="tw:text-xs tw:font-normal tw:text-(--o2-text-muted) tw:ml-1">
-            — viewing <strong class="tw:font-semibold tw:text-(--o2-text-primary)">{{ selectedService.label ?? selectedService.id }}</strong>
+          <span v-if="servicePanelVisible && selectedService" class="text-xs font-normal text-(--o2-text-muted) ml-1">
+            — viewing <strong class="font-semibold text-(--o2-text-primary)">{{ selectedService.label ?? selectedService.id }}</strong>
           </span>
         </div>
         <button class="text-xs font-medium text-(--o2-primary-color) bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToServiceGraph">{{ t('overview.viewAll') }} →</button>
@@ -249,17 +249,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="ev.id"
           class="ov-event-row flex items-center gap-3 py-2 px-[0.875rem] border-b border-b-[0.0625em] border-b-(--o2-border-color) text-[0.8125rem] transition-[background] duration-150 hover:bg-(--o2-hover-gray)"
         >
-          <OTag type="eventStatus" :value="ev.typeLabel" class="tw:shrink-0" />
-          <span class="tw:font-medium tw:text-(--o2-text-primary) tw:whitespace-nowrap tw:min-w-[7.5em] tw:max-w-[12.5em] tw:overflow-hidden tw:text-ellipsis">{{ ev.service }}</span>
-          <span class="tw:flex-1 tw:text-(--o2-text-muted) tw:truncate">{{ ev.description }}</span>
+          <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0" />
+          <span class="font-medium text-(--o2-text-primary) whitespace-nowrap min-w-[7.5em] max-w-[12.5em] overflow-hidden text-ellipsis">{{ ev.service }}</span>
+          <span class="flex-1 text-(--o2-text-muted) truncate">{{ ev.description }}</span>
           <OTag
             v-if="ev.failCount > 1"
             type="countChip"
             value="error"
-            class="tw:shrink-0"
+            class="shrink-0"
             :title="`Failed ${ev.failCount} times in this window`"
           >×{{ ev.failCount }}</OTag>
-          <span class="tw:shrink-0 tw:text-(--o2-text-muted) tw:text-xs tw:whitespace-nowrap">{{ ev.timeAgo }}</span>
+          <span class="shrink-0 text-(--o2-text-muted) text-xs whitespace-nowrap">{{ ev.timeAgo }}</span>
         </div>
       </div>
     </section>

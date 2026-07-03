@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-correlation_reason="{ row }">
-        <span class="tw:inline-flex">
+        <span class="inline-flex">
           <OTag
             data-test="correlation-reason-badge"
             type="correlationReason"

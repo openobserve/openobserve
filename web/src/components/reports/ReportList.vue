@@ -156,13 +156,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="row.dashboards?.[0]?.report_type === 'png'"
                     type="reportTag"
                     value="png"
-                    class="tw:ml-1"
+                    class="ml-1"
                   />
                   <OTag
                     v-if="row.imagePreview"
                     type="reportTag"
                     value="preview"
-                    class="tw:ml-1"
+                    class="ml-1"
                   />
                 </template>
 

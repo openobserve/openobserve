@@ -218,7 +218,7 @@ size="xs" class="warning" />{{
           @mouseenter="handleMouseEnter"
           @mouseleave="handleMouseLeave"
         >
-          <img :src="getBtnLogo" class="ai-icon tw:w-5 tw:h-5 tw:shrink-0" />
+          <img :src="getBtnLogo" class="ai-icon w-5 h-5 shrink-0" />
           <OTooltip
             side="bottom"
             align="center"

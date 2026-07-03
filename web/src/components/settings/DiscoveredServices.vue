@@ -203,8 +203,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #cell-service_name="{ row }">
-              <div v-if="row.__type === 'group'" class="tw:flex tw:items-center tw:gap-2 tw:ml-2">
-                <span class="tw:font-semibold">{{ row.service_name }}</span>
+              <div v-if="row.__type === 'group'" class="flex items-center gap-2 ml-2">
+                <span class="font-semibold">{{ row.service_name }}</span>
                 <OTag type="countChip" value="neutral">
                   {{ row.instances.length }}
                   {{
@@ -214,8 +214,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}
                 </OTag>
               </div>
-              <div v-else class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-                <span class="set-id-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-2 tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-semibold tw:border tw:whitespace-nowrap tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(109,40,217,0.2)] tw:text-[#c4b5fd] tw:border-[#7c3aed]' : 'tw:bg-[#ede9fe] tw:text-[#5b21b6] tw:border-[#a78bfa]'">{{ row.set_id }}</span>
+              <div v-else class="flex items-center gap-2 flex-wrap">
+                <span class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-[0.625rem] text-[0.6875rem] font-semibold border whitespace-nowrap shrink-0" :class="store.state.theme === 'dark' ? 'bg-[rgba(109,40,217,0.2)] text-[#c4b5fd] border-[#7c3aed]' : 'bg-[#ede9fe] text-[#5b21b6] border-[#a78bfa]'">{{ row.set_id }}</span>
                 <ODimensionChip
                   v-for="[key, value] in Object.entries(
                     row.disambiguation,
@@ -233,30 +233,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #cell-telemetry="{ row }">
-              <div v-if="row.__type === 'group'" class="instance-telemetry-grid tw:inline-grid tw:grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] tw:gap-1 tw:items-center tw:justify-items-start">
+              <div v-if="row.__type === 'group'" class="instance-telemetry-grid inline-grid grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] gap-1 items-center justify-items-start">
                 <OTag
                   v-if="row.totalLogs > 0"
                   type="streamType"
                   :value="'logs'"
                 />
-                <span v-else class="telemetry-slot-empty tw:inline-block"></span>
+                <span v-else class="telemetry-slot-empty inline-block"></span>
                 <OTag
                   v-if="row.totalTraces > 0"
                   type="streamType"
                   :value="'traces'"
                 />
-                <span v-else class="telemetry-slot-empty tw:inline-block"></span>
+                <span v-else class="telemetry-slot-empty inline-block"></span>
                 <OTag
                   v-if="row.totalMetrics > 0"
                   type="streamType"
                   :value="'metrics'"
                 />
-                <span v-else class="telemetry-slot-empty tw:inline-block"></span>
+                <span v-else class="telemetry-slot-empty inline-block"></span>
               </div>
               <div v-else class="instance-telemetry-grid inline-grid grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] gap-1 items-center justify-items-start">
                 <span
                   v-if="row.logs_streams.length > 0"
-                  class="tw:inline-flex tw:min-w-0"
+                  class="inline-flex min-w-0"
                 >
                   <OTag type="streamType" :value="'logs'">
                     {{
@@ -267,14 +267,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OTag>
                   <OTooltip
                     :content="row.logs_streams.join(', ')"
-                    content-class="tw:text-xs"
+                    content-class="text-xs"
                   />
                 </span>
                 <span v-else class="telemetry-slot-empty inline-block"></span>
 
                 <span
                   v-if="row.traces_streams.length > 0"
-                  class="tw:inline-flex tw:min-w-0"
+                  class="inline-flex min-w-0"
                 >
                   <OTag type="streamType" :value="'traces'">
                     {{
@@ -285,14 +285,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OTag>
                   <OTooltip
                     :content="row.traces_streams.join(', ')"
-                    content-class="tw:text-xs"
+                    content-class="text-xs"
                   />
                 </span>
                 <span v-else class="telemetry-slot-empty inline-block"></span>
 
                 <span
                   v-if="row.metrics_streams.length > 0"
-                  class="tw:inline-flex tw:min-w-0"
+                  class="inline-flex min-w-0"
                 >
                   <OTag type="streamType" :value="'metrics'">
                     {{
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OTag>
                   <OTooltip
                     :content="row.metrics_streams.join(', ')"
-                    content-class="tw:text-xs"
+                    content-class="text-xs"
                   />
                 </span>
                 <span v-else class="telemetry-slot-empty inline-block"></span>
@@ -417,13 +417,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="selectedService && selectedService.logs_streams.length > 0"
             >
-              <div class="panel-signal-row tw:flex tw:items-start tw:gap-3">
+              <div class="panel-signal-row flex items-start gap-3">
                 <OTag
                   type="streamType"
                   :value="'logs'"
                   class="panel-signal-type"
                 />
-                <div class="tw:flex tw:flex-wrap tw:gap-1.5">
+                <div class="flex flex-wrap gap-1.5">
                   <span
                     v-for="stream in selectedService.logs_streams"
                     :key="stream"
@@ -441,13 +441,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 selectedService && selectedService.traces_streams.length > 0
               "
             >
-              <div class="panel-signal-row tw:flex tw:items-start tw:gap-3">
+              <div class="panel-signal-row flex items-start gap-3">
                 <OTag
                   type="streamType"
                   :value="'traces'"
                   class="panel-signal-type"
                 />
-                <div class="tw:flex tw:flex-wrap tw:gap-1.5">
+                <div class="flex flex-wrap gap-1.5">
                   <span
                     v-for="stream in selectedService.traces_streams"
                     :key="stream"
@@ -465,13 +465,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 selectedService && selectedService.metrics_streams.length > 0
               "
             >
-              <div class="panel-signal-row tw:flex tw:items-start tw:gap-3">
+              <div class="panel-signal-row flex items-start gap-3">
                 <OTag
                   type="streamType"
                   :value="'metrics'"
                   class="panel-signal-type"
                 />
-                <div class="tw:flex tw:flex-wrap tw:gap-1.5">
+                <div class="flex flex-wrap gap-1.5">
                   <span
                     v-for="stream in selectedService.metrics_streams"
                     :key="stream"

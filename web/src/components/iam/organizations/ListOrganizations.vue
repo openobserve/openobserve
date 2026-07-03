@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-plan="{ row }">
             <OTag v-if="row.plan && row.plan !== '-'" type="subscriptionPlan" :value="row.plan" />
-            <span v-else class="tw:text-text-primary">—</span>
+            <span v-else class="text-text-primary">—</span>
           </template>
 
           <template #cell-actions="{ row }">

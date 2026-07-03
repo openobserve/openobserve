@@ -244,13 +244,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="cursor-pointer opacity-50 shrink-0"
                         @click="toggleFlappingGroup(row.timestamp)"
                       />
-                      <OTag type="alertState" value="flapping" class="tw:cursor-pointer tw:shrink-0" @click="toggleFlappingGroup(row.timestamp)" />
-                      <span class="tw:text-[11px] tw:truncate" style="color: var(--color-text-secondary)">
+                      <OTag type="alertState" value="flapping" class="cursor-pointer shrink-0" @click="toggleFlappingGroup(row.timestamp)" />
+                      <span class="text-[11px] truncate" style="color: var(--color-text-secondary)">
                         {{ row._children.length }} rows · {{ row._duration }}
                       </span>
                     </div>
                     <!-- Normal row -->
-                    <span v-else class="tw:inline-flex tw:cursor-default">
+                    <span v-else class="inline-flex cursor-default">
                       <OTag
                         type="alertState"
                         :value="row.status"

@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-count-badge"
           type="logsResultChip"
           value="neutral"
-          class="tw:mr-[0.6rem]"
+          class="mr-[0.6rem]"
         >{{ `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}` }}</OTag>
         <OTag
           v-if="
@@ -65,10 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-error-count-badge"
           variant="error"
           :clickable="true"
-          class="tw:text-xs tw:rounded! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]!"
+          class="text-xs rounded! py-[0.4rem]! px-[0.625rem]! text-[0.75rem]!"
           :class="showErrorOnly
-            ? 'tw:bg-badge-error-solid-bg! tw:text-badge-error-solid-text!'
-            : 'tw:bg-[var(--o2-error-tag-bg)]! tw:text-[var(--o2-error-tag-text)]!'"
+            ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
+            : 'bg-[var(--o2-error-tag-bg)]! text-[var(--o2-error-tag-text)]!'"
           @click="toggleErrorOnly"
         >
           {{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}

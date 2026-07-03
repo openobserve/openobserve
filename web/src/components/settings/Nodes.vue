@@ -471,7 +471,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="store.state.zoConfig.super_cluster_enabled"
             #cell-region="{ row }"
           >
-            <OTag type="fieldTag" class="badge-region tw:mr-1"
+            <OTag type="fieldTag" class="badge-region mr-1"
               >{{ row.region }}
               <OTooltip :content="t('nodes.region')" />
             </OTag>

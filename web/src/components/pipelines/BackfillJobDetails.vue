@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div v-else-if="job" class="flex flex-col gap-5 px-6 py-4">
           <!-- Status and Actions -->
-          <div class="tw:flex tw:items-center tw:justify-between">
+          <div class="flex items-center justify-between">
             <OTag
               type="backfillJobStatus"
               :value="getStatusKey(job.status, job.deletion_status)"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="rounded-md border border-card-border bg-card-bg p-4 flex flex-col gap-3">
               <div class="grid grid-cols-2 gap-x-6 gap-y-3">
                 <div>
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Status</div>
+                  <div class="text-xs text-gray-400 mb-1">Status</div>
                   <OTag
                     type="deletionStatus"
                     :value="typeof job.deletion_status === 'object' ? 'failed' : job.deletion_status"

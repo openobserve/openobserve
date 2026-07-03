@@ -91,15 +91,15 @@ describe("OBadge", () => {
 
   it("applies default variant classes when no variant specified", () => {
     const wrapper = mount(OBadge, { slots: { default: "x" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:bg-badge-default-soft-bg");
-    expect(wrapper.classes().join(" ")).toContain("tw:text-badge-default-soft-text");
+    expect(wrapper.classes().join(" ")).toContain("bg-badge-default-soft-bg");
+    expect(wrapper.classes().join(" ")).toContain("text-badge-default-soft-text");
   });
 
   it.each([
-    ["primary", "tw:bg-badge-primary-soft-bg"],
-    ["success", "tw:bg-badge-success-soft-bg"],
-    ["warning", "tw:bg-badge-warning-soft-bg"],
-    ["error",   "tw:bg-badge-error-soft-bg"],
+    ["primary", "bg-badge-primary-soft-bg"],
+    ["success", "bg-badge-success-soft-bg"],
+    ["warning", "bg-badge-warning-soft-bg"],
+    ["error",   "bg-badge-error-soft-bg"],
   ] as const)("applies %s solid variant classes (now soft-styled)", (variant, expectedClass) => {
     const wrapper = mount(OBadge, {
       props: { variant },
@@ -147,16 +147,16 @@ describe("OBadge", () => {
       slots: { default: "x" },
     });
     const classes = wrapper.classes().join(" ");
-    expect(classes, variant).toContain("tw:ring-1");
-    expect(classes, variant).toContain("tw:ring-inset");
+    expect(classes, variant).toContain("ring-1");
+    expect(classes, variant).toContain("ring-inset");
   });
 
   it("solid variants render the soft (not solid) fill weight", () => {
     for (const variant of ["default", "primary", "success", "warning", "error"] as const) {
       const wrapper = mount(OBadge, { props: { variant }, slots: { default: "x" } });
       const classes = wrapper.classes().join(" ");
-      expect(classes, variant).toContain(`tw:bg-badge-${variant}-soft-bg`);
-      expect(classes, variant).not.toContain(`tw:bg-badge-${variant}-solid-bg`);
+      expect(classes, variant).toContain(`bg-badge-${variant}-soft-bg`);
+      expect(classes, variant).not.toContain(`bg-badge-${variant}-solid-bg`);
     }
   });
 

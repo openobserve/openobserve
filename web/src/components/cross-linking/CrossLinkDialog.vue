@@ -46,12 +46,12 @@
             <div class="text-xs mb-2" style="color: var(--o2-text-muted)">
               {{ t("crossLinks.fieldsHint") }}
             </div>
-            <div v-if="form.fields.length > 0" class="tw:flex tw:flex-wrap tw:gap-1 tw:mb-2">
+            <div v-if="form.fields.length > 0" class="flex flex-wrap gap-1 mb-2">
               <OTag
                 v-for="(field, idx) in form.fields"
                 :key="idx"
                 type="selectionChip"
-                class="tw:max-w-[250px]"
+                class="max-w-[250px]"
                 :data-test="`cross-link-field-chip-${idx}`"
               >
                 <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>

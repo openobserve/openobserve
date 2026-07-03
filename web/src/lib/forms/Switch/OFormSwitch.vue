@@ -45,7 +45,7 @@ const passthroughProps = computed(() => {
     :name="props.name"
   >
     <template #default="{ field }">
-      <div class="tw:flex tw:flex-col tw:gap-1 tw:items-start">
+      <div class="flex flex-col gap-1 items-start">
         <OSwitch
           v-bind="{ ...$attrs, ...passthroughProps }"
           :model-value="field.state.value"

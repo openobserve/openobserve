@@ -51,7 +51,7 @@ const variantClasses: Record<
       v-if="props.shortcut || props.shortcutId"
       :keys="props.shortcut"
       :id="props.shortcutId"
-      class="tw:ms-auto tw:ps-4"
+      class="ms-auto ps-4"
     />
   </DropdownMenuItem>
 </template>

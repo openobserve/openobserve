@@ -52,7 +52,7 @@
               <span class="dimension-section-title cursor-help">Matched Dimensions</span>
               <OTooltip content="These stable dimensions were used to find related telemetry" />
             </div>
-            <div class="service-dimensions tw:flex tw:flex-wrap tw:gap-[6px]">
+            <div class="service-dimensions flex flex-wrap gap-[6px]">
               <ODimensionChip
                 v-for="(value, key) in correlationResult.correlationData.matched_dimensions"
                 :key="`matched-${key}`"
@@ -73,7 +73,7 @@
               <span class="dimension-section-title cursor-help">Additional Filters Available</span>
               <OTooltip content="These additional dimensions can be used for more specific filtering" />
             </div>
-            <div class="service-dimensions tw:flex tw:flex-wrap tw:gap-[6px]">
+            <div class="service-dimensions flex flex-wrap gap-[6px]">
               <ODimensionChip
                 v-for="(value, key) in correlationResult.correlationData.additional_dimensions"
                 :key="`additional-${key}`"

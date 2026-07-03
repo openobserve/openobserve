@@ -32,24 +32,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Summary toolbar — sidebar-style badge chips. Hidden in the Session
          Detail Pretty view (those metrics already show in the KPI cards). -->
-    <div v-if="props.showSummary" class="thread-summary tw:flex tw:flex-wrap tw:items-center tw:gap-[0.4rem] tw:py-2 tw:px-4 tw:bg-(--o2-bg-2,transparent) tw:border-b tw:border-(--o2-border-color)">
+    <div v-if="props.showSummary" class="thread-summary flex flex-wrap items-center gap-[0.4rem] py-2 px-4 bg-(--o2-bg-2,transparent) border-b border-(--o2-border-color)">
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--steps tw:h-[26px]! tw:px-[0.625rem]! tw:py-0! tw:bg-(--o2-card-bg)! tw:border tw:border-(--o2-border-color) tw:rounded! tw:text-xs! tw:text-(--o2-text-primary)! tw:border-l-[3px]! tw:border-l-[#cc785c]!"
+        class="thread-chip thread-chip--steps h-[26px]! px-[0.625rem]! py-0! bg-(--o2-card-bg)! border border-(--o2-border-color) rounded! text-xs! text-(--o2-text-primary)! border-l-[3px]! border-l-[#cc785c]!"
         :title="`${summary.turnCount} LLM step${summary.turnCount === 1 ? '' : 's'}`"
       >
         <template #icon><OIcon name="auto-awesome" size="xs" /></template>
-        <span class="thread-chip__label tw:text-(--o2-text-muted) tw:font-medium tw:mr-[5px] tw:tracking-normal tw:text-[11.5px]">Steps</span>
-        <span class="thread-chip__value tw:text-(--o2-text-primary) tw:font-semibold tw:text-xs">{{ summary.turnCount }}</span>
+        <span class="thread-chip__label text-(--o2-text-muted) font-medium mr-[5px] tracking-normal text-[11.5px]">Steps</span>
+        <span class="thread-chip__value text-(--o2-text-primary) font-semibold text-xs">{{ summary.turnCount }}</span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--tools tw:h-[26px]! tw:px-[0.625rem]! tw:py-0! tw:bg-(--o2-card-bg)! tw:border tw:border-(--o2-border-color) tw:rounded! tw:text-xs! tw:text-(--o2-text-primary)! tw:border-l-[3px]! tw:border-l-[#0ea5e9]!">
+      <OTag type="metricChip" class="thread-chip thread-chip--tools h-[26px]! px-[0.625rem]! py-0! bg-(--o2-card-bg)! border border-(--o2-border-color) rounded! text-xs! text-(--o2-text-primary)! border-l-[3px]! border-l-[#0ea5e9]!">
         <template #icon><OIcon name="build" size="xs" /></template>
-        <span class="thread-chip__label tw:text-(--o2-text-muted) tw:font-medium tw:mr-[5px] tw:tracking-normal tw:text-[11.5px]">Tools</span>
-        <span class="thread-chip__value tw:text-(--o2-text-primary) tw:font-semibold tw:text-xs">{{ summary.toolCallCount }}</span>
+        <span class="thread-chip__label text-(--o2-text-muted) font-medium mr-[5px] tracking-normal text-[11.5px]">Tools</span>
+        <span class="thread-chip__value text-(--o2-text-primary) font-semibold text-xs">{{ summary.toolCallCount }}</span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--duration tw:h-[26px]! tw:px-[0.625rem]! tw:py-0! tw:bg-(--o2-card-bg)! tw:border tw:border-(--o2-border-color) tw:rounded! tw:text-xs! tw:text-(--o2-text-primary)! tw:border-l-[3px]! tw:border-l-[#64748b]!">
+      <OTag type="metricChip" class="thread-chip thread-chip--duration h-[26px]! px-[0.625rem]! py-0! bg-(--o2-card-bg)! border border-(--o2-border-color) rounded! text-xs! text-(--o2-text-primary)! border-l-[3px]! border-l-[#64748b]!">
         <template #icon><OIcon name="schedule" size="xs" /></template>
         <span class="thread-chip__label text-(--o2-text-muted) font-medium mr-[5px] tracking-normal text-[11.5px]">Duration</span>
         <span class="thread-chip__value text-(--o2-text-primary) font-semibold text-xs">
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--cost tw:h-[26px]! tw:px-[0.625rem]! tw:py-0! tw:bg-(--o2-card-bg)! tw:border tw:border-(--o2-border-color) tw:rounded! tw:text-xs! tw:text-(--o2-text-primary)! tw:border-l-[3px]! tw:border-l-[#16a34a]!">
+      <OTag type="metricChip" class="thread-chip thread-chip--cost h-[26px]! px-[0.625rem]! py-0! bg-(--o2-card-bg)! border border-(--o2-border-color) rounded! text-xs! text-(--o2-text-primary)! border-l-[3px]! border-l-[#16a34a]!">
         <template #icon><OIcon name="payments" size="xs" /></template>
         <span class="thread-chip__label text-(--o2-text-muted) font-medium mr-[5px] tracking-normal text-[11.5px]">Cost</span>
         <span class="thread-chip__value text-(--o2-text-primary) font-semibold text-xs">
@@ -68,22 +68,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.dominantModel"
         type="metricChip"
-        class="thread-chip thread-chip--model tw:h-[26px]! tw:px-[0.625rem]! tw:py-0! tw:bg-(--o2-card-bg)! tw:border tw:border-(--o2-border-color) tw:rounded! tw:text-xs! tw:text-(--o2-text-primary)! tw:border-l-[3px]! tw:border-l-[#8b5cf6]!"
+        class="thread-chip thread-chip--model h-[26px]! px-[0.625rem]! py-0! bg-(--o2-card-bg)! border border-(--o2-border-color) rounded! text-xs! text-(--o2-text-primary)! border-l-[3px]! border-l-[#8b5cf6]!"
         :title="summary.dominantModel"
       >
         <template #icon><OIcon name="bolt" size="xs" /></template>
-        <span class="thread-chip__label tw:text-(--o2-text-muted) tw:font-medium tw:mr-[5px] tw:tracking-normal tw:text-[11.5px]">Model</span>
-        <span class="thread-chip__value tw:text-(--o2-text-primary) tw:font-semibold tw:text-xs">{{ summary.dominantModel }}</span>
+        <span class="thread-chip__label text-(--o2-text-muted) font-medium mr-[5px] tracking-normal text-[11.5px]">Model</span>
+        <span class="thread-chip__value text-(--o2-text-primary) font-semibold text-xs">{{ summary.dominantModel }}</span>
       </OTag>
 
       <OTag
         v-if="summary.errorCount > 0"
         type="metricChip"
-        class="thread-chip thread-chip--error tw:h-[26px]! tw:px-[0.625rem]! tw:py-0! tw:bg-(--o2-card-bg)! tw:border tw:border-(--o2-border-color) tw:rounded! tw:text-xs! tw:text-(--o2-text-primary)! tw:border-l-[3px]! tw:border-l-[var(--o2-status-error-text)]!"
+        class="thread-chip thread-chip--error h-[26px]! px-[0.625rem]! py-0! bg-(--o2-card-bg)! border border-(--o2-border-color) rounded! text-xs! text-(--o2-text-primary)! border-l-[3px]! border-l-[var(--o2-status-error-text)]!"
       >
         <template #icon><OIcon name="error-outline" size="xs" /></template>
-        <span class="thread-chip__label tw:text-(--o2-text-muted) tw:font-medium tw:mr-[5px] tw:tracking-normal tw:text-[11.5px]">Errors</span>
-        <span class="thread-chip__value thread-chip__value--error tw:font-semibold tw:text-xs tw:text-(--o2-status-error-text)">{{ summary.errorCount }}</span>
+        <span class="thread-chip__label text-(--o2-text-muted) font-medium mr-[5px] tracking-normal text-[11.5px]">Errors</span>
+        <span class="thread-chip__value thread-chip__value--error font-semibold text-xs text-(--o2-status-error-text)">{{ summary.errorCount }}</span>
       </OTag>
 
     </div>

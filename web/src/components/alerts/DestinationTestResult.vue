@@ -32,7 +32,7 @@ limitations under the License. -->
           <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
           </OTag>
-          <span v-if="result.responseTime" class="tw:font-['Monaco','Consolas','Courier_New',monospace] tw:text-(--q-text-secondary)">
+          <span v-if="result.responseTime" class="font-['Monaco','Consolas','Courier_New',monospace] text-(--q-text-secondary)">
             {{ result.responseTime }}ms
           </span>
         </div>
@@ -57,7 +57,7 @@ limitations under the License. -->
           <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
           </OTag>
-          <span v-if="result.responseTime" class="tw:font-['Monaco','Consolas','Courier_New',monospace] tw:text-(--q-text-secondary)">
+          <span v-if="result.responseTime" class="font-['Monaco','Consolas','Courier_New',monospace] text-(--q-text-secondary)">
             {{ result.responseTime }}ms
           </span>
         </div>

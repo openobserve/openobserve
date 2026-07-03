@@ -73,7 +73,7 @@
             type="evalDataType"
             :value="row.dataType"
           />
-          <span v-else class="tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
+          <span v-else class="text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
         </template>
 
         <template #cell-totalScores="{ row }">

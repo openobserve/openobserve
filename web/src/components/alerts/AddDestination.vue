@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag
                     type="readonlyFlag"
                     value="readonly"
-                    class="tw:ml-2"
+                    class="ml-2"
                     >{{ t("alert_destinations.readonly") }}</OTag
                   >
                 </div>

@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-scope="{ row }">
-            <div class="tw:flex tw:items-center">
+            <div class="flex items-center">
               <OTag
                 type="variableScope"
                 value="global"

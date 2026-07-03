@@ -97,7 +97,7 @@
                     <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
                       {{ t("about.status_lbl") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2 tw:leading-[1.2]">
+                    <td class="px-3 py-2 leading-[1.2]">
                       <OTag
                         type="licenseStatus"
                         :value="licenseData?.expired ? 'expired' : 'active'"

@@ -79,19 +79,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="card-container p-2 mb-2">
             <div class="flex items-center gap-2">
               <div class="col-auto">
-                <OTag type="diffCategory" value="new" class="tw:text-sm!">
-                  <strong class="tw:text-[15px]">{{ diffData.additions.length }}</strong
+                <OTag type="diffCategory" value="new" class="text-sm!">
+                  <strong class="text-[15px]">{{ diffData.additions.length }}</strong
                   >&nbsp;New
                 </OTag>
               </div>
               <div class="col-auto">
-                <OTag type="diffCategory" value="modified" class="tw:text-sm!">
-                  <strong class="tw:text-[15px]">{{ diffData.modifications.length }}</strong
+                <OTag type="diffCategory" value="modified" class="text-sm!">
+                  <strong class="text-[15px]">{{ diffData.modifications.length }}</strong
                   >&nbsp;Modified
                 </OTag>
               </div>
               <div class="col-auto">
-                <OTag type="diffCategory" value="unchanged" class="tw:text-sm!">
+                <OTag type="diffCategory" value="unchanged" class="text-sm!">
                   {{ diffData.unchanged.length }} Unchanged
                 </OTag>
               </div>
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="text-[13px] font-medium">{{ group.display }}</span>
                     <span class="block text-[11px] text-muted-foreground truncate">
                       {{ group.id }} • {{ group.fields.length }} fields
-                      <OTag v-if="group.normalize" type="normalizeState" value="true" class="tw:ml-1" />
+                      <OTag v-if="group.normalize" type="normalizeState" value="true" class="ml-1" />
                     </span>
                   </div>
                   <div class="flex items-center shrink-0 ms-auto">
@@ -264,11 +264,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="field"
         type="fieldNameChip"
         value="highlight"
-        class="tw:m-1"
+        class="m-1"
       >
         {{ field }}
       </OTag>
-      <div class="tw:mt-3">
+      <div class="mt-3">
         <OTag type="normalizeState" :value="!!selectedGroup?.normalize" />
       </div>
     </div>
@@ -290,13 +290,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="field-chips-container tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--o2-primary-background)] tw:rounded">
+        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-[var(--o2-primary-background)] rounded">
           <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
             type="fieldNameChip"
             value="muted"
-            class="tw:m-1"
+            class="m-1"
           >
             {{ field }}
           </OTag>
@@ -307,13 +307,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="field-chips-container tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--o2-primary-background)] tw:rounded">
+        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-[var(--o2-primary-background)] rounded">
           <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
             type="fieldDiffStatus"
             :value="isNewField(field) ? 'new' : 'existing'"
-            class="tw:m-1"
+            class="m-1"
           >
             {{ field }}
             <template #trailing>
@@ -321,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="isNewField(field)"
                 name="add"
                 size="xs"
-                class="tw:ml-1"
+                class="ml-1"
               />
             </template>
           </OTag>

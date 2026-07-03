@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="fieldType"
           :value="tokenType"
           :label="tokenType"
-          class="wcp__type-badge tw:shrink-0 tw:font-mono tw:font-bold"
+          class="wcp__type-badge shrink-0 font-mono font-bold"
         />
         <span
           class="wcp__title text-[0.8125rem] font-semibold text-(--o2-text-heading) truncate"

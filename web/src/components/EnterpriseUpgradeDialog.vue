@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex-1 min-w-0">
                 <div class="text-[13px] font-semibold mb-0.5 leading-[1.25] flex items-center gap-1.5" :class="isDark ? 'text-[rgba(255,255,255,0.95)]' : 'text-[rgba(0,0,0,0.87)]'">
                   {{ feature.name }}
-                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="tw:opacity-60 tw:ml-1 tw:align-middle" />
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="opacity-60 ml-1 align-middle" />
                   <OTag v-if="feature.beta" type="featureFlag" value="beta" data-test="enterprise-upgrade-feature-beta-badge" />
                 </div>
                 <div class="text-[11px] leading-[1.25]" :class="isDark ? 'text-[rgba(255,255,255,0.55)]' : 'text-[rgba(0,0,0,0.55)]'">{{ feature.note }}</div>
@@ -228,9 +228,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex-1 min-w-0">
                 <div data-test="enterprise-upgrade-feature-name" class="text-[13px] font-semibold mb-0.5 leading-[1.25] flex items-center gap-1.5" :class="isDark ? 'text-[rgba(255,255,255,0.95)]' : 'text-[rgba(0,0,0,0.87)]'">
                   {{ feature.name }}
-                  <OIcon v-if="feature.link" name="open-in-new" size="xs" data-test="enterprise-upgrade-feature-external-link" class="tw:opacity-60 tw:ml-1 tw:align-middle" />
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" data-test="enterprise-upgrade-feature-external-link" class="opacity-60 ml-1 align-middle" />
                   <OTag v-if="feature.beta" type="featureFlag" value="beta" data-test="enterprise-upgrade-feature-beta-badge" />
-                  <span v-if="feature.requiresHA" class="tw:inline-flex">
+                  <span v-if="feature.requiresHA" class="inline-flex">
                     <OTag type="featureFlag" value="ha" data-test="enterprise-upgrade-feature-ha-badge" />
                     <OTooltip side="top" align="center" :sideOffset="8" :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')" />
                   </span>

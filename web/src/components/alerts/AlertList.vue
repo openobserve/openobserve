@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else
                       :data-row-action="row.enabled ? 'pause' : 'resume'"
                       :data-test="`alert-list-${row.name}-pause-start-alert`"
-                      class="tw:ml-1"
+                      class="ml-1"
                       :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                       size="icon-sm"
                       :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -351,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <button
                       type="button"
                       data-row-action="export"
-                      class="tw:hidden"
+                      class="hidden"
                       tabindex="-1"
                       aria-hidden="true"
                       @click.stop="exportAlert(row)"
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <button
                       type="button"
                       data-row-action="delete"
-                      class="tw:hidden"
+                      class="hidden"
                       tabindex="-1"
                       aria-hidden="true"
                       @click.stop="showDeleteDialogFn({ row })"
@@ -534,8 +534,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="mr-2"
                       @click="bulkToggleAlerts('pause')"
                     >
-                      <OIcon name="pause" size="sm" class="tw:text-button-ghost-destructive-text" />
-                      <span class="tw:ml-2">Pause</span>
+                      <OIcon name="pause" size="sm" class="text-button-ghost-destructive-text" />
+                      <span class="ml-2">Pause</span>
                     </OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
@@ -545,8 +545,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="mr-2"
                       @click="bulkToggleAlerts('resume')"
                     >
-                      <OIcon name="play-arrow" size="sm" class="tw:text-button-ghost-success-text" />
-                      <span class="tw:ml-2">Resume</span>
+                      <OIcon name="play-arrow" size="sm" class="text-button-ghost-success-text" />
+                      <span class="ml-2">Resume</span>
                     </OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"

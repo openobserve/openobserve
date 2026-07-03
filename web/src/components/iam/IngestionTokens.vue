@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('ingestion.searchToken', 'Search tokens')"
-                class="tw:flex-1"
+                class="flex-1"
                 data-test="ingestion-tokens-search-input"
               />
             </div>

@@ -586,7 +586,7 @@ function fireConfetti() {
               <OIcon name="info-outline" size="sm" /> {{ step.note }}
             </p>
 
-            <div v-if="step.pills?.length" class="pill-list tw:mt-2">
+            <div v-if="step.pills?.length" class="pill-list mt-2">
               <OTag
                 v-for="p in step.pills"
                 :key="p"
@@ -727,7 +727,7 @@ function fireConfetti() {
           <div class="acc-body">
             <template v-if="extras.installs?.length">
               Installs via pip and verifies imports:
-              <div class="pill-list tw:mt-2">
+              <div class="pill-list mt-2">
                 <OTag
                   v-for="p in extras.installs"
                   :key="p"
@@ -741,7 +741,7 @@ function fireConfetti() {
               <div class="mt-3">
                 Writes these keys to <code>./.env</code> (idempotent):
               </div>
-              <div class="pill-list tw:mt-2">
+              <div class="pill-list mt-2">
                 <OTag
                   v-for="p in extras.envVars"
                   :key="p"

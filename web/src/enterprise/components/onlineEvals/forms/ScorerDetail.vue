@@ -150,7 +150,7 @@
           <section class="flex flex-col gap-2 px-5">
             <dl class="sd-kv">
               <dt>{{ t("onlineEvals.scorer.detail.scorerTypeLabel") }}</dt>
-              <dd class="tw:flex tw:flex-wrap tw:items-center tw:gap-1.5">
+              <dd class="flex flex-wrap items-center gap-1.5">
                 <OTag type="scorerType" :value="scorerType" />
                 <OTag type="fieldTag" value="soft">v{{ row.version }}</OTag>
               </dd>

@@ -145,7 +145,7 @@
                 <OTag
                   type="modelSource"
                   :value="testResult.matched.source || 'org'"
-                  class="tw:shrink-0 tw:text-[11px] tw:font-semibold tw:ml-auto"
+                  class="shrink-0 text-[11px] font-semibold ml-auto"
                 >
                   {{ sourceLabel(testResult.matched) }}
                 </OTag>
