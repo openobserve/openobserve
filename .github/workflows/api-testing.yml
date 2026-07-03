@@ -46,19 +46,11 @@ jobs:
 
       - id: check
         run: |
-          # Files that can never affect the API test suite. If EVERY changed file matches one
-          # of these, the run is auto-bypassed (has_changes=false) — no 'e2e' label needed and
-          # the merge is allowed. Includes web/ + UI-test dirs (frontend-only changes don't
-          # affect API tests). Deliberately NOT bypassed (these still trigger the suite):
-          # .github/workflows/** — INCLUDING this api-testing.yml — plus source, package/lock
-          # files, configs, and *.txt (may be fixtures).
-          IGNORE_RE='(\.(md|mdx|markdown|rst|adoc)$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/|\.(png|jpe?g|gif|svg|ico|webp|bmp|pdf|mp4|mov|webm)$|^LICENSE(\.|-|$)|^NOTICE(\.|-|$)|^AUTHORS(\.|$)|^CONTRIBUTORS(\.|$)|^CHANGELOG(\.|-|$)|^\.mailmap$|^CODEOWNERS$|^\.github/CODEOWNERS$|^\.github/ISSUE_TEMPLATE/|^\.github/PULL_REQUEST_TEMPLATE|^\.github/FUNDING|^\.github/dependabot\.ya?ml$|^\.github/renovate\.json$|^\.gitignore$|^\.gitattributes$|^\.editorconfig$|\.gitkeep$|^\.husky/|^\.vscode/|^\.idea/)'
-          BASE="${{ github.base_ref || 'main' }}"
-          git fetch origin "$BASE" --quiet 2>/dev/null || true
-          CHANGED=$(git diff --name-only "origin/$BASE" ${{ github.sha }} 2>/dev/null || true)
-          if [ -z "$CHANGED" ]; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          elif echo "$CHANGED" | grep -qvE "$IGNORE_RE"; then
+          # Skip the suite when a PR touches only docs, images, or frontend/UI-test files
+          # (none affect the API). Anything else — source, workflows (incl. this file) — runs it.
+          IGNORE_RE='(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/|\.(png|jpe?g|gif|svg|webp)$)'
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
+          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qvE "$IGNORE_RE"; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
