@@ -57,7 +57,7 @@
     <template v-else>
       <!-- Scrollable form body -->
       <div class="flex-1 min-h-0 overflow-y-auto px-4 py-4">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="grid grid-cols-1 gap-5">
           <OTextarea
             v-model="agentNameText"
             :label="t('settings.genAiAgentMapping.agentNameFields')"
