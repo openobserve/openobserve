@@ -9,6 +9,13 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
+// Forward tabindex to the slider input; keep it off the wrapper (avoids a double tab-stop).
+const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
+const wrapperAttrs = computed(() => {
+  const { tabindex, ...rest } = $attrs;
+  return rest;
+});
+
 const props = withDefaults(defineProps<SliderProps>(), {
   min: 0,
   max: 100,
@@ -92,7 +99,7 @@ const resolvedSize = computed(() => props.size ?? "md");
 </script>
 
 <template>
-  <div v-bind="$attrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div v-bind="wrapperAttrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
     <div
       v-if="$slots.label || label || showValue || $slots.tooltip"
       class="tw:flex tw:items-center tw:justify-between tw:gap-2"
@@ -160,6 +167,7 @@ const resolvedSize = computed(() => props.size ?? "md");
         :step="step"
         :value="currentValue"
         :disabled="disabled"
+        :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
         :class="[
           'o2-slider-input',
