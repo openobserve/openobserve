@@ -72,16 +72,22 @@ jobs:
             echo "::notice::Manual dispatch — running regardless of main changes."
             exit 0
           fi
+          # Scheduled runs execute on main, so HEAD is main's tip.
           CURRENT_SHA=$(git rev-parse HEAD)
-          # head_sha of the most recent previous run of THIS workflow on main,
-          # excluding the current run.
+          # head_sha of the most recent completed previous run of THIS workflow on
+          # main, excluding the current run. Limit 50 so the current run is always in
+          # the window even under bursty history. On any failure LAST_SHA stays empty
+          # and we fall through to should_run=true (fail-safe: run rather than skip).
           LAST_SHA=$(gh run list \
             --workflow "${{ github.workflow }}" \
             --branch main \
-            --limit 20 \
-            --json databaseId,headSha \
-            --jq "[.[] | select(.databaseId != ${{ github.run_id }})] | .[0].headSha" \
+            --limit 50 \
+            --json databaseId,headSha,status \
+            --jq "[.[] | select(.databaseId != ${{ github.run_id }} and .status == \"completed\")] | .[0].headSha" \
             2>/dev/null || echo "")
+          if [ -z "$LAST_SHA" ]; then
+            echo "::warning::Could not determine last run SHA (no prior completed run, or gh query failed) — defaulting to run."
+          fi
           echo "Current main SHA: ${CURRENT_SHA:-<none>}"
           echo "Last run SHA:     ${LAST_SHA:-<none>}"
           if [ -n "$LAST_SHA" ] && [ "$CURRENT_SHA" = "$LAST_SHA" ]; then
