@@ -121,6 +121,54 @@ describe('ShortcutManager', () => {
 
       expect(handler).toHaveBeenCalledOnce();
     });
+
+    it('should not fire plain-key shortcuts while a contenteditable element has focus', () => {
+      const handler = vi.fn();
+      manager.register({ key: 'r', handler, description: 'refresh' });
+
+      // jsdom does not implement isContentEditable — stub it like a real
+      // contenteditable element (RichTextInput, editable table cells, …).
+      const editable = document.createElement('div');
+      Object.defineProperty(editable, 'isContentEditable', { value: true });
+
+      manager.handleKeyDown(fakeEvent({ key: 'r', target: editable }));
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('should not fire plain-key shortcuts while an ARIA textbox has focus', () => {
+      const handler = vi.fn();
+      manager.register({ key: 'r', handler, description: 'refresh' });
+
+      const widget = document.createElement('div');
+      widget.setAttribute('role', 'combobox');
+
+      manager.handleKeyDown(fakeEvent({ key: 'r', target: widget }));
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('should fire allowInInput shortcuts even while typing in an input', () => {
+      const handler = vi.fn();
+      manager.register({
+        key: 'escape', handler, description: 'close', allowInInput: true,
+      });
+      input.focus();
+
+      manager.handleKeyDown(fakeEvent({ key: 'Escape', target: input }));
+
+      expect(handler).toHaveBeenCalledOnce();
+    });
+
+    it('should suppress plain escape (no allowInInput) while typing in an input', () => {
+      const handler = vi.fn();
+      manager.register({ key: 'escape', handler, description: 'close' });
+      input.focus();
+
+      manager.handleKeyDown(fakeEvent({ key: 'Escape', target: input }));
+
+      expect(handler).not.toHaveBeenCalled();
+    });
   });
 });
 

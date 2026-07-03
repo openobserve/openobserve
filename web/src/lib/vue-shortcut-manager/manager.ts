@@ -272,8 +272,15 @@ export class ShortcutManager {
   ): void {
     // Guard: never intercept single-letter shortcuts while the user is typing
     // in an input/textarea/contenteditable. Modifier-key shortcuts (Ctrl+S,
-    // ⌘+Enter, etc.) are always allowed through regardless of focus.
-    if (!ShortcutManager.hasModifier(shortcut.key) && isInputFocused()) {
+    // ⌘+Enter, etc.) are always allowed through regardless of focus, and a
+    // shortcut can opt out with `allowInInput` (e.g. Escape closing a panel).
+    // The event's composed target (not document.activeElement) is checked so
+    // inputs inside shadow DOM are detected too.
+    if (
+      !shortcut.allowInInput &&
+      !ShortcutManager.hasModifier(shortcut.key) &&
+      isInputFocused(e.composedPath?.()[0] ?? e.target)
+    ) {
       return;
     }
 

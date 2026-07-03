@@ -95,6 +95,7 @@ export function useShortcuts(
             description: def.descriptionKey,
             handler: input.handler,
             whenFocused: input.whenFocused,
+            allowInInput: def.allowInInput,
           });
         });
       } else {
