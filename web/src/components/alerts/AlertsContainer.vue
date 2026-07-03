@@ -16,7 +16,7 @@
             :class="[
               store.state.theme === 'dark'
                 ? 'tw:text-gray-100 tw:bg-gray-600'
-                : 'light-mode-icon',
+                : 'tw:bg-[#f2f1f1] tw:text-[#555555]',
                 iconClass
             ]"
           />
@@ -28,7 +28,7 @@
             :class="[
               store.state.theme === 'dark'
                 ? 'tw:text-gray-100 tw:bg-gray-600'
-                : 'light-mode-icon',
+                : 'tw:bg-[#f2f1f1] tw:text-[#555555]',
                 iconClass
             ]"
           />
@@ -119,11 +119,4 @@
   });
   </script>
   
-  <style scoped lang="scss">
-
-  .light-mode-icon{
-    background-color: #f2f1f1;
-    color: #555555;
-  }
-  </style>
   

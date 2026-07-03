@@ -46,8 +46,3 @@ const handleInvitationsProcessed = (data: any) => {
 };
 </script>
 
-<style scoped>
-.invitations-page {
-  padding: 0;
-}
-</style>

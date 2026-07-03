@@ -154,33 +154,26 @@ describe("AlertContextMenu Component", () => {
   });
 
   describe("Hover State", () => {
-    it("should initialize hoveredItem as null", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.hoveredItem).toBeNull();
-    });
-
-    it("should update hoveredItem to above on mouseenter", async () => {
+    // Hover is now handled purely via CSS (tw:hover:bg-*) rather than a
+    // JS-tracked hoveredItem state, so we assert the hover utility classes exist.
+    it("should apply hover background utility class to above menu item", () => {
       wrapper = createWrapper();
       const aboveItem = wrapper.find('[data-test="alert-context-menu-above"]');
-      await aboveItem.trigger("mouseenter");
-      expect(wrapper.vm.hoveredItem).toBe("above");
+      expect(aboveItem.exists()).toBe(true);
+      expect(aboveItem.classes()).toContain("tw:hover:bg-[#f5f5f5]");
     });
 
-    it("should update hoveredItem to below on mouseenter", async () => {
+    it("should apply hover background utility class to below menu item", () => {
       wrapper = createWrapper();
       const belowItem = wrapper.find('[data-test="alert-context-menu-below"]');
-      await belowItem.trigger("mouseenter");
-      expect(wrapper.vm.hoveredItem).toBe("below");
+      expect(belowItem.exists()).toBe(true);
+      expect(belowItem.classes()).toContain("tw:hover:bg-[#f5f5f5]");
     });
 
-    it("should reset hoveredItem to null on mouseleave", async () => {
+    it("should apply cursor-pointer class to menu items", () => {
       wrapper = createWrapper();
       const aboveItem = wrapper.find('[data-test="alert-context-menu-above"]');
-      await aboveItem.trigger("mouseenter");
-      expect(wrapper.vm.hoveredItem).toBe("above");
-
-      await aboveItem.trigger("mouseleave");
-      expect(wrapper.vm.hoveredItem).toBeNull();
+      expect(aboveItem.classes()).toContain("tw:cursor-pointer");
     });
   });
 
@@ -247,10 +240,14 @@ describe("AlertContextMenu Component", () => {
   describe("Props Reactivity", () => {
     it("should react to visible prop changes", async () => {
       wrapper = createWrapper({ visible: false });
-      expect(wrapper.vm.hoveredItem).toBeNull();
+      expect(wrapper.find('[data-test="alert-context-menu"]').exists()).toBe(
+        false,
+      );
 
       await wrapper.setProps({ visible: true });
-      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-context-menu"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should react to x prop changes", async () => {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import { inject } from "vue";
+import { inject, ref } from "vue";
 import OCombobox from "./OCombobox.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import { firstFieldError } from "../Form/fieldError";
@@ -18,12 +18,21 @@ if (import.meta.env.DEV && !form) {
     "[OFormCombobox] must be rendered inside <OForm>. No form context found.",
   );
 }
+
+// Forward OCombobox's imperative `clear()` (resets reka-ui's internal
+// search-term text + the model in the same tick) so form-based chip-builders —
+// which add the typed value as a chip and immediately reset the input — can
+// clear it deterministically (e.g. CrossLinkDialog). Pure passthrough; no
+// behavior change for single-value consumers that never call it.
+const comboboxRef = ref<{ clear: () => Promise<void> } | null>(null);
+defineExpose({ clear: () => comboboxRef.value?.clear() });
 </script>
 
 <template>
   <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <OCombobox
+        ref="comboboxRef"
         v-bind="$attrs"
         :label="props.label"
         :placeholder="props.placeholder"

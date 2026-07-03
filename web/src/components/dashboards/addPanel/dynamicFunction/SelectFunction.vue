@@ -26,7 +26,7 @@
             <div class="tw:mr-2 tw:relative tw:w-3" style="min-height: 50px">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
-                class="tw:absolute tw:top-0 tw:w-[1px] tw:bg-[#001495] tw:opacity-50"
+                class="tw:absolute tw:top-0 tw:w-px tw:bg-[#001495] tw:opacity-50"
                 :style="{
                   bottom:
                     argIndex === fields.args.length - 1
@@ -61,7 +61,7 @@
                   "
                   icon-key="icon"
                   label-position="inside"
-                  class="o2-custom-select-dashboard arg-type-select tw:mr-0.5 tw:w-auto"
+                  class="o2-custom-select-dashboard arg-type-select tw:mr-0.5 tw:w-fit! tw:flex-none!"
                   :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
@@ -549,20 +549,14 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
-.arg-type-select {
-  // Constrain to icon-only width, prevent OSelect's internal tw:w-full from expanding it
-  width: fit-content !important;
-  flex: none !important;
+<style>
+/* Make the trigger compact - only show the icon + chevron (no label text) */
+.arg-type-select span[class~="tw:flex-1"][class~="tw:truncate"] {
+  display: none !important;
+}
 
-  // Make the trigger compact - only show the icon + chevron (no label text)
-  :deep(span[class~="tw:flex-1"][class~="tw:truncate"]) {
-    display: none !important;
-  }
-
-  :deep(button[type="button"]) {
-    min-width: 2rem;
-    padding-inline-end: 1.5rem !important;
-  }
+.arg-type-select button[type="button"] {
+  min-width: 2rem;
+  padding-inline-end: 1.5rem !important;
 }
 </style>

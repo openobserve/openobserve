@@ -15,11 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="query-plan-tree">
+  <div class="query-plan-tree tw:font-mono tw:text-[13px] tw:leading-[1.8] tw:p-4 tw:bg-[rgba(0,0,0,0.02)] tw:dark:bg-[rgba(255,255,255,0.03)] tw:rounded tw:overflow-x-auto">
     <div
       v-for="(node, index) in tree.children"
       :key="index"
-      class="tree-node"
+      class="tree-node tw:m-0"
+      data-test="query-plan-tree-node"
     >
       <QueryPlanNode
         :node="node"
@@ -53,25 +54,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.query-plan-tree {
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro", monospace;
-  font-size: 13px;
-  line-height: 1.8;
-  padding: 16px;
-  background-color: rgba(0, 0, 0, 0.02);
-  border-radius: 4px;
-  overflow-x: auto;
-
-  .tree-node {
-    margin: 0;
-  }
-}
-
-.body--dark {
-  .query-plan-tree {
-    background-color: rgba(255, 255, 255, 0.03);
-  }
-}
-</style>

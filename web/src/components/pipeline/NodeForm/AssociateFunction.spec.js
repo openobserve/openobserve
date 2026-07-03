@@ -306,13 +306,13 @@ describe("AssociateFunction Component", () => {
       await flushPromises();
       wrapper.vm.loading = true;
       await nextTick();
-      expect(wrapper.find(".stream-routing-container").exists()).toBe(false);
+      expect(wrapper.find('[data-test="associate-function-routing-container"]').exists()).toBe(false);
     });
 
     it("shows stream-routing-container when loading is false", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.find(".stream-routing-container").exists()).toBe(true);
+      expect(wrapper.find('[data-test="associate-function-routing-container"]').exists()).toBe(true);
     });
   });
 
@@ -635,13 +635,13 @@ describe("AssociateFunction Component", () => {
       await flushPromises();
       wrapper.vm.selectedFunction = "alpha";
       await nextTick();
-      expect(wrapper.find(".function-definition-section").exists()).toBe(true);
+      expect(wrapper.find('[data-test="associate-function-definition-section"]').exists()).toBe(true);
     });
 
     it("does NOT show function definition card when no function is selected", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.find(".function-definition-section").exists()).toBe(false);
+      expect(wrapper.find('[data-test="associate-function-definition-section"]').exists()).toBe(false);
     });
 
     it("does NOT show function definition card when createNewFunction is true", async () => {
@@ -654,7 +654,7 @@ describe("AssociateFunction Component", () => {
       wrapper.vm.selectedFunction = "alpha";
       wrapper.vm.createNewFunction = true;
       await nextTick();
-      expect(wrapper.find(".function-definition-section").exists()).toBe(false);
+      expect(wrapper.find('[data-test="associate-function-definition-section"]').exists()).toBe(false);
     });
   });
 

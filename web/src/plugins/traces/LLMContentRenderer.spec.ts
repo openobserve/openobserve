@@ -452,7 +452,9 @@ describe("LLMContentRenderer", () => {
         },
       });
 
-      expect(wrapper.find(".expand-indicator").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="traces-llm-content-renderer-expand-btn"]').exists(),
+      ).toBe(true);
       expect(wrapper.text()).toContain("expand");
     });
 

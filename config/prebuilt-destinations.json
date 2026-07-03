@@ -93,7 +93,7 @@
       },
       "template": {
         "name": "prebuilt_pagerduty",
-        "body": "{\n  \"routing_key\": \"{integration_key}\",\n  \"event_action\": \"trigger\",\n  \"payload\": {\n    \"summary\": \"OpenObserve Alert: {alert_name}\",\n    \"severity\": \"error\",\n    \"source\": \"openobserve\",\n    \"component\": \"{stream_name}\",\n    \"group\": \"{stream_type}\",\n    \"class\": \"alert\",\n    \"custom_details\": {\n      \"alert_name\": \"{alert_name}\",\n      \"stream_name\": \"{stream_name}\",\n      \"stream_type\": \"{stream_type}\",\n      \"alert_count\": \"{alert_count}\",\n      \"alert_threshold\": \"{alert_operator} {alert_threshold}\",\n      \"alert_time\": \"{alert_time}\",\n      \"alert_url\": \"{alert_url}\"\n    }\n  }\n}"
+        "body": "{\n  \"payload\": {\n    \"summary\": \"OpenObserve Alert: {alert_name}\",\n    \"severity\": \"{severity}\",\n    \"source\": \"{source}\",\n    \"component\": \"{stream_name}\",\n    \"group\": \"{stream_type}\",\n    \"class\": \"alert\",\n    \"custom_details\": {\n      \"alert_name\": \"{alert_name}\",\n      \"stream_name\": \"{stream_name}\",\n      \"stream_type\": \"{stream_type}\",\n      \"alert_count\": \"{alert_count}\",\n      \"alert_threshold\": \"{alert_operator} {alert_threshold}\",\n      \"alert_time\": \"{alert_trigger_time_str}\",\n      \"alert_url\": \"{alert_url}\"\n    }\n  },\n  \"routing_key\": \"{routing_key}\",\n  \"event_action\": \"trigger\",\n  \"links\": [\n    {\n      \"href\": \"{alert_url}\",\n      \"text\": \"View in OpenObserve\"\n    }\n  ]\n}"
       },
       "credential_fields": [
         {

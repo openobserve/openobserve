@@ -77,7 +77,7 @@ class="tw:mr-1" />
                   </template>
                 </OButton>
               </template>
-              <div class="column-visibility-list tw:min-w-[220px] tw:max-h-[320px] tw:overflow-y-auto">
+              <div class="column-visibility-list tw:min-w-62.5 tw:max-h-100 tw:overflow-y-auto">
                 <!-- Select All / Deselect All -->
                 <ODropdownItem
                   class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
@@ -1015,7 +1015,6 @@ const handleResetFilters = () => {
 };
 
 const handleRowClick = (row: any) => {
-  console.log("[CorrelatedLogsTable] Row clicked:", row);
 };
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
@@ -1035,11 +1034,6 @@ const handleAddSearchTerm = (
   fieldValue: string | number | boolean,
   action: string,
 ) => {
-  console.log("[CorrelatedLogsTable] Add search term:", {
-    field,
-    fieldValue,
-    action,
-  });
   emit("addSearchTerm", field, fieldValue, action);
 };
 
@@ -1118,7 +1112,6 @@ const handleColumnOrderChange = (newOrder: string[]) => {
   const newOrderStr = JSON.stringify(newOrder);
 
   if (currentOrder === newOrderStr) {
-    console.log("[CorrelatedLogsTable] Order unchanged, skipping update");
     return;
   }
 
@@ -1211,7 +1204,6 @@ const handleViewTrace = (log: any) => {
 
 const handleNestedCorrelation = (row: any) => {
   // Nested correlation is disabled (as per hideViewRelatedButton prop)
-  console.log("[CorrelatedLogsTable] Nested correlation disabled");
 };
 
 // Lifecycle
@@ -1229,7 +1221,6 @@ onBeforeUnmount(() => {
 watch(
   () => props.timeRange,
   (newRange) => {
-    console.log("[CorrelatedLogsTable] Time range changed:", newRange);
   },
   { deep: true },
 );
@@ -1349,43 +1340,29 @@ const unifiedChips = computed<DimensionChip[]>(() =>
   }
 }
 
-// Smooth transitions
-.tw\:overflow-auto {
-  scroll-behavior: smooth;
+.column-visibility-list .column-item {
+  cursor: grab;
+  transition: background-color 0.2s ease;
 }
 
-
-// Column visibility list styling
-.column-visibility-list {
-  max-height: 400px;
-  overflow-y: auto;
-  min-width: 250px;
-
-  .column-item {
-    cursor: grab;
-    transition: background-color 0.2s ease;
-
-    &:hover {
-      background-color: var(--o2-hover-bg);
-    }
-
-    &.dragging {
-      opacity: 0.5;
-      cursor: grabbing;
-    }
-
-    .drag-handle {
-      opacity: 0.4;
-      transition: opacity 0.2s ease;
-    }
-
-    &:hover .drag-handle {
-      opacity: 0.8;
-    }
-  }
+.column-visibility-list .column-item:hover {
+  background-color: var(--o2-hover-bg);
 }
 
-// Responsive adjustments
+.column-visibility-list .column-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.column-visibility-list .column-item .drag-handle {
+  opacity: 0.4;
+  transition: opacity 0.2s ease;
+}
+
+.column-visibility-list .column-item:hover .drag-handle {
+  opacity: 0.8;
+}
+
 @media (max-width: 768px) {
   .correlation-controls {
     padding: 0.5rem;

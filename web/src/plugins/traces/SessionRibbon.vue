@@ -1,0 +1,431 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<!--
+  SessionRibbon — one bar per turn, toggled between Cost / Latency / Tokens.
+  Custom CSS bars (no charting lib) because the data is already in memory
+  (traces[]) and each bar needs the rich TurnPreviewCard hover — Panel chrome + bar colours match the
+-->
+<template>
+  <div
+    class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:pt-[1rem] tw:px-[1rem] tw:pb-[0.625rem] tw:flex tw:flex-col"
+    data-test="session-ribbon"
+  >
+    <!-- Header: title + subtitle (left) · metric toggle (right) -->
+    <div class="tw:flex tw:items-baseline tw:justify-between tw:gap-[0.5rem] tw:mb-[0.75rem]">
+      <div>
+        <div class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
+          {{ t('traces.sessionDetail.ribbon.title') }}
+        </div>
+        <div class="tw:text-[0.7rem] tw:leading-normal tw:text-[var(--o2-text-secondary)] tw:mt-[0.1rem]">
+          {{ t('traces.sessionDetail.ribbon.subtitle') }}
+        </div>
+      </div>
+      <OToggleGroup v-model="metric" class="tw:flex-shrink-0">
+        <OToggleGroupItem value="cost" size="sm">
+          {{ t('traces.sessionDetail.kpi.cost') }}
+        </OToggleGroupItem>
+        <OToggleGroupItem value="latency" size="sm">
+          {{ t('traces.sessionDetail.kpi.duration') }}
+        </OToggleGroupItem>
+        <OToggleGroupItem value="tokens" size="sm">
+          {{ t('traces.sessionDetail.kpi.tokens') }}
+        </OToggleGroupItem>
+      </OToggleGroup>
+    </div>
+
+    <!-- Detail ribbon fills the remaining panel height. The chart region
+         (y-axis + bars) grows; the x-axis row sits beneath it, offset by the
+         y-axis width so the turn numbers stay aligned under their bars. Shows the
+         whole session when it fits, otherwise just the selected window. -->
+    <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+      <!-- chart region: y-axis labels + bars, sharing the grown height -->
+      <div class="tw:flex tw:gap-[0.5rem] tw:flex-1 tw:min-h-0">
+        <div
+          class="tw:flex tw:flex-col tw:justify-between tw:items-end tw:h-full tw:w-[2.75rem] tw:flex-shrink-0 tw:text-[0.6rem] tw:text-[var(--o2-text-muted)] tw:tabular-nums"
+        >
+          <span>{{ maxLabel }}</span>
+          <span>{{ midLabel }}</span>
+          <span>0</span>
+        </div>
+
+        <div
+          class="tw:relative tw:flex-1 tw:min-w-0 tw:min-h-0 tw:flex tw:items-end tw:gap-[3px] tw:border-l tw:border-b tw:border-[var(--o2-border-color)]"
+        >
+          <!-- gridlines (top + mid) to echo the dashboard chart grid -->
+          <div class="tw:absolute tw:inset-x-0 tw:top-0 tw:border-t tw:border-[var(--o2-border-color)] tw:opacity-60" />
+          <div class="tw:absolute tw:inset-x-0 tw:top-1/2 tw:border-t tw:border-[var(--o2-border-color)] tw:opacity-40" />
+
+          <TurnPreviewCard
+            v-for="bar in detailBars"
+            :key="bar.index"
+            :turn="bar.turn"
+            :index="bar.index"
+            :cache-pct="cachePct"
+            :delay="40"
+          >
+            <div
+              class="tw:relative tw:flex-1 tw:min-w-0 tw:rounded-t-[2px] tw:cursor-pointer tw:transition-[height] tw:duration-300 tw:ease-out hover:tw:brightness-110"
+              :style="{ height: bar.pct + '%', background: bar.color }"
+              @click="emit('jump', bar.index + 1)"
+            />
+          </TurnPreviewCard>
+        </div>
+      </div>
+
+      <!-- x-axis + title, offset by the y-axis column width so the numbers stay
+           aligned under their bars. With the window capped at WINDOW turns, every
+           visible bar is wide enough to print its turn number. -->
+      <div class="tw:flex tw:gap-[0.5rem] tw:flex-shrink-0">
+        <div class="tw:w-[2.75rem] tw:flex-shrink-0" />
+        <div class="tw:flex-1 tw:min-w-0">
+          <div class="tw:flex tw:gap-[3px] tw:mt-[0.25rem]">
+            <span
+              v-for="bar in detailBars"
+              :key="bar.index"
+              class="tw:flex-1 tw:min-w-0 tw:text-center tw:text-[0.6rem] tw:text-[var(--o2-text-muted)] tw:tabular-nums"
+            >
+              {{ detailLabeled.has(bar.index + 1) ? bar.index + 1 : "" }}
+            </span>
+          </div>
+
+          <!-- x-axis title — matches the dashboard axis name (nameLocation
+               "middle" + nameTextStyle bold/14px). -->
+          <div
+            class="tw:text-center tw:text-[14px] tw:font-bold tw:text-[var(--o2-text-primary)] tw:mt-[0.25rem]"
+          >
+            {{ t('traces.sessionDetail.turnLabel') }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overview (focus + context): the whole session as a thin minimap, sitting
+         below the chart's Turn axis. Drag the highlighted window to pan, click
+         anywhere to jump it there, or drag an edge to resize. The detailed,
+         labelled ribbon above shows just that window. Only rendered when there
+         are more turns than fit. Offset by the y-axis width so the minimap lines
+         up with the bars above. -->
+    <div
+      v-if="windowed"
+      class="tw:flex tw:gap-[0.5rem] tw:flex-shrink-0 tw:mt-[0.625rem]"
+    >
+      <div class="tw:w-[2.75rem] tw:flex-shrink-0" />
+      <div
+        ref="overviewTrackRef"
+        class="tw:relative tw:flex-1 tw:min-w-0 tw:h-[26px] tw:flex tw:items-end tw:gap-[1px] tw:select-none tw:touch-none"
+        :class="dragging ? 'tw:cursor-grabbing' : 'tw:cursor-grab'"
+        @pointerdown="onTrackPointerDown"
+        data-test="session-ribbon-overview"
+      >
+        <div
+          v-for="bar in bars"
+          :key="bar.index"
+          class="tw:flex-1 tw:min-w-0 tw:rounded-t-[1px] tw:transition-opacity"
+          :style="{
+            height: Math.max(2, bar.pct) + '%',
+            background: bar.color,
+            opacity: bar.index >= windowStart && bar.index < windowEnd ? 1 : 0.3,
+          }"
+        />
+        <!-- selected window: drag the body to pan, or either edge to resize -->
+        <div
+          class="tw:absolute tw:top-0 tw:bottom-0 tw:rounded-[2px] tw:border tw:border-[color-mix(in_srgb,var(--o2-text-primary)_45%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)]"
+          :class="dragging ? 'tw:cursor-grabbing' : 'tw:cursor-grab'"
+          :style="{ left: brushLeftPct + '%', width: brushWidthPct + '%' }"
+          @pointerdown.stop="(e) => beginDrag('pan', e)"
+        >
+          <!-- left resize handle (overhangs the edge so it's easy to grab) -->
+          <div
+            class="tw:absolute tw:top-0 tw:bottom-0 tw:-left-[4px] tw:w-[9px] tw:cursor-ew-resize tw:flex tw:items-center tw:justify-center"
+            @pointerdown.stop="(e) => beginDrag('resize-left', e)"
+          >
+            <div class="tw:w-[2px] tw:h-[55%] tw:rounded tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_60%,transparent)]" />
+          </div>
+          <!-- right resize handle -->
+          <div
+            class="tw:absolute tw:top-0 tw:bottom-0 tw:-right-[4px] tw:w-[9px] tw:cursor-ew-resize tw:flex tw:items-center tw:justify-center"
+            @pointerdown.stop="(e) => beginDrag('resize-right', e)"
+          >
+            <div class="tw:w-[2px] tw:h-[55%] tw:rounded tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_60%,transparent)]" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { ref, computed, watch, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import TurnPreviewCard from "./TurnPreviewCard.vue";
+import type { SessionTraceRow } from "./composables/useSessions";
+import {
+  splitCost,
+  splitDuration,
+  splitNumberWithUnit,
+} from "./llmInsightsDashboard.utils";
+
+const props = defineProps<{
+  traces: SessionTraceRow[];
+  /** Session-level cache reuse percentage forwarded to hover cards. */
+  cachePct: number;
+}>();
+
+// Emitted when a bar is clicked — the parent scrolls/expands that turn (S5).
+const emit = defineEmits<{ (e: "jump", turn: number): void }>();
+
+const { t } = useI18n();
+
+type Metric = "cost" | "latency" | "tokens";
+const metric = ref<Metric>("cost");
+
+// Bar colours match the LLM Insights dashboard chart palette (hex, as the panel
+// defs use). Error turns are always red regardless of the selected metric.
+const COLORS: Record<Metric | "error", string> = {
+  cost: "#3b82f6",
+  latency: "#f97316",
+  tokens: "#a855f7",
+  error: "#ef4444",
+};
+
+function metricValue(row: SessionTraceRow): number {
+  if (metric.value === "cost") return row.cost;
+  if (metric.value === "latency") return row.durationNanos;
+  return row.tokens;
+}
+
+function formatMetric(v: number): string {
+  if (metric.value === "cost") {
+    const c = splitCost(v);
+    return `${c.value}${c.unit}`;
+  }
+  if (metric.value === "latency") {
+    if (!v) return "0";
+    const d = splitDuration(v / 1000);
+    return `${d.value}${d.unit}`;
+  }
+  const tk = splitNumberWithUnit(v);
+  return `${tk.value}${tk.unit}`;
+}
+
+const maxValue = computed(() => {
+  const vals = props.traces.map(metricValue);
+  return vals.length ? Math.max(...vals) : 0;
+});
+
+const maxLabel = computed(() => formatMetric(maxValue.value));
+const midLabel = computed(() => formatMetric(maxValue.value / 2));
+
+const bars = computed(() =>
+  props.traces.map((turn, index) => {
+    const v = metricValue(turn);
+    const pct = maxValue.value > 0 ? Math.max(2, (v / maxValue.value) * 100) : 2;
+    return {
+      turn,
+      index,
+      pct,
+      color: turn.status === "error" ? COLORS.error : COLORS[metric.value],
+    };
+  }),
+);
+
+// ── Focus + context (brush-to-zoom) ─────────────────────────────────────────
+// A many-turn session won't fit as readable, labelled bars in one strip. Rather
+// than page through it, we keep a thin OVERVIEW of the whole session on top with
+// a draggable, RESIZABLE window, and render just that window as the detailed
+// ribbon below — so you get the whole-session shape AND legible turns at once.
+const DEFAULT_WINDOW = 20;
+const MIN_WINDOW = 5;
+// Hard cap on how wide the window can be resized — past this the detail bars get
+// too thin to read, which is the very thing the window is meant to avoid.
+const MAX_WINDOW = 40;
+const total = computed(() => bars.value.length);
+// Overview + window mode kicks in only when there are more turns than the
+// default window; at or below it the detail ribbon just shows them all.
+const windowed = computed(() => total.value > DEFAULT_WINDOW);
+
+// How many turns the window spans (user-resizable, MIN_WINDOW..MAX_WINDOW) and
+// where it starts.
+const windowSize = ref(DEFAULT_WINDOW);
+const windowStart = ref(0);
+// Largest window this session allows: never more than MAX_WINDOW, nor more turns
+// than exist.
+const sizeCap = computed(() =>
+  Math.max(MIN_WINDOW, Math.min(MAX_WINDOW, total.value || MIN_WINDOW)),
+);
+// Clamp the desired size to [MIN_WINDOW, sizeCap].
+const effectiveWindow = computed(() =>
+  Math.min(Math.max(windowSize.value, MIN_WINDOW), sizeCap.value),
+);
+const maxStart = computed(() => Math.max(0, total.value - effectiveWindow.value));
+const windowEnd = computed(() => windowStart.value + effectiveWindow.value); // exclusive
+
+// Reset to the default window at the start whenever the session changes.
+watch(total, () => {
+  windowStart.value = 0;
+  windowSize.value = DEFAULT_WINDOW;
+});
+
+// Turns rendered in the detailed ribbon: the whole session when it fits,
+// otherwise just the selected window.
+const detailBars = computed(() =>
+  bars.value.slice(windowStart.value, windowEnd.value),
+);
+
+// Brush rectangle geometry, as percentages of the overview width.
+const brushLeftPct = computed(() =>
+  total.value ? (windowStart.value / total.value) * 100 : 0,
+);
+const brushWidthPct = computed(() =>
+  total.value ? (effectiveWindow.value / total.value) * 100 : 100,
+);
+
+const clamp = (v: number, lo: number, hi: number) =>
+  Math.min(hi, Math.max(lo, v));
+
+// ── Drag the window: pan the body, or resize from either edge ───────────────
+const overviewTrackRef = ref<HTMLElement | null>(null);
+const dragging = ref(false);
+type DragMode = "pan" | "resize-left" | "resize-right";
+let dragState:
+  | {
+      mode: DragMode;
+      startX: number;
+      startStart: number;
+      startSize: number;
+      trackLeft: number;
+      trackWidth: number;
+    }
+  | null = null;
+
+// Turn index under the given client X (fractional), using the geometry captured
+// at drag start.
+function turnAtClientX(clientX: number): number {
+  if (!dragState) return 0;
+  return ((clientX - dragState.trackLeft) / dragState.trackWidth) * total.value;
+}
+
+function beginDrag(mode: DragMode, e: PointerEvent) {
+  const el = overviewTrackRef.value;
+  if (!el || total.value === 0) return;
+  e.preventDefault();
+  const rect = el.getBoundingClientRect();
+  dragState = {
+    mode,
+    startX: e.clientX,
+    startStart: windowStart.value,
+    startSize: effectiveWindow.value,
+    trackLeft: rect.left,
+    trackWidth: rect.width,
+  };
+  dragging.value = true;
+  document.body.style.cursor = mode === "pan" ? "grabbing" : "ew-resize";
+  document.body.style.userSelect = "none";
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", onPointerUp);
+}
+
+// Click on the bare track recenters the window there, then pans from the grab.
+function onTrackPointerDown(e: PointerEvent) {
+  const el = overviewTrackRef.value;
+  if (!el || total.value === 0) return;
+  const rect = el.getBoundingClientRect();
+  const center = ((e.clientX - rect.left) / rect.width) * total.value;
+  windowStart.value = clamp(
+    Math.round(center - effectiveWindow.value / 2),
+    0,
+    maxStart.value,
+  );
+  beginDrag("pan", e);
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (!dragState) return;
+  const { mode, startX, startStart, startSize, trackWidth } = dragState;
+  if (mode === "pan") {
+    const deltaTurns = Math.round(
+      ((e.clientX - startX) / trackWidth) * total.value,
+    );
+    windowStart.value = clamp(
+      startStart + deltaTurns,
+      0,
+      total.value - effectiveWindow.value,
+    );
+  } else if (mode === "resize-right") {
+    // Left edge fixed; the right edge follows the pointer → grows/shrinks size,
+    // bounded by MIN_WINDOW and MAX_WINDOW (and the end of the session).
+    const newEnd = clamp(
+      Math.round(turnAtClientX(e.clientX)),
+      startStart + MIN_WINDOW,
+      Math.min(total.value, startStart + MAX_WINDOW),
+    );
+    windowSize.value = newEnd - startStart;
+  } else {
+    // resize-left: right edge fixed; the left edge follows the pointer, bounded
+    // so the window stays within MIN_WINDOW..MAX_WINDOW.
+    const fixedEnd = startStart + startSize;
+    const newStart = clamp(
+      Math.round(turnAtClientX(e.clientX)),
+      Math.max(0, fixedEnd - MAX_WINDOW),
+      fixedEnd - MIN_WINDOW,
+    );
+    windowStart.value = newStart;
+    windowSize.value = fixedEnd - newStart;
+  }
+}
+
+function onPointerUp() {
+  dragState = null;
+  dragging.value = false;
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+  window.removeEventListener("pointermove", onPointerMove);
+  window.removeEventListener("pointerup", onPointerUp);
+}
+
+onUnmounted(() => {
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+  window.removeEventListener("pointermove", onPointerMove);
+  window.removeEventListener("pointerup", onPointerUp);
+});
+
+// ── Detail x-axis labels ────────────────────────────────────────────────────
+// Up to the default window every visible bar is labelled; if the window is
+// resized larger, thin to evenly-spaced milestones so numbers don't cram.
+function niceStep(n: number, target: number): number {
+  const raw = n / target;
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / pow;
+  const nice = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+  return Math.max(1, nice * pow);
+}
+const detailLabeled = computed<Set<number>>(() => {
+  const vis = detailBars.value;
+  const set = new Set<number>();
+  if (vis.length <= DEFAULT_WINDOW) {
+    for (const b of vis) set.add(b.index + 1);
+    return set;
+  }
+  const step = niceStep(vis.length, 10);
+  set.add(vis[0].index + 1);
+  for (let i = step; i < vis.length; i += step) set.add(vis[i].index + 1);
+  return set;
+});
+</script>

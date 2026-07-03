@@ -145,13 +145,10 @@ export function filterDimensionsForCorrelation(
       }
     }
     selectedFields = Array.from(allDistinguishByFields);
-    console.log(`[filterDimensionsForCorrelation] Using distinguish_by from all identity sets:`, selectedFields);
   } else if (identityConfig.tracked_alias_ids && identityConfig.tracked_alias_ids.length > 0) {
     // Fallback to tracked_alias_ids
     selectedFields = identityConfig.tracked_alias_ids;
-    console.log(`[filterDimensionsForCorrelation] Using tracked_alias_ids fallback:`, selectedFields);
   } else {
-    console.log(`[filterDimensionsForCorrelation] No identity config available, using all dimensions`);
     // No config available, return all dimensions
     return allDimensions;
   }
@@ -169,13 +166,6 @@ export function filterDimensionsForCorrelation(
     Object.entries(allDimensions).filter(([key]) => fieldsToKeep.has(key))
   );
 
-  console.log(`[filterDimensionsForCorrelation] Filtered dimensions:`, {
-    fieldsToKeep: Array.from(fieldsToKeep),
-    originalCount: Object.keys(allDimensions).length,
-    filteredCount: Object.keys(filtered).length,
-    original: allDimensions,
-    filtered
-  });
 
   return filtered;
 }

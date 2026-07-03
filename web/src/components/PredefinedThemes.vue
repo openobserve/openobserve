@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Light / Dark segmented mode toggle -->
-    <OCardSection class="tw:pt-0 tw:px-2">
+    <OCardSection class="tw:pt-2 tw:px-2">
       <OToggleGroup
         :model-value="activeTab"
         type="single"
@@ -58,30 +58,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Theme list for the active mode. Selecting a row applies it immediately;
          the applied row is highlighted rather than carrying an Apply button. -->
-    <OCardSection class="tw:py-2 tw:px-2 scroll-content-predefined-themes">
+    <OCardSection class="tw:py-2 tw:px-2 tw:max-h-[calc(100vh-100px)] tw:overflow-y-auto">
       <ul class="tw:list-none tw:m-0 tw:p-0 tw:flex tw:flex-col tw:gap-2">
         <li v-for="theme in predefinedThemes" :key="theme.id">
           <button
             type="button"
             :data-test="`predefined-themes-apply-btn-${mode}-${themeNameSlug(theme.name)}`"
-            class="theme-row"
-            :class="{ 'theme-row--applied': isThemeApplied(theme, mode) }"
+            class="tw:flex tw:items-center tw:w-full tw:py-2 tw:px-3 tw:border tw:rounded-lg tw:cursor-pointer tw:transition-[border-color,background-color,box-shadow] tw:duration-150 tw:focus-visible:outline-none tw:focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--o2-primary-color)_40%,transparent)]"
+            :class="isThemeApplied(theme, mode)
+              ? 'tw:border-(--o2-primary-color) tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] tw:shadow-[inset_0_0_0_1px_var(--o2-primary-color)]'
+              : 'tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:hover:border-(--o2-primary-color) tw:hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))]'"
             :aria-pressed="isThemeApplied(theme, mode)"
-            :aria-label="`Apply ${theme.name} theme`"
+            :aria-label="`Apply ${themeDisplayName(theme.name)} theme`"
             @click="applyTheme(theme, mode)"
           >
-            <span class="color-preview-small" :style="swatchStyle(theme[mode])" />
+            <span class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative" :style="swatchStyle(theme[mode])" />
             <span class="tw:ml-2 tw:min-w-0 tw:flex-1 tw:text-left">
-              <span class="tw:block tw:text-sm tw:font-medium tw:truncate">{{ theme.name }}</span>
+              <span class="tw:block tw:text-sm tw:font-medium tw:truncate">{{ themeDisplayName(theme.name) }}</span>
               <span class="tw:block tw:text-xs tw:text-gray-400 tw:truncate">{{ theme[mode].themeColor }}</span>
             </span>
-            <OBadge
+            <OTag
               v-if="isThemeApplied(theme, mode)"
               :data-test="`predefined-themes-applied-badge-${mode}-${themeNameSlug(theme.name)}`"
-              variant="success-soft"
-              size="sm"
-              icon="check-circle"
-            >Applied</OBadge>
+              type="themeApplied"
+              value="applied"
+            />
           </button>
         </li>
 
@@ -90,18 +91,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <button
             type="button"
             :data-test="`predefined-themes-card-${mode}-custom-color`"
-            class="theme-row theme-row--custom"
-            :class="{ 'theme-row--applied': isCustomThemeApplied(mode) }"
+            class="tw:flex tw:items-center tw:w-full tw:py-2 tw:px-3 tw:border tw:border-dashed tw:rounded-lg tw:cursor-pointer tw:transition-[border-color,background-color,box-shadow] tw:duration-150 tw:focus-visible:outline-none tw:focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--o2-primary-color)_40%,transparent)]"
+            :class="isCustomThemeApplied(mode)
+              ? 'tw:border-(--o2-primary-color) tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] tw:shadow-[inset_0_0_0_1px_var(--o2-primary-color)]'
+              : 'tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:hover:border-(--o2-primary-color) tw:hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))]'"
             :aria-pressed="isCustomThemeApplied(mode)"
             aria-label="Pick a custom theme color"
             @click="openColorPicker(mode)"
           >
             <span
               :data-test="`predefined-themes-custom-color-preview-${mode}`"
-              class="color-preview-small"
+              class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative"
               :style="{ backgroundColor: mode === 'light' ? customLightColor : customDarkColor }"
             >
-              <OIcon name="colorize" size="sm" class="custom-color-icon" />
+              <OIcon name="colorize" size="sm" class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2" />
             </span>
             <span class="tw:ml-2 tw:min-w-0 tw:flex-1 tw:text-left">
               <span class="tw:block tw:text-sm tw:font-medium tw:truncate">Custom Color</span>
@@ -111,13 +114,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'Pick any brand hex' }}
               </span>
             </span>
-            <OBadge
+            <OTag
               v-if="isCustomThemeApplied(mode)"
               :data-test="`predefined-themes-applied-badge-${mode}-custom-color`"
-              variant="success-soft"
-              size="sm"
-              icon="check-circle"
-            >Applied</OBadge>
+              type="themeApplied"
+              value="applied"
+            />
           </button>
         </li>
       </ul>
@@ -165,7 +167,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { useStore } from "vuex";
@@ -177,6 +179,7 @@ import {
   THEME_STORAGE_KEYS,
   getDefaultTheme,
   themeNameSlug,
+  themeDisplayName,
   type PredefinedTheme,
   type ThemeModeColors,
 } from "@/constants/themes";
@@ -396,7 +399,7 @@ const applyTheme = (theme: PredefinedTheme, themeMode: "light" | "dark") => {
 
   toast({
     variant: "success",
-    message: `${theme.name} applied to ${themeMode} mode successfully!`,
+    message: `${themeDisplayName(theme.name)} applied to ${themeMode} mode successfully!`,
   });
 };
 
@@ -514,64 +517,3 @@ const resetToDefaultTheme = () => {
   });
 };
 </script>
-
-<style scoped>
-.scroll-content-predefined-themes {
-  max-height: calc(100vh - 100px);
-  overflow-y: auto;
-}
-
-.theme-row {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.5rem;
-  background: var(--o2-card-bg);
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background-color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.theme-row:hover {
-  border-color: var(--o2-primary-color);
-  background: color-mix(in srgb, var(--o2-primary-color) 5%, var(--o2-card-bg));
-}
-
-.theme-row:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--o2-primary-color) 40%, transparent);
-}
-
-/* Applied row — highlighted with a primary ring + subtle tint, no badge needed
-   to convey selection on its own. */
-.theme-row--applied {
-  border-color: var(--o2-primary-color);
-  background: color-mix(in srgb, var(--o2-primary-color) 8%, var(--o2-card-bg));
-  box-shadow: inset 0 0 0 1px var(--o2-primary-color);
-}
-
-.theme-row--custom {
-  border-style: dashed;
-}
-
-.color-preview-small {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.25rem;
-  border: 1px solid var(--o2-border-color);
-  flex-shrink: 0;
-  position: relative;
-}
-
-.custom-color-icon {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-</style>

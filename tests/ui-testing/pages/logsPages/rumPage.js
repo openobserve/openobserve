@@ -15,7 +15,9 @@ export class RumPage {
         this.appTableContainer = '[data-test="rum-app-errors-table"]';
         this.tableBody = '[data-test="o2-table-body"]';
         this.tableRow = '[data-test^="o2-table-row-"]';
-        this.errorViewerContainer = '.error-viewer-container';
+        // #12764 (scoped scss styles removal) moved this from a `.error-viewer-container`
+        // class to a data-test attribute; the `.error-stacks` class below still exists.
+        this.errorViewerContainer = '[data-test="error-viewer-container"]';
         this.errorStacksSection = '.error-stacks';
 
         // Store first error data from query response
@@ -144,8 +146,9 @@ export class RumPage {
     }
 
     async expectTagsSectionVisible() {
-        // Use first() to avoid strict mode violation (multiple .tags-title elements exist)
-        const tagsSection = this.page.locator('.tags-title').first();
+        // #12764 (scoped scss styles removal) dropped the `.tags-title` class from the
+        // RUM error-detail sections; the Tags section title now carries a data-test hook.
+        const tagsSection = this.page.locator('[data-test="error-tags-title"]').first();
         await expect(tagsSection).toBeVisible({ timeout: 5000 });
     }
 

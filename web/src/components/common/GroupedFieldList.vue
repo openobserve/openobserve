@@ -19,7 +19,7 @@
     <template #group-header="{ row, groupName }">
       <slot name="group-header" :row="row" :group-name="groupName">
         <div
-          class="field-group-header tw:h-full tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem]"
+          class="tw:h-full tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem] tw:font-semibold tw:text-xs tw:px-[0.325rem] tw:cursor-pointer tw:bg-surface-subtle tw:text-field-list-group-text"
           @click="toggleGroup(row.group)"
         >
           <div class="tw:flex-1 tw:min-w-0">
@@ -180,13 +180,3 @@ function scrollToTop() {
 defineExpose({ scrollToTop });
 </script>
 
-<style scoped lang="scss">
-.field-group-header {
-  font-weight: 600;
-  font-size: 0.75rem;
-  padding: 0 0.325rem;
-  cursor: pointer;
-  background-color: var(--color-surface-subtle);
-  color: var(--color-field-list-group-text);
-}
-</style>

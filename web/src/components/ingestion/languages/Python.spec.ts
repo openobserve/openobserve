@@ -120,7 +120,7 @@ describe('Python.vue Comprehensive Coverage', () => {
       wrapper = createWrapper();
       const links = wrapper.findAll('a');
       expect(links[0].classes()).toContain('tw:text-text-link');
-      expect(links[0].classes()).toContain('hover:tw:text-text-link-hover');
+      expect(links[0].classes()).toContain('tw:hover:text-text-link-hover');
       expect(links[0].classes()).toContain('tw:underline');
     });
 

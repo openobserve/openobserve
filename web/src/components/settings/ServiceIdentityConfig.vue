@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full service-identity-config tw:mt-2">
+  <div class="tw:w-full service-identity-config tw:mt-2 tw:bg-(--o2-card-bg)">
     <!-- Loading State -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
       <OSpinner size="sm" />
@@ -61,27 +61,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <i18n-t keypath="settings.correlation.exampleText" tag="span">
                 <template #dim1>
-                  <OBadge
-                    size="sm"
-                    variant="primary"
+                  <OTag
+                    type="exampleChip"
+                    value="dim"
                     class="tw:mx-1 tw:my-1 example-chip"
-                    >k8s-cluster=prod</OBadge
+                    >k8s-cluster=prod</OTag
                   >
                 </template>
                 <template #dim2>
-                  <OBadge
-                    size="sm"
-                    variant="primary"
+                  <OTag
+                    type="exampleChip"
+                    value="dim"
                     class="tw:mx-1 tw:my-1 example-chip"
-                    >k8s-deployment=api-server</OBadge
+                    >k8s-deployment=api-server</OTag
                   >
                 </template>
                 <template #value>
-                  <OBadge
-                    size="sm"
-                    variant="success"
+                  <OTag
+                    type="exampleChip"
+                    value="value"
                     class="tw:mx-1 tw:my-1 example-chip"
-                    >prod/api-server</OBadge
+                    >prod/api-server</OTag
                   >
                 </template>
               </i18n-t>
@@ -146,7 +146,7 @@ import { ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import GroupHeader from "@/components/common/GroupHeader.vue";
@@ -356,12 +356,7 @@ const loadConfig = async () => {
 loadConfig();
 </script>
 
-<style scoped lang="scss">
-.service-identity-config {
-  // Match parent card-container background
-  background: var(--o2-card-bg);
-}
-
+<style>
 :deep(.section-header) {
   font-weight: 600;
 }
@@ -377,5 +372,4 @@ loadConfig();
 :deep(.text-caption) {
   color: var(--o2-text-primary);
 }
-
 </style>

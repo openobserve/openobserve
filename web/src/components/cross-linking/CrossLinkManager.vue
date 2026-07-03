@@ -38,13 +38,12 @@
               :data-test="`cross-link-item-name-${idx}`"
             >
               {{ link.name }}
-              <OBadge
+              <OTag
                 v-if="link._source"
-                :variant="link._source === 'stream' ? 'primary' : 'default'"
+                type="crossLinkSource"
+                :value="link._source"
                 class="tw:ml-1"
-              >
-                {{ link._source === 'stream' ? 'Stream' : 'Global' }}
-              </OBadge>
+              />
             </div>
             <!-- URL -->
             <div
@@ -57,14 +56,15 @@
             </div>
             <!-- Fields -->
             <div v-if="link.fields?.length" class="tw:flex tw:flex-wrap tw:gap-1 tw:mt-1">
-              <OBadge
+              <OTag
                 v-for="(field, fIdx) in link.fields"
                 :key="fIdx"
+                type="fieldTag"
                 class="tw:max-w-[200px]"
                 :data-test="`cross-link-field-chip-${fIdx}`"
               >
                 <span class="tw:truncate tw:text-xs" :title="field.name">{{ field.name }}</span>
-              </OBadge>
+              </OTag>
             </div>
           </div>
           <!-- Actions -->
@@ -115,7 +115,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import CrossLinkDialog from "./CrossLinkDialog.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import OBadge from '@/lib/core/Badge/OBadge.vue';
+import OTag from '@/lib/core/Badge/OTag.vue';
 
 
 export interface CrossLink {
@@ -127,7 +127,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkManager",
-  components: { CrossLinkDialog, OButton, OBadge },
+  components: { CrossLinkDialog, OButton, OTag },
   props: {
     modelValue: {
       type: Array as PropType<CrossLink[]>,

@@ -205,7 +205,7 @@ describe("WebVitalsDashboard", () => {
 
     it("renders the learn-web-vitals-link section", () => {
       // Act
-      const section = wrapper.find(".learn-web-vitals-link");
+      const section = wrapper.find('[data-test="learn-web-vitals-link"]');
 
       // Assert
       expect(section.exists()).toBe(true);

@@ -1,0 +1,56 @@
+import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
+
+export const ALL_AGENTS_VALUE = "__all__";
+
+export type AgentFilterSelection = GenAiAgentListItem;
+
+function escapeSqlString(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+export function agentFilterKey(agent: AgentFilterSelection): string {
+  const identity = agent.id ? `id:${agent.id}` : `name:${agent.name}`;
+  return `${agent.source_stream_type}/${agent.source_stream}/${identity}`;
+}
+
+export function agentFilterLabel(agent: AgentFilterSelection): string {
+  // Display the agent identity only — the source stream is part of the filter
+  // KEY (see agentFilterKey) for uniqueness, but it's noise in the dropdown.
+  return agent.id ? `${agent.name} (${agent.id})` : agent.name;
+}
+
+// `_llm_scores` and `_evaluator` carry the agent identity denormalized onto
+// every row at ingest, so a selected agent is filtered inline on those columns
+// — no trace_id subquery against the source stream. Agent id is preferred over
+// name (names are display labels); we fall back to name only when id is absent.
+export function buildScoresAgentFilterWhere(
+  agent: AgentFilterSelection | null | undefined,
+): string | null {
+  if (!agent) return null;
+  const field = agent.id ? "agent_id" : "agent_name";
+  const value = agent.id ?? agent.name;
+  if (!value) return null;
+  return `${field} = '${escapeSqlString(String(value))}'`;
+}
+
+export function buildEvaluatorAgentFilterWhere(
+  agent: AgentFilterSelection | null | undefined,
+): string | null {
+  if (!agent) return null;
+  const field = agent.id
+    ? "attributes_target_agent_id"
+    : "attributes_target_agent_name";
+  const value = agent.id ?? agent.name;
+  if (!value) return null;
+  return `${field} = '${escapeSqlString(String(value))}'`;
+}
+
+export function combineWhere(
+  ...clauses: Array<string | null | undefined>
+): string | null {
+  const filtered = clauses.filter((clause): clause is string =>
+    Boolean(clause),
+  );
+  if (filtered.length === 0) return null;
+  return filtered.map((clause) => `(${clause})`).join(" AND ");
+}

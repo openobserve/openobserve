@@ -121,7 +121,9 @@ describe("ShortUrl", () => {
   });
 
   it("should render message with correct CSS class", () => {
-    expect(wrapper.find('[data-test="message"]').classes()).toContain("message");
+    const message = wrapper.find('[data-test="message"]');
+    expect(message.classes()).toContain("tw:text-base");
+    expect(message.classes()).toContain("tw:text-[#666]");
   });
 
   // Props Tests

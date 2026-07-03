@@ -271,20 +271,51 @@ describe("PanelLayoutSettings.vue", () => {
     });
   });
 
-  describe("Theme", () => {
-    it("applies the dark-mode class when theme is dark", async () => {
+  describe("Template Rendering", () => {
+    beforeEach(() => {
+      wrapper = mountComponent();
+    });
+
+    it("should not hardcode a background on the content area in dark mode", async () => {
       store.state.theme = "dark";
       wrapper = mountComponent();
       await nextTick();
-      const content = wrapper.find('[data-test="panel-layout-settings-content"]');
-      expect(content.exists()).toBe(true);
-      expect(content.attributes("class")).toContain("dark-mode");
+
+      // The content area is theme-agnostic — its background now comes from the
+      // dialog surface, not a hardcoded class. It must not force a light bg
+      // (which previously showed a lighter band in dark mode).
+      const contentDiv = wrapper.find('[data-test="panel-layout-settings-content"]');
+      expect(contentDiv.exists()).toBe(true);
+      expect(contentDiv.attributes("class")).toContain("tw:p-0");
+      expect(contentDiv.attributes("class")).not.toContain("tw:bg-white");
+      expect(contentDiv.attributes("class")).not.toContain(
+        "tw:bg-(--o2-primary-background)",
+      );
     });
 
-    it("does not apply the dark-mode class when theme is light", () => {
-      wrapper = mountComponent();
-      const content = wrapper.find('[data-test="panel-layout-settings-content"]');
-      expect(content.attributes("class")).not.toContain("dark-mode");
+    it("should keep the content area theme-agnostic in light mode", () => {
+      const contentDiv = wrapper.find('[data-test="panel-layout-settings-content"]');
+      expect(contentDiv.exists()).toBe(true);
+      expect(contentDiv.attributes("class")).toContain("tw:p-0");
+      expect(contentDiv.attributes("class")).not.toContain(
+        "tw:bg-(--o2-primary-background)",
+      );
+    });
+
+    it("should expose panel layout title via ODrawer prop", () => {
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.props("title")).toBe("Layout");
+    });
+
+    it("should render the ODrawer overlay", () => {
+      expect(wrapper.findComponent(ODialogStub).exists()).toBe(true);
+    });
+
+    it("should still expose getImageURL helper on the instance", () => {
+      expect(wrapper.vm.getImageURL).toBeDefined();
+      expect(wrapper.vm.getImageURL("images/common/close_icon.svg")).toBe(
+        "mocked-image-url",
+      );
     });
   });
 
