@@ -523,7 +523,7 @@ describe("DrilldownPopUp", () => {
       wrapper.vm.form.setFieldValue("data.logsMode", "custom");
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Enter Custom Query:");
+      expect(wrapper.text()).toContain("Custom SQL Query");
     });
 
     it("should update query value", async () => {
@@ -767,6 +767,57 @@ describe("DrilldownPopUp", () => {
       await submitForm(wrapper);
 
       expect(wrapper.vm.form.state.isValid).toBe(false);
+    });
+
+    it("surfaces an inline required error for an empty custom query after submit", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      setField(wrapper, "name", "Test Drilldown");
+      setField(wrapper, "type", "logs");
+      setField(wrapper, "data.logsMode", "custom");
+      setField(wrapper, "data.logsQuery", "");
+      await flushPromises();
+
+      // submit-then-change timing: nothing shows before the first submit attempt.
+      expect(
+        wrapper
+          .find('[data-test="dashboard-drilldown-logs-query-error"]')
+          .exists(),
+      ).toBe(false);
+
+      await submitForm(wrapper);
+
+      // The Monaco editor is a manual widget bridged into the form; the error is
+      // rendered from its mapped field meta next to the editor.
+      expect(
+        wrapper
+          .find('[data-test="dashboard-drilldown-logs-query-error"]')
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("clears the inline custom-query error once a query is entered", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      setField(wrapper, "name", "Test Drilldown");
+      setField(wrapper, "type", "logs");
+      setField(wrapper, "data.logsMode", "custom");
+      setField(wrapper, "data.logsQuery", "");
+      await submitForm(wrapper);
+      expect(
+        wrapper
+          .find('[data-test="dashboard-drilldown-logs-query-error"]')
+          .exists(),
+      ).toBe(true);
+
+      // Re-validation on change (submit-then-change) drops the error.
+      setField(wrapper, "data.logsQuery", "SELECT * FROM logs");
+      await flushPromises();
+      expect(
+        wrapper
+          .find('[data-test="dashboard-drilldown-logs-query-error"]')
+          .exists(),
+      ).toBe(false);
     });
 
     it("is valid for byDashboard with all selections", async () => {

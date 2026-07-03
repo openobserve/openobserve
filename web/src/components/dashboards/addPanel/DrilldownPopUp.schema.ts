@@ -78,7 +78,7 @@ export const makeDrilldownPopUpSchema = (t: (_key: string) => string) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["data", "logsQuery"],
-            message: t("common.required"),
+            message: t("dashboard.sqlQueryRequired"),
           });
         }
       } else if (val.type === "byDashboard") {

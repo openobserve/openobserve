@@ -75,21 +75,34 @@
           <OToggleGroupItem value="custom" size="sm">{{ t("common.custom") }}</OToggleGroupItem>
         </OFormToggleGroup>
       </div>
-      <div
+      <component
+        :is="form.Field"
+        name="data.logsQuery"
         v-if="drilldownData.data.logsMode === 'custom'"
-        style="margin-top: 10px"
       >
-        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
-        <query-editor
-          data-test="scheduled-alert-sql-editor"
-          ref="queryEditorRef"
-          editor-id="alerts-query-editor"
-          style="height: 80px"
-          :debounceTime="300"
-          :query="drilldownData.data.logsQuery"
-          @update:query="updateQueryValue"
-        />
-      </div>
+        <template #default="{ field }">
+          <div style="margin-top: 10px">
+            <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
+            <query-editor
+              data-test="scheduled-alert-sql-editor"
+              ref="queryEditorRef"
+              editor-id="alerts-query-editor"
+              style="height: 80px"
+              :debounceTime="300"
+              :query="drilldownData.data.logsQuery"
+              @update:query="updateQueryValue"
+            />
+            <span
+              v-if="field.state.meta.errors.length > 0"
+              class="tw:text-xs tw:text-input-error-text tw:leading-none tw:mt-1 tw:block"
+              role="alert"
+              data-test="dashboard-drilldown-logs-query-error"
+            >
+              {{ firstFieldError(field.state.meta.errors) }}
+            </span>
+          </div>
+        </template>
+      </component>
     </div>
     <div v-if="drilldownData.type == 'byUrl'">
       <div style="margin-top: 10px; display: flex; flex-direction: column">
@@ -234,6 +247,7 @@ import useDashboardPanelData from "../../../composables/dashboard/useDashboardPa
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { useLoading } from "@/composables/useLoading";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -746,6 +760,7 @@ export default defineComponent({
     return {
       t,
       form,
+      firstFieldError,
       dashboardPanelData,
       drilldownData,
       "delete": "delete",
