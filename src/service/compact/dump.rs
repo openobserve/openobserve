@@ -31,7 +31,7 @@ use config::{
     },
     utils::{
         parquet::get_recordbatch_reader_from_bytes,
-        time::{BASE_TIME, get_ymdh_from_micros, hour_micros, now, now_micros},
+        time::{BASE_TIME, HourFormat, get_ymdh_from_micros, hour_micros, now, now_micros},
     },
 };
 use futures::StreamExt;
@@ -410,8 +410,8 @@ pub async fn delete_by_time_range(
         .collect::<Vec<_>>();
 
     // Filter files based on the time range to find files to delete
-    let start_date = get_ymdh_from_micros(range.0);
-    let end_date = get_ymdh_from_micros(range.1);
+    let start_date = get_ymdh_from_micros(range.0, HourFormat::Real);
+    let end_date = get_ymdh_from_micros(range.1, HourFormat::Real);
     let (files_to_delete, files_to_keep): (Vec<_>, Vec<_>) = files
         .into_iter()
         .partition(|f| f.date >= start_date && f.date <= end_date);

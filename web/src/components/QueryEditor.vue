@@ -306,7 +306,6 @@ const handleAIGenerate = async () => {
 
   // Check if user wants to execute the query instead of generating a new one
   if (currentQuery && currentQuery.trim() && isExecutionIntent(userInput)) {
-    console.log('[QueryEditor] Execution intent detected, running query instead of generating');
     aiInputText.value = ''; // Clear input
     emit('run-query'); // Trigger query execution
     return;
@@ -419,7 +418,6 @@ const handleGenerationEnd = () => {
 };
 
 const handleGenerationSuccess = ({ type, message }: any) => {
-  console.log('[QueryEditor] Generation success:', { type, message });
 
   // Show success message in AI status
   aiStatusText.value = '✓ ' + t('search.queryGeneratedSuccess');

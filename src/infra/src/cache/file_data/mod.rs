@@ -23,7 +23,7 @@ use std::{
 };
 
 use bytes::Bytes;
-use config::utils::time::get_ymdh_from_micros;
+use config::utils::time::{HourFormat, get_ymdh_from_micros};
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 use object_store::{GetOptions, GetResult};
@@ -486,7 +486,7 @@ fn get_file_time(file: &str) -> Option<u64> {
         }
         "results" => {
             let (_, _, _, meta) = disk::parse_result_cache_key(file)?;
-            get_ymdh_from_micros(meta.start_time).replace("/", "")
+            get_ymdh_from_micros(meta.start_time, HourFormat::Real).replace("/", "")
         }
         "files" => {
             if parts.len() < 8 {
@@ -496,7 +496,7 @@ fn get_file_time(file: &str) -> Option<u64> {
         }
         "aggregations" => {
             let (_, _, _, meta) = disk::parse_aggregation_cache_key(file)?;
-            get_ymdh_from_micros(meta.start_time).replace("/", "")
+            get_ymdh_from_micros(meta.start_time, HourFormat::Real).replace("/", "")
         }
         _ => {
             return None;

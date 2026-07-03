@@ -60,7 +60,7 @@
         </template>
 
         <template #cell-status="{ row }">
-          <span class="tw:inline-flex tw:text-base tw:leading-none" :class="statusClass(row.status)" :aria-label="row.status">●</span>
+          <OTag type="qualityStatus" :value="row.status" label="" :aria-label="row.status" />
         </template>
 
         <template #cell-name="{ row }">
@@ -68,13 +68,11 @@
         </template>
 
         <template #cell-type="{ row }">
-          <OBadge
+          <OTag
             v-if="shortType(row.dataType) !== '—'"
-            :variant="dataTypeBadgeVariant(row.dataType)"
-            size="sm"
-          >
-            {{ row.dataType }}
-          </OBadge>
+            type="evalDataType"
+            :value="row.dataType"
+          />
           <span v-else class="tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
         </template>
 
@@ -125,7 +123,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";
@@ -167,17 +165,6 @@ const filteredRows = computed(() => {
     (r) => r.name.toLowerCase().includes(q) || r.description.toLowerCase().includes(q),
   );
 });
-
-// De-emphasize configs that have no scores in the selected window. They
-// stay visible (so users can spot a scorer they defined but never wired
-// up) but visually recede beneath active rows.
-function statusClass(status: string): string {
-  if (status === 'unhealthy') return 'tw:text-[var(--o2-status-warning-text,#b25400)]';
-  if (status === 'warn') return 'tw:text-[var(--o2-status-warning-text,#b25400)] tw:opacity-[0.7]';
-  if (status === 'healthy') return 'tw:text-[var(--o2-status-success-text,#2e7d32)]';
-  if (status === 'noData') return 'tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:opacity-[0.55]';
-  return 'tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]';
-}
 
 function sparkClass(status: string): string {
   if (status === 'unhealthy' || status === 'warn') return 'tw:text-[var(--o2-status-warning-text,#b25400)]';
@@ -261,15 +248,6 @@ function shortType(type: ScoreConfigRow["dataType"]): string {
   if (type === "categorical") return "Cat";
   if (type === "boolean") return "Bool";
   return "—";
-}
-
-// Map a score-config data type to a neutral design-system OBadge soft variant
-// (numeric → blue, categorical → purple, boolean → teal). Data types are just
-// labels, so use neutral palette colors rather than semantic variants.
-function dataTypeBadgeVariant(type: ScoreConfigRow["dataType"]) {
-  if (type === "categorical") return "purple-soft" as const;
-  if (type === "boolean") return "teal-soft" as const;
-  return "blue-soft" as const; // numeric
 }
 
 function formatCount(n: number | null): string {

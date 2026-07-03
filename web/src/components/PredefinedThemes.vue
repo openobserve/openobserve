@@ -77,13 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="tw:block tw:text-sm tw:font-medium tw:truncate">{{ themeDisplayName(theme.name) }}</span>
               <span class="tw:block tw:text-xs tw:text-gray-400 tw:truncate">{{ theme[mode].themeColor }}</span>
             </span>
-            <OBadge
+            <OTag
               v-if="isThemeApplied(theme, mode)"
               :data-test="`predefined-themes-applied-badge-${mode}-${themeNameSlug(theme.name)}`"
-              variant="success-soft"
-              size="sm"
-              icon="check-circle"
-            >Applied</OBadge>
+              type="themeApplied"
+              value="applied"
+            />
           </button>
         </li>
 
@@ -115,13 +114,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'Pick any brand hex' }}
               </span>
             </span>
-            <OBadge
+            <OTag
               v-if="isCustomThemeApplied(mode)"
               :data-test="`predefined-themes-applied-badge-${mode}-custom-color`"
-              variant="success-soft"
-              size="sm"
-              icon="check-circle"
-            >Applied</OBadge>
+              type="themeApplied"
+              value="applied"
+            />
           </button>
         </li>
       </ul>
@@ -169,7 +167,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { useStore } from "vuex";

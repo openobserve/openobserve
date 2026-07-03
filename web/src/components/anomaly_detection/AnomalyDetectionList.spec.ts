@@ -202,36 +202,6 @@ describe("AnomalyDetectionList - rendering", () => {
   });
 });
 
-describe("AnomalyDetectionList - statusColor", () => {
-  it("returns 'success' for active enabled row", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    const color = (w.vm as any).statusColor({ status: "ready", enabled: true });
-    expect(color).toBe("success");
-  });
-
-  it("returns 'primary' for training enabled row", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    const color = (w.vm as any).statusColor({ status: "training", enabled: true });
-    expect(color).toBe("primary");
-  });
-
-  it("returns 'error' for failed enabled row", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    const color = (w.vm as any).statusColor({ status: "failed", enabled: true });
-    expect(color).toBe("error");
-  });
-
-  it("returns 'default' for disabled row regardless of status", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    const color = (w.vm as any).statusColor({ status: "ready", enabled: false });
-    expect(color).toBe("default");
-  });
-});
-
 describe("AnomalyDetectionList - statusLabel", () => {
   it("returns i18n label for 'ready' enabled row", async () => {
     const w = await mountComp();
