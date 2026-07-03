@@ -4198,13 +4198,13 @@ button.date-time-button {
 }
 
 @media print {
-  .tw\:h-full,
-  .tw\:h-\[calc\(100vh-105px\)\],
-  .tw\:overflow-y-auto,
-  .tw\:overflow-auto,
-  .tw\:overflow-hidden,
-  .tw\:min-h-0,
-  .tw\:flex-1 {
+  .h-full,
+  .h-\[calc\(100vh-105px\)\],
+  .overflow-y-auto,
+  .overflow-auto,
+  .overflow-hidden,
+  .min-h-0,
+  .flex-1 {
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;

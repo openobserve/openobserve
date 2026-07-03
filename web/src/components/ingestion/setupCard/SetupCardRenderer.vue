@@ -935,7 +935,7 @@ function fireConfetti() {
 }
 /* Keep the hint on one line — it overflows the 280px field into the empty space
    to its right rather than wrapping (the input box itself stays md width). */
-.c-config :deep(.tw\:text-input-hint) {
+.c-config :deep(.text-input-hint) {
   white-space: nowrap;
 }
 

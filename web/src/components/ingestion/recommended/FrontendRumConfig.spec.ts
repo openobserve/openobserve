@@ -611,7 +611,7 @@ describe("FrontendRumConfig Component", () => {
       
       // Should show the v-else content with i18n translation key
       expect(wrapper.vm.t).toBeTruthy();
-      const messageElement = wrapper.find('.tw\\:mt-1');
+      const messageElement = wrapper.find('.mt-1');
       expect(messageElement.exists()).toBe(true);
     });
 

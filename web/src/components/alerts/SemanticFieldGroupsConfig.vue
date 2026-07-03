@@ -390,7 +390,7 @@ onMounted(async () => {
       // Scroll within the nearest scrollable parent to avoid pushing
       // ancestor containers (main page layout) out of view
       const scrollParent = el.closest(
-        ".tw\\:overflow-y-auto",
+        ".overflow-y-auto",
       ) as HTMLElement | null;
       if (scrollParent) {
         const parentRect = scrollParent.getBoundingClientRect();

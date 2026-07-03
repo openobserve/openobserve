@@ -1368,14 +1368,14 @@ const unifiedChips = computed<DimensionChip[]>(() =>
     padding: 0.5rem;
   }
 
-  .tw\:flex-wrap {
+  .flex-wrap {
     flex-direction: column;
     align-items: flex-start !important;
   }
 
   // Adjust skeleton for mobile
   [data-test="table-skeleton"] {
-    .tw\:flex {
+    .flex {
       flex-direction: column;
     }
   }

@@ -1092,27 +1092,27 @@ body.body--dark .ungrounded-highlight {
 
 /* Mobile responsiveness */
 @media (max-width: 1024px) {
-  .tw\:flex.tw\:mb-4.tw\:h-28 {
+  .flex.mb-4.h-28 {
     flex-wrap: wrap;
     height: auto !important;
   }
 
-  .tw\:flex.tw\:mb-4.tw\:h-28 .tw\:flex-1 {
+  .flex.mb-4.h-28 .flex-1 {
     min-width: calc(33.33% - 8px);
     height: 112px;
   }
 
-  .tw\:flex.tw\:gap-4 {
+  .flex.gap-4 {
     flex-direction: column;
   }
 
-  .tw\:flex.tw\:gap-4 .tw\:flex-col {
+  .flex.gap-4 .flex-col {
     width: 100% !important;
   }
 }
 
 @media (max-width: 640px) {
-  .tw\:flex.tw\:mb-4 .tw\:flex-1 {
+  .flex.mb-4 .flex-1 {
     min-width: calc(50% - 8px);
   }
 }

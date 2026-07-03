@@ -50,7 +50,7 @@ const classes = computed(() => [
   • The shimmer beam is a 105° tilted gradient — a slight diagonal makes it
     read as a gloss catch, not a mechanical wipe.
 */
-.tw\:skeleton-wave::after {
+.skeleton-wave::after {
   content: "";
   position: absolute;
   inset: 0;

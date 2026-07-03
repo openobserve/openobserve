@@ -104,7 +104,7 @@ describe("CloudWatchMetrics", () => {
 
     it("should have correct component structure", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
+      expect(wrapper.find('.p-3').exists()).toBe(true);
       expect(wrapper.find('.copy-content-container-cls').exists()).toBe(true);
     });
 
@@ -398,7 +398,7 @@ describe("CloudWatchMetrics", () => {
   describe("Template Rendering", () => {
     it("should render main container with correct classes", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('.tw\\:p-3');
+      const container = wrapper.find('.p-3');
       expect(container.exists()).toBe(true);
     });
 
@@ -432,7 +432,7 @@ describe("CloudWatchMetrics", () => {
 
     it("should render note about output availability", () => {
       wrapper = createWrapper();
-      const note = wrapper.find('.tw\\:italic');
+      const note = wrapper.find('.italic');
       expect(note.exists()).toBe(true);
       expect(note.text()).toContain("Note: Output is available under Logs");
       expect(note.text()).toContain("cloudwatch_metrics");

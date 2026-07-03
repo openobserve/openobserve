@@ -85,7 +85,7 @@ describe("OProgressBar", () => {
     it("does not render label span when no slot provided", () => {
       const wrapper = mount(OProgressBar, { props: { value: 0.5 } });
       // the label span only appears when $slots.default is present
-      expect(wrapper.find("span.tw\\:text-progress-bar-label").exists()).toBe(false);
+      expect(wrapper.find("span.text-progress-bar-label").exists()).toBe(false);
     });
   });
 

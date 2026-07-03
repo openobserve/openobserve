@@ -13,7 +13,7 @@ describe("OSpinner", () => {
 
     it("does not render dots", () => {
       const wrapper = mount(OSpinner, { props: { variant: "ring" } });
-      expect(wrapper.findAll("span.tw\\:rounded-full").length).toBe(0);
+      expect(wrapper.findAll("span.rounded-full").length).toBe(0);
     });
   });
 

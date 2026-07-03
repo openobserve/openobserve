@@ -168,7 +168,7 @@ describe("LoadingProgress", () => {
       },
     });
 
-    const container = wrapper.find(".tw\\:absolute");
+    const container = wrapper.find(".absolute");
     expect(container.classes()).toContain("opacity-0");
   });
 
@@ -183,7 +183,7 @@ describe("LoadingProgress", () => {
       },
     });
 
-    const container = wrapper.find(".tw\\:absolute");
+    const container = wrapper.find(".absolute");
     expect(container.classes()).toContain("opacity-100");
   });
 
@@ -292,7 +292,7 @@ describe("LoadingProgress", () => {
       },
     });
 
-    const container = wrapper.find(".tw\\:absolute");
+    const container = wrapper.find(".absolute");
     expect(container.classes()).toContain("top-0");
     expect(container.classes()).toContain("z-[999]");
   });

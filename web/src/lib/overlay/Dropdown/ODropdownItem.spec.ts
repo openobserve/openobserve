@@ -67,7 +67,7 @@ describe("ODropdownItem", () => {
       {},
       { default: () => h("span", "Action") },
     );
-    const item = wrapper.find(".tw\\:text-dropdown-item-text");
+    const item = wrapper.find(".text-dropdown-item-text");
     expect(item.exists()).toBe(true);
   });
 

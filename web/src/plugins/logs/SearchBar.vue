@@ -5565,7 +5565,7 @@ export default defineComponent({
 /* Remove outer box border so both panels blend into the dialog background
    Exclude elements that also have rounded-md (OInput wrapper) so the
    search input keeps its visible border. */
-.saved-view-table .tw\:border:not(.tw\:rounded-md) {
+.saved-view-table .border:not(.rounded-md) {
   border: none;
 }
 
@@ -5577,7 +5577,7 @@ export default defineComponent({
 }
 
 /* Remove pagination top separator */
-.saved-view-table .tw\:border-t {
+.saved-view-table .border-t {
   border-top: none;
 }
 

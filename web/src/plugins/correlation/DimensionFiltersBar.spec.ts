@@ -300,19 +300,19 @@ describe("DimensionFiltersBar.vue", () => {
   describe("Styling and Layout", () => {
     it("should have correct container classes", () => {
       wrapper = createWrapper();
-      const container = wrapper.find(".tw\\:py-2");
+      const container = wrapper.find(".py-2");
       expect(container.exists()).toBe(true);
     });
 
     it("should use flex layout for dimensions", () => {
       wrapper = createWrapper();
-      const flexContainer = wrapper.find(".tw\\:flex");
+      const flexContainer = wrapper.find(".flex");
       expect(flexContainer.exists()).toBe(true);
     });
 
     it("should have proper spacing between elements", () => {
       wrapper = createWrapper();
-      const gapContainer = wrapper.find(".tw\\:gap-3");
+      const gapContainer = wrapper.find(".gap-3");
       expect(gapContainer.exists()).toBe(true);
     });
   });

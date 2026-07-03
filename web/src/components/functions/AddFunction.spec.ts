@@ -697,10 +697,10 @@ describe('AddFunction.vue Branch Coverage', () => {
       });
 
       // Branch: store.state.isAiChatEnabled && !isAddFunctionComponent
-      const mainContainerClasses = wrapper.find('.tw\\:flex.tw\\:overflow-hidden.tw\\:min-h-0');
+      const mainContainerClasses = wrapper.find('.flex.overflow-hidden.min-h-0');
       expect(mainContainerClasses.classes()).toContain('w-3/4');
 
-      const chatContainer = wrapper.find('.tw\\:w-1\\/4');
+      const chatContainer = wrapper.find('.w-1\\/4');
       expect(chatContainer.exists()).toBe(true);
     });
 
@@ -731,10 +731,10 @@ describe('AddFunction.vue Branch Coverage', () => {
       });
 
       // Branch: !store.state.isAiChatEnabled || isAddFunctionComponent
-      const mainContainerClasses = wrapper.find('.tw\\:flex.tw\\:overflow-hidden.tw\\:min-h-0');
+      const mainContainerClasses = wrapper.find('.flex.overflow-hidden.min-h-0');
       expect(mainContainerClasses.classes()).toContain('w-full');
 
-      const chatContainer = wrapper.find('.tw\\:w-1\\/4');
+      const chatContainer = wrapper.find('.w-1\\/4');
       expect(chatContainer.exists()).toBe(false);
     });
   });

@@ -172,7 +172,7 @@ describe('OTabs', () => {
 
   it('does not apply the bottom-border class on the outer wrapper by default (horizontal)', () => {
     const wrapper = mountTabs()
-    const outer = wrapper.find('.tw\\:flex.tw\\:flex-row.tw\\:items-stretch')
+    const outer = wrapper.find('.flex.flex-row.items-stretch')
     expect(outer.exists()).toBe(true)
     expect(outer.classes()).not.toContain('border-b')
   })
@@ -180,7 +180,7 @@ describe('OTabs', () => {
   it('applies the bottom-border class on the outer wrapper when bordered is true (horizontal)', () => {
     const wrapper = mountTabs({ bordered: true })
     // The horizontal layout adds the border to the outer flex-row wrapper
-    const outer = wrapper.find('.tw\\:flex.tw\\:flex-row.tw\\:items-stretch')
+    const outer = wrapper.find('.flex.flex-row.items-stretch')
     expect(outer.exists()).toBe(true)
     expect(outer.classes()).toContain('border-b')
     expect(outer.classes()).toContain('border-solid')

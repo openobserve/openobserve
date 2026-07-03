@@ -37,7 +37,7 @@ describe("ORefreshButton", () => {
 
   it("does not render a timestamp span when lastRunAt is not provided", () => {
     const wrapper = mount(ORefreshButton, { global: globalConfig });
-    expect(wrapper.find("span.tw\:tabular-nums").exists()).toBe(false);
+    expect(wrapper.find("span.tabular-nums").exists()).toBe(false);
   });
 
   it("renders a timestamp span when lastRunAt is provided", () => {
@@ -46,14 +46,14 @@ describe("ORefreshButton", () => {
       props: { lastRunAt: ts },
       global: globalConfig,
     });
-    expect(wrapper.find("span.tw\\:tabular-nums").exists()).toBe(true);
+    expect(wrapper.find("span.tabular-nums").exists()).toBe(true);
   });
 
   // --- dot color classes ---
 
   it("uses idle dot color when no lastRunAt", () => {
     const wrapper = mount(ORefreshButton, { global: globalConfig });
-    const dot = wrapper.find(".tw\\:rounded-full");
+    const dot = wrapper.find(".rounded-full");
     expect(dot.classes()).toContain("bg-refresh-dot-idle");
   });
 
@@ -62,7 +62,7 @@ describe("ORefreshButton", () => {
       props: { lastRunAt: Date.now() - 5_000 },
       global: globalConfig,
     });
-    const dot = wrapper.find(".tw\\:rounded-full");
+    const dot = wrapper.find(".rounded-full");
     expect(dot.classes()).toContain("bg-refresh-dot-fresh");
   });
 
@@ -71,7 +71,7 @@ describe("ORefreshButton", () => {
       props: { lastRunAt: Date.now() - 60_000 },
       global: globalConfig,
     });
-    const dot = wrapper.find(".tw\\:rounded-full");
+    const dot = wrapper.find(".rounded-full");
     expect(dot.classes()).toContain("bg-refresh-dot-stale");
   });
 
@@ -80,7 +80,7 @@ describe("ORefreshButton", () => {
       props: { lastRunAt: Date.now() - 400_000 },
       global: globalConfig,
     });
-    const dot = wrapper.find(".tw\\:rounded-full");
+    const dot = wrapper.find(".rounded-full");
     expect(dot.classes()).toContain("bg-refresh-dot-critical");
   });
 
@@ -89,7 +89,7 @@ describe("ORefreshButton", () => {
       props: { lastRunAt: Date.now() - 5_000, loading: true },
       global: globalConfig,
     });
-    const dot = wrapper.find(".tw\\:rounded-full");
+    const dot = wrapper.find(".rounded-full");
     expect(dot.classes()).toContain("bg-refresh-dot-idle");
   });
 

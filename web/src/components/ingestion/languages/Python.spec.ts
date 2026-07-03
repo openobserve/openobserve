@@ -126,7 +126,7 @@ describe('Python.vue Comprehensive Coverage', () => {
 
     it('should render documentation section text', () => {
       wrapper = createWrapper();
-      const docSection = wrapper.find('.tw\\:font-medium');
+      const docSection = wrapper.find('.font-medium');
       expect(docSection.exists()).toBe(true);
       expect(docSection.text()).toContain('Check further documentation');
     });

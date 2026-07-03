@@ -108,7 +108,7 @@ describe("Okta.vue", () => {
     it("should apply padding class", () => {
       const wrapper = mountComponent();
 
-      expect(wrapper.find(".tw\\:p-3").exists()).toBe(true);
+      expect(wrapper.find(".p-3").exists()).toBe(true);
     });
 
     it("should have link styling", () => {
