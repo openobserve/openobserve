@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,11 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div icon="info" class="tw:justify-between date-time-container">
-    <PopoverRoot
+    <OPopover
       v-model:open="menuOpen"
+      side="bottom"
+      :align="menuAlign"
+      :z-index="10000000"
+      content-class="tw:p-1"
       @update:open="onMenuOpenChange"
     >
-      <PopoverTrigger as-child>
+      <template #trigger>
         <OButton
           :data-test="dataTestName"
           id="date-time-button"
@@ -42,17 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow tw:transition-transform tw:duration-250 tw:ml-auto tw:text-[18px]!"
           /></template>
         </OButton>
-      </PopoverTrigger>
-      <PopoverPortal>
-        <PopoverContent
-          side="bottom"
-          :align="menuAlign"
-          :side-offset="4"
-          :hide-when-detached="true"
-          class="tw:z-[10001] tw:outline-none tw:bg-dropdown-bg tw:border tw:border-dropdown-border tw:rounded-lg tw:shadow-md"
-          @keydown.capture="onPickerKeydown"
-        >
-      <div id="date-time-menu" class="date-time-dialog tw:w-81.25 tw:max-h-(--reka-popper-available-height,600px) tw:overflow-y-auto">
+      </template>
+      <div id="date-time-menu" class="date-time-dialog tw:w-81.25 tw:z-10001 tw:max-h-(--reka-popper-available-height,600px) tw:overflow-y-auto" @keydown.capture="onPickerKeydown">
         <div v-if="!disableRelative" class="tw:flex tw:justify-evenly tw:py-2">
           <OButton
             data-test="date-time-relative-tab"
@@ -258,9 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
-        </PopoverContent>
-      </PopoverPortal>
-    </PopoverRoot>
+    </OPopover>
   </div>
 </template>
 
@@ -275,12 +268,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import {
-  PopoverRoot,
-  PopoverTrigger,
-  PopoverPortal,
-  PopoverContent,
-} from "reka-ui";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 // @ts-nocheck
 import {
   ref,
@@ -317,10 +305,7 @@ export default defineComponent({
     OSelect,
     OTime,
     ODateRangeCalendar,
-    PopoverRoot,
-    PopoverTrigger,
-    PopoverPortal,
-    PopoverContent,
+    OPopover,
   },
   props: {
     defaultType: {
