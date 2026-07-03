@@ -136,7 +136,6 @@ export function usePrebuiltDestinations() {
         systemTemplatesCache.value.set(template.name, template);
       });
 
-      console.log(`Fetched ${templates.length} system templates from backend`);
     } catch (error) {
       console.error('Failed to fetch system templates from backend:', error);
       // Don't throw - allow destination operations to proceed
