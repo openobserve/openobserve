@@ -45,9 +45,57 @@ env:
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
+  # Skip the whole suite when main has not moved since the last regression run.
+  # Scheduled runs fire every 4h; if nothing merged in between, rebuilding and
+  # re-running the full matrix on identical code is pure waste. Manual dispatch
+  # always runs.
+  check_main_changed:
+    timeout-minutes: 5
+    name: check_main_changed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      should_run: ${{ steps.decide.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+      - id: decide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Manual dispatch always runs.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Manual dispatch — running regardless of main changes."
+            exit 0
+          fi
+          CURRENT_SHA=$(git rev-parse HEAD)
+          # head_sha of the most recent previous run of THIS workflow on main,
+          # excluding the current run.
+          LAST_SHA=$(gh run list \
+            --workflow "${{ github.workflow }}" \
+            --branch main \
+            --limit 20 \
+            --json databaseId,headSha \
+            --jq "[.[] | select(.databaseId != ${{ github.run_id }})] | .[0].headSha" \
+            2>/dev/null || echo "")
+          echo "Current main SHA: ${CURRENT_SHA:-<none>}"
+          echo "Last run SHA:     ${LAST_SHA:-<none>}"
+          if [ -n "$LAST_SHA" ] && [ "$CURRENT_SHA" = "$LAST_SHA" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::main unchanged since last regression run ($CURRENT_SHA) — skipping."
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build_binary:
     timeout-minutes: 45
     name: build_binary
+    needs: [check_main_changed]
+    if: ${{ needs.check_main_changed.outputs.should_run == 'true' }}
     runs-on:
       labels: ubicloud-standard-16
     permissions:
