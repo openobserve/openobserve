@@ -56,6 +56,12 @@ defineSlots<DateTimeRangeSlots>();
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
+// Forward tabindex to the real trigger; keep it off the wrapper (avoids a double tab-stop).
+const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
+const wrapperAttrs = computed(() => {
+  const { tabindex, ...rest } = $attrs;
+  return rest;
+});
 
 // ── Popover ────────────────────────────────────────────────────
 const _popoverOpen = ref(false);
@@ -301,7 +307,7 @@ const triggerClasses = computed(() => [
 </script>
 
 <template>
-  <div v-bind="$attrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div v-bind="wrapperAttrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
     <!-- Label -->
     <div
       v-if="$slots.label || label || $slots.tooltip"
@@ -326,6 +332,7 @@ const triggerClasses = computed(() => [
           :aria-expanded="popoverOpen"
           :aria-haspopup="true"
           :aria-disabled="disabled || undefined"
+          :tabindex="inputTabindex"
           data-test="datetimerange-trigger"
         >
           <!-- Clock icon -->

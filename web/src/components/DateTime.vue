@@ -16,13 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div icon="info" class="tw:justify-between date-time-container">
-    <ODropdown
+    <PopoverRoot
       v-model:open="menuOpen"
-      side="bottom"
-      :align="menuAlign"
       @update:open="onMenuOpenChange"
     >
-      <template #trigger>
+      <PopoverTrigger as-child>
         <OButton
           :data-test="dataTestName"
           id="date-time-button"
@@ -44,8 +42,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow tw:transition-transform tw:duration-250 tw:ml-auto tw:text-[18px]!"
           /></template>
         </OButton>
-      </template>
-      <div id="date-time-menu" class="date-time-dialog tw:w-81.25 tw:z-10001 tw:max-h-(--reka-popper-available-height,600px) tw:overflow-y-auto">
+      </PopoverTrigger>
+      <PopoverPortal>
+        <PopoverContent
+          side="bottom"
+          :align="menuAlign"
+          :side-offset="4"
+          :hide-when-detached="true"
+          class="tw:z-[10001] tw:outline-none tw:bg-dropdown-bg tw:border tw:border-dropdown-border tw:rounded-lg tw:shadow-md"
+          @keydown.capture="onPickerKeydown"
+        >
+      <div id="date-time-menu" class="date-time-dialog tw:w-81.25 tw:max-h-(--reka-popper-available-height,600px) tw:overflow-y-auto">
         <div v-if="!disableRelative" class="tw:flex tw:justify-evenly tw:py-2">
           <OButton
             data-test="date-time-relative-tab"
@@ -251,7 +258,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
-    </ODropdown>
+        </PopoverContent>
+      </PopoverPortal>
+    </PopoverRoot>
   </div>
 </template>
 
@@ -266,7 +275,12 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import {
+  PopoverRoot,
+  PopoverTrigger,
+  PopoverPortal,
+  PopoverContent,
+} from "reka-ui";
 // @ts-nocheck
 import {
   ref,
@@ -303,7 +317,10 @@ export default defineComponent({
     OSelect,
     OTime,
     ODateRangeCalendar,
-    ODropdown,
+    PopoverRoot,
+    PopoverTrigger,
+    PopoverPortal,
+    PopoverContent,
   },
   props: {
     defaultType: {
@@ -971,6 +988,95 @@ export default defineComponent({
         saveDate(type === "absolute" ? "absolute" : "relative-custom");
     };
 
+    // Arrow-key navigation for the picker panel: Left/Right switch the
+    // Relative/Absolute tabs, and arrows roam the relative preset grid.
+    // stopPropagation keeps reka's dropdown-menu keydown from swallowing them.
+    const onPickerKeydown = (event: KeyboardEvent) => {
+      const arrows = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+      if (!arrows.includes(event.key)) return;
+      const panel = event.currentTarget as HTMLElement;
+      const target = event.target as HTMLElement;
+      if (!panel || !target) return;
+
+      const tab = target.closest(
+        "[data-test='date-time-relative-tab'], [data-test='date-time-absolute-tab']",
+      );
+      if (tab) {
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          event.preventDefault();
+          event.stopPropagation();
+          const next = event.key === "ArrowRight" ? "absolute" : "relative";
+          setDateType(next);
+          panel
+            .querySelector<HTMLElement>(`[data-test='date-time-${next}-tab']`)
+            ?.focus();
+        } else if (event.key === "ArrowDown") {
+          event.preventDefault();
+          event.stopPropagation();
+          panel
+            .querySelector<HTMLElement>(
+              ".date-time-table [data-test$='-btn']:not([disabled])",
+            )
+            ?.focus();
+        }
+        return;
+      }
+
+      const cell = target.closest<HTMLButtonElement>(
+        "[data-test^='date-time-relative-'][data-test$='-btn']",
+      );
+      if (!cell) return;
+      const rows = Array.from(
+        panel.querySelectorAll(".date-time-table .relative-row"),
+      )
+        .map((row) =>
+          Array.from(
+            row.querySelectorAll<HTMLButtonElement>(
+              "[data-test^='date-time-relative-'][data-test$='-btn']",
+            ),
+          ),
+        )
+        .filter((btns) => btns.length > 0);
+      let r = -1;
+      let c = -1;
+      rows.forEach((btns, ri) => {
+        const ci = btns.indexOf(cell);
+        if (ci !== -1) {
+          r = ri;
+          c = ci;
+        }
+      });
+      if (r === -1) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const enabled = (btn?: HTMLButtonElement) => !!btn && !btn.disabled;
+      const stepRow = (btns: HTMLButtonElement[], from: number, dir: number) => {
+        for (let i = from + dir; i >= 0 && i < btns.length; i += dir)
+          if (enabled(btns[i])) return btns[i];
+        return null;
+      };
+      const stepCol = (from: number, dir: number) => {
+        for (let ri = from + dir; ri >= 0 && ri < rows.length; ri += dir) {
+          const btns = rows[ri];
+          const col = Math.min(c, btns.length - 1);
+          if (enabled(btns[col])) return btns[col];
+          const back = stepRow(btns, col + 1, -1);
+          if (back) return back;
+          const fwd = stepRow(btns, col - 1, 1);
+          if (fwd) return fwd;
+        }
+        return null;
+      };
+
+      let next: HTMLButtonElement | null = null;
+      if (event.key === "ArrowLeft") next = stepRow(rows[r], c, -1);
+      else if (event.key === "ArrowRight") next = stepRow(rows[r], c, 1);
+      else if (event.key === "ArrowUp") next = stepCol(r, -1);
+      else if (event.key === "ArrowDown") next = stepCol(r, 1);
+      next?.focus();
+    };
+
     const computeRelativePeriod = () => {
       if (selectedType.value === "relative") {
         if (props.queryRangeRestrictionInHour > 0) {
@@ -1119,6 +1225,7 @@ export default defineComponent({
       setSavedDate,
       optionsFn,
       setDateType,
+      onPickerKeydown,
       getConsumableDateTime,
       relativeDatesInHour,
       setAbsoluteTime,
