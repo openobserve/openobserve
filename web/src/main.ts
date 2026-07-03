@@ -18,7 +18,7 @@ import store from "./stores";
 import App from "./App.vue";
 import createRouter from "./router";
 import i18n from "./locales";
-import "./lib/styles/tokens/base.css";
+import "./styles/tailwind.css";
 import config from "./aws-exports";
 import configService from "./services/config";
 
