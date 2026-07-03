@@ -17,7 +17,7 @@ use config::{
     cluster::LOCAL_NODE,
     meta::stream::{ALL_STREAM_TYPES, StreamType},
     metrics,
-    utils::time::{day_micros, get_ymdh_from_micros, now_micros},
+    utils::time::{day_micros, get_ymdh0_from_micros, now_micros},
 };
 use infra::{cluster::get_node_by_uuid, dist_lock, file_list as infra_file_list};
 
@@ -55,7 +55,7 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
 
     // check if we need to update old stats by comparing the last_updated and now is the same day
     let no_need_update_old_stats = last_updated_at > 0
-        && get_ymdh_from_micros(last_updated_at) == get_ymdh_from_micros(now_micros());
+        && get_ymdh0_from_micros(last_updated_at) == get_ymdh0_from_micros(now_micros());
 
     log::info!(
         "[STATS] update stats from file list, last updated: {last_updated_at}, latest updated: {latest_updated_at}, no need update old stats: {no_need_update_old_stats}"
@@ -197,10 +197,10 @@ async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
     }
 }
 
-/// Get yesterday's boundary date (yesterday 00:00:00 in YYYY/MM/DD/HH)
+/// Get yesterday's boundary date (yesterday 00:00:00 in YYYY/MM/DD/00)
 /// This is the boundary between "historical" and "recent" data
 pub fn get_yesterday_boundary() -> String {
-    get_ymdh_from_micros(now_micros() - day_micros(1))
+    get_ymdh0_from_micros(now_micros() - day_micros(1))
 }
 
 #[cfg(test)]
@@ -252,7 +252,7 @@ mod tests {
     #[test]
     fn test_get_yesterday_boundary_is_yesterday() {
         let boundary = get_yesterday_boundary();
-        let now_boundary = get_ymdh_from_micros(now_micros());
+        let now_boundary = get_ymdh0_from_micros(now_micros());
 
         // Yesterday should be different from today
         assert_ne!(boundary, now_boundary);
@@ -302,7 +302,7 @@ mod tests {
     fn test_date_range_ordering() {
         // Test that historical range is before recent range
         let yesterday = get_yesterday_boundary();
-        let now_date = get_ymdh_from_micros(now_micros());
+        let now_date = get_ymdh0_from_micros(now_micros());
 
         // Yesterday should be before now
         assert!(yesterday <= now_date);

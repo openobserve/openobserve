@@ -79,6 +79,17 @@ pub fn get_ymdh_from_micros(n: i64) -> String {
 }
 
 #[inline(always)]
+pub fn get_ymdh0_from_micros(n: i64) -> String {
+    let n = if n > 0 {
+        n
+    } else {
+        Utc::now().timestamp_micros()
+    };
+    let t = Utc.timestamp_nanos(n * 1000);
+    t.format("%Y/%m/%d/00").to_string()
+}
+
+#[inline(always)]
 pub fn parse_i64_to_timestamp_micros(v: i64) -> i64 {
     if v == 0 {
         return Utc::now().timestamp_micros();
@@ -537,6 +548,9 @@ mod tests {
     fn test_get_ymdhms_from_micros() {
         assert_eq!(get_ymdh_from_micros(1609459200000000), "2021/01/01/00");
         assert_eq!(get_ymdh_from_micros(1744077663427000), "2025/04/08/02");
+
+        assert_eq!(get_ymdh0_from_micros(1609459200000000), "2021/01/01/00");
+        assert_eq!(get_ymdh0_from_micros(1744077663427000), "2025/04/08/00");
 
         // Test with input 0 (uses current time, so we can't test the exact value)
         let result = get_ymdh_from_micros(0);
