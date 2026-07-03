@@ -640,7 +640,7 @@ mod tests {
         )?;
         let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
         let result = wrap_partial_reduce(true, input)?;
-        let result_agg = result.downcast_ref::<AggregateExec>().unwrap();
+        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
         assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
         // PartialReduce preserves the partial agg's partition count (partition-local reduce).
         assert_eq!(result.output_partitioning().partition_count(), 4);
@@ -648,6 +648,7 @@ mod tests {
         // so each group key lands in exactly one bucket (no duplication across buckets).
         let child = result.children()[0].clone();
         let repartition = child
+            .as_any()
             .downcast_ref::<RepartitionExec>()
             .expect("a multi-partition GROUP BY should hash-partition the partial output");
         match repartition.partitioning() {
