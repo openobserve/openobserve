@@ -327,6 +327,29 @@ export default defineComponent({
       other_organization: "",
     });
 
+    // `custom_role` is an Enterprise/Cloud-only concept — the field is rendered
+    // and hydrated (getUserRoles) ONLY under this flag.
+    const supportsCustomRole =
+      config.isEnterprise == "true" || config.isCloud == "true";
+
+    // Reproduce the pre-migration wire behaviour EXACTLY. Before, `custom_role`
+    // was on `formData` only once actually POPULATED — via getUserRoles hydration
+    // (edit + Enterprise/Cloud) or the user picking in the select (add-existing /
+    // edit + Enterprise/Cloud). An unpopulated field stayed `undefined` and was
+    // JSON-omitted; a populated one (even `[]`) was sent. The migrated schema
+    // seeds `custom_role: []` for every mode, collapsing that distinction, so
+    // decide inclusion explicitly to match BEFORE byte-for-byte:
+    //   • OSS → never (the field is Enterprise/Cloud-only).
+    //   • edit → always (getUserRoles always hydrates it, even to `[]`).
+    //   • otherwise (add-existing / create-new) → only when the user actually
+    //     selected roles (length > 0). Untouched `[]` ⇒ omit, as before; a
+    //     selection carried from add-existing into a 422→create-new flow is
+    //     still sent, also as before.
+    const includeCustomRole = (value: AddUserForm) =>
+      supportsCustomRole &&
+      (beingUpdated.value ||
+        (Array.isArray(value.custom_role) && value.custom_role.length > 0));
+
     // The save handler reads the VALIDATED `value` ONLY (Rule ②) — no formData
     // mirror. Non-form context (org, the original edit record) comes from the refs
     // above. OForm awaits it, so the footer Save spinner spans the request.
@@ -343,10 +366,16 @@ export default defineComponent({
           first_name: value.first_name,
           last_name: value.last_name,
           role: value.role,
-          custom_role: value.custom_role,
           change_password: value.change_password,
           organization: selectedOrg,
         };
+        // Match pre-migration: send the hydrated custom_role on Enterprise/Cloud
+        // edits; otherwise drop it (the editRecord spread could also leak it).
+        if (includeCustomRole(value)) {
+          payload.custom_role = value.custom_role;
+        } else {
+          delete payload.custom_role;
+        }
         delete payload.email;
         if (value.change_password) {
           payload.old_password = value.old_password;
@@ -385,11 +414,12 @@ export default defineComponent({
       } else if (existingUser.value) {
         const userEmail = value.email;
         try {
+          const existingUserBody: any = { role: value.role };
+          if (includeCustomRole(value)) {
+            existingUserBody.custom_role = value.custom_role;
+          }
           const res: any = await userServiece.updateexistinguser(
-            {
-              role: value.role,
-              custom_role: value.custom_role,
-            },
+            existingUserBody,
             selectedOrg,
             userEmail,
           );
@@ -423,6 +453,11 @@ export default defineComponent({
             org_member_id: "",
             organization: selectedOrg,
           };
+          // Before, create-new never had a populated custom_role (the select is
+          // hidden in create mode) unless it was carried over from add-existing.
+          if (!includeCustomRole(value)) {
+            delete payload.custom_role;
+          }
           const res: any = await userServiece.create(payload, selectedOrg);
           emit("updated", res.data, payload, "created");
           emit("update:open", false);
