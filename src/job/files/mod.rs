@@ -60,6 +60,7 @@ pub fn generate_ingester_storage_file_key(
     stream_type: StreamType,
     stream_name: &str,
     wal_file_name: &str,
+    file_format: FileFormat,
 ) -> String {
     // eg: 0/2023/08/21/08/8b8a5451bbe1c44b/ip=1234/7099303408192061440f3XQ2p.json
     let file_columns = wal_file_name.splitn(7, '/').collect::<Vec<&str>>();
@@ -77,25 +78,26 @@ pub fn generate_ingester_storage_file_key(
     } else {
         format!("{}/{}", &file_name[..file_name_pos], id)
     };
-    let file_format =
-        FileFormat::for_ingester_stream(stream_type, config::get_config().common.file_format)
-            .extension();
-    format!("files/{stream_key}/{file_date}/{file_name}{file_format}")
+    format!(
+        "files/{stream_key}/{file_date}/{file_name}{}",
+        file_format.extension()
+    )
 }
 
 #[cfg(test)]
 mod tests {
-    use config::meta::stream::StreamType;
+    use config::{FileFormat, meta::stream::StreamType};
 
     use super::generate_ingester_storage_file_key;
 
     #[test]
-    fn test_ingester_metrics_storage_file_name_uses_parquet_extension() {
+    fn test_ingester_storage_file_key_uses_given_format_extension() {
         let file_name = generate_ingester_storage_file_key(
             "default",
             StreamType::Metrics,
             "quickstart",
             "0/2026/07/02/12/hash/service_name=ingester/source.json",
+            FileFormat::Parquet,
         );
 
         assert!(
@@ -104,6 +106,14 @@ mod tests {
             )
         );
         assert!(file_name.ends_with(".parquet"));
-        assert!(!file_name.ends_with(".vortex"));
+
+        let file_name = generate_ingester_storage_file_key(
+            "default",
+            StreamType::Logs,
+            "quickstart",
+            "0/2026/07/02/12/hash/service_name=ingester/source.json",
+            FileFormat::Vortex,
+        );
+        assert!(file_name.ends_with(".vortex"));
     }
 }

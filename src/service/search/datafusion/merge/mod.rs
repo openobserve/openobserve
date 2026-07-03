@@ -42,11 +42,16 @@ use {
 };
 
 pub enum MergeParquetResult {
-    Single(Vec<u8>, FileMeta),
+    Single {
+        buf: Vec<u8>,
+        file_meta: FileMeta,
+        file_format: FileFormat,
+    },
     #[allow(unused)]
     Multiple {
         bufs: Vec<Vec<u8>>,
         file_metas: Vec<FileMeta>,
+        file_format: FileFormat,
     },
 }
 
@@ -62,6 +67,8 @@ pub async fn merge_parquet_files(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
+    let file_format = merge_output_file_format(stream_type, is_ingester, cfg.common.file_format);
+
     #[cfg(feature = "enterprise")]
     if stream_type == StreamType::Metrics && !is_ingester {
         let rule = get_largest_downsampling_rule(stream_name, metadata.max_ts);
@@ -75,6 +82,7 @@ pub async fn merge_parquet_files(
                 bloom_filter_fields,
                 rule,
                 &metadata,
+                file_format,
             )
             .await;
         }
@@ -150,7 +158,6 @@ pub async fn merge_parquet_files(
         Ok(())
     });
 
-    let file_format = merge_output_file_format(stream_type, is_ingester, cfg.common.file_format);
     let buf = match file_format {
         FileFormat::Parquet => {
             write_parquet(
@@ -172,7 +179,11 @@ pub async fn merge_parquet_files(
     );
 
     metadata.compressed_size = buf.len() as i64;
-    Ok(MergeParquetResult::Single(buf, metadata))
+    Ok(MergeParquetResult::Single {
+        buf,
+        file_meta: metadata,
+        file_format,
+    })
 }
 
 fn merge_output_file_format(

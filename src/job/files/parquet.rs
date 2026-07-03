@@ -811,8 +811,12 @@ async fn merge_files(
         }
     };
 
-    let (buf, mut new_file_meta) = match buf {
-        MergeParquetResult::Single(buf, meta) => (buf, meta),
+    let (buf, mut new_file_meta, file_format) = match buf {
+        MergeParquetResult::Single {
+            buf,
+            file_meta,
+            file_format,
+        } => (buf, file_meta, file_format),
         MergeParquetResult::Multiple { .. } => {
             // ingester should not support multiple files, it will be handled in compactor mode
             panic!("[INGESTER:JOB] merge_parquet_files error: multiple files");
@@ -824,8 +828,13 @@ async fn merge_files(
             "merge_parquet_files error: compressed_size is 0"
         ));
     }
-    let new_file_key =
-        super::generate_ingester_storage_file_key(&org_id, stream_type, &stream_name, &file_name);
+    let new_file_key = super::generate_ingester_storage_file_key(
+        &org_id,
+        stream_type,
+        &stream_name,
+        &file_name,
+        file_format,
+    );
     log::info!(
         "[INGESTER:JOB:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
         retain_file_list.len(),
@@ -891,8 +900,6 @@ async fn merge_files(
                 let buf_clone = buf.clone();
                 let org_id_clone = org_id.clone();
                 let stream_name_clone = stream_name.clone();
-                let file_format =
-                    FileFormat::from_extension(&new_file_key).unwrap_or(FileFormat::Parquet);
 
                 // Queue services for batched processing (non-blocking)
                 tokio::spawn(async move {
@@ -901,7 +908,7 @@ async fn merge_files(
                         stream_type,
                         &stream_name_clone,
                         file_format,
-                        &buf_clone,
+                        buf_clone,
                     )
                     .await
                     {
@@ -969,7 +976,7 @@ async fn queue_services_from_data_file(
     stream_type: StreamType,
     stream_name: &str,
     file_format: FileFormat,
-    file_data: &[u8],
+    file_data: Bytes,
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
 
@@ -985,9 +992,6 @@ async fn queue_services_from_data_file(
         get_enterprise_config().service_streams.channel_capacity,
     );
 
-    // Clone data needed for producer task
-    let file_bytes = Bytes::copy_from_slice(file_data);
-
     // Spawn producer task to read the data file and send Arrow batches through channel.
     // ARROW-NATIVE: No HashMap conversion! Sends RecordBatch directly.
     let producer_handle = tokio::spawn(async move {
@@ -995,7 +999,7 @@ async fn queue_services_from_data_file(
         let mut records_dropped = 0u64;
         let mut batches_sent = 0u64;
 
-        let reader_result = get_recordbatch_reader_from_bytes(file_format, file_bytes).await;
+        let reader_result = get_recordbatch_reader_from_bytes(file_format, file_data).await;
         let (_schema, mut reader) = match reader_result {
             Ok(r) => r,
             Err(e) => {
