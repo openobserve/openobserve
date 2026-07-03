@@ -174,7 +174,7 @@ pub async fn list_workflows(
 )]
 pub async fn delete_workflows(Path((org_id, id)): Path<(String, String)>) -> Response {
     // TODO YJDoc2: check for workflow associations
-    match workflows::delete_workflow(&id).await {
+    match workflows::delete_workflow(&org_id, &id).await {
         Ok(_) => MetaHttpResponse::ok("deleted successfully"),
         Err(e) => {
             log::error!("error deleting workflow {org_id}/{id} : {e}");

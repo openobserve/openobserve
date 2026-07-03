@@ -7,13 +7,20 @@ use infra::{
     table::workflows::{Workflow, WorkflowRunErrors},
 };
 
-use crate::service::{db, workflows::get_inputs_file_path};
+use crate::{
+    common::{
+        meta::authz::Authz,
+        utils::auth::{remove_ownership, set_ownership},
+    },
+    service::{db, workflows::get_inputs_file_path},
+};
 
 const CHECK_INTERVAL_MIN: u64 = 30;
 pub const WORKFLOWS_PREFIX: &str = "/workflows/";
 
 pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
     infra::table::workflows::save_workflow(workflow.clone()).await?;
+    set_ownership(&workflow.org_id, "workflows", Authz::new(&workflow.id)).await;
 
     // trigger watch event by putting value to cluster coordinator
     let cluster_coordinator = get_coordinator().await;
@@ -95,8 +102,9 @@ pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn delete_workflow(id: &str) -> Result<(), anyhow::Error> {
+pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
     infra::table::workflows::delete_workflow(id).await?;
+    remove_ownership(&org_id, "workflows", Authz::new(id)).await;
     // trigger watch event by putting value to cluster coordinator
     let cluster_coordinator = get_coordinator().await;
     cluster_coordinator
@@ -165,7 +173,10 @@ pub async fn clean() {
     let cfg = get_config();
     let duration_limit = cfg.limit.workflow_error_retention_secs * 1000 * 1000;
 
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_mins(CHECK_INTERVAL_MIN));
+
     loop {
+        interval.tick().await;
         let now = chrono::Utc::now().timestamp_micros();
         let limit_time = now - duration_limit;
 
@@ -198,7 +209,6 @@ pub async fn clean() {
         } else {
             log::info!("successfully cleaned up old workflow error files");
         }
-        tokio::time::sleep(tokio::time::Duration::from_mins(CHECK_INTERVAL_MIN)).await;
     }
 }
 

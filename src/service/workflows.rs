@@ -178,8 +178,8 @@ fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>
     }
 }
 
-pub async fn delete_workflow(id: &str) -> Result<(), anyhow::Error> {
-    db::workflows::delete_workflow(id).await?;
+pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
+    db::workflows::delete_workflow(org_id, id).await?;
     Ok(())
 }
 
