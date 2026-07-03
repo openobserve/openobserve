@@ -361,19 +361,32 @@ fn wrap_partial_reduce(
         .collect::<Result<_>>()?;
     // null_expr entries are schema-independent NULL literals used by GROUPING SETS
     let null_exprs: Vec<(Arc<dyn PhysicalExpr>, String)> = agg.group_expr().null_expr().to_vec();
+    // Reuse the group-key Column refs as the hash-partition keys.
+    let hash_exprs: Vec<Arc<dyn PhysicalExpr>> = group_exprs
+        .iter()
+        .map(|(expr, _)| Arc::clone(expr))
+        .collect();
     let new_group_by = PhysicalGroupBy::new(
         group_exprs,
         null_exprs,
         agg.group_expr().groups().to_vec(),
         !agg.group_expr().is_single(),
     );
-    let coalesce_partition_exec = Arc::new(CoalescePartitionsExec::new(input.clone()));
+    let reduce_input: Arc<dyn ExecutionPlan> = if !hash_exprs.is_empty() {
+        let num_partitions = input.output_partitioning().partition_count();
+        Arc::new(RepartitionExec::try_new(
+            input.clone(),
+            Partitioning::Hash(hash_exprs, num_partitions),
+        )?)
+    } else {
+        Arc::new(CoalescePartitionsExec::new(input.clone()))
+    };
     Ok(Arc::new(AggregateExec::try_new(
         AggregateMode::PartialReduce,
         new_group_by,
         agg.aggr_expr().to_vec(),
         vec![None; agg.aggr_expr().len()],
-        coalesce_partition_exec,
+        reduce_input,
         agg.input_schema(),
     )?) as Arc<dyn ExecutionPlan>)
 }
@@ -603,6 +616,70 @@ mod tests {
             .expect("group expr should be a Column reference into partial output schema");
         assert_eq!(col_expr.name(), "a");
         assert_eq!(col_expr.index(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_multi_partition_group_by_hash_repartitions()
+    -> datafusion::common::Result<()> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let group_by = PhysicalGroupBy::new(
+            vec![(col("a", &schema)?, "a".to_string())],
+            vec![],
+            vec![vec![false]],
+            false,
+        );
+        // Partial agg over a 4-partition input -> 4 output partitions.
+        let agg = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&schema)).with_partitions(4)),
+            Arc::clone(&schema),
+        )?;
+        let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
+        let result = wrap_partial_reduce(true, input)?;
+        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
+        // PartialReduce preserves the partial agg's partition count (partition-local reduce).
+        assert_eq!(result.output_partitioning().partition_count(), 4);
+        // Its child must be a Hash RepartitionExec on the group key into 4 partitions,
+        // so each group key lands in exactly one bucket (no duplication across buckets).
+        let child = result.children()[0].clone();
+        let repartition = child
+            .as_any()
+            .downcast_ref::<RepartitionExec>()
+            .expect("a multi-partition GROUP BY should hash-partition the partial output");
+        match repartition.partitioning() {
+            Partitioning::Hash(exprs, n) => {
+                assert_eq!(*n, 4);
+                assert_eq!(exprs.len(), 1, "should hash on the single group key");
+            }
+            other => panic!("expected Hash partitioning, got {other:?}"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_multi_partition_no_group_by_falls_back_to_coalesce()
+    -> datafusion::common::Result<()> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let group_by = PhysicalGroupBy::new(vec![], vec![], vec![vec![]], false);
+        // Partial agg over a 4-partition input but with no GROUP BY.
+        let agg = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&schema)).with_partitions(4)),
+            Arc::clone(&schema),
+        )?;
+        let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
+        // No GROUP BY: can't hash-partition even with multiple input partitions -> coalesce to one.
+        let result = wrap_partial_reduce(true, input)?;
+        assert_eq!(result.children()[0].name(), "CoalescePartitionsExec");
+        assert_eq!(result.output_partitioning().partition_count(), 1);
         Ok(())
     }
 
