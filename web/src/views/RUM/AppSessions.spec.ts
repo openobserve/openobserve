@@ -385,12 +385,13 @@ describe("AppSessions.vue", () => {
     it("should initialize with correct columns structure", () => {
       const columns = wrapper.vm.tableColumns;
 
-      expect(columns).toHaveLength(5);
+      expect(columns).toHaveLength(6);
       expect(columns[0].id).toBe("action_play");
       expect(columns[1].id).toBe("session");
-      expect(columns[2].id).toBe("health");
-      expect(columns[3].id).toBe("location");
-      expect(columns[4].id).toBe("duration");
+      expect(columns[2].id).toBe("activity");
+      expect(columns[3].id).toBe("health");
+      expect(columns[4].id).toBe("location");
+      expect(columns[5].id).toBe("duration");
     });
 
     it("should fetch stream fields on mount", async () => {

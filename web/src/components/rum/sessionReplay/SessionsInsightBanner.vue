@@ -15,8 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- Soft variants only — an insight is a hint, not an alarm. The solid
+       `error` banner stays reserved for hard failures. -->
   <OBanner
-    :variant="insight.kind === 'frustration' ? 'warning' : 'error'"
+    :variant="insight.kind === 'frustration' ? 'warning' : 'error-soft'"
     :icon="
       insight.kind === 'frustration'
         ? 'sentiment-very-dissatisfied'
@@ -134,8 +136,8 @@ const message = computed(() => {
 </script>
 
 <style scoped lang="scss">
-// Inherit the banner variant's text color — a ghost/grey button is unreadable
-// on the tinted error/warning backgrounds.
+// Inherit the banner variant's text color — the soft variants use their
+// darkest palette step for text, so currentColor stays readable.
 .insight-action-btn {
   color: currentColor;
   font-size: var(--text-sm);

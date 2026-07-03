@@ -283,6 +283,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                   </template>
+                  <template #cell-activity="{ row }">
+                    <SessionActivitySparkline
+                      :session-id="row.session_id"
+                      :start-time="row.start_time"
+                      :end-time="row.end_time"
+                      :is-bounce="row.is_bounce"
+                      :has-frustration-field="
+                        !!schemaMapping['action_frustration_type']
+                      "
+                    />
+                  </template>
                   <template #cell-health="{ row }">
                     <SessionHealthCell
                       :error-count="row.error_count || 0"
@@ -378,6 +389,11 @@ import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocatio
 import SessionHealthCell from "@/components/rum/sessionReplay/SessionHealthCell.vue";
 import SessionsMetricsStrip from "@/components/rum/sessionReplay/SessionsMetricsStrip.vue";
 import SessionsInsightBanner from "@/components/rum/sessionReplay/SessionsInsightBanner.vue";
+import SessionActivitySparkline from "@/components/rum/sessionReplay/SessionActivitySparkline.vue";
+import {
+  holdActivityQueries,
+  releaseActivityQueries,
+} from "@/composables/useSessionActivity";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -586,6 +602,14 @@ const tableColumns = [
     meta: { align: "left", autoWidth: true },
   },
   {
+    id: "activity",
+    header: t("rum.activity"),
+    accessorFn: (row: any) => row["events"] || 0,
+    sortable: true,
+    size: 220,
+    meta: { align: "left" },
+  },
+  {
     id: "health",
     // Sorts by "badness": errors dominate, frustrations break ties.
     header: t("rum.health"),
@@ -755,9 +779,13 @@ const getSessions = () => {
     whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
   }
 
+  // Activity sparklines are the lowest-priority calls — hold them until the
+  // page query, replay query, and all window aggregates have settled.
+  holdActivityQueries();
+
   // Window-level aggregates (KPI totals, deltas, insights) run in parallel
   // with the page query and share its WHERE clause + time range.
-  fetchWindowAggregates(req, whereClause);
+  const aggregatesSettled = fetchWindowAggregates(req, whereClause);
 
   // Query 1: Get sessions with all metrics from _rumdata (supports usr_email, usr_id, session_id filters)
   req.query.sql = `
@@ -779,7 +807,7 @@ const getSessions = () => {
 
   updateUrlQueryParams();
 
-  searchService
+  const pageQuerySettled = searchService
     .search(
       {
         org_identifier: store.state.selectedOrganization.identifier,
@@ -816,7 +844,7 @@ const getSessions = () => {
       const sessionIds = hits.map((hit: any) => hit.session_id);
 
       // Query 2: Get start/end times from _sessionreplay
-      getSessionTimeFromReplay(req, sessionIds);
+      return getSessionTimeFromReplay(req, sessionIds);
     })
     .catch((err) => {
       rows.value = [];
@@ -828,6 +856,11 @@ const getSessions = () => {
     .finally(() => {
       isLoading.value.pop();
     });
+
+  // Everything settled (success or failure) → let activity queries through.
+  Promise.allSettled([pageQuerySettled, aggregatesSettled]).finally(() => {
+    releaseActivityQueries();
+  });
 };
 
 // Query 2: Get start/end times from _sessionreplay for the sessions
@@ -835,7 +868,7 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
   if (sessionIds.length === 0) {
     rows.value = [];
     isLoading.value.pop();
-    return;
+    return Promise.resolve();
   }
 
   // Sanitize session IDs to prevent SQL injection
@@ -849,7 +882,7 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
   if (!sanitizedIds) {
     rows.value = [];
     isLoading.value.pop();
-    return;
+    return Promise.resolve();
   }
 
   const whereClause = `WHERE session_id IN (${sanitizedIds})`;
@@ -869,7 +902,7 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
     GROUP BY session_id`;
 
   isLoading.value.push(true);
-  searchService
+  return searchService
     .search(
       {
         org_identifier: store.state.selectedOrganization.identifier,
@@ -938,11 +971,15 @@ const runAggregateQuery = (req: any) =>
     )
     .then((res: any) => res.data?.hits || []);
 
+// Returns a promise that settles when ALL aggregate queries finish — used to
+// release the activity-sparkline gate so those queries go last.
 const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
   windowTotals.value = null;
   previousWindowTotals.value = null;
   frustrationCluster.value = null;
   errorCluster.value = null;
+
+  const pending: Promise<unknown>[] = [];
 
   const hasFrustrationField = !!schemaMapping.value["action_frustration_type"];
   const frustratedSessionsExpr = hasFrustrationField
@@ -968,28 +1005,32 @@ const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
     unhealthySessions: hit?.unhealthy_sessions || 0,
   });
 
-  runAggregateQuery(buildAggregateReq(baseReq, summarySql))
-    .then((hits) => {
-      windowTotals.value = hits.length ? toTotals(hits[0]) : null;
-    })
-    .catch(() => {
-      windowTotals.value = null;
-    });
+  pending.push(
+    runAggregateQuery(buildAggregateReq(baseReq, summarySql))
+      .then((hits) => {
+        windowTotals.value = hits.length ? toTotals(hits[0]) : null;
+      })
+      .catch(() => {
+        windowTotals.value = null;
+      }),
+  );
 
   const windowLengthUs = baseReq.query.end_time - baseReq.query.start_time;
   if (windowLengthUs > 0) {
-    runAggregateQuery(
-      buildAggregateReq(baseReq, summarySql, {
-        startTime: baseReq.query.start_time - windowLengthUs,
-        endTime: baseReq.query.start_time,
-      }),
-    )
-      .then((hits) => {
-        previousWindowTotals.value = hits.length ? toTotals(hits[0]) : null;
-      })
-      .catch(() => {
-        previousWindowTotals.value = null;
-      });
+    pending.push(
+      runAggregateQuery(
+        buildAggregateReq(baseReq, summarySql, {
+          startTime: baseReq.query.start_time - windowLengthUs,
+          endTime: baseReq.query.start_time,
+        }),
+      )
+        .then((hits) => {
+          previousWindowTotals.value = hits.length ? toTotals(hits[0]) : null;
+        })
+        .catch(() => {
+          previousWindowTotals.value = null;
+        }),
+    );
   }
 
   if (hasFrustrationField && schemaMapping.value["action_target_name"]) {
@@ -1006,20 +1047,22 @@ const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
       GROUP BY action_target_name
       ORDER BY sessions_count DESC
       LIMIT 1`;
-    runAggregateQuery(buildAggregateReq(baseReq, clusterSql))
-      .then((hits) => {
-        frustrationCluster.value = hits.length
-          ? {
-              kind: "frustration",
-              count: hits[0].sessions_count || 0,
-              target: hits[0].target,
-              view: hits[0].view,
-            }
-          : null;
-      })
-      .catch(() => {
-        frustrationCluster.value = null;
-      });
+    pending.push(
+      runAggregateQuery(buildAggregateReq(baseReq, clusterSql))
+        .then((hits) => {
+          frustrationCluster.value = hits.length
+            ? {
+                kind: "frustration",
+                count: hits[0].sessions_count || 0,
+                target: hits[0].target,
+                view: hits[0].view,
+              }
+            : null;
+        })
+        .catch(() => {
+          frustrationCluster.value = null;
+        }),
+    );
   }
 
   if (schemaMapping.value["error_message"]) {
@@ -1034,20 +1077,24 @@ const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
       GROUP BY error_message
       ORDER BY sessions_count DESC
       LIMIT 1`;
-    runAggregateQuery(buildAggregateReq(baseReq, errorSql))
-      .then((hits) => {
-        errorCluster.value = hits.length
-          ? {
-              kind: "error",
-              count: hits[0].sessions_count || 0,
-              message: hits[0].message,
-            }
-          : null;
-      })
-      .catch(() => {
-        errorCluster.value = null;
-      });
+    pending.push(
+      runAggregateQuery(buildAggregateReq(baseReq, errorSql))
+        .then((hits) => {
+          errorCluster.value = hits.length
+            ? {
+                kind: "error",
+                count: hits[0].sessions_count || 0,
+                message: hits[0].message,
+              }
+            : null;
+        })
+        .catch(() => {
+          errorCluster.value = null;
+        }),
+    );
   }
+
+  return Promise.allSettled(pending);
 };
 
 const updateDateChange = (date: any) => {

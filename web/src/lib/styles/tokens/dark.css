@@ -463,6 +463,9 @@
     --color-banner-warning-text:   var(--color-warning-100);
     --color-banner-error-bg:       var(--color-error-700);
     --color-banner-error-text:     var(--color-grey-0);
+    --color-banner-error-soft-bg:     color-mix(in srgb, var(--color-error-700) 20%, transparent);
+    --color-banner-error-soft-border: var(--color-error-700);
+    --color-banner-error-soft-text:   var(--color-error-100);
 
     /* Note Container */
     --color-note-bg:               color-mix(in srgb, var(--color-warning-900) 15%, transparent);
