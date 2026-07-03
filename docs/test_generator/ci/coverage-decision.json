@@ -1,0 +1,9 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/RUM/rum-sessions.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/RUM/sourcemap-ui.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The only existing RUM test is sourcemap-ui.spec.js, which covers Error Tracking UI (RUM errors list, error detail view, stack traces) — a completely different feature from the Sessions Health & Metrics Dashboard. No existing spec covers the sessions dashboard, KPI strip, segment filters, or session replay navigation. A brand-new spec is required. Playwright auto-discovers *.spec.js under testDir, so no explicit config registration is needed."
+}

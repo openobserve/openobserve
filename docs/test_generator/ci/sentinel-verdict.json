@@ -1,0 +1,14 @@
+{
+  "verdict": "PASS",
+  "critical_count": 0,
+  "warning_count": 3,
+  "auto_fixed": 0,
+  "feature_slug": "rum-sessions-redesign",
+  "feature_title": "RUM Sessions Health & Metrics Dashboard",
+  "spec_path": "tests/ui-testing/playwright-tests/RUM/rum-sessions.spec.js",
+  "warnings": [
+    "P1.6 DateTime range test missing state guard after toggle (rule 8)",
+    "Inline locators in page object methods instead of top-level properties (rumPage.js)",
+    "CSS class selector '.error-stacks' in page object — prefer data-test attributes"
+  ]
+}

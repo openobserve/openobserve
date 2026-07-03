@@ -1,0 +1,6 @@
+{
+  "group": "RUM",
+  "spec_filename": "rum-sessions.spec.js",
+  "create_group": true,
+  "browser": "chrome"
+}
