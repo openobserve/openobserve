@@ -115,7 +115,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted, defineAsyncComponent, getCurrentInstance } from "vue";
+import { defineComponent, ref, computed, onMounted, defineAsyncComponent } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import DateTimePicker from "@/components/DateTimePicker.vue";
@@ -137,9 +138,7 @@ export default defineComponent({
     canAdmin: { type: Boolean, default: true },
   },
   setup(props) {
-    const instance = getCurrentInstance();
-    const t = (key: string, params?: Record<string, unknown>) =>
-      (instance?.proxy as any)?.$t?.(key, params) ?? key;
+    const { t } = useI18n();
     const store = useStore();
 
     const empty: UsageAnalyticsResult = {
@@ -151,7 +150,6 @@ export default defineComponent({
       trend: [],
     };
     const result = ref<UsageAnalyticsResult>(empty);
-    const loading = ref(false);
     const enabling = ref(false);
 
     const enabled = computed(
@@ -175,28 +173,24 @@ export default defineComponent({
       totalMb.value > 0 ? Math.round((mb / totalMb.value) * 1000) / 10 : 0;
 
     const trendChart = computed(() => ({
-      options: {
-        xAxis: {
-          type: "category",
-          data: result.value.trend.map((p) => p.day),
-        },
-        yAxis: { type: "value" },
-        series: [
-          {
-            type: "bar",
-            data: result.value.trend.map((p) => display(p.total_mb)),
-          },
-        ],
+      xAxis: {
+        type: "category",
+        data: result.value.trend.map((p) => p.day),
       },
+      yAxis: { type: "value" },
+      series: [
+        {
+          type: "bar",
+          data: result.value.trend.map((p) => display(p.total_mb)),
+        },
+      ],
     }));
 
     const sparkChart = (spark: number[]) => ({
-      options: {
-        grid: { top: 2, bottom: 2, left: 2, right: 2 },
-        xAxis: { type: "category", show: false, data: spark.map((_, i) => i) },
-        yAxis: { type: "value", show: false },
-        series: [{ type: "line", showSymbol: false, data: spark }],
-      },
+      grid: { top: 2, bottom: 2, left: 2, right: 2 },
+      xAxis: { type: "category", show: false, data: spark.map((_, i) => i) },
+      yAxis: { type: "value", show: false },
+      series: [{ type: "line", showSymbol: false, data: spark }],
     });
 
     const dateModel = ref({
@@ -221,15 +215,13 @@ export default defineComponent({
 
     const load = async () => {
       if (props.canAdmin !== true || !enabled.value) return;
-      loading.value = true;
       try {
         const orgId = store.state.selectedOrganization.identifier;
         const { start, end } = currentWindow();
         result.value = await fetchUsageAnalytics(orgId, start, end);
       } catch (e) {
+        console.error(e);
         result.value = empty;
-      } finally {
-        loading.value = false;
       }
     };
 
@@ -249,6 +241,7 @@ export default defineComponent({
         toast({ message: t("billing.usageAnalytics.enableButton"), variant: "success" });
         await load();
       } catch (e) {
+        console.error(e);
         toast({ message: "Failed to enable Usage Analytics", variant: "error" });
       } finally {
         enabling.value = false;

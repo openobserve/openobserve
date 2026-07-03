@@ -2797,7 +2797,7 @@
     "usageLabel": "Usage",
     "usageAnalytics": {
       "tabLabel": "Usage Analytics",
-      "last24h": "Last 24h ingestion",
+      "last24h": "Ingestion (selected range)",
       "avgDaily": "Avg daily ingestion",
       "avgDailyCaveat": "based on {days} days so far",
       "perStreamTitle": "Avg daily ingestion by stream",
@@ -2805,7 +2805,6 @@
       "streamColumn": "Stream",
       "percentOfTotal": "% of total",
       "trendColumn": "Trend",
-      "basedOnDays": "Based on {days} days of data.",
       "enableTitle": "See your daily ingestion",
       "enableBody": "Enable Usage Analytics to track daily ingestion, break it down per stream, and estimate your needs. This writes a lightweight per-org usage stream.",
       "enableButton": "Enable Usage Analytics",

@@ -9,6 +9,7 @@ export function buildLast24hSql(): string {
   return `SELECT SUM(size) AS total_mb FROM "${USAGE_STREAM}" WHERE ${INGESTION_FILTER}`;
 }
 
+// usage stream 'size' field is in MB; mbToDisplay divides by 1024 for GB.
 export function buildPerStreamSql(): string {
   return (
     `SELECT stream_name, SUM(size) AS total_mb, SUM(num_records) AS records, ` +
