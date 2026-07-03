@@ -11,7 +11,7 @@
         :stream-fields="streamFields"
         :stream-fields-map="streamFieldsMap"
         :show-sql-preview="true"
-        condition-input-width="w-[220px]"
+        condition-input-width="w-[150px]"
         :allow-custom-columns="true"
         module="alerts"
         @add-condition="handleUpdate"

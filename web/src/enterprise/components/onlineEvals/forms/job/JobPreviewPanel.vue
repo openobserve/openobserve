@@ -1,5 +1,5 @@
 <template>
-  <aside class="min-w-0 overflow-auto p-4.5 bg-(--o2-card-bg) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
+  <aside class="flex-[3.5] min-w-0 overflow-auto p-2 bg-(--o2-card-bg) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
     <section class="py-[14px] px-4 mb-3 border border-(--color-dialog-header-border,var(--o2-border)) rounded-md">
       <header class="flex items-center gap-[6px] mb-[6px] text-(--color-text-secondary,var(--o2-text-secondary))">
         <OIcon name="visibility" size="xs" />
