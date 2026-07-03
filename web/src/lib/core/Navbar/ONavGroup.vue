@@ -49,6 +49,7 @@ import MenuLink from "@/components/MenuLink.vue";
 import config from "@/aws-exports";
 import { GATE_PREDICATES } from "./navGroups";
 import type { SubnavChild, NavGateContext } from "./ONavbar.types";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const props = defineProps<{
   groupKey: string;
@@ -349,8 +350,10 @@ function onChildClick() {
   close();
 }
 
-// Focus the hovered item so Enter activates it natively.
+// Focus the hovered item so Enter activates it natively — but never yank
+// focus away from an input the user is typing in.
 function onChildMouseenter(event: MouseEvent) {
+  if (isInputFocused()) return;
   (event.currentTarget as HTMLElement)?.focus();
 }
 </script>

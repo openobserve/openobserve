@@ -569,7 +569,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="row.id"
               :data-index="idx"
               :ref="(node: any) => measureDashboardRow(node)"
-              class="dashboard-data-row tw:cursor-pointer tw:hover:bg-[var(--o2-hover-gray)] tw:focus-visible:bg-[var(--o2-hover-gray)] tw:focus-visible:outline-none"
+              class="dashboard-data-row tw:cursor-pointer tw:hover:bg-[var(--o2-hover-gray)]"
               :class="{ 'tw:border-b': !usesSeparateBorders }"
               data-test="dashboard-data-row"
               tabindex="0"

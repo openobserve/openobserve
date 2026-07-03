@@ -1,5 +1,11 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
+<script lang="ts">
+// Every row registers its own window keydown listener, so they all see the
+// same event — this shared set lets only the first responder act on it.
+const handledNavEvents = new WeakSet<KeyboardEvent>();
+</script>
+
 <script setup lang="ts">
 import type { Row, Table } from "@tanstack/vue-table";
 import { computed, inject, ref, onMounted, onBeforeUnmount, watch, useSlots } from "vue";
@@ -155,9 +161,8 @@ const handleKeydown = (e: KeyboardEvent) => {
   const rowEl = rowRef.value?.closest("tr");
   const active = document.activeElement;
   if (active && active !== rowEl && active !== document.body) return;
-  // One shared window listener per row — stop the same event cascading through siblings.
-  if ((e as any)._o2RowNavHandled) return;
-  (e as any)._o2RowNavHandled = true;
+  if (handledNavEvents.has(e)) return;
+  handledNavEvents.add(e);
 
   // Arrow up/down — move focus to the adjacent row
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
