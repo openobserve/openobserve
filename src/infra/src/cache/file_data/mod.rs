@@ -52,6 +52,7 @@ enum CacheStrategy {
 enum FileType {
     Parquet,
     Ttv,
+    Vortex,
 }
 
 impl CacheStrategy {
@@ -220,6 +221,15 @@ async fn validate_file(bytes: &[u8], ftype: FileType) -> Result<(), anyhow::Erro
                 return Err(anyhow::anyhow!("payload size mismatch"));
             }
         }
+        FileType::Vortex => {
+            if bytes.len() < 12 {
+                return Err(anyhow::anyhow!("invalid vortex file"));
+            }
+            const VORTEX_MAGIC: &[u8; 4] = b"VTXF";
+            if &bytes[..4] != VORTEX_MAGIC || &bytes[bytes.len() - 4..] != VORTEX_MAGIC {
+                return Err(anyhow::anyhow!("vortex magic bytes mismatch"));
+            }
+        }
     }
     Ok(())
 }
@@ -289,16 +299,20 @@ async fn download_from_storage(
                 // so we check if the footer is valid. If it is, then the db entry is invalid
                 // and we reset it. If footer is invalid, the store has a corrupted file
                 // so we mark it as deleted, and return error.
+                // data files (parquet/vortex) are tracked in file_list, ttv index files are not
+                let is_data_file = file.ends_with(".parquet") || file.ends_with(".vortex");
                 let valid_parquet = file.ends_with(".parquet")
                     && validate_file(&data_bytes, FileType::Parquet).await.is_ok();
+                let valid_vortex = file.ends_with(".vortex")
+                    && validate_file(&data_bytes, FileType::Vortex).await.is_ok();
                 let valid_ttv = file.ends_with(".ttv")
                     && validate_file(&data_bytes, FileType::Ttv).await.is_ok();
-                if valid_parquet || valid_ttv {
+                if valid_parquet || valid_vortex || valid_ttv {
                     log::warn!(
                         "download file {file} found size mismatch, remote : {expected_blob_size}, db: {size}, correcting db as valid file",
                     );
-                    // only update for parquet files, not ttv files
-                    if file.ends_with(".parquet") {
+                    // only update for data files, not ttv files
+                    if is_data_file {
                         crate::file_list::update_compressed_size(file, data_len as i64).await?;
                         crate::file_list::LOCAL_CACHE
                             .update_compressed_size(file, data_len as i64)
@@ -309,8 +323,8 @@ async fn download_from_storage(
                     log::warn!(
                         "download file {file} found corrupt file, remote: {expected_blob_size}, db: {size}, deleting entry from file_list "
                     );
-                    // only update for parquet files, not ttv files
-                    if file.ends_with(".parquet") {
+                    // only update for data files, not ttv files
+                    if is_data_file {
                         crate::file_list::remove(file).await?;
                         crate::file_list::LOCAL_CACHE.remove(file).await?;
                     }
