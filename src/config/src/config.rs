@@ -1697,8 +1697,6 @@ pub struct Limit {
     pub wal_runtime_worker_num: usize, // equals to mem_table_bucket_num if 0
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
     pub calculate_stats_interval: u64,
-    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT_SECS", default = 600)] // seconds
-    pub calculate_stats_step_limit_secs: i64,
     #[env_config(name = "ZO_HTTP_SHUTDOWN_TIMEOUT", default = 5)] // seconds
     pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_HTTP_SLOW_LOG_THRESHOLD", default = 5)] // seconds
@@ -2754,14 +2752,6 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     #[allow(deprecated)]
     if cfg.limit.udschema_max_fields > 0 {
         cfg.limit.schema_max_fields_to_enable_uds = cfg.limit.udschema_max_fields;
-    }
-
-    // check for calculate stats
-    if cfg.limit.calculate_stats_step_limit_secs < 1 {
-        cfg.limit.calculate_stats_step_limit_secs = 600;
-    }
-    if cfg.limit.calculate_stats_step_limit_secs > 86400 {
-        cfg.limit.calculate_stats_step_limit_secs = 86400;
     }
 
     // migrate deprecated *_file_retention ENVs to *_query_retention for backward compatibility
