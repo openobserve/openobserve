@@ -24,6 +24,8 @@ service Search {
     rpc StartQuery(StartQueryRequest) returns (StartQueryResponse) {}
     rpc ReleaseQuery(ReleaseQueryRequest) returns (ReleaseQueryResponse) {}
     rpc GetLicenseUsageInfo(GetLicenseUsageRequest) returns (GetLicenseUsageResponse) {}
+    // generic get file call
+    rpc GetFile(GetFileRequest) returns (GetFileResponse) {}
 }
 
 message QueryStatusRequest {}
@@ -212,4 +214,12 @@ message GetLicenseUsageResponse {
     string                  last_usage_response = 7;
     repeated UsageResult    ingestion_history = 8;
 
+}
+
+message GetFileRequest {
+    string            path = 3;
+}
+
+message GetFileResponse {
+    bytes   file_data = 1;
 }

@@ -145,12 +145,19 @@ pub async fn save_workflow_errors(errors: WorkflowRunErrors) -> Result<(), anyho
                 }
                 Err(e) => {
                     log::error!(
-                        "error in sending workflow errors add notification to super cluster queue for {org_id}/{wid} : run {run_id}",
+                        "error in sending workflow errors add notification to super cluster queue for {org_id}/{wid} : run {run_id} : {e}",
                     );
                 }
             }
         }
     }
+    Ok(())
+}
+
+pub async fn update_error_input_file_cluster(
+    errors: WorkflowRunErrors,
+) -> Result<(), anyhow::Error> {
+    infra::table::workflows::update_error_input_file_cluster(errors).await?;
     Ok(())
 }
 

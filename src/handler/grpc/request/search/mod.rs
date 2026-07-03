@@ -19,10 +19,11 @@ use config::{
 };
 use proto::cluster_rpc::{
     CancelQueryRequest, CancelQueryResponse, DeleteResultRequest, DeleteResultResponse,
-    GetLicenseUsageRequest, GetLicenseUsageResponse, GetResultRequest, GetResultResponse,
-    GetSourcemapFileRequest, GetSourcemapFileResponse, GetTableRequest, GetTableResponse,
-    QueryStatusRequest, QueryStatusResponse, SearchPartitionRequest, SearchPartitionResponse,
-    SearchRequest, SearchResponse, search_server::Search,
+    GetFileRequest, GetFileResponse, GetLicenseUsageRequest, GetLicenseUsageResponse,
+    GetResultRequest, GetResultResponse, GetSourcemapFileRequest, GetSourcemapFileResponse,
+    GetTableRequest, GetTableResponse, QueryStatusRequest, QueryStatusResponse,
+    SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
+    search_server::Search,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -525,6 +526,23 @@ impl Search for Searcher {
         _req: Request<proto::cluster_rpc::ReleaseQueryRequest>,
     ) -> Result<Response<proto::cluster_rpc::ReleaseQueryResponse>, Status> {
         Err(Status::unimplemented("Not Supported"))
+    }
+
+    async fn get_file(
+        &self,
+        req: Request<GetFileRequest>,
+    ) -> Result<Response<GetFileResponse>, Status> {
+        let req = req.into_inner();
+        log::info!("got get request for file at {}", req.path);
+
+        let res = infra::storage::get_bytes("", &req.path)
+            .await
+            .map_err(|e| {
+                Status::internal(format!("failed to get file at path {}: {e}", req.path))
+            })?;
+        Ok(Response::new(GetFileResponse {
+            file_data: res.to_vec(),
+        }))
     }
 }
 

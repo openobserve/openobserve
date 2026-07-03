@@ -47,6 +47,11 @@ fn create_workflow_errors_table_statement() -> TableCreateStatement {
                 .auto_increment(),
         )
         .col(
+            ColumnDef::new(WorkflowErrors::Cluster)
+                .string_len(100)
+                .not_null(),
+        )
+        .col(
             ColumnDef::new(WorkflowErrors::OrgId)
                 .string_len(256)
                 .not_null(),
@@ -79,6 +84,7 @@ enum WorkflowErrors {
     OrgId,
     RanAt,
     Data,
+    Cluster,
 }
 
 #[cfg(test)]
@@ -93,6 +99,7 @@ mod tests {
             &create_workflow_errors_table_statement().to_string(PostgresQueryBuilder),
             r#"CREATE TABLE IF NOT EXISTS "workflow_errors" ( 
             "id" PRIMARY KEY,
+            "cluster" varchar(100) NOT NULL,
             "org_id" varchar(256) NOT NULL,
             "workflow_id" varchar(100) NOT NULL,
             "run_id" varchar(100) NOT NULL,
@@ -108,6 +115,7 @@ mod tests {
             &create_workflow_errors_table_statement().to_string(SqliteQueryBuilder),
             r#"CREATE TABLE IF NOT EXISTS "workflow_errors" ( 
             "id" PRIMARY KEY AUTOINCREMENT,
+            "cluster" varchar(100) NOT NULL,
             "org_id" varchar(256) NOT NULL,
             "workflow_id" varchar(100) NOT NULL,
             "run_id" varchar(100) NOT NULL,

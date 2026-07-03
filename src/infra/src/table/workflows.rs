@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::pipeline::components::{Edge, Node};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait, prelude::Expr};
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -45,6 +45,7 @@ pub struct WorkflowError {
 #[derive(Deserialize, Serialize, Clone)]
 pub struct WorkflowRunErrors {
     pub id: i32,
+    pub cluster: String,
     pub org_id: String,
     pub workflow_id: String,
     pub run_id: String,
@@ -75,6 +76,7 @@ impl TryFrom<workflow_errors::Model> for WorkflowRunErrors {
     fn try_from(value: workflow_errors::Model) -> Result<Self, Self::Error> {
         let ret = Self {
             id: value.id,
+            cluster: value.cluster,
             org_id: value.org_id,
             workflow_id: value.workflow_id,
             run_id: value.run_id,
@@ -140,6 +142,23 @@ pub async fn list_errors_for_workflow(
     Ok(ret)
 }
 
+pub async fn list_errors_for_workflow_run(
+    org_id: &str,
+    wid: &str,
+    run_id: &str,
+) -> Result<Option<WorkflowRunErrors>, anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let res = workflow_errors::Entity::find()
+        .filter(workflow_errors::Column::OrgId.eq(org_id))
+        .filter(workflow_errors::Column::WorkflowId.eq(wid))
+        .filter(workflow_errors::Column::RunId.eq(run_id))
+        .one(client)
+        .await?;
+
+    let ret = res.map(|v| v.try_into()).transpose()?;
+    Ok(ret)
+}
+
 pub async fn get_error_for_run(run_id: &str) -> Result<Option<WorkflowRunErrors>, anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = workflow_errors::Entity::find()
@@ -197,6 +216,7 @@ pub async fn save_workflow_errors(errors: WorkflowRunErrors) -> Result<(), anyho
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let _lock = get_lock().await;
     let model = workflow_errors::ActiveModel {
+        cluster: Set(errors.cluster),
         org_id: Set(errors.org_id),
         workflow_id: Set(errors.workflow_id),
         run_id: Set(errors.run_id),
@@ -205,6 +225,26 @@ pub async fn save_workflow_errors(errors: WorkflowRunErrors) -> Result<(), anyho
         ..Default::default()
     };
     workflow_errors::Entity::insert(model).exec(client).await?;
+    Ok(())
+}
+
+pub async fn update_error_input_file_cluster(
+    errors: WorkflowRunErrors,
+) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    workflow_errors::Entity::update_many()
+        .filter(workflow_errors::Column::OrgId.eq(errors.org_id))
+        .filter(workflow_errors::Column::WorkflowId.eq(errors.workflow_id))
+        .filter(workflow_errors::Column::RunId.eq(errors.run_id))
+        .col_expr(
+            workflow_errors::Column::Cluster,
+            Expr::value(errors.cluster),
+        )
+        .exec(client)
+        .await?;
+
     Ok(())
 }
 
