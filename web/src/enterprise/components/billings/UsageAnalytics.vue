@@ -49,6 +49,13 @@
 
     <!-- live -->
     <div v-else data-test="usage-analytics-live" class="tw:flex tw:flex-col tw:gap-4">
+      <div class="tw:flex tw:justify-end tw:mb-2">
+        <DateTimePicker
+          data-test="usage-analytics-date-picker"
+          :model-value="dateModel"
+          @update:model-value="onDateChange"
+        />
+      </div>
       <div class="tw:grid tw:grid-cols-2 tw:gap-4">
         <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4">
           <div class="tw:text-(--o2-text-secondary)">{{ t("billing.usageAnalytics.last24h") }}</div>
@@ -107,8 +114,10 @@
 import { defineComponent, ref, computed, onMounted, defineAsyncComponent, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import DateTimePicker from "@/components/DateTimePicker.vue";
 import organizations from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { getConsumableDateTime } from "@/utils/commons";
 import { fetchUsageAnalytics, type UsageAnalyticsResult } from "./useUsageAnalytics";
 import { mbToDisplay } from "./usageAnalytics";
 
@@ -118,7 +127,7 @@ const CustomChartRenderer = defineAsyncComponent(
 
 export default defineComponent({
   name: "UsageAnalytics",
-  components: { OButton, CustomChartRenderer },
+  components: { OButton, CustomChartRenderer, DateTimePicker },
   props: {
     unit: { type: String, default: "gb" },
     canAdmin: { type: Boolean, default: true },
@@ -177,23 +186,43 @@ export default defineComponent({
       },
     }));
 
+    const dateModel = ref({
+      tab: "relative",
+      relative: { period: { label: "Days", value: "Days" }, value: 1 },
+      absolute: {
+        date: { from: "", to: "" },
+        startTime: "00:00",
+        endTime: "23:59",
+      },
+    });
+
+    const currentWindow = () => {
+      const { start_time, end_time } = getConsumableDateTime(
+        JSON.parse(JSON.stringify(dateModel.value)),
+      );
+      return {
+        start: new Date(start_time).getTime() * 1000,
+        end: new Date(end_time).getTime() * 1000,
+      };
+    };
+
     const load = async () => {
       if (props.canAdmin !== true || !enabled.value) return;
       loading.value = true;
       try {
         const orgId = store.state.selectedOrganization.identifier;
-        const nowMicros = Date.now() * 1000;
-        const dayMicros = 24 * 60 * 60 * 1000 * 1000;
-        result.value = await fetchUsageAnalytics(
-          orgId,
-          nowMicros - dayMicros,
-          nowMicros,
-        );
+        const { start, end } = currentWindow();
+        result.value = await fetchUsageAnalytics(orgId, start, end);
       } catch (e) {
         result.value = empty;
       } finally {
         loading.value = false;
       }
+    };
+
+    const onDateChange = (val: any) => {
+      dateModel.value = val;
+      load();
     };
 
     const enableUsageAnalytics = async () => {
@@ -225,6 +254,8 @@ export default defineComponent({
       trendChart,
       enabling,
       enableUsageAnalytics,
+      dateModel,
+      onDateChange,
     };
   },
 });

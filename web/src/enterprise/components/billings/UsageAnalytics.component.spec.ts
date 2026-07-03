@@ -50,4 +50,21 @@ describe("UsageAnalytics.vue", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="usage-analytics-warming"]').exists()).toBe(true);
   });
+
+  it("renders the date picker in the live state", async () => {
+    const SearchService = (await import("@/services/search")).default as any;
+    SearchService.search.mockResolvedValue({
+      data: { hits: [{ total_mb: 100, stream_name: "s", records: 1, days: 1, day: "2026-7-1" }] },
+    });
+    const wrapper = mount(UsageAnalytics, {
+      props: { canAdmin: true },
+      global: {
+        plugins: [makeStore(true), i18n],
+        mocks: { $t: (k: string) => k },
+        stubs: { DateTimePicker: { template: '<div data-test="usage-analytics-date-picker" />' } },
+      },
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="usage-analytics-date-picker"]').exists()).toBe(true);
+  });
 });
