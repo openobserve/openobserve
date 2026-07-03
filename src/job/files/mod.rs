@@ -76,6 +76,30 @@ pub fn generate_storage_file_name(
     } else {
         format!("{}/{}", &file_name[..file_name_pos], id)
     };
-    let file_format = config::get_config().common.file_format.extension();
+    let file_format = config::FileFormat::Parquet.extension();
     format!("files/{stream_key}/{file_date}/{file_name}{file_format}")
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::StreamType;
+
+    use super::generate_storage_file_name;
+
+    #[test]
+    fn test_ingester_storage_file_name_uses_parquet_extension() {
+        let file_name = generate_storage_file_name(
+            "default",
+            StreamType::Logs,
+            "quickstart",
+            "0/2026/07/02/12/hash/service_name=ingester/source.json",
+        );
+
+        assert!(
+            file_name
+                .starts_with("files/default/logs/quickstart/2026/07/02/12/service_name=ingester/")
+        );
+        assert!(file_name.ends_with(".parquet"));
+        assert!(!file_name.ends_with(".vortex"));
+    }
 }

@@ -997,8 +997,8 @@ async fn queue_services_from_parquet(
         let mut records_dropped = 0u64;
         let mut batches_sent = 0u64;
 
-        let file_format = config::get_config().common.file_format;
-        let reader_result = get_recordbatch_reader_from_bytes(file_format, parquet_bytes).await;
+        let reader_result =
+            get_recordbatch_reader_from_bytes(config::FileFormat::Parquet, parquet_bytes).await;
         let (_schema, mut reader) = match reader_result {
             Ok(r) => r,
             Err(e) => {

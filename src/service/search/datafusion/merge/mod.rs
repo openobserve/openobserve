@@ -150,8 +150,10 @@ pub async fn merge_parquet_files(
         Ok(())
     });
 
-    // write batches to the appropriate format
-    let buf = match cfg.common.file_format {
+    // Ingesters always produce parquet; compactors may convert those files to the
+    // configured storage format.
+    let file_format = merge_output_file_format(is_ingester, cfg.common.file_format);
+    let buf = match file_format {
         FileFormat::Parquet => {
             write_parquet(
                 &schema,
@@ -173,6 +175,14 @@ pub async fn merge_parquet_files(
 
     metadata.compressed_size = buf.len() as i64;
     Ok(MergeParquetResult::Single(buf, metadata))
+}
+
+fn merge_output_file_format(is_ingester: bool, configured: FileFormat) -> FileFormat {
+    if is_ingester {
+        FileFormat::Parquet
+    } else {
+        configured
+    }
 }
 
 async fn write_parquet(
@@ -272,6 +282,22 @@ mod tests {
             Field::new("field1", DataType::Utf8, true),
             Field::new("field2", DataType::Int64, true),
         ]))
+    }
+
+    #[test]
+    fn test_merge_output_file_format_keeps_vortex_out_of_ingester() {
+        assert_eq!(
+            merge_output_file_format(true, FileFormat::Vortex),
+            FileFormat::Parquet
+        );
+        assert_eq!(
+            merge_output_file_format(false, FileFormat::Vortex),
+            FileFormat::Vortex
+        );
+        assert_eq!(
+            merge_output_file_format(false, FileFormat::Parquet),
+            FileFormat::Parquet
+        );
     }
 
     #[tokio::test]
