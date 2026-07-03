@@ -74,6 +74,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div><!-- end flex row -->
         </div><!-- end card-container -->
       </div><!-- end toolbar wrapper -->
+
+      <!-- KPI summary strip -->
+      <div class="card-container tw:border-b tw:border-border-default">
+        <SessionsMetricsStrip
+          :total="sessionsSummary.total"
+          :error-sessions="sessionsSummary.errorSessions"
+          :frustrated-sessions="sessionsSummary.frustratedSessions"
+          :bounced-sessions="sessionsSummary.bouncedSessions"
+          :avg-duration-ms="sessionsSummary.avgDurationMs"
+          :median-duration-ms="sessionsSummary.medianDurationMs"
+          :active-card="activeMetricCard"
+          @select="handleMetricSelect"
+        />
+
+        <!-- Segment filters -->
+        <div
+          class="tw:flex tw:flex-wrap tw:items-center tw:gap-4 tw:px-2 tw:pb-2"
+          data-test="rum-app-sessions-segment-filters"
+        >
+          <OToggleGroup
+            :model-value="healthSegment"
+            type="single"
+            :label="t('rum.health')"
+            label-position="left"
+            @update:model-value="(v: any) => setHealthSegment(v)"
+          >
+            <OToggleGroupItem
+              value="all"
+              size="xs"
+              data-test="rum-app-sessions-health-all"
+            >{{ t("rum.all") }}</OToggleGroupItem>
+            <OToggleGroupItem
+              value="errors"
+              size="xs"
+              data-test="rum-app-sessions-health-errors"
+            >{{ t("rum.withErrors") }} · {{ sessionsSummary.errorSessions }}</OToggleGroupItem>
+            <OToggleGroupItem
+              value="frustrated"
+              size="xs"
+              data-test="rum-app-sessions-health-frustrated"
+            >{{ t("rum.frustrated") }} · {{ sessionsSummary.frustratedSessions }}</OToggleGroupItem>
+            <OToggleGroupItem
+              value="clean"
+              size="xs"
+              data-test="rum-app-sessions-health-clean"
+            >{{ t("rum.clean") }} · {{ sessionsSummary.cleanSessions }}</OToggleGroupItem>
+          </OToggleGroup>
+
+          <OToggleGroup
+            :model-value="typeSegment"
+            type="single"
+            :label="t('rum.type')"
+            label-position="left"
+            @update:model-value="(v: any) => setTypeSegment(v)"
+          >
+            <OToggleGroupItem
+              value="all"
+              size="xs"
+              data-test="rum-app-sessions-type-all"
+            >{{ t("rum.all") }}</OToggleGroupItem>
+            <OToggleGroupItem
+              value="engaged"
+              size="xs"
+              data-test="rum-app-sessions-type-engaged"
+            >{{ t("rum.engaged") }} · {{ sessionsSummary.engagedSessions }}</OToggleGroupItem>
+            <OToggleGroupItem
+              value="bounced"
+              size="xs"
+              data-test="rum-app-sessions-type-bounced"
+            >{{ t("rum.bounced") }} · {{ sessionsSummary.bouncedSessions }}</OToggleGroupItem>
+          </OToggleGroup>
+        </div>
+      </div>
+
       <OSplitter
         class="logs-horizontal-splitter tw:flex-1 tw:min-h-0"
         v-model="splitterModel"
@@ -112,13 +186,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:h-full"
                   data-test="rum-sessions-table"
                   row-class="tw:cursor-pointer"
+                  :get-row-status-color="getSessionStatusColor"
                   @row-click="handleRowClick"
                   @scroll-end="handleScrollEnd"
                   :show-global-filter="false"
                   :default-columns="false"
                 >
                   <template #empty>
-                    <NoData />
+                    <div
+                      v-if="hasSegmentFilteredOutAllRows"
+                      class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-8"
+                      data-test="rum-app-sessions-segment-empty"
+                    >
+                      <p>{{ t("rum.noMatchingSessions") }}</p>
+                      <OButton
+                        variant="outline"
+                        size="sm"
+                        data-test="rum-app-sessions-reset-segments-btn"
+                        @click="resetSegments"
+                      >
+                        {{ t("rum.resetFilters") }}
+                      </OButton>
+                    </div>
+                    <NoData v-else />
                   </template>
                   <template #cell-action_play="{ row }">
                     <OIcon
@@ -127,24 +217,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:cursor-pointer session-play-icon tw:text-[var(--o2-icon-color)] tw:hover:text-[var(--o2-primary-btn-bg)]"
                     />
                   </template>
-                  <template #cell-error_count="{ row }">
-                    <span
-                      class="tw:tabular-nums"
-                      :class="(row.error_count || 0) > 0
-                        ? 'tw:text-badge-error-soft-text tw:font-medium'
-                        : 'tw:text-text-primary'"
-                    >{{ row.error_count || 0 }}</span>
+                  <template #cell-session="{ row }">
+                    <div class="tw:flex tw:flex-col tw:justify-center tw:gap-0.5 tw:min-w-0">
+                      <OUserCell
+                        :value="row.user_email || 'Unknown'"
+                        class="tw:font-medium tw:truncate"
+                      />
+                      <div
+                        class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-[var(--o2-text-caption)]"
+                      >
+                        <span
+                          class="o2-monospace-font"
+                          :title="row.session_id"
+                          data-test="rum-app-sessions-session-id-text"
+                        >{{ shortSessionId(row.session_id) }}</span>
+                        <span aria-hidden="true">·</span>
+                        <OTimeCell
+                          :value="row.zo_sql_timestamp"
+                          unit="us"
+                          :timezone="store.state.timezone"
+                        />
+                      </div>
+                    </div>
                   </template>
-                  <template #cell-frustration_count="{ row }">
-                    <FrustrationBadge
-                      :count="row.frustration_count || 0"
+                  <template #cell-health="{ row }">
+                    <SessionHealthCell
+                      :error-count="row.error_count || 0"
+                      :frustration-count="row.frustration_count || 0"
                     />
-                  </template>
-                  <template #cell-user_email="{ row }">
-                    <OUserCell :value="row.user_email" />
                   </template>
                   <template #cell-location="{ row }">
                     <SessionLocationColumn :column="row" />
+                  </template>
+                  <template #cell-duration="{ row }">
+                    <div class="tw:flex tw:flex-col tw:items-end tw:gap-0.5">
+                      <span class="tw:tabular-nums tw:font-medium">{{
+                        formatSessionDuration(row.time_spent)
+                      }}</span>
+                      <small
+                        v-if="row.is_bounce"
+                        class="tw:text-[var(--o2-status-warning-text)]"
+                        data-test="rum-app-sessions-bounced-text"
+                      >{{ t("rum.bounced").toLowerCase() }}</small>
+                      <small
+                        v-else-if="row.is_active"
+                        class="tw:text-[var(--o2-status-success-text)]"
+                        data-test="rum-app-sessions-active-text"
+                      >{{ t("rum.active") }}</small>
+                    </div>
                   </template>
                 </OTable>
             </div>
@@ -199,7 +319,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import {
-  formatDuration,
+  durationFormatter,
   b64DecodeUnicode,
   b64EncodeUnicode,
 } from "@/utils/zincutils";
@@ -208,12 +328,15 @@ import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
-import { formatDate } from "@/utils/date";
 import useSession from "@/composables/useSessionReplay";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
-import FrustrationBadge from "@/components/rum/FrustrationBadge.vue";
+import SessionHealthCell from "@/components/rum/sessionReplay/SessionHealthCell.vue";
+import SessionsMetricsStrip from "@/components/rum/sessionReplay/SessionsMetricsStrip.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";
@@ -231,9 +354,22 @@ interface Session {
   time_spent: number;
   error_count: string;
   frustration_count?: number;
+  events?: number;
+  end_time?: number;
   initial_view_name: string;
   id: string;
 }
+
+type HealthSegment = "all" | "errors" | "frustrated" | "clean";
+type TypeSegment = "all" | "engaged" | "bounced";
+
+const HEALTH_SEGMENTS: HealthSegment[] = [
+  "all",
+  "errors",
+  "frustrated",
+  "clean",
+];
+const TYPE_SEGMENTS: TypeSegment[] = ["all", "engaged", "bounced"];
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -376,40 +512,18 @@ const tableColumns = [
     meta: { align: "left" },
   },
   {
-    id: "timestamp",
-    header: t("rum.timestamp"),
-    accessorFn: (row: any) => getFormattedDate(row["timestamp"] / 1000),
-    sortable: true,
-    size: 240,
-    meta: { align: "left" },
-  },
-  {
-    id: "user_email",
-    header: t("login.userEmail"),
+    id: "session",
+    header: t("rum.userSession"),
     accessorFn: (row: any) => row["user_email"] || "Unknown",
     sortable: true,
     meta: { align: "left", autoWidth: true },
   },
   {
-    id: "time_spent",
-    header: t("rum.timeSpent"),
-    accessorFn: (row: any) => formatDuration(row["time_spent"]),
-    sortable: true,
-    size: COL.duration,
-    meta: { align: "left" },
-  },
-  {
-    id: "error_count",
-    header: t("rum.errorCount"),
-    accessorKey: "error_count",
-    sortable: true,
-    size: 120,
-    meta: { align: "right" },
-  },
-  {
-    id: "frustration_count",
-    header: t("rum.frustrationCount"),
-    accessorFn: (row: any) => row["frustration_count"] || 0,
+    id: "health",
+    // Sorts by "badness": errors dominate, frustrations break ties.
+    header: t("rum.health"),
+    accessorFn: (row: any) =>
+      (row["error_count"] || 0) * 1000 + (row["frustration_count"] || 0),
     sortable: true,
     size: 160,
     meta: { align: "left" },
@@ -417,10 +531,18 @@ const tableColumns = [
   {
     id: "location",
     header: t("rum.location"),
-    accessorFn: (row: any) => formatDuration(row["time_spent"]),
+    accessorFn: (row: any) => row["country"] || "",
     sortable: true,
     size: 360,
     meta: { align: "left" },
+  },
+  {
+    id: "duration",
+    header: t("rum.duration"),
+    accessorFn: (row: any) => row["time_spent"] || 0,
+    sortable: true,
+    size: COL.duration,
+    meta: { align: "right" },
   },
 ];
 
@@ -607,6 +729,7 @@ const getSessions = () => {
           type: hit.type,
           error_count: hit.error_count,
           frustration_count: hit.frustration_count || 0,
+          events: hit.events || 0,
           user_email: hit.user_email,
           country: hit.country,
           city: hit.city,
@@ -723,7 +846,140 @@ const splitterModel = ref(250);
 
 const rows = ref<Session[]>([]);
 
-const tableRows = computed(() => rows.value);
+const healthSegment = ref<HealthSegment>("all");
+const typeSegment = ref<TypeSegment>("all");
+
+// A session with ≤1 event or under 10s of activity counts as a bounce; a
+// session whose last replay event is within the last 5 minutes is still live.
+const BOUNCE_MAX_MS = 10_000;
+const ACTIVE_WINDOW_MS = 5 * 60_000;
+
+const enrichedRows = computed(() =>
+  rows.value.map((row: any) => ({
+    ...row,
+    is_bounce:
+      (row.events ?? 0) <= 1 || (row.time_spent ?? 0) < BOUNCE_MAX_MS,
+    is_active: !!row.end_time && Date.now() - row.end_time <= ACTIVE_WINDOW_MS,
+  })),
+);
+
+const sessionsSummary = computed(() => {
+  const all = enrichedRows.value;
+  const total = all.length;
+  const durations = all
+    .map((row: any) => row.time_spent || 0)
+    .sort((a: number, b: number) => a - b);
+  const errorSessions = all.filter(
+    (row: any) => (row.error_count || 0) > 0,
+  ).length;
+  const frustratedSessions = all.filter(
+    (row: any) => (row.frustration_count || 0) > 0,
+  ).length;
+  const cleanSessions = all.filter(
+    (row: any) =>
+      !((row.error_count || 0) > 0) && !((row.frustration_count || 0) > 0),
+  ).length;
+  const bouncedSessions = all.filter((row: any) => row.is_bounce).length;
+  const avgDurationMs = total
+    ? durations.reduce((sum: number, d: number) => sum + d, 0) / total
+    : 0;
+  const mid = Math.floor(durations.length / 2);
+  const medianDurationMs = !total
+    ? 0
+    : durations.length % 2
+      ? durations[mid]
+      : (durations[mid - 1] + durations[mid]) / 2;
+
+  return {
+    total,
+    errorSessions,
+    frustratedSessions,
+    cleanSessions,
+    bouncedSessions,
+    engagedSessions: total - bouncedSessions,
+    avgDurationMs,
+    medianDurationMs,
+  };
+});
+
+const tableRows = computed(() =>
+  enrichedRows.value.filter((row: any) => {
+    if (healthSegment.value === "errors" && !((row.error_count || 0) > 0))
+      return false;
+    if (
+      healthSegment.value === "frustrated" &&
+      !((row.frustration_count || 0) > 0)
+    )
+      return false;
+    if (
+      healthSegment.value === "clean" &&
+      ((row.error_count || 0) > 0 || (row.frustration_count || 0) > 0)
+    )
+      return false;
+    if (typeSegment.value === "bounced" && !row.is_bounce) return false;
+    if (typeSegment.value === "engaged" && row.is_bounce) return false;
+    return true;
+  }),
+);
+
+const hasSegmentFilteredOutAllRows = computed(
+  () => rows.value.length > 0 && tableRows.value.length === 0,
+);
+
+const activeMetricCard = computed(() => {
+  if (healthSegment.value === "errors") return "errors";
+  if (healthSegment.value === "frustrated") return "frustrated";
+  if (typeSegment.value === "bounced") return "bounced";
+  return "";
+});
+
+const setHealthSegment = (value: HealthSegment | undefined | null) => {
+  healthSegment.value = value && HEALTH_SEGMENTS.includes(value) ? value : "all";
+  updateUrlQueryParams();
+};
+
+const setTypeSegment = (value: TypeSegment | undefined | null) => {
+  typeSegment.value = value && TYPE_SEGMENTS.includes(value) ? value : "all";
+  updateUrlQueryParams();
+};
+
+const resetSegments = () => {
+  healthSegment.value = "all";
+  typeSegment.value = "all";
+  updateUrlQueryParams();
+};
+
+const handleMetricSelect = (card: string) => {
+  if (card === "sessions") {
+    resetSegments();
+  } else if (card === "errors") {
+    setHealthSegment(healthSegment.value === "errors" ? "all" : "errors");
+  } else if (card === "frustrated") {
+    setHealthSegment(
+      healthSegment.value === "frustrated" ? "all" : "frustrated",
+    );
+  } else if (card === "bounced") {
+    setTypeSegment(typeSegment.value === "bounced" ? "all" : "bounced");
+  }
+};
+
+const shortSessionId = (id?: string) => {
+  if (!id) return "—";
+  return id.length > 12 ? `${id.slice(0, 4)}…${id.slice(-4)}` : id;
+};
+
+const formatSessionDuration = (ms?: number) => {
+  if (!ms || ms <= 0) return "0s";
+  if (ms < 1000) return "<1s";
+  return durationFormatter(Math.round(ms / 1000));
+};
+
+const getSessionStatusColor = (row: any) => {
+  if ((row.error_count || 0) > 0) return "var(--o2-status-error-text)";
+  if ((row.frustration_count || 0) > 0)
+    return "var(--o2-status-warning-text)";
+  return undefined;
+};
 
 const router = useRouter();
 
@@ -770,9 +1026,6 @@ const handleSidebarEvent = (event: string, value: any) => {
   }
 };
 
-const getFormattedDate = (timestamp: number) =>
-  formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
-
 const runQuery = () => {
   sessionState.data.resultGrid.currentPage = 0;
   sessionState.data.sessions = {};
@@ -808,6 +1061,20 @@ function restoreUrlQueryParams() {
     sessionState.data.editorValue =
       b64DecodeUnicode(queryParams.query as string) || "";
   }
+
+  if (
+    queryParams.health &&
+    HEALTH_SEGMENTS.includes(queryParams.health as HealthSegment)
+  ) {
+    healthSegment.value = queryParams.health as HealthSegment;
+  }
+
+  if (
+    queryParams.session_type &&
+    TYPE_SEGMENTS.includes(queryParams.session_type as TypeSegment)
+  ) {
+    typeSegment.value = queryParams.session_type as TypeSegment;
+  }
 }
 
 function updateUrlQueryParams() {
@@ -824,6 +1091,10 @@ function updateUrlQueryParams() {
   }
 
   query["query"] = b64EncodeUnicode(sessionState.data.editorValue);
+
+  if (healthSegment.value !== "all") query["health"] = healthSegment.value;
+  if (typeSegment.value !== "all")
+    query["session_type"] = typeSegment.value;
 
   query["org_identifier"] = store.state.selectedOrganization.identifier;
   router.push({ query });

@@ -211,22 +211,20 @@ function onRowMouseleave() {
       !isRowSelected && isStriped
         ? 'tw:bg-table-row-striped-bg'
         : '',
+      statusBarColor ? 'o2-table-row-with-status' : '',
       rowClass,
     ]"
-    :style="{ height: 'var(--o2-table-row-height, 2.25rem)', ...rowStyle }"
+    :style="{
+      height: 'var(--o2-table-row-height, 2.25rem)',
+      ...(statusBarColor ? { '--o2-row-status-color': statusBarColor } : {}),
+      ...rowStyle,
+    }"
+    :data-status-bar="statusBarColor ? 'true' : undefined"
     @click="onClick"
     @dblclick="onDblclick"
     @mouseenter="onRowMouseenter"
     @mouseleave="onRowMouseleave"
   >
-    <!-- Status bar color indicator -->
-    <td
-      v-if="statusBarColor"
-      class="tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:p-0 tw:border-0 tw:z-10"
-      :style="{ backgroundColor: statusBarColor }"
-      data-test="o2-table-status-bar"
-    />
-
     <!-- Expand button cell -->
     <td
       v-if="expansionEnabled"
@@ -326,6 +324,13 @@ function onRowMouseleave() {
 </template>
 
 <style>
+/* Per-row status spine. Painted as an inset box-shadow on the row's first
+   cell — an extra <td> would add a phantom column on only the rows that have
+   a status color and shift their cells out of alignment under table-fixed. */
+.o2-table-row-with-status > td:first-child {
+  box-shadow: inset 0.25rem 0 0 0 var(--o2-row-status-color);
+}
+
 /* Continuation of the tree connector vertical line through the warning row */
 .o2-table-tree-warning-cell::after {
   content: "";
