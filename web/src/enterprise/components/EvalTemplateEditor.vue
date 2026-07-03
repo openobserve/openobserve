@@ -47,9 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Row 1: Name & Description -->
         <div style="display: flex; gap: 1rem; margin-bottom: 1rem">
           <div style="flex: 1; display: flex; flex-direction: column">
-            <div class="field-label-row">
-              <label class="textarea-label">{{ t("evalTemplate.templateName") }} *</label>
-              <OIcon name="info" size="xs" class="field-info-icon">
+            <div class="tw:flex tw:items-center tw:gap-1 tw:mb-2">
+              <label class="tw:text-xs tw:font-medium tw:mb-0 tw:text-(--q-color-text) tw:leading-none">{{ t("evalTemplate.templateName") }} *</label>
+              <OIcon name="info" size="xs" class="tw:opacity-45 tw:cursor-default tw:shrink-0 tw:hover:opacity-75">
                 <OTooltip :content="t('evalTemplate.tooltipName')" side="top" />
               </OIcon>
             </div>
@@ -58,9 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div style="flex: 1; display: flex; flex-direction: column">
-            <div class="field-label-row">
-              <label class="textarea-label">{{ t("common.description") }}</label>
-              <OIcon name="info" size="xs" class="field-info-icon">
+            <div class="tw:flex tw:items-center tw:gap-1 tw:mb-2">
+              <label class="tw:text-xs tw:font-medium tw:mb-0 tw:text-(--q-color-text) tw:leading-none">{{ t("common.description") }}</label>
+              <OIcon name="info" size="xs" class="tw:opacity-45 tw:cursor-default tw:shrink-0 tw:hover:opacity-75">
                 <OTooltip :content="t('evalTemplate.tooltipDescription')" side="top" />
               </OIcon>
             </div>
@@ -73,9 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Row 2: Response Type & Dimensions -->
         <div style="display: flex; gap: 1rem; margin-bottom: 1rem">
           <div style="flex: 0 0 200px; display: flex; flex-direction: column">
-            <div class="field-label-row">
-              <label class="textarea-label">{{ t("evalTemplate.responseType") }} *</label>
-              <OIcon name="info" size="xs" class="field-info-icon">
+            <div class="tw:flex tw:items-center tw:gap-1 tw:mb-2">
+              <label class="tw:text-xs tw:font-medium tw:mb-0 tw:text-(--q-color-text) tw:leading-none">{{ t("evalTemplate.responseType") }} *</label>
+              <OIcon name="info" size="xs" class="tw:opacity-45 tw:cursor-default tw:shrink-0 tw:hover:opacity-75">
                 <OTooltip :content="t('evalTemplate.tooltipResponseType')" side="top" />
               </OIcon>
             </div>
@@ -90,9 +90,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden">
-            <div class="field-label-row">
-              <label class="textarea-label">{{ t("evalTemplate.dimensions") }} *</label>
-              <OIcon name="info" size="xs" class="field-info-icon">
+            <div class="tw:flex tw:items-center tw:gap-1 tw:mb-2">
+              <label class="tw:text-xs tw:font-medium tw:mb-0 tw:text-(--q-color-text) tw:leading-none">{{ t("evalTemplate.dimensions") }} *</label>
+              <OIcon name="info" size="xs" class="tw:opacity-45 tw:cursor-default tw:shrink-0 tw:hover:opacity-75">
                 <OTooltip :content="t('evalTemplate.tooltipDimensions')" side="top" />
               </OIcon>
             </div>
@@ -111,9 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Row 3: Prompt Template -->
         <div style="display: flex; flex-direction: column; flex: 1; min-height: 0">
-          <div class="field-label-row">
-            <label class="textarea-label">{{ t("evalTemplate.promptTemplate") }} *</label>
-            <OIcon name="info" size="xs" class="field-info-icon">
+          <div class="tw:flex tw:items-center tw:gap-1 tw:mb-2">
+            <label class="tw:text-xs tw:font-medium tw:mb-0 tw:text-(--q-color-text) tw:leading-none">{{ t("evalTemplate.promptTemplate") }} *</label>
+            <OIcon name="info" size="xs" class="tw:opacity-45 tw:cursor-default tw:shrink-0 tw:hover:opacity-75">
               <OTooltip :content="t('evalTemplate.tooltipPromptTemplate')" side="top" />
             </OIcon>
           </div>
@@ -356,53 +356,5 @@ onBeforeMount(async () => {
     min-width: 80px !important;
     flex-shrink: 0 !important;
   }
-}
-
-// NOTE: Dark/light chip styling removed — `.q-chip` and `.body--dark/--light` selectors
-// no longer match post-Quasar removal. Chip-like visuals are now provided by OBadge
-// variants (use `<OBadge variant="default">` for the dimensions-select tag tokens).
-
-// ── Fields ────────────────────────────────────────────────────────────────────
-.field-label-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 0.5rem;
-
-  .textarea-label {
-    margin-bottom: 0;
-  }
-}
-
-.field-info-icon {
-  opacity: 0.45;
-  cursor: default;
-  flex-shrink: 0;
-
-  &:hover {
-    opacity: 0.75;
-  }
-}
-
-.textarea-border {
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-}
-
-.textarea-label {
-  font-size: 12px;
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-  color: var(--q-color-text);
-  line-height: 1;
-}
-
-.prompt-input {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
-
 }
 </style>

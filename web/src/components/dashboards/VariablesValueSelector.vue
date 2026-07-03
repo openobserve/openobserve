@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <!-- Add Variable Button -->
-    <div v-if="showAddVariableButton" class="tw:ml-1 tw:mt-2">
+    <div v-if="showAddVariableButton" class="tw:ml-1 tw:mt-1">
       <OButton
         variant="outline"
         size="sm"

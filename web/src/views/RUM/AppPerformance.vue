@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div :key="store.state.selectedOrganization.identifier">
-    <div class="tw:pb-[0.625rem]">
+    <div class="tw:pb-2.5">
       <div class="card-container">
         <div class="tw:flex tw:justify-between tw:items-center tw:py-2 tw:px-3">
-          <div class="performance_title">
+          <div data-test="rum-performance-title" class="tw:text-2xl">
             {{ t("rum.performanceSummaryLabel") }}
           </div>
-          <div class="tw:flex tw:items-center tw:gap-[0.5rem]">
+          <div class="tw:flex tw:items-center tw:gap-2">
             <DateTimePickerDashboard
               class="rum-date-time-picker"
               ref="dateTimePicker"
@@ -434,39 +434,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.performance_title {
-  font-size: 1.5rem;
-}
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-
-.performance-dashboard {
-  :deep(.card-container) {
-    box-shadow: none !important;
-    &:first-child {
-      padding: 0 !important;
-    }
-  }
-}
-
-</style>
-
-<style lang="scss">
-.performance-dashboard {
-  min-height: auto !important;
-  max-height: calc(100vh - 12.5rem);
-  overflow-y: auto;
-
-  .card-container {
-    box-shadow: none !important;
-    &:only-child {
-      padding: 0 !important;
-    }
-  }
-}
-</style>

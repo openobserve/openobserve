@@ -171,10 +171,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-sm"
                 icon-left="refresh"
                 :loading="loading"
-                :title="t('dashboard.reloadDashboards')"
                 data-test="dashboard-list-refresh"
                 @click="getDashboards"
-              />
+              >
+                <OTooltip side="bottom" :content="t('dashboard.reloadDashboards')" shortcut-id="dashboardsListRefresh" />
+              </OButton>
             </template>
             <template #cell-name="{ row, value }">
               <span
@@ -238,6 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-xs-sq"
                   data-test="dashboard-duplicate"
+                  data-row-action="duplicate"
                   @click.stop="duplicateDashboard(row.id, row.folder_id)"
                 />
                 <OButton
@@ -247,6 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost-destructive"
                   size="icon-xs-sq"
                   data-test="dashboard-delete"
+                  data-row-action="delete"
                   @click.stop="showDeleteDialogFn({ row })"
                 />
               </span>
@@ -473,6 +476,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -1271,6 +1276,29 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
+
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "dashboardsListAdd",
+        handler: () => { if (!isInputFocused()) addDashboard(); },
+      },
+      {
+        id: "dashboardsListImport",
+        handler: () => { if (!isInputFocused()) importDashboard(); },
+      },
+      {
+        id: "dashboardsListRefresh",
+        handler: () => { if (!isInputFocused()) getDashboards(); },
+      },
+      {
+        id: "dashboardsListFocusSearch",
+        handler: () => {
+          focusSearchInput("dashboard-search");
+        },
+      },
+    ]);
     return {
       t,
       oTableRef,

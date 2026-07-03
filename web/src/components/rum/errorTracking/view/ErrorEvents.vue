@@ -16,7 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:mt-4">
-    <div class="tags-title tw:font-bold tw:mb-2 tw:ml-1">{{ t("rum.events") }}</div>
+    <div
+      data-test="error-events-title"
+      class="tw:text-base tw:font-bold tw:mb-2 tw:ml-1"
+    >{{ t("rum.events") }}</div>
     <OTable
       :data="error.events || []"
       :columns="columns || []"
@@ -84,14 +87,14 @@ const columns = ref<OTableColumnDef[]>([
     cell: " ",
     sortable: true,
     size: COL.description,
-    meta: { align: "left", cellClass: "description-column", autoWidth: true },
+    meta: { align: "left", cellClass: "tw:max-w-[60vw]", autoWidth: true },
   },
   {
     id: "level",
     header: t("rum.level"),
     accessorFn: (row: any) => (row["type"] === "error" ? "error" : "info"),
     size: COL.status,
-    meta: { align: "left", cellClass: "error-level" },
+    meta: { align: "left", cellClass: "tw:border tw:border-[var(--o2-border)]" },
   },
   {
     id: "timestamp",
@@ -118,18 +121,3 @@ const getFormattedDate = (timestamp: number) =>
   formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 </script>
 
-<style scoped>
-.tags-title {
-  font-size: 16px;
-}
-</style>
-
-<style>
-.description-column {
-  max-width: 60vw;
-}
-
-.error-level {
-  border: 1px solid #e0e0e0;
-}
-</style>

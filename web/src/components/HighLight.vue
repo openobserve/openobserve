@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="(item) in list"
       :key="item.id"
       :title="title"
-      :class="{ highlight: item.isKeyWord }"
+      :class="{ 'tw:bg-[rgb(255,213,0)]': item.isKeyWord }"
     >
       {{ item.text }}
     </span>
@@ -108,8 +108,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.highlight {
-  background-color: rgb(255, 213, 0);
-}
-</style>

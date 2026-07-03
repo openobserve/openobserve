@@ -63,6 +63,7 @@ export const usePanelDataLoader = (
   folderName?: any,
   shouldRefreshWithoutCache?: any,
   regionClusterParams?: any,
+  allowAnnotationsAPI?: any,
 ) => {
   const log = (...args: any[]) => {
     if (false) {
@@ -93,6 +94,7 @@ export const usePanelDataLoader = (
     store.state.selectedOrganization.identifier,
     dashboardId?.value,
     panelSchema.value.id,
+    allowAnnotationsAPI?.value,
   );
 
   const shouldFetchAnnotations = () => {

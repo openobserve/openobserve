@@ -253,23 +253,3 @@ watch(
 );
 </script>
 
-<style lang="scss" scoped>
-.tw\\:bg-gray-50 {
-  background-color: rgba(0, 0, 0, 0.02);
-}
-
-// Dark theme adjustments
-:deep(.q-dark) {
-  .tw\\:bg-gray-50 {
-    background-color: rgba(255, 255, 255, 0.03);
-  }
-
-  .tw\\:text-gray-500 {
-    color: rgba(255, 255, 255, 0.6);
-  }
-
-  .tw\\:text-gray-600 {
-    color: rgba(255, 255, 255, 0.7);
-  }
-}
-</style>

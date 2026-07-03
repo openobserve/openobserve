@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:border-b tw:border-[var(--color-border-default)] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] table-row-hover tw:relative tw:py-1"
+    class="tw:flex tw:border-b tw:border-[var(--color-border-default)] tw:cursor-pointer tw:hover:bg-[var(--o2-hover-gray)] tw:relative tw:py-1 tw:transition-colors tw:duration-150 tw:ease-in-out"
     :class="wrap ? 'tw:items-start' : 'tw:items-center'"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex-1 tw:min-w-0 tw:px-2 tw:pl-3" :class="wrap ? '' : 'tw:overflow-hidden'">
       <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
-        class="pattern-template-text tw:w-full"
+        class="tw:font-mono tw:text-xs tw:w-full"
         :class="[
           store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-500',
           wrap
@@ -59,13 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
             @mouseleave="onMouseLeave"
           >
-            <OBadge
-              size="sm"
-              class="wildcard-chip tw:my-0 tw:mx-0"
+            <OTag
+              type="wildcardChip"
+              data-test="pattern-card-wildcard-chip"
               :class="wildcardChipColor(tok.value, tok.sampleValues)"
             >
               {{ wildcardLabel(tok.value, tok.sampleValues) }}
-            </OBadge>
+            </OTag>
           </span>
         </template>
       </div>
@@ -145,7 +145,7 @@ import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
@@ -215,35 +215,6 @@ function highlightLevels(text: string): HighlightSegment[] {
 }
 </script>
 
-<style scoped lang="scss">
-@import "@/styles/logs/search-result.scss";
-
-.pattern-template-text {
-  font-family: monospace;
-  font-size: 0.75rem;
-}
-
-// Add explicit hover styles
-.table-row-hover {
-  transition: background-color 0.15s ease-in-out;
-
-  &:hover {
-    background-color: var(--o2-hover-gray) !important;
-  }
-}
-</style>
-
-<style lang="scss">
+<style>
 @import "@/assets/styles/log-highlighting.css";
-.wildcard-chip {
-  font-family: monospace;
-  font-size: 0.75rem;
-  font-weight: bold;
-  height: 1.125rem;
-  padding: 0 0.3125rem;
-  border-radius: 0.1875rem;
-  line-height: 1.125rem;
-  // Prevent chips from inheriting the truncate overflow of the parent "row"
-  flex-shrink: 0;
-}
 </style>

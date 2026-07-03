@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="replace-query-checkbox"
         />
         <div
-          class="tw:text-xs tw:mt-1 tw:ml-7 tw:text-gray-500 dark:tw:text-gray-400"
+          class="tw:text-xs tw:mt-1 tw:ml-7 tw:text-gray-500 tw:dark:text-gray-400"
         >
           The example query will be inserted into the query editor
         </div>

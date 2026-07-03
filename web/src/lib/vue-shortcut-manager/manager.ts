@@ -3,6 +3,7 @@ import type {
   Shortcut,
   ShortcutManagerOptions,
 } from "./types";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 // ---------------------------------------------------------------------------
 // Lazy singleton — no plugin or main.ts setup needed.
@@ -92,10 +93,12 @@ export class ShortcutManager {
   // ---------- Register / Unregister ----------
 
   register(shortcut: Shortcut): string {
-    const id = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
-    });
+    const id =
+      shortcut.id ??
+      "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+      });
     const key = shortcut.key.toLowerCase();
     const existing = this.shortcuts.get(key) ?? [];
 
@@ -149,6 +152,15 @@ export class ShortcutManager {
 
   getByScope(scope: string): RegisteredShortcut[] {
     return this.getAll().filter((s) => (s.scope ?? "global") === scope);
+  }
+
+  /** Find a registered shortcut by its id (for tests / programmatic triggers). */
+  getById(id: string): RegisteredShortcut | undefined {
+    for (const list of this.shortcuts.values()) {
+      const found = list.find((s) => s.id === id);
+      if (found) return found;
+    }
+    return undefined;
   }
 
   // ---------- Key Parsing ----------
@@ -239,10 +251,39 @@ export class ShortcutManager {
     );
   }
 
+  /**
+   * Returns true when the shortcut key string contains a command modifier
+   * (ctrl, meta, alt). `shift` is intentionally excluded: on most keyboards it
+   * only produces a printable character (e.g. `shift+?` → "?"), so a shift-only
+   * combo behaves like a plain key and must still be suppressed while the user
+   * is typing in an input. Pure single-letter keys have no modifier.
+   */
+  private static hasModifier(key: string): boolean {
+    return (
+      key.includes("ctrl+") ||
+      key.includes("meta+") ||
+      key.includes("alt+")
+    );
+  }
+
   private triggerShortcut(
     shortcut: RegisteredShortcut,
     e: KeyboardEvent,
   ): void {
+    // Guard: never intercept single-letter shortcuts while the user is typing
+    // in an input/textarea/contenteditable. Modifier-key shortcuts (Ctrl+S,
+    // ⌘+Enter, etc.) are always allowed through regardless of focus, and a
+    // shortcut can opt out with `allowInInput` (e.g. Escape closing a panel).
+    // The event's composed target (not document.activeElement) is checked so
+    // inputs inside shadow DOM are detected too.
+    if (
+      !shortcut.allowInInput &&
+      !ShortcutManager.hasModifier(shortcut.key) &&
+      isInputFocused(e.composedPath?.()[0] ?? e.target)
+    ) {
+      return;
+    }
+
     if (shortcut.whenFocused !== undefined && shortcut.whenFocused !== null) {
       const isRef =
         shortcut.whenFocused !== null &&

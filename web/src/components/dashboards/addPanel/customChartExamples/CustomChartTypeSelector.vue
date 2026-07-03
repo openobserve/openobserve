@@ -60,18 +60,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:flex-nowrap" style="height: 100%; width: 100%">
         <!-- Left Sidebar -->
         <OCard
-          class="sidebar tw:p-4"
+          class="tw:p-4"
           style="width: 160px; height: 100%; flex-shrink: 0; overflow-y: auto"
         >
           <div class="tw:text-sm tw:font-medium tw:mb-3 text-weight-bold">Chart Types</div>
-          <ul class="chart-category-list tw:flex tw:flex-col">
+          <ul class="tw:flex tw:flex-col tw:list-none tw:p-0 tw:m-0">
             <li
               v-for="(category, index) in chartCategories"
               :key="index"
               @click="scrollToCategory(category.chartLabel)"
-              class="sidebar-item tw:flex tw:items-center tw:px-3 tw:py-2 tw:cursor-pointer"
+              class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:cursor-pointer tw:rounded tw:mb-1 tw:transition-all tw:duration-200 tw:hover:bg-black/4"
               :class="{
-                'active-category': selectedCategory === category.chartLabel,
+                'tw:bg-(--q-primary) tw:text-white tw:font-semibold': selectedCategory === category.chartLabel,
               }"
               data-test="chart-category-item"
             >
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Content Area -->
         <div
           ref="contentArea"
-          class="content-area tw:p-3"
+          class="tw:p-3"
           style="flex: 1; height: 100%; overflow-y: auto; overflow-x: hidden"
           @scroll="handleScroll"
         >
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(category, categoryIndex) in filteredCategories"
             :key="categoryIndex"
-            class="chart-category-section tw:mb-6"
+            class="chart-category-section tw:mb-6 tw:scroll-mt-5"
             :data-category="category.chartLabel"
             data-test="chart-category-section"
           >
@@ -120,19 +120,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
               >
                 <OCard
-                  class="chart-card tw:cursor-pointer"
+                  class="tw:cursor-pointer tw:transition-all tw:duration-200 tw:h-full tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] tw:hover:-translate-y-0.5"
                   :class="{
-                    'selected-chart': selectedChart?.value === chart.value,
+                    'tw:border-2 tw:border-(--q-primary) tw:shadow-[0_4px_12px_rgba(var(--q-primary-rgb),0.3)]': selectedChart?.value === chart.value,
                   }"
                   @click="selectChart(chart)"
                   data-test="chart-type-card"
                 >
                   <OCardSection class="tw:p-2">
-                    <div class="chart-image-container">
+                    <div class="tw:w-full tw:h-37.5 tw:flex tw:items-center tw:justify-center tw:bg-[#f8f8f8] tw:rounded tw:overflow-hidden">
                       <img
                         :src="chart.asset"
                         :alt="chart.label"
-                        class="chart-image"
+                        class="tw:w-full tw:h-full tw:object-cover"
                         loading="lazy"
                       />
                     </div>
@@ -344,67 +344,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.sidebar {
-  .chart-category-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-
-  .sidebar-item {
-    border-radius: 4px;
-    margin-bottom: 4px;
-    transition: all 0.2s ease;
-
-    &:hover {
-      background-color: rgba(0, 0, 0, 0.04);
-    }
-
-    &.active-category {
-      background-color: var(--q-primary);
-      color: white;
-      font-weight: 600;
-    }
-  }
-}
-
-.content-area {
-  .chart-category-section {
-    scroll-margin-top: 20px;
-  }
-
-  .chart-card {
-    transition: all 0.2s ease;
-    height: 100%;
-
-    &:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      transform: translateY(-2px);
-    }
-
-    &.selected-chart {
-      border: 2px solid var(--q-primary);
-      box-shadow: 0 4px 12px rgba(var(--q-primary-rgb), 0.3);
-    }
-
-    .chart-image-container {
-      width: 100%;
-      height: 150px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background-color: #f8f8f8;
-      border-radius: 4px;
-      overflow: hidden;
-
-      .chart-image {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-      }
-    }
-  }
-}
-</style>

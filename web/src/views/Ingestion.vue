@@ -204,6 +204,7 @@ import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
+import { awsIntegrations } from "@/utils/awsIntegrations";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
@@ -628,26 +629,22 @@ export default defineComponent({
       }
 
       // Third, check AWS services
-      import("@/utils/awsIntegrations").then((module) => {
-        const awsIntegrations = module.awsIntegrations;
+      const matchesAWSService = awsIntegrations.some(
+        (integration: any) =>
+          integration.displayName.toLowerCase().includes(searchQuery) ||
+          integration.name.toLowerCase().includes(searchQuery) ||
+          integration.description.toLowerCase().includes(searchQuery),
+      );
 
-        const matchesAWSService = awsIntegrations.some(
-          (integration: any) =>
-            integration.displayName.toLowerCase().includes(searchQuery) ||
-            integration.name.toLowerCase().includes(searchQuery) ||
-            integration.description.toLowerCase().includes(searchQuery),
-        );
-
-        if (matchesAWSService) {
-          router.replace({
-            name: "AWSConfig",
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-              search: newSearch,
-            },
-          });
-        }
-      });
+      if (matchesAWSService) {
+        router.replace({
+          name: "AWSConfig",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            search: newSearch,
+          },
+        });
+      }
     });
 
     return {
@@ -688,10 +685,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.ingestionPage {
-  .head {
-    padding-bottom: 1rem;
-  }
-}
-</style>

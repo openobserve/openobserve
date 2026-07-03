@@ -4,6 +4,7 @@ import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
 import { openNavFlyoutChild } from '../commonActions.js';
+import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -303,7 +304,10 @@ export class LogsPage {
         // ===== QUERY EDITOR EXPAND/COLLAPSE SELECTORS =====
         this.queryEditorFullScreenBtn = '[data-test="logs-query-editor-full_screen-btn"]';
         this.queryEditorContainer = '.query-editor-container';
-        this.expandOnFocusClass = '.editor-fullscreen';
+        // Fullscreen state is exposed via a stable data attribute on the container
+        // (the old `.editor-fullscreen` scoped class was removed in PR #12764 in
+        // favour of inline utility classes bound to `isFocused`).
+        this.expandOnFocusClass = '[data-fullscreen="true"]';
 
         // ===== LOG DETAIL SIDEBAR SELECTORS (Bug #9724) =====
         this.logDetailDialogBox = '[data-test="log-detail-dialog"]';
@@ -404,8 +408,10 @@ export class LogsPage {
         this.patternCardIncludeBtn = (index) => `[data-test="pattern-card-${index}-include-btn"]`;
         this.patternCardExcludeBtn = (index) => `[data-test="pattern-card-${index}-exclude-btn"]`;
         this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}"]`;
-        this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] .wildcard-chip`;
-        this.wildcardChip = '.wildcard-chip';
+        // The pattern-template wildcard chip carries a data-test hook (the `.wildcard-chip`
+        // scoped class was dropped when the chip moved from a class to the OTag component).
+        this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] [data-test="pattern-card-wildcard-chip"]`;
+        this.wildcardChip = '[data-test="pattern-card-wildcard-chip"]';
         // Pattern details dialog (ODrawer — PatternDetailsDialog.vue)
         this.closePatternDialog = '[data-test="pattern-details-dialog"] [data-test="o-drawer-close-btn"]';
         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
@@ -4392,9 +4398,9 @@ export class LogsPage {
     }
 
     async isQueryEditorExpanded() {
-        // editor-fullscreen is added to the container itself, not a child element.
-        // Use a combined selector (.query-editor-container.editor-fullscreen) instead of
-        // container.locator('.editor-fullscreen') which would search descendants only.
+        // Fullscreen state is reflected by data-fullscreen="true" on the container itself.
+        // Use a combined selector (.query-editor-container[data-fullscreen="true"]) so we
+        // match the container node, not a descendant.
         return await this.page.locator(`${this.queryEditorContainer}${this.expandOnFocusClass}`).count() > 0;
     }
 
@@ -4932,12 +4938,22 @@ export class LogsPage {
     }
 
     async clickCustomDownloadRangeSelect() {
-        return await this.page.locator(this.customDownloadRangeSelect).click();
+        // OSelect (reka-ui popover): clicking the root wrapper can open-then-close the
+        // listbox on a single click, which continuously re-mounts the options and makes
+        // the subsequent option click flake with "element was detached from the DOM".
+        // openOSelectDropdown clicks the inner -trigger until aria-expanded="true" so the
+        // listbox is stably open before we pick an option.
+        await openOSelectDropdown(this.page, this.page.locator(this.customDownloadRangeSelect));
     }
 
     async selectCustomDownloadRange(range) {
         // OSelect option data-test contract: `${parent}-option` shared + `data-test-value="<value>"`.
-        return await this.page.locator(this.customDownloadRangeOption(range)).click();
+        // The reka listbox virtualises/re-renders its items, so the option node can detach
+        // between resolve and click. Poll the click until it lands (option gone / selected).
+        const option = this.page.locator(this.customDownloadRangeOption(range));
+        await expect(async () => {
+            await option.click({ timeout: 3000 });
+        }).toPass({ timeout: 15000, intervals: [500] });
     }
 
     async clickCustomDownloadFileTypeJson() {

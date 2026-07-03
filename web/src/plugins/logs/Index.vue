@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <div class="tw:rounded-md logPage" id="logPage" data-test="logs-page-container">
+  <div class="tw:rounded-md tw:h-full tw:min-h-full! tw:max-h-full! tw:overflow-hidden! logPage" id="logPage" data-test="logs-page-container">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -410,6 +410,8 @@ import {
   saveLogsStreamType,
   restoreLogsStreamType,
 } from "@/utils/streamPersist";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageSearch",
@@ -3216,6 +3218,76 @@ export default defineComponent({
       }
     };
 
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "logsRunQuery",
+        handler: () => {
+          // In normal logs mode `handleRunQueryFn` only handles
+          // visualize/patterns/build — trigger the logs search the same way the
+          // refresh shortcut and the run button do (via the runQuery watcher).
+          const mode = searchObj.meta.logsVisualizeToggle;
+          if (!mode || mode === "logs") {
+            if (searchObj.loading) return;
+            searchObj.loading = true;
+            searchObj.runQuery = true;
+          } else {
+            handleRunQueryFn();
+          }
+        },
+      },
+      {
+        id: "logsSearchHistory",
+        handler: () => showSearchHistoryfn(),
+      },
+      {
+        id: "logsFocusQuery",
+        handler: () => {
+          // The logs query editor is Monaco — focus its inner textarea
+          // (`.monaco-editor textarea`), not a CodeMirror `.cm-editor`.
+          const el = document.querySelector<HTMLElement>(
+            '[data-test="logs-search-bar-query-editor"] textarea, [data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] .cm-editor',
+          );
+          el?.focus();
+        },
+      },
+      {
+        id: "logsRefresh",
+        handler: () => {
+          if (isInputFocused()) return;
+          if (searchObj.loading) return;
+          searchObj.loading = true;
+          searchObj.runQuery = true;
+        },
+      },
+      {
+        id: "logsToggleHistogram",
+        handler: () => {
+          if (isInputFocused()) return;
+          searchObj.meta.showHistogram = !searchObj.meta.showHistogram;
+        },
+      },
+      {
+        id: "logsToggleSidebar",
+        handler: () => {
+          searchObj.meta.showFields = !searchObj.meta.showFields;
+        },
+      },
+      {
+        id: "logsSaveView",
+        handler: () => {
+          if (isInputFocused()) return;
+          (searchBarRef.value as any)?.fnSavedView?.();
+        },
+      },
+      {
+        id: "logsExport",
+        handler: () => {
+          (searchBarRef.value as any)?.downloadLogs?.(searchObj.data?.queryResults?.hits ?? [], "csv");
+        },
+      },
+    ]);
+
     return {
       t,
       store,
@@ -3536,53 +3608,33 @@ export default defineComponent({
 }) as any;
 </script>
 
-<style lang="scss">
-.logPage {
-  // Fill the app content card (MainLayout's o2-content-scroll already sizes the
-  // available area below the nav + chrome). Computing height from 100vh here
-  // double-counts the content card's padding/border and overflows → page scroll.
-  height: 100%;
-  min-height: 100% !important;
-  max-height: 100% !important;
-  overflow: hidden !important;
+<style>
+.logPage .index-menu .field_list .field_overlay .field_label,
+.logPage .q-field__native,
+.logPage .q-field__input,
+.logPage .q-table tbody td {
+  font-size: 12px !important;
+}
 
-  .index-menu .field_list .field_overlay .field_label,
-  .q-field__native,
-  .q-field__input,
-  .q-table tbody td {
-    font-size: 12px !important;
-  }
+.logPage .q-table__top {
+  padding: 0px !important;
+}
 
-  .q-table__top {
-    padding: 0px !important;
-  }
+.logPage .q-table__control {
+  width: 100%;
+}
 
-  .q-table__control {
-    width: 100%;
-  }
+.logPage .logsPageMainSection > .q-field__control-container {
+  padding-top: 0px !important;
+}
 
-  .logsPageMainSection > .q-field__control-container {
-    padding-top: 0px !important;
-  }
-
-  .thirdlevel {
-    padding: 0 !important;
-    margin: 0 !important;
-    box-sizing: border-box !important;
-    height: 100% !important;
-    overflow: visible !important;
-    /* Changed from tw:hidden to visible for button */
-  }
-
-  // .search-result-container {
-  //   position: relative;
-  //   width: 100%;
-  //   height: 100%;
-  //   padding: 0 !important;
-  //   margin: 0 !important;
-  //   box-sizing: border-box !important;
-  //   overflow: hidden !important;
-  // }
+.logPage .thirdlevel {
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  height: 100% !important;
+  overflow: visible !important;
+  /* Changed from tw:hidden to visible for button */
 }
 
 .field-list-separator::after {
@@ -3602,6 +3654,3 @@ export default defineComponent({
 }
 </style>
 
-<style lang="scss">
-@import "@/styles/logs/logs-page.scss";
-</style>

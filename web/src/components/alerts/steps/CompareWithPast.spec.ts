@@ -373,9 +373,8 @@ describe("CompareWithPast.vue", () => {
 
   describe("UI Rendering", () => {
     it("should render Current window text", () => {
-      const html = wrapper.html();
-      // Check for translation key or class that indicates current window section
-      expect(html).toContain("multi-window-container");
+      // The current window section renders its translated label
+      expect(wrapper.text()).toContain("Current window");
     });
 
     it("should render Cycle text", () => {

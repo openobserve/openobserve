@@ -19,14 +19,14 @@
             <OTooltip :content="t('search.messageWrapContent')" />
           </OButton>
           <div
-            class="warning-text tw:flex tw:items-center tw:px-2 tw:h-[36px] tw:rounded-md"
+            class="tw:text-[#f5a623] tw:border tw:border-[#f5a623] tw:flex tw:items-center tw:px-2 tw:h-[36px] tw:rounded-md"
           >
             <OIcon name="info" class="tw:mr-1" size="sm" />
             <div>
               {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
             </div>
           </div>
-          <div>
+          <div class="tw:[&_#date-time-button]:h-9!">
             <date-time
               data-test-name="search-history-date-time"
               ref="searchDateTimeRef"
@@ -177,7 +177,6 @@
                 style="height: 200px"
                 :ref="`QueryEditorRef${row.trace_id + row.sql}`"
                 :editor-id="`search-query-editor${row.trace_id + row.sql}`"
-                class="monaco-editor"
                 :debounceTime="600"
                 v-model:query="moreDetailsToDisplay"
                 language="json"
@@ -644,6 +643,3 @@ export default defineComponent({
   },
 });
 </script>
-<style lang="scss" scoped>
-@import "@/styles/logs/search-history.scss";
-</style>

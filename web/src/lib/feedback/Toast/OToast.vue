@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import type { ToastProps, ToastEmits } from "./OToast.types"
 import { computed, ref, onUnmounted } from "vue"
 import OIcon from "@/lib/core/Icon/OIcon.vue"
-import OBadge from "@/lib/core/Badge/OBadge.vue"
+import OTag from "@/lib/core/Badge/OTag.vue"
 import { pauseTimer, resumeTimer, isPageVisible } from "./useToast"
 import {
   ToastRoot,
@@ -226,11 +226,11 @@ onUnmounted(() => {
           <ToastTitle class="tw:text-sm tw:font-semibold tw:text-toast-fg tw:leading-snug">
             {{ title ?? screenReaderTitle }}
           </ToastTitle>
-          <OBadge
+          <OTag
             v-if="title && titleCount !== undefined"
-            variant="error"
-            size="sm"
-          >{{ titleCount }}</OBadge>
+            type="countChip"
+            value="errorstrong"
+          >{{ titleCount }}</OTag>
         </div>
 
         <!-- Message + inline action -->
@@ -329,7 +329,7 @@ onUnmounted(() => {
         aria-hidden="true"
       >
         <div
-          :class="['tw:h-full tw:w-full tw:origin-left toast-progress-fill', progressBarColorClasses[variant ?? 'default']]"
+          :class="['tw:h-full tw:w-full tw:origin-left tw:[animation:toast-shrink_linear_forwards]', progressBarColorClasses[variant ?? 'default']]"
           :style="{
             animationDuration: `${timeout}ms`,
             animationPlayState: isPaused ? 'paused' : 'running',
@@ -340,11 +340,7 @@ onUnmounted(() => {
   </ToastRoot>
 </template>
 
-<style scoped>
-.toast-progress-fill {
-  animation: toast-shrink linear forwards;
-}
-
+<style>
 @keyframes toast-shrink {
   from {
     transform: scaleX(1);

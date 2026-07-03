@@ -37,17 +37,17 @@
         <div
           v-for="(series, index) in editColorBySeries"
           :key="index"
-          class="draggable-row"
+          class="tw:flex tw:items-center tw:justify-between tw:mb-2"
         >
-          <div class="draggable-handle tw:self-center">
+          <div class="tw:cursor-move tw:p-2 tw:self-center">
             <OIcon
               name="drag-indicator" size="sm"
               class="tw:mr-1"
               :data-test="`dashboard-addpanel-config-color-by-series-drag-handle-${index}`"
             />
           </div>
-          <div class="draggable-content tw:flex tw:items-center tw:gap-x-3">
-            <div class="input-container tw:flex-1">
+          <div class="tw:flex tw:items-center tw:justify-between tw:flex-1 tw:gap-x-3">
+            <div class="tw:flex-1 tw:min-w-0">
               <OCombobox
                 v-model="series.value"
                 :items="seriesDataItems"
@@ -61,7 +61,7 @@
 
             <!-- Color Picker -->
             <div
-              class="color-section tw:shrink-0"
+              class="tw:flex tw:items-center tw:shrink-0"
               :data-test="`dashboard-addpanel-config-color-by-series-color-section-${index}`"
             >
               <div
@@ -285,37 +285,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.draggable-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.draggable-handle {
-  cursor: move;
-  padding: 8px;
-}
-
-.draggable-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex: 1;
-}
-
-.input-container {
-  flex: 1;
-  min-width: 0;
-}
-
-.input-spacing {
-  margin-right: 10px;
-}
-
-.color-section {
-  display: flex;
-  align-items: center;
-}
-</style>

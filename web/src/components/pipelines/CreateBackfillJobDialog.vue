@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -66,9 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Advanced Options -->
-          <div class="collapsible-section card-container" data-test="advanced-options-section">
+          <div class="collapsible-section card-container tw:flex tw:flex-col tw:transition-all tw:overflow-hidden tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:border tw:border-[var(--o2-border-color,rgba(0,0,0,0.08))]" data-test="advanced-options-section">
             <div
-              class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
+              class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer tw:shrink-0 tw:border-b tw:border-[rgba(0,0,0,0.08)] tw:transition-all tw:rounded-t-md tw:select-none tw:hover:bg-[rgba(0,0,0,0.04)] tw:active:bg-[rgba(0,0,0,0.06)]"
               @click="showAdvanced = !showAdvanced"
             >
               <div class="tw:flex tw:items-center tw:gap-2">
@@ -81,10 +81,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="showAdvanced ? 'Collapse' : 'Expand'"
                 :icon-left="showAdvanced ? 'unfold-less' : 'unfold-more'"
                 @click.stop="showAdvanced = !showAdvanced"
-                class="expand-toggle-btn-wrapper"
+                class="tw:opacity-50 tw:transition-all tw:duration-200 tw:hover:opacity-100"
               />
             </div>
-            <div v-show="showAdvanced" class="section-content">
+            <div v-show="showAdvanced" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:p-4">
               <div class="tw:space-y-4">
               <!-- Chunk Period -->
               <div class="tw:grid tw:grid-cols-12 tw:gap-4 tw:items-start">
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ]"
                 >
                   <div class="tw:flex tw:items-start tw:gap-3">
-                    <OIcon name="warning" size="md" class="tw:mt-0.5 tw:text-orange-500 dark:tw:text-orange-400" />
+                    <OIcon name="warning" size="md" class="tw:mt-0.5 tw:text-orange-500 tw:dark:text-orange-400" />
                     <div>
                       <div :class="['tw:font-semibold tw:mb-2', store.state.theme === 'dark' ? 'tw:text-orange-200' : 'tw:text-orange-900']">Warning: Irreversible Data Deletion</div>
                       <div :class="['tw:text-xs tw:mb-3', store.state.theme === 'dark' ? 'tw:text-orange-300' : 'tw:text-orange-800']">
@@ -440,63 +440,3 @@ const createBackfillJobRequest = async () => {
 };
 </script>
 
-<style scoped lang="scss">
-.text-h6 {
-  font-size: 1.125rem;
-  font-weight: 600;
-}
-
-.text-subtitle2 {
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.text-caption {
-  font-size: 0.75rem;
-}
-
-// Advanced Options Collapsible Styling - matching AlertWizardRightColumn.vue
-.collapsible-section {
-  display: flex;
-  flex-direction: column;
-  transition: all 0.3s ease;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
-  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
-  overflow: hidden;
-
-  .section-header {
-    flex-shrink: 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-    transition: all 0.2s ease;
-    border-radius: 0.375rem 0.375rem 0 0;
-    user-select: none;
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.04);
-    }
-
-    &:active {
-      background: rgba(0, 0, 0, 0.06);
-    }
-  }
-
-  .section-content {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    padding: 16px;
-  }
-
-  .expand-toggle-btn-wrapper {
-    opacity: 0.5;
-    transition: all 0.2s ease;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-</style>

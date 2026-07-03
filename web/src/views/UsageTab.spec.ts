@@ -271,14 +271,18 @@ describe("UsageTab", () => {
     it("should render streams count tile", () => {
       const tile = wrapper.find('[aria-label="Streams count statistics"]');
       expect(tile.exists()).toBe(true);
-      expect(tile.find(".data-to-display").text()).toBe("5");
+      expect(
+        tile.find('[data-test="home-usage-tab-streams-count"]').text(),
+      ).toBe("5");
     });
 
     it("should render events count tile", () => {
       const tile = wrapper.find('[aria-label="Events count statistics"]');
       expect(tile.exists()).toBe(true);
       // formatEventCount(10000) -> "10000" (falls back to summary.doc_count)
-      expect(tile.find(".data-to-display").text()).toBe("10000");
+      expect(
+        tile.find('[data-test="home-usage-tab-events-count"]').text(),
+      ).toBe("10000");
     });
 
     it("should render ingested data size tile", () => {
@@ -287,19 +291,25 @@ describe("UsageTab", () => {
       );
       expect(tile.exists()).toBe(true);
       // fallback: summary.value.ingested_data = formatSizeFromMB(2000) -> "2000 MB"
-      expect(tile.find(".data-to-display").text()).toBe("2000 MB");
+      expect(
+        tile.find('[data-test="home-usage-tab-ingested-size"]').text(),
+      ).toBe("2000 MB");
     });
 
     it("should render the functions tile", () => {
       const tile = wrapper.find('[aria-label="Functions count statistics"]');
       expect(tile.exists()).toBe(true);
-      expect(tile.find(".data-to-display").text()).toBe("3");
+      expect(
+        tile.find('[data-test="home-usage-tab-functions-count"]').text(),
+      ).toBe("3");
     });
 
     it("should render the dashboards tile", () => {
       const tile = wrapper.find('[aria-label="Dashboards count statistics"]');
       expect(tile.exists()).toBe(true);
-      expect(tile.find(".data-to-display").text()).toBe("4");
+      expect(
+        tile.find('[data-test="home-usage-tab-dashboards-count"]').text(),
+      ).toBe("4");
     });
 
     it("should render the alerts overview section", () => {
@@ -320,27 +330,30 @@ describe("UsageTab", () => {
 
     it("should show scheduled and real-time alert counts", () => {
       const section = wrapper.find('[aria-label="Alerts overview section"]');
-      const resultsCounts = section.findAll(".results-count");
-      // Two results-count elements: scheduled alerts and real-time alerts
-      expect(resultsCounts.length).toBe(2);
       // animated counts are 0, so fallback to summary values
-      expect(resultsCounts[0].text()).toBe("3");
-      expect(resultsCounts[1].text()).toBe("2");
+      expect(
+        section.find('[data-test="home-usage-tab-scheduled-alerts-count"]').text(),
+      ).toBe("3");
+      expect(
+        section.find('[data-test="home-usage-tab-rt-alerts-count"]').text(),
+      ).toBe("2");
     });
 
     it("should show scheduled and real-time pipeline counts", () => {
       const section = wrapper.find(
         '[aria-label="Pipelines overview section"]',
       );
-      const resultsCounts = section.findAll(".results-count");
-      expect(resultsCounts.length).toBe(2);
       // animated counts are 0, so fallback to summary values
-      expect(resultsCounts[0].text()).toBe("2");
-      expect(resultsCounts[1].text()).toBe("1");
+      expect(
+        section.find('[data-test="home-usage-tab-scheduled-pipelines-count"]').text(),
+      ).toBe("2");
+      expect(
+        section.find('[data-test="home-usage-tab-rt-pipelines-count"]').text(),
+      ).toBe("1");
     });
 
     it("should not show the empty-state panel when data exists", () => {
-      expect(wrapper.find(".home-no-data-panel").exists()).toBe(false);
+      expect(wrapper.find('[data-test="home-usage-tab-no-data"]').exists()).toBe(false);
     });
   });
 
@@ -361,13 +374,17 @@ describe("UsageTab", () => {
         '[aria-label="Compressed data size statistics"]',
       );
       expect(tile.exists()).toBe(true);
-      expect(tile.find(".data-to-display").text()).toBe("500 MB");
+      expect(
+        tile.find('[data-test="home-usage-tab-compressed-size"]').text(),
+      ).toBe("500 MB");
     });
 
     it("should render index size tile when isCloud is false", () => {
       const tile = wrapper.find('[aria-label="Index size statistics"]');
       expect(tile.exists()).toBe(true);
-      expect(tile.find(".data-to-display").text()).toBe("100 MB");
+      expect(
+        tile.find('[data-test="home-usage-tab-index-size"]').text(),
+      ).toBe("100 MB");
     });
   });
 

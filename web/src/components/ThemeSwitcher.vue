@@ -101,25 +101,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.light-mode {
-  background-color: #ffffff;
-  color: #000000;
-}
-
-.dark-mode {
-  background-color: #36383a;
-  color: #ffffff;
-}
-
-.round-button {
-  border: none;
-  border-radius: 50%;
-  box-shadow: none;
-  transition: box-shadow 0.3s ease;
-}
-
-.round-button:hover {
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-</style>
