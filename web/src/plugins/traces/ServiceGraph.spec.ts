@@ -1202,17 +1202,13 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
-
       wrapper.vm.handleNodeClick({
         dataType: "unknown",
         data: null,
       });
 
-      expect(consoleLog).toHaveBeenCalled();
+      // Invalid clicks are ignored — the side panel must not open.
       expect(wrapper.vm.showSidePanel).toBe(false);
-
-      consoleLog.mockRestore();
     });
 
     it("should silently ignore edge clicks for nonexistent edges", async () => {

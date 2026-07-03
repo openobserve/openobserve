@@ -37,10 +37,7 @@
         :data-test="`quality-sidebar-item-${row.name}`"
         @click="$emit('select', row)"
       >
-        <span class="qcs-item__status shrink-0 basis-[14px] inline-flex items-start pt-[2px] text-[13px] leading-none" :class="{ 'text-[var(--o2-status-warning-text,#b25400)]': row.status === 'unhealthy', 'text-[var(--o2-status-warning-text,#b25400)] opacity-75': row.status === 'warn', 'text-[var(--o2-status-success-text,#2e7d32)]': row.status === 'healthy', 'text-[var(--color-text-secondary,var(--o2-text-secondary))]': row.status === 'noThreshold' }">
-          <template v-if="row.status === 'unhealthy'">▲</template>
-          <template v-else>●</template>
-        </span>
+        <OTag type="qualityStatus" :value="row.status" label="" :aria-label="row.status" />
 
         <div class="qcs-item__main flex-1 min-w-0 flex flex-col gap-1">
           <div class="flex items-center gap-[6px]">
@@ -93,6 +90,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";
 
 const props = defineProps<{

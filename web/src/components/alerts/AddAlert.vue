@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ anomalyConfig.name }}
                 <OTooltip v-if="anomalyConfig.name?.length > 24" :content="anomalyConfig.name" />
               </span>
-              <OBadge v-if="anomalyConfig.status" :variant="anomalyStatusVariant" class="text-xs">{{ anomalyConfig.status }}</OBadge>
+              <OTag v-if="anomalyConfig.status" type="anomalyStatus" :value="anomalyConfig.status" />
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
                 class="text-[11px] whitespace-nowrap text-text-secondary"
@@ -459,7 +459,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
@@ -507,7 +507,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     ODrawer,
-    OBadge,
+    OTag,
     OTooltip,
     OInput,
     OSelect,

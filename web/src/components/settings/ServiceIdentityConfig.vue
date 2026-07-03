@@ -61,27 +61,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <i18n-t keypath="settings.correlation.exampleText" tag="span">
                 <template #dim1>
-                  <OBadge
-                    size="sm"
-                    variant="primary"
-                    class="mx-1 my-1 example-chip"
-                    >k8s-cluster=prod</OBadge
+                  <OTag
+                    type="exampleChip"
+                    value="dim"
+                    class="tw:mx-1 tw:my-1 example-chip"
+                    >k8s-cluster=prod</OTag
                   >
                 </template>
                 <template #dim2>
-                  <OBadge
-                    size="sm"
-                    variant="primary"
-                    class="mx-1 my-1 example-chip"
-                    >k8s-deployment=api-server</OBadge
+                  <OTag
+                    type="exampleChip"
+                    value="dim"
+                    class="tw:mx-1 tw:my-1 example-chip"
+                    >k8s-deployment=api-server</OTag
                   >
                 </template>
                 <template #value>
-                  <OBadge
-                    size="sm"
-                    variant="success"
-                    class="mx-1 my-1 example-chip"
-                    >prod/api-server</OBadge
+                  <OTag
+                    type="exampleChip"
+                    value="value"
+                    class="tw:mx-1 tw:my-1 example-chip"
+                    >prod/api-server</OTag
                   >
                 </template>
               </i18n-t>
@@ -146,7 +146,7 @@ import { ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import GroupHeader from "@/components/common/GroupHeader.vue";

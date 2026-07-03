@@ -9,6 +9,7 @@ defineOptions({ inheritAttrs: false });
 const props = withDefaults(defineProps<BadgeProps>(), {
   variant: "default",
   size: "md",
+  shape: "pill",
   dot: false,
   clickable: false,
   disabled: false,
@@ -46,15 +47,15 @@ const tag = computed(() => (props.clickable ? "button" : "span"));
 const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
   // Solid
   default:
-    "bg-badge-default-solid-bg text-badge-default-solid-text",
+    "tw:bg-badge-default-soft-bg tw:text-badge-default-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-default-ol-border/30",
   primary:
-    "bg-badge-primary-solid-bg text-badge-primary-solid-text",
+    "tw:bg-badge-primary-soft-bg tw:text-badge-primary-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-primary-ol-border/30",
   success:
-    "bg-badge-success-solid-bg text-badge-success-solid-text",
+    "tw:bg-badge-success-soft-bg tw:text-badge-success-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-success-ol-border/30",
   warning:
-    "bg-badge-warning-solid-bg text-badge-warning-solid-text",
+    "tw:bg-badge-warning-soft-bg tw:text-badge-warning-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-warning-ol-border/30",
   error:
-    "bg-badge-error-solid-bg text-badge-error-solid-text",
+    "tw:bg-badge-error-soft-bg tw:text-badge-error-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-error-ol-border/30",
   // Outline (transparent bg + inset ring)
   "default-outline": [
     "bg-transparent",
@@ -106,7 +107,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
   // NEW: Extended color families for correlation dimensions
   // Teal
   teal:
-    "bg-badge-teal-solid-bg text-badge-teal-solid-text",
+    "tw:bg-badge-teal-soft-bg tw:text-badge-teal-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-teal-ol-border/30",
   "teal-outline": [
     "bg-transparent",
     "text-badge-teal-ol-text",
@@ -117,7 +118,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
 
   // Orange
   orange:
-    "bg-badge-orange-solid-bg text-badge-orange-solid-text",
+    "tw:bg-badge-orange-soft-bg tw:text-badge-orange-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-orange-ol-border/30",
   "orange-outline": [
     "bg-transparent",
     "text-badge-orange-ol-text",
@@ -128,7 +129,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
 
   // Lime
   lime:
-    "bg-badge-lime-solid-bg text-badge-lime-solid-text",
+    "tw:bg-badge-lime-soft-bg tw:text-badge-lime-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-lime-ol-border/30",
   "lime-outline": [
     "bg-transparent",
     "text-badge-lime-ol-text",
@@ -139,7 +140,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
 
   // Amber
   amber:
-    "bg-badge-amber-solid-bg text-badge-amber-solid-text",
+    "tw:bg-badge-amber-soft-bg tw:text-badge-amber-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-amber-ol-border/30",
   "amber-outline": [
     "bg-transparent",
     "text-badge-amber-ol-text",
@@ -150,7 +151,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
 
   // Cyan
   cyan:
-    "bg-badge-cyan-solid-bg text-badge-cyan-solid-text",
+    "tw:bg-badge-cyan-soft-bg tw:text-badge-cyan-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-cyan-ol-border/30",
   "cyan-outline": [
     "bg-transparent",
     "text-badge-cyan-ol-text",
@@ -161,7 +162,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
 
   // Blue
   blue:
-    "bg-badge-blue-solid-bg text-badge-blue-solid-text",
+    "tw:bg-badge-blue-soft-bg tw:text-badge-blue-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-blue-ol-border/30",
   "blue-outline": [
     "bg-transparent",
     "text-badge-blue-ol-text",
@@ -172,13 +173,13 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
 
   // Purple (solid/soft variants for correlation)
   purple:
-    "bg-badge-purple-solid-bg text-badge-purple-solid-text",
+    "tw:bg-badge-purple-soft-bg tw:text-badge-purple-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-purple-ol-border/30",
   "purple-soft":
     "bg-badge-purple-soft-bg text-badge-purple-soft-text ring-1 ring-inset ring-badge-purple-ol-border/30",
 
   // Indigo
   indigo:
-    "bg-badge-indigo-solid-bg text-badge-indigo-solid-text",
+    "tw:bg-badge-indigo-soft-bg tw:text-badge-indigo-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-indigo-ol-border/30",
   "indigo-outline": [
     "bg-transparent",
     "text-badge-indigo-ol-text",
@@ -190,13 +191,21 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
 
 // ── Size class map ────────────────────────────────────────────────────────
 const sizeClasses: Record<NonNullable<BadgeProps["size"]>, string> = {
-  sm: "px-2.5 py-1.5 text-[11px] gap-1",
-  md: "px-2.5 py-2 text-xs gap-1.5",
+  xs: "tw:px-1.5 tw:py-0.5 tw:text-[10px] tw:gap-0.5",
+  sm: "tw:px-2.5 tw:py-1.5 tw:text-[11px] tw:gap-1",
+  md: "tw:px-2.5 tw:py-2 tw:text-xs tw:gap-1.5",
+};
+
+// ── Shape (corner radius) class map ───────────────────────────────────────
+const shapeClasses: Record<NonNullable<BadgeProps["shape"]>, string> = {
+  pill: "tw:rounded-full",
+  rounded: "tw:rounded-md",
+  square: "tw:rounded-none",
 };
 
 // ── Trailing segment padding per size ────────────────────────────────────
 const trailingSizeClasses = computed(() =>
-  props.size === "sm" ? "ps-1 ms-0.5" : "ps-1.5 ms-1",
+  props.size === "md" ? "tw:ps-1.5 tw:ms-1" : "tw:ps-1 tw:ms-0.5",
 );
 
 // ── Root element classes ──────────────────────────────────────────────────
@@ -204,12 +213,13 @@ const classes = computed(() => [
   // Base — layout + typography + shape.
   // Weight 600 per the design-system weight scale (HANDOFF §2.2: badges = 600).
   // Pill shape (rounded-full) per HANDOFF §11 + this component's own contract.
-  "inline-flex items-center whitespace-nowrap rounded-full",
-  "font-medium leading-none",
-  "transition-colors duration-150",
-  // Variant + size
+  "tw:inline-flex tw:items-center tw:whitespace-nowrap",
+  "tw:font-medium tw:leading-none",
+  "tw:transition-colors tw:duration-150",
+  // Variant + size + shape
   variantClasses[props.variant],
   sizeClasses[props.size],
+  shapeClasses[props.shape],
   // Clickable — interaction states (button element handles :disabled natively)
   props.clickable && [
     "cursor-pointer",

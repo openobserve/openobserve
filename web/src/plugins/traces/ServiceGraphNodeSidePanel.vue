@@ -25,10 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="(v) => { if (!v) handleClose() }"
   >
     <template #header-right>
-      <div class="flex items-center gap-2">
-        <span class="health-badge inline-flex items-center gap-1 py-0.5 px-2 rounded-[10px] text-[11px] font-semibold leading-none" :class="serviceHealth.status">
-          {{ serviceHealth.text }}
-        </span>
+      <div class="tw:flex tw:items-center tw:gap-2">
+        <OTag type="serviceStatus" :value="serviceHealth.status" data-test="service-health-badge">{{ serviceHealth.text }}</OTag>
         <ODropdown side="bottom" align="start">
           <template #trigger>
             <OButton
@@ -550,6 +548,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -827,6 +826,7 @@ const envLabel = (envKey: string): string =>
 export default defineComponent({
   name: "ServiceGraphNodeSidePanel",
   components: {
+    OTag,
     OSeparator,
     OTabs,
     OTab,

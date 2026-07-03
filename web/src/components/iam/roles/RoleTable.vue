@@ -83,7 +83,8 @@ const columns: OTableColumnDef[] = [
         <OSearchInput
           :model-value="globalFilter"
           :placeholder="t('iam.searchRole')"
-          class="flex-1"
+          class="tw:flex-1"
+          data-test="iam-roles-search-input"
           @update:model-value="emit('update:globalFilter', $event)"
         />
       </div>
@@ -93,6 +94,7 @@ const columns: OTableColumnDef[] = [
       <div class="flex items-center justify-center">
         <OButton
           :data-test="`iam-roles-edit-${row.role_name}-role-icon`"
+          data-row-action="edit"
           variant="ghost"
           size="icon-sm"
           :title="t('common.edit')"
@@ -102,6 +104,7 @@ const columns: OTableColumnDef[] = [
         </OButton>
         <OButton
           :data-test="`iam-roles-delete-${row.role_name}-role-icon`"
+          data-row-action="delete"
           variant="ghost"
           size="icon-sm"
           :title="t('common.delete')"

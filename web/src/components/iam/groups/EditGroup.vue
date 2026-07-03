@@ -222,7 +222,6 @@ const getGroupDetails = () => {
 
   getGroup(groupName, store.state.selectedOrganization.identifier)
     .then((res) => {
-      console.log(res,'res in get group')
       groupDetails.value = {
         ...res.data,
         group_name: res.data.name,

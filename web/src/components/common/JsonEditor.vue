@@ -199,7 +199,6 @@ export default defineComponent({
 
           emit("saveJson", JSON.stringify(finalContent));
         } catch (error) {
-          console.log(error, 'error')
           validationErrors.value = ['Invalid JSON format'];
         }
       };

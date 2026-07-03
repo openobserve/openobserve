@@ -108,15 +108,11 @@
           :data-test="`scorer-detail-tab-${tab.id}`"
         >
           <span>{{ tab.label }}</span>
-          <span
+          <OTag
             v-if="tab.count != null"
-            class="inline-flex items-center justify-center px-[0.375rem] min-w-[1.125rem] h-[1rem] rounded-full text-[0.625rem] font-semibold"
-            :class="
-              activeTab === tab.id
-                ? 'bg-[color-mix(in_srgb,var(--color-primary-600,#3f7994)_18%,transparent)] text-[var(--color-primary-600,#3f7994)]'
-                : 'bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] text-[var(--color-text-secondary)]'
-            "
-            >{{ tab.count }}</span
+            type="countChip"
+            :value="activeTab === tab.id ? 'primary' : 'neutral'"
+            >{{ tab.count }}</OTag
           >
         </OTab>
       </OTabs>
@@ -154,13 +150,9 @@
           <section class="flex flex-col gap-2 px-5">
             <dl class="sd-kv">
               <dt>{{ t("onlineEvals.scorer.detail.scorerTypeLabel") }}</dt>
-              <dd>
-                <span
-                  class="sd-type-chip"
-                  :class="`sd-type-chip--${scorerType}`"
-                  >{{ scorerTypeLabel }}</span
-                >
-                <span class="sd-version-chip">v{{ row.version }}</span>
+              <dd class="tw:flex tw:flex-wrap tw:items-center tw:gap-1.5">
+                <OTag type="scorerType" :value="scorerType" />
+                <OTag type="fieldTag" value="soft">v{{ row.version }}</OTag>
               </dd>
 
               <template v-if="scorerType === 'llm_judge'">
@@ -227,13 +219,10 @@
                   ? t("onlineEvals.scorer.detail.promptSection")
                   : t("onlineEvals.scorer.detail.requestTemplateSection")
               }}
-              <span
-                v-if="variables.length"
-                class="inline-flex items-center px-[0.3125rem] rounded-[0.1875rem] text-[0.625rem] font-semibold text-[var(--color-text-secondary)] bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
-              >
+              <OTag v-if="variables.length" type="fieldTag" value="soft">
                 {{ variables.length }}
                 {{ t("onlineEvals.scorer.detail.variablesSuffix") }}
-              </span>
+              </OTag>
             </h4>
             <pre class="sd-code" data-test="scorer-detail-template">{{
               row.template
@@ -284,9 +273,7 @@
                   <span class="sd-versions__label"
                     >v{{ row.version }}</span
                   >
-                  <span class="sd-versions__chip">{{
-                    t("onlineEvals.scorer.detail.activeVersionChip")
-                  }}</span>
+                  <OTag type="activeVersionFlag" value="active" />
                 </div>
                 <div v-if="updatedAt" class="sd-versions__meta">
                   {{ t("onlineEvals.scorer.detail.lastUpdated") }}
@@ -353,13 +340,7 @@
               }}</span>
             </template>
             <template #cell-status="{ row }">
-              <span
-                class="sd-status-cell"
-                :class="`sd-status-cell--${row.status}`"
-              >
-                <span class="sd-status-cell__dot" />
-                {{ row.status }}
-              </span>
+              <OTag type="evalRunStatus" :value="row.status" />
             </template>
           </OTable>
         </template>
@@ -409,6 +390,7 @@ import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

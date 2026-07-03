@@ -90,12 +90,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center actions-container">
             <OButton
               :data-test="`pipeline-list-${row.name}-pause-start-action`"
+              :data-row-action="row.enabled ? 'pause' : 'resume'"
               :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
               size="icon-sm"
-              :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
               @click.stop="togglePipeline(row)"
-            />
+            >
+              <OTooltip
+                side="bottom"
+                :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                :shortcut-id="row.enabled ? 'pipelinesRowPause' : undefined"
+              />
+            </OButton>
             <OButton
               :data-test="`pipeline-list-${row.name}-view-pipeline`"
               variant="ghost"
@@ -111,10 +117,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`pipeline-list-${row.name}-update-pipeline`"
+              data-row-action="edit"
               variant="ghost"
               size="icon-sm"
               @click.stop="editPipeline(row)"
               icon-left="edit"
+            >
+              <OTooltip side="bottom" :content="t('alerts.edit')" shortcut-id="pipelinesRowEdit" />
+            </OButton>
+            <!-- Hidden proxies so the row-hover shortcuts reach the more-menu
+                 actions (teleported out of the row): x = export, Del = delete. -->
+            <button
+              type="button"
+              data-row-action="export"
+              class="tw:hidden"
+              tabindex="-1"
+              aria-hidden="true"
+              @click.stop="exportPipeline(row)"
+            />
+            <button
+              type="button"
+              data-row-action="delete"
+              class="tw:hidden"
+              tabindex="-1"
+              aria-hidden="true"
+              @click.stop="openDeleteDialog(row)"
             />
             <ODropdown align="end">
               <template #trigger>
@@ -128,6 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <ODropdownItem
                 :data-test="`pipeline-list-${row.name}-export-action`"
+                shortcut-id="pipelinesRowExport"
                 @select="exportPipeline(row)"
               >
                 <template #icon-left>
@@ -138,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownSeparator />
               <ODropdownItem
                 :data-test="`pipeline-list-${row.name}-delete-pipeline`"
+                shortcut-id="pipelinesRowDelete"
                 @select="openDeleteDialog(row)"
                 variant="destructive"
               >
@@ -422,6 +451,8 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
@@ -1124,4 +1155,26 @@ const onBackfillSuccess = (jobId: string) => {
   // Navigate to backfill jobs page after successful creation
   goToBackfillJobs();
 };
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcuts([
+  {
+    id: "pipelinesAdd",
+    handler: () => { if (!isInputFocused()) goToCreatePipeline(); },
+  },
+  {
+    id: "pipelinesImport",
+    handler: () => { if (!isInputFocused()) goToImportPipeline(); },
+  },
+  {
+    id: "pipelinesRefresh",
+    handler: () => { if (!isInputFocused()) getPipelines(); },
+  },
+  {
+    id: "pipelinesFocusSearch",
+    handler: () => {
+      focusSearchInput("pipeline-list-search-input");
+    },
+  },
+]);
 </script>

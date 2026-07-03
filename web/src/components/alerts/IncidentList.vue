@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -101,12 +101,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-severity="{ row }">
-          <OBadge
-            :variant="getSeverityVariant(row.severity)"
-            dot
+          <OTag
+            type="severity"
+            :value="row.severity"
             size="sm"
             data-test="incident-severity-badge"
-          >{{ row.severity }}</OBadge>
+          />
         </template>
         <template #cell-title="{ row }">
           <div class="flex items-center gap-1">
@@ -116,25 +116,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-dimensions="{ row }">
-          <div class="flex flex-nowrap items-center gap-1 min-w-0 overflow-hidden">
-            <span
+          <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-1 tw:min-w-0 tw:overflow-hidden">
+            <ODimensionChip
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
-              class="inline-flex min-w-0"
-            >
-              <OBadge :variant="getDimensionVariant(key)" size="sm" class="min-w-0 !p-0 overflow-hidden">
-                <span class="inline-flex items-stretch min-w-0">
-                  <span class="ps-2.5 pe-1 py-1.5 shrink-0 whitespace-nowrap bg-current/8 opacity-90">{{ key }}</span>
-                  <span class="ps-1 pe-2.5 py-1.5 truncate min-w-0 font-semibold">{{ value }}</span>
-                </span>
-              </OBadge>
-              <OTooltip :delay="300" :content="key + '=' + value" />
-            </span>
-            <OBadge
+              :dim-key="key"
+              :value="value"
+              :tooltip="true"
+              class="tw:min-w-0"
+            />
+            <OTag
               v-if="getSortedDimensions(row.group_values).length > 2"
-              variant="default-soft"
-              size="sm"
-              class="shrink-0"
+              type="countChip"
+              value="neutral"
+              class="tw:shrink-0"
             >
               +{{ getSortedDimensions(row.group_values).length - 2 }} more
               <OTooltip :delay="300" :max-width="'28rem'">
@@ -144,12 +139,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="[key, value] in getSortedDimensions(row.group_values).slice(2)"
                       :key="key"
                     >
-                      <span class="inline-block overflow-hidden truncate">{{ key }}</span>=<span class="inline-block overflow-hidden truncate">{{ value }}</span>
+                      <span>{{ key }}</span>=<span>{{ value }}</span>
                     </div>
                   </div>
                 </template>
               </OTooltip>
-            </OBadge>
+            </OTag>
           </div>
         </template>
         <template #cell-last_alert_at="{ row }">
@@ -230,13 +225,11 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import { BADGE_GROUPS, normalizeKey } from "@/lib/core/Badge/badgeGroups";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
@@ -253,7 +246,7 @@ export default defineComponent({
     OIcon,
     OTable,
     OTag,
-    OBadge,
+    ODimensionChip,
     OTimeCell,
     OToggleGroup,
     OToggleGroupItem,
@@ -497,26 +490,6 @@ export default defineComponent({
       }
     };
 
-    const getSeverityVariant = (severity: string): BadgeVariant => {
-      switch (severity) {
-        case "P1": return "error-soft";
-        case "P2": return "orange-soft";
-        case "P3": return "amber-soft";
-        case "P4": return "blue-soft";
-        default: return "default-soft";
-      }
-    };
-
-    const getSeverityColorClass = (severity: string) => {
-      switch (severity) {
-        case "P1": return "severity-p1";
-        case "P2": return "severity-p2";
-        case "P3": return "severity-p3";
-        case "P4": return "severity-p4";
-        default: return "severity-default";
-      }
-    };
-
     const formatTimestamp = (timestamp: number) => {
       return formatToReadable(timestamp);
     };
@@ -569,24 +542,6 @@ export default defineComponent({
         hash = hash & hash;
       }
       return classes[Math.abs(hash) % classes.length];
-    };
-
-    const DIMENSION_FALLBACK_VARIANTS: BadgeVariant[] = [
-      'default-soft', 'amber-soft', 'purple-soft', 'blue-soft', 'teal-soft', 'indigo-soft',
-    ];
-    const getDimensionVariant = (key: string): BadgeVariant => {
-      const values = BADGE_GROUPS.dimensionKey.values as Record<string, { variant: BadgeVariant }>;
-      const nk = normalizeKey(key);
-      if (values[nk]) return values[nk].variant;
-      for (const [pattern, cfg] of Object.entries(values)) {
-        if (nk.includes(pattern)) return cfg.variant;
-      }
-      let hash = 0;
-      for (let i = 0; i < key.length; i++) {
-        hash = ((hash << 5) - hash) + key.charCodeAt(i);
-        hash = hash & hash;
-      }
-      return DIMENSION_FALLBACK_VARIANTS[Math.abs(hash) % DIMENSION_FALLBACK_VARIANTS.length];
     };
 
     const restoreStateFromStore = (): boolean => {
@@ -677,13 +632,10 @@ export default defineComponent({
       reopenIncident,
       getStatusColorClass,
       getStatusLabel,
-      getSeverityVariant,
-      getSeverityColorClass,
       formatTimestamp,
       formatDimensions,
       getSortedDimensions,
       getDimensionColorClass,
-      getDimensionVariant,
       qTableRef,
       store,
     };

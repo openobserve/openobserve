@@ -17,17 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="hasValidContent" class="llm-content-renderer w-full h-full">
     <!-- Tool-specific rendering -->
-    <div v-if="isToolObservation && toolContent !== null" class="tool-content flex flex-col h-full">
-      <div v-if="toolMetadata" class="flex items-center flex-wrap gap-2 mb-2">
-        <OBadge
+    <div v-if="isToolObservation && toolContent !== null" class="tool-content tw:flex tw:flex-col tw:h-full">
+      <div v-if="toolMetadata" class="tw:flex tw:items-center tw:flex-wrap tw:gap-2 tw:mb-2">
+        <OTag
           v-if="toolMetadata.name"
-          variant="warning"
-          class="mr-2"
-        >{{ `Tool: ${toolMetadata.name}` }}</OBadge>
-        <OBadge
+          type="toolMeta"
+          value="tool"
+          class="tw:mr-2"
+        >{{ `Tool: ${toolMetadata.name}` }}</OTag>
+        <OTag
           v-if="toolMetadata.callId"
-          variant="default"
-        >{{ `Call ID: ${toolMetadata.callId}` }}</OBadge>
+          type="toolMeta"
+          value="callid"
+        >{{ `Call ID: ${toolMetadata.callId}` }}</OTag>
       </div>
       <div class="tool-data flex-1">
         <CodeQueryEditor
@@ -267,7 +269,7 @@ const CodeQueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
 import OButton from '@/lib/core/Button/OButton.vue';
-import OBadge from '@/lib/core/Badge/OBadge.vue';
+import OTag from '@/lib/core/Badge/OTag.vue';
 
 const INITIAL_LINE_LIMIT = 15;
 

@@ -2544,8 +2544,6 @@ const handleSidebarEvent = (event: string, value: any) => {
     // Set the new value
     pipelineEditorRef.value.setValue(newQuery);
     updateQueryValue(newQuery);
-  } else {
-    console.log("Could not find editor instance");
   }
 };
 const updateDateChange = (date: any) => {

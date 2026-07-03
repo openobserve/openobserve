@@ -857,14 +857,18 @@ test.describe("dashboard UI testcases", () => {
 
     // Set custom SQL — fields are populated client-side by the SQL parser.
     // Use `level` and `method` (guaranteed fields in e2e_automate) with
-    // impossible conditions so all counts are zero. This validates that the
-    // line chart renders zero-valued camelCase-aliased series without errors.
+    // impossible conditions so the camelCase-aliased error counts are zero.
+    // `pageViewCount` counts every row so at least one series carries data:
+    // a line chart whose series are ALL zero renders "No Data" (series with no
+    // non-null/non-zero points are dropped from the chart), which would make
+    // this test flaky. Keeping one non-zero series makes the chart render
+    // deterministically while still exercising zero-valued camelCase aliases.
     await pm.chartTypeSelector.setCustomSQL(
       `SELECT histogram(_timestamp, '5 minute') AS "_time",
        COUNT(CASE WHEN level = 'nonexistentLevel_abc' THEN 1 END) AS "4xxErrorCount",
        COUNT(CASE WHEN level = 'nonexistentLevel_def' THEN 1 END) AS "5xxErrorCount",
        COUNT(CASE WHEN method = 'NONEXISTENT_METHOD_xyz' THEN 1 END) AS "NullErrorCount",
-       COUNT(CASE WHEN stream = 'nonexistentStream_xyz' THEN 1 END) AS "pageViewCount"
+       COUNT(CASE WHEN _timestamp IS NOT NULL THEN 1 END) AS "pageViewCount"
 FROM e2e_automate
 GROUP BY _time
 ORDER BY _time ASC`

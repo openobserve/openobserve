@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -202,6 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     @click="exploreEnrichmentTable(row)"
                     icon-left="search"
+                    data-row-action="view"
                   />
 
                   <!-- Schema Settings button - show for uploaded tables or completed URL jobs -->
@@ -213,6 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     @click="listSchema(row)"
                     icon-left="format-list-bulleted"
+                    data-row-action="view"
                   />
 
                   <!-- Edit button - show for uploaded tables, completed URL jobs, or failed URL jobs (to add more URLs) -->
@@ -224,6 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     @click="showAddUpdateFn(row)"
                     icon-left="edit"
+                    data-row-action="edit"
                   />
 
                   <!-- Delete button - always visible -->
@@ -234,6 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     @click="showDeleteDialogFn(row)"
                     icon-left="delete"
+                    data-row-action="delete"
                   />
                 </div>
               </template>
@@ -309,20 +313,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-xl font-semibold">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
         </div>
         <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
-          <ul class="flex flex-col divide-y divide-border">
-            <li v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" :data-test="`enrichment-url-jobs-item-${index}`" class="flex items-center gap-2 p-4">
-              <div class="flex flex-col flex-1 min-w-0">
-                <span class="text-sm font-bold">Job {{ index + 1 }}</span>
-                <span class="block text-xs text-muted-foreground">{{ job.url }}</span>
-                <span class="block text-xs text-muted-foreground mt-2">
-                  <OBadge
+          <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border">
+            <li v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" :data-test="`enrichment-url-jobs-item-${index}`" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
+              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span class="tw:text-sm tw:font-bold">Job {{ index + 1 }}</span>
+                <span class="tw:block tw:text-xs tw:text-muted-foreground">{{ job.url }}</span>
+                <span class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
+                  <OTag
                     :data-test="`enrichment-url-jobs-item-${index}-status-badge`"
                     :data-test-value="job.status"
-                    dot
-                    :variant="job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : job.status === 'processing' ? 'primary' : 'default'"
-                  >
-                    {{ job.status }}
-                  </OBadge>
+                    type="enrichmentJobStatus"
+                    :value="job.status"
+                  />
                 </span>
                 <span v-if="job.status === 'completed'" class="block text-xs text-muted-foreground mt-2">
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
@@ -375,7 +377,6 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -399,7 +400,6 @@ export default defineComponent({
     OTooltip,
     OCheckbox,
     OIcon,
-    OBadge,
     OTag,
     ONumberCell,
     OTable,
@@ -455,7 +455,7 @@ export default defineComponent({
     onBeforeMount(() => {
       getLookupTables();
     });
-    //here we need to check if the action is there or not 
+    //here we need to check if the action is there or not
     //because if action is there user before refresh the page user was there in add / update page
     //so to maitain consistency we are checking the action and if action is there we are showing the add / update page
     //else we are showing the list of enrichment tables

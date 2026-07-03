@@ -824,7 +824,6 @@ export default defineComponent({
           isOrgLoading.value = false;
         } catch (error) {
           isOrgLoading.value = false;
-          console.log(error);
         } finally {
           isOrgLoading.value = false;
         }
@@ -927,7 +926,6 @@ export default defineComponent({
         resultTotal.value = rolesLimitRows.value.length;
         isRolesLoading.value = false;
       } catch (error) {
-        console.log(error);
         isRolesLoading.value = false;
       }
     };

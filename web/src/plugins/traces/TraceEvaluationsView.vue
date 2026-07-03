@@ -214,8 +214,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               <div v-if="getWeakestDimension(record)" class="mb-4">
                 <div class="flex items-center gap-2 mb-2">
                   <OIcon name="trending-down" size="xs" />
-                  <span class="text-xs font-medium text-[var(--o2-text-secondary)]">{{ $t("traces.evaluations.weakestDimension") }}</span>
-                  <OBadge variant="warning">{{ formatDimLabel(getWeakestDimension(record)!.dimension) }}</OBadge>
+                  <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">{{ $t("traces.evaluations.weakestDimension") }}</span>
+                  <OTag type="evalBadge" value="weakest">{{ formatDimLabel(getWeakestDimension(record)!.dimension) }}</OTag>
                 </div>
                 <div v-if="getWeakestDimension(record)!.reasoning" class="text-sm bg-[var(--o2-border-color)] p-3 rounded-md leading-relaxed">
                   {{ getWeakestDimension(record)!.reasoning }}
@@ -240,12 +240,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                     <div class="text-[10px] font-bold text-[var(--o2-text-secondary)] uppercase tracking-wider">
                       {{ formatDimLabel(dim.dimension) }}
                     </div>
-                    <!-- Pass/Fail inline -->
-                    <OBadge
+                    <!-- Pass/Fail tw:inline -->
+                    <OTag
                       v-if="isTemplateDimension(dim.dimension)"
-                      :variant="getDimVerdict(dim.score) === 'PASS' ? 'success' : 'error'"
-                      class="text-[9px] py-px px-1"
-                    >{{ getDimVerdict(dim.score) }}</OBadge>
+                      type="evaluationVerdict"
+                      :value="getDimVerdict(dim.score)"
+                      class="tw:text-[9px] tw:py-px tw:px-1"
+                    />
                   </div>
                   <div class="text-xs leading-relaxed text-[var(--o2-text-primary)]">
                     {{ truncateContent(dim.reasoning, 200) }}
@@ -361,20 +362,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                       <OIcon :name="getDimIcon(dim.dimension)" :class="getDimColorClass(dim.dimension)" size="sm" />
                       <span class="text-xs font-medium text-[var(--o2-text-primary)]">{{ formatDimLabel(dim.dimension) }}</span>
                       <!-- Template aspect badge -->
-                      <OBadge
+                      <OTag
                         v-if="isTemplateDimension(dim.dimension)"
-                        variant="primary-outline"
-                        class="text-[9px] py-px px-1"
-                      >{{ $t('traces.evaluations.templateBadge') }}</OBadge>
+                        type="evalBadge"
+                        value="template"
+                        class="tw:text-[9px] tw:py-px tw:px-1"
+                      />
                     </div>
                     <div class="flex items-center gap-1.5">
                       <!-- Pass/Fail verdict badge for template dimensions -->
-                      <OBadge
+                      <OTag
                         v-if="isTemplateDimension(dim.dimension)"
-                        :variant="getDimVerdict(dim.score) === 'PASS' ? 'success' : 'error'"
-                        class="text-[9px] py-px px-1"
-                      >{{ getDimVerdict(dim.score) }}</OBadge>
-                      <span class="text-xs font-bold text-[var(--o2-text-primary)]">{{ formatScore(dim.score) }}</span>
+                        type="evaluationVerdict"
+                        :value="getDimVerdict(dim.score)"
+                        class="tw:text-[9px] tw:py-px tw:px-1"
+                      />
+                      <span class="tw:text-xs tw:font-bold tw:text-[var(--o2-text-primary)]">{{ formatScore(dim.score) }}</span>
                     </div>
                   </div>
                   <div class="h-1.5 w-full bg-[var(--o2-border-color)] rounded-full overflow-hidden">
@@ -416,10 +419,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 <div class="grid grid-cols-[80px_1fr] gap-1">
                   <div class="text-[10px] font-bold text-[var(--o2-text-secondary)] uppercase">{{ $t("traces.evaluations.status") }}</div>
                   <div>
-                    <OBadge
-                      :variant="record.exit_status === 'ok' ? 'success' : 'error'"
-                      size="sm"
-                    >{{ record.exit_status?.toUpperCase() || 'UNKNOWN' }}</OBadge>
+                    <OTag
+                      type="evalStatus"
+                      :value="record.exit_status"
+                      :label="record.exit_status?.toUpperCase() || 'UNKNOWN'"
+                    />
                   </div>
                 </div>
                 <div v-if="record.is_multi_step" class="grid grid-cols-[80px_1fr] gap-1">
@@ -444,7 +448,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 
 export default defineComponent({
@@ -455,7 +459,7 @@ export default defineComponent({
     OSelect,
     OTooltip,
     OIcon,
-    OBadge,
+    OTag,
     OCollapsible,
   },
   props: {

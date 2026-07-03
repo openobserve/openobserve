@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="upload-file"
             >
               <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
-              <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" />
+              <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" shortcut-id="alertsImport" />
             </OButton>
             <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
             <OButton
@@ -175,10 +175,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     icon-left="refresh"
                     :loading="loading"
-                    title="Reload alerts"
                     data-test="alert-list-refresh-btn"
                     @click="refreshAlerts"
-                  />
+                  >
+                    <OTooltip side="bottom" content="Reload alerts" shortcut-id="alertsRefresh" />
+                  </OButton>
                 </template>
 
 
@@ -310,33 +311,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <OButton
                       v-else
+                      :data-row-action="row.enabled ? 'pause' : 'resume'"
                       :data-test="`alert-list-${row.name}-pause-start-alert`"
-                      class="ml-1"
-                      :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+                      class="tw:ml-1"
+                      :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                       size="icon-sm"
                       :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                      :title="
-                        row.enabled
-                          ? t('alerts.pause')
-                          : t('alerts.start')
-                      "
                       @click.stop="toggleAlertState(row)"
-                    />
+                    >
+                      <OTooltip
+                        side="bottom"
+                        :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                        :shortcut-id="row.enabled ? 'alertsRowPause' : undefined"
+                      />
+                    </OButton>
                     <OButton
+                      data-row-action="edit"
                       :data-test="`alert-list-${row.name}-update-alert`"
                       variant="ghost"
                       size="icon-sm"
                       icon-left="edit"
-                      :title="t('alerts.edit')"
                       @click.stop="editAlert(row)"
-                    />
+                    >
+                      <OTooltip side="bottom" :content="t('alerts.edit')" shortcut-id="alertsRowEdit" />
+                    </OButton>
                     <OButton
-                      :title="t('alerts.clone')"
+                      data-row-action="duplicate"
                       variant="ghost"
                       size="icon-sm"
                       icon-left="content-copy"
                       @click.stop="duplicateAlert(row)"
                       :data-test="`alert-list-${row.name}-clone-alert`"
+                    >
+                      <OTooltip side="bottom" :content="t('alerts.clone')" shortcut-id="alertsRowDuplicate" />
+                    </OButton>
+                    <!-- Hidden proxies so the row-hover shortcuts work for
+                         actions that live in the more-menu dropdown (which is
+                         teleported out of the row DOM): x = export, Del = delete. -->
+                    <button
+                      type="button"
+                      data-row-action="export"
+                      class="tw:hidden"
+                      tabindex="-1"
+                      aria-hidden="true"
+                      @click.stop="exportAlert(row)"
+                    />
+                    <button
+                      type="button"
+                      data-row-action="delete"
+                      class="tw:hidden"
+                      tabindex="-1"
+                      aria-hidden="true"
+                      @click.stop="showDeleteDialogFn({ row })"
                     />
                     <ODropdown>
                       <template #trigger>
@@ -348,7 +374,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :data-test="`alert-list-${row.name}-more-options`"
                         />
                       </template>
-                      <ODropdownItem @select="moveAlertToAnotherFolder(row)">
+                      <ODropdownItem
+                        :data-test="`alert-list-${row.name}-move-alert`"
+                        @select="moveAlertToAnotherFolder(row)"
+                      >
                         <template #icon-left>
                           <OIcon name="drive-file-move" size="sm" />
                         </template>
@@ -356,7 +385,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </ODropdownItem>
                       <ODropdownSeparator />
                       <ODropdownItem
+                        :data-test="`alert-list-${row.name}-delete-alert`"
                         variant="destructive"
+                        shortcut-id="alertsRowDelete"
                         @select="showDeleteDialogFn({ row })"
                       >
                         <template #icon-left>
@@ -365,7 +396,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.delete") }}
                       </ODropdownItem>
                       <ODropdownSeparator />
-                      <ODropdownItem @select="exportAlert(row)">
+                      <ODropdownItem
+                        :data-test="`alert-list-${row.name}-export-alert`"
+                        shortcut-id="alertsRowExport"
+                        @select="exportAlert(row)"
+                      >
                         <template #icon-left>
                           <OIcon size="sm" name="download" />
                         </template>
@@ -499,8 +534,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="mr-2"
                       @click="bulkToggleAlerts('pause')"
                     >
-                      <OIcon name="pause" size="sm" />
-                      <span class="ml-2">Pause</span>
+                      <OIcon name="pause" size="sm" class="tw:text-button-ghost-destructive-text" />
+                      <span class="tw:ml-2">Pause</span>
                     </OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
@@ -510,8 +545,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="mr-2"
                       @click="bulkToggleAlerts('resume')"
                     >
-                      <OIcon name="play-arrow" size="sm" />
-                      <span class="ml-2">Resume</span>
+                      <OIcon name="play-arrow" size="sm" class="tw:text-button-ghost-success-text" />
+                      <span class="tw:ml-2">Resume</span>
                     </OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
@@ -708,7 +743,6 @@ import ODropdownSeparator from '@/lib/overlay/Dropdown/ODropdownSeparator.vue';
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -718,6 +752,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
 // import alertList from "./alerts";
 
@@ -750,7 +786,6 @@ export default defineComponent({
     ODropdownItem,
     ODropdownSeparator,
     OSpinner,
-    OBadge,
     OSelect,
     OTable,
     OTimeCell,
@@ -2629,6 +2664,51 @@ export default defineComponent({
 
       confirmBulkDelete.value = false;
     };
+
+    // ── Keyboard shortcuts ──────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "alertsCreate",
+        handler: () => {
+          if (isInputFocused()) return;
+          // Mirror the Add button so the URL updates (action=add / route push),
+          // otherwise "go back"/discard can't return to the list.
+          if (!destinations.value.length || !templates.value.length) return;
+          if (activeTab.value === "anomalyDetection") {
+            router.push({
+              name: "addAnomalyDetection",
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+                folder: activeFolderId.value,
+                tab: activeTab.value,
+              },
+            });
+          } else {
+            showAddUpdateFn({});
+          }
+        },
+      },
+      {
+        id: "alertsImport",
+        handler: () => {
+          if (isInputFocused()) return;
+          importAlert();
+        },
+      },
+      {
+        id: "alertsRefresh",
+        handler: () => {
+          if (isInputFocused()) return;
+          refreshAlerts();
+        },
+      },
+      {
+        id: "alertsFocusSearch",
+        handler: () => {
+          focusSearchInput("alert-list-search-input");
+        },
+      },
+    ]);
 
     return {
       t,

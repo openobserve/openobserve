@@ -66,21 +66,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="summary-bar mb-3">
           <div class="flex gap-2 items-center">
             <div class="col-auto">
-              <OBadge variant="success">
+              <OTag type="diffCategory" value="new">
                 <strong>{{ diffData.additions.length }}</strong
                 >&nbsp;New
-              </OBadge>
+              </OTag>
             </div>
             <div class="col-auto">
-              <OBadge variant="warning">
+              <OTag type="diffCategory" value="modified">
                 <strong>{{ diffData.modifications.length }}</strong
                 >&nbsp;Modified
-              </OBadge>
+              </OTag>
             </div>
             <div class="col-auto">
-              <OBadge variant="default">
+              <OTag type="diffCategory" value="unchanged">
                 {{ diffData.unchanged.length }} Unchanged
-              </OBadge>
+              </OTag>
             </div>
           </div>
         </div>
@@ -249,14 +249,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-sm font-medium mb-2">
         Fields ({{ selectedGroup?.fields.length }})
       </div>
-      <OBadge
+      <OTag
         v-for="field in selectedGroup?.fields"
         :key="field"
-        variant="primary"
-        class="m-1"
+        type="fieldNameChip"
+        value="highlight"
+        class="tw:m-1"
       >
         {{ field }}
-      </OBadge>
+      </OTag>
     </div>
   </ODialog>
 
@@ -276,16 +277,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="max-h-[250px] overflow-y-auto p-2 bg-[var(--q-dark)] rounded">
-          <OBadge
+        <div class="tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--q-dark)] tw:rounded">
+          <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
-            variant="default"
-            size="sm"
-            class="m-1"
+            type="fieldNameChip"
+            value="muted"
+            class="tw:m-1"
           >
             {{ field }}
-          </OBadge>
+          </OTag>
         </div>
       </div>
       <div class="w-1/2">
@@ -293,22 +294,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="max-h-[250px] overflow-y-auto p-2 bg-[var(--q-dark)] rounded">
-          <OBadge
+        <div class="tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--q-dark)] tw:rounded">
+          <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
-            :variant="isNewField(field) ? 'success' : 'default'"
-            size="sm"
-            class="m-1"
+            type="fieldDiffStatus"
+            :value="isNewField(field) ? 'new' : 'existing'"
+            class="tw:m-1"
           >
             {{ field }}
-            <OIcon
-              v-if="isNewField(field)"
-              name="add"
-              size="xs"
-              class="ml-1"
-            />
-          </OBadge>
+            <template #trailing>
+              <OIcon
+                v-if="isNewField(field)"
+                name="add"
+                size="xs"
+                class="tw:ml-1"
+              />
+            </template>
+          </OTag>
         </div>
       </div>
     </div>
@@ -320,7 +323,7 @@ import { ref, computed, watch } from "vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import alertsService from "@/services/alerts";

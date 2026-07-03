@@ -29,12 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="p-2 max-h-50 overflow-y-auto border rounded"
         :class="store.state.theme === 'dark' ? 'border-[#3a3a3a] bg-[#1e1e1e]' : 'border-(--o2-border) bg-[#f5f5f5]'"
       >
-        <OBadge
+        <OTag
           v-for="field in fieldsByType.fts"
           :key="field.name"
-          variant="primary-soft"
-          size="sm"
-          class="mr-1 mb-1"
+          type="indexFieldType"
+          value="fts"
+          class="tw:mr-1 tw:mb-1"
         >
           {{ field.name }}
           <template #trailing>
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="close" size="xs" />
             </button>
           </template>
-        </OBadge>
+        </OTag>
       </div>
     </div>
 
@@ -59,12 +59,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="p-2 max-h-50 overflow-y-auto border rounded"
         :class="store.state.theme === 'dark' ? 'border-[#3a3a3a] bg-[#1e1e1e]' : 'border-(--o2-border) bg-[#f5f5f5]'"
       >
-        <OBadge
+        <OTag
           v-for="field in fieldsByType.secondaryIndex"
           :key="field.name"
-          variant="success-soft"
-          size="sm"
-          class="mr-1 mb-1"
+          type="indexFieldType"
+          value="secondaryIndex"
+          class="tw:mr-1 tw:mb-1"
         >
           {{ field.name }}
           <template #trailing>
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="close" size="xs" />
             </button>
           </template>
-        </OBadge>
+        </OTag>
       </div>
     </div>
   </ODialog>
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed, PropType } from "vue";
 import { useStore } from "vuex";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export interface PerformanceField {
@@ -97,7 +97,7 @@ export interface PerformanceField {
 
 export default defineComponent({
   name: "PerformanceFieldsDialog",
-  components: { ODialog, OBadge, OIcon },
+  components: { ODialog, OTag, OIcon },
   props: {
     modelValue: {
       type: Boolean,

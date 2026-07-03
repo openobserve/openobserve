@@ -15,16 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="px-1 py-0.5 rounded text-[10px] font-semibold uppercase mr-1.5"
-    :class="getEventTypeClass(type)"
+  <OTag
+    type="rumEventType"
+    :value="type"
+    class="tw:mr-1.5"
     :data-test="dataTest"
-  >
-    {{ type }}
-  </div>
+  />
 </template>
 
 <script setup lang="ts">
+import OTag from "@/lib/core/Badge/OTag.vue";
+
 interface Props {
   type: string;
   dataTest?: string;
@@ -33,17 +34,4 @@ interface Props {
 withDefaults(defineProps<Props>(), {
   dataTest: "",
 });
-
-const getEventTypeClass = (type: string) => {
-  const classes: { [key: string]: string } = {
-    error:
-      "bg-red-100 text-red-700 border border-solid border-red-300",
-    action:
-      "bg-blue-100 text-blue-700 border border-solid border-blue-300",
-    view: "bg-green-100 text-green-700 border border-solid border-green-300",
-    resource:
-      "bg-purple-100 text-purple-700 border border-solid border-purple-300",
-  };
-  return classes[type] || "bg-gray-200 text-gray-500-700";
-};
 </script>

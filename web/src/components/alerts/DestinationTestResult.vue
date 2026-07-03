@@ -29,10 +29,10 @@ limitations under the License. -->
         </div>
         <div data-test="test-success-timestamp" class="text-[11px] text-(--q-text-secondary) flex items-center gap-2 flex-wrap">
           {{ formatTimestamp(result.timestamp) }}
-          <span v-if="result.statusCode" class="inline-block py-[2px] px-[6px] rounded-[3px] text-[10px] font-semibold font-['Monaco','Consolas','Courier_New',monospace] tracking-[0.3px] bg-(--q-positive) text-white">
+          <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
-          </span>
-          <span v-if="result.responseTime" class="font-['Monaco','Consolas','Courier_New',monospace] text-(--q-text-secondary)">
+          </OTag>
+          <span v-if="result.responseTime" class="tw:font-['Monaco','Consolas','Courier_New',monospace] tw:text-(--q-text-secondary)">
             {{ result.responseTime }}ms
           </span>
         </div>
@@ -54,10 +54,10 @@ limitations under the License. -->
         </div>
         <div v-if="result.timestamp" data-test="test-failure-timestamp" class="text-[11px] text-(--q-text-secondary) flex items-center gap-2 flex-wrap">
           {{ formatTimestamp(result.timestamp) }}
-          <span v-if="result.statusCode" class="inline-block py-[2px] px-[6px] rounded-[3px] text-[10px] font-semibold font-['Monaco','Consolas','Courier_New',monospace] tracking-[0.3px] bg-(--q-negative) text-white">
+          <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
-          </span>
-          <span v-if="result.responseTime" class="font-['Monaco','Consolas','Courier_New',monospace] text-(--q-text-secondary)">
+          </OTag>
+          <span v-if="result.responseTime" class="tw:font-['Monaco','Consolas','Courier_New',monospace] tw:text-(--q-text-secondary)">
             {{ result.responseTime }}ms
           </span>
         </div>
@@ -157,6 +157,8 @@ import type { TestResult } from '@/utils/prebuilt-templates/types';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { httpStatusBucket } from "@/lib/core/Badge/badgeGroups";
 import { ref } from 'vue';
 
 // Define component props

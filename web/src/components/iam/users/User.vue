@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -106,8 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="(roleName, idx) in (row.roles || [])"
                 :key="`${roleName}-${idx}`"
                 :type="isBuiltinRole(roleName) ? 'userRole' : undefined"
-                :value="isBuiltinRole(roleName) ? roleName : roleName"
-                :label="isBuiltinRole(roleName) ? undefined : roleName"
+                :value="roleName"
               />
             </div>
           </template>
@@ -122,8 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OTag
                 v-if="row.status === 'pending'"
-                value="Invited"
-                variant="warning-soft"
+                type="userStatus"
+                value="invited"
               />
             </span>
           </template>
@@ -135,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`delete-basic-user-${row.email}`"
+              data-row-action="delete"
               @click="confirmDeleteAction(row)"
             >
               <OIcon name="delete" size="sm" />
@@ -145,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`revoke-invite-${row.email}`"
+              data-row-action="delete"
               @click="confirmRevokeAction(row)"
             >
               <OIcon name="cancel" size="sm" />
@@ -155,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`edit-basic-user-${row.email}`"
+              data-row-action="edit"
               @click="addRoutePush(row)"
             >
               <OIcon name="edit" size="sm" />
@@ -176,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
         </div>
     </div>
-    
+
     <update-user-role
       v-if="config.isCloud == 'false'"
       v-model:open="showUpdateUserDialog"
@@ -237,7 +239,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -267,6 +268,8 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
 import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
@@ -278,7 +281,6 @@ export default defineComponent({
     AddUser,
     MemberInvitation,
     OButton,
-    OBadge,
     OTag,
     OIcon,
     ODialog,
@@ -619,7 +621,7 @@ export default defineComponent({
               const invitedMembers: any = await getInvitedMembers();
               users = [...res.data.data, ...invitedMembers];
             }
-            
+
             let counter = 1;
             currentUserRole.value = "";
             usersState.users = users.map((data: any) => {
@@ -1214,10 +1216,29 @@ export default defineComponent({
     watch(selectedUsers, (newSelectedUsers) => {
       const onlyEnabledSelected = newSelectedUsers.filter((user: any) => user.enableDelete);
       if (onlyEnabledSelected.length !== newSelectedUsers.length) {
+
         selectedUsers.value = onlyEnabledSelected;
       }
     });
 
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "iamUsersAdd",
+        handler: () => { if (!isInputFocused()) addRoutePush({}); },
+      },
+      {
+        id: "iamUsersRefresh",
+        handler: () => { if (!isInputFocused()) getOrgMembers(); },
+      },
+      {
+        id: "iamUsersFocusSearch",
+        handler: () => {
+          focusSearchInput("user-list-search-input");
+        },
+      },
+    ]);
     return {
       t,
       router,

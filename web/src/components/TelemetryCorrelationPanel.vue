@@ -52,16 +52,13 @@
               <span class="dimension-section-title cursor-help">Matched Dimensions</span>
               <OTooltip content="These stable dimensions were used to find related telemetry" />
             </div>
-            <div class="service-dimensions flex flex-wrap gap-[6px]">
-              <OBadge
+            <div class="service-dimensions tw:flex tw:flex-wrap tw:gap-[6px]">
+              <ODimensionChip
                 v-for="(value, key) in correlationResult.correlationData.matched_dimensions"
                 :key="`matched-${key}`"
-                size="sm"
-                variant="success"
-              >
-                <span class="dimension-key font-medium mr-1">{{ key }}:</span>
-                <span class="dimension-value opacity-90">{{ value }}</span>
-              </OBadge>
+                :dim-key="String(key)"
+                :value="value"
+              />
             </div>
           </div>
 
@@ -76,16 +73,13 @@
               <span class="dimension-section-title cursor-help">Additional Filters Available</span>
               <OTooltip content="These additional dimensions can be used for more specific filtering" />
             </div>
-            <div class="service-dimensions flex flex-wrap gap-[6px]">
-              <OBadge
+            <div class="service-dimensions tw:flex tw:flex-wrap tw:gap-[6px]">
+              <ODimensionChip
                 v-for="(value, key) in correlationResult.correlationData.additional_dimensions"
                 :key="`additional-${key}`"
-                size="sm"
-                variant="default-outline"
-              >
-                <span class="dimension-key font-medium mr-1">{{ key }}:</span>
-                <span class="dimension-value opacity-90">{{ value }}</span>
-              </OBadge>
+                :dim-key="String(key)"
+                :value="value"
+              />
             </div>
           </div>
 
@@ -94,14 +88,12 @@
             v-if="!correlationResult.correlationData"
             class="service-dimensions flex flex-wrap gap-[6px]"
           >
-            <OBadge
-              v-for="(value, key) in correlationResult.service.dimensions"
-              :key="key"
-              size="sm"
-            >
-              <span class="dimension-key font-medium mr-1">{{ key }}:</span>
-              <span class="dimension-value opacity-90">{{ value }}</span>
-            </OBadge>
+            <ODimensionChip
+                v-for="(value, key) in correlationResult.service.dimensions"
+                :key="key"
+                :dim-key="String(key)"
+                :value="value"
+              />
           </div>
         </div>
 
@@ -193,6 +185,7 @@
 import { computed, watch, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext, CorrelationQuery } from "@/utils/telemetryCorrelation";
 import type { CorrelationResult } from "@/utils/telemetryCorrelation";

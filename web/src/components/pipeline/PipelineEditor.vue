@@ -1111,7 +1111,6 @@ const savePipelineJson = async (json: string) => {
     pipelineObj.currentSelectedPipeline = parsedPipeline;
     savePipeline();
   } catch (error) {
-    console.log(error, 'error')
     // Handle JSON parsing errors
     validationErrors.value = ['Invalid JSON format'];
   }

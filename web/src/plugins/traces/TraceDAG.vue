@@ -62,14 +62,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-[13px] text-[#1976d2] font-semibold break-words max-w-[160px] leading-[1.3] whitespace-nowrap overflow-hidden text-ellipsis dark:text-[#90caf9]"
               :class="getObservationTypeTextClass(data.gen_ai_operation_name)"
             >{{ data.operation_name }}</div>
-            <OBadge
+            <OTag
               v-if="data.span_status === 'ERROR'"
-              size="sm"
-              variant="error"
-              class="text-[10px] h-[14px] mt-0.5 px-1"
-            >
-              ERR
-            </OBadge>
+              type="spanStatus"
+              :value="data.span_status"
+              label="ERR"
+              class="tw:text-[10px] tw:h-[14px] tw:mt-0.5 tw:px-1"
+            />
           </div>
           <Handle v-if="data.hasOutgoing" type="source" :position="Position.Bottom"
             class="w-2 h-2 bg-[#1976d2] border-2 border-white rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
@@ -94,7 +93,7 @@ import "@vue-flow/controls/dist/style.css";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 export interface SpanNode {
   span_id: string;
@@ -127,7 +126,7 @@ export default defineComponent({
     Handle,
     OSpinner,
     OIcon,
-    OBadge,
+    OTag,
 },
   props: {
     traceId: {

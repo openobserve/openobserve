@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-panel-add"
               icon-left="add"
             >
-              <OTooltip :content="t('panel.add')" />
+              <OTooltip :content="t('panel.add')" shortcut-id="dashboardAddPanel" />
             </OButton>
             <!-- <DateTimePicker 
             class="ml-2"
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-refresh-btn"
               icon-left="refresh"
             >
-              <OTooltip :content="isVariablesChanged ? 'Refresh to apply latest variable changes' : 'Refresh'" />
+              <OTooltip :content="isVariablesChanged ? 'Refresh to apply latest variable changes' : 'Refresh'" shortcut-id="dashboardRefresh" />
             </OButton>
 
             <ExportDashboard
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     isFullscreen ? 'fullscreen-exit' : 'fullscreen'
                   " size="sm"
               /></template>
-              <OTooltip :content="isFullscreen ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')" />
+              <OTooltip :content="isFullscreen ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')" shortcut-id="dashboardFullscreen" />
             </OButton>
             <OButton
               v-if="!isFullscreen"
@@ -351,6 +351,8 @@ import {
 import { hasPanelTime } from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -1830,6 +1832,47 @@ export default defineComponent({
         showJsonEditorDialog.value = false;
       }
     });
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "dashboardRefresh",
+        handler: () => {
+          if (isInputFocused()) return;
+          refreshData();
+        },
+      },
+      {
+        id: "dashboardAddPanel",
+        handler: () => {
+          if (isInputFocused()) return;
+          addPanelData();
+        },
+      },
+      {
+        id: "dashboardSave",
+        handler: () => savePanelLayout(null),
+      },
+      {
+        id: "dashboardFullscreen",
+        handler: () => {
+          if (isInputFocused()) return;
+          toggleFullscreen();
+        },
+      },
+      {
+        id: "dashboardExport",
+        handler: () => {
+          if (isInputFocused()) return;
+          // Trigger the whole-dashboard export (ExportDashboard button).
+          (
+            document.querySelector(
+              '[data-test="export-dashboard"]',
+            ) as HTMLElement | null
+          )?.click();
+        },
+      },
+    ]);
 
     return {
       currentDashboardData,

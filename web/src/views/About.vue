@@ -332,7 +332,6 @@ import licenseServer from "@/services/license_server";
 import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -344,7 +343,6 @@ export default defineComponent({
     FeatureComparisonTable,
     OButton,
     OIcon,
-    OBadge,
     OSpinner,
     OBanner,
     OText,

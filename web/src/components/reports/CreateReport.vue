@@ -1493,7 +1493,6 @@ const validateReportData = async (): Promise<boolean> => {
     return false;
   }
 
-  console.log(JSON.parse(JSON.stringify(formData.value)));
 
   if (!formData.value.frequency.interval || !formData.value.frequency.type) {
     if (formData.value.frequency.type === "custom") {

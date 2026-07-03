@@ -218,7 +218,13 @@ size="xs" class="warning" />{{
           @mouseenter="handleMouseEnter"
           @mouseleave="handleMouseLeave"
         >
-          <img :src="getBtnLogo" class="ai-icon w-5 h-5 shrink-0" />
+          <img :src="getBtnLogo" class="ai-icon tw:w-5 tw:h-5 tw:shrink-0" />
+          <OTooltip
+            side="bottom"
+            align="center"
+            :content="t('menu.aiAssistant')"
+            shortcut-id="aiChatToggle"
+          />
         </OButton>
       </template>
 
@@ -269,6 +275,16 @@ size="xs" class="warning" />{{
             @select="navigateToDocs()"
           >
             {{ t(`menu.docs`) }}
+          </ODropdownItem>
+          <ODropdownSeparator />
+
+          <!-- Keyboard shortcuts -->
+          <ODropdownItem
+            data-test="menu-link-shortcuts-item"
+            shortcut-id="openCheatsheet"
+            @select="openShortcuts"
+          >
+            {{ t("menu.keyboardShortcuts") }}
           </ODropdownItem>
           <ODropdownSeparator />
 
@@ -528,6 +544,7 @@ export default defineComponent({
     "navigateToDocs",
     "changeLanguage",
     "openPredefinedThemes",
+    "openShortcuts",
     "signout",
   ],
   setup(props, { emit }) {
@@ -605,6 +622,10 @@ export default defineComponent({
       emit("openPredefinedThemes");
     };
 
+    const openShortcuts = () => {
+      emit("openShortcuts");
+    };
+
     const signout = () => {
       emit("signout");
     };
@@ -646,6 +667,7 @@ export default defineComponent({
       navigateToDocs,
       changeLanguage,
       openPredefinedThemes,
+      openShortcuts,
       signout,
       handleMouseEnter,
       handleMouseLeave,

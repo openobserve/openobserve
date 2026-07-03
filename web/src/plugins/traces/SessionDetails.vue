@@ -327,12 +327,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-[0.95rem] font-semibold text-[var(--o2-text-primary)]">
             {{ t('traces.sessionDetail.conversation') }}
           </span>
-          <OBadge size="sm" variant="default-soft">
+          <OTag type="countChip" value="neutral">
             {{ t('traces.sessionDetail.turnCount', {
               count: filteredTraces.length,
               unit: filteredTraces.length === 1 ? t('traces.sessionDetail.turn') : t('traces.sessionDetail.turns'),
             }) }}
-          </OBadge>
+          </OTag>
           <OToggleGroup :model-value="viewMode" @update:model-value="setViewMode">
             <OToggleGroupItem value="collapsed" size="sm">
               {{ t('traces.sessionDetail.viewCollapsed') }}
@@ -485,9 +485,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center justify-between px-[0.625rem] py-[0.375rem] border-b border-[var(--o2-border-color)]">
                     <span class="flex items-center gap-[0.375rem] text-[0.75rem] font-bold text-[var(--o2-text-primary)]">
                       {{ t('traces.sessionDetail.roles.assistant') }}
-                      <OBadge v-if="turnDetail(trace.traceId)?.model" size="sm" variant="purple-soft">
+                      <OTag v-if="turnDetail(trace.traceId)?.model" variant="purple-soft" size="sm">
                         {{ turnDetail(trace.traceId)?.model }}
-                      </OBadge>
+                      </OTag>
                     </span>
                     <OIcon
                       v-if="turnDetail(trace.traceId)?.assistantMessage"
@@ -760,7 +760,7 @@ import {
 } from "./threadView.utils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";

@@ -142,12 +142,13 @@
                     }}</code>
                   </div>
                 </div>
-                <OBadge
-                  :variant="sourceColor(testResult.matched)"
-                  class="shrink-0 text-[11px] font-semibold ml-auto"
+                <OTag
+                  type="modelSource"
+                  :value="testResult.matched.source || 'org'"
+                  class="tw:shrink-0 tw:text-[11px] tw:font-semibold tw:ml-auto"
                 >
                   {{ sourceLabel(testResult.matched) }}
-                </OBadge>
+                </OTag>
               </div>
 
               <!-- Priority flow -->
@@ -250,8 +251,7 @@ import modelPricingService from "@/services/model_pricing";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 
 const props = defineProps({
@@ -379,11 +379,6 @@ function operatorSymbol(op: string) {
   return map[op] || op;
 }
 
-function sourceColor(model: any): BadgeVariant {
-  if (!model.source || model.source === "org") return "primary";
-  if (model.source === "meta_org") return "default-outline";
-  return "default";
-}
 function sourceLabel(model: any) {
   if (!model.source || model.source === "org") return "Your Org";
   if (model.source === "meta_org") return "Global";

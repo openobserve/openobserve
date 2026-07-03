@@ -79,21 +79,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="card-container p-2 mb-2">
             <div class="flex items-center gap-2">
               <div class="col-auto">
-                <OBadge variant="success" class="text-sm!">
-                  <strong class="text-[15px]">{{ diffData.additions.length }}</strong
+                <OTag type="diffCategory" value="new" class="tw:text-sm!">
+                  <strong class="tw:text-[15px]">{{ diffData.additions.length }}</strong
                   >&nbsp;New
-                </OBadge>
+                </OTag>
               </div>
               <div class="col-auto">
-                <OBadge variant="warning" class="text-sm!">
-                  <strong class="text-[15px]">{{ diffData.modifications.length }}</strong
+                <OTag type="diffCategory" value="modified" class="tw:text-sm!">
+                  <strong class="tw:text-[15px]">{{ diffData.modifications.length }}</strong
                   >&nbsp;Modified
-                </OBadge>
+                </OTag>
               </div>
               <div class="col-auto">
-                <OBadge variant="default" class="text-sm!">
+                <OTag type="diffCategory" value="unchanged" class="tw:text-sm!">
                   {{ diffData.unchanged.length }} Unchanged
-                </OBadge>
+                </OTag>
               </div>
               <div class="flex flex-col">
                 <OButtonGroup class="float-right">
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="text-[13px] font-medium">{{ group.display }}</span>
                     <span class="block text-[11px] text-muted-foreground truncate">
                       {{ group.id }} • {{ group.fields.length }} fields
-                      <OBadge v-if="group.normalize" variant="primary" class="ml-1">norm</OBadge>
+                      <OTag v-if="group.normalize" type="normalizeState" value="true" class="tw:ml-1" />
                     </span>
                   </div>
                   <div class="flex items-center shrink-0 ms-auto">
@@ -259,20 +259,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-sm font-medium mb-2">
         Fields ({{ selectedGroup?.fields.length }})
       </div>
-      <OBadge
+      <OTag
         v-for="field in selectedGroup?.fields"
         :key="field"
-        color="primary"
-        text-color="white"
-        class="m-1"
+        type="fieldNameChip"
+        value="highlight"
+        class="tw:m-1"
       >
         {{ field }}
-      </OBadge>
-      <div class="mt-3">
-        <OBadge v-if="selectedGroup?.normalize" variant="primary"
-          >Normalized</OBadge
-        >
-        <OBadge v-else variant="default">Not Normalized</OBadge>
+      </OTag>
+      <div class="tw:mt-3">
+        <OTag type="normalizeState" :value="!!selectedGroup?.normalize" />
       </div>
     </div>
   </ODialog>
@@ -293,16 +290,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-[var(--o2-primary-background)] rounded">
-          <OBadge
+        <div class="field-chips-container tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--o2-primary-background)] tw:rounded">
+          <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
-            color="grey-4"
-            size="sm"
-            class="m-1"
+            type="fieldNameChip"
+            value="muted"
+            class="tw:m-1"
           >
             {{ field }}
-          </OBadge>
+          </OTag>
         </div>
       </div>
       <div class="w-1/2">
@@ -310,22 +307,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-[var(--o2-primary-background)] rounded">
-          <OBadge
+        <div class="field-chips-container tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--o2-primary-background)] tw:rounded">
+          <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
-            :variant="isNewField(field) ? 'success' : 'default'"
-            size="sm"
-            class="m-1"
+            type="fieldDiffStatus"
+            :value="isNewField(field) ? 'new' : 'existing'"
+            class="tw:m-1"
           >
             {{ field }}
-            <OIcon
-              v-if="isNewField(field)"
-              name="add"
-              size="xs"
-              class="ml-1"
-            />
-          </OBadge>
+            <template #trailing>
+              <OIcon
+                v-if="isNewField(field)"
+                name="add"
+                size="xs"
+                class="tw:ml-1"
+              />
+            </template>
+          </OTag>
         </div>
       </div>
     </div>
@@ -336,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";

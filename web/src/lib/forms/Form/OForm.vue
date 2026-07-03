@@ -2,11 +2,16 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { provide, inject, watch } from "vue";
-import { useForm, revalidateLogic } from "@tanstack/vue-form";
 import { FORM_CONTEXT_KEY, FORM_SUBMIT_STATE_KEY } from "./OForm.types";
+import { useOForm, type OFormInstance } from "./useOForm";
 
 const props = defineProps<{
-  defaultValues: T;
+  /**
+   * Initial values for all fields. Optional ONLY because the headless path
+   * supplies them via `useOForm()` instead (then `:form` is passed). For the
+   * normal path this is required.
+   */
+  defaultValues?: T;
   /**
    * Validate every field before stopping on the first error.
    * Mirrors q-form's `greedy` prop. Without this, validation short-circuits
@@ -19,7 +24,8 @@ const props = defineProps<{
    * the whole save: the dialog/drawer Save button shows its spinner
    * automatically (no `useLoading` / `:primary-button-loading` needed) and
    * re-entry is guarded. Written as `@submit="handler"` in templates — Vue maps
-   * the `@submit` listener onto this prop.
+   * the `@submit` listener onto this prop. (In the headless `:form` path the
+   * save handler is baked into `useOForm({ onSubmit })` instead.)
    */
   onSubmit?: (values: T) => unknown | Promise<unknown>;
   /**
@@ -33,42 +39,34 @@ const props = defineProps<{
    * blur; first submit reveals all; then errors update live on each change.
    */
   schema?: unknown;
+  /**
+   * An externally-created form from `useOForm()`. When present, OForm uses it
+   * and does NOT create its own — this lets the component that OWNS <OForm>
+   * read the form reactively (form.useStore) to drive parent-side conditional
+   * rendering. When absent, OForm creates its own form from
+   * `defaultValues`/`schema`/`onSubmit` (the ~60 existing simple forms are
+   * untouched). See START-HERE.md (Rule ③).
+   */
+  form?: OFormInstance;
 }>();
 
 const emit = defineEmits<{
   reset: [];
 }>();
 
-const form = useForm({
-  defaultValues: props.defaultValues as Record<string, unknown>,
-  // When a Zod/Standard schema is supplied, drive validation TIMING with
-  // TanStack's revalidateLogic: NOTHING validates until the first submit, then
-  // it re-validates on every change (mode: "submit" → modeAfterSubmission:
-  // "change"). The schema lives in the single `onDynamic` source it runs.
-  // Field wrappers display whenever `errors.length > 0` (empty until submit). Net UX:
-  //  • before the first submit → no errors while typing OR on blur;
-  //  • first submit → every field's error is revealed;
-  //  • after that → errors clear / re-show live on each change.
-  // TanStack maps each schema issue onto the matching field by `name`.
-  ...(props.schema
-    ? {
-        validationLogic: revalidateLogic({
-          mode: "submit",
-          modeAfterSubmission: "change",
-        }),
-        validators: {
-          onDynamic: props.schema as any,
-          onDynamicAsync: props.schema as any,
-        },
-      }
-    : {}),
-  // AWAIT the consumer's handler so TanStack's `isSubmitting` spans the entire
-  // save (that's what drives the auto Save spinner). Errors are the consumer's
-  // to surface (toast) — see handleSubmit's catch.
-  onSubmit: async ({ value }) => {
-    await props.onSubmit?.(value as T);
-  },
-});
+// Use the form the owner created (headless path) if one was handed in, else
+// build the internal default — same config, just owned here. Both behave
+// identically (submit-then-change timing, single onDynamic source, awaited
+// onSubmit), so handleSubmit() below runs whichever form's onSubmit.
+const form =
+  props.form ??
+  useOForm<Record<string, unknown>>({
+    defaultValues: (props.defaultValues ?? {}) as Record<string, unknown>,
+    schema: props.schema,
+    onSubmit: props.onSubmit as
+      | ((values: Record<string, unknown>) => unknown | Promise<unknown>)
+      | undefined,
+  });
 
 provide(FORM_CONTEXT_KEY, form);
 

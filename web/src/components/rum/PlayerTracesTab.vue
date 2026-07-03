@@ -144,18 +144,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- List view -->
     <div v-else class="flex flex-col overflow-hidden h-full px-2">
       <!-- Filter bar -->
-      <div class="flex items-center pr-2 py-1  shrink-0 min-h-[2rem]">
-        <OBadge
-          variant="default"
+      <div class="tw:flex tw:items-center tw:pr-2 tw:py-1  tw:shrink-0 tw:min-h-[2rem]">
+        <OTag
+          type="logsResultChip"
+          value="neutral"
           data-test="rum-player-traces-tab-count-badge"
-          class="text-xs rounded! bg-[var(--o2-tag-grey-1)]! py-[0.4rem]! px-[0.625rem]! text-[0.75rem] text-[var(--o2-text-4)]! mr-[0.6rem]"
-        >{{ `${formatLargeNumber(correlatedViews.length)} ${t("menu.traces").toLowerCase()}` }}</OBadge>
-        <OBadge
+          class="tw:mr-[0.6rem]"
+        >{{ `${formatLargeNumber(correlatedViews.length)} ${t("menu.traces").toLowerCase()}` }}</OTag>
+        <OTag
           v-if="totalErrorCount > 0"
-          variant="error"
+          type="logsResultChip"
+          value="error"
           data-test="rum-player-traces-tab-error-count-badge"
-          class="text-xs rounded! bg-[var(--o2-error-tag-bg)]! py-[0.4rem]! px-[0.625rem]! text-[0.75rem] text-[var(--o2-error-tag-text)]!"
-        >{{ `${formatLargeNumber(totalErrorCount)} ${t("rum.errorTraces")}` }}</OBadge>
+        >{{ `${formatLargeNumber(totalErrorCount)} ${t("rum.errorTraces")}` }}</OTag>
       </div>
 
       <!-- Traces table -->
@@ -231,7 +232,7 @@ import useHttpStreaming from "@/composables/useStreamingSearch";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import TraceStatusCell from "@/plugins/traces/components/TraceStatusCell.vue";
 import TenstackTable from "@/components/TenstackTable.vue";

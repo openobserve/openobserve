@@ -140,32 +140,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="bg-[var(--o2-text-3)] py-[0rem] w-[1px] h-[16px]"
               />
               <!-- Span Count Badge -->
-              <div
-                data-test="trace-details-spans-count"
-                class="flex items-center ml-[0rem] space-x-1 px-[0.625rem] py-[0.1rem] rounded text-[0.75rem] text-[var(--o2-text-4)] bg-[var(--o2-tag-grey-1)]"
-              >
-                <span data-test="span-count-text">
-                  {{ formatLargeNumber(effectiveSpanList.length) }}
-                  {{ t("traces.spansLabel") }}
-                  <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
-                </span>
-              </div>
+              <span class="tw:inline-flex">
+                <OTag
+                  type="logsResultChip"
+                  value="neutral"
+                  data-test="trace-details-spans-count"
+                >
+                  <span data-test="span-count-text">
+                    {{ formatLargeNumber(effectiveSpanList.length) }}
+                    {{ t("traces.spansLabel") }}
+                  </span>
+                </OTag>
+                <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
+              </span>
 
               <div
                 class="bg-[var(--o2-text-3)] py-[0rem] w-[1px] h-[16px]"
               />
 
               <!-- Error Count Badge -->
-              <div
-                data-test="trace-details-error-spans-count"
-                class="flex items-center space-x-1 px-[0.625rem] py-[0.1rem] rounded text-[0.75rem] text-[var(--o2-error-tag-text)] bg-[var(--o2-error-tag-bg)] mr-[0.85rem]"
-              >
-                <span
-                  >{{ formatLargeNumber(errorSpansCount) }}
-                  {{ t("traces.errorsLabel") }}</span
+              <span class="tw:inline-flex tw:mr-[0.85rem]">
+                <OTag
+                  type="logsResultChip"
+                  value="error"
+                  data-test="trace-details-error-spans-count"
                 >
+                  <span
+                    >{{ formatLargeNumber(errorSpansCount) }}
+                    {{ t("traces.errorsLabel") }}</span
+                  >
+                </OTag>
                 <OTooltip :content="errorSpansCount + ' ' + t('traces.errorsLabel')" />
-              </div>
+              </span>
             </div>
           </div>
 
@@ -797,6 +803,7 @@ import {
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import useTraces from "@/composables/useTraces";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
@@ -859,6 +866,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
 import {
   TRACE_SERVICE_DETECTION_KEY,
@@ -958,6 +967,7 @@ export default defineComponent({
   },
   components: {
     ShareButton,
+    OTag,
     TraceDetailsSidebar,
     TraceTree,
     TraceDAG,
@@ -2600,6 +2610,28 @@ export default defineComponent({
       await setupTraceDetails();
     };
 
+    // ── Keyboard shortcuts — span navigation ─────────────────────────────
+    const nextSpanHandler = () => {
+      if (isInputFocused()) return;
+      const list = spanList.value;
+      if (!list?.length) return;
+      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
+      if (idx < list.length - 1) updateSelectedSpan(list[idx + 1].span_id);
+    };
+    const prevSpanHandler = () => {
+      if (isInputFocused()) return;
+      const list = spanList.value;
+      if (!list?.length) return;
+      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
+      if (idx > 0) updateSelectedSpan(list[idx - 1].span_id);
+    };
+
+    useShortcuts([
+      // `traceNextSpan` registers j + ↓, `tracePrevSpan` registers k + ↑
+      // (both bindings live in the registry under `keys`).
+      { id: "traceNextSpan", handler: nextSpanHandler },
+      { id: "tracePrevSpan", handler: prevSpanHandler },
+    ]);
     return {
       router,
       t,

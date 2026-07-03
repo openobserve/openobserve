@@ -390,7 +390,6 @@ const highlightErrorLine = (traceIndex: number, frameIndex: number) => {
   // Relative position = stack_line - source_line_start + 1
   const relativeLineNumber = stack_line - source_line_start;
 
-  console.log(`Highlighting line - stack_line: ${stack_line}, source_line_start: ${source_line_start}, source_line_end: ${source_line_end}, relativeLineNumber: ${relativeLineNumber}`);
 
   // Use the decorateRanges method to highlight the error line
   if (editorComponent.decorateRanges) {
@@ -463,8 +462,6 @@ const translateStackTrace = async () => {
       payload.env = env;
     }
 
-    console.log("Translating stack trace with payload:", payload);
-    console.log("Organization identifier:", store.state.selectedOrganization.identifier);
 
     // Call the API
     const response = await sourcemapsService.translateStackTrace(
@@ -472,7 +469,6 @@ const translateStackTrace = async () => {
       payload
     );
 
-    console.log("Translation response:", response);
 
     if (response.data && response.data.stacktrace) {
       // Check if stacktrace is already an array, if not wrap it in an array
@@ -485,15 +481,11 @@ const translateStackTrace = async () => {
       // Store in cache
       setCachedTranslation(cacheKey, translatedData);
 
-      console.log("Translated stack trace:", translatedStackTrace.value);
 
       // Log each frame for debugging
       translatedStackTrace.value.forEach((trace, idx) => {
-        console.log(`Stack trace ${idx}:`, trace.error);
         trace.stack.forEach((frame, frameIdx) => {
-          console.log(`  Frame ${frameIdx}:`, frame.line);
           if (frame.source_info) {
-            console.log(`    Source: ${frame.source_info.source.substring(0, 100)}...`);
           }
         });
       });

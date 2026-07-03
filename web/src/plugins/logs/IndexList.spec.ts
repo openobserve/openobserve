@@ -33,7 +33,6 @@ const mockCancelStreamQueryBasedOnRequestId = vi.fn();
 vi.mock("@/services/search", () => ({
   default: {
     partition: vi.fn((...args) => {
-      console.log("MOCK partition called with:", args);
       return Promise.resolve({
         data: {
           partitions: [
@@ -269,7 +268,6 @@ vi.mock("@/utils/query/sqlIdentifiers", () => ({
 vi.mock("@/services/stream", () => {
   // Define the mock function with a console.log
   const mockFieldValues = vi.fn((...args) => {
-    console.log("MOCK fieldValues called with:", args);
     // You can customize the return value based on args or call count if needed
     return Promise.resolve({
       data: {
@@ -1330,7 +1328,6 @@ describe("Index List", async () => {
 vi.mock("@/services/stream", () => {
   // Define the mock function with a console.log
   const mockFieldValues = vi.fn((...args) => {
-    console.log("MOCK fieldValues called with:", args);
     // You can customize the return value based on args or call count if needed
     return Promise.resolve({
       data: {

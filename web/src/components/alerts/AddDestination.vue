@@ -84,11 +84,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-sm">{{
                     getDestinationTypeName(formData.destination_type)
                   }}</span>
-                  <OBadge
-                    size="sm"
-                    variant="default"
-                    class="ml-2"
-                    >{{ t("alert_destinations.readonly") }}</OBadge
+                  <OTag
+                    type="readonlyFlag"
+                    value="readonly"
+                    class="tw:ml-2"
+                    >{{ t("alert_destinations.readonly") }}</OTag
                   >
                 </div>
               </div>
@@ -553,7 +553,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type {
   Template,

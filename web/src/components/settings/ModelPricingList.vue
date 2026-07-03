@@ -206,30 +206,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 Object.keys(getDefaultTier(row).prices || {}).length
               "
             >
-              <span
+              <ODimensionChip
                 v-for="(price, key) in getVisiblePrices(row)"
                 :key="key"
-                class="inline-flex items-center gap-[2px] py-[2px] px-2 rounded-md text-[11px] font-normal whitespace-nowrap border"
-                :class="[
-                  getPriceKeyColorClass(key as string),
-                  store.state.theme === 'dark'
-                    ? 'text-white border-[#4b5563]'
-                    : 'text-inherit border-[#d1d5db]',
-                ]"
-              >
-                <span class="font-medium">{{
-                  formatPriceKey(key as string)
-                }}</span
-                >=<span>{{ formatPerMillion(price as number) }}</span>
-              </span>
-              <span
+                :dim-key="key as string"
+                :key-label="formatPriceKey(key as string)"
+                :value="formatPerMillion(price as number)"
+              />
+              <OTag
                 v-if="getOverflowCount(row) > 0"
-                class="inline-flex items-center gap-[2px] py-[2px] px-2 rounded-md text-[11px] whitespace-nowrap border-0 font-medium cursor-pointer"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'bg-[#4b5563] text-[#d1d5db]'
-                    : 'bg-[#e5e7eb] text-[#6b7280]'
-                "
+                type="countChip"
+                value="neutral"
+                clickable
                 @click.stop="openPricingDialog(row)"
               >
                 +{{ getOverflowCount(row) }}
@@ -264,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                 </OTooltip>
-              </span>
+              </OTag>
             </template>
             <span v-else class="text-text-primary">&mdash;</span>
           </div>
@@ -274,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="!isReadOnly(row)">
               <OButton
                 :variant="
-                  row.enabled ? 'ghost-destructive' : 'ghost'
+                  row.enabled ? 'ghost-destructive' : 'ghost-success'
                 "
                 size="icon-sm"
                 :title="
@@ -284,6 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 @click.stop="toggleEnabled(row, !row.enabled)"
                 data-test="model-pricing-toggle-btn"
+                :data-row-action="row.enabled ? 'pause' : 'resume'"
                 :icon-left="row.enabled ? 'pause' : 'play-arrow'"
               />
               <OButton
@@ -292,6 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('modelPricing.actionEdit')"
                 @click.stop="openEditor(row)"
                 data-test="model-pricing-edit-btn"
+                data-row-action="edit"
                 icon-left="edit"
               />
               <OButton
@@ -300,6 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('modelPricing.actionDelete')"
                 @click.stop="confirmDelete(row)"
                 data-test="model-pricing-delete-btn"
+                data-row-action="delete"
                 icon-left="delete"
               />
               <OButton
@@ -308,6 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('modelPricing.actionDuplicate')"
                 @click.stop="duplicateModel(row)"
                 data-test="model-pricing-duplicate-btn"
+                data-row-action="duplicate"
                 icon-left="content-copy"
               />
             </template>
@@ -318,6 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('modelPricing.actionClone')"
                 @click.stop="duplicateModel(row)"
                 data-test="model-pricing-clone-btn"
+                data-row-action="duplicate"
                 icon-left="content-copy"
               />
             </template>
@@ -505,6 +498,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -689,29 +684,6 @@ const shadowingParentNames = computed(() => {
 /** Shorten usage key for display: replace underscores with hyphens, drop trailing "_tokens". */
 function formatPriceKey(key: string): string {
   return key.replace(/_tokens$/, "").replace(/_/g, "-");
-}
-
-function getPriceKeyColorClass(key: string): string {
-  const k = key.toLowerCase();
-  if (k.includes("input")) return "badge-blue";
-  if (k.includes("output")) return "badge-green";
-  const palette = [
-    "badge-cyan",
-    "badge-purple",
-    "badge-pink",
-    "badge-orange",
-    "badge-amber",
-    "badge-violet",
-    "badge-rose",
-    "badge-teal",
-    "badge-indigo",
-  ];
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash << 5) - hash + key.charCodeAt(i);
-    hash = hash & hash;
-  }
-  return palette[Math.abs(hash) % palette.length];
 }
 
 function formatPerMillion(pricePerToken: number | undefined | null): string {

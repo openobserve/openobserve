@@ -188,10 +188,7 @@
               class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-[var(--color-text-primary)] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.scorersSection") }}
-              <span
-                class="inline-flex items-center px-[0.3125rem] rounded-[0.1875rem] text-[0.625rem] font-semibold text-[var(--color-text-secondary)] bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
-                >{{ resolvedScorers.length }}</span
-              >
+              <OTag type="fieldTag" value="soft">{{ resolvedScorers.length }}</OTag>
             </h4>
             <OEmptyState
               v-if="resolvedScorers.length === 0"
@@ -224,13 +221,11 @@
                       <span class="jd-scorers__name">{{
                         item.name
                       }}</span>
-                      <span
+                      <OTag
                         v-if="item.scorerTypeLabel"
-                        class="jd-scorers__type text-[0.625rem] font-semibold leading-[1.5]"
-                        :class="`jd-scorers__type--${item.scorerType}`"
-                      >
-                        {{ item.scorerTypeLabel }}
-                      </span>
+                        type="scorerType"
+                        :value="item.scorerType"
+                      />
                       <span class="jd-scorers__version"
                         >v{{ item.version }}</span
                       >
@@ -387,13 +382,7 @@
               }}</span>
             </template>
             <template #cell-status="{ row }">
-              <span
-                class="jd-status-cell"
-                :class="`jd-status-cell--${row.status}`"
-              >
-                <span class="jd-status-cell__dot" />
-                {{ row.status }}
-              </span>
+              <OTag type="evalRunStatus" :value="row.status" />
             </template>
           </OTable>
         </template>
@@ -455,13 +444,7 @@
               }}</span>
             </template>
             <template #cell-status="{ row }">
-              <span
-                class="jd-status-cell"
-                :class="`jd-status-cell--${row.status}`"
-              >
-                <span class="jd-status-cell__dot" />
-                {{ row.status }}
-              </span>
+              <OTag type="evalRunStatus" :value="row.status" />
             </template>
           </OTable>
         </template>
@@ -477,6 +460,7 @@ import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

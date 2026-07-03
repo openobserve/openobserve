@@ -90,7 +90,7 @@
             />
           </template>
           <template #cell-type="{ row }">
-            <span class="inline-flex items-center gap-1 py-[1px] px-[7px] rounded-[3px] font-semibold text-[11px] leading-[1.5] bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)] text-(--o2-status-info-text) lowercase">{{ providerTypeOf(row) || "—" }}</span>
+            <OTag type="providerType" class="tw:lowercase">{{ providerTypeOf(row) || "—" }}</OTag>
           </template>
 
           <template #cell-endpoint="{ row }">
@@ -104,9 +104,8 @@
           <template #cell-isDefault="{ row }">
             <OTag
               v-if="booleanOf(row, 'isDefault', 'is_default')"
-              type="booleanState"
-              value="yes"
-              :label="t('llmProviders.defaultBadge')"
+              type="providerDefaultFlag"
+              value="default"
             />
             <span v-else class="text-text-primary">—</span>
           </template>
@@ -115,6 +114,7 @@
             <div class="flex items-center actions-container">
               <OButton
                 :data-test="`llm-providers-${row.name}-edit-btn`"
+                data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('onlineEvals.actions.edit')"
@@ -123,6 +123,7 @@
               />
               <OButton
                 :data-test="`llm-providers-${row.name}-delete-btn`"
+                data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
                 :title="t('onlineEvals.actions.delete')"

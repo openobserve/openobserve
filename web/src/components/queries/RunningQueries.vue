@@ -199,6 +199,8 @@ import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
 import { getDuration } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
@@ -792,6 +794,20 @@ export default defineComponent({
       selectedSearchType.value = row.search_type_label;
       filterQuery.value = row.user_id;
     };
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "runningQueriesRefresh",
+        handler: () => { if (!isInputFocused()) refreshData(); },
+      },
+      {
+        id: "runningQueriesFocusSearch",
+        handler: () => {
+          focusSearchInput("running-queries-search-input");
+        },
+      },
+    ]);
 
     return {
       t,

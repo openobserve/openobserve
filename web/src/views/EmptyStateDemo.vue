@@ -139,6 +139,5 @@ const presets: { preset: EmptyStatePresetName; label: string }[] = [
 
 const onAction = (which: string) => {
 
-  console.log("OEmptyState action:", which);
 };
 </script>

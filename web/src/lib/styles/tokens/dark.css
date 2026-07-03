@@ -139,6 +139,11 @@
     --color-button-ghost-destructive-hover-bg: var(--color-surface-overlay);
     --color-button-ghost-destructive-active-bg: var(--color-surface-overlay);
 
+    /* ghost-success */
+    --color-button-ghost-success-text: var(--color-success-400);
+    --color-button-ghost-success-hover-bg: var(--color-surface-overlay);
+    --color-button-ghost-success-active-bg: var(--color-surface-overlay);
+
     /* ghost-muted */
     --color-button-ghost-muted-hover-text: var(--color-primary-400);
     --color-button-ghost-muted-hover-bg: var(--color-primary-900);
@@ -199,6 +204,9 @@
     --color-badge-primary-ol-text: var(--color-primary-300);
     --color-badge-primary-soft-bg: var(--color-primary-900);
     --color-badge-primary-soft-text: var(--color-primary-300);
+
+    /* Keyboard-shortcut cheatsheet — reversed dark tint */
+    --color-shortcut-highlight-bg: var(--color-primary-900);
 
     /* success: solid unchanged; outline text brightened (700 too dark on dark bg) */
     --color-badge-success-ol-text: var(--color-success-500);

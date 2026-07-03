@@ -38,12 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ selectedPattern?.pattern?.description || t('search.patternDetailsTitle') }}
           </h4>
           <template v-if="selectedPattern">
-            <OBadge variant="default-soft" size="sm" class="shrink-0">
+            <OTag type="countChip" value="neutral" class="tw:shrink-0">
               {{ selectedTemplateTokens.length }} {{ selectedTemplateTokens.length === 1 ? 'token' : 'tokens' }}
-            </OBadge>
-            <OBadge variant="default-soft" size="sm" class="shrink-0">
+            </OTag>
+            <OTag type="countChip" value="neutral" class="tw:shrink-0">
               {{ patternWildcardCount }} {{ patternWildcardCount === 1 ? 'variable slot' : 'variable slots' }}
-            </OBadge>
+            </OTag>
           </template>
         </div>
         <!-- Row 2: full-width module path, truncates at edge -->
@@ -175,13 +175,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
                 @mouseleave="onMouseLeave"
               >
-                <OBadge
-                  size="sm"
-                  class="font-mono text-xs font-bold h-4.5 py-0 px-1.25 rounded-[0.1875rem] leading-4.5 shrink-0 my-0 mx-0"
+                <OTag
+                  type="wildcardChip"
                   :class="wildcardChipColor(tok.value, tok.sampleValues)"
                 >
                   {{ wildcardLabel(tok.value, tok.sampleValues) }}
-                </OBadge>
+                </OTag>
               </span>
             </template>
           </div>
@@ -215,15 +214,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-type="{ row }">
-              <div class="text-left">
-                <OBadge
-                  size="sm"
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200'
-                  "
-                >
-                  {{ row.var_type || "unknown" }}
-                </OBadge>
+              <div class="tw:text-left">
+                <OTag
+                  type="fieldType"
+                  :value="row.var_type"
+                  :label="row.var_type || 'unknown'"
+                />
               </div>
             </template>
           </OTable>
@@ -317,7 +313,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";

@@ -86,11 +86,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <img :src="aiIcon" />
               </div>
             </div>
-            <OBadge
-              :variant="aiModeBadgeVariant"
-              class="mt-2"
+            <OTag
+              type="aiMode"
+              :value="aiUsage.mode"
+              class="tw:mt-2"
               style="width: fit-content;"
-            >{{ aiModeLabel }}</OBadge>
+            />
           </div>
           <div class="mt-3 mb-2">
             <OProgressBar
@@ -158,7 +159,7 @@ import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import { siteURL } from "@/constants/config";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
@@ -170,7 +171,7 @@ export default defineComponent({
     OSpinner,
     OProgressBar,
     OIcon,
-    OBadge,
+    OTag,
     OButton,
   },
 
@@ -398,22 +399,6 @@ export default defineComponent({
       if (!aiUsage.value || !aiUsage.value.credits_limit) return 0;
       return Math.min(aiUsage.value.credits_used / aiUsage.value.credits_limit, 1);
     });
-    const aiModeBadgeVariant = computed(() => {
-      if (!aiUsage.value) return 'default';
-      switch (aiUsage.value.mode) {
-        case 'pay_as_you_go': return 'primary';
-        case 'exhausted': return 'error';
-        default: return 'success';
-      }
-    });
-    const aiModeLabel = computed(() => {
-      if (!aiUsage.value) return '';
-      switch (aiUsage.value.mode) {
-        case 'pay_as_you_go': return t("billing.aiModePayAsYouGo");
-        case 'exhausted': return t("billing.aiModeExhausted");
-        default: return t("billing.aiModeFree");
-      }
-    });
     const proPlanFeatures: any = ref([]);
     const enterprisePlanFeatures: any = ref([]);
     const pricingError = ref(false);
@@ -452,8 +437,6 @@ export default defineComponent({
       aiUsage,
       aiIcon,
       aiUsageRatio,
-      aiModeBadgeVariant,
-      aiModeLabel,
       proPlanFeatures,
       enterprisePlanFeatures,
       pricingError,

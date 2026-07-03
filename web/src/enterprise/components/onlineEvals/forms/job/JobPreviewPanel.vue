@@ -37,20 +37,10 @@
         <dd class="sc-mono-cell">{{ streamType }}</dd>
         <dt>{{ t("onlineEvals.job.preview.summaryStatus") }}</dt>
         <dd>
-          <span
-            class="inline-flex items-center gap-[5px] py-0.5 px-2 rounded-full text-[11px] font-semibold"
-            :class="
-              mode === 'edit'
-                ? 'bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)] text-(--o2-status-info-text)'
-                : 'bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] text-(--color-text-secondary,var(--o2-text-secondary))'
-            "
-          >
-            {{
-              mode === "edit"
-                ? t("onlineEvals.job.preview.statusEditing")
-                : t("onlineEvals.job.preview.statusDraft")
-            }}
-          </span>
+          <OTag
+            type="jobPreviewState"
+            :value="mode === 'edit' ? 'editing' : 'draft'"
+          />
         </dd>
       </dl>
     </section>
@@ -61,6 +51,7 @@
 import { computed, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { useJobMatchedSpans } from "../../composables/useJobMatchedSpans";
 
 const props = defineProps<{

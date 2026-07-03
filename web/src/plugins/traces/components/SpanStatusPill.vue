@@ -14,45 +14,19 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <template>
-  <div
+  <OTag
     data-test="span-row-status-pill"
-    class="rounded px-[0.625rem] inline-flex items-center w-fit"
-    :class="
-      isError
-        ? 'o2-status-pill--error text-(--o2-status-error-text) bg-(--o2-status-error-bg)'
-        : isOk
-          ? 'o2-status-pill--success text-(--o2-status-success-text) bg-(--o2-status-success-bg)'
-          : 'o2-status-pill--unset text-[var(--o2-status-unset-text,#888888)] bg-[var(--o2-status-unset-bg,#f0f0f0)]'
-    "
-  >
-    <span
-      class="mr-1 inline-block w-[0.375rem] h-[0.375rem] rounded-full shrink-0 o2-status-pill__dot"
-      :class="
-        isError
-          ? 'bg-[var(--o2-status-error-text)]'
-          : isOk
-            ? 'bg-[var(--o2-status-success-text)]'
-            : 'bg-[var(--o2-status-unset-text,#888888)]'
-      "
-    />
-    <span
-      class="text-[0.7rem] tracking-[0.03em] leading-[1.0625rem] uppercase font-bold"
-    >
-      {{ label }}
-    </span>
-  </div>
+    type="spanStatus"
+    :value="status || 'unset'"
+    :label="status || 'UNSET'"
+    class="tw:uppercase"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
-const props = defineProps<{
+defineProps<{
   status?: string;
 }>();
-
-const isError = computed(() => (props.status ?? "").toUpperCase() === "ERROR");
-
-const isOk = computed(() => (props.status ?? "").toUpperCase() === "OK");
-
-const label = computed(() => props.status || "UNSET");
 </script>

@@ -97,14 +97,11 @@
                     <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
                       {{ t("about.status_lbl") }}
                     </td>
-                    <td class="px-3 py-2 leading-[1.2]">
-                      <OBadge :variant="licenseData?.expired ? 'error' : 'success'">
-                        {{
-                          licenseData?.expired
-                            ? t("about.expired_lbl")
-                            : t("about.active_lbl")
-                        }}
-                      </OBadge>
+                    <td class="tw:px-3 tw:py-2 tw:leading-[1.2]">
+                      <OTag
+                        type="licenseStatus"
+                        :value="licenseData?.expired ? 'expired' : 'active'"
+                      />
                     </td>
                   </tr>
                   <tr class="border-b border-solid border-[var(--o2-border-color)]">
@@ -455,7 +452,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -476,7 +473,7 @@ export default defineComponent({
     ODialog,
     OSpinner,
     OIcon,
-    OBadge,
+    OTag,
     OTextarea,
     OCard,
     OCardSection,

@@ -69,15 +69,11 @@
           :data-test="`score-config-detail-tab-${tab.id}`"
         >
           <span>{{ tab.label }}</span>
-          <span
+          <OTag
             v-if="tab.count != null"
-            class="inline-flex items-center justify-center px-1.5 min-w-[1.125rem] h-4 rounded-full text-[10px] font-semibold leading-none"
-            :class="
-              activeTab === tab.id
-                ? 'bg-[color-mix(in_srgb,var(--color-primary-600,#3f7994)_18%,transparent)] text-[var(--color-primary-600,#3f7994)]'
-                : 'bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] text-[var(--color-text-secondary)]'
-            "
-            >{{ tab.count }}</span
+            type="countChip"
+            :value="activeTab === tab.id ? 'primary' : 'neutral'"
+            >{{ tab.count }}</OTag
           >
         </OTab>
       </OTabs>
@@ -95,13 +91,7 @@
             <dl class="scd-kv grid gap-x-3.5 gap-y-1.5 m-0" style="grid-template-columns: 120px 1fr;">
               <dt>{{ t("onlineEvals.scoreConfig.detail.dataTypeLabel") }}</dt>
               <dd>
-                <span
-                  class="inline-flex py-px px-1.5 rounded text-[11px] font-semibold bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] text-[#4f5bcf]"
-                  :class="{
-                    'bg-[color-mix(in_srgb,#9333ea_14%,transparent)]! text-[#7c3aed]!': dataType === 'categorical',
-                    'bg-[color-mix(in_srgb,#16a34a_14%,transparent)]! text-[#15803d]!': dataType === 'boolean',
-                  }"
-                >{{ dataType }}</span>
+                <OTag type="evalDataType" :value="dataType" />
               </dd>
 
               <template v-if="dataType === 'numeric' && numericRange">
@@ -112,11 +102,7 @@
               <template v-if="dataType === 'categorical' && categories.length">
                 <dt>{{ t("onlineEvals.scoreConfig.detail.categoriesLabel") }}</dt>
                 <dd>
-                  <span
-                    v-for="cat in categories"
-                    :key="cat"
-                    class="inline-flex mr-1.5 mb-1 py-px px-2 rounded-full font-semibold text-[11px] bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-(--color-text-primary)"
-                  >{{ cat }}</span>
+                  <OTag v-for="cat in categories" :key="cat" type="fieldTag" value="soft">{{ cat }}</OTag>
                 </dd>
               </template>
 
@@ -130,12 +116,7 @@
           <section class="flex flex-col gap-2">
             <h4 class="scd-section__title m-0 font-semibold text-[13px] leading-normal text-(--color-text-primary) pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">
               {{ t("onlineEvals.scoreConfig.detail.thresholdSection") }}
-              <span
-                v-if="!healthyLabel"
-                class="inline-flex items-center px-[5px] py-0 rounded font-semibold text-[10px] bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-(--color-text-secondary)"
-              >
-                {{ t("onlineEvals.scoreConfig.detail.noThreshold") }}
-              </span>
+              <OTag v-if="!healthyLabel" type="thresholdFlag" value="notdeclared" />
             </h4>
             <div
               v-if="healthyLabel"
@@ -155,15 +136,11 @@
             <dl class="scd-kv grid gap-x-3.5 gap-y-1.5 m-0" style="grid-template-columns: 120px 1fr;">
               <dt>{{ t("onlineEvals.scoreConfig.detail.statusLabel") }}</dt>
               <dd>
-                <span
-                  class="inline-flex items-center gap-[5px] text-(--o2-status-success-text) font-semibold"
-                  :class="{ 'text-(--color-text-secondary)!': !isActive }"
-                >
-                  <span class="w-1.5 h-1.5 rounded-full bg-current" />
+                <OTag type="booleanState" :value="isActive ? 'enabled' : 'disabled'">
                   {{ isActive
                     ? t("onlineEvals.scoreConfig.detail.statusActive")
                     : t("onlineEvals.scoreConfig.detail.statusInactive") }}
-                </span>
+                </OTag>
               </dd>
               <dt>{{ t("onlineEvals.scoreConfig.detail.versionLabel") }}</dt>
               <dd class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">v{{ row.version }}</dd>
@@ -182,9 +159,9 @@
             <li
               class="p-[12px_14px] bg-(--color-card-bg) border border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))]! rounded-md"
             >
-              <div class="flex items-center gap-2">
-                <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums] font-bold text-[13px] text-(--color-text-primary)">v{{ row.version }}</span>
-                <span class="inline-flex py-px px-[7px] rounded font-semibold text-[10px] leading-none bg-[color-mix(in_srgb,var(--o2-status-success-text,#2e7d32)_14%,transparent)] text-(--o2-status-success-text)">{{ t("onlineEvals.scoreConfig.detail.activeVersionChip") }}</span>
+              <div class="tw:flex tw:items-center tw:gap-2">
+                <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:font-bold tw:text-[13px] tw:text-(--color-text-primary)">v{{ row.version }}</span>
+                <OTag type="activeVersionFlag" value="active" />
               </div>
               <div v-if="updatedAt" class="mt-1.5 text-[11.5px] text-(--color-text-secondary)">
                 {{ t("onlineEvals.scoreConfig.detail.lastUpdated") }}
@@ -212,16 +189,11 @@
                 :data-test="`score-config-detail-used-by-item-${scorer.name}`"
                 @click="emit('view-scorer', scorer)"
               >
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2">
-                    <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums] font-bold text-[13px] text-(--color-text-primary)">{{ scorer.name }}</span>
-                    <span
-                      class="inline-flex py-px px-[7px] rounded font-semibold text-[10px] leading-none bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] text-[#4f5bcf]"
-                      :class="`scd-used-card__type--${scorerTypeOf(scorer)}`"
-                    >
-                      {{ scorerTypeLabel(scorerTypeOf(scorer)) }}
-                    </span>
-                    <span class="text-[11px] text-(--color-text-secondary) [font-variant-numeric:tabular-nums]">v{{ scorer.version }}</span>
+                <div class="tw:flex-1 tw:min-w-0">
+                  <div class="tw:flex tw:items-center tw:gap-2">
+                    <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:font-bold tw:text-[13px] tw:text-(--color-text-primary)">{{ scorer.name }}</span>
+                    <OTag type="scorerType" :value="scorerTypeOf(scorer)" />
+                    <span class="tw:text-[11px] tw:text-(--color-text-secondary) tw:[font-variant-numeric:tabular-nums]">v{{ scorer.version }}</span>
                   </div>
                 </div>
                 <OIcon name="chevron-right" size="sm" class="scd-used-card__chevron shrink-0 text-(--color-text-secondary) opacity-50" />
@@ -239,6 +211,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -362,12 +335,6 @@ const tabs = computed(() => [
 function scorerTypeOf(s: Scorer): "llm_judge" | "remote" {
   const raw = valueOf<string>(s, "scorerType", "scorer_type") ?? "llm_judge";
   return raw === "remote" ? "remote" : "llm_judge";
-}
-
-function scorerTypeLabel(type: "llm_judge" | "remote"): string {
-  return type === "remote"
-    ? t("onlineEvals.scoreConfig.detail.scorerTypeRemote")
-    : t("onlineEvals.scoreConfig.detail.scorerTypeLlmJudge");
 }
 
 function formatTimestamp(microsOrMs: number): string {

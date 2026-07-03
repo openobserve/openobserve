@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-history-status-badge"
               :data-test-status="(row.status || '').toLowerCase()"
             >
-              <OTag :value="row.status" />
+              <OTag type="queryStatus" :value="row.status" />
             </span>
           </template>
 
@@ -250,14 +250,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ selectedRow.pipeline_name }}
                 </div>
               </div>
-              <div class="w-1/2">
-                <div class="text-xs text-gray-400 mb-1">Status</div>
-                <OBadge
-                  :variant="getStatusVariant(selectedRow.status)"
-                  size="sm"
-                >
-                  {{ selectedRow.status }}
-                </OBadge>
+              <div class="tw:w-1/2">
+                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Status</div>
+                <OTag type="queryStatus" :value="selectedRow.status" />
               </div>
             </div>
           </div>
@@ -483,7 +478,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -837,25 +831,6 @@ const formatDuration = (microseconds: number) => {
     return `${minutes}m ${seconds % 60}s`;
   }
   return `${seconds}s`;
-};
-
-const getStatusVariant = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "success":
-    case "ok":
-    case "completed":
-      return "success-outline";
-    case "error":
-    case "failed":
-      return "error-outline";
-    case "warning":
-      return "warning-outline";
-    case "pending":
-    case "running":
-      return "primary-outline";
-    default:
-      return "default-outline";
-  }
 };
 
 const showDetailsDialog = (row: any) => {

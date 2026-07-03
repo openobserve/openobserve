@@ -31,15 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="edge-name text-[15px] font-semibold m-0 leading-[1.2] text-[#e4e7eb] tracking-normal flex items-center gap-2 flex-wrap"
             data-test="service-graph-edge-side-panel-route"
           >
-            <span class="from-service text-[#60a5fa] overflow-hidden text-ellipsis whitespace-nowrap">{{ selectedEdge?.from }}</span>
-            <OIcon name="arrow-forward" size="xs" class="edge-arrow text-[rgba(255,255,255,0.35)] shrink-0" />
-            <span class="to-service text-[#a78bfa] overflow-hidden text-ellipsis whitespace-nowrap">{{ selectedEdge?.to }}</span>
-            <span
-              class="health-badge inline-flex items-center gap-1 py-[2px] px-2 rounded-[10px] text-[11px] font-semibold leading-none shrink-0"
-              :class="edgeHealth.status"
-            >
-              {{ edgeHealth.text }}
-            </span>
+            <span class="from-service tw:text-[#60a5fa] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">{{ selectedEdge?.from }}</span>
+            <OIcon name="arrow-forward" size="xs" class="edge-arrow tw:text-[rgba(255,255,255,0.35)] tw:shrink-0" />
+            <span class="to-service tw:text-[#a78bfa] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">{{ selectedEdge?.to }}</span>
+            <OTag type="serviceStatus" :value="edgeHealth.status">{{ edgeHealth.text }}</OTag>
           </h2>
         </div>
         <div class="panel-header-actions flex items-center shrink-0">
@@ -106,17 +101,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="getLatencyClass(p50Latency)"
                 data-test="service-graph-edge-side-panel-p50"
               >
-                <span class="col-metric"><span class="percentile-badge">P50</span></span>
+                <span class="col-metric"><OTag type="percentileTag" value="p50" /></span>
                 <span class="col-current latency-current">{{ p50Latency }}</span>
                 <span class="col-baseline latency-baseline">{{ baselineP50 }}</span>
                 <span class="col-delta">
-                  <span class="delta-badge" :class="getDeltaClass(p50DeltaPct)">
-                    <OIcon
-                      :name="p50DeltaPct > 2 ? 'arrow-upward' : p50DeltaPct < -2 ? 'arrow-downward' : 'remove'"
-                      size="xs"
-                    />
+                  <OTag type="deltaTrend" :value="getDeltaTrend(p50DeltaPct)">
+                    <template #icon>
+                      <OIcon
+                        :name="p50DeltaPct > 2 ? 'arrow-upward' : p50DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                        size="xs"
+                      />
+                    </template>
                     {{ p50DeltaFormatted }}
-                  </span>
+                  </OTag>
                 </span>
               </div>
 
@@ -126,17 +123,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="getLatencyClass(p95Latency)"
                 data-test="service-graph-edge-side-panel-p95"
               >
-                <span class="col-metric"><span class="percentile-badge">P95</span></span>
+                <span class="col-metric"><OTag type="percentileTag" value="p95" /></span>
                 <span class="col-current latency-current">{{ p95Latency }}</span>
                 <span class="col-baseline latency-baseline">{{ baselineP95 }}</span>
                 <span class="col-delta">
-                  <span class="delta-badge" :class="getDeltaClass(p95DeltaPct)">
-                    <OIcon
-                      :name="p95DeltaPct > 2 ? 'arrow-upward' : p95DeltaPct < -2 ? 'arrow-downward' : 'remove'"
-                      size="xs"
-                    />
+                  <OTag type="deltaTrend" :value="getDeltaTrend(p95DeltaPct)">
+                    <template #icon>
+                      <OIcon
+                        :name="p95DeltaPct > 2 ? 'arrow-upward' : p95DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                        size="xs"
+                      />
+                    </template>
                     {{ p95DeltaFormatted }}
-                  </span>
+                  </OTag>
                 </span>
               </div>
 
@@ -146,17 +145,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="getLatencyClass(p99Latency)"
                 data-test="service-graph-edge-side-panel-p99"
               >
-                <span class="col-metric"><span class="percentile-badge">P99</span></span>
+                <span class="col-metric"><OTag type="percentileTag" value="p99" /></span>
                 <span class="col-current latency-current">{{ p99Latency }}</span>
                 <span class="col-baseline latency-baseline">{{ baselineP99 }}</span>
                 <span class="col-delta">
-                  <span class="delta-badge" :class="getDeltaClass(p99DeltaPct)">
-                    <OIcon
-                      :name="p99DeltaPct > 2 ? 'arrow-upward' : p99DeltaPct < -2 ? 'arrow-downward' : 'remove'"
-                      size="xs"
-                    />
+                  <OTag type="deltaTrend" :value="getDeltaTrend(p99DeltaPct)">
+                    <template #icon>
+                      <OIcon
+                        :name="p99DeltaPct > 2 ? 'arrow-upward' : p99DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                        size="xs"
+                      />
+                    </template>
                     {{ p99DeltaFormatted }}
-                  </span>
+                  </OTag>
                 </span>
               </div>
             </div>
@@ -249,13 +250,14 @@ import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 type ChartTab = 'rate' | 'errors' | 'duration';
 
 export default defineComponent({
   name: 'ServiceGraphEdgeSidePanel',
   components: { OButton, OToggleGroup, OToggleGroupItem, OSpinner, OTooltip,
-    OIcon,
+    OIcon, OTag,
 },
   props: {
     selectedEdge: {
@@ -380,12 +382,12 @@ export default defineComponent({
     const p95DeltaFormatted = computed(() => formatDelta(p95DeltaPct.value));
     const p99DeltaFormatted = computed(() => formatDelta(p99DeltaPct.value));
 
-    const getDeltaClass = (pct: number): string => {
-      if (Math.abs(pct) < 2) return 'delta-neutral';
-      if (pct <= -5) return 'delta-improved';
-      if (pct < 0) return 'delta-improved-slight';
-      if (pct < 20) return 'delta-warning';
-      return 'delta-critical';
+    const getDeltaTrend = (pct: number): string => {
+      if (Math.abs(pct) < 2) return 'neutral';
+      if (pct <= -5) return 'improved';
+      if (pct < 0) return 'slight';
+      if (pct < 20) return 'warning';
+      return 'critical';
     };
 
     const trendDataPoints = computed<any[]>(
@@ -788,7 +790,7 @@ export default defineComponent({
       p50DeltaFormatted,
       p95DeltaFormatted,
       p99DeltaFormatted,
-      getDeltaClass,
+      getDeltaTrend,
       getErrorRateClass,
       getLatencyClass,
       formatNumber,

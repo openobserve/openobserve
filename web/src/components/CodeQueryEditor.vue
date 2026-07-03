@@ -395,31 +395,16 @@ export default defineComponent({
       currentEditorText.value = text;
       const isNL = detectNaturalLanguage(text, props.language);
 
-      console.log("[NL2Q-Detection]", {
-        text: text.substring(0, 50),
-        language: props.language,
-        isNaturalLanguage: isNL,
-        currentNlpMode: props.nlpMode,
-      });
 
       // ONLY emit events if NOT already in NLP mode (auto-detection feature)
       // If already in NLP mode (user toggled it), don't change anything
       if (!props.nlpMode) {
         if (isNL) {
-          console.log(
-            "[NL2Q-Detection] Natural language detected, emitting nlpModeDetected: true",
-          );
           emit("nlpModeDetected", true);
         } else {
-          console.log(
-            "[NL2Q-Detection] Query syntax detected, emitting nlpModeDetected: false",
-          );
           emit("nlpModeDetected", false);
         }
       } else {
-        console.log(
-          "[NL2Q-Detection] Already in NLP mode, not emitting auto-detection events",
-        );
       }
     }, 500);
 
@@ -437,17 +422,10 @@ export default defineComponent({
       if (!currentText.trim()) return;
 
       const currentLanguage = props.language?.toLowerCase() || "sql";
-      console.log(
-        "[NL2Q-UI] Starting query generation for language:",
-        currentLanguage,
-        "text:",
-        currentText,
-      );
 
       try {
         // Get organization ID from store
         const orgId = store.state.selectedOrganization?.identifier || "default";
-        console.log("[NL2Q-UI] Organization ID:", orgId);
 
         // Create language-appropriate prompt
         let promptPrefix = "";
@@ -468,29 +446,17 @@ export default defineComponent({
         }
 
         const prompt = `${promptPrefix} : ${currentText}`;
-        console.log("[NL2Q-UI] Generated prompt:", prompt);
 
         // Generate query from natural language
-        console.log("[NL2Q-UI] Calling generateSQL...");
         const generatedSQL = await generateSQL(
           prompt,
           orgId,
           abortSignal,
           sessionId,
         );
-        console.log("[NL2Q-UI] generateSQL returned:", {
-          value: generatedSQL,
-          type: typeof generatedSQL,
-          isNull: generatedSQL === null,
-          isEmpty: generatedSQL === "",
-          isFalsy: !generatedSQL,
-        });
 
         if (!generatedSQL || generatedSQL.trim() === "") {
           // Show error notification - use streaming error message if available (e.g. Unauthorized Access)
-          console.log(
-            "[NL2Q-UI] Showing error notification - query generation failed or empty",
-          );
           const errorMsg = isAuthError(streamingResponse.value)
             ? streamingResponse.value
             : t("search.nlQueryGenerationFailed");
@@ -503,7 +469,6 @@ export default defineComponent({
 
         // Check if this is a special action completion (dashboard/alert)
         if (generatedSQL.startsWith("✓ DASHBOARD_CREATED:")) {
-          console.log("[NL2Q-UI] Dashboard created successfully");
           const responseText = generatedSQL
             .replace("✓ DASHBOARD_CREATED:", "")
             .trim();
@@ -516,7 +481,6 @@ export default defineComponent({
         }
 
         if (generatedSQL.startsWith("✓ ALERT_CREATED:")) {
-          console.log("[NL2Q-UI] Alert created successfully");
           const responseText = generatedSQL
             .replace("✓ ALERT_CREATED:", "")
             .trim();
@@ -526,7 +490,6 @@ export default defineComponent({
         }
 
         if (generatedSQL.startsWith("✓ ACTION_COMPLETED:")) {
-          console.log("[NL2Q-UI] Action completed successfully");
           const responseText = generatedSQL
             .replace("✓ ACTION_COMPLETED:", "")
             .trim();
@@ -541,7 +504,6 @@ export default defineComponent({
           generatedSQL,
           props.language,
         );
-        console.log("[NL2Q-UI] Transformed text:", transformedText);
 
         // Update editor value
         setValue(transformedText);
@@ -552,14 +514,10 @@ export default defineComponent({
 
         // Turn off NLP mode after generating SQL (we're now in SQL mode)
         emit("nlpModeDetected", false);
-        console.log(
-          "[NL2Q-UI] Emitted nlpModeDetected: false to turn off NLP mode",
-        );
 
         // Emit SQL generation success
         emit("generation-success", { type: "sql", message: generatedSQL });
 
-        console.log("[NL2Q-UI] SQL generation completed successfully");
       } catch (error) {
         console.error("[NL2Q-UI] Exception during SQL generation:", error);
         showErrorNotification(t("search.nlQueryGenerationFailed"));
@@ -1189,12 +1147,9 @@ export default defineComponent({
 
     // Watch isGenerating and emit events to parent
     watch(isGenerating, (newValue) => {
-      console.log("[CodeQueryEditor] isGenerating changed to:", newValue);
       if (newValue) {
-        console.log("[CodeQueryEditor] Emitting generation-start");
         emit("generation-start");
       } else {
-        console.log("[CodeQueryEditor] Emitting generation-end");
         emit("generation-end");
       }
     });

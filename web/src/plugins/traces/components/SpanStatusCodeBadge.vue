@@ -30,18 +30,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
   >
     —
   </span>
-  <span
+  <OTag
     v-else
     data-test="span-status-code-badge"
-    class="rounded py-[0.125rem] px-[0.5rem] inline-flex items-center w-fit font-mono text-[0.75rem] font-semibold tabular-nums"
-    :class="tierClass"
-  >
-    {{ displayValue }}
-  </span>
+    :type="badgeType"
+    :value="badgeValue"
+    :label="displayValue"
+    :dot="false"
+    class="tw:font-mono tw:tabular-nums"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { httpStatusBucket, grpcStatusKey } from "@/lib/core/Badge/badgeGroups";
 
 const props = defineProps<{
   /** HTTP status code (e.g. 200, 404, 500) */
@@ -77,18 +80,13 @@ const displayValue = computed(() => {
   return null;
 });
 
-const tierClass = computed(() => {
-  if (source.value === "grpc") {
-    return grpcNum.value === 0
-      ? "text-(--o2-status-success-text) bg-(--o2-status-success-bg)"
-      : "text-(--o2-status-error-text) bg-(--o2-status-error-bg)";
-  }
-  const n = httpNum.value;
-  if (!n) return "text-(--o2-status-neutral-text) bg-(--o2-status-neutral-bg)";
-  if (n >= 200 && n < 300) return "text-(--o2-status-success-text) bg-(--o2-status-success-bg)";
-  if (n >= 300 && n < 400) return "text-(--o2-status-info-text) bg-(--o2-status-info-bg)";
-  if (n >= 400 && n < 500) return "text-(--o2-status-warning-text) bg-(--o2-status-warning-bg)";
-  if (n >= 500 && n < 600) return "text-(--o2-status-error-text) bg-(--o2-status-error-bg)";
-  return "text-(--o2-status-neutral-text) bg-(--o2-status-neutral-bg)";
+const badgeType = computed(() =>
+  source.value === "grpc" ? "spanStatus" : "httpStatus",
+);
+
+const badgeValue = computed(() => {
+  if (source.value === "http") return httpStatusBucket(props.code);
+  if (source.value === "grpc") return grpcStatusKey(props.grpcCode);
+  return "";
 });
 </script>

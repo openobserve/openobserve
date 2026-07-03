@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center justify-center">
               <OButton
                 :data-test="`iam-groups-edit-${row.group_name}-role-icon`"
+                data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('common.edit')"
@@ -84,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 :data-test="`iam-groups-delete-${row.group_name}-role-icon`"
+                data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('common.delete')"
@@ -161,6 +163,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const showAddGroup = ref(false);
@@ -428,6 +432,24 @@ const bulkDeleteUserGroups = async () => {
     confirmBulkDelete.value = false;
   }
 };
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcuts([
+  {
+    id: "iamGroupsAdd",
+    handler: () => { if (!isInputFocused()) addGroup(); },
+  },
+  {
+    id: "iamGroupsRefresh",
+    handler: () => { if (!isInputFocused()) setupGroups(); },
+  },
+  {
+    id: "iamGroupsFocusSearch",
+    handler: () => {
+      focusSearchInput("iam-groups-search-input");
+    },
+  },
+]);
 
 </script>
 

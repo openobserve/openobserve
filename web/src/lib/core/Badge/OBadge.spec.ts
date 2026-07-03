@@ -91,16 +91,16 @@ describe("OBadge", () => {
 
   it("applies default variant classes when no variant specified", () => {
     const wrapper = mount(OBadge, { slots: { default: "x" } });
-    expect(wrapper.classes().join(" ")).toContain("bg-badge-default-solid-bg");
-    expect(wrapper.classes().join(" ")).toContain("text-badge-default-solid-text");
+    expect(wrapper.classes().join(" ")).toContain("tw:bg-badge-default-soft-bg");
+    expect(wrapper.classes().join(" ")).toContain("tw:text-badge-default-soft-text");
   });
 
   it.each([
-    ["primary", "bg-badge-primary-solid-bg"],
-    ["success", "bg-badge-success-solid-bg"],
-    ["warning", "bg-badge-warning-solid-bg"],
-    ["error",   "bg-badge-error-solid-bg"],
-  ] as const)("applies %s solid variant classes", (variant, expectedClass) => {
+    ["primary", "tw:bg-badge-primary-soft-bg"],
+    ["success", "tw:bg-badge-success-soft-bg"],
+    ["warning", "tw:bg-badge-warning-soft-bg"],
+    ["error",   "tw:bg-badge-error-soft-bg"],
+  ] as const)("applies %s solid variant classes (now soft-styled)", (variant, expectedClass) => {
     const wrapper = mount(OBadge, {
       props: { variant },
       slots: { default: "x" },
@@ -135,6 +135,29 @@ describe("OBadge", () => {
       slots: { default: "x" },
     });
     expect(wrapper.classes().join(" ")).toContain(expectedClass);
+  });
+
+  it.each([
+    "default", "primary", "success", "warning", "error",
+    "default-soft", "primary-soft", "success-soft", "warning-soft", "error-soft",
+    "default-outline", "primary-outline",
+  ] as const)("renders an inset border ring for the %s variant", (variant) => {
+    const wrapper = mount(OBadge, {
+      props: { variant },
+      slots: { default: "x" },
+    });
+    const classes = wrapper.classes().join(" ");
+    expect(classes, variant).toContain("tw:ring-1");
+    expect(classes, variant).toContain("tw:ring-inset");
+  });
+
+  it("solid variants render the soft (not solid) fill weight", () => {
+    for (const variant of ["default", "primary", "success", "warning", "error"] as const) {
+      const wrapper = mount(OBadge, { props: { variant }, slots: { default: "x" } });
+      const classes = wrapper.classes().join(" ");
+      expect(classes, variant).toContain(`tw:bg-badge-${variant}-soft-bg`);
+      expect(classes, variant).not.toContain(`tw:bg-badge-${variant}-solid-bg`);
+    }
   });
 
   // ── Sizes ───────────────────────────────────────────────────────────────

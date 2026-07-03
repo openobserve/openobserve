@@ -14,20 +14,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <template>
-  <span
+  <OTag
     v-if="abbrev"
-    class="inline-flex items-center justify-center text-[0.6rem] font-bold tracking-[0.03em] rounded-[0.2rem] py-[0.075rem] px-[0.25rem] mr-[0.25rem] shrink-0 leading-none cursor-default"
-    :class="kindColorClasses"
+    type="spanKind"
+    :value="kind"
     :data-test="`trace-tree-span-kind-badge-${kindClass}`"
   >
     {{ abbrev }}
     <OTooltip :content="kind" side="bottom" align="center" />
-  </span>
+  </OTag>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 const props = defineProps<{
   /** Human-readable span kind label, e.g. "Client", "Server", "Internal" */
@@ -49,23 +50,6 @@ const abbrev = computed(() => {
       return "CO";
     case "Internal":
       return "I";
-    default:
-      return "";
-  }
-});
-
-const kindColorClasses = computed(() => {
-  switch (kindClass.value) {
-    case "client":
-      return "text-(--o2-span-kind-client-text) bg-(--o2-span-kind-client-bg)";
-    case "server":
-      return "text-(--o2-span-kind-server-text) bg-(--o2-span-kind-server-bg)";
-    case "producer":
-      return "text-(--o2-span-kind-producer-text) bg-(--o2-span-kind-producer-bg)";
-    case "consumer":
-      return "text-(--o2-span-kind-consumer-text) bg-(--o2-span-kind-consumer-bg)";
-    case "internal":
-      return "text-(--o2-span-kind-internal-text) bg-(--o2-span-kind-internal-bg)";
     default:
       return "";
   }

@@ -42,7 +42,6 @@ class MockWorker {
 
     // Define postMessage as a method that can be spied on
     postMessage(msg: any) {
-      console.log('MockWorker.postMessage called with:', msg);
       // Just track the message, don't auto-trigger responses
       // Tests will manually trigger onmessage when needed
       if(msg.action == 'cancelStream'){
@@ -75,7 +74,6 @@ let mockWorker: MockWorker;
 
 mockWorker = new MockWorker();
 const WorkerConstructor = vi.fn().mockImplementation(() => {
-  console.log('WorkerConstructor called, returning mockWorker with postMessage:', typeof mockWorker.postMessage);
   return mockWorker;
 });
 
@@ -331,9 +329,6 @@ let onDataSpy: any;
         };
         mockFetch.mockResolvedValueOnce(mockResponse);
 
-        console.log('typeof window:', typeof window);
-        console.log('window.Worker:', window.Worker);
-        console.log('Before fetchQueryDataWithHttpStream, window.Worker:', typeof window?.Worker);
 
         const streamData = { ...mockData, traceId };
         const streamPromise = httpStreaming.fetchQueryDataWithHttpStream(streamData, mockHandlers);
@@ -342,10 +337,6 @@ let onDataSpy: any;
         await flushPromises();
         await new Promise((resolve) => setTimeout(resolve, 50));
 
-        console.log('After fetchQueryDataWithHttpStream');
-        console.log('WorkerConstructor calls:', WorkerConstructor.mock.calls.length);
-        console.log('mockWorker.postMessage calls:', mockWorker.postMessage.mock.calls.length);
-        console.log('All postMessage calls:', JSON.stringify(mockWorker.postMessage.mock.calls));
 
         // Mock AbortController and add it to abortControllers
         const abortFn = vi.fn();

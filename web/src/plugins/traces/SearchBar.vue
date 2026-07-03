@@ -267,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :url="tracesShareURL"
           variant="outline"
           size="icon-toolbar"
+          shortcut-id="tracesCopyUrl"
         />
       </div>
 
