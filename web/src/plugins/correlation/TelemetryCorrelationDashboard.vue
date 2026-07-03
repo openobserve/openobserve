@@ -274,8 +274,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <div
                     v-else
-                    class="p-3 text-center text-xs opacity-60"
+                    class="text-center px-2 pt-3"
                   >
+                    <OIcon name="info" size="sm" class="align-middle mr-1" />
                     {{ t("search.noResult") }}
                   </div>
                 </div>
@@ -533,7 +534,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Traces List -->
-            <div style="height: calc(100% - 4rem)">
+            <div class="h-full">
               <TracesSearchResultList
                 :hits="tracesForDimensions"
                 :loading="false"
@@ -775,8 +776,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div
                   v-else
-                  class="p-3 text-center text-xs opacity-60"
+                  class="text-center px-2 pt-3"
                 >
+                  <OIcon name="info" size="sm" class="align-middle mr-1" />
                   {{ t("search.noResult") }}
                 </div>
               </div>
@@ -908,6 +910,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :viewOnly="true"
                   :allowAlertCreation="false"
                   searchType="dashboards"
+                  class="border-none"
                 />
                 <div
                   v-else
@@ -966,7 +969,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="
             traceCorrelationMode === 'direct' && traceSpanList.length > 0
           "
-          class="h-full overflow-hidden telemetry-correlation-traces"
+          class="h-full overflow-auto telemetry-correlation-traces"
         >
           <TraceDetails
             mode="embedded"
@@ -997,7 +1000,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             traceCorrelationMode === 'dimension-based' &&
             tracesForDimensions.length > 0
           "
-          class="h-full"
+          class="h-full flex flex-col"
         >
           <!-- Header -->
           <div
@@ -1033,7 +1036,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Traces List -->
-          <div style="height: calc(100vh - 11rem)">
+          <div class="flex-1">
             <TracesSearchResultList
               :hits="tracesForDimensions"
               :loading="false"
@@ -1158,7 +1161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- No results message -->
-      <div v-else class="p-4 text-center text-gray-500">
+      <div v-else class="text-center px-2 pt-3">
+        <OIcon name="info" size="sm" class="align-middle mr-1" />
         {{ t("search.noResult") }}
       </div>
     </div>

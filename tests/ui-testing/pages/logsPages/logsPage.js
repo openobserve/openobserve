@@ -4,6 +4,7 @@ import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
 import { openNavFlyoutChild } from '../commonActions.js';
+import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -4937,12 +4938,22 @@ export class LogsPage {
     }
 
     async clickCustomDownloadRangeSelect() {
-        return await this.page.locator(this.customDownloadRangeSelect).click();
+        // OSelect (reka-ui popover): clicking the root wrapper can open-then-close the
+        // listbox on a single click, which continuously re-mounts the options and makes
+        // the subsequent option click flake with "element was detached from the DOM".
+        // openOSelectDropdown clicks the inner -trigger until aria-expanded="true" so the
+        // listbox is stably open before we pick an option.
+        await openOSelectDropdown(this.page, this.page.locator(this.customDownloadRangeSelect));
     }
 
     async selectCustomDownloadRange(range) {
         // OSelect option data-test contract: `${parent}-option` shared + `data-test-value="<value>"`.
-        return await this.page.locator(this.customDownloadRangeOption(range)).click();
+        // The reka listbox virtualises/re-renders its items, so the option node can detach
+        // between resolve and click. Poll the click until it lands (option gone / selected).
+        const option = this.page.locator(this.customDownloadRangeOption(range));
+        await expect(async () => {
+            await option.click({ timeout: 3000 });
+        }).toPass({ timeout: 15000, intervals: [500] });
     }
 
     async clickCustomDownloadFileTypeJson() {

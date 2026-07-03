@@ -187,101 +187,103 @@ class="mr-1" />
     <!-- Main Content Area -->
     <div class="flex-1 overflow-hidden relative">
       <!-- Logs Table or Skeleton -->
-      <div class="h-full w-full overflow-auto logs-table-container">
-        <!-- Actual Table (when data is loaded) -->
-        <TenstackTable
-          v-if="hasResults"
-          :key="`page-${currentPage}`"
-          :rows="pagedResults"
-          :columns="tableColumns"
-          :wrap="wrapTableCells"
-          :loading="isLoading"
-          :err-msg="''"
-          :function-error-msg="''"
-          :expanded-rows="expandedRows"
-          :highlight-timestamp="-1"
-          :default-columns="showingDefaultColumns"
-          :jsonpreview-stream-name="jsonPreviewStreamName"
-          :highlight-query="highlightQuery"
-          :selected-stream-fts-keys="ftsFields"
-          :selected-stream-fields="selectedFields"
-          :hide-search-term-actions="hideSearchTermActions"
-          :hide-view-related-button="hideViewRelatedButton"
-          class="overflow-y-auto!"
-          @click:dataRow="handleRowClick"
-          @copy="handleCopy"
-          @sendToAiChat="handleSendToAiChat"
-          @addSearchTerm="handleAddSearchTerm"
-          @addFieldToTable="handleAddFieldToTable"
-          @closeColumn="handleCloseColumn"
-          @update:columnOrder="handleColumnOrderChange"
-          @expandRow="handleExpandRow"
-          @view-trace="handleViewTrace"
-          @show-correlation="handleNestedCorrelation"
-          data-test="logs-tenstack-table"
-        />
+      <div class="flex flex-col h-full">
+        <div class="flex-1 w-full overflow-auto logs-table-container">
+          <!-- Actual Table (when data is loaded) -->
+          <TenstackTable
+            v-if="hasResults"
+            :key="`page-${currentPage}`"
+            :rows="pagedResults"
+            :columns="tableColumns"
+            :wrap="wrapTableCells"
+            :loading="isLoading"
+            :err-msg="''"
+            :function-error-msg="''"
+            :expanded-rows="expandedRows"
+            :highlight-timestamp="-1"
+            :default-columns="showingDefaultColumns"
+            :jsonpreview-stream-name="jsonPreviewStreamName"
+            :highlight-query="highlightQuery"
+            :selected-stream-fts-keys="ftsFields"
+            :selected-stream-fields="selectedFields"
+            :hide-search-term-actions="hideSearchTermActions"
+            :hide-view-related-button="hideViewRelatedButton"
+            class="overflow-y-auto!"
+            @click:dataRow="handleRowClick"
+            @copy="handleCopy"
+            @sendToAiChat="handleSendToAiChat"
+            @addSearchTerm="handleAddSearchTerm"
+            @addFieldToTable="handleAddFieldToTable"
+            @closeColumn="handleCloseColumn"
+            @update:columnOrder="handleColumnOrderChange"
+            @expandRow="handleExpandRow"
+            @view-trace="handleViewTrace"
+            @show-correlation="handleNestedCorrelation"
+            data-test="logs-tenstack-table"
+          />
 
-        <!-- Table Skeleton (initial load) -->
-        <div
-          v-else-if="isLoading && !hasError"
-          class="h-full flex flex-col items-center justify-center"
-          data-test="table-skeleton"
-        >
-          <!-- Loading indicator -->
+          <!-- Table Skeleton (initial load) -->
           <div
-            class="flex items-center justify-center gap-3"
+            v-else-if="isLoading && !hasError"
+            class="h-full flex flex-col items-center justify-center"
+            data-test="table-skeleton"
           >
-            <OSpinner size="sm" />
-            <span class="text-sm opacity-70">
-              {{ t("correlation.logs.loading") }}
-            </span>
+            <!-- Loading indicator -->
+            <div
+              class="flex items-center justify-center gap-3"
+            >
+              <OSpinner size="sm" />
+              <span class="text-sm opacity-70">
+                {{ t("correlation.logs.loading") }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Error State -->
+          <div
+            v-else-if="hasError"
+            class="flex flex-col items-center justify-center h-full py-20"
+            data-test="error-state"
+          >
+            <p
+              class="text-base opacity-70 max-w-md text-center"
+            >
+              {{ error || t("correlation.logs.errorDetails") }}
+            </p>
+          </div>
+
+          <!-- Empty State -->
+          <div
+            v-else-if="isEmpty"
+            class="flex flex-col items-center justify-center h-full py-20"
+            data-test="empty-state"
+          >
+            <p class="text-base font-medium mb-2 opacity-90">
+              {{ t("correlation.logs.noData") }}
+            </p>
+            <p class="text-sm opacity-70 mb-4">
+              {{ t("correlation.logs.noDataDetails") }}
+            </p>
           </div>
         </div>
 
-        <!-- Error State -->
+        <!-- Pagination bar -->
         <div
-          v-else-if="hasError"
-          class="flex flex-col items-center justify-center h-full py-20"
-          data-test="error-state"
+          v-if="hasResults && totalPages > 1"
+          class="flex items-center justify-between px-4 py-2 border-t border-solid border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] text-xs shrink-0"
+          data-test="correlated-logs-pagination"
         >
-          <p
-            class="text-base opacity-70 max-w-md text-center"
-          >
-            {{ error || t("correlation.logs.errorDetails") }}
-          </p>
+          <span class="opacity-60">
+            {{ (currentPage - 1) * displayPageSize + 1 }}–{{ Math.min(currentPage * displayPageSize, searchResults.length) }} of {{ searchResults.length }}
+          </span>
+          <OPagination
+            :model-value="currentPage"
+            :max="totalPages"
+            :max-pages="5"
+            data-test="correlated-logs-pagination-control"
+            @update:model-value="goToPage"
+          />
         </div>
-
-        <!-- Empty State -->
-        <div
-          v-else-if="isEmpty"
-          class="flex flex-col items-center justify-center h-full py-20"
-          data-test="empty-state"
-        >
-          <p class="text-base font-medium mb-2 opacity-90">
-            {{ t("correlation.logs.noData") }}
-          </p>
-          <p class="text-sm opacity-70 mb-4">
-            {{ t("correlation.logs.noDataDetails") }}
-          </p>
-        </div>
-      </div>
-
-      <!-- Pagination bar -->
-      <div
-        v-if="hasResults && totalPages > 1"
-        class="flex items-center justify-between px-4 py-2 border-t border-solid border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] text-xs shrink-0"
-        data-test="correlated-logs-pagination"
-      >
-        <span class="opacity-60">
-          {{ (currentPage - 1) * displayPageSize + 1 }}–{{ Math.min(currentPage * displayPageSize, searchResults.length) }} of {{ searchResults.length }}
-        </span>
-        <OPagination
-          :model-value="currentPage"
-          :max="totalPages"
-          :max-pages="5"
-          data-test="correlated-logs-pagination-control"
-          @update:model-value="goToPage"
-        />
       </div>
     </div>
   </div>

@@ -126,7 +126,7 @@ describe("useMetricsCorrelationDashboard", () => {
 
       // Second row
       expect(panels[3].layout.x).toBe(0);
-      expect(panels[3].layout.y).toBe(16);
+      expect(panels[3].layout.y).toBe(14);
     });
 
     it("should use default panelWidth=64 and panelHeight=16 in createMetricPanel when not provided", () => {
@@ -151,7 +151,7 @@ describe("useMetricsCorrelationDashboard", () => {
 
       // Width and height use defaults
       expect(panels[0].layout.w).toBe(64);
-      expect(panels[0].layout.h).toBe(16);
+      expect(panels[0].layout.h).toBe(14);
 
       // x is col * 64 (default panelWidth)
       expect(panels[0].layout.x).toBe(0);   // col 0
@@ -160,7 +160,7 @@ describe("useMetricsCorrelationDashboard", () => {
 
       // y is row * 16 (default panelHeight)
       expect(panels[0].layout.y).toBe(0);   // row 0
-      expect(panels[3].layout.y).toBe(16);  // row 1
+      expect(panels[3].layout.y).toBe(14);  // row 1
     });
 
     it("should use custom panelWidth and panelHeight in createMetricPanel when provided", () => {

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex flex-col flex-nowrap searchdetaildialog"
+    class="flex flex-col h-full flex-nowrap searchdetaildialog"
     data-test="dialog-box"
   >
     <!-- Single Tab Row -->
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       :class="[
-        'flex flex-col h-screen',
+        'flex flex-col h-full',
         tab.startsWith('correlated-') ? 'overflow-hidden full-height-panels' : 'overflow-y-auto',
       ]"
     >
@@ -83,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="tab"
       keep-alive
       grow
+      class="tw:overflow-y-auto!"
     >
       <OTabPanel name="json">
         <OCardSection
