@@ -3,6 +3,7 @@ import {
   buildLast24hSql,
   buildPerStreamSql,
   buildDailyTrendSql,
+  buildPerStreamDailySql,
   mbToDisplay,
   distinctDays,
 } from "./usageAnalytics";
@@ -25,6 +26,12 @@ describe("usageAnalytics SQL builders", () => {
   it("builds a daily trend grouped by day", () => {
     const sql = buildDailyTrendSql();
     expect(sql).toContain("GROUP BY day");
+    expect(sql).toContain("event = 'Ingestion'");
+  });
+
+  it("builds a per-stream daily series grouped by stream and day", () => {
+    const sql = buildPerStreamDailySql();
+    expect(sql).toContain("GROUP BY stream_name, day");
     expect(sql).toContain("event = 'Ingestion'");
   });
 });

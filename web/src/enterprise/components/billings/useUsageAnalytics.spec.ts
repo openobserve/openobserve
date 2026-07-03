@@ -40,6 +40,14 @@ describe("fetchUsageAnalytics", () => {
             { day: "2026-7-2", total_mb: 2048 },
           ],
         },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          hits: [
+            { stream_name: "logs_a", day: "2026-7-1", total_mb: 1024 },
+            { stream_name: "logs_a", day: "2026-7-2", total_mb: 2048 },
+          ],
+        },
       });
     const res = await fetchUsageAnalytics("org1", 1000, 2000);
     expect(res.hasData).toBe(true);
@@ -47,5 +55,6 @@ describe("fetchUsageAnalytics", () => {
     expect(res.daysOfData).toBe(2);
     expect(res.avgDailyMb).toBe(2048); // (2048+2048)/2
     expect(res.perStream[0].stream_name).toBe("logs_a");
+    expect(res.perStream[0].spark.length).toBe(2);
   });
 });

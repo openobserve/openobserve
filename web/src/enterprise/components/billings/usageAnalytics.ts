@@ -26,6 +26,14 @@ export function buildDailyTrendSql(): string {
   );
 }
 
+export function buildPerStreamDailySql(): string {
+  return (
+    `SELECT stream_name, concat(year, '-', month, '-', day) AS day, SUM(size) AS total_mb ` +
+    `FROM "${USAGE_STREAM}" WHERE ${INGESTION_FILTER} ` +
+    `GROUP BY stream_name, day ORDER BY stream_name, day`
+  );
+}
+
 export function mbToDisplay(mb: number, unit: "gb" | "mb"): number {
   const value = unit === "gb" ? (mb || 0) / 1024 : mb || 0;
   return Math.round(value * 100) / 100;

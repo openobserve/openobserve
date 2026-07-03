@@ -85,6 +85,7 @@
               <th class="tw:py-1">{{ t("billing.usageAnalytics.streamColumn") }}</th>
               <th class="tw:py-1">{{ unitLabel }}</th>
               <th class="tw:py-1">{{ t("billing.usageAnalytics.percentOfTotal") }}</th>
+              <th class="tw:py-1" style="width:120px">{{ t("billing.usageAnalytics.trendColumn") }}</th>
             </tr>
           </thead>
           <tbody>
@@ -92,6 +93,9 @@
               <td class="tw:py-1 tw:text-(--o2-text-heading)">{{ row.stream_name }}</td>
               <td class="tw:py-1">{{ display(row.total_mb) }}</td>
               <td class="tw:py-1">{{ percent(row.total_mb) }}%</td>
+              <td class="tw:py-1" style="width:120px;height:32px">
+                <CustomChartRenderer :data="sparkChart(row.spark)" />
+              </td>
             </tr>
           </tbody>
         </table>
@@ -186,6 +190,15 @@ export default defineComponent({
       },
     }));
 
+    const sparkChart = (spark: number[]) => ({
+      options: {
+        grid: { top: 2, bottom: 2, left: 2, right: 2 },
+        xAxis: { type: "category", show: false, data: spark.map((_, i) => i) },
+        yAxis: { type: "value", show: false },
+        series: [{ type: "line", showSymbol: false, data: spark }],
+      },
+    });
+
     const dateModel = ref({
       tab: "relative",
       relative: { period: { label: "Days", value: "Days" }, value: 1 },
@@ -252,6 +265,7 @@ export default defineComponent({
       display,
       percent,
       trendChart,
+      sparkChart,
       enabling,
       enableUsageAnalytics,
       dateModel,

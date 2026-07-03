@@ -3,6 +3,7 @@ import {
   buildLast24hSql,
   buildPerStreamSql,
   buildDailyTrendSql,
+  buildPerStreamDailySql,
   distinctDays,
 } from "./usageAnalytics";
 
@@ -11,6 +12,7 @@ export interface PerStreamRow {
   total_mb: number;
   records: number;
   days: number;
+  spark: number[];
 }
 export interface TrendPoint {
   day: string;
@@ -47,11 +49,24 @@ export async function fetchUsageAnalytics(
   startTimeMicros: number,
   endTimeMicros: number,
 ): Promise<UsageAnalyticsResult> {
-  const [last24hHits, perStreamHits, trendHits] = await Promise.all([
-    runQuery(orgId, buildLast24hSql(), startTimeMicros, endTimeMicros),
-    runQuery(orgId, buildPerStreamSql(), startTimeMicros, endTimeMicros),
-    runQuery(orgId, buildDailyTrendSql(), startTimeMicros, endTimeMicros),
-  ]);
+  const [last24hHits, perStreamHits, trendHits, perStreamDailyHits] =
+    await Promise.all([
+      runQuery(orgId, buildLast24hSql(), startTimeMicros, endTimeMicros),
+      runQuery(orgId, buildPerStreamSql(), startTimeMicros, endTimeMicros),
+      runQuery(orgId, buildDailyTrendSql(), startTimeMicros, endTimeMicros),
+      runQuery(
+        orgId,
+        buildPerStreamDailySql(),
+        startTimeMicros,
+        endTimeMicros,
+      ),
+    ]);
+
+  const sparkByStream: Record<string, number[]> = {};
+  for (const h of perStreamDailyHits ?? []) {
+    const name = String(h.stream_name ?? "");
+    (sparkByStream[name] ||= []).push(Number(h.total_mb ?? 0));
+  }
 
   const last24hMb = Number(last24hHits?.[0]?.total_mb ?? 0);
   const perStream: PerStreamRow[] = (perStreamHits ?? []).map((h) => ({
@@ -59,6 +74,7 @@ export async function fetchUsageAnalytics(
     total_mb: Number(h.total_mb ?? 0),
     records: Number(h.records ?? 0),
     days: Number(h.days ?? 0),
+    spark: sparkByStream[String(h.stream_name ?? "")] ?? [],
   }));
   const trend: TrendPoint[] = (trendHits ?? []).map((h) => ({
     day: String(h.day ?? ""),

@@ -2804,6 +2804,7 @@
       "trendTitle": "Daily ingestion trend",
       "streamColumn": "Stream",
       "percentOfTotal": "% of total",
+      "trendColumn": "Trend",
       "basedOnDays": "Based on {days} days of data.",
       "enableTitle": "See your daily ingestion",
       "enableBody": "Enable Usage Analytics to track daily ingestion, break it down per stream, and estimate your needs. This writes a lightweight per-org usage stream.",
