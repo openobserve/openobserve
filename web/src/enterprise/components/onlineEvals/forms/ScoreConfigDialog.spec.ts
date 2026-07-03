@@ -31,11 +31,15 @@ const store = createStore({
   state: { theme: "light", selectedOrganization: { identifier: "test-org" } },
 });
 
-function createWrapper(props: Record<string, any> = {}) {
-  return mount(ScoreConfigDialog, {
+async function createWrapper(props: Record<string, any> = {}) {
+  const wrapper = mount(ScoreConfigDialog, {
     props: { orgId: "test-org", mode: "create", row: null, ...props },
     global: { plugins: [store, i18n] },
   });
+  // ODrawer (reka-ui Dialog) mounts its body slot in a portal asynchronously —
+  // flush so the nested <OForm> + fields are present before the assertions.
+  await flushPromises();
+  return wrapper;
 }
 
 function oform(w: any) {
@@ -46,6 +50,20 @@ function setField(w: any, name: string, value: unknown) {
 }
 async function submit(w: any) {
   await oform(w).form.handleSubmit();
+  await flushPromises();
+}
+// ODrawer (reka-ui) teleports its body + footer to <body>, so DOM lookups go
+// through `document` (wrapper.find only sees the wrapper's own subtree).
+function domFind(sel: string) {
+  return document.querySelector(sel);
+}
+async function typeNumber(testId: string, value: string) {
+  const el = document.querySelector(
+    `[data-test="${testId}"] input`,
+  ) as HTMLInputElement | null;
+  if (!el) throw new Error(`input not found: ${testId}`);
+  el.value = value;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
   await flushPromises();
 }
 
@@ -59,28 +77,27 @@ describe("ScoreConfigDialog", () => {
   });
   afterEach(() => wrapper?.unmount());
 
-  it("mounts the real OForm with the name + data-type fields", () => {
-    wrapper = createWrapper();
+  it("mounts the real OForm with the name + data-type fields", async () => {
+    wrapper = await createWrapper();
     expect(wrapper.findComponent({ name: "OForm" }).exists()).toBe(true);
-    expect(wrapper.find('[data-test="score-config-name-input"]').exists()).toBe(true);
+    expect(Boolean(domFind('[data-test="score-config-name-input"]'))).toBe(true);
   });
 
-  it("keeps the create Save button enabled before first submit (R3)", () => {
-    wrapper = createWrapper();
-    const save = wrapper.find('[data-test="score-config-save-btn"]');
-    expect(save.attributes("disabled")).toBeUndefined();
+  it("keeps the create Save button enabled before first submit (R3)", async () => {
+    wrapper = await createWrapper();
+    expect(domFind('[data-test="o-drawer-primary-btn"]')?.hasAttribute("disabled")).toBe(false);
     expect(oform(wrapper).form.state.isValid).toBe(true);
   });
 
   it("blocks submit and does NOT call the service when the name is empty", async () => {
-    wrapper = createWrapper();
+    wrapper = await createWrapper();
     await submit(wrapper);
     expect(oform(wrapper).form.state.isValid).toBe(false);
     expect(onlineEvalsService.scoreConfigs.create).not.toHaveBeenCalled();
   });
 
   it("blocks submit when the name has invalid characters (must be a lowercase slug)", async () => {
-    wrapper = createWrapper();
+    wrapper = await createWrapper();
     // e.g. "<test>" — not a lowercase-letters/numbers/underscores identifier.
     setField(wrapper, "name", "<test>");
     await submit(wrapper);
@@ -89,7 +106,7 @@ describe("ScoreConfigDialog", () => {
   });
 
   it("does NOT enforce the name pattern in edit mode (name is immutable)", async () => {
-    wrapper = createWrapper({
+    wrapper = await createWrapper({
       mode: "edit",
       row: {
         id: "sc1",
@@ -108,7 +125,7 @@ describe("ScoreConfigDialog", () => {
   });
 
   it("creates a numeric score config when the schema passes", async () => {
-    wrapper = createWrapper();
+    wrapper = await createWrapper();
     setField(wrapper, "name", "faithfulness");
     // numeric defaults: min 0, max 1 → valid ordering.
     await submit(wrapper);
@@ -123,7 +140,7 @@ describe("ScoreConfigDialog", () => {
   });
 
   it("allows a numeric range where min >= max (no ordering rule — pre-migration parity)", async () => {
-    wrapper = createWrapper();
+    wrapper = await createWrapper();
     setField(wrapper, "name", "faithfulness");
     setField(wrapper, "min", 5);
     setField(wrapper, "max", 1);
@@ -136,18 +153,18 @@ describe("ScoreConfigDialog", () => {
   });
 
   it("blocks submit when min or max is cleared (a blank number is not allowed)", async () => {
-    wrapper = createWrapper();
+    wrapper = await createWrapper();
     setField(wrapper, "name", "faithfulness");
     // Clear the real min input → stored value becomes "" (not 0).
-    await wrapper.find('[data-test="score-config-min-input"] input').setValue("");
+    await typeNumber("score-config-min-input", "");
     await flushPromises();
     await submit(wrapper);
     expect(oform(wrapper).form.state.isValid).toBe(false);
     expect(onlineEvalsService.scoreConfigs.create).not.toHaveBeenCalled();
 
     // Now clear max instead (min valid) → still blocked.
-    await wrapper.find('[data-test="score-config-min-input"] input').setValue("0");
-    await wrapper.find('[data-test="score-config-max-input"] input').setValue("");
+    await typeNumber("score-config-min-input", "0");
+    await typeNumber("score-config-max-input", "");
     await flushPromises();
     await submit(wrapper);
     expect(oform(wrapper).form.state.isValid).toBe(false);
@@ -155,7 +172,7 @@ describe("ScoreConfigDialog", () => {
   });
 
   it("allows an empty categorical config (no ≥1-category guard — pre-migration parity)", async () => {
-    wrapper = createWrapper();
+    wrapper = await createWrapper();
     setField(wrapper, "name", "verdict");
     setField(wrapper, "dataType", "categorical");
     // categories empty → pre-migration sent `categories: null` and saved fine.
@@ -168,7 +185,7 @@ describe("ScoreConfigDialog", () => {
   });
 
   it("creates a categorical config once categories are provided", async () => {
-    wrapper = createWrapper();
+    wrapper = await createWrapper();
     setField(wrapper, "name", "verdict");
     setField(wrapper, "dataType", "categorical");
     setField(wrapper, "categories", ["good", "bad"]);
@@ -181,8 +198,8 @@ describe("ScoreConfigDialog", () => {
     expect(payload.numericRange).toBeNull();
   });
 
-  it("keeps the dirty affordance on edit (Save disabled until changed)", () => {
-    wrapper = createWrapper({
+  it("keeps the dirty affordance on edit (Save disabled until changed)", async () => {
+    wrapper = await createWrapper({
       mode: "edit",
       row: {
         id: "sc1",
@@ -193,9 +210,7 @@ describe("ScoreConfigDialog", () => {
         numericRange: { min: 0, max: 1 },
       },
     });
-    const save = wrapper.find('[data-test="score-config-save-btn"]');
-    // Not dirty yet → disabled (a save-affordance, NOT a validation gate).
-    expect(save.attributes("disabled")).toBeDefined();
+    expect(domFind('[data-test="o-drawer-primary-btn"]')?.hasAttribute("disabled")).toBe(true);
   });
 
   // Regression: a number <input> emits a STRING (OInput only coerces with a
@@ -205,10 +220,10 @@ describe("ScoreConfigDialog", () => {
   // number and hides the bug) so the string actually flows through the form.
   describe("numeric values typed through the real inputs (string-coercion)", () => {
     it("sends a numeric numericRange (not null) when the range is typed", async () => {
-      wrapper = createWrapper();
+      wrapper = await createWrapper();
       setField(wrapper, "name", "faithfulness");
-      await wrapper.find('[data-test="score-config-min-input"] input').setValue("0.2");
-      await wrapper.find('[data-test="score-config-max-input"] input').setValue("0.9");
+      await typeNumber("score-config-min-input", "0.2");
+      await typeNumber("score-config-max-input", "0.9");
       await flushPromises();
 
       await submit(wrapper);
@@ -221,10 +236,10 @@ describe("ScoreConfigDialog", () => {
     });
 
     it("sends a numeric healthy-threshold value (not a string) when typed", async () => {
-      wrapper = createWrapper();
+      wrapper = await createWrapper();
       setField(wrapper, "name", "faithfulness");
       // healthyDirection defaults to "gte" → type the gte threshold value.
-      await wrapper.find('[data-test="score-config-gte-value-input"] input').setValue("0.7");
+      await typeNumber("score-config-gte-value-input", "0.7");
       await flushPromises();
 
       await submit(wrapper);
