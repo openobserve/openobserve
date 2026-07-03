@@ -264,7 +264,14 @@ const blockedReason = computed<'incognito' | null>(() =>
 function onReplay() {
   const steps = journeyToWireSteps(check.value.journey)
   if (steps.length === 0) return
-  recorder.replay(steps, check.value.url).catch((err) => {
+  recorder.replay(
+    steps,
+    check.value.url,
+    check.value.variables,
+    check.value.auth,
+    check.value.headers,
+    check.value.cookies,
+  ).catch((err) => {
     recorder.error.value = err instanceof Error ? err.message : String(err)
   })
 }

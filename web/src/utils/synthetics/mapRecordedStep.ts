@@ -144,3 +144,25 @@ export function journeyToWireSteps(steps: BrowserStep[]): WireStep[] {
     .map((s) => s.wire ?? buildWireFromStep(s))
     .filter((w): w is WireStep => w != null)
 }
+
+/**
+ * Substitute `{{ VAR_NAME }}` placeholders in wire step string fields with
+ * actual variable values. Operates on all string fields that could contain
+ * variable references (value, url, text, key, selector, name).
+ */
+export function substituteVariables(step: WireStep, vars: Record<string, string>): WireStep {
+  const re = /\{\{\s*(\w+)\s*\}\}/g
+  const sub = (s: string | undefined): string | undefined => {
+    if (s === undefined || s === null) return s
+    return s.replace(re, (_, k: string) => vars[k] ?? '')
+  }
+  return {
+    ...step,
+    url: sub(step.url),
+    value: sub(step.value),
+    text: sub(step.text),
+    key: sub(step.key),
+    selector: sub(step.selector),
+    name: sub(step.name),
+  }
+}

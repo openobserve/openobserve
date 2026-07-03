@@ -17,6 +17,7 @@ import type {
   StepReplayResult,
   WireStep,
 } from '@/types/synthetics'
+import { substituteVariables } from '@/utils/synthetics/mapRecordedStep'
 
 const RECORDING_PORT_NAME = 'synthetics-recorder'
 
@@ -219,7 +220,14 @@ const useSyntheticsRecorder = () => {
    * events stream over the port and are accumulated in `stepResults`. The final
    * `ReplayResponse` arrives via the sendCommand promise.
    */
-  async function replay(steps: WireStep[], targetUrl?: string): Promise<ReplayResponse | null> {
+  async function replay(
+    steps: WireStep[],
+    targetUrl?: string,
+    variables?: { name: string; value: string }[],
+    auth?: { type: 'basic'; username: string; password: string },
+    headers?: { key: string; value: string }[],
+    cookies?: { name: string; value: string; domain: string }[],
+  ): Promise<ReplayResponse | null> {
     if (steps.length === 0) {
       error.value = 'No replayable steps in this journey.'
       return null
@@ -231,6 +239,12 @@ const useSyntheticsRecorder = () => {
     replayPhase.value = 'running'
     isReplaying.value = true
 
+    // Substitute {{ VAR_NAME }} placeholders in wire step fields with actual variable values.
+    const vars = Object.fromEntries((variables ?? []).map(v => [v.name, v.value]))
+    const resolvedSteps = vars && Object.keys(vars).length > 0
+      ? steps.map(s => substituteVariables(s, vars))
+      : steps
+
     // Ensure port is open so stepReplayResult events flow through handlePortMessage.
     teardownPort() // discard any previous port (recording)
     if (!connectPort()) {
@@ -240,7 +254,7 @@ const useSyntheticsRecorder = () => {
       return null
     }
 
-    const res = await sendCommand<ReplayResponse>({ action: 'replay', steps, targetUrl })
+    const res = await sendCommand<ReplayResponse>({ action: 'replay', steps: resolvedSteps, targetUrl, auth, headers, cookies })
     isReplaying.value = false
     replayResult.value = res
     if (res) {

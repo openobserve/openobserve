@@ -93,7 +93,7 @@ export type RecorderCommand =
   | { action: 'startRecording'; mode?: RecorderMode; testIdAttr?: string, targetUrl: string }
   | { action: 'stopRecording' }
   | { action: 'setMode'; mode: RecorderMode }
-  | { action: 'replay'; steps: WireStep[]; targetUrl?: string }
+  | { action: 'replay'; steps: WireStep[]; targetUrl?: string; auth?: { type: 'basic'; username: string; password: string }; headers?: { key: string; value: string }[]; cookies?: { name: string; value: string; domain: string }[] }
   | { action: 'stopReplay' }
 
 export interface RecorderCommandEnvelope {

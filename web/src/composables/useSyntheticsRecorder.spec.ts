@@ -177,6 +177,49 @@ describe('useSyntheticsRecorder', () => {
       expect(r.replayResult.value).toEqual({ success: true, passed: true })
     })
 
+    it('should pass auth, headers, cookies, and variables in the replay command', async () => {
+      const runtime = installChrome({ replay: (cb) => cb({ success: true, passed: true }) }, port)
+      const r = useSyntheticsRecorder()
+      const vars = [{ name: 'BASE_URL', value: 'https://example.com' }]
+      const auth = { type: 'basic' as const, username: 'admin', password: 'secret' }
+      const headers = [{ key: 'X-Custom', value: 'val' }]
+      const cookies = [{ name: 'session', value: 'abc123', domain: 'example.com' }]
+
+      await r.replay(steps, 'https://x.test', vars, auth, headers, cookies)
+
+      expect(runtime.sendMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        {
+          type: 'synthetics-command',
+          command: {
+            action: 'replay',
+            steps,
+            targetUrl: 'https://x.test',
+            auth,
+            headers,
+            cookies,
+          },
+        },
+        expect.any(Function),
+      )
+    })
+
+    it('should substitute variables in wire steps before sending', async () => {
+      const runtime = installChrome({ replay: (cb) => cb({ success: true, passed: true }) }, port)
+      const r = useSyntheticsRecorder()
+      const stepsWithVars: WireStep[] = [
+        { id: 's1', action: 'navigate', url: 'https://{{ BASE_URL }}/login' },
+        { id: 's2', action: 'type', selector: '#email', value: '{{ EMAIL }}' },
+      ]
+      const vars = [{ name: 'BASE_URL', value: 'example.com' }, { name: 'EMAIL', value: 'test@test.com' }]
+
+      await r.replay(stepsWithVars, 'https://example.com', vars)
+
+      const sentCommand = runtime.sendMessage.mock.calls[0][1] as any
+      expect(sentCommand.command.steps[0].url).toBe('https://example.com/login')
+      expect(sentCommand.command.steps[1].value).toBe('test@test.com')
+    })
+
     it('should store a failed replay result with the step error', async () => {
       installChrome({ replay: (cb) => cb({ success: true, passed: false, error: 'Timeout on #go' }) }, port)
       const r = useSyntheticsRecorder()
