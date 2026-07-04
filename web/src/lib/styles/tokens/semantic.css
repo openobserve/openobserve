@@ -293,6 +293,11 @@
   --o2-status-warning-bg: #FFF4EB;
   --o2-status-error-text: #CC3645;
   --o2-status-error-bg: #FFF7F7;
+  /* Log-severity colors — MUST stay aligned with STATUS_COLORS in
+     src/utils/logs/statusParser.ts (row spines / severity accents, so RUM
+     sessions match the logs page). */
+  --o2-severity-error-color: #EF5350;
+  --o2-severity-warning-color: #FB8C00;
   --o2-status-neutral-text: #6C707E;
   --o2-status-neutral-bg: #F7F8FA;
   --o2-span-kind-client-text: #588CF3;

@@ -280,6 +280,11 @@ class="tw:mr-1" />
             :data-expanded="
               formattedRows?.[virtualRow.index]?.original?.isExpandedRow
             "
+            :tabindex="
+              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                ? 0
+                : undefined
+            "
             :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
             :class="[
               'tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b-[1px]',
@@ -302,13 +307,18 @@ class="tw:mr-1" />
                   ? 'log-row-base tw:bg-(--o2-log-table-row-bg)'
                   : '',
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'table-row-hover tw:transition-[background-color,box-shadow] tw:duration-[120ms] tw:[transition-timing-function:ease-in-out] tw:border-b-(--o2-log-table-row-border)!'
+                ? 'table-row-hover table-row-focus tw:focus-visible:outline-none tw:transition-[background-color,box-shadow] tw:duration-[120ms] tw:[transition-timing-function:ease-in-out] tw:border-b-(--o2-log-table-row-border)!'
                 : '',
             ]"
             @click="
               !(formattedRows[virtualRow.index]?.original as any)
                 ?.isExpandedRow &&
               handleDataRowClick(tableRows[virtualRow.index], virtualRow.index)
+            "
+            @keydown="
+              !(formattedRows[virtualRow.index]?.original as any)
+                ?.isExpandedRow &&
+              handleRowKeydown($event, tableRows[virtualRow.index], virtualRow.index)
             "
           >
             <!-- Status color line for entire row -->
@@ -1125,6 +1135,29 @@ const handleDataRowClick = (row: any, index: number) => {
   }
 };
 
+const handleRowKeydown = (event: KeyboardEvent, row: any, index: number) => {
+  // Only handle keys originating from the row itself, not focusable inner elements.
+  if (event.target !== event.currentTarget) return;
+
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    handleDataRowClick(row, index);
+  } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    let sibling =
+      event.key === "ArrowDown"
+        ? (event.currentTarget as HTMLElement).nextElementSibling
+        : (event.currentTarget as HTMLElement).previousElementSibling;
+    while (sibling && !sibling.matches("tr[tabindex]")) {
+      sibling =
+        event.key === "ArrowDown"
+          ? sibling.nextElementSibling
+          : sibling.previousElementSibling;
+    }
+    if (sibling instanceof HTMLElement) sibling.focus();
+  }
+};
+
 const expandFunctionError = () => {
   isFunctionErrorOpen.value = !isFunctionErrorOpen.value;
 };
@@ -1231,7 +1264,8 @@ defineExpose({
   height: 0.75rem !important;
 }
 
-.table-row-hover:hover {
+.table-row-hover:hover,
+.table-row-focus:focus-visible {
   background-color: var(--o2-log-table-row-hover) !important;
   box-shadow: inset 3px 0 0 var(--o2-primary-color) !important;
 }

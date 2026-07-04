@@ -103,6 +103,13 @@ const parentDataTest = computed(
   () => $attrs["data-test"] as string | undefined,
 );
 
+// Forward tabindex to the real trigger; keep it off the wrapper (avoids a double tab-stop).
+const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
+const wrapperAttrs = computed(() => {
+  const { tabindex, ...rest } = $attrs;
+  return rest;
+});
+
 const emit = defineEmits<SelectEmits>();
 const slots = useSlots();
 
@@ -940,7 +947,7 @@ const fieldWidthClass = computed(() => {
 
 <template>
   <div
-    v-bind="$attrs"
+    v-bind="wrapperAttrs"
     :class="[
       'tw:flex tw:flex-col tw:gap-1',
       fieldWidthClass,
@@ -981,6 +988,7 @@ const fieldWidthClass = computed(() => {
             :id="inputId"
             :name="name"
             :disabled="disabled"
+            :tabindex="inputTabindex"
             :data-test="
               parentDataTest ? `${parentDataTest}-trigger` : undefined
             "
@@ -1521,6 +1529,7 @@ const fieldWidthClass = computed(() => {
       >
         <SelectTrigger
           :id="inputId"
+          :tabindex="inputTabindex"
           :data-test="
             parentDataTest ? `${parentDataTest}-trigger` : undefined
           "
