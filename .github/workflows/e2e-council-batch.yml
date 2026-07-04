@@ -22,7 +22,15 @@ name: E2E Council Batch — Automate Regression from Needs-Automation
 #              tomorrow retries. Engine writes ALL runs to autoe2e/batch-<key> (shared branch,
 #              reuse-forced) so no cherry-pick step exists.
 #   finalize:  grep `Issue: #<n>` commit trailers on autoe2e/batch-<key> — that IS the success set.
-#              Empty set → skip PR (empty-day guard). Non-empty → open ONE PR against main.
+#              Empty set → skip PR (empty-day guard). Non-empty → THREE writes:
+#                (a) register every new RegressionSet/<Area>/*.spec.js in OSS `playwright_regression.yml`
+#                    (yq-append to <Area>-Regression's run_files) and commit to the same batch branch.
+#                (b) mirror-register the same filenames in ENT `playwright_regression.yml` on a
+#                    same-named ENT branch and open a yml-only ENT companion PR (mirrors what today's
+#                    `ent_register` job does for main `playwright.yml` — ENT CI pulls the spec files
+#                    from the OSS branch, so ENT only needs the run_files delta).
+#                (c) open ONE aggregated OSS PR against main containing the specs + OSS yml update
+#                    + a link to the ENT PR.
 #              mode=full only: for each SUCCESSFULLY-COVERED issue, remove `Needs-Automation`,
 #              add `Automated`. Failures keep the label → auto-retry on the next run.
 #
@@ -416,8 +424,8 @@ jobs:
             done <<< "$NEW_SPECS"
 
             if [ "$REG_CHANGES" -gt 0 ]; then
-              # Commit the yml update on the same batch branch via the Contents API (no checkout, no
-              # local git needed). Get current SHA of the file on the branch → PUT the new content.
+              # Commit the OSS yml update on the same batch branch via the Contents API (no
+              # checkout, no local git needed). Get current SHA of the file on the branch → PUT.
               SHA=$(gh api "/repos/${OSS_REPO}/contents/.github/workflows/playwright_regression.yml?ref=${WORK_BRANCH}" \
                 --jq '.sha' 2>/dev/null || true)
               B64=$(base64 -i "$WORKDIR/playwright_regression.yml" | tr -d '\n')
@@ -431,6 +439,112 @@ jobs:
                 echo "::warning::commit of playwright_regression.yml update failed — the PR will still open but the specs won't run in the scheduled regression cron until manually registered."
             else
               echo "No new RegressionSet specs to register (all filenames already in playwright_regression.yml)."
+            fi
+          fi
+
+          # ---- 2c. Mirror the registration into ENT playwright_regression.yml (yml-only ENT PR) ----
+          # Regression cron exists on BOTH openobserve/openobserve AND openobserve/o2-enterprise.
+          # ENT CI uses the "Determine OSS Branch" pattern the existing ent_register job uses: a
+          # same-named ENT branch holds JUST the yml delta; the spec files themselves live on the
+          # OSS batch branch (ENT CI reads them from there). This mirrors what the /e2e council
+          # does today for main playwright.yml — we're doing the equivalent for
+          # playwright_regression.yml so RegressionSet specs land in ENT regression too.
+          ENT_REG_CHANGES=0
+          ENT_PR_URL=""
+          if [ "${PLW_REG_SKIPPED:-0}" = "0" ] && [ -n "${NEW_SPECS:-}" ]; then
+            ENT_WORKDIR="$RUNNER_TEMP/reg-yml-ent"
+            rm -rf "$ENT_WORKDIR" && mkdir -p "$ENT_WORKDIR"
+            # Create the ENT batch branch off ENT main (same name as the OSS branch — that's the
+            # convention the existing ent_register job uses, and ENT CI's "Determine OSS Branch"
+            # lookup finds the OSS branch by this name). Idempotent: exists → reuse.
+            ENT_MAIN_SHA=$(gh api "/repos/${ENT_REPO}/git/ref/heads/main" --jq '.object.sha' 2>/dev/null || true)
+            if [ -z "$ENT_MAIN_SHA" ]; then
+              echo "::warning::couldn't read ENT main SHA — ENT registration skipped (check ORG_ADMIN_TOKEN access to ${ENT_REPO})."
+            else
+              gh api -X POST "/repos/${ENT_REPO}/git/refs" \
+                -f ref="refs/heads/${WORK_BRANCH}" -f sha="${ENT_MAIN_SHA}" >/dev/null 2>&1 \
+                && echo "Created ENT branch ${WORK_BRANCH}." \
+                || echo "ENT branch ${WORK_BRANCH} already exists — reusing."
+              # Fetch ENT's playwright_regression.yml from the branch head.
+              gh api "/repos/${ENT_REPO}/contents/.github/workflows/playwright_regression.yml?ref=${WORK_BRANCH}" \
+                --jq '.content' 2>/dev/null | base64 --decode > "$ENT_WORKDIR/playwright_regression.yml" || {
+                  echo "::warning::couldn't fetch ENT playwright_regression.yml — ENT registration skipped."
+                  PLW_REG_ENT_SKIPPED=1
+                }
+              if [ "${PLW_REG_ENT_SKIPPED:-0}" = "0" ]; then
+                # Same append loop as the OSS side. ENT's matrix mirrors OSS group names 1:1.
+                while IFS= read -r SPEC_PATH; do
+                  [ -z "$SPEC_PATH" ] && continue
+                  REL="${SPEC_PATH#tests/ui-testing/playwright-tests/RegressionSet/}"
+                  AREA_FOLDER="${REL%%/*}"
+                  FILENAME="${REL##*/}"
+                  case "$AREA_FOLDER" in
+                    Logs)        GROUP=Logs-Regression ;;
+                    Alerts)      GROUP=Alerts-Regression ;;
+                    Dashboards)  GROUP=Dashboard-Regression ;;
+                    Pipelines)   GROUP=Pipelines-Regression ;;
+                    Streams)     GROUP=Streams-Regression ;;
+                    Traces)      GROUP=Traces-Regression ;;
+                    Metrics)     GROUP=Metrics-Regression ;;
+                    Reports)     GROUP=Reports-Regression ;;
+                    DataSources) GROUP=DataSources-Regression ;;
+                    General)     GROUP=GeneralTests-Regression ;;
+                    *)           GROUP=GeneralTests-Regression ;;
+                  esac
+                  ENT_CURRENT=$(yq eval "(.jobs.playwright.strategy.matrix.include[] | select(.testfolder == \"${GROUP}\") | .run_files)" "$ENT_WORKDIR/playwright_regression.yml" 2>/dev/null || echo "")
+                  if printf '%s' "$ENT_CURRENT" | grep -qx "^- ${FILENAME}$" 2>/dev/null; then
+                    echo "::notice::ENT: already registered ${FILENAME} in ${GROUP}"
+                    continue
+                  fi
+                  yq eval -i "(.jobs.playwright.strategy.matrix.include[] | select(.testfolder == \"${GROUP}\") | .run_files) += [\"${FILENAME}\"]" \
+                    "$ENT_WORKDIR/playwright_regression.yml" || { echo "::warning::ENT yq append failed for ${GROUP}/${FILENAME}"; continue; }
+                  echo "::notice::ENT: registered ${FILENAME} → ${GROUP}"
+                  ENT_REG_CHANGES=$((ENT_REG_CHANGES + 1))
+                done <<< "$NEW_SPECS"
+
+                if [ "$ENT_REG_CHANGES" -gt 0 ]; then
+                  ENT_SHA=$(gh api "/repos/${ENT_REPO}/contents/.github/workflows/playwright_regression.yml?ref=${WORK_BRANCH}" \
+                    --jq '.sha' 2>/dev/null || true)
+                  ENT_B64=$(base64 -i "$ENT_WORKDIR/playwright_regression.yml" | tr -d '\n')
+                  gh api "/repos/${ENT_REPO}/contents/.github/workflows/playwright_regression.yml" \
+                    --method PUT \
+                    -f message="test(autoe2e): register ${ENT_REG_CHANGES} regression spec(s) from batch ${BATCH_KEY}" \
+                    -f content="$ENT_B64" \
+                    -f sha="$ENT_SHA" \
+                    -f branch="$WORK_BRANCH" >/dev/null 2>&1 \
+                    && echo "ENT playwright_regression.yml updated on ${WORK_BRANCH} (+${ENT_REG_CHANGES})" \
+                    || { echo "::warning::ENT commit failed — skipping ENT PR."; ENT_REG_CHANGES=0; }
+                fi
+
+                # Open the yml-only ENT PR (idempotent — re-runs reuse). NO merge gate: reviewer
+                # merges when happy. ENT CI already validated each spec on the enterprise binary
+                # during verify_heal, so this is just the ongoing-regression-suite entry.
+                if [ "$ENT_REG_CHANGES" -gt 0 ]; then
+                  ENT_EXISTING=$(gh pr list --repo "${ENT_REPO}" --head "${WORK_BRANCH}" --state open --json number --jq '.[0].number // empty' 2>/dev/null || true)
+                  if [ -n "$ENT_EXISTING" ]; then
+                    ENT_PR_URL="https://github.com/${ENT_REPO}/pull/${ENT_EXISTING}"
+                    echo "ENT PR already open: ${ENT_PR_URL}"
+                  else
+                    ENT_BODY_FILE="$RUNNER_TEMP/ent-pr-body.md"
+                    {
+                      echo "## Enterprise regression registration — batch ${BATCH_KEY}"
+                      echo ""
+                      echo "Auto-generated **yml-only** companion to the OSS batch PR. Adds ${ENT_REG_CHANGES} regression spec(s) to \`playwright_regression.yml\` \`run_files\` so the ENT scheduled regression suite runs them going forward."
+                      echo ""
+                      echo "The spec files themselves live on the OSS branch \`${WORK_BRANCH}\` — ENT CI's \"Determine OSS Branch\" lookup finds them there (mirror of what \`ent_register\` does today for the main \`playwright.yml\`)."
+                      echo ""
+                      echo "Each spec was already validated on the enterprise binary during \`verify_heal\`. **No merge gate** — merge to keep in ongoing enterprise regression, or close to opt out."
+                      echo ""
+                      echo "_Generated by \`e2e-council-batch.yml\`._"
+                    } > "$ENT_BODY_FILE"
+                    ENT_PR_URL=$(gh pr create --repo "${ENT_REPO}" \
+                      --base main --head "${WORK_BRANCH}" \
+                      --title "test(autoe2e): enterprise regression for batch ${BATCH_KEY} (${ENT_REG_CHANGES} spec(s))" \
+                      --body-file "$ENT_BODY_FILE" 2>&1 | grep -oE 'https://github.com/[^ ]+' | head -n1 || true)
+                    echo "Opened ENT PR: ${ENT_PR_URL:-<failed>}"
+                  fi
+                fi
+              fi
             fi
           fi
 
@@ -465,6 +579,13 @@ jobs:
             echo "- Each spec targets \`tests/ui-testing/playwright-tests/RegressionSet/<Area>/\`."
             echo "- The spec was verify-healed against the enterprise binary before landing on this branch."
             echo "- The existing Playwright CI on this PR re-validates the specs against the OSS binary."
+            echo "- OSS regression matrix updated: \`.github/workflows/playwright_regression.yml\` (+${REG_CHANGES:-0} run_files)."
+            if [ -n "${ENT_PR_URL:-}" ]; then
+              echo "- **Enterprise regression** — a yml-only companion PR is open on o2-enterprise: ${ENT_PR_URL}"
+              echo "  (mirror registration in ENT's \`playwright_regression.yml\`; ENT CI pulls the spec files from this OSS branch)."
+            elif [ "${ENT_REG_CHANGES:-0}" = "0" ] && [ -n "${NEW_SPECS:-}" ]; then
+              echo "- ENT regression: no ENT-side changes needed (all filenames already registered)."
+            fi
           } > "$BODY_FILE"
 
           # ---- 4. Open ONE aggregated PR (idempotent — reuse if today's PR already exists) ----
@@ -508,7 +629,8 @@ jobs:
             echo ""
             echo "- Batch: \`${BATCH_KEY}\`"
             echo "- Success: **${SUCCESS_COUNT}** issue(s)"
-            echo "- PR: ${PR_URL:-<none>}"
+            echo "- OSS PR: ${PR_URL:-<none>}  (+${REG_CHANGES:-0} OSS regression yml)"
+            echo "- ENT PR: ${ENT_PR_URL:-<none>}  (+${ENT_REG_CHANGES:-0} ENT regression yml)"
             if [ "$MODE" != "full" ]; then
               echo "- Labels unchanged (mode=${MODE})."
             fi
