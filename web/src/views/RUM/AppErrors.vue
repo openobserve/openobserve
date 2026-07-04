@@ -96,18 +96,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #after>
-        <div class="card-container tw:h-full tw:overflow-hidden">
+        <div class="tw:h-full tw:flex tw:flex-col tw:min-h-0">
+          <!-- Errors-over-time chart + KPI summary -->
+          <div
+            class="tw:grid tw:grid-cols-1 tw:lg:grid-cols-5 tw:gap-2 tw:px-2 tw:pt-1.5 tw:h-[11rem] tw:shrink-0"
+          >
+            <ErrorsOverTimeChart
+              class="tw:lg:col-span-3"
+              :buckets="chartSeries"
+              :deploy="latestDeploy"
+              :spike-factor="deploySpikeFactor"
+              :focus="typeFilter"
+              :loading="isLoadingChart"
+            />
+            <ErrorsKpiCards
+              class="tw:lg:col-span-2"
+              :kpis="kpis"
+              :loading="isLoadingKpis"
+            />
+          </div>
+
+          <!-- Status / type / service filters -->
+          <div class="tw:px-2 tw:py-1.5">
+            <ErrorsFilterBar
+              :status="statusFilter"
+              :type="typeFilter"
+              :service="serviceFilter"
+              :services="serviceOptions"
+              :counts="filterCounts"
+              @update:status="onStatusFilterChange"
+              @update:type="onTypeFilterChange"
+              @update:service="onServiceFilterChange"
+            />
+          </div>
+
+          <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
           <OTable
-            :data="tableErrors"
+            :data="visibleIssues"
             :columns="tableColumns"
-            :loading="isLoading.length"
+            :loading="!!isLoading.length || isLoadingIssues"
             row-key="_rowKey"
             pagination="none"
             virtual-scroll
             :dense="false"
-            :row-height="86"
+            :row-height="60"
             :show-global-filter="false"
-            horizontal-scroll
+            :default-columns="false"
             class="tw:h-full"
             data-test="rum-app-errors-table"
             row-class="tw:cursor-pointer"
@@ -116,14 +150,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #empty>
               <NoData />
             </template>
-            <template #cell-error="{ row }">
-              <ErrorDetail :column="row" />
+            <template #cell-issue="{ row }">
+              <ErrorIssueCell :issue="row" />
             </template>
-            <!-- Event count as a data bar — surfaces the noisiest errors (audit §2.2). -->
-            <template #cell-events="{ row, value }">
-              <ODataBarCell :value="row.events" :max="eventsMax" :display="value" />
+            <template #cell-trend="{ row }">
+              <ErrorTrendCell
+                :buckets="trendBuckets[issueKey(row)] ?? null"
+                :status="row.status"
+                :handling="row.error_handling"
+                :loading="isLoadingTrends"
+              />
+            </template>
+            <template #cell-events="{ row }">
+              <div class="tw:flex tw:flex-col tw:items-end">
+                <span
+                  class="tw:font-semibold tw:tabular-nums"
+                  data-test="rum-app-errors-events-count"
+                >{{ addCommasToNumber(row.events) }}</span>
+                <small>{{ t("rum.eventsUnit") }}</small>
+              </div>
+            </template>
+            <template #cell-users="{ row }">
+              <span
+                class="tw:tabular-nums"
+                data-test="rum-app-errors-users-count"
+              >{{
+                row.users_affected != null
+                  ? addCommasToNumber(row.users_affected)
+                  : "—"
+              }}</span>
+            </template>
+            <template #cell-seen="{ row }">
+              <div class="tw:flex tw:flex-col">
+                <span data-test="rum-app-errors-last-seen">{{
+                  formatRelativeTime(row.zo_sql_timestamp)
+                }}</span>
+                <small data-test="rum-app-errors-first-seen">{{
+                  t("rum.firstSeenAgo", {
+                    time: formatRelativeTime(row.first_seen),
+                  })
+                }}</small>
+              </div>
+            </template>
+            <template #cell-status="{ row }">
+              <OTag
+                :label="
+                  row.status === 'new'
+                    ? t('rum.statusNew')
+                    : t('rum.statusOngoing')
+                "
+                :variant="row.status === 'new' ? 'error' : 'error-outline'"
+                size="sm"
+                :title="
+                  row.status === 'new' ? t('rum.statusNewTooltip') : undefined
+                "
+                data-test="rum-app-errors-status-badge"
+              />
             </template>
           </OTable>
+          </div>
         </div>
       </template>
     </OSplitter>
@@ -148,12 +233,20 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
-import ErrorDetail from "@/components/rum/ErrorDetail.vue";
-import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
+import ErrorIssueCell from "@/components/rum/errorTracking/list/ErrorIssueCell.vue";
+import ErrorTrendCell from "@/components/rum/errorTracking/list/ErrorTrendCell.vue";
+import ErrorsOverTimeChart from "@/components/rum/errorTracking/list/ErrorsOverTimeChart.vue";
+import ErrorsKpiCards from "@/components/rum/errorTracking/list/ErrorsKpiCards.vue";
+import ErrorsFilterBar, {
+  type IssueStatusFilter,
+  type IssueTypeFilter,
+} from "@/components/rum/errorTracking/list/ErrorsFilterBar.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import useErrorTracking from "@/composables/useErrorTracking";
-import useQuery from "@/composables/useQuery";
+import useErrorIssuesData from "@/composables/rum/useErrorIssuesData";
+import { issueKey, formatRelativeTime } from "@/utils/rum/errorIssueUtils";
+import { addCommasToNumber } from "@/utils/formatters";
 import { useStore } from "vuex";
-import searchService from "@/services/search";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
@@ -165,9 +258,7 @@ import {
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -230,31 +321,87 @@ const { placeholder: editorPlaceholder } = useQueryPlaceholder(
   _sqlMode,
   _noStream,
 );
-const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 const { errorTrackingState } = useErrorTracking();
+const {
+  issues,
+  trendBuckets,
+  chartSeries,
+  latestDeploy,
+  deploySpikeFactor,
+  kpis,
+  isLoadingIssues,
+  isLoadingChart,
+  isLoadingKpis,
+  isLoadingTrends,
+  fetchAll,
+} = useErrorIssuesData();
 const store = useStore();
 const isLoading: Ref<true[]> = ref([]);
 const isMounted = ref(false);
 const { getStream } = useStreams();
-const totalErrorsCount = ref(0);
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
 
-const tableErrors = computed(() => {
-  const errors = errorTrackingState.data.errors;
-  if (!Array.isArray(errors)) return [];
-  return errors.map((e: any, i: number) => ({
-    _rowKey: e.latest_error_id || e.zo_sql_timestamp || `err_${i}`,
-    ...e,
-  }));
+const tableErrors = computed(() =>
+  issues.value.map((issue: any, i: number) => ({
+    _rowKey: issue.latest_error_id || issue.zo_sql_timestamp || `err_${i}`,
+    ...issue,
+  })),
+);
+
+// ── Status / type / service filters ────────────────────────────────
+const statusFilter = ref<IssueStatusFilter>("all");
+const typeFilter = ref<IssueTypeFilter>("all");
+const serviceFilter = ref("");
+// Accumulated across runs so the list survives service-filtered queries.
+const serviceOptions: Ref<string[]> = ref([]);
+
+const filterCounts = computed(() => {
+  const counts = { new: 0, ongoing: 0, unhandled: 0, handled: 0 };
+  for (const issue of issues.value) {
+    counts[issue.status === "new" ? "new" : "ongoing"]++;
+    counts[issue.error_handling === "handled" ? "handled" : "unhandled"]++;
+  }
+  return counts;
 });
 
-// Per-page max for the events data bar (audit §2.2).
-const eventsMax = computed(() =>
-  tableErrors.value.reduce((m: number, r: any) => {
-    const n = Number(r?.events);
-    return isNaN(n) ? m : Math.max(m, n);
-  }, 0),
+// Chips filter client-side over the grouped result set; the chart and KPI
+// cards intentionally keep showing the whole (SQL-filtered) stream.
+const visibleIssues = computed(() =>
+  tableErrors.value.filter((issue: any) => {
+    if (statusFilter.value !== "all" && issue.status !== statusFilter.value) {
+      return false;
+    }
+    if (typeFilter.value !== "all") {
+      const handling =
+        issue.error_handling === "handled" ? "handled" : "unhandled";
+      if (handling !== typeFilter.value) return false;
+    }
+    return true;
+  }),
 );
+
+const collectServiceOptions = () => {
+  const merged = new Set(serviceOptions.value);
+  for (const issue of issues.value) {
+    if (issue.service) merged.add(issue.service);
+  }
+  serviceOptions.value = Array.from(merged).sort();
+};
+
+const onStatusFilterChange = (value: IssueStatusFilter) => {
+  statusFilter.value = value;
+  updateUrlQueryParams();
+};
+
+const onTypeFilterChange = (value: IssueTypeFilter) => {
+  typeFilter.value = value;
+  updateUrlQueryParams();
+};
+
+const onServiceFilterChange = (value: string) => {
+  serviceFilter.value = value;
+  runQuery();
+};
 
 // Dynamic editor height based on content lines
 const errorEditorHeight = computed(() => {
@@ -266,12 +413,21 @@ const errorEditorHeight = computed(() => {
 
 const tableColumns = [
   {
-    id: "error",
-    header: t("rum.error"),
-    accessorKey: "error",
-    sortable: true,
-    size: COL.description,
-    meta: { align: "left" }
+    id: "issue",
+    header: t("rum.issueColumn"),
+    accessorKey: "error_message",
+    sortable: false,
+    // autoWidth: the issue cell absorbs leftover width and truncates long
+    // messages instead of expanding the table into a horizontal scrollbar.
+    meta: { align: "left", autoWidth: true },
+  },
+  {
+    id: "trend",
+    header: t("rum.trendColumn"),
+    accessorKey: "events",
+    sortable: false,
+    size: 170,
+    meta: { align: "left" },
   },
   {
     id: "events",
@@ -282,11 +438,27 @@ const tableColumns = [
     meta: { align: "right" },
   },
   {
-    id: "initial_view_name",
-    header: t("rum.viewURL"),
-    accessorKey: "view_url",
+    id: "users",
+    header: t("rum.usersColumn"),
+    accessorKey: "users_affected",
     sortable: true,
-    size: COL.url,
+    size: COL.count,
+    meta: { align: "right" },
+  },
+  {
+    id: "seen",
+    header: t("rum.seenColumn"),
+    accessorKey: "zo_sql_timestamp",
+    sortable: true,
+    size: 150,
+    meta: { align: "left" },
+  },
+  {
+    id: "status",
+    header: t("rum.statusColumn"),
+    accessorKey: "status",
+    sortable: true,
+    size: COL.status,
     meta: { align: "left" },
   },
 ];
@@ -395,112 +567,6 @@ const getStreamFields = () => {
   });
 };
 
-const getErrorLogs = () => {
-  const interval = getTimeInterval(
-    dateTime.value.startTime,
-    dateTime.value.endTime,
-  );
-  const parsedQuery = parseQuery(errorTrackingState.data.editorValue, false);
-  const queryPayload: any = {
-    from: Object.keys(errorTrackingState.data.errors).length,
-    size: errorTrackingState.data.resultGrid.size,
-    timestamp_column: store.state.zoConfig.timestamp_column,
-    timestamps: {
-      startTime: dateTime.value.startTime,
-      endTime: dateTime.value.endTime,
-    },
-    timeInterval: interval.interval,
-    sqlMode: false,
-    currentPage: errorTrackingState.data.resultGrid.currentPage,
-    selectedStream: errorTrackingState.data.stream.errorStream,
-    parsedQuery,
-    streamName: errorTrackingState.data.stream.errorStream,
-  };
-  const req = buildQueryPayload(queryPayload);
-
-  let errorFields = "";
-  let errorWhereClause = "";
-
-  if (schemaMapping.value["error_message"]) {
-    errorFields += "error_message, ";
-    errorWhereClause += "error_message, ";
-  }
-  if (schemaMapping.value["error_handling"]) {
-    errorFields += "error_handling, ";
-    errorWhereClause += "error_handling, ";
-  }
-
-  if (schemaMapping.value["error_type"]) {
-    errorFields += "error_type, ";
-    errorWhereClause += "error_type, ";
-  }
-
-  if (schemaMapping.value["error_id"]) {
-    errorWhereClause += `FIRST_VALUE(error_id ORDER BY ${store.state.zoConfig.timestamp_column} DESC) as latest_error_id, `;
-  }
-
-  schemaMapping.value["error_stack"] = false;
-  schemaMapping.value["error_handling_stack"] = false;
-
-  if (
-    schemaMapping.value["error_handling_stack"] &&
-    schemaMapping.value["error_stack"]
-  ) {
-    errorWhereClause +=
-      "MIN(CASE WHEN error_stack IS NOT NULL THEN error_stack WHEN error_handling_stack IS NOT NULL THEN error_handling_stack ELSE NULL END ) AS error_stack, ";
-    errorFields += "error_stack, ";
-  } else if (schemaMapping.value["error_handling_stack"]) {
-    errorWhereClause +=
-      "MIN(CASE WHEN error_handling_stack IS NOT NULL THEN error_handling_stack ELSE NULL END ) AS error_stack, ";
-    errorFields += "error_stack, ";
-  } else if (schemaMapping.value["error_stack"]) {
-    errorWhereClause +=
-      "MIN(CASE WHEN error_stack IS NOT NULL THEN error_stack ELSE NULL END ) AS error_stack, ";
-    errorFields += "error_stack, ";
-  }
-
-  req.query.sql = `select max(${
-    store.state.zoConfig.timestamp_column
-  }) as zo_sql_timestamp, service, COUNT(*) as events, ${errorWhereClause} max(view_url) as view_url, max(session_id) as session_id from "_rumdata" where type='error'${
-    errorTrackingState.data.editorValue.length
-      ? " and " + errorTrackingState.data.editorValue
-      : ""
-  } GROUP BY ${errorFields} service order by zo_sql_timestamp DESC`;
-
-  req.query.sql.replaceAll("\n", " ");
-  delete req.aggs;
-  isLoading.value.push(true);
-
-  updateUrlQueryParams();
-
-  searchService
-    .search(
-      {
-        org_identifier: store.state.selectedOrganization.identifier,
-        query: req,
-        page_type: "logs",
-      },
-      "RUM",
-    )
-    .then((res) => {
-      errorTrackingState.data.errors = res.data.hits;
-      totalErrorsCount.value = res.data.hits.reduce(
-        (acc: number, curr: any) => {
-          return acc + curr.events;
-        },
-        0,
-      );
-    })
-    .catch((err) => {
-      toast({
-        message:
-          err.response?.data?.message || "Error while fetching error events",
-        variant: "error",
-      });
-    })
-    .finally(() => isLoading.value.pop());
-};
-
 const updateDateChange = (date: any) => {
   if (JSON.stringify(date) === JSON.stringify(dateTime.value)) return;
   dateTime.value = {
@@ -517,8 +583,14 @@ const updateDateChange = (date: any) => {
 
 const runQuery = () => {
   errorTrackingState.data.resultGrid.currentPage = 0;
-  errorTrackingState.data.errors = {};
-  getErrorLogs();
+  updateUrlQueryParams();
+  fetchAll({
+    startTime: dateTime.value.startTime,
+    endTime: dateTime.value.endTime,
+    schema: schemaMapping.value,
+    userQuery: errorTrackingState.data.editorValue,
+    service: serviceFilter.value,
+  }).then(collectServiceOptions);
 };
 
 const handleErrorTypeClick = async (payload: any) => {
@@ -555,6 +627,22 @@ function restoreUrlQueryParams() {
     errorTrackingState.data.editorValue =
       b64DecodeUnicode(queryParams.query as string) || "";
   }
+
+  if (
+    queryParams.status === "new" ||
+    queryParams.status === "ongoing"
+  ) {
+    statusFilter.value = queryParams.status;
+  }
+  if (
+    queryParams.type === "unhandled" ||
+    queryParams.type === "handled"
+  ) {
+    typeFilter.value = queryParams.type;
+  }
+  if (typeof queryParams.service === "string" && queryParams.service) {
+    serviceFilter.value = queryParams.service;
+  }
 }
 
 function updateUrlQueryParams() {
@@ -571,6 +659,10 @@ function updateUrlQueryParams() {
   }
 
   query["query"] = b64EncodeUnicode(errorTrackingState.data.editorValue);
+
+  if (statusFilter.value !== "all") query["status"] = statusFilter.value;
+  if (typeFilter.value !== "all") query["type"] = typeFilter.value;
+  if (serviceFilter.value) query["service"] = serviceFilter.value;
 
   query["org_identifier"] = store.state.selectedOrganization.identifier;
   router.push({ query });
