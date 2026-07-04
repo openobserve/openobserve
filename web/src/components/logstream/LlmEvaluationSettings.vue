@@ -14,23 +14,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <template>
-  <div class="llm-eval-settings">
+  <div class="tw:flex tw:flex-col tw:h-full">
     <!-- Loading skeleton -->
     <div
       v-if="loading"
       data-test="stream-llm-eval-loading"
-      class="llm-eval-settings__loading"
+      class="tw:flex tw:justify-center tw:items-center tw:p-8"
     >
       <OSpinner size="md" />
     </div>
 
     <template v-else>
       <div
-        class="llm-eval-settings__card"
+        class="tw:flex-1 tw:overflow-y-auto tw:rounded-lg tw:border tw:border-solid tw:py-2 tw:m-4"
         :class="
           store.state.theme === 'dark'
-            ? 'llm-eval-settings__card--dark'
-            : 'llm-eval-settings__card--light'
+            ? 'tw:border-[#374151] tw:bg-(--o2-primary-background)'
+            : 'tw:border-[#e5e7eb] tw:bg-white'
         "
       >
         <OForm
@@ -39,30 +39,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
         >
           <!-- Enable toggle row -->
           <div
-            class="llm-eval-settings__row llm-eval-settings__row--bordered"
+            class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:text-[0.8125rem] tw:border-b tw:border-b-solid"
             :class="
               store.state.theme === 'dark'
-                ? 'llm-eval-settings__row--bordered-dark'
-                : 'llm-eval-settings__row--bordered-light'
+                ? 'tw:border-b-[#4b5563]'
+                : 'tw:border-b-[#e5e7eb]'
             "
           >
-            <div class="llm-eval-settings__row-content">
+            <div class="tw:flex tw:flex-col tw:gap-0.5 tw:flex-1 tw:pr-4">
               <span
-                class="llm-eval-settings__label"
+                class="tw:text-[0.8125rem] tw:font-semibold"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'llm-eval-settings__label--dark'
-                    : 'llm-eval-settings__label--light'
+                    ? 'tw:text-[#e5e7eb]'
+                    : 'tw:text-[#374151]'
                 "
               >
                 {{ t("pipeline.llmEvaluation") }}
               </span>
               <small
-                class="llm-eval-settings__hint"
+                class="tw:block tw:text-xs tw:italic tw:mt-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'llm-eval-settings__hint--dark'
-                    : 'llm-eval-settings__hint--light'
+                    ? 'tw:text-[#9ca3af]'
+                    : 'tw:text-[#6b7280]'
                 "
               >
                 {{ t("pipeline.llmEvaluationEnableHelp") }}
@@ -78,13 +78,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           <!-- Config fields — visible when enabled -->
           <template v-if="enabled">
             <!-- LLM Span Identifier -->
-            <div class="setting-group llm-eval-settings__field">
+            <div class="tw:pt-3 tw:px-4 tw:pb-1">
               <label
-                class="llm-eval-settings__field-label"
+                class="tw:block tw:text-[0.8125rem] tw:font-semibold tw:mb-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'llm-eval-settings__label--dark'
-                    : 'llm-eval-settings__label--light'
+                    ? 'tw:text-[#e5e7eb]'
+                    : 'tw:text-[#374151]'
                 "
               >
                 {{ t("pipeline.llmSpanIdentifier") }}
@@ -95,16 +95,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 searchable
                 labelKey="label"
                 valueKey="value"
-                class="llm-eval-settings__input"
+                class="tw:w-full"
                 data-test="stream-llm-eval-span-identifier"
                 @update:model-value="markDirty"
               />
               <small
-                class="llm-eval-settings__hint"
+                class="tw:block tw:text-xs tw:italic tw:mt-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'llm-eval-settings__hint--dark'
-                    : 'llm-eval-settings__hint--light'
+                    ? 'tw:text-[#9ca3af]'
+                    : 'tw:text-[#6b7280]'
                 "
               >
                 {{ t("pipeline.llmSpanIdentifierFieldHelp") }}
@@ -112,13 +112,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             </div>
 
             <!-- Evaluation Template Selection -->
-            <div class="setting-group llm-eval-settings__field">
+            <div class="tw:pt-3 tw:px-4 tw:pb-1">
               <label
-                class="llm-eval-settings__field-label"
+                class="tw:block tw:text-[0.8125rem] tw:font-semibold tw:mb-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'llm-eval-settings__label--dark'
-                    : 'llm-eval-settings__label--light'
+                    ? 'tw:text-[#e5e7eb]'
+                    : 'tw:text-[#374151]'
                 "
               >
                 {{ t("pipeline.evaluationTemplate") }}
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                   :options="availableTemplates"
                   labelKey="name"
                   valueKey="id"
-                  class="llm-eval-settings__input tw:flex-1"
+                  class="tw:w-full tw:flex-1"
                   data-test="stream-llm-eval-template-select"
                   @update:model-value="markDirty"
                 />
@@ -144,11 +144,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 />
               </div>
               <small
-                class="llm-eval-settings__hint"
+                class="tw:block tw:text-xs tw:italic tw:mt-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'llm-eval-settings__hint--dark'
-                    : 'llm-eval-settings__hint--light'
+                    ? 'tw:text-[#9ca3af]'
+                    : 'tw:text-[#6b7280]'
                 "
               >
                 {{ t("pipeline.evaluationTemplateHelp") }}
@@ -157,19 +157,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
             <!-- Sampling toggle row -->
             <div
-              class="llm-eval-settings__row llm-eval-settings__row--bordered"
+              class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:text-[0.8125rem] tw:border-b tw:border-b-solid"
               :class="
                 store.state.theme === 'dark'
-                  ? 'llm-eval-settings__row--bordered-dark'
-                  : 'llm-eval-settings__row--bordered-light'
+                  ? 'tw:border-b-[#4b5563]'
+                  : 'tw:border-b-[#e5e7eb]'
               "
             >
               <span
-                class="llm-eval-settings__label"
+                class="tw:text-[0.8125rem] tw:font-semibold"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'llm-eval-settings__label--dark'
-                    : 'llm-eval-settings__label--light'
+                    ? 'tw:text-[#e5e7eb]'
+                    : 'tw:text-[#374151]'
                 "
               >
                 {{ t("pipeline.samplingLabel") }}
@@ -184,15 +184,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             <!-- Sampling rate slider -->
             <div
               v-if="enableSampling"
-              class="setting-group llm-eval-settings__field"
+              class="tw:pt-3 tw:px-4 tw:pb-1"
             >
-              <div class="llm-eval-settings__sampling-header">
+              <div class="tw:mb-1">
                 <span
-                  class="llm-eval-settings__sampling-label"
+                  class="tw:text-xs"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'llm-eval-settings__label--dark'
-                      : 'llm-eval-settings__label--light'
+                      ? 'tw:text-[#e5e7eb]'
+                      : 'tw:text-[#374151]'
                   "
                 >
                   {{
@@ -211,11 +211,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 @update:model-value="markDirty"
               />
               <small
-                class="llm-eval-settings__hint"
+                class="tw:block tw:text-xs tw:italic tw:mt-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'llm-eval-settings__hint--dark'
-                    : 'llm-eval-settings__hint--light'
+                    ? 'tw:text-[#9ca3af]'
+                    : 'tw:text-[#6b7280]'
                 "
               >
                 {{ t("pipeline.llmEvaluationSamplingHelp") }}
@@ -223,29 +223,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             </div>
 
             <!-- Output stream name -->
-            <div class="setting-group llm-eval-settings__field">
+            <div class="tw:pt-3 tw:px-4 tw:pb-1">
               <label
-                class="llm-eval-settings__field-label"
+                class="tw:block tw:text-[0.8125rem] tw:font-semibold tw:mb-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'llm-eval-settings__label--dark'
-                    : 'llm-eval-settings__label--light'
+                    ? 'tw:text-[#e5e7eb]'
+                    : 'tw:text-[#374151]'
                 "
               >
                 {{ t("pipeline.llmEvaluationOutputStreamName") }}
               </label>
               <OFormInput
                 name="outputStream"
-                class="llm-eval-settings__input"
+                class="tw:w-full"
                 data-test="stream-llm-eval-output-stream"
                 @update:model-value="markDirty"
               />
               <small
-                class="llm-eval-settings__hint"
+                class="tw:block tw:text-xs tw:italic tw:mt-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'llm-eval-settings__hint--dark'
-                    : 'llm-eval-settings__hint--light'
+                    ? 'tw:text-[#9ca3af]'
+                    : 'tw:text-[#6b7280]'
                 "
               >
                 {{ t("pipeline.llmEvaluationOutputStreamHelp") }}
@@ -257,11 +257,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           <div
             v-else
             data-test="stream-llm-eval-info-banner"
-            class="llm-eval-settings__info-banner"
+            class="tw:mx-4 tw:my-3 tw:p-3 tw:rounded tw:border tw:border-solid tw:text-xs"
             :class="
               store.state.theme === 'dark'
-                ? 'llm-eval-settings__info-banner--dark'
-                : 'llm-eval-settings__info-banner--light'
+                ? 'tw:text-[#fcd34d] tw:border-[#92400e] tw:bg-[rgba(146,64,14,0.15)]'
+                : 'tw:text-[#92400e] tw:border-[#fde68a] tw:bg-[#fffbeb]'
             "
           >
             {{ t("pipeline.llmEvaluationRemoveWarning") }}
@@ -672,136 +672,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.llm-eval-settings {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-
-  &__loading {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 2rem;
-  }
-
-  &__card {
-    flex: 1;
-    overflow-y: auto;
-    border-radius: 0.5rem;
-    border-width: 0.0625rem;
-    border-style: solid;
-    padding: 0.5rem 0;
-    margin: 1rem;
-
-    &--light {
-      border-color: #e5e7eb;
-      background-color: #ffffff;
-    }
-
-    &--dark {
-      border-color: #374151;
-      background-color: #181a1b;
-    }
-  }
-
-  &__row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.5rem 1rem;
-    font-size: 0.8125rem;
-
-    &--bordered {
-      border-bottom-width: 0.0625rem;
-      border-bottom-style: solid;
-
-      &-light {
-        border-bottom-color: #e5e7eb;
-      }
-      &-dark {
-        border-bottom-color: #4b5563;
-      }
-    }
-  }
-
-  &__row-content {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-    flex: 1;
-    padding-right: 1rem;
-  }
-
-  &__label {
-    font-size: 0.8125rem;
-    font-weight: 600;
-
-    &--light {
-      color: #374151;
-    }
-    &--dark {
-      color: #e5e7eb;
-    }
-  }
-
-  &__field {
-    padding: 0.75rem 1rem 0.25rem;
-  }
-
-  &__field-label {
-    display: block;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-  }
-
-  &__input {
-    width: 100%;
-  }
-
-  &__hint {
-    display: block;
-    font-size: 0.75rem;
-    font-style: italic;
-    margin-top: 0.25rem;
-
-    &--light {
-      color: #6b7280;
-    }
-    &--dark {
-      color: #9ca3af;
-    }
-  }
-
-  &__sampling-header {
-    margin-bottom: 0.25rem;
-  }
-
-  &__sampling-label {
-    font-size: 0.75rem;
-  }
-
-  &__info-banner {
-    margin: 0.75rem 1rem;
-    padding: 0.75rem;
-    border-radius: 0.25rem;
-    border-width: 0.0625rem;
-    border-style: solid;
-    font-size: 0.75rem;
-
-    &--light {
-      color: #92400e;
-      border-color: #fde68a;
-      background-color: #fffbeb;
-    }
-
-    &--dark {
-      color: #fcd34d;
-      border-color: #92400e;
-      background-color: rgba(146, 64, 14, 0.15);
-    }
-  }
-}
-</style>
