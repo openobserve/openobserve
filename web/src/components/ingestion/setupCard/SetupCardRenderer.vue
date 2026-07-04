@@ -324,8 +324,13 @@ const chipIcon = (kind: StepChipKind) =>
   ({ terminal: "", editor: "code", run: "play-arrow", traces: "timeline" })[
     kind
   ];
+// A code block with a filename is a file, not a shell command — render it with
+// editor chrome even under a terminal-chip step. Needed when one step mixes
+// command and file variants (e.g. RUM's npm install vs CDN HTML snippet).
 const codeChrome = (step: RichCardStep): "terminal" | "editor" =>
-  step.chip?.kind === "terminal" ? "terminal" : "editor";
+  !displayCode(step)?.filename && step.chip?.kind === "terminal"
+    ? "terminal"
+    : "editor";
 
 const extras = computed(() => props.content.extras ?? {});
 const hasInstallerAccordion = computed(
