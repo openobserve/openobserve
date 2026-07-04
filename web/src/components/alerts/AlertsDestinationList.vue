@@ -131,12 +131,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:truncate tw:min-w-0"
                 :title="row.template"
               >{{ row.template }}</span>
-              <OBadge
+              <OTag
                 v-if="isDefaultPrebuiltTemplate(row)"
                 :data-test="`destination-template-default-badge-${row.name}`"
-                variant="default"
-                class="tw:text-xs tw:flex-shrink-0"
-              >{{ t('alert_destinations.templateDefaultBadge') }}</OBadge>
+                type="templateDefaultFlag"
+                value="default"
+                class="tw:flex-shrink-0"
+              />
             </div>
             <span v-else class="tw:text-text-primary">—</span>
           </template>
@@ -144,11 +145,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-type="{ row }">
             <div class="tw:flex tw:items-center tw:gap-2">
               <template v-if="getPrebuiltTypeName(row)">
-                <OBadge
+                <OTag
                   :data-test="`destination-type-badge-${getPrebuiltTypeName(row)?.toLowerCase()}`"
-                  variant="primary"
-                  class="tw:text-xs"
-                >{{ getPrebuiltTypeName(row) }}</OBadge>
+                  type="destinationKind"
+                  value="prebuilt"
+                >{{ getPrebuiltTypeName(row) }}</OTag>
                 <OIcon
                   name="auto-awesome"
                   size="sm"
@@ -156,11 +157,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template v-else>
-                <OBadge
+                <OTag
                   data-test="destination-type-badge-custom"
-                  variant="default"
-                  class="tw:text-xs"
-                >{{ getCustomDestinationLabel(row) }}</OBadge>
+                  type="destinationKind"
+                  value="custom"
+                >{{ getCustomDestinationLabel(row) }}</OTag>
                 <OIcon
                   name="settings"
                   size="sm"
@@ -174,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
               <OButton
                 data-test="destination-export"
+                data-row-action="export"
                 variant="ghost"
                 size="icon-sm"
                 title="Export Destination"
@@ -183,6 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${row.name}-update-destination`"
+                data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alert_destinations.edit')"
@@ -192,6 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${row.name}-delete-destination`"
+                data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alert_destinations.delete')"
@@ -270,13 +274,15 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
-import OBadge from '@/lib/core/Badge/OBadge.vue';
+import OTag from '@/lib/core/Badge/OTag.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
@@ -294,7 +300,7 @@ export default defineComponent({
     OButton,
     OSearchInput,
     OCheckbox,
-    OBadge,
+    OTag,
     OTable,
     OToggleGroup,
     OToggleGroupItem,
@@ -759,10 +765,29 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
+
     watch(visibleRows, (newVisibleRows) => {
       resultTotal.value = newVisibleRows.length;
     }, { immediate: true });
 
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "alertDestinationsAdd",
+        handler: () => { if (!isInputFocused()) editDestination(null); },
+      },
+      {
+        id: "alertDestinationsRefresh",
+        handler: () => { if (!isInputFocused()) getDestinations(); },
+      },
+      {
+        id: "alertDestinationsFocusSearch",
+        handler: () => {
+          focusSearchInput("destination-list-search-input");
+        },
+      },
+    ]);
     return {
       t,
       showDestinationEditor,

@@ -203,8 +203,8 @@ describe("ErrorHeader", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.find(".error_type").exists()).toBe(true);
-      expect(wrapper.find(".error_type").text()).toBe("TypeError");
+      expect(wrapper.find('[data-test="error-header-error-type"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-header-error-type"]').text()).toBe("TypeError");
     });
   });
 
@@ -226,8 +226,8 @@ describe("ErrorHeader", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.find(".unhandled_error").exists()).toBe(true);
-      expect(wrapper.find(".unhandled_error").text()).toBe("unhandled");
+      expect(wrapper.find('[data-test="error-header-unhandled-badge"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-header-unhandled-badge"]').text()).toBe("unhandled");
     });
 
     it("does not show the unhandled badge when error_handling is handled", async () => {
@@ -236,7 +236,7 @@ describe("ErrorHeader", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.find(".unhandled_error").exists()).toBe(false);
+      expect(wrapper.find('[data-test="error-header-unhandled-badge"]').exists()).toBe(false);
     });
 
     it("does not show the unhandled badge when error_handling is absent", async () => {
@@ -247,7 +247,7 @@ describe("ErrorHeader", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.find(".unhandled_error").exists()).toBe(false);
+      expect(wrapper.find('[data-test="error-header-unhandled-badge"]').exists()).toBe(false);
     });
   });
 
@@ -270,7 +270,7 @@ describe("ErrorHeader", () => {
 
       // Assert
       expect(wrapper.find('[data-test="error-id"]').attributes("title")).toBe("custom-error-456");
-      expect(wrapper.find(".error_type").text()).toBe("ReferenceError");
+      expect(wrapper.find('[data-test="error-header-error-type"]').text()).toBe("ReferenceError");
       expect(wrapper.text()).toContain("Variable is not defined");
       expect(wrapper.text()).toContain("2024-02-01 15:30:00 UTC");
     });
@@ -289,7 +289,7 @@ describe("ErrorHeader", () => {
       // Act & Assert
       for (const error of errors) {
         await wrapper.setProps({ error });
-        expect(wrapper.find(".error_type").text()).toBe(error.type);
+        expect(wrapper.find('[data-test="error-header-error-type"]').text()).toBe(error.type);
         expect(wrapper.text()).toContain(error.timestamp);
       }
     });

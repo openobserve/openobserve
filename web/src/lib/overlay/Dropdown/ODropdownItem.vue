@@ -6,6 +6,7 @@ import type {
 } from "./ODropdown.types";
 import { DropdownMenuItem } from "reka-ui";
 import OIcon from "../../core/Icon/OIcon.vue";
+import OShortcut from "../../core/Shortcut/OShortcut.vue";
 
 const props = withDefaults(defineProps<DropdownItemProps>(), {
   disabled: false,
@@ -46,5 +47,11 @@ const variantClasses: Record<
     </slot>
     <slot />
     <slot name="icon-right" />
+    <OShortcut
+      v-if="props.shortcut || props.shortcutId"
+      :keys="props.shortcut"
+      :id="props.shortcutId"
+      class="tw:ms-auto tw:ps-4"
+    />
   </DropdownMenuItem>
 </template>

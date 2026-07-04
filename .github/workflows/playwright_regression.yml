@@ -2,7 +2,9 @@ name: Playwright Regression Tests
 
 on:
   schedule:
-    - cron: '30 3,7,11,15,19,23 * * *'  # Every 4 hrs from 9 AM IST (3:30, 7:30, 11:30, 15:30, 19:30, 23:30 UTC)
+    # Daytime IST only (9 AM, 1 PM, 5 PM, 9 PM IST) — the 1 AM and 5 AM IST slots were
+    # dropped: main rarely moves overnight, so those runs mostly re-tested unchanged code.
+    - cron: '30 3,7,11,15 * * *'  # 9 AM, 1 PM, 5 PM, 9 PM IST (3:30, 7:30, 11:30, 15:30 UTC)
   workflow_dispatch:
 
 concurrency:
@@ -45,9 +47,59 @@ env:
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
+  # Skip the whole suite when main has not moved since the last regression run.
+  # Scheduled runs fire every 4h; if nothing merged in between, rebuilding and
+  # re-running the full matrix on identical code is pure waste. Manual dispatch
+  # always runs.
+  check_main_changed:
+    timeout-minutes: 5
+    name: check_main_changed
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read  # for `gh run list` (last run's head_sha)
+    outputs:
+      should_run: ${{ steps.decide.outputs.should_run }}
+    steps:
+      - id: decide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Manual dispatch always runs.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Manual dispatch — running regardless of main changes."
+            exit 0
+          fi
+          # On a scheduled run github.sha is main's tip, so no checkout is needed.
+          CURRENT_SHA="${{ github.sha }}"
+          # head_sha of the most recent completed previous run of THIS workflow on
+          # main, excluding the current run. Limit 50 so the current run is always in
+          # the window even under bursty history. On any failure LAST_SHA stays empty
+          # and we fall through to should_run=true (fail-safe: run rather than skip).
+          LAST_SHA=$(gh run list \
+            --workflow "${{ github.workflow }}" \
+            --branch main \
+            --limit 50 \
+            --json databaseId,headSha,status \
+            --jq "[.[] | select(.databaseId != ${{ github.run_id }} and .status == \"completed\")] | .[0].headSha" \
+            2>/dev/null || echo "")
+          if [ -z "$LAST_SHA" ]; then
+            echo "::warning::Could not determine last run SHA (no prior completed run, or gh query failed) — defaulting to run."
+          fi
+          echo "Current main SHA: ${CURRENT_SHA:-<none>}"
+          echo "Last run SHA:     ${LAST_SHA:-<none>}"
+          if [ -n "$LAST_SHA" ] && [ "$CURRENT_SHA" = "$LAST_SHA" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::main unchanged since last regression run ($CURRENT_SHA) — skipping."
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build_binary:
     timeout-minutes: 45
     name: build_binary
+    needs: [check_main_changed]
+    if: ${{ needs.check_main_changed.outputs.should_run == 'true' }}
     runs-on:
       labels: ubicloud-standard-16
     permissions:
@@ -118,7 +170,7 @@ jobs:
     name: e2e / ${{ matrix.testfolder }}
     needs: [build_binary]
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
     strategy:
@@ -688,7 +740,7 @@ jobs:
     needs: [ui_integration_tests, merge_reports]
     if: ${{ !cancelled() && needs.ui_integration_tests.result == 'failure' && needs.merge_reports.result == 'success' }}
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
       actions: read  # download-artifact fetches the merged-report artifact
@@ -798,7 +850,7 @@ jobs:
     needs: [build_binary, ui_integration_tests, merge_reports]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
       actions: read  # reads run/job timings from the Actions API
@@ -980,7 +1032,7 @@ jobs:
   playwright_summary:
     timeout-minutes: 5
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions: {}
     needs: [build_binary, ui_integration_tests, merge_reports]
     if: always()

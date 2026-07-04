@@ -240,6 +240,12 @@ pub struct ExecutablePipelineBulkInputs {
 }
 
 impl ExecutablePipeline {
+    pub fn contains_llm_evaluation_node(&self) -> bool {
+        self.node_map
+            .values()
+            .any(|node| matches!(node.node_data, NodeData::LlmEvaluation(_)))
+    }
+
     pub async fn new(pipeline: &Pipeline) -> Result<Self> {
         let node_map = pipeline
             .nodes
@@ -393,6 +399,7 @@ impl ExecutablePipeline {
 
             // WARN: Do not change. Processing node can only be done in a task, as the internals of
             // remote wal writer depends on the task id.
+            let source_stream_name = source_stream_params.stream_name.to_string();
             let source_stream_type = source_stream_params.stream_type;
             // For LLM eval nodes, resolve the destination stream params from child leaf node
             // TODO: check if this is actually used, or no longer needed
@@ -415,6 +422,7 @@ impl ExecutablePipeline {
                 org_id: org_id_cp,
                 pipeline_name,
                 stream_name,
+                source_stream_name,
                 source_stream_type,
                 inv_id: inv_id_cp,
                 print_event,
@@ -729,6 +737,7 @@ struct ProcessMetadata {
     org_id: String,
     pipeline_name: String,
     stream_name: Option<String>,
+    source_stream_name: String,
     source_stream_type: StreamType,
     inv_id: String,
     print_event: bool,
@@ -929,6 +938,8 @@ async fn process_llm_evaluation_node(
                 &metadata.org_id,
                 job_id,
                 &item.record,
+                &metadata.source_stream_name,
+                &metadata.source_stream_type.to_string(),
             )
         {
             let eval_run_id = config::ider::generate();
@@ -946,6 +957,9 @@ async fn process_llm_evaluation_node(
                             target_span_id: ctx.span_id.clone(),
                             target_trace_id: ctx.trace_id.clone(),
                             target_stream: ctx.source_stream.clone(),
+                            target_stream_type: ctx.source_stream_type.clone(),
+                            target_agent_name: ctx.agent_name.clone(),
+                            target_agent_id: ctx.agent_id.clone(),
                             scorer_id: None,
                             scorer_version: None,
                             scorer_type: None,
@@ -2061,6 +2075,38 @@ mod tests {
         assert!(inputs.records.is_empty());
         assert!(inputs.doc_ids.is_empty());
         assert!(inputs.originals.is_empty());
+    }
+
+    #[test]
+    fn test_contains_llm_evaluation_node_detects_misclassified_eval_pipeline() {
+        let mut node_map = HashMap::new();
+        node_map.insert(
+            "eval".to_string(),
+            ExecutableNode {
+                id: "eval".to_string(),
+                node_data: NodeData::LlmEvaluation(
+                    config::meta::pipeline::components::LlmEvaluationParams {
+                        name: "eval-job".to_string(),
+                        sampling_rate: 1.0,
+                        scorers: Vec::new(),
+                        job_id: Some("job-1".to_string()),
+                    },
+                ),
+                children: Vec::new(),
+            },
+        );
+        let pipeline = ExecutablePipeline {
+            id: "pipe-1".to_string(),
+            name: "__eval__job".to_string(),
+            is_realtime: false,
+            source_node_id: "input".to_string(),
+            sorted_nodes: vec!["eval".to_string()],
+            function_map: HashMap::new(),
+            node_map,
+            kind: PipelineKind::User,
+        };
+
+        assert!(pipeline.contains_llm_evaluation_node());
     }
 
     #[test]

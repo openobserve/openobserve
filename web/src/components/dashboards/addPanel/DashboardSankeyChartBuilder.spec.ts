@@ -1064,7 +1064,7 @@ describe("DashboardSankeyChartBuilder", () => {
       const sourceContainer = wrapper.find(
         '[data-test="dashboard-source-layout"]',
       );
-      expect(sourceContainer.classes()).toContain("drop-target");
+      expect(sourceContainer.classes()).toContain("tw:border-dotted");
     });
 
     it("should apply drop-entered class when drag area matches", () => {
@@ -1077,7 +1077,7 @@ describe("DashboardSankeyChartBuilder", () => {
       const sourceContainer = wrapper.find(
         '[data-test="dashboard-source-layout"]',
       );
-      expect(sourceContainer.classes()).toContain("drop-entered");
+      expect(sourceContainer.classes()).toContain("tw:transition-all");
     });
 
     it("should not apply drop-entered class when drag area doesn't match", () => {
@@ -1090,7 +1090,7 @@ describe("DashboardSankeyChartBuilder", () => {
       const sourceContainer = wrapper.find(
         '[data-test="dashboard-source-layout"]',
       );
-      expect(sourceContainer.classes()).not.toContain("drop-entered");
+      expect(sourceContainer.classes()).not.toContain("tw:transition-all");
     });
   });
 

@@ -84,9 +84,11 @@ describe('AzureConfig.vue', () => {
       expect(() => wrapper.unmount()).not.toThrow();
     });
 
-    it('should have azure-config-page class', () => {
+    it('should render the deploy button', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.azure-config-page').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="azure-activity-logs-deploy-btn"]').exists(),
+      ).toBe(true);
     });
 
     it('should render Azure Activity Logs title', () => {

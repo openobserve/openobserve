@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <label class="tw:flex q-field tw:mb-3">
         <b>{{ t('cipherKey.accessId') }}</b>
       </label>
-      <pre class="pre-text">{{ accessId }}</pre>
+      <pre class="tw:[text-wrap:auto] tw:break-words tw:border tw:border-(--o2-border-input) tw:p-[5px] tw:mb-[5px]">{{ accessId }}</pre>
       <OButton data-test="add-cipher-key-akeyless-access-id-input-update" variant="primary" size="sm-action" @click="isUpdateAccessID = true">{{ t('common.update') }}</OButton>
     </div>
     <OFormSelect
@@ -56,10 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       valueKey="value"
     />
     <fieldset
-      class="q-fieldset tw:p-3 tw:w-full"
+      class="q-fieldset tw:p-3 tw:w-full tw:border tw:border-[lightgray] tw:rounded tw:relative"
       v-if="authType != ''"
     >
-      <legend class="q-caption tw:px-2">
+      <legend class="q-caption tw:px-2 tw:text-xs tw:text-(--q-color-dark) tw:ml-2 tw:py-0 tw:px-1">
         {{ getAuthenticationTypeLabel(authType) }}
         Configuration
       </legend>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <label class="tw:flex q-field tw:mb-3">
             <b>{{ t('cipherKey.accessKey') }}</b>
           </label>
-          <pre class="pre-text">{{ accessKey }}</pre>
+          <pre class="tw:[text-wrap:auto] tw:break-words tw:border tw:border-(--o2-border-input) tw:p-[5px] tw:mb-[5px]">{{ accessKey }}</pre>
           <OButton data-test="add-cipher-key-akeyless-access-key-input-update" variant="primary" size="sm-action" @click="isUpdateAccessKey = true">{{ t('common.update') }}</OButton>
         </div>
       </div>
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <label class="tw:flex q-field tw:mb-3">
             <b>{{ t('cipherKey.ldapUsername') }}</b>
           </label>
-          <pre class="pre-text">{{ ldapUsername }}</pre>
+          <pre class="tw:[text-wrap:auto] tw:break-words tw:border tw:border-(--o2-border-input) tw:p-[5px] tw:mb-[5px]">{{ ldapUsername }}</pre>
           <OButton data-test="add-cipher-key-akeyless-ldap-username-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPUsername = true">{{ t('common.update') }}</OButton>
         </div>
         <div v-if="!isUpdate || isUpdateLDAPPass || ldapPassword == ''">
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <label class="tw:flex q-field tw:mb-3">
             <b>{{ t('cipherKey.ldapPassword') }}</b>
           </label>
-          <pre class="pre-text">{{ ldapPassword }}</pre>
+          <pre class="tw:[text-wrap:auto] tw:break-words tw:border tw:border-(--o2-border-input) tw:p-[5px] tw:mb-[5px]">{{ ldapPassword }}</pre>
           <OButton data-test="add-cipher-key-akeyless-ldap-password-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPPass = true">{{ t('common.update') }}</OButton>
         </div>
       </div>
@@ -132,10 +132,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       valueKey="value"
     />
     <fieldset
-      class="q-fieldset tw:p-3 tw:w-full"
+      class="q-fieldset tw:p-3 tw:w-full tw:border tw:border-[lightgray] tw:rounded tw:relative"
       v-if="secretType != ''"
     >
-      <legend class="q-caption tw:px-2">
+      <legend class="q-caption tw:px-2 tw:text-xs tw:text-(--q-color-dark) tw:ml-2 tw:py-0 tw:px-1">
         {{ getSecretOptionLabel(secretType) }}
         Configuration
       </legend>
@@ -265,37 +265,10 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.cipher-keys-add-akeyless-type {
-  // Small consistent gap between every top-level field (inputs, selects,
-  // fieldsets) so they don't render flush against each other.
-  > * + * {
-    margin-top: 0.5rem;
-  }
-
-  .q-field--labeled.showLabelOnTop .q-field__bottom {
-    padding: 0px;
-  }
-
-  .q-fieldset {
-    border: 1px solid lightgray;
-    border-radius: 4px;
-    position: relative;
-  }
-
-  legend {
-    font-size: 12px;
-    color: var(--q-color-dark);
-    margin-left: 8px;
-    padding: 0 4px;
-  }
-
-  .pre-text {
-    text-wrap: auto;
-    word-wrap: break-word;
-    border: 1px solid #E1E1E1;
-    padding: 5px;
-    margin-bottom: 5px;
-  }
+<style>
+/* Small consistent gap between every top-level field (inputs, selects,
+   fieldsets) so they don't render flush against each other. */
+.cipher-keys-add-akeyless-type > * + * {
+  margin-top: 0.5rem;
 }
 </style>

@@ -66,7 +66,7 @@ withDefaults(
 );
 </script>
 
-<style scoped>
+<style>
 .es-badge {
   transform-box: fill-box;
   transform-origin: center;

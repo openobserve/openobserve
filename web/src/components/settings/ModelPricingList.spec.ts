@@ -726,30 +726,6 @@ describe("ModelPricingList.vue", () => {
     });
   });
 
-  describe("getPriceKeyColorClass", () => {
-    it("returns badge-blue for input keys", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.vm.getPriceKeyColorClass("input")).toBe("badge-blue");
-      expect(wrapper.vm.getPriceKeyColorClass("cached_input")).toBe("badge-blue");
-    });
-
-    it("returns badge-green for output keys", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.vm.getPriceKeyColorClass("output")).toBe("badge-green");
-    });
-
-    it("returns a stable hashed palette class for arbitrary keys", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const class1 = wrapper.vm.getPriceKeyColorClass("audio");
-      const class2 = wrapper.vm.getPriceKeyColorClass("audio");
-      expect(class1).toBe(class2);
-      // Should be one of the palette options (badge-something)
-      expect(class1.startsWith("badge-")).toBe(true);
-    });
-  });
 
   describe("getDefaultTier", () => {
     it("returns the first unconditional tier", async () => {

@@ -539,7 +539,7 @@ describe("SyntaxGuideMetrics — PromQL guide content (normal mode)", () => {
     const button = wrapper.find('[data-cy="syntax-guide-button"]');
     await button.trigger("click");
     await flushPromises();
-    const items = document.querySelectorAll(".guide-list li");
+    const items = document.querySelectorAll(".answers ul li");
     expect(items.length).toBeGreaterThan(0);
   });
 
@@ -584,12 +584,13 @@ describe("SyntaxGuideMetrics — PromQL guide content (normal mode)", () => {
     expect(document.body.innerHTML).not.toContain("SELECT");
   });
 
-  it("has guide-list class on the list", async () => {
+  it("renders the guide list with highlighted examples", async () => {
     wrapper = createWrapper({ sqlmode: false });
     const button = wrapper.find('[data-cy="syntax-guide-button"]');
     await button.trigger("click");
     await flushPromises();
-    expect(document.querySelector(".guide-list")).toBeTruthy();
+    expect(document.querySelector(".answers ul")).toBeTruthy();
+    expect(document.querySelector(".answers .bg-highlight")).toBeTruthy();
   });
 });
 
@@ -688,12 +689,13 @@ describe("SyntaxGuideMetrics — SQL mode guide content", () => {
     expect(document.body.innerHTML).not.toContain("rate(");
   });
 
-  it("has guide-list class in SQL mode too", async () => {
+  it("renders the guide list with highlighted examples in SQL mode too", async () => {
     wrapper = createWrapper({ sqlmode: true });
     const button = wrapper.find('[data-cy="syntax-guide-button"]');
     await button.trigger("click");
     await flushPromises();
-    expect(document.querySelector(".guide-list")).toBeTruthy();
+    expect(document.querySelector(".answers ul")).toBeTruthy();
+    expect(document.querySelector(".answers .bg-highlight")).toBeTruthy();
   });
 });
 

@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <!-- Version column -->
           <template #cell-version="{ row }">
-            <span class="eval-version-badge">v{{ row.version }}</span>
+            <OTag type="fieldTag" value="soft">v{{ row.version }}</OTag>
           </template>
 
           <!-- Actions column -->
@@ -97,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-center tw:justify-center actions-container">
               <OButton
                 :data-test="`eval-template-list-${row.name}-edit-btn`"
+                data-row-action="edit"
                 icon-left="edit"
                 variant="ghost"
                 size="icon-sm"
@@ -105,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 :data-test="`eval-template-list-${row.name}-delete-btn`"
+                data-row-action="delete"
                 icon-left="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
@@ -181,6 +183,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
@@ -404,16 +407,3 @@ onBeforeMount(async () => {
 });
 </script>
 
-<style scoped lang="scss">
-.eval-version-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.15));
-  color: var(--q-color-text);
-  background: transparent;
-}
-</style>

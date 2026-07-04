@@ -25,7 +25,7 @@ jobs:
           ORG: ${{ github.repository_owner }}
           CREATOR: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.user.login || github.event.issue.user.login }}
         run: |
-          ALLOWLIST=" bjp232004 hengfeiyang prabhatsharma uddhavdave oasisk haohuaijin Subhra264 Loaki07 007harshmahajan chaitanya-sistla ktx-kirtan omkarK06 ktx-vaidehi ktx-abhay neha00290 ktx-akshay ktx-sadhna nikhilsaikethe YashodhanJoshi1 ktx-riya mmosarafO2 Shrinath-O2 ktx-mihir "
+          ALLOWLIST=" bjp232004 hengfeiyang prabhatsharma uddhavdave oasisk haohuaijin Subhra264 Loaki07 007harshmahajan chaitanya-sistla ktx-kirtan omkarK06 ktx-vaidehi ktx-abhay neha00290 ktx-akshay ktx-sadhna nikhilsaikethe YashodhanJoshi1 ktx-riya mmosarafO2 Shrinath-O2 ktx-mihir vamsikarthikr "
           CREATOR_LOWER=$(echo "$CREATOR" | tr '[:upper:]' '[:lower:]')
           ALLOWLIST_LOWER=$(echo "$ALLOWLIST" | tr '[:upper:]' '[:lower:]')
           if echo "$ALLOWLIST_LOWER" | grep -q " $CREATOR_LOWER "; then

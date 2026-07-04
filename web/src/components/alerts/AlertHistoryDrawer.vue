@@ -145,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="history"
           layout="flex-col"
           stretch
+          class="tw:flex-1"
         >
           <div
             class="tw:flex tw:h-full tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:py-2"
@@ -202,8 +203,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <div
-                class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
-                :class="store.state.theme === 'dark' ? 'code-block-dark' : 'code-block-light'"
+                class="tw:rounded-lg tw:overflow-hidden tw:border tw:flex tw:flex-col tw:flex-1"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:border-[#374151]'
+                    : 'tw:border-[#e5e7eb] tw:bg-[#f9fafb]'
+                "
               >
                 <OTable
                   :data="groupedHistory"
@@ -217,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :row-class="getRowClass"
                   :default-columns="false"
                   :show-global-filter="false"
-                  class="history-table tw:flex-1 tw:overflow-hidden"
+                  class="history-table tw:flex-1 tw:overflow-hidden tw:!border-0 tw:!shadow-none"
                   data-test="alert-details-history-table"
                   @pagination-change="onPaginationChange"
                 >
@@ -239,25 +244,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:cursor-pointer tw:opacity-50 tw:shrink-0"
                         @click="toggleFlappingGroup(row.timestamp)"
                       />
-                      <OBadge size="sm" variant="warning-soft" class="tw:cursor-pointer tw:shrink-0" @click="toggleFlappingGroup(row.timestamp)">
-                        ⚡ Flapping
-                      </OBadge>
+                      <OTag type="alertState" value="flapping" class="tw:cursor-pointer tw:shrink-0" @click="toggleFlappingGroup(row.timestamp)" />
                       <span class="tw:text-[11px] tw:truncate" style="color: var(--color-text-secondary)">
                         {{ row._children.length }} rows · {{ row._duration }}
                       </span>
                     </div>
                     <!-- Normal row -->
-                    <OBadge
-                      v-else
-                      size="sm"
-                      :icon="getStatusChipIcon(row.status)"
-                      :variant="getStatusChipVariant(row.status)"
-                      class="tw:cursor-default"
-                      data-test="alert-history-status-chip"
-                    >
-                      {{ formatStatus(row.status) }}
+                    <span v-else class="tw:inline-flex tw:cursor-default">
+                      <OTag
+                        type="alertState"
+                        :value="row.status"
+                        data-test="alert-history-status-chip"
+                      />
                       <OTooltip v-if="row.error" :max-width="'300px'" :content="row.error" />
-                    </OBadge>
+                    </span>
                   </template>
 
                   <template #cell-timestamp="{ row }">
@@ -309,6 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="condition"
           layout="flex-col"
           stretch
+          class="tw:flex-1"
         >
           <div
             class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:py-2"
@@ -316,19 +317,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Anomaly detection condition view — mirrors the alert SQL code block -->
             <template v-if="isAnomaly">
               <div
-                class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden "
+                class="tw:rounded-lg tw:overflow-hidden tw:border tw:flex tw:flex-col tw:flex-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'code-block-dark'
-                    : 'code-block-light'
+                    ? 'tw:border-[#374151]'
+                    : 'tw:border-[#e5e7eb] tw:bg-[#f9fafb]'
                 "
               >
                 <div
-                  class="code-block-header tw:shrink-0"
+                  class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2.5 tw:border-b tw:shrink-0"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'code-block-header-dark'
-                      : 'code-block-header-light'
+                      ? 'tw:border-[#374151]'
+                      : 'tw:bg-[#f3f4f6] tw:border-[#e5e7eb]'
                   "
                 >
                   <div class="tw:flex tw:items-center tw:gap-1.5">
@@ -355,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
                 <pre
-                  class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                  class="tw:p-[10px_14px] tw:font-mono tw:whitespace-pre-wrap tw:overflow-x-auto tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
                   >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre
                 >
               </div>
@@ -364,20 +365,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Regular alert condition view -->
             <template v-else>
               <div
-                class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
+                class="tw:rounded-lg tw:overflow-hidden tw:border tw:flex tw:flex-col tw:flex-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'code-block-dark'
-                    : 'code-block-light'
+                    ? 'tw:border-[#374151]'
+                    : 'tw:border-[#e5e7eb] tw:bg-[#f9fafb]'
                 "
               >
                 <!-- Code block header bar — stays fixed -->
                 <div
-                  class="code-block-header tw:shrink-0"
+                  class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2.5 tw:border-b tw:shrink-0"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'code-block-header-dark'
-                      : 'code-block-header-light'
+                      ? 'tw:border-[#374151]'
+                      : 'tw:bg-[#f3f4f6] tw:border-[#e5e7eb]'
                   "
                 >
                   <div class="tw:flex tw:items-center tw:gap-1.5">
@@ -426,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Code content — scrolls internally -->
                 <pre
-                  class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                  class="tw:p-[10px_14px] tw:font-mono tw:whitespace-pre-wrap tw:overflow-x-auto tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
                   >{{
                     alertDetails.conditions !== "" &&
                     alertDetails.conditions !== "--"
@@ -485,7 +486,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -820,88 +821,17 @@ const historyTableColumns = computed(() =>
 
 const getRowClass = (row: any) => {
   if (row?._flappingGroup) {
-    return store.state.theme === "dark" ? "row-flapping-dark" : "row-flapping-light";
+    return store.state.theme === "dark" ? "tw:!bg-[#1e1a2e]" : "tw:!bg-[#f5f3ff]";
   }
   if (row?._child) {
-    return store.state.theme === "dark" ? "row-child-dark" : "row-child-light";
+    return store.state.theme === "dark" ? "tw:!bg-[#1a1a1a]" : "tw:!bg-[#fafafa]";
   }
   const status = row?.status?.toLowerCase();
   const isFiringStatus = status === "firing" || status === "error" || status === "anomaly" || status === "completed";
   if (isFiringStatus) {
-    return store.state.theme === "dark" ? "row-error-dark" : "row-error-light";
+    return store.state.theme === "dark" ? "tw:!bg-[#2d1b1b]" : "tw:!bg-[#fff5f5]";
   }
   return "";
-};
-
-const formatStatus = (status: string) => {
-  if (!status) return "Unknown";
-  switch (status.toLowerCase()) {
-    case "firing":
-    case "completed":
-    case "error":
-    case "anomaly":
-      return "Firing";
-    case "ok":
-    case "success":
-    case "normal":
-    case "condition_not_satisfied":
-      return "Ok";
-    case "skipped":
-      return "Skipped";
-    case "failed":
-      return "Failed";
-    case "pending":
-      return "Pending";
-    default:
-      return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ");
-  }
-};
-
-const getStatusChipIcon = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "firing":
-    case "error":
-    case "anomaly":
-      return "error-outline";
-    case "completed":
-      return "notifications-active";
-    case "ok":
-    case "success":
-    case "normal":
-    case "condition_not_satisfied":
-      return "check-circle-outline";
-    case "skipped":
-      return "block";
-    case "failed":
-      return "cancel";
-    case "pending":
-      return "schedule";
-    default:
-      return "help-outline";
-  }
-};
-
-const getStatusChipVariant = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "firing":
-    case "error":
-    case "anomaly":
-    case "completed":
-      return "error-soft";
-    case "ok":
-    case "success":
-    case "normal":
-    case "condition_not_satisfied":
-      return "success-soft";
-    case "skipped":
-      return "warning-soft";
-    case "failed":
-      return "error-soft";
-    case "pending":
-      return "primary-soft";
-    default:
-      return "default-soft";
-  }
 };
 
 const formatTimestamp = (timestamp: number) => {
@@ -1023,69 +953,3 @@ watch(
   { immediate: true },
 );
 </script>
-
-<style lang="scss" scoped>
-/* ── Code Block ── */
-.code-block {
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid;
-}
-.code-block-light {
-  border-color: #e5e7eb;
-  background: #f9fafb;
-}
-.code-block-dark {
-  border-color: #374151;
-  // background: #111827;
-}
-
-.code-block-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  border-bottom: 1px solid;
-}
-.code-block-header-light {
-  background: #f3f4f6;
-  border-color: #e5e7eb;
-}
-.code-block-header-dark {
-  // background: #1f2937;
-  border-color: #374151;
-}
-
-.code-block-content {
-  padding: 10px 14px;
-  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
-  white-space: pre-wrap;
-  overflow-x: auto;
-  font-size: 13px;
-}
-
-/* ── Row tints ── */
-.row-error-light   { background: #fff5f5 !important; }
-.row-error-dark    { background: #2d1b1b !important; }
-.row-flapping-light { background: #f5f3ff !important; }
-.row-flapping-dark  { background: #1e1a2e !important; }
-.row-child-light   { background: #fafafa !important; }
-.row-child-dark    { background: #1a1a1a !important; }
-
-/* ── Table layout ── */
-.history-table {
-  border: none !important;
-  box-shadow: none !important;
-}
-
-/* ── Tab panels fill height ── */
-:deep(.o-tab-panels) {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-:deep(.o-tab-panel) {
-  flex: 1;
-}
-</style>

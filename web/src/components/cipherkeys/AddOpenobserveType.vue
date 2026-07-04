@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <label class="tw:flex q-field tw:mb-3">
         <b>{{ t('cipherKey.secret') }}</b>
       </label>
-      <pre class="pre-text">{{ localValue }}</pre>
+      <pre class="tw:[text-wrap:auto] tw:break-words tw:border tw:border-(--o2-border-input) tw:p-[5px] tw:mb-[5px]">{{ localValue }}</pre>
       <OButton
         data-test="add-cipher-key-openobserve-secret-input-update"
         variant="primary"
@@ -95,12 +95,3 @@ export default defineComponent({
   },
 });
 </script>
-<style lang="scss" scoped>
-.pre-text {
-  text-wrap: auto;
-  word-wrap: break-word;
-  border: 1px solid #E1E1E1;
-  padding: 5px;
-  margin-bottom: 5px;
-}
-</style>

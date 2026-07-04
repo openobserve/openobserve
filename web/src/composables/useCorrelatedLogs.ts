@@ -293,7 +293,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
             currentTraceId = null;
           },
           reset: (_data: any, response: any) => {
-            console.log('[useCorrelatedLogs] Stream reset:', response);
           },
         }
       );

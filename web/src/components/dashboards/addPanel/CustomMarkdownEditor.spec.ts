@@ -614,10 +614,14 @@ console.log('Hello World');
       expect(separator.exists()).toBe(true);
     });
 
-    it("should have markdown-editor class applied", () => {
+    it("should render the editor container with card-container class", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.classes()).toContain('markdown-editor');
+      const container = wrapper.find(
+        '[data-test="dashboard-custom-markdown-editor-container"]',
+      );
+      expect(container.exists()).toBe(true);
+      expect(container.classes()).toContain('card-container');
     });
   });
 

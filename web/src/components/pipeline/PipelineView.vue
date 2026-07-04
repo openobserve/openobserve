@@ -1,5 +1,5 @@
 <template>
-    <div class="pipeline-view-tooltip container">
+    <div class="pipeline-view-tooltip container tw:w-125 tw:h-75 tw:overflow-auto">
       <VueFlow
         ref="vueFlowRef"
         v-model:nodes="lockedNodes"
@@ -186,66 +186,58 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
   });
   </script>
     
-  <style lang="scss">
-  /* Simple tooltip styling - let CustomNode handle everything else */
-  .pipeline-view-tooltip {
-    width: 500px;
-    height: 300px; 
-    overflow: auto;
-    
-    /* Node background colors */
-    .vue-flow__node-input .btn-fixed-width {
-      background-color: rgba(219, 234, 254, 0.8) !important;
-      border-color: #3b82f6 !important;
-      color: #000000 !important;
-      padding: 8px 12px !important;
-    }
-
-    .vue-flow__node-output .btn-fixed-width {
-      background-color: rgba(220, 252, 231, 0.8) !important;
-      border-color: #22c55e !important;
-      color: #000000 !important;
-      padding: 8px 12px !important;
-    }
-
-    .vue-flow__node-default .btn-fixed-width {
-      background-color: rgba(255, 237, 168, 0.8) !important;
-      border-color: #f59e0b !important;
-      color: #000000 !important;
-      padding: 8px 12px !important;
-    }
-    
-    /* Handle colors for tooltip context */
-    .handle_input {
-      background: #dbeafe !important;
-      
-      &::before {
-        background: #3b82f6 !important;
-      }
-    }
-
-    .handle_output {
-      background: #dcfce7 !important;
-      
-      &::before {
-        background: #22c55e !important;
-      }
-    }
-
-    .handle_default {
-      background: #fef3c7 !important;
-      
-      &::before {
-        background: #f59e0b !important;
-      }
-    }
-    
-    /* Hide action buttons in tooltip */
-    .node-action-buttons {
-      display: none !important;
-    }
+  <style>
+  /* Node background colors — parent-context compound selectors, must stay in CSS */
+  .pipeline-view-tooltip .vue-flow__node-input .btn-fixed-width {
+    background-color: rgba(219, 234, 254, 0.8) !important;
+    border-color: #3b82f6 !important;
+    color: #000000 !important;
+    padding: 8px 12px !important;
   }
 
+  .pipeline-view-tooltip .vue-flow__node-output .btn-fixed-width {
+    background-color: rgba(220, 252, 231, 0.8) !important;
+    border-color: #22c55e !important;
+    color: #000000 !important;
+    padding: 8px 12px !important;
+  }
+
+  .pipeline-view-tooltip .vue-flow__node-default .btn-fixed-width {
+    background-color: rgba(255, 237, 168, 0.8) !important;
+    border-color: #f59e0b !important;
+    color: #000000 !important;
+    padding: 8px 12px !important;
+  }
+
+  /* Handle colors — ::before pseudo-elements, must stay in CSS */
+  .pipeline-view-tooltip .handle_input {
+    background: #dbeafe !important;
+  }
+
+  .pipeline-view-tooltip .handle_input::before {
+    background: #3b82f6 !important;
+  }
+
+  .pipeline-view-tooltip .handle_output {
+    background: #dcfce7 !important;
+  }
+
+  .pipeline-view-tooltip .handle_output::before {
+    background: #22c55e !important;
+  }
+
+  .pipeline-view-tooltip .handle_default {
+    background: #fef3c7 !important;
+  }
+
+  .pipeline-view-tooltip .handle_default::before {
+    background: #f59e0b !important;
+  }
+
+  /* Hide action buttons in tooltip */
+  .pipeline-view-tooltip .node-action-buttons {
+    display: none !important;
+  }
   </style>
 
   

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="aws-integration-grid">
+  <div class="aws-integration-grid tw:w-full">
     <div class="tw:mb-4">
       <OSearchInput
         v-model="searchQuery"
@@ -43,13 +43,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="filteredIntegrations.length === 0"
-      class="tw:text-center tw:py-12 empty-state"
+      class="tw:text-center tw:py-12 tw:text-[#666] tw:dark:text-[#999]"
     >
       <OIcon name="search-off" class="tw:mb-2" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-base">No integrations found matching your search</div>
     </div>
 
-    <div class="integrations-grid" v-else>
+    <div class="integrations-grid tw:grid tw:grid-cols-4 tw:gap-4" v-else>
       <AWSIntegrationTile
         v-for="integration in filteredIntegrations"
         :key="integration.id"
@@ -141,36 +141,23 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.aws-integration-grid {
-  width: 100%;
-
-  .integrations-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-
-    @media (max-width: 1200px) {
-      grid-template-columns: repeat(3, 1fr);
-    }
-
-    @media (max-width: 900px) {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
-    @media (max-width: 600px) {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  .empty-state {
-    .body--light & {
-      color: #666;
-    }
-
-    .body--dark & {
-      color: #999;
-    }
+<style>
+@media (max-width: 1200px) {
+  .aws-integration-grid .integrations-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
+
+@media (max-width: 900px) {
+  .aws-integration-grid .integrations-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .aws-integration-grid .integrations-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 </style>

@@ -129,7 +129,7 @@ withDefaults(
 );
 </script>
 
-<style scoped>
+<style>
 /* Subtle, looping motion. transform-box/origin keep scale + translate sane on
    SVG groups. All gated behind `animated` (es-static) and the OS reduce-motion
    preference. */

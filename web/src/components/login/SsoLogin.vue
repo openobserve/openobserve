@@ -35,13 +35,14 @@
 
     <div class="tw:mb-3 tw:mt-4 tw:text-center">
       <a
-        class="tw:cursor-pointer login-internal-link"
+        data-test="sso-login-internal-link"
+        class="tw:cursor-pointer tw:hover:text-[#595959]"
         style="text-decoration: underline"
         @click="showLoginInput = !showLoginInput"
         >Sign in with an internal user</a
       >
 
-      <div v-show="showLoginInput" class="o2-input login-inputs tw:pt-4">
+      <div v-show="showLoginInput" class="o2-input tw:pt-4">
         <div class="tw:gap-3">
           <OInput
             v-model="name"
@@ -103,22 +104,3 @@ const onSignIn = () => {
   console.log("onSignIn");
 };
 </script>
-
-<style lang="scss">
-.login-inputs {
-  .q-field__label {
-    font-weight: normal !important;
-    font-size: 12px;
-    transform: translate(-0.75rem, -155%);
-    color: #3a3a3a;
-  }
-}
-</style>
-
-<style scoped lang="scss">
-.login-internal-link {
-  &:hover {
-    color: #595959;
-  }
-}
-</style>

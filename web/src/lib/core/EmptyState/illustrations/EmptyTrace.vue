@@ -61,7 +61,7 @@ withDefaults(
 );
 </script>
 
-<style scoped>
+<style>
 .es-scan {
   transform-box: view-box;
   animation: es-scan 3.4s ease-in-out infinite;

@@ -188,13 +188,7 @@ export default defineConfig({
     }),
     isTesting && monacoEditorTestResolver(),
   ].filter(Boolean),
-  css: {
-    preprocessorOptions: {
-      scss: {
-        additionalData: `@use '@/styles/legacy-variables' as *;\n`,
-      },
-    },
-  },
+  css: {},
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
@@ -246,7 +240,6 @@ export default defineConfig({
           jszip: ["jszip"],
           leaflet: ["leaflet"],
           gridstack: ["gridstack"],
-          "flag-icons": ["flag-icons"],
           "highlight.js": ["highlight.js"],
         },
         chunkFileNames: ({ name }) => {

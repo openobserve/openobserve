@@ -191,12 +191,4 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   defineExpose({ refreshData });
   </script>
   
-  <style scoped>
-  .sql-preview {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-top: 5vh;
-  }
-  </style>
   

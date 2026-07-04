@@ -163,17 +163,13 @@ watch(
     </CollapsibleTrigger>
 
     <!-- Animated content -->
-    <CollapsibleContent class="o-collapsible-content">
+    <CollapsibleContent class="o-collapsible-content tw:overflow-hidden">
       <slot />
     </CollapsibleContent>
   </CollapsibleRoot>
 </template>
 
 <style>
-.o-collapsible-content {
-  overflow: hidden;
-}
-
 .o-collapsible-content[data-state="open"] {
   animation: o-collapsible-open 200ms ease-out;
 }
