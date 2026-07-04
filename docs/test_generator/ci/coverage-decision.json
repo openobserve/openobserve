@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/RegressionSet/General/pipelines-preview-popup-overflow.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Pipelines/pipelines.spec.js",
+    "tests/ui-testing/playwright-tests/Pipelines/pipeline-core.spec.js",
+    "tests/ui-testing/playwright-tests/Pipelines/pipeline-history.spec.js",
+    "tests/ui-testing/playwright-tests/RegressionSet/General/ui-regression.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "No existing spec covers the pipeline preview popup viewport overflow behavior. The pipelines.spec.js suite tests creation, validation, conditions, and editing but never hovers the view (eye) button to trigger the preview tooltip. The RegressionSet/General/ folder is the correct location for a standalone UI regression bug test per the run-context spec_path."
+}

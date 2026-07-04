@@ -1,0 +1,6 @@
+{
+  "group": "GeneralTests-Regression",
+  "spec_filename": "pipelines-preview-popup-overflow.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}
