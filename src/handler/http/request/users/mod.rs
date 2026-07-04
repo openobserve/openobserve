@@ -291,6 +291,43 @@ pub async fn update(
             .unwrap();
     }
 
+    let initiator_id = &user_email.user_id;
+    let update_mode = if user_email.user_id.eq(&email_id) {
+        UserUpdateMode::SelfUpdate
+    } else {
+        UserUpdateMode::OtherUpdate
+    };
+
+    // OSS-only initiator-role gate.
+    //
+    // In the enterprise build, RBAC middleware (`check_permissions`) has
+    // already vetted the caller before this handler runs. In OSS there is
+    // no such middleware — the auth extractor `bypass_check=true` lets any
+    // authenticated principal reach the handler, including a
+    // `service_account` role. Combined with the historical OSS behaviour
+    // below (unconditionally rewrite `user.role` to `Admin` for every
+    // update), that let a low-privilege service account promote any target
+    // user to org admin through `PUT /users/{email}` and, in the same
+    // handler, rewrite any target user's profile fields. Reject
+    // cross-user updates here unless the initiator is Admin or Root.
+    // Self-update remains permitted; the service layer's existing
+    // "Self role cannot be upgraded" check still guards role changes on
+    // self.
+    #[cfg(not(feature = "enterprise"))]
+    if matches!(update_mode, UserUpdateMode::OtherUpdate)
+        && !crate::common::utils::auth::is_root_user(initiator_id)
+    {
+        let initiator_is_admin = match users::get_user(Some(&org_id), initiator_id).await {
+            Some(u) => u.role == UserRole::Admin || u.role == UserRole::Root,
+            None => false,
+        };
+        if !initiator_is_admin {
+            return MetaHttpResponse::forbidden(
+                "Admin or Root role required to update other users",
+            );
+        }
+    }
+
     #[cfg(not(feature = "enterprise"))]
     {
         user.role = Some(UserRoleRequest {
@@ -298,12 +335,6 @@ pub async fn update(
             custom: None,
         });
     }
-    let initiator_id = &user_email.user_id;
-    let update_mode = if user_email.user_id.eq(&email_id) {
-        UserUpdateMode::SelfUpdate
-    } else {
-        UserUpdateMode::OtherUpdate
-    };
     match users::update_user(&org_id, &email_id, update_mode, initiator_id, user).await {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e),
@@ -1210,5 +1241,178 @@ mod tests {
         assert!(result.is_some());
         let role_response = result.unwrap();
         assert_eq!(role_response.value, "admin");
+    }
+
+    // ---------- OSS `PUT /api/{org}/users/{email}` privilege-gate regressions ----------
+    //
+    // These tests pin the invariant that a `service_account` principal MUST
+    // NOT be able to mutate another user's fields (first_name / last_name /
+    // role / token) through the OSS update handler. In the pre-fix code the
+    // handler both (a) unconditionally rewrote the incoming role to Admin
+    // and (b) never checked the initiator's role — so a low-privilege
+    // service account could rename any user in the org and promote them to
+    // admin. Each test seeds the initiator + target directly into the
+    // in-memory `ORG_USERS` / `USERS` caches (matching the pattern used by
+    // the `list` regression next to it) and drives the axum handler at the
+    // surface where the gate lives.
+
+    #[cfg(not(feature = "enterprise"))]
+    fn seed_user_and_membership(org_id: &str, email: &str, role: UserRole) {
+        use config::meta::user::UserType;
+        use infra::table::{org_users::OrgUserRecord, users::UserRecord};
+
+        use crate::common::infra::config::{ORG_USERS, USERS};
+
+        USERS.insert(
+            email.to_string(),
+            UserRecord {
+                email: email.to_string(),
+                password: "test-pass".to_string(),
+                salt: String::new(),
+                first_name: "Test".to_string(),
+                last_name: "User".to_string(),
+                password_ext: None,
+                user_type: UserType::Internal,
+                is_root: false,
+                created_at: 0,
+                updated_at: 0,
+            },
+        );
+        ORG_USERS.insert(
+            format!("{org_id}/{email}"),
+            OrgUserRecord {
+                email: email.to_string(),
+                org_id: org_id.to_string(),
+                role,
+                token: "test-token".to_string(),
+                rum_token: None,
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+    }
+
+    /// Regression for the role-escalation half of the cluster:
+    /// a `service_account`-role initiator MUST NOT be able to update the
+    /// role of another user in the org via `PUT /api/{org}/users/{email}`.
+    /// Before the fix, the OSS handler unconditionally clobbered the
+    /// incoming role to `Admin` and never checked the initiator's role, so
+    /// this call returned HTTP 200 and promoted the target to org admin.
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn service_account_cannot_update_other_user_role_regression() {
+        use axum::extract::Path;
+
+        use crate::handler::http::extractors::Headers as HeadersExtractor;
+
+        let org = "org-user-update-role-regression";
+        let sa_email = "user-update-sa-role-regression@example.test";
+        let victim_email = "user-update-victim-role-regression@example.test";
+        seed_user_and_membership(org, sa_email, UserRole::ServiceAccount);
+        seed_user_and_membership(org, victim_email, UserRole::ServiceAccount);
+
+        let body = UpdateUser {
+            first_name: Some("Owned".to_string()),
+            last_name: Some("ByMemberA".to_string()),
+            ..UpdateUser::default()
+        };
+
+        let resp = update(
+            Path((org.to_string(), victim_email.to_string())),
+            HeadersExtractor(UserEmail {
+                user_id: sa_email.to_string(),
+            }),
+            axum::Json(body),
+        )
+        .await;
+
+        assert_eq!(
+            resp.status().as_u16(),
+            403,
+            "OSS service_account must be blocked from updating another user (role escalation vector)"
+        );
+    }
+
+    /// Regression for the profile-tampering half of the cluster:
+    /// even without touching the role field, a `service_account`-role
+    /// initiator MUST NOT be able to rewrite another user's `first_name` /
+    /// `last_name`. Before the fix, this returned HTTP 200 and persisted
+    /// the change on the victim's account.
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn service_account_cannot_update_other_user_profile_regression() {
+        use axum::extract::Path;
+
+        use crate::handler::http::extractors::Headers as HeadersExtractor;
+
+        let org = "org-user-update-profile-regression";
+        let sa_email = "user-update-sa-profile-regression@example.test";
+        let victim_email = "user-update-victim-profile-regression@example.test";
+        seed_user_and_membership(org, sa_email, UserRole::ServiceAccount);
+        // Target is a regular admin — the pre-fix bug let a service account
+        // rewrite adminA's profile fields, so exercise that exact shape.
+        seed_user_and_membership(org, victim_email, UserRole::Admin);
+
+        let body = UpdateUser {
+            first_name: Some("Hijacked".to_string()),
+            last_name: Some("User".to_string()),
+            ..UpdateUser::default()
+        };
+
+        let resp = update(
+            Path((org.to_string(), victim_email.to_string())),
+            HeadersExtractor(UserEmail {
+                user_id: sa_email.to_string(),
+            }),
+            axum::Json(body),
+        )
+        .await;
+
+        assert_eq!(
+            resp.status().as_u16(),
+            403,
+            "OSS service_account must be blocked from mutating another user's profile fields"
+        );
+    }
+
+    /// Baseline: an Admin initiator must NOT be blocked by the gate on the
+    /// same code path. This proves the 403 above is provably the invariant
+    /// (initiator role), not a broken setup that fails everyone — matches
+    /// the "isolated red" requirement in the remediator playbook.
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn admin_is_not_blocked_by_update_gate() {
+        use axum::extract::Path;
+
+        use crate::handler::http::extractors::Headers as HeadersExtractor;
+
+        let org = "org-user-update-admin-baseline";
+        let admin_email = "user-update-admin-baseline@example.test";
+        let target_email = "user-update-target-baseline@example.test";
+        seed_user_and_membership(org, admin_email, UserRole::Admin);
+        seed_user_and_membership(org, target_email, UserRole::ServiceAccount);
+
+        let body = UpdateUser {
+            first_name: Some("Renamed".to_string()),
+            ..UpdateUser::default()
+        };
+
+        let resp = update(
+            Path((org.to_string(), target_email.to_string())),
+            HeadersExtractor(UserEmail {
+                user_id: admin_email.to_string(),
+            }),
+            axum::Json(body),
+        )
+        .await;
+
+        // The gate must let an Admin initiator through. The downstream
+        // service layer may or may not fully persist (DB backends vary in
+        // this unit-test harness), but it must NOT be the gate's 403.
+        assert_ne!(
+            resp.status().as_u16(),
+            403,
+            "Admin initiator must not be blocked by the OSS update gate; got 403"
+        );
     }
 }
