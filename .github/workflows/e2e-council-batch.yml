@@ -251,6 +251,9 @@ jobs:
             # but is ignored downstream — we send the issue number as a placeholder so the field
             # is a valid integer. `--ref` targets a specific branch of o2-enterprise so test-runs
             # can hit engine feat branches pre-merge.
+            # target_dir is intentionally NOT passed: the engine's issue-mode rewrites run-context.json
+            # to RegressionSet/<Area>/ deterministically from the issue's area/* labels, so an
+            # advisory target_dir would just be a redundant + conflict-prone third signal.
             if ! gh workflow run e2e-council.yml \
               --repo "$ENT_REPO" \
               --ref "$ENGINE_REF" \
@@ -262,7 +265,6 @@ jobs:
               -f feature_hint="regression coverage for closed issue #${ISSUE}" \
               -f actor=e2e-council-batch \
               -f batch_key="$BATCH_KEY" \
-              -f target_dir="$TARGET_DIR" \
               -f pr_back_enabled=false; then
               printf '{"issue":%s,"status":"dispatch_failed","duration":0}\n' \
                 "$ISSUE" >> "$RESULTS_FILE"
@@ -359,6 +361,77 @@ jobs:
               echo "(healing failed or Sentinel rejected all attempts). Labels unchanged; retry tomorrow."
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
+          fi
+
+          # ---- 2b. Register new RegressionSet specs in playwright_regression.yml ----
+          # Engine's issue-mode drops specs at tests/ui-testing/playwright-tests/RegressionSet/<Area>/,
+          # but the scheduled regression cron (playwright_regression.yml) only picks up files listed
+          # in its matrix `run_files`. We update that YAML on the same batch branch so the same PR
+          # ships both the specs AND their CI registration. Folder → group mapping mirrors the case
+          # statement in playwright_regression.yml itself (Dashboards → Dashboard-Regression, etc.).
+          # yq is preinstalled on ubuntu-latest runners.
+          WORKDIR="$RUNNER_TEMP/reg-yml"
+          rm -rf "$WORKDIR" && mkdir -p "$WORKDIR"
+          # Sparse-shallow checkout: fetch only the yml (via API) — no PR-code checkout, no PAT surface widening.
+          gh api "/repos/${OSS_REPO}/contents/.github/workflows/playwright_regression.yml?ref=${WORK_BRANCH}" \
+            --jq '.content' 2>/dev/null | base64 --decode > "$WORKDIR/playwright_regression.yml" || {
+              echo "::warning::couldn't fetch playwright_regression.yml from ${WORK_BRANCH} — skipping registration."
+              PLW_REG_SKIPPED=1
+            }
+          if [ "${PLW_REG_SKIPPED:-0}" = "0" ]; then
+            # List spec files added on the batch branch under RegressionSet/. Compare vs main to know NEW ones.
+            NEW_SPECS=$(gh api "/repos/${OSS_REPO}/compare/main...${WORK_BRANCH}?per_page=100" \
+              --jq '[.files[] | select(.status=="added" and (.filename | startswith("tests/ui-testing/playwright-tests/RegressionSet/") and endswith(".spec.js"))) | .filename] | .[]' \
+              2>/dev/null || true)
+            REG_CHANGES=0
+            while IFS= read -r SPEC_PATH; do
+              [ -z "$SPEC_PATH" ] && continue
+              # Extract Area folder + filename: "tests/ui-testing/playwright-tests/RegressionSet/Pipelines/foo.spec.js" → Pipelines, foo.spec.js
+              REL="${SPEC_PATH#tests/ui-testing/playwright-tests/RegressionSet/}"
+              AREA_FOLDER="${REL%%/*}"
+              FILENAME="${REL##*/}"
+              case "$AREA_FOLDER" in
+                Logs)        GROUP=Logs-Regression ;;
+                Alerts)      GROUP=Alerts-Regression ;;
+                Dashboards)  GROUP=Dashboard-Regression ;;
+                Pipelines)   GROUP=Pipelines-Regression ;;
+                Streams)     GROUP=Streams-Regression ;;
+                Traces)      GROUP=Traces-Regression ;;
+                Metrics)     GROUP=Metrics-Regression ;;
+                Reports)     GROUP=Reports-Regression ;;
+                DataSources) GROUP=DataSources-Regression ;;
+                General)     GROUP=GeneralTests-Regression ;;
+                *)           GROUP=GeneralTests-Regression ;;
+              esac
+              # Idempotent: only add if not already present.
+              CURRENT=$(yq eval "(.jobs.playwright.strategy.matrix.include[] | select(.testfolder == \"${GROUP}\") | .run_files)" "$WORKDIR/playwright_regression.yml" 2>/dev/null || echo "")
+              if printf '%s' "$CURRENT" | grep -qx "^- ${FILENAME}$" 2>/dev/null; then
+                echo "::notice::already registered: ${FILENAME} in ${GROUP}"
+                continue
+              fi
+              yq eval -i "(.jobs.playwright.strategy.matrix.include[] | select(.testfolder == \"${GROUP}\") | .run_files) += [\"${FILENAME}\"]" \
+                "$WORKDIR/playwright_regression.yml" || { echo "::warning::yq append failed for ${GROUP}/${FILENAME}"; continue; }
+              echo "::notice::registered: ${FILENAME} → ${GROUP} in playwright_regression.yml"
+              REG_CHANGES=$((REG_CHANGES + 1))
+            done <<< "$NEW_SPECS"
+
+            if [ "$REG_CHANGES" -gt 0 ]; then
+              # Commit the yml update on the same batch branch via the Contents API (no checkout, no
+              # local git needed). Get current SHA of the file on the branch → PUT the new content.
+              SHA=$(gh api "/repos/${OSS_REPO}/contents/.github/workflows/playwright_regression.yml?ref=${WORK_BRANCH}" \
+                --jq '.sha' 2>/dev/null || true)
+              B64=$(base64 -i "$WORKDIR/playwright_regression.yml" | tr -d '\n')
+              gh api "/repos/${OSS_REPO}/contents/.github/workflows/playwright_regression.yml" \
+                --method PUT \
+                -f message="ci(regression): register ${REG_CHANGES} spec(s) added by batch ${BATCH_KEY}" \
+                -f content="$B64" \
+                -f sha="$SHA" \
+                -f branch="$WORK_BRANCH" >/dev/null 2>&1 && \
+                echo "playwright_regression.yml updated on ${WORK_BRANCH} (+${REG_CHANGES} run_files)" || \
+                echo "::warning::commit of playwright_regression.yml update failed — the PR will still open but the specs won't run in the scheduled regression cron until manually registered."
+            else
+              echo "No new RegressionSet specs to register (all filenames already in playwright_regression.yml)."
+            fi
           fi
 
           # ---- 3. Build the PR body table ----
