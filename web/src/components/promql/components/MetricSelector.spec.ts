@@ -111,14 +111,18 @@ describe("MetricSelector", () => {
     it("renders the metric selector root element", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find(".metric-selector").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="promql-metric-selector"]').exists(),
+      ).toBe(true);
     });
 
     it("displays the 'Metric' layout label", () => {
       wrapper = createWrapper();
 
       // i18n resolves 'panel.metric' to 'Metric' in the en locale
-      expect(wrapper.find(".layout-name").text()).toBe("Metric");
+      expect(
+        wrapper.find('[data-test="promql-metric-selector-label"]').text(),
+      ).toBe("Metric");
     });
 
     it("renders the OSelect component", () => {

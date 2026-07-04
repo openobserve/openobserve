@@ -42,6 +42,9 @@ impl From<ProviderError> for Response {
             ),
             ProviderError::NotFound => MetaHttpResponse::not_found("Provider not found"),
             ProviderError::InvalidConfig(err) => MetaHttpResponse::bad_request(err),
+            ProviderError::ProviderInUse(scorers) => MetaHttpResponse::conflict(format!(
+                "Provider is used by active scorers: {scorers}. Unlink or replace the provider before deleting it."
+            )),
         }
     }
 }
@@ -269,13 +272,24 @@ async fn test_provider_connection(
     org_id: &str,
     provider_id: &str,
 ) -> Result<String, ProviderError> {
-    let provider = providers::get_provider(org_id, provider_id).await?;
-    let provider = infra::provider::PreparedProvider::parse((&provider).into())
-        .map_err(|e| ProviderError::InvalidConfig(e.to_string()))?;
-    provider
-        .test_connection()
-        .await
-        .map_err(|e| ProviderError::InfraError(infra::errors::Error::Message(e.to_string())))
+    #[cfg(feature = "enterprise")]
+    {
+        let provider = providers::get_provider(org_id, provider_id).await?;
+        let provider =
+            o2_enterprise::enterprise::llm_evaluations::provider::PreparedProvider::parse(
+                (&provider).into(),
+            )
+            .map_err(|e| ProviderError::InvalidConfig(e.to_string()))?;
+        provider
+            .test_connection()
+            .await
+            .map_err(|e| ProviderError::InfraError(infra::errors::Error::Message(e.to_string())))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, provider_id);
+        Err(ProviderError::NotFound)
+    }
 }
 
 #[cfg(test)]
@@ -292,6 +306,7 @@ mod tests {
                 ProviderError::InvalidConfig("bad endpoint".to_string()),
                 400,
             ),
+            (ProviderError::ProviderInUse("judge".to_string()), 409),
         ];
         for (err, expected) in cases {
             let resp: Response = err.into();

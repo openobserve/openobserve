@@ -458,15 +458,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.o2-custom-select-dashboard {
-  max-width: 37.5rem;
-}
-
-:deep(.q-field__native) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-</style>

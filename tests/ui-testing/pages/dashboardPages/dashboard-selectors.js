@@ -60,7 +60,8 @@ const DASHBOARD = {
   VARIABLE_TAB: '[data-test="dashboard-settings-variable-tab"]',
   ADD_VARIABLE_BTN: '[data-test="dashboard-add-variable-btn"]',
   VARIABLE_DRAG: '[data-test="dashboard-variable-settings-drag"]',
-  VARIABLE_DRAGGABLE_ROW: '[data-test="dashboard-variable-settings-draggable-row"]',
+  // Variables list migrated to OTable; rows are `o2-table-row-{index}`.
+  VARIABLE_DRAGGABLE_ROW: '[data-test^="o2-table-row-"]',
 
   // Variable form fields
   VARIABLE_NAME: '[data-test="dashboard-variable-name"]',

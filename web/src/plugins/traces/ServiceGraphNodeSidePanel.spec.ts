@@ -356,42 +356,31 @@ describe("ServiceGraphNodeSidePanel", () => {
   describe("health badge", () => {
     it("should show Healthy badge when error_rate is 0", () => {
       wrapper = mountPanel({ selectedNode: healthyNode });
-      const badge = wrapper.find(".health-badge");
+      const badge = wrapper.find('[data-test="service-health-badge"]');
       expect(badge.exists()).toBe(true);
       expect(badge.text()).toBe("Healthy");
-      expect(badge.classes()).toContain("healthy");
     });
 
     it("should show Degraded badge when error_rate is above 5", () => {
       wrapper = mountPanel({ selectedNode: degradedNode });
-      const badge = wrapper.find(".health-badge");
-      expect(badge.text()).toBe("Degraded");
-      expect(badge.classes()).toContain("degraded");
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Degraded");
     });
 
     it("should show Critical badge when error_rate is above 10", () => {
       wrapper = mountPanel({ selectedNode: criticalNode });
-      const badge = wrapper.find(".health-badge");
-      expect(badge.text()).toBe("Critical");
-      expect(badge.classes()).toContain("critical");
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Critical");
     });
 
     it("should show Healthy badge when error_rate is exactly 5", () => {
       // error_rate <= 5 maps to "healthy" per the component logic (> 5 triggers degraded)
-      wrapper = mountPanel({
-        selectedNode: { ...baseNode, error_rate: 5 },
-      });
-      const badge = wrapper.find(".health-badge");
-      expect(badge.text()).toBe("Healthy");
+      wrapper = mountPanel({ selectedNode: { ...baseNode, error_rate: 5 } });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Healthy");
     });
 
     it("should show Degraded badge when error_rate is exactly 10", () => {
       // error_rate <= 10 maps to "degraded" per component logic (> 10 triggers critical)
-      wrapper = mountPanel({
-        selectedNode: { ...baseNode, error_rate: 10 },
-      });
-      const badge = wrapper.find(".health-badge");
-      expect(badge.text()).toBe("Degraded");
+      wrapper = mountPanel({ selectedNode: { ...baseNode, error_rate: 10 } });
+      expect(wrapper.find('[data-test="service-health-badge"]').text()).toBe("Degraded");
     });
   });
 

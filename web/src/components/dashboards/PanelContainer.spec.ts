@@ -1377,21 +1377,29 @@ describe("PanelContainer", () => {
   });
 
   describe("Theme Support", () => {
-    it("should apply dark mode theme", async () => {
+    // Theme is now handled globally via CSS custom property tokens
+    // (e.g. tw:border-border-subtle) that switch with the body--dark class,
+    // rather than a per-component dark-mode class. We assert the panel bar
+    // uses the theme-aware token class and renders consistently in both themes.
+    it("should use theme-aware token classes on the panel bar in dark mode", async () => {
       store.state.theme = 'dark';
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
       const qBar = wrapper.find('[data-test="dashboard-panel-bar"]');
-      expect(qBar.classes()).toContain('dark-mode');
+      expect(qBar.exists()).toBe(true);
+      expect(qBar.classes()).toContain('tw:border-border-subtle');
+      expect(qBar.classes()).not.toContain('dark-mode');
     });
 
-    it("should NOT apply dark-mode class in light mode", async () => {
+    it("should use the same theme-aware token classes in light mode", async () => {
       store.state.theme = 'light';
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
       const qBar = wrapper.find('[data-test="dashboard-panel-bar"]');
+      expect(qBar.exists()).toBe(true);
+      expect(qBar.classes()).toContain('tw:border-border-subtle');
       expect(qBar.classes()).not.toContain('dark-mode');
     });
   });

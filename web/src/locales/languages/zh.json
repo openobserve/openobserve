@@ -475,7 +475,9 @@
     "actions": "操作",
     "incidents": "事件",
     "evals": "评测",
-    "aiObservability": "AI"
+    "keyboardShortcuts": "键盘快捷键",
+    "aiObservability": "AI",
+    "aiAssistant": "人工智能助手"
   },
   "rum": {
     "title": "用户体验监控",
@@ -3109,6 +3111,25 @@
     "aiToolsets": "AI 工具集",
     "llmModelPricing": "LLM 模型定价",
     "ingestionTokens": "写入令牌",
+    "genAiAgentMapping": {
+      "tabLabel": "GenAI 代理映射",
+      "title": "GenAI 代理映射",
+      "description": "配置备用遥测属性，用于对 LLM 跟踪和评估的代理身份进行标准化。",
+      "howItWorksTitle": "映射的工作原理",
+      "howItWorksDescription": "OpenObserve 首先保留了标准的 gen_ai.agent.name 和 gen_ai.agent.id 属性。仅当标准属性缺失或为空时，才会检查这些列表。每行添加一个传入遥测属性。",
+      "agentNameFields": "代理名称备用字段",
+      "agentNameHelp": "传入的属性用作 gen_ai.agent.name 的备用属性。",
+      "agentIdFields": "代理 ID 备用字段",
+      "agentIdHelp": "传入属性用作 gen_ai.agent.id 的备用属性。",
+      "fieldsPlaceholder": "代理人姓名\nllm.agent.name",
+      "applyDefaults": "应用默认值",
+      "resetToEmpty": "重置为空",
+      "defaultsSource": "默认值是从 openobserve/sdr_patterns 加载的，可以在为该组织保存之前进行修改。",
+      "saved": "GenAI 代理映射已成功保存",
+      "loadFailed": "无法加载 GenAI 代理映射",
+      "saveFailed": "无法保存 GenAI 代理映射",
+      "defaultsLoadFailed": "无法加载 GenAI 代理映射默认值"
+    },
     "groupGeneral": "常规",
     "groupAccessSecurity": "访问与安全",
     "groupDestinationsTemplates": "目标与模板",
@@ -4883,18 +4904,18 @@
     }
   },
   "aiObservability": {
-    "title": "AI",
+    "title": "LLM 可观测性",
     "sections": {
-      "monitor": "观测",
-      "evaluate": "评测"
+      "monitor": "监视器",
+      "evaluate": "评估"
     },
     "nav": {
-      "llmInsights": "洞察",
+      "overview": "概述",
       "sessions": "会话",
       "quality": "质量",
-      "evalJobs": "评测任务",
-      "scorers": "评分器",
-      "scoreConfigs": "评分配置"
+      "evalJobs": "评估职位",
+      "scorers": "记分员",
+      "scoreConfigs": "分数配置"
     },
     "kpi": {
       "totalCost": "总成本",
@@ -4940,6 +4961,14 @@
         "title": "最近的错误",
         "subtitle": "最近 10 次失败的跨度"
       }
+    },
+    "subtitle": {
+      "llmInsights": "跟踪 LLM 流量的延迟、错误、代币和成本",
+      "sessions": "依次浏览和检查代理会话",
+      "quality": "对您的 LLM 回复进行评分和跟踪",
+      "evalJobs": "在会话中运行和监控评估作业",
+      "scorers": "创建和管理对 LLM 输出进行评分的记分员",
+      "scoreConfigs": "配置评估时使用的评分标准"
     }
   },
   "onlineEvals": {
@@ -5740,7 +5769,84 @@
     },
     "empty": {
       "title": "还没有 LLM 提供商",
-      "description": "LLM 提供商存储您的 LLM Judge 评分器调用的语言模型的连接详细信息（端点 + 凭据）。添加一个即可开始进行基于法官的评估。"
+      "description": "LLM 提供商存储您的 LLM Judge 评分员调用的语言模型的连接详细信息（端点 + 凭据）。添加一个即可开始进行基于法官的评估。"
+    }
+  },
+  "shortcuts": {
+    "title": "键盘快捷键",
+    "mac": "苹果电脑",
+    "windowsLinux": "Windows/Linux",
+    "toggleHint": "切换此面板",
+    "pages": {
+      "global": "全球",
+      "logs": "日志",
+      "dashboardsList": "仪表板",
+      "dashboards": "仪表板视图",
+      "dashboardsPanel": "仪表板-面板（将鼠标悬停在面板上）",
+      "metrics": "指标",
+      "traces": "痕迹",
+      "alerts": "警报",
+      "streams": "直播",
+      "pipelines": "管道",
+      "functions": "函数",
+      "reports": "报告"
+    },
+    "actions": {
+      "openCheatsheet": "打开键盘快捷键备忘单",
+      "closeDialog": "关闭任何对话框、抽屉或模态",
+      "focusSearch": "焦点搜索栏",
+      "logsRunQuery": "运行搜索查询",
+      "logsRefresh": "刷新/重新运行搜索",
+      "logsToggleHistogram": "切换直方图",
+      "logsToggleSidebar": "切换字段侧边栏",
+      "dashboardsListAdd": "新仪表板",
+      "dashboardsListImport": "导入控制面板",
+      "dashboardsListRefresh": "刷新清单",
+      "dashboardRefresh": "刷新所有面板",
+      "dashboardAddPanel": "添加新面板",
+      "dashboardSave": "保存仪表板",
+      "dashboardFullscreen": "切换全屏",
+      "panelView": "全屏查看面板",
+      "panelEdit": "编辑面板",
+      "panelDuplicate": "复制面板",
+      "panelDelete": "删除面板",
+      "metricsRunQuery": "运行 PromQL 查询",
+      "metricsRefresh": "刷新",
+      "tracesSearch": "搜索痕迹",
+      "tracesRefresh": "刷新",
+      "alertsCreate": "创建新警报",
+      "alertsRefresh": "刷新警报列表",
+      "alertsClose": "关闭警报详细信息抽屉",
+      "streamsAdd": "添加新直播",
+      "streamsRefresh": "刷新清单",
+      "pipelinesAdd": "创建新管道",
+      "pipelinesImport": "导入管道",
+      "pipelinesRefresh": "刷新清单",
+      "functionsAdd": "添加新函数",
+      "functionsRefresh": "刷新清单",
+      "reportsAdd": "创建新报告",
+      "reportsRefresh": "刷新清单"
+    },
+    "search": "搜索快捷方式...",
+    "noResults": "未找到快捷方式",
+    "subtitle": "按？任何地方·点击任一行即可触发",
+    "footerClose": "关闭",
+    "footerReopen": "重新打开",
+    "footerRun": "点击行即可运行",
+    "footerMacHint": "▼ = Mac 上的 Cmd · Windows 上的 Ctrl",
+    "modules": {
+      "global": "全球",
+      "logs": "日志",
+      "dashboards": "仪表板",
+      "metrics": "指标",
+      "traces": "痕迹",
+      "alerts": "警报",
+      "streams": "直播",
+      "pipelines": "管道",
+      "functions": "函数",
+      "reports": "报告",
+      "iam": "IAM",
+      "runningQueries": "运行查询"
     }
   },
   "logs": {

@@ -110,7 +110,7 @@ withDefaults(
 );
 </script>
 
-<style scoped>
+<style>
 .es-slot {
   transform-box: fill-box;
   transform-origin: center;

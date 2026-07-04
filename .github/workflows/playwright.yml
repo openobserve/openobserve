@@ -1,12 +1,16 @@
 name: Playwright UI Tests
 
 on:
-  push:
-    branches:
-      - "main"
+  # No `push: main` trigger: the merge_group (merge-queue) run already builds and
+  # tests the exact commit that lands on main, so a post-merge push run would be a
+  # full-suite duplicate. The merge_group run is now the trusted main-ward build and
+  # also warms the shared Rust cache (see save-if on the rust-cache step below).
   pull_request:
     branches:
       - "**"
+    # labeled/unlabeled so adding or removing the 'e2e' label re-fires the run and
+    # re-evaluates the gate in playwright_summary.
+    types: [opened, reopened, synchronize, labeled, unlabeled]
   merge_group:
 
 concurrency:
@@ -64,10 +68,11 @@ jobs:
 
       - id: check
         run: |
+          # Skip the suite when a PR touches only docs or images. Anything else — source,
+          # web/, workflows (incl. this file) — runs the suite.
+          IGNORE_RE='(\.md$|^docs/|\.(png|jpe?g|gif|svg|webp)$)'
           CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          if [ -z "$CHANGED" ]; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          elif echo "$CHANGED" | grep -qvE '(\.md$|^docs/)'; then
+          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qvE "$IGNORE_RE"; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
@@ -77,7 +82,12 @@ jobs:
     timeout-minutes: 45
     name: build_binary
     needs: [check_changes]
-    if: needs.check_changes.outputs.has_changes == 'true'
+    # Run when there are e2e-relevant changes AND either this is not a pull_request
+    # (push to main / merge_group always run) or the PR carries the 'e2e' label.
+    if: >-
+      needs.check_changes.outputs.has_changes == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on:
       labels: ubicloud-standard-16
     permissions:
@@ -105,7 +115,9 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: playwright-release-ci
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          # Save the shared cache on merge_group runs (the main-ward build now that
+          # push:main is gone); keep the main-ref check for any non-PR fallback.
+          save-if: ${{ github.event_name == 'merge_group' || github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: |
@@ -149,7 +161,7 @@ jobs:
     needs: [build_binary]
     if: ${{ !cancelled() && needs.build_binary.result == 'success' }}
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
       actions: read
@@ -339,6 +351,7 @@ jobs:
                 "reportFolders.spec.js",
                 "reports-bulk-operations.spec.js",
                 "reports-form-validation.spec.js",
+                "reportCsvMediaType.spec.js",
               ]
           - testfolder: "Streams"
             browser: "chrome"
@@ -1049,7 +1062,7 @@ jobs:
     needs: [ui_integration_tests, merge_reports]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
       actions: read  # reads run/job timings from the Actions API
@@ -1106,7 +1119,7 @@ jobs:
     needs: [ui_integration_tests, merge_reports]
     if: ${{ !cancelled() && needs.ui_integration_tests.result == 'failure' && needs.merge_reports.result == 'success' }}
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
       actions: read  # download-artifact fetches the merged-report artifact
@@ -1249,7 +1262,7 @@ jobs:
   playwright_summary:
     timeout-minutes: 5
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions: {}
     needs:
       [
@@ -1261,25 +1274,33 @@ jobs:
     steps:
       - name: Check test results
         run: |
-          # check_changes must have succeeded — if it failed, all downstream jobs skipped
-          # and we would otherwise incorrectly report success.
+          # 1. check_changes must have succeeded — if it failed, downstream jobs skipped
+          #    and we must not report a false success.
           if [ "${{ needs.check_changes.result }}" != "success" ]; then
             echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"
             exit 1
           fi
 
-          BUILD_OK=false
-          UI_OK=false
-
-          if [ "${{ needs.build_binary.result }}" == "success" ] || [ "${{ needs.build_binary.result }}" == "skipped" ]; then
-            BUILD_OK=true
+          # 2. No e2e-relevant changes (docs/images/meta only) → the suite legitimately did
+          #    not run. Allow the merge; no 'e2e' label required.
+          if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
+            echo "✅ No e2e-relevant file changes — Playwright suite not required for this PR."
+            exit 0
           fi
 
-          if [ "${{ needs.ui_integration_tests.result }}" == "success" ] || [ "${{ needs.ui_integration_tests.result }}" == "skipped" ]; then
-            UI_OK=true
+          # 3. The change IS e2e-relevant. On a pull_request it must carry the 'e2e' label,
+          #    otherwise the suite was intentionally not run and we BLOCK the merge until the
+          #    author opts in. (push to main / merge_group are never label-gated.)
+          if [ "${{ github.event_name }}" == "pull_request" ] && \
+             [ "${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}" != "true" ]; then
+            echo "::error::This PR changes e2e-relevant files but has no 'e2e' label, so the Playwright suite did not run."
+            echo "::error::Add the 'e2e' label to the PR to run the full Playwright suite before merging."
+            exit 1
           fi
 
-          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ]; then
+          # 4. Suite was expected to run — pass only if build + tests actually succeeded.
+          if [ "${{ needs.build_binary.result }}" == "success" ] && \
+             [ "${{ needs.ui_integration_tests.result }}" == "success" ]; then
             echo "All Playwright tests completed successfully"
             exit 0
           else

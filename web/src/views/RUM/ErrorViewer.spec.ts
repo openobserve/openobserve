@@ -230,7 +230,9 @@ describe("ErrorViewer.vue", () => {
         data: { hits: [mockErrorData] },
       });
       wrapper = mountComponent();
-      expect(wrapper.find(".error-viewer-container").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="error-viewer-container"]').exists(),
+      ).toBe(true);
     });
 
     it("should have correct styles applied", () => {
@@ -238,10 +240,10 @@ describe("ErrorViewer.vue", () => {
         data: { hits: [mockErrorData] },
       });
       wrapper = mountComponent();
-      const container = wrapper.find(".error-viewer-container");
+      const container = wrapper.find('[data-test="error-viewer-container"]');
       expect(container.exists()).toBe(true);
-      // Check that the container has the expected CSS class
-      expect(container.classes()).toContain("error-viewer-container");
+      // Check that the container has the expected layout class
+      expect(container.classes()).toContain("card-container");
     });
   });
 

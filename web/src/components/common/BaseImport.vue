@@ -102,17 +102,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="monaco-editor tw:mx-2"
+                    class="import-editor-shell import-url-editor tw:mx-2"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
-                    :class="
-                      jsonStr === '' && queryEditorPlaceholderFlag
-                        ? 'empty-query'
-                        : ''
-                    "
-                    @focus="queryEditorPlaceholderFlag = false"
-                    @blur="queryEditorPlaceholderFlag = true"
                   />
                 </div>
               </div>
@@ -154,17 +147,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="monaco-editor tw:mx-2"
+                    class="import-editor-shell import-file-editor tw:mx-2"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
-                    :class="
-                      jsonStr === '' && queryEditorPlaceholderFlag
-                        ? 'empty-query'
-                        : ''
-                    "
-                    @focus="queryEditorPlaceholderFlag = false"
-                    @blur="queryEditorPlaceholderFlag = true"
                   />
                 </div>
               </div>
@@ -351,7 +337,6 @@ export default defineComponent({
     const jsonArrayOfObj = ref<any[]>([]);
     const activeTab = ref(props.defaultActiveTab);
     const splitterModel = ref(60);
-    const queryEditorPlaceholderFlag = ref(true);
     const editorKey = ref(0); // Force editor to re-render when changes
     const isImporting = ref(false); // Track if import is in progress
 
@@ -506,6 +491,13 @@ export default defineComponent({
       () => jsonStr.value,
       (newVal) => {
         emit("update:jsonStr", newVal);
+        // Editor emptied → clear the selected file(s) too, so the file input
+        // stays in sync with the editor (mirrors the file→editor clear above).
+        if (newVal === "" && jsonFiles.value) {
+          jsonFiles.value = null;
+          jsonArrayOfObj.value = [];
+          emit("update:jsonArray", jsonArrayOfObj.value);
+        }
       },
     );
 
@@ -538,7 +530,6 @@ export default defineComponent({
       jsonArrayOfObj,
       activeTab,
       splitterModel,
-      queryEditorPlaceholderFlag,
       editorKey,
       isImporting,
       handleBack,
@@ -557,42 +548,32 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.empty-query .monaco-editor-background {
-  background-image: url("../../assets/images/common/query-editor.png");
-  background-repeat: no-repeat;
-  background-size: 115px;
-}
-
-.editor-container-url {
-  .monaco-editor {
-    height: v-bind('editorHeights.urlEditor') !important;
-    overflow: auto;
-    resize: none;
-    border: 1px solid var(--o2-border-color);
-    border-radius: 0.375rem;
-    padding-top: 12px;
-  }
-}
-
-.editor-container-json {
-  .monaco-editor {
-    height: v-bind('editorHeights.fileEditor') !important;
-    overflow: auto;
-    resize: none;
-    border: 1px solid var(--o2-border-color);
-    border-radius: 0.375rem;
-    padding-top: 12px;
-  }
-}
-
-.monaco-editor {
-  height: v-bind('editorHeights.fileEditor') !important;
-  overflow: auto;
-  resize: none;
+<style>
+/*
+ * Box styling (border, radius, padding, height) lives on the editor SHELL
+ * wrapper — never on Monaco's internal .monaco-editor element. Monaco sizes
+ * its inner .overflow-guard to the full box it measures; adding border/padding
+ * directly to that element shrinks the content box and forces phantom
+ * horizontal + vertical scrollbars. Styling the wrapper lets Monaco fill a
+ * clean box and removes the scrollbars without any !important overrides.
+ */
+.import-editor-shell {
+  box-sizing: border-box;
+  /* tw:w-full (100%) + tw:mx-2 (1rem total) would overflow by 1rem and add a
+     horizontal scrollbar; subtract the margins so the box stays inside and
+     keeps a right-side gap. */
+  width: calc(100% - 1rem);
   border: 1px solid var(--o2-border-color);
   border-radius: 0.375rem;
-  width: calc(100% - 14px) !important;
+  overflow: hidden;
+}
+
+.import-url-editor {
+  height: v-bind('editorHeights.urlEditor');
+}
+
+.import-file-editor {
+  height: v-bind('editorHeights.fileEditor');
 }
 
 .error-report-container {
@@ -601,22 +582,4 @@ export default defineComponent({
   resize: none;
 }
 
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-
-.error-list {
-}
-
-.error-item {
-  padding: 5px 0px;
-  font-size: 14px;
-}
 </style>

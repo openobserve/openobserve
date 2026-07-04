@@ -43,26 +43,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Legends List -->
     <div
-      class="show-legends-popup"
       data-test="dashboard-show-legends-popup"
     >
-      <div class="legends-content scroll">
-        <div v-if="legends.length === 0" class="no-legends tw:p-3 tw:text-center">
+      <div class="scroll tw:max-h-[400px] tw:overflow-y-auto tw:py-[3px]">
+        <div v-if="legends.length === 0" class="tw:p-3 tw:text-center tw:min-h-[100px] tw:flex tw:items-center tw:justify-center">
           {{ t("dashboard.noLegendsAvailable") }}
         </div>
-        <div v-else class="legends-list">
+        <div v-else class="tw:flex tw:flex-col">
           <div
             v-for="(legend, index) in legends"
             :key="index"
-            class="legend-item tw:px-2 tw:py-1"
+            class="legend-item tw:px-2 tw:py-1 tw:last:border-b-0"
             :data-test="`dashboard-legend-item-${index}`"
           >
-            <div class="tw:flex tw:items-center legend-row">
+            <div class="tw:flex tw:items-center tw:flex-nowrap tw:w-full">
               <div
-                class="legend-color-box"
+                class="tw:w-5 tw:h-3 tw:rounded-sm tw:mr-[10px] tw:shrink-0"
                 :style="{ backgroundColor: legend.color || '#5960b2' }"
               ></div>
-              <div class="legend-text" data-test="dashboard-legend-item-text">
+              <div class="tw:break-all tw:overflow-wrap-anywhere tw:whitespace-normal tw:leading-[1.4] tw:text-xs" data-test="dashboard-legend-item-text">
                 {{ legend.name }}
               </div>
               <OButton
@@ -276,68 +275,14 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.show-legends-popup {
-  .header {
-    background-color: var(--q-background);
-    border-bottom: 2px solid var(--o2-border-color);
-    z-index: 10;
-  }
+<style>
+.legend-item [data-test="dashboard-legend-copy-btn"] {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  flex-shrink: 0;
+}
 
-  .legends-content {
-    max-height: 400px;
-    overflow-y: auto;
-    padding: 3px 0;
-  }
-
-  .legends-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0px;
-  }
-
-  .legend-item {
-    &:last-child {
-      border-bottom: none;
-    }
-
-    .legend-row {
-      flex-wrap: nowrap;
-      width: 100%;
-    }
-
-    .legend-color-box {
-      width: 20px;
-      height: 12px;
-      border-radius: 2px;
-      margin-right: 10px;
-      flex-shrink: 0;
-    }
-
-    .legend-text {
-      word-break: break-all;
-      overflow-wrap: anywhere;
-      white-space: normal;
-      line-height: 1.4;
-      font-size: 12px;
-    }
-
-    [data-test="dashboard-legend-copy-btn"] {
-      opacity: 0;
-      transition: opacity 0.2s ease-in-out;
-      flex-shrink: 0;
-    }
-
-    &:hover [data-test="dashboard-legend-copy-btn"] {
-      opacity: 1;
-    }
-  }
-
-  .no-legends {
-    min-height: 100px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+.legend-item:hover [data-test="dashboard-legend-copy-btn"] {
+  opacity: 1;
 }
 </style>

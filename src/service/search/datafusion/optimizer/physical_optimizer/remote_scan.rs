@@ -329,21 +329,37 @@ impl TreeNodeRewriter for RemoteScanRewriter {
     }
 }
 
-// If partial reduce is enabled and the input is a Partial AggregateExec,
-// wrap it with a PartialReduce AggregateExec.
+// If partial reduce is enabled and the input is a partial aggregate, wrap it
+// with a PartialReduce AggregateExec.
 fn wrap_partial_reduce(
     partial_reduce_enabled: bool,
+    input: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    let Some(agg) = input.downcast_ref::<AggregateExec>() else {
+        return Ok(input);
+    };
+    wrap_partial_reduce_for_aggregate(partial_reduce_enabled, agg, input.clone())
+}
+
+// If partial reduce is enabled and `agg` is a partial aggregate, wrap `input`
+// with a PartialReduce AggregateExec. `input` can be either the original partial
+// aggregate itself or another plan producing that aggregate's partial-output
+// schema, such as a RemoteScanExec on a super-cluster region leader.
+pub(crate) fn wrap_partial_reduce_for_aggregate(
+    partial_reduce_enabled: bool,
+    agg: &AggregateExec,
     input: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     if !partial_reduce_enabled {
         return Ok(input);
     }
-    let Some(agg) = input.downcast_ref::<AggregateExec>() else {
-        return Ok(input);
-    };
-    if *agg.mode() != AggregateMode::Partial {
+    if !matches!(
+        *agg.mode(),
+        AggregateMode::Partial | AggregateMode::PartialReduce
+    ) {
         return Ok(input);
     }
+
     // PartialReduce receives Partial's output, so group expressions must be
     // simple Column refs into that schema rather than the original scan-level exprs.
     let partial_schema = input.schema();
@@ -678,6 +694,51 @@ mod tests {
         let result = wrap_partial_reduce(true, input)?;
         assert_eq!(result.children()[0].name(), "CoalescePartitionsExec");
         assert_eq!(result.output_partitioning().partition_count(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_for_partial_reduce_source_accepts_remote_output()
+    -> datafusion::common::Result<()> {
+        let scan_schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let group_by = PhysicalGroupBy::new(
+            vec![(col("a", &scan_schema)?, "a".to_string())],
+            vec![],
+            vec![vec![false]],
+            false,
+        );
+        let partial = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&scan_schema)).with_partitions(4)),
+            Arc::clone(&scan_schema),
+        )?;
+        let partial_plan: Arc<dyn ExecutionPlan> = Arc::new(partial);
+        let source_plan = wrap_partial_reduce(true, partial_plan)?;
+        let source_agg = source_plan
+            .downcast_ref::<AggregateExec>()
+            .expect("source plan should be a PartialReduce aggregate");
+        assert_eq!(*source_agg.mode(), AggregateMode::PartialReduce);
+
+        // Simulate a super-cluster region leader: the local RemoteScanExec is not
+        // itself an AggregateExec, but it emits the source aggregate's partial schema.
+        let remote_output: Arc<dyn ExecutionPlan> =
+            Arc::new(EmptyExec::new(source_plan.schema().clone()).with_partitions(4));
+        let result = wrap_partial_reduce_for_aggregate(true, source_agg, remote_output)?;
+        let result_agg = result.downcast_ref::<AggregateExec>().unwrap();
+        assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
+        assert_eq!(result_agg.group_expr().expr().len(), 1);
+
+        let child = result.children()[0].clone();
+        let repartition = child
+            .downcast_ref::<RepartitionExec>()
+            .expect("region-level grouped reduce should hash-partition remote output");
+        assert!(matches!(
+            repartition.partitioning(),
+            Partitioning::Hash(_, 4)
+        ));
         Ok(())
     }
 

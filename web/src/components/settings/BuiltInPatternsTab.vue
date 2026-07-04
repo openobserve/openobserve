@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="built-in-patterns-container card-container">
+  <div class="built-in-patterns-container card-container tw:h-full tw:flex tw:flex-col">
     <!-- Search and Filter Bar -->
-    <div class="filters-bar tw:p-3">
+    <div class="filters-bar tw:p-3 tw:shrink-0 tw:border-b tw:border-(--o2-border-color)">
       <div class="tw:flex tw:gap-3">
         <div class="tw:w-full col-md-6">
           <OSearchInput
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Patterns List -->
-    <div v-else class="patterns-list">
+    <div v-else class="patterns-list tw:flex-1 tw:overflow-y-auto tw:min-h-0">
       <div class="tw:p-3">
         <div class="tw:text-sm tw:font-medium tw:mb-3">
           {{
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li
             v-for="(pattern, index) in filteredPatterns"
             :key="`${pattern.name}-${pattern.pattern.substring(0, 20)}`"
-            class="pattern-item tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-3"
+            class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-3 tw:transition-colors tw:duration-150 tw:hover:bg-(--color-interactive-hover-bg)"
             :data-test="`pattern-item-${index}`"
           >
             <div class="tw:flex tw:items-center tw:shrink-0">
@@ -104,20 +104,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ pattern.name }}
               </span>
               <div class="tw:flex tw:flex-wrap tw:gap-1">
-                <OBadge
+                <OTag
                   v-for="tag in pattern.tags.slice(0, 3)"
                   :key="tag"
-                  size="md"
-                  variant="primary-soft"
-                  class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current"
+                  type="fieldTag"
+                  value="primarysoftsm"
                 >
                   {{ tag }}
-                </OBadge>
-                <OBadge v-if="pattern.tags.length > 3" size="md" variant="default-soft" class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current">
+                </OTag>
+                <OTag v-if="pattern.tags.length > 3" type="fieldTag" value="softsm">
                   +{{ pattern.tags.length - 3 }}
-                </OBadge>
+                </OTag>
               </div>
-              <div class="pattern-preview tw:line-clamp-1">
+              <div class="tw:font-mono tw:text-[0.8125rem] tw:leading-[1.4] tw:text-(--o2-text-secondary) tw:break-all tw:line-clamp-1">
                 {{ pattern.pattern.substring(0, 100)
                 }}{{ pattern.pattern.length > 100 ? "..." : "" }}
               </div>
@@ -183,15 +182,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:mb-3">
           <div class="text-weight-bold tw:mb-1">{{ t('regex_patterns.tags') }}</div>
           <div class="tw:flex tw:flex-wrap tw:gap-2">
-            <OBadge
+            <OTag
               v-for="tag in previewedPattern?.tags"
               :key="tag"
-              size="md"
-              variant="primary-soft"
-              class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current"
+              type="fieldTag"
+              value="primarysoftsm"
             >
               {{ tag }}
-            </OBadge>
+            </OTag>
           </div>
         </div>
 
@@ -237,7 +235,7 @@ import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -265,7 +263,7 @@ interface BuiltInPattern {
 
 export default defineComponent({
   name: "BuiltInPatternsTab",
-  components: { OButton, ODialog, OSpinner, OIcon, OBadge, OSelect, OSearchInput, OCheckbox, OTooltip, OTextarea },
+  components: { OButton, ODialog, OSpinner, OIcon, OTag, OSelect, OSearchInput, OCheckbox, OTooltip, OTextarea },
   emits: ["import-patterns"],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -463,37 +461,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.built-in-patterns-container {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.filters-bar {
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--o2-border-color);
-}
-
-.patterns-list {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0; // Important for flex scrolling
-}
-
-.pattern-item {
-  transition: background-color 0.15s ease;
-
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
-}
-
-.pattern-preview {
-  font-family: monospace;
-  font-size: 0.8125rem;
-  line-height: 1.4;
-  color: var(--o2-text-secondary);
-  word-break: break-all;
-}
-</style>

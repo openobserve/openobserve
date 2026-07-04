@@ -283,10 +283,8 @@ export function useNLQuery() {
         // Normalize VRL comments from // to #
         if (type === 'vrl') {
           extracted = normalizeVrlComments(extracted);
-          console.log('[NL2Q] Normalized VRL comments from // to #');
         }
 
-        console.log('[NL2Q] Extracted query from code block:', extracted);
         return extracted;
       }
     }
@@ -296,7 +294,6 @@ export function useNLQuery() {
     const genericCodeBlockMatch = response.match(/```\s*\n?([\s\S]+?)\n?```/);
     if (genericCodeBlockMatch && genericCodeBlockMatch[1]) {
       const extracted = genericCodeBlockMatch[1].trim();
-      console.log('[NL2Q] Extracted query from generic code block:', extracted);
       return extracted;
     }
 
@@ -369,7 +366,6 @@ export function useNLQuery() {
       return null;
     }
 
-    console.log('[NL2Q] generateSQL called with:', { prompt, orgId });
     isGenerating.value = true;
     streamingResponse.value = ''; // Reset streaming response
 
@@ -378,7 +374,6 @@ export function useNLQuery() {
       // The logsContextProvider returns data in the correct format already
       const pageContext = await getStructuredContext();
 
-      console.log('[NL2Q] Page context from logsContextProvider:', pageContext);
 
       // Build context for AI assistant matching backend expectations
       // pageContext already has: currentPage, organization_identifier, selectedStreams, sqlMode, etc.
@@ -399,7 +394,6 @@ export function useNLQuery() {
         currentVRLQuery: pageContext?.currentVRLQuery || ''
       };
 
-      console.log('[NL2Q] Formatted context for AI:', context);
 
       // Prepare messages for AI
       const messages = [
@@ -420,7 +414,6 @@ export function useNLQuery() {
       );
 
       if (!response || (response as any).cancelled) {
-        console.log('[NL2Q] Request was cancelled');
         return null;
       }
 
@@ -448,7 +441,6 @@ export function useNLQuery() {
       let errorMessage = '';
       let lastMessageContent = ''; // Track latest message events for dashboard URLs
 
-      console.log('[NL2Q] Starting to read streaming response...');
 
       try {
         while (true) {
@@ -456,12 +448,10 @@ export function useNLQuery() {
           chunkCount++;
 
           if (done) {
-            console.log('[NL2Q] Streaming complete after', chunkCount, 'chunks');
             break;
           }
 
           const chunk = decoder.decode(value, { stream: true });
-          console.log('[NL2Q] Received chunk', chunkCount, ':', chunk.substring(0, 100));
 
           // Parse SSE format: data: {...}\n\n
           const lines = chunk.split('\n');
@@ -473,16 +463,13 @@ export function useNLQuery() {
                 // Handle different event types
                 if (data.type === 'status') {
                   // Status event (processing, etc.)
-                  console.log('[NL2Q] Status:', data.message);
                   streamingResponse.value = data.message || 'Processing...';
               } else if (data.type === 'message') {
                 // Message event (AI planning/explanation text)
-                console.log('[NL2Q] Message:', data.content?.substring(0, 100));
                 lastMessageContent = data.content || '';
                 streamingResponse.value = data.content?.substring(0, 100) || 'Processing...';
               } else if (data.type === 'tool_call') {
                 // Track tool execution (dashboard/alert creation)
-                console.log('[NL2Q] Tool call:', data.tool, '-', data.message);
                 toolCalls.push({
                   tool: data.tool || 'unknown',
                   message: data.message || '',
@@ -491,7 +478,6 @@ export function useNLQuery() {
                 streamingResponse.value = data.message || `Executing ${data.tool}...`;
               } else if (data.type === 'tool_result') {
                 // Tool execution result
-                console.log('[NL2Q] Tool result:', data.tool, '- Success:', data.success);
                 toolResults.push({
                   tool: data.tool || 'unknown',
                   success: data.success || false,
@@ -518,7 +504,6 @@ export function useNLQuery() {
                 streamingResponse.value = errorMessage;
               } else if (data.type === 'complete') {
                 // Completion event - may contain full response in history
-                console.log('[NL2Q] Completion event received');
 
                 // Extract final response from history if available
                 if (data.history && Array.isArray(data.history)) {
@@ -527,7 +512,6 @@ export function useNLQuery() {
                     // If we haven't accumulated content yet, use the history
                     if (!generatedQuery.trim()) {
                       generatedQuery = lastMessage.content;
-                      console.log('[NL2Q] Using content from completion history');
                     }
                     // Also update lastMessageContent for URL extraction
                     lastMessageContent = lastMessage.content;
@@ -535,7 +519,6 @@ export function useNLQuery() {
                 }
               } else if (data.type === 'title') {
                 // Title event (ignore for now)
-                console.log('[NL2Q] Title event:', data.title);
                 } else if (data.content) {
                   // Content event (regular text)
                   generatedQuery += data.content;
@@ -549,12 +532,6 @@ export function useNLQuery() {
         }
 
         const rawResponse = generatedQuery.trim();
-        console.log('[NL2Q] Full AI response received:', {
-          length: rawResponse.length,
-          preview: rawResponse.substring(0, 200),
-          toolCalls: toolCalls.length,
-          hasError
-        });
 
         // Check for error first
         if (hasError) {
@@ -568,18 +545,15 @@ export function useNLQuery() {
         }
 
         // PRIORITY 1: Try to extract SQL from AI response first
-        console.log('[NL2Q] Attempting to extract SQL from response...');
         const extractedSQL = extractSQLFromResponse(rawResponse);
 
         // If SQL was successfully extracted, return it (this is the primary goal)
         if (extractedSQL) {
-          console.log('[NL2Q] Successfully generated SQL query:', extractedSQL);
           return extractedSQL;
         }
 
         // PRIORITY 2: Check if this is a non-SQL action (dashboard/alert creation)
         if (toolCalls.length > 0) {
-          console.log('[NL2Q] Tool calls detected but no SQL found:', toolCalls);
 
           // Use lastMessageContent if available (has formatted response with URLs)
           const responseToReturn = lastMessageContent || rawResponse;
@@ -596,7 +570,6 @@ export function useNLQuery() {
           });
 
           if (dashboardTool) {
-            console.log('[NL2Q] Dashboard created successfully');
             return '✓ DASHBOARD_CREATED: ' + responseToReturn;
           }
 
@@ -612,7 +585,6 @@ export function useNLQuery() {
           });
 
           if (alertTool) {
-            console.log('[NL2Q] Alert created successfully');
             return '✓ ALERT_CREATED: ' + responseToReturn;
           }
 
@@ -620,7 +592,6 @@ export function useNLQuery() {
           const hasSuccessfulTool = toolCalls.some(tc => tc.success === true);
 
           if (hasSuccessfulTool) {
-            console.log('[NL2Q] Tool execution completed successfully');
             return '✓ ACTION_COMPLETED: ' + responseToReturn;
           }
 

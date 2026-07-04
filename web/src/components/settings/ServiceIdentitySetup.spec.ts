@@ -372,7 +372,7 @@ describe("ServiceIdentitySetup", () => {
       // section (v-if="serviceNameExpanded"). Expand it first by clicking the
       // collapsed header row, then find and click the link.
       const collapsedRow = wrapper.find(
-        ".tw\\:cursor-pointer.hover\\:tw\\:opacity-80",
+        '[data-test="service-identity-service-name-header"]',
       );
       await collapsedRow.trigger("click");
       await wrapper.vm.$nextTick();

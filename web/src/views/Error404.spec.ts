@@ -63,11 +63,9 @@ describe("Error404", () => {
     expect(button.text()).toContain("Go home");
   });
 
-  it("should have correct styling classes", () => {
-    const page = wrapper.find(".error-404-page");
-    expect(page.exists()).toBe(true);
-
-    const content = wrapper.find(".error-404-content");
-    expect(content.exists()).toBe(true);
+  it("should have a 'Go back' button", () => {
+    const button = wrapper.find('[data-test="error-404-go-back-btn"]');
+    expect(button.exists()).toBe(true);
+    expect(button.text()).toContain("Go Back");
   });
 });

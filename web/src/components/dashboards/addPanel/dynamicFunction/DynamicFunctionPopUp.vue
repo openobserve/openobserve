@@ -8,10 +8,10 @@
     "
   >
     <div style="width: auto; flex-shrink: 0;">
-      <div class="text-label-bold tw:pb-3" data-test="dynamic-function-popup-property-label">Property</div>
+      <div class="tw:font-semibold tw:text-[13px] tw:pb-3" data-test="dynamic-function-popup-property-label">Property</div>
       <div style="display: flex; flex-direction: column; gap: 14px">
         <div>
-          <div class="text-label-normal tw:text-sm" data-test="dynamic-function-popup-label-text">Label</div>
+          <div class="tw:text-[13px] tw:font-normal tw:leading-[70%] tw:pb-0.75" data-test="dynamic-function-popup-label-text">Label</div>
           <OInput
             v-model="fields.label"
             size="sm"
@@ -20,7 +20,7 @@
           />
         </div>
         <div>
-          <div class="text-label-normal tw:text-sm">Alias</div>
+          <div class="tw:text-[13px] tw:font-normal tw:leading-[70%] tw:pb-0.75">Alias</div>
           <OInput
             v-model="fields.alias"
             size="sm"
@@ -53,11 +53,13 @@
         <OTab
           name="build"
           label="Build"
+          class="tw:flex-1"
           data-test="dynamic-function-popup-tab-build"
         />
         <OTab
           name="raw"
           label="Raw"
+          class="tw:flex-1"
           data-test="dynamic-function-popup-tab-raw"
         />
       </OTabs>
@@ -71,7 +73,7 @@
       >
         <OTabPanel name="build">
           <div class="tw:pt-2" style="max-height: 26.25rem; overflow: auto;">
-            <div class="text-label-bold tw:pb-3">Configuration</div>
+            <div class="tw:font-semibold tw:text-[13px] tw:pb-3">Configuration</div>
             <SelectFunction
               v-model="fields"
               data-test="dynamic-function-popup-select-function"
@@ -299,50 +301,3 @@ export default {
   },
 };
 </script>
-<style scoped>
-.tab-item {
-  flex: 0 1 auto !important;
-  padding: 10px 16px !important;
-}
-
-:deep(.o-tab) {
-  flex: 1;
-}
-
-.text-label-bold {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  font-style: normal;
-  font-weight: 600;
-}
-
-.text-label-normal {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  font-style: normal;
-  font-weight: 400;
-  line-height: 70%;
-  padding-bottom: 3px;
-}
-
-.edit-input {
-  flex: 1;
-  border: 1px solid #e0e0e0;
-  line-height: 0px;
-  border-radius: 4px;
-  padding: 2px;
-  outline: none;
-  min-width: 0;
-  width: 100%;
-
-  &:focus {
-    border-color: var(--q-primary);
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-    background-color: var(--o2-primary-background);
-  }
-}
-</style>

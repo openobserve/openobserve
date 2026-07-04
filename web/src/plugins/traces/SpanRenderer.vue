@@ -71,9 +71,3 @@ export default defineComponent({
   components: { SpanBlock },
 });
 </script>
-
-<style scoped lang="scss">
-.spans-container {
-  position: relative;
-}
-</style>

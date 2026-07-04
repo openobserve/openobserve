@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
     <div class="tw:p-3 " style="height: calc(100vh - 130px); width: 100%;" >
       <div class="tw:flex tw:items-baseline tw:justify-between">
-        <div class="tw:flex tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:pb-3 usage-title">
-          <span>{{ t("billing.totalUsage") }}</span>
-          <span> {{ new Date(startTime/1000).toDateString() }} </span>
-          <span>-</span>
-          <span> {{ new Date(endTime/1000).toDateString() }} </span>
+        <div class="tw:flex tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:pb-3">
+          <span class="tw:my-auto tw:mx-[0.625rem] tw:text-[var(--o2-text-heading)]">{{ t("billing.totalUsage") }}</span>
+          <span class="tw:my-auto tw:mx-[0.625rem] tw:text-[var(--o2-text-heading)]"> {{ new Date(startTime/1000).toDateString() }} </span>
+          <span class="tw:my-auto tw:mx-[0.625rem] tw:text-[var(--o2-text-heading)]">-</span>
+          <span class="tw:my-auto tw:mx-[0.625rem] tw:text-[var(--o2-text-heading)]"> {{ new Date(endTime/1000).toDateString() }} </span>
         </div>
       </div>
       <div>
@@ -36,13 +36,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- tab-info-section -->
       <!-- this will be unlocked when we get the actionscripts , rum sessions , error tracking from BE -->
         <div v-if="false" class="tw:grid tw:grid-cols-3 tw:gap-4 tw:w-full">
-            <div class="feature-card">
-              <div class="tile-content tw:flex tw:flex-col tw:justify-between ">
+            <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
+              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
               <!-- Top Section (60%) -->
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <!-- Title row -->
                 <div class="tw:flex tw:justify-between tw:items-center">
-                  <div class="usage-tile-title"> Action Scripts</div>
+                  <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left"> Action Scripts</div>
                   <div style="opacity: 0.8;">
                     <img :src="actionScriptIcon" />
                   </div>
@@ -50,18 +50,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="usage-data-to-display tw:flex tw:items-end ">
+            <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
               2
             </div>
             </div>
             </div>
-            <div class="feature-card">
-              <div class="tile-content tw:flex tw:flex-col tw:justify-between ">
+            <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
+              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
               <!-- Top Section (60%) -->
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <!-- Title row -->
                 <div class="tw:flex tw:justify-between tw:items-center">
-                  <div class="usage-tile-title">Error Tracking</div>
+                  <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Error Tracking</div>
                   <div style="opacity: 0.8;">
                     <img :src="errorTrackingIcon" />
                   </div>
@@ -69,18 +69,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="usage-data-to-display tw:flex tw:items-end ">
+            <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
               300
             </div>
             </div>
             </div>
-            <div class="feature-card">
-              <div class="tile-content tw:flex tw:flex-col tw:justify-between ">
+            <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
+              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
               <!-- Top Section (60%) -->
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <!-- Title row -->
                 <div class="tw:flex tw:justify-between tw:items-center">
-                  <div class="usage-tile-title">RUM Session</div>
+                  <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">RUM Session</div>
                   <div style="opacity: 0.8;">
                     <img :src="rumSessionIcon" />
                   </div>
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="usage-data-to-display tw:flex tw:items-end ">
+            <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
               20
             </div>
             </div>
@@ -98,13 +98,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- new section introduced to show the usage for ingestion , search , functions -->
         <div v-if="!dataLoading && Object.keys(usageData).length > 0" class="tw:flex tw:flex-col tw:gap-4 tw:w-full">
             <div class="tw:grid tw:grid-cols-3 tw:gap-4 tw:w-full">
-                <div class="feature-card">
-              <div class="tile-content tw:flex tw:flex-col tw:justify-between ">
+                <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
+              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
               <!-- Top Section (60%) -->
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <!-- Title row -->
                 <div class="tw:flex tw:justify-between tw:items-center">
-                  <div class="usage-tile-title"> Ingestion</div>
+                  <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title"> Ingestion</div>
                   <div style="opacity: 0.8;">
                     <img :src="ingestionIcon" />
                   </div>
@@ -112,18 +112,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="usage-data-to-display tw:flex tw:items-end ">
+            <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
                {{ usageData.ingestion }} {{ usageDataType.toUpperCase() }} {{ usageCost.ingestion ? '| $ '+ usageCost.ingestion : '' }}
             </div>
             </div>
                 </div>
-                <div class="feature-card">
-              <div class="tile-content tw:flex tw:flex-col tw:justify-between ">
+                <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
+              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
                 <!-- Top Section (60%) -->
                 <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="usage-tile-title">Search</div>
+                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">Search</div>
                     <div style="opacity: 0.8;">
                         <img :src="searchIcon" />
                     </div>
@@ -131,18 +131,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="usage-data-to-display tw:flex tw:items-end ">
+                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
                 {{ usageData.search }} {{ usageDataType.toUpperCase() }} {{ usageCost.search ? '| $ '+ usageCost.search : '' }}
                 </div>
                 </div>
                 </div>
-                <div class="feature-card">
-              <div class="tile-content tw:flex tw:flex-col tw:justify-between ">
+                <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
+              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
                 <!-- Top Section (60%) -->
                 <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="usage-tile-title">Functions</div>
+                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">Functions</div>
                     <div style="opacity: 0.8;">
                         <img :src="functionsIcon" />
                     </div>
@@ -150,35 +150,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="usage-data-to-display tw:flex tw:items-end ">
+                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
                 {{ usageData.functions }} {{ usageDataType.toUpperCase() }} {{ usageCost.functions ? '| $ '+ usageCost.functions : '' }}
                 </div>
                 </div>
                 </div>
             </div>
             <div class="tw:grid tw:grid-cols-4 tw:gap-4 tw:w-full">
-                <div class="feature-card">
-              <div class="tile-content tw:flex tw:flex-col tw:justify-between ">
+                <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
+              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
                 <div class="tw:flex tw:flex-col tw:justify-between">
                     <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="usage-tile-title">{{ t("billing.aiCredits") }}</div>
+                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">{{ t("billing.aiCredits") }}</div>
                     <div style="opacity: 0.8;">
                         <img :src="aiIcon" />
                     </div>
                     </div>
                 </div>
-                <div class="usage-data-to-display tw:flex tw:items-end ">
+                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
                 {{ usageData.ai_credits }} Credits {{ usageCost.ai_credits ? '| $ '+ usageCost.ai_credits : '' }}
                 </div>
                 </div>
                 </div>
-                <div class="feature-card">
-              <div class="tile-content tw:flex tw:flex-col tw:justify-between ">
+                <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
+              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
                 <!-- Top Section (60%) -->
                 <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="usage-tile-title">Pipelines</div>
+                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Pipelines</div>
                     <div style="opacity: 0.8;" class="tw:bg-[#E6EFFE] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
                         <img :src="pipelineIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
                     </div>
@@ -186,18 +186,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="usage-data-to-display tw:flex tw:items-end ">
+                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
                 {{ usageData.pipeline }} {{ usageDataType.toUpperCase() }} {{ usageCost.pipeline ? '| $ '+ usageCost.pipeline : '' }}
                 </div>
                 </div>
                 </div>
-                <div class="feature-card">
-              <div class="tile-content tw:flex tw:flex-col tw:justify-between ">
+                <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
+              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
                 <!-- Top Section (60%) -->
                 <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="usage-tile-title">Remote Pipelines</div>
+                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Remote Pipelines</div>
                     <div style="opacity: 0.8;" class="tw:bg-[#F2DCF5] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
                         <img :src="remotePipelineIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
                     </div>
@@ -205,18 +205,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="usage-data-to-display tw:flex tw:items-end ">
+                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
                 {{ usageData.remotepipeline }} {{ usageDataType.toUpperCase() }} {{ usageCost.remotepipeline ? '| $ '+ usageCost.remotepipeline : '' }}
                 </div>
                 </div>
                 </div>
-                <div class="feature-card">
-              <div class="tile-content tw:flex tw:flex-col tw:justify-between ">
+                <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
+              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
                 <!-- Top Section (60%) -->
                 <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="usage-tile-title">Data Retention</div>
+                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Data Retention</div>
                     <div style="opacity: 0.8;" class="tw:bg-[#FFF4E6] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
                         <img :src="dataRetentionIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
                     </div>
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="usage-data-to-display tw:flex tw:items-end ">
+                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
                 {{ usageData.dataretention }} {{ usageDataType.toUpperCase() }} {{ usageCost.dataretention ? '| $ '+ usageCost.dataretention : '' }}
                 </div>
                 </div>
@@ -255,19 +255,17 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
   let currentDate = new Date(); // Get the current date and time
-  
+
   // Subtract 30 days from the current date
   let thirtyDaysAgo = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-  
+
   export default defineComponent({
     name: "Usage",
     components: {
       ChartRenderer: defineAsyncComponent(
         () => import("@/components/dashboards/panels/ChartRenderer.vue")
       ),
-      CustomChartRenderer: defineAsyncComponent(
-        () => import("@/components/dashboards/panels/CustomChartRenderer.vue")
-      ),
+      CustomChartRenderer,
       OSpinner,
     },
     setup() {
@@ -398,7 +396,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
           ? getImageURL("images/common/ai_icon_dark.svg")
           : getImageURL("images/common/ai_icon_gradient.svg")
       );
-      //this is the example data that needs to be used to get the chart in usage page 
+      //this is the example data that needs to be used to get the chart in usage page
       //we just need to have the data in the format of the dataModel
       //eg: date and value and in the array format
       const dataModel = ref(
@@ -994,83 +992,3 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
     },
   });
   </script>
-  <style lang="scss" scoped>
-  .date-selector {
-    width: 200px;
-  }
-
-  .feature-card {
-    background: var(--o2-card-bg);
-    border: 1px solid var(--o2-border-color);
-    border-radius: 0.5rem;
-    padding: 1rem;
-    min-height: 8rem;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    transition: box-shadow 0.2s ease;
-  }
-
-  .feature-card:hover {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
-
-  .tile-content {
-    border-radius: 0.325rem;
-    height: 100%;
-    gap: 1rem;
-  }
-
-  .dark-usage-tile-content {
-    background: #2B2C2D;
-    border: 1px solid #444444;
-    color: #D2D2D2;
-  }
-
-  .light-usage-tile-content {
-    background: #ffffff;
-    border: 1px solid #E7EAEE;
-    color: #2D2D2D;
-  }
-
-  .usage-tile-title {
-    font-size: var(--text-sm);
-    font-weight: 600;
-    line-height: var(--leading-base);
-    letter-spacing: 0%;
-    color: var(--color-text-heading);
-    text-align: left;
-  }
-
-  .usage-data-to-display {
-    font-size: var(--text-2xl);
-    font-weight: 600;
-    line-height: var(--leading-xl);
-    letter-spacing: 0px;
-    color: var(--color-text-heading);
-    text-align: left;
-  }
-
-  .custom-first-chart {
-    width: 500px;
-  }
-
-  .chart-container {
-    height: 250px !important;
-  }
-
-  .text-title {
-    font-size: var(--text-md);
-    font-weight: 600;
-  }
-
-  .text-sub-title {
-    font-size: var(--text-xl);
-    font-weight: 600;
-  }
-
-  .usage-title > span {
-    margin: auto 0.625rem;
-    color: var(--o2-text-heading);
-  }
-  </style>

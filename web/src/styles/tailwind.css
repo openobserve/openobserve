@@ -1,12 +1,9 @@
 @import "tailwindcss" prefix(tw);
 @import "tw-animate-css";
-/* Design tokens are now sourced from the .css files (Tailwind-only direction;
-   SCSS being phased out). The _*.scss token files hold identical content and
-   remain as a one-line revert until this flip is build-verified. */
+/* Design tokens — all SCSS files removed; these 4 CSS files are the sole source. */
 @import "../lib/styles/tokens/base.css";
 @import "../lib/styles/tokens/semantic.css";
 @import "../lib/styles/tokens/component.css";
-@import "../lib/styles/tokens/sdr-fields.css";
 @import "../lib/styles/tokens/dark.css";
 
 @plugin "@tailwindcss/typography";
@@ -24,6 +21,23 @@
  */
 [data-reka-popper-content-wrapper] {
   pointer-events: auto !important;
+}
+
+/*
+ * Query editor placeholder — the ONE definition for every page that overlays
+ * a placeholder on the Monaco query editor (logs, traces, RUM sessions,
+ * RUM error tracking, alerts). Mirrors Monaco's rendered text (monospace,
+ * same line height) so the placeholder reads as the future typed query.
+ * --o2-text-placeholder is theme-paired, so no dark override is needed.
+ */
+.query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
+  font-family: monospace;
+  font-size: var(--text-base);
+  line-height: 1.3125rem;
+  color: var(--o2-text-placeholder);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @layer base {

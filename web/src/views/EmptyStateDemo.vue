@@ -5,7 +5,7 @@
   would appear in the app. Remove this file + its route once approved.
 -->
 <template>
-  <div :class="['es-demo-page', { dark: localDark }]">
+  <div :class="['es-demo-page', { dark: localDark, 'tw:[color-scheme:dark]': localDark }]">
     <div class="tw:p-8 tw:flex tw:flex-col tw:gap-8 tw:bg-surface-base tw:min-h-screen">
       <div class="tw:flex tw:items-start tw:justify-between tw:gap-4 tw:flex-wrap">
         <div>
@@ -138,15 +138,6 @@ const presets: { preset: EmptyStatePresetName; label: string }[] = [
 ];
 
 const onAction = (which: string) => {
-   
-  console.log("OEmptyState action:", which);
+
 };
 </script>
-
-<style scoped>
-/* Scope a `.dark` so the dark-preview toggle works locally regardless of the
-   app's global theme. The token overrides live under :global(.dark). */
-.es-demo-page.dark {
-  color-scheme: dark;
-}
-</style>

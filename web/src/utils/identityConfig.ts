@@ -54,17 +54,14 @@ export async function loadIdentityConfig(orgIdentifier: string): Promise<Service
     const age = Date.now() - cached.timestamp;
 
     if (age < CACHE_TTL_MS) {
-      console.log(`[identityConfig] Using cached identity config for org '${orgIdentifier}' (age: ${Math.round(age / 1000)}s)`);
       return cached.data;
     } else {
-      console.log(`[identityConfig] Cache expired for org '${orgIdentifier}' (age: ${Math.round(age / 1000)}s), fetching fresh data`);
       identityConfigCache.delete(orgIdentifier);
     }
   }
 
   // Check if there's already a pending request for this org
   if (pendingIdentityConfigRequests.has(orgIdentifier)) {
-    console.log(`[identityConfig] Already loading identity config for org '${orgIdentifier}', awaiting existing request...`);
     // Await the existing promise directly - no polling or recursion needed
     return await pendingIdentityConfigRequests.get(orgIdentifier)!;
   }
@@ -78,10 +75,6 @@ export async function loadIdentityConfig(orgIdentifier: string): Promise<Service
         timestamp: Date.now()
       };
       identityConfigCache.set(orgIdentifier, cacheEntry);
-      console.log(`[identityConfig] Loaded identity config for org '${orgIdentifier}':`, {
-        sets: response.data.sets?.length || 0,
-        tracked_alias_ids: response.data.tracked_alias_ids?.length || 0
-      });
       return response.data;
     } catch (err: any) {
       console.warn("[identityConfig] Failed to load identity config, using fallback:", err);
@@ -108,7 +101,6 @@ export async function loadIdentityConfig(orgIdentifier: string): Promise<Service
 export function clearIdentityConfigCache(orgIdentifier: string): void {
   identityConfigCache.delete(orgIdentifier);
   pendingIdentityConfigRequests.delete(orgIdentifier);
-  console.log(`[identityConfig] Cleared identity config cache for org '${orgIdentifier}'`);
 }
 
 /**
@@ -118,7 +110,6 @@ export function clearIdentityConfigCache(orgIdentifier: string): void {
 export function clearAllIdentityConfigCache(): void {
   identityConfigCache.clear();
   pendingIdentityConfigRequests.clear();
-  console.log(`[identityConfig] Cleared all identity config caches`);
 }
 
 /**
