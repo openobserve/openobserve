@@ -513,6 +513,57 @@ pub async fn delete_bulk(
     })
 }
 
+/// Builds the `access_token` value that is embedded in the OSS `auth_tokens`
+/// login cookie.
+///
+/// The security invariant is that the returned token — and by extension the
+/// cookie built from it — MUST NOT contain the user's plaintext password or
+/// any straightforwardly-decodable encoding of it, because anyone who can read
+/// the cookie value (XSS, cookie theft, DevTools, browser-storage access) can
+/// then recover the actual credential. It is also required that the returned
+/// token be an opaque server-side identifier so `GET /config/logout` can
+/// invalidate it — any leaked copy stops authenticating immediately.
+///
+/// Implementation: mint a random session id and return the enterprise-shaped
+/// `session <uuid>` prefix. The real credential is persisted server-side in
+/// [`persist_login_session`] which the handler calls right after; the auth
+/// extractor resolves the session id back to the stored `Basic ...` string on
+/// every request, and the existing logout handler (which already removes
+/// `session ` prefixed tokens) then invalidates any leaked cookie copy.
+///
+/// This helper is the single point that the `authentication` handler and the
+/// regression tests both go through — changing this function changes both.
+#[cfg(not(feature = "enterprise"))]
+fn build_login_access_token(_email: &str, _password: &str) -> String {
+    format!("session {}", config::ider::uuid())
+}
+
+/// Persists the real credential for an OSS login session, so the auth
+/// extractor can resolve the opaque `session <uuid>` cookie back to a
+/// verifiable `Basic ...` string on every request.
+///
+/// Returns `true` on success, `false` if the session store rejected the write
+/// (e.g. the DB is unreachable). Callers should treat `false` as a login
+/// failure — issuing a cookie whose credential was never stored would produce
+/// a session that cannot authenticate anyway.
+#[cfg(not(feature = "enterprise"))]
+async fn persist_login_session(access_token: &str, email: &str, password: &str) -> bool {
+    let Some(session_id) = access_token.strip_prefix("session ") else {
+        // Not a session-shaped token — nothing to persist. Defensive: this
+        // shouldn't happen because `build_login_access_token` always returns
+        // the `session ` shape now, but if some code path reverts to Basic we
+        // don't want to silently write it to the session store.
+        return false;
+    };
+    let basic_credential = format!(
+        "Basic {}",
+        base64::encode(&format!("{}:{}", email, password))
+    );
+    crate::service::session::set_session(session_id, &basic_credential)
+        .await
+        .is_some()
+}
+
 /// AuthenticateUser
 #[utoipa::path(
 post,
@@ -638,6 +689,25 @@ pub async fn authentication(
     if resp.status {
         let cfg = get_config();
 
+        // OSS builds an access-token that is embedded verbatim in the
+        // auth_tokens cookie. See `build_login_access_token` for the security
+        // invariants this must satisfy (no plaintext password in cookie,
+        // opaque so logout can revoke it). Enterprise takes a different path
+        // (Dex + session store) and keeps its inline construction below.
+        #[cfg(not(feature = "enterprise"))]
+        let access_token = {
+            let token = build_login_access_token(&auth.name, &auth.password);
+            if !persist_login_session(&token, &auth.name, &auth.password).await {
+                // Session store was unreachable — refuse to issue a cookie
+                // that cannot be resolved on subsequent requests. Falling
+                // back to the old `Basic <b64>` shape would silently
+                // re-introduce the plaintext-password-in-cookie exposure the
+                // fix exists to eliminate.
+                return unauthorized_error(resp);
+            }
+            token
+        };
+        #[cfg(feature = "enterprise")]
         let access_token = format!(
             "Basic {}",
             base64::encode(&format!("{}:{}", auth.name, auth.password))
@@ -1210,5 +1280,100 @@ mod tests {
         assert!(result.is_some());
         let role_response = result.unwrap();
         assert_eq!(role_response.value, "admin");
+    }
+
+    /// Regression: the OSS `auth_tokens` login cookie MUST NOT contain the
+    /// user's plaintext password or any reversibly-encoded form of it.
+    ///
+    /// Before the fix, the login handler put
+    /// `"Basic " + base64(email:password)` directly into the cookie, which
+    /// meant anyone who read the cookie (XSS, cookie theft, DevTools, cookie
+    /// jar backups) could recover the actual password with a single base64
+    /// decode. This test walks the exact decoding path an attacker uses —
+    /// base64(cookie) -> JSON -> access_token; strip `Basic ` -> base64 -> raw
+    /// bytes — and asserts the password does not appear at any layer.
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn regression_login_cookie_never_contains_plaintext_password() {
+        let email = "regression-user@example.com";
+        // A high-entropy password unlikely to appear anywhere else in the
+        // cookie by accident; the assertion is a byte-substring check, so we
+        // want the value to be a distinctive marker.
+        let password = "S3cret!-Regression-NiroFix-Alpha92";
+
+        let access_token = build_login_access_token(email, password);
+
+        let tokens = json::to_string(&AuthTokens {
+            access_token: access_token.clone(),
+            refresh_token: "".to_string(),
+        })
+        .expect("AuthTokens must serialize");
+        let cookie_value = base64::encode(&tokens);
+
+        let pwd_bytes = password.as_bytes();
+
+        // Layer 1: the raw cookie value shipped to the browser must not
+        // straight-up contain the password.
+        assert!(
+            !cookie_value.as_bytes().windows(pwd_bytes.len()).any(|w| w == pwd_bytes),
+            "auth_tokens cookie value contains the plaintext password verbatim"
+        );
+
+        // Layer 2: base64-decode the cookie (one hop everyone can perform).
+        let decoded_outer = base64::decode_raw(&cookie_value)
+            .expect("cookie value must be valid base64");
+        assert!(
+            !decoded_outer.windows(pwd_bytes.len()).any(|w| w == pwd_bytes),
+            "base64-decoded auth_tokens cookie contains the plaintext password"
+        );
+
+        // Layer 3: parse the JSON envelope and inspect the `access_token`.
+        let parsed: AuthTokens = json::from_slice(&decoded_outer)
+            .expect("decoded cookie must be a JSON AuthTokens payload");
+        assert!(
+            !parsed.access_token.as_bytes().windows(pwd_bytes.len()).any(|w| w == pwd_bytes),
+            "access_token field contains the plaintext password"
+        );
+
+        // Layer 4: if it's a `Basic <b64>` token, decode the inner base64
+        // (the specific attack path the current bug enables).
+        if let Some(basic_body) = parsed.access_token.strip_prefix("Basic ") {
+            if let Ok(inner) = base64::decode_raw(basic_body) {
+                assert!(
+                    !inner.windows(pwd_bytes.len()).any(|w| w == pwd_bytes),
+                    "Basic credential inside auth_tokens decodes to a string containing the plaintext password"
+                );
+            }
+        }
+    }
+
+    /// Regression: the OSS `auth_tokens` cookie MUST carry an opaque,
+    /// server-side-revocable session identifier — not a self-contained
+    /// credential.
+    ///
+    /// Rationale: `GET /config/logout` can only invalidate the cookie by
+    /// deleting a server-side record keyed by an opaque id. The existing
+    /// logout handler at `src/handler/http/request/status/mod.rs` already
+    /// removes sessions whose token starts with `"session "` (the pattern the
+    /// enterprise Dex flow uses). While the OSS login cookie kept storing
+    /// `"Basic <b64>"` — a self-contained credential — the server had nothing
+    /// to revoke, so any pre-logout copy of the cookie remained valid
+    /// indefinitely. Asserting the `"session "` shape here forces the login
+    /// path to speak the same server-revocable protocol as logout.
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn regression_login_access_token_is_opaque_session_id() {
+        let access_token =
+            build_login_access_token("regression-user@example.com", "AnotherSecret!123");
+        assert!(
+            access_token.starts_with("session "),
+            "login access_token must be an opaque `session <id>` so logout can revoke it; got {:?}",
+            access_token
+        );
+        let session_id = access_token.trim_start_matches("session ").trim();
+        assert!(
+            !session_id.is_empty(),
+            "session id embedded in auth_tokens must not be empty"
+        );
     }
 }
