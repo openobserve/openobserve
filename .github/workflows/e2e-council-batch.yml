@@ -9,11 +9,14 @@ name: E2E Council Batch — Automate Regression from Needs-Automation
 #   different failure semantics. Mixing batch orchestration into it would bloat the hot path,
 #   which every open PR reads on every comment. Cheap file separation now saves debugging later.
 #
-# THE FLOW (mode=full):
-#   plan:      kill-switch → resolve closed `Needs-Automation` issues → find each issue's fix PR
-#              → cap to `max_issues` → emit JSON queue.
+# THE FLOW (mode=full) — ISSUE-MODE (no fix-PR resolution):
+#   plan:      kill-switch → resolve closed `Needs-Automation` issues → derive target_dir from
+#              each issue's `area/*` label → cap to `max_issues` → emit JSON queue.
+#              We do NOT look up a fix PR per issue: the real repo rarely uses `closes #<n>`
+#              keywords, so that resolver would skip most issues. Instead the engine reads the
+#              ISSUE BODY as the feature description (see engine's issue-mode short-circuit).
 #   run:       per queued issue, dispatch the engine (workflow `e2e-council.yml` on o2-enterprise)
-#              with batch_key=regression-YYYY-MM-DD, pr_back_enabled=false,
+#              with issue_number=<n>, batch_key=regression-YYYY-MM-DD, pr_back_enabled=false,
 #              target_dir=<area folder derived from labels>. Wait per-run with a 45-min hard cap
 #              (`timeout 2700 gh run watch`). Failures don't abort the batch — the label stays,
 #              tomorrow retries. Engine writes ALL runs to autoe2e/batch-<key> (shared branch,
@@ -160,31 +163,16 @@ jobs:
           CAPPED=$(printf '%s\n' "$RAW" | head -n "${MAX_ISSUES:-10}")
           COUNT=$(printf '%s\n' "$CAPPED" | grep -c '^' || true)
 
-          # ---- 2. Resolve fix PR for each issue ----
-          # Preferred: gh issue view --json closedByPullRequestsReferences (GitHub's own "Closed by"
-          # timeline link, most reliable). Fallback for older issues without that: scan the timeline
-          # events for `closed_event` with a linked PR. Empty result → skip issue with a comment.
+          # ---- 2. Derive target_dir per issue (ISSUE-MODE — no fix-PR resolution needed) ----
+          # We used to resolve each issue → its fix PR → engine diffs the PR. That doesn't work
+          # against the real Needs-Automation backlog because fixes typically aren't linked with
+          # strict `closes #<n>` keywords. In ISSUE-MODE the engine reads the ISSUE BODY as the
+          # feature description (see e2e-council.yml's issue-mode short-circuit + the triage
+          # agent's ISSUE-MODE section) — the fix PR is irrelevant to test generation.
           QUEUE_JSON="["
           FIRST=1
-          SKIPPED_NO_PR=""
           while IFS= read -r ISSUE; do
             [ -z "$ISSUE" ] && continue
-            # Primary: the "closed by" back-link. Multiple linked PRs possible → take the merged one.
-            FIX_PR=$(gh issue view "$ISSUE" --repo "$OSS_REPO" \
-              --json closedByPullRequestsReferences \
-              --jq '[.closedByPullRequestsReferences[] | select(.state == "MERGED")] | sort_by(.number) | last | .number // empty' \
-              2>/dev/null || true)
-            # Fallback: scan issue timeline events.
-            if [ -z "$FIX_PR" ]; then
-              FIX_PR=$(gh api "/repos/${OSS_REPO}/issues/${ISSUE}/timeline" \
-                --jq '[.[] | select(.event=="closed" and .commit_id == null) | .source.issue.pull_request.merged_at // empty]' \
-                2>/dev/null | head -n1 || true)
-              # This fallback is best-effort; if it doesn't yield a PR number, we skip below.
-            fi
-            if [ -z "$FIX_PR" ] || ! printf '%s' "$FIX_PR" | grep -qE '^[0-9]+$'; then
-              SKIPPED_NO_PR="$SKIPPED_NO_PR $ISSUE"
-              continue
-            fi
 
             # Derive an advisory target_dir from the issue's `area/*` label, fallback to Bugs/.
             # awk here Title-cases "alerts" → "Alerts" (matches the RegressionSet/ folder convention).
@@ -196,7 +184,7 @@ jobs:
             TARGET_DIR="tests/ui-testing/playwright-tests/RegressionSet/${AREA}"
 
             [ $FIRST -eq 0 ] && QUEUE_JSON="${QUEUE_JSON},"
-            QUEUE_JSON="${QUEUE_JSON}{\"issue\":${ISSUE},\"fix_pr\":${FIX_PR},\"target_dir\":\"${TARGET_DIR}\"}"
+            QUEUE_JSON="${QUEUE_JSON}{\"issue\":${ISSUE},\"target_dir\":\"${TARGET_DIR}\"}"
             FIRST=0
           done <<< "$CAPPED"
           QUEUE_JSON="${QUEUE_JSON}]"
@@ -226,15 +214,10 @@ jobs:
             echo "- Engine ref: \`${ENGINE_REF}\`"
             echo "- Queued: **${QUEUE_COUNT}** issue(s) (cap: ${MAX_ISSUES:-10})"
             echo ""
-            if [ -n "$SKIPPED_NO_PR" ]; then
-              echo "### Skipped (no fix PR found)"
-              for I in $SKIPPED_NO_PR; do echo "- #${I} — no MERGED closing PR (label stays; add the PR link and it'll retry)"; done
-              echo ""
-            fi
             echo "### Queue"
-            echo "| Issue | Fix PR | Target dir |"
-            echo "|-------|--------|------------|"
-            printf '%s' "$QUEUE_JSON" | jq -r '.[] | "| #\(.issue) | #\(.fix_pr) | \(.target_dir) |"'
+            echo "| Issue | Target dir |"
+            echo "|-------|------------|"
+            printf '%s' "$QUEUE_JSON" | jq -r '.[] | "| #\(.issue) | \(.target_dir) |"'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Dry-run stop (mode=dry_run reports the plan, does not dispatch)
@@ -255,33 +238,34 @@ jobs:
           RESULTS_FILE="$RUNNER_TEMP/batch-results.jsonl"
           : > "$RESULTS_FILE"
 
-          # Iterate the queue as JSON to preserve exact issue/PR pairing.
+          # Iterate the queue as JSON.
           echo "$QUEUE_JSON" | jq -c '.[]' | while IFS= read -r ITEM; do
             ISSUE=$(printf '%s' "$ITEM" | jq -r '.issue')
-            FIX_PR=$(printf '%s' "$ITEM" | jq -r '.fix_pr')
             TARGET_DIR=$(printf '%s' "$ITEM" | jq -r '.target_dir')
 
-            echo "::group::Issue #${ISSUE} — dispatch engine for fix PR #${FIX_PR} (target_dir=${TARGET_DIR})"
+            echo "::group::Issue #${ISSUE} — dispatch engine (issue-mode, target_dir=${TARGET_DIR})"
             START=$(date -u +%s)
 
-            # Dispatch the engine on the chosen ref. This mirrors the /e2e caller's dispatch shape
-            # (source_repo, pr_number, dry_run, force_overwrite, feature_hint, actor) + our three
-            # batch-mode inputs. `--ref` targets a specific branch of o2-enterprise so test-runs
+            # ISSUE-MODE dispatch. `issue_number` triggers the engine's issue-mode short-circuit;
+            # `pr_number` must still be passed (workflow_dispatch requires it as `required: true`)
+            # but is ignored downstream — we send the issue number as a placeholder so the field
+            # is a valid integer. `--ref` targets a specific branch of o2-enterprise so test-runs
             # can hit engine feat branches pre-merge.
             if ! gh workflow run e2e-council.yml \
               --repo "$ENT_REPO" \
               --ref "$ENGINE_REF" \
               -f source_repo=openobserve \
-              -f pr_number="$FIX_PR" \
+              -f pr_number="$ISSUE" \
+              -f issue_number="$ISSUE" \
               -f dry_run=false \
               -f force_overwrite=false \
-              -f feature_hint="regression coverage for issue #${ISSUE}" \
+              -f feature_hint="regression coverage for closed issue #${ISSUE}" \
               -f actor=e2e-council-batch \
               -f batch_key="$BATCH_KEY" \
               -f target_dir="$TARGET_DIR" \
               -f pr_back_enabled=false; then
-              printf '{"issue":%s,"fix_pr":%s,"status":"dispatch_failed","duration":0}\n' \
-                "$ISSUE" "$FIX_PR" >> "$RESULTS_FILE"
+              printf '{"issue":%s,"status":"dispatch_failed","duration":0}\n' \
+                "$ISSUE" >> "$RESULTS_FILE"
               echo "::error::dispatch failed for issue #${ISSUE}"
               echo "::endgroup::"
               continue
@@ -302,8 +286,8 @@ jobs:
               [ -n "$RUN_ID" ] && break
             done
             if [ -z "$RUN_ID" ]; then
-              printf '{"issue":%s,"fix_pr":%s,"status":"run_not_found","duration":0}\n' \
-                "$ISSUE" "$FIX_PR" >> "$RESULTS_FILE"
+              printf '{"issue":%s,"status":"run_not_found","duration":0}\n' \
+                "$ISSUE" >> "$RESULTS_FILE"
               echo "::warning::couldn't locate dispatched engine run for #${ISSUE} — continuing"
               echo "::endgroup::"
               continue
@@ -322,8 +306,8 @@ jobs:
             END=$(date -u +%s)
             DURATION=$((END - START))
 
-            printf '{"issue":%s,"fix_pr":%s,"status":"%s","duration":%s,"run_id":%s}\n' \
-              "$ISSUE" "$FIX_PR" "$STATUS" "$DURATION" "$RUN_ID" >> "$RESULTS_FILE"
+            printf '{"issue":%s,"status":"%s","duration":%s,"run_id":%s}\n' \
+              "$ISSUE" "$STATUS" "$DURATION" "$RUN_ID" >> "$RESULTS_FILE"
             echo "Issue #${ISSUE} → status=${STATUS} duration=${DURATION}s"
             echo "::endgroup::"
           done
@@ -385,24 +369,23 @@ jobs:
             echo "Generated by \`e2e-council-batch.yml\` — scheduled council-of-agents run over closed issues labelled \`Needs-Automation\`."
             echo ""
             echo "### Covered in this batch (${SUCCESS_COUNT} issues)"
-            echo "| Issue | Fix PR | Engine run |"
-            echo "|-------|--------|------------|"
+            echo "| Issue | Engine run |"
+            echo "|-------|------------|"
             for N in $SUCCESS_ISSUES; do
               LINE=$(grep -E "\"issue\":${N}," "$RESULTS_FILE" | head -n1 || true)
-              FIX_PR=$(printf '%s' "$LINE" | jq -r '.fix_pr // "?"' 2>/dev/null || echo "?")
               RUN_ID=$(printf '%s' "$LINE" | jq -r '.run_id // ""' 2>/dev/null || echo "")
               RUN_LINK="—"
               [ -n "$RUN_ID" ] && RUN_LINK="[run](https://github.com/${ENT_REPO}/actions/runs/${RUN_ID})"
-              echo "| #${N} | #${FIX_PR} | ${RUN_LINK} |"
+              echo "| #${N} | ${RUN_LINK} |"
             done
             echo ""
             # Failures worth surfacing (non-success statuses from the dispatch loop).
             FAILURES=$(jq -c 'select(.status != "success")' "$RESULTS_FILE" 2>/dev/null || true)
             if [ -n "$FAILURES" ]; then
               echo "### Not covered (label stays \`Needs-Automation\`, will retry)"
-              echo "| Issue | Fix PR | Reason |"
-              echo "|-------|--------|--------|"
-              printf '%s\n' "$FAILURES" | jq -r '"| #\(.issue) | #\(.fix_pr) | \(.status) |"'
+              echo "| Issue | Reason |"
+              echo "|-------|--------|"
+              printf '%s\n' "$FAILURES" | jq -r '"| #\(.issue) | \(.status) |"'
               echo ""
             fi
             echo "### Review guidance"
