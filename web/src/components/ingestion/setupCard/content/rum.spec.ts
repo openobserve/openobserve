@@ -540,6 +540,25 @@ describe("rumCard builder", () => {
       }
     });
 
+    it("documents that the client token is visible in page source and how to rotate it", () => {
+      const card = buildCard();
+
+      const init = card.steps.find((s) => s.id === "init")!;
+      const ts = card.extras!.troubleshooting as any[];
+      const exposureEntry = ts.find((e: any) =>
+        e.q.toLowerCase().includes("visible"),
+      );
+
+      // The init step (both NPM and CDN tabs) states the token ships to
+      // visitors' browsers and can be rotated.
+      expect(init.description).toContain("ships to visitors' browsers");
+      expect(init.description).toContain("rotate");
+      // The troubleshooting entry explains it is write-only and rotatable.
+      expect(exposureEntry).toBeDefined();
+      expect(exposureEntry.a).toContain("write");
+      expect(exposureEntry.a).toContain("regenerate");
+    });
+
     it("insecureHTTP value appears in the troubleshooting answer about HTTP", () => {
       const card = rumCard(HTTP_SUBS); // insecureHTTP: true
       const ts = card.extras!.troubleshooting as any[];
@@ -591,7 +610,9 @@ describe("rumCard builder", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
       const cdn = install.variants!.find((v) => v.id === "cdn")!;
-      expect(cdn.code.raw).toContain(`@${RUM_SDK_VERSION}/`);
+      expect(cdn.code.raw).toContain(
+        `https://browsersdk.openobserve.ai/${RUM_SDK_VERSION}/`,
+      );
     });
   });
 });

@@ -250,7 +250,7 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
         id: "init",
         title: "Initialize RUM + Logs",
         description:
-          "Both SDKs are initialized with this org's values — copy as-is, then adjust `service`, `env` and `applicationId` to describe your app.",
+          "Both SDKs are initialized with this org's values — copy as-is, then adjust `service`, `env` and `applicationId` to describe your app. The `clientToken` ships to visitors' browsers by design (NPM bundles it, CDN inlines it) — it can only write RUM events, and you can rotate it from this page's header anytime.",
         chip: { kind: "editor", label: "Editor" },
         completeOn: "copy",
         required: true,
@@ -299,6 +299,10 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
         {
           q: "Requests are blocked by ad-blockers or privacy extensions",
           a: "Some blockers filter third-party analytics scripts. Self-hosting the two bundles on your own origin (copy them from the CDN at deploy time) keeps everything first-party and avoids this entirely — it also lets you add Subresource Integrity hashes.",
+        },
+        {
+          q: "Is it safe that the token is visible in my page source?",
+          a: "Yes — the `clientToken` is a client-side token by design, like every browser RUM product's. NPM setups expose it inside the JS bundle and CDN setups inline it in the HTML; DevTools reveals it either way. It can only **write** RUM events — it grants no read access and is separate from the ingestion passcode. If someone abuses it to send fake events, regenerate it from this page's header and redeploy your app.",
         },
         {
           q: "RUM requests return 401 or 403",
