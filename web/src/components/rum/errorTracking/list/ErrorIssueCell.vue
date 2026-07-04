@@ -15,11 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- The severity spine is drawn by the table row (get-row-status-color),
+       matching the sessions page — no in-cell border. -->
   <div
-    class="issue-cell tw:flex tw:flex-col tw:gap-0.5 tw:pl-1.5 tw:min-w-0"
-    :class="
-      isUnhandled ? 'issue-cell--unhandled' : 'issue-cell--handled'
-    "
+    class="tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0"
     data-test="rum-error-issue-cell"
   >
     <div class="tw:flex tw:items-baseline tw:gap-1 tw:min-w-0">
@@ -100,18 +99,6 @@ const route = computed(() => routeFromUrl(props.issue.view_url));
 </script>
 
 <style scoped lang="scss">
-.issue-cell {
-  border-left: 3px solid transparent;
-
-  &--unhandled {
-    border-left-color: var(--o2-severity-error-color);
-  }
-
-  &--handled {
-    border-left-color: var(--o2-severity-warning-color);
-  }
-}
-
 .issue-cell__type {
   font-weight: var(--font-semibold);
 

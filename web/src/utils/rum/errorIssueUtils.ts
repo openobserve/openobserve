@@ -171,19 +171,31 @@ export const pickLatestDeploy = (
 
 /** Minimum post/pre ratio for the chart's "spike after deploy" caption. */
 const DEPLOY_SPIKE_MIN_FACTOR = 1.5;
+/** Caption needs a real baseline: at least this many pre-deploy buckets… */
+const DEPLOY_SPIKE_MIN_PRE_BUCKETS = 3;
+/** …averaging at least this many errors per bucket. A near-zero baseline
+ * turns any post-deploy activity into an absurd ratio ("23× spike" when
+ * there simply was no traffic before), so the caption is suppressed. */
+const DEPLOY_SPIKE_MIN_BASELINE = 1;
 
 /**
  * Ratio of average total errors after vs before the deploy bucket.
- * Returns null when below the caption threshold or not computable.
+ * Returns null when below the caption threshold, when the pre-deploy
+ * baseline is too thin to be meaningful, or when not computable.
  */
 export const computeDeploySpikeFactor = (
   totals: number[],
   deployIndex: number,
 ): number | null => {
-  if (deployIndex <= 0 || deployIndex >= totals.length) return null;
+  if (
+    deployIndex < DEPLOY_SPIKE_MIN_PRE_BUCKETS ||
+    deployIndex >= totals.length
+  ) {
+    return null;
+  }
   const pre = average(totals.slice(0, deployIndex));
-  const post = average(totals.slice(deployIndex));
-  const factor = post / Math.max(pre, 0.01);
+  if (pre < DEPLOY_SPIKE_MIN_BASELINE) return null;
+  const factor = average(totals.slice(deployIndex)) / pre;
   return factor >= DEPLOY_SPIKE_MIN_FACTOR ? factor : null;
 };
 

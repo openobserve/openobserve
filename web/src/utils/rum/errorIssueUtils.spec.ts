@@ -599,30 +599,33 @@ describe("computeDeploySpikeFactor", () => {
     expect(computeDeploySpikeFactor([1, 2], 5)).toBeNull();
   });
 
-  it("returns factor when post/pre ratio >= 1.5", () => {
-    // pre = avg([1,1]) = 1; post = avg([3,3,3]) = 3; factor = 3 >= 1.5
-    const result = computeDeploySpikeFactor([1, 1, 3, 3, 3], 2);
+  it("returns factor when post/pre ratio >= 1.5 with a solid baseline", () => {
+    // pre = avg([1,1,1]) = 1; post = avg([3,3,3]) = 3; factor = 3 >= 1.5
+    const result = computeDeploySpikeFactor([1, 1, 1, 3, 3, 3], 3);
 
     expect(result).toBe(3);
   });
 
   it("returns null when factor is below 1.5 threshold", () => {
-    // pre = avg([2,2]) = 2; post = avg([2,2]) = 2; factor = 1 < 1.5
-    expect(computeDeploySpikeFactor([2, 2, 2, 2], 2)).toBeNull();
+    // pre = avg([2,2,2]) = 2; post = avg([2,2]) = 2; factor = 1 < 1.5
+    expect(computeDeploySpikeFactor([2, 2, 2, 2, 2], 3)).toBeNull();
   });
 
-  it("uses 0.01 floor for zero pre-deploy average", () => {
-    // pre = avg([0,0]) = 0 → 0.01 floor; post = avg([5,5]) = 5; factor = 500 >= 1.5
-    const result = computeDeploySpikeFactor([0, 0, 5, 5], 2);
-
-    expect(result).toBeCloseTo(500);
+  it("returns null for a near-zero pre-deploy baseline instead of an inflated ratio", () => {
+    // pre = avg([0,0,0]) = 0 < 1 min baseline → caption suppressed; the old
+    // 0.01 floor produced absurd "500× spike" captions on empty baselines.
+    expect(computeDeploySpikeFactor([0, 0, 0, 5, 5], 3)).toBeNull();
   });
 
-  it("handles two-element array at deployIndex 1", () => {
-    // pre = avg([1]) = 1; post = avg([5]) = 5; factor = 5 >= 1.5
-    const result = computeDeploySpikeFactor([1, 5], 1);
+  it("returns null when the baseline average is below 1 error per bucket", () => {
+    // pre = avg([1,0,0]) ≈ 0.33 < 1 → suppressed even though post is high
+    expect(computeDeploySpikeFactor([1, 0, 0, 9, 9], 3)).toBeNull();
+  });
 
-    expect(result).toBe(5);
+  it("returns null when fewer than 3 pre-deploy buckets exist", () => {
+    // Only 1-2 buckets before the marker is not a meaningful baseline.
+    expect(computeDeploySpikeFactor([1, 5], 1)).toBeNull();
+    expect(computeDeploySpikeFactor([2, 2, 8, 8], 2)).toBeNull();
   });
 });
 

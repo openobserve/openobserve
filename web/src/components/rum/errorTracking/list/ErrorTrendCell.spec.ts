@@ -22,15 +22,17 @@ import ErrorTrendCell from "./ErrorTrendCell.vue";
 // Component analysis
 // ---------------------------------------------------------------------------
 // Props:
-//   buckets: number[] | null  — histogram buckets; null → trend not fetched
-//   status:  "new" | "ongoing"
-//   handling?: string          — "handled" | "unhandled" (affects bar color, not tested)
-//   loading?: boolean          — true → skeleton overlay
+//   buckets: number[] | null  — histogram buckets
+//     null/undefined  → not fetched yet → skeleton (rum-error-trend-cell-loading)
+//     []              → fetched but empty/failed → em-dash (rum-error-trend-cell-empty)
+//     non-empty       → bars + annotation (rum-error-trend-cell)
+//   status:   "new" | "ongoing"
+//   handling?: string  — "handled" | "unhandled" (affects bar color class — NOT asserted)
 //
-// Conditional states:
-//   loading=true             → rum-error-trend-cell-loading skeleton
-//   displayBuckets.length>0  → rum-error-trend-cell + bars + annotation
-//   else (null or empty [])  → rum-error-trend-cell-empty em-dash
+// Emits:
+//   visible — fired ONCE when cell first scrolls into view via IntersectionObserver.
+//             Falls back to synchronous emit on mount when IO is unavailable.
+//             Never emitted when buckets is already non-null at mount.
 //
 // Downsampling:
 //   >24 buckets → chunk-merge to MAX_BARS=24; 48 → 24 bars
@@ -40,6 +42,12 @@ import ErrorTrendCell from "./ErrorTrendCell.vue";
 //   "spike" → "▲ {factor}×"
 //   "drop"  → "▼ {factor}×"
 //   "flat"  → t("rum.trendFlat") = "flat"
+//
+// IntersectionObserver:
+//   setupTests.ts provides a global MockIntersectionObserver with observe/disconnect
+//   as vi.fn()s. Callbacks are NOT auto-fired by the mock — tests must either
+//   capture the constructor call to invoke the callback manually, or stub IO away
+//   with vi.stubGlobal to exercise the fallback path.
 //
 // Note: bar colour variant is purely CSS — not asserted (forbidden by rules).
 // ---------------------------------------------------------------------------
@@ -59,7 +67,6 @@ function mountCell(props: {
   buckets: number[] | null;
   status?: "new" | "ongoing";
   handling?: string;
-  loading?: boolean;
 }): VueWrapper {
   return mount(ErrorTrendCell, {
     props: {
@@ -76,16 +83,17 @@ describe("ErrorTrendCell", () => {
   afterEach(() => {
     wrapper?.unmount();
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
   // -------------------------------------------------------------------------
-  // loading skeleton
+  // skeleton state — buckets null/undefined = not yet fetched
   // -------------------------------------------------------------------------
 
-  describe("loading state", () => {
-    it("renders loading skeleton when loading=true with null buckets", () => {
+  describe("skeleton state (buckets null = not yet fetched)", () => {
+    it("renders skeleton when buckets is null", () => {
       // Arrange
-      wrapper = mountCell({ buckets: null, loading: true });
+      wrapper = mountCell({ buckets: null });
 
       // Assert
       expect(
@@ -93,19 +101,9 @@ describe("ErrorTrendCell", () => {
       ).toBe(true);
     });
 
-    it("renders loading skeleton when loading=true with populated buckets", () => {
+    it("does not render bars container when buckets is null", () => {
       // Arrange
-      wrapper = mountCell({ buckets: spikeBuckets, loading: true });
-
-      // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
-      ).toBe(true);
-    });
-
-    it("does not render the bars when loading=true", () => {
-      // Arrange
-      wrapper = mountCell({ buckets: spikeBuckets, loading: true });
+      wrapper = mountCell({ buckets: null });
 
       // Assert
       expect(
@@ -113,32 +111,52 @@ describe("ErrorTrendCell", () => {
       ).toBe(false);
     });
 
-    it("does not render the empty em-dash when loading=true", () => {
-      // Arrange
-      wrapper = mountCell({ buckets: null, loading: true });
-
-      // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists(),
-      ).toBe(false);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // empty / null buckets
-  // -------------------------------------------------------------------------
-
-  describe("empty state", () => {
-    it("shows em-dash when buckets is null", () => {
+    it("does not render em-dash when buckets is null", () => {
       // Arrange
       wrapper = mountCell({ buckets: null });
 
       // Assert
       expect(
         wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists(),
-      ).toBe(true);
+      ).toBe(false);
     });
 
+    it("skeleton has aria-label for screen readers", () => {
+      // Arrange
+      wrapper = mountCell({ buckets: null });
+
+      // Assert — aria-label must be non-empty
+      const label = wrapper
+        .find('[data-test="rum-error-trend-cell-loading"]')
+        .attributes("aria-label");
+      expect(label).toBeTruthy();
+    });
+
+    it("transitions from skeleton to bars after buckets become populated", async () => {
+      // Arrange
+      wrapper = mountCell({ buckets: null });
+      expect(
+        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
+      ).toBe(true);
+
+      // Act
+      await wrapper.setProps({ buckets: flatBuckets });
+
+      // Assert
+      expect(
+        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="rum-error-trend-cell"]').exists(),
+      ).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // empty state — buckets [] = fetched but no data / failed
+  // -------------------------------------------------------------------------
+
+  describe("empty state (buckets [] = fetched, no data)", () => {
     it("shows em-dash when buckets is an empty array", () => {
       // Arrange
       wrapper = mountCell({ buckets: [] });
@@ -151,7 +169,7 @@ describe("ErrorTrendCell", () => {
 
     it("empty span contains the em-dash character", () => {
       // Arrange
-      wrapper = mountCell({ buckets: null });
+      wrapper = mountCell({ buckets: [] });
 
       // Assert
       expect(
@@ -159,25 +177,25 @@ describe("ErrorTrendCell", () => {
       ).toBe("—");
     });
 
-    it("empty span has title tooltip explaining the 'top 20 issues' limit", () => {
+    it("empty span has title tooltip 'No occurrences in the selected time range'", () => {
       // Arrange
-      wrapper = mountCell({ buckets: null });
+      wrapper = mountCell({ buckets: [] });
 
       // Assert
       expect(
         wrapper
           .find('[data-test="rum-error-trend-cell-empty"]')
           .attributes("title"),
-      ).toBe("Trend is computed for the top 20 issues by users affected");
+      ).toBe("No occurrences in the selected time range");
     });
 
-    it("does not render bars container when buckets is null", () => {
+    it("does not render skeleton when buckets is empty array", () => {
       // Arrange
-      wrapper = mountCell({ buckets: null });
+      wrapper = mountCell({ buckets: [] });
 
       // Assert
       expect(
-        wrapper.find('[data-test="rum-error-trend-cell"]').exists(),
+        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
       ).toBe(false);
     });
 
@@ -210,6 +228,12 @@ describe("ErrorTrendCell", () => {
     it("does not render the empty state", () => {
       expect(
         wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists(),
+      ).toBe(false);
+    });
+
+    it("does not render skeleton when buckets are populated", () => {
+      expect(
+        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
       ).toBe(false);
     });
 
@@ -336,8 +360,8 @@ describe("ErrorTrendCell", () => {
       ).toBe("flat");
     });
 
-    it("shows 'new' annotation for status='new' with null buckets — but null → empty state", () => {
-      // Arrange — null buckets → empty state (em-dash), annotation not shown
+    it("annotation is not shown when buckets is null (skeleton shown instead)", () => {
+      // Arrange — null buckets → skeleton state, annotation is irrelevant
       wrapper = mountCell({ buckets: null, status: "new" });
 
       // Assert
@@ -345,7 +369,7 @@ describe("ErrorTrendCell", () => {
         wrapper.find('[data-test="rum-error-trend-cell-annotation"]').exists(),
       ).toBe(false);
       expect(
-        wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists(),
+        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
       ).toBe(true);
     });
   });
@@ -355,9 +379,9 @@ describe("ErrorTrendCell", () => {
   // -------------------------------------------------------------------------
 
   describe("accessibility", () => {
-    it("loading skeleton has aria-label for screen readers", () => {
+    it("skeleton has aria-label for screen readers", () => {
       // Arrange
-      wrapper = mountCell({ buckets: null, loading: true });
+      wrapper = mountCell({ buckets: null });
 
       // Assert — aria-label must be non-empty
       const label = wrapper
@@ -381,15 +405,15 @@ describe("ErrorTrendCell", () => {
   // -------------------------------------------------------------------------
 
   describe("props reactivity", () => {
-    it("transitions from loading to bars after loading prop becomes false", async () => {
+    it("transitions from skeleton to bars after buckets become populated", async () => {
       // Arrange
-      wrapper = mountCell({ buckets: flatBuckets, loading: true });
+      wrapper = mountCell({ buckets: null });
       expect(
         wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
       ).toBe(true);
 
       // Act
-      await wrapper.setProps({ loading: false });
+      await wrapper.setProps({ buckets: flatBuckets });
 
       // Assert
       expect(
@@ -400,22 +424,22 @@ describe("ErrorTrendCell", () => {
       ).toBe(true);
     });
 
-    it("transitions from empty to bars after buckets become populated", async () => {
+    it("transitions from skeleton to em-dash after buckets become empty array", async () => {
       // Arrange
       wrapper = mountCell({ buckets: null });
       expect(
-        wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists(),
+        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
       ).toBe(true);
 
       // Act
-      await wrapper.setProps({ buckets: flatBuckets });
+      await wrapper.setProps({ buckets: [] });
 
       // Assert
       expect(
-        wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists(),
+        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
       ).toBe(false);
       expect(
-        wrapper.find('[data-test="rum-error-trend-cell"]').exists(),
+        wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists(),
       ).toBe(true);
     });
 
@@ -446,6 +470,185 @@ describe("ErrorTrendCell", () => {
 
       // Assert
       expect(wrapper.findAll(".trend-bar")).toHaveLength(24);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // visible emit — IntersectionObserver behavior
+  // -------------------------------------------------------------------------
+
+  describe("visible emit via IntersectionObserver", () => {
+    it("emits visible when the cell intersects (via IO callback)", async () => {
+      // Arrange — capture the IO constructor so we can manually fire the callback
+      let capturedCallback: IntersectionObserverCallback | null = null;
+      vi.stubGlobal(
+        "IntersectionObserver",
+        class MockIO {
+          constructor(cb: IntersectionObserverCallback) {
+            capturedCallback = cb;
+          }
+          observe = vi.fn();
+          disconnect = vi.fn();
+          takeRecords = vi.fn(() => []);
+        },
+      );
+
+      wrapper = mountCell({ buckets: null });
+      expect(capturedCallback).not.toBeNull();
+
+      // Act — simulate a visible intersection
+      capturedCallback!([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+
+      // Assert
+      expect(wrapper.emitted("visible")).toHaveLength(1);
+    });
+
+    it("does not emit visible when the cell is not intersecting", async () => {
+      // Arrange
+      let capturedCallback: IntersectionObserverCallback | null = null;
+      vi.stubGlobal(
+        "IntersectionObserver",
+        class MockIO {
+          constructor(cb: IntersectionObserverCallback) {
+            capturedCallback = cb;
+          }
+          observe = vi.fn();
+          disconnect = vi.fn();
+          takeRecords = vi.fn(() => []);
+        },
+      );
+
+      wrapper = mountCell({ buckets: null });
+
+      // Act — not intersecting
+      capturedCallback!([{ isIntersecting: false } as IntersectionObserverEntry], {} as IntersectionObserver);
+
+      // Assert
+      expect(wrapper.emitted("visible")).toBeFalsy();
+    });
+
+    it("emits visible only once even when IO fires multiple intersecting entries", async () => {
+      // Arrange
+      let capturedCallback: IntersectionObserverCallback | null = null;
+      const disconnectSpy = vi.fn();
+      vi.stubGlobal(
+        "IntersectionObserver",
+        class MockIO {
+          constructor(cb: IntersectionObserverCallback) {
+            capturedCallback = cb;
+          }
+          observe = vi.fn();
+          disconnect = disconnectSpy;
+          takeRecords = vi.fn(() => []);
+        },
+      );
+
+      wrapper = mountCell({ buckets: null });
+
+      // Act — fire intersecting twice
+      const entry = { isIntersecting: true } as IntersectionObserverEntry;
+      capturedCallback!([entry], {} as IntersectionObserver);
+      capturedCallback!([entry], {} as IntersectionObserver);
+
+      // Assert — only one emit and observer disconnected after first fire
+      expect(wrapper.emitted("visible")).toHaveLength(1);
+    });
+
+    it("disconnects the observer after first intersection", async () => {
+      // Arrange
+      let capturedCallback: IntersectionObserverCallback | null = null;
+      const disconnectSpy = vi.fn();
+      vi.stubGlobal(
+        "IntersectionObserver",
+        class MockIO {
+          constructor(cb: IntersectionObserverCallback) {
+            capturedCallback = cb;
+          }
+          observe = vi.fn();
+          disconnect = disconnectSpy;
+          takeRecords = vi.fn(() => []);
+        },
+      );
+
+      wrapper = mountCell({ buckets: null });
+
+      // Act
+      capturedCallback!([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+
+      // Assert
+      expect(disconnectSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not emit visible when buckets is already non-null at mount", () => {
+      // Arrange — pre-fetched buckets; no observer should be set up
+      let capturedCallback: IntersectionObserverCallback | null = null;
+      vi.stubGlobal(
+        "IntersectionObserver",
+        class MockIO {
+          constructor(cb: IntersectionObserverCallback) {
+            capturedCallback = cb;
+          }
+          observe = vi.fn();
+          disconnect = vi.fn();
+          takeRecords = vi.fn(() => []);
+        },
+      );
+
+      wrapper = mountCell({ buckets: flatBuckets });
+
+      // Assert — no observer set up, so no callback captured and no emit
+      expect(capturedCallback).toBeNull();
+      expect(wrapper.emitted("visible")).toBeFalsy();
+    });
+
+    it("does not emit visible when buckets is [] (empty array) at mount", () => {
+      // Arrange — [] is non-null; IO guard is `buckets != null`, so no observer
+      let capturedCallback: IntersectionObserverCallback | null = null;
+      vi.stubGlobal(
+        "IntersectionObserver",
+        class MockIO {
+          constructor(cb: IntersectionObserverCallback) {
+            capturedCallback = cb;
+          }
+          observe = vi.fn();
+          disconnect = vi.fn();
+          takeRecords = vi.fn(() => []);
+        },
+      );
+
+      wrapper = mountCell({ buckets: [] });
+
+      // Assert — [] != null so no observer, no emit
+      expect(capturedCallback).toBeNull();
+      expect(wrapper.emitted("visible")).toBeFalsy();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // visible emit — IntersectionObserver fallback (IO unavailable)
+  // -------------------------------------------------------------------------
+
+  describe("visible emit fallback when IntersectionObserver is unavailable", () => {
+    it("emits visible synchronously on mount when IntersectionObserver is undefined", () => {
+      // Arrange — remove IO from global to simulate unavailable environment
+      vi.stubGlobal("IntersectionObserver", undefined);
+
+      // Act
+      wrapper = mountCell({ buckets: null });
+
+      // Assert — emitted immediately at mount
+      expect(wrapper.emitted("visible")).toHaveLength(1);
+    });
+
+    it("does not emit visible when IO is unavailable but buckets is already non-null", () => {
+      // Arrange
+      vi.stubGlobal("IntersectionObserver", undefined);
+
+      // Act
+      wrapper = mountCell({ buckets: flatBuckets });
+
+      // Assert — buckets non-null → no emit regardless of IO availability
+      expect(wrapper.emitted("visible")).toBeFalsy();
     });
   });
 

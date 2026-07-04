@@ -15,62 +15,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    v-if="loading"
-    class="tw:flex tw:items-end tw:gap-[0.0938rem] tw:h-7 tw:animate-pulse"
-    data-test="rum-error-trend-cell-loading"
-    :aria-label="t('rum.loadingMsg')"
-  >
-    <span
-      v-for="index in 12"
-      :key="index"
-      class="trend-bar trend-bar--empty tw:w-1.5"
-      :style="{ height: `${20 + ((index * 11) % 60)}%` }"
-    />
-  </div>
-
-  <div
-    v-else-if="displayBuckets.length"
-    class="tw:flex tw:flex-col tw:gap-0.5"
-    data-test="rum-error-trend-cell"
-  >
+  <!-- Single stable root so the IntersectionObserver has one element to
+       watch across all display states. -->
+  <div ref="rootEl" class="tw:min-h-4">
     <div
-      class="tw:flex tw:items-end tw:gap-[0.0938rem] tw:h-7"
-      role="img"
-      :aria-label="ariaLabel"
-      :title="ariaLabel"
+      v-if="displayBuckets.length"
+      class="tw:flex tw:flex-col tw:gap-0.5"
+      data-test="rum-error-trend-cell"
+    >
+      <div
+        class="tw:flex tw:items-end tw:gap-[0.0938rem] tw:h-7"
+        role="img"
+        :aria-label="ariaLabel"
+        :title="ariaLabel"
+      >
+        <span
+          v-for="(value, index) in displayBuckets"
+          :key="index"
+          class="trend-bar tw:w-1.5"
+          :class="
+            value > 0
+              ? isUnhandled
+                ? 'trend-bar--unhandled'
+                : 'trend-bar--handled'
+              : 'trend-bar--empty'
+          "
+          :style="{ height: barHeight(value) }"
+        />
+      </div>
+      <small
+        class="trend-annotation"
+        :class="`trend-annotation--${annotation.kind}`"
+        data-test="rum-error-trend-cell-annotation"
+      >{{ annotationLabel }}</small>
+    </div>
+
+    <!-- Pre-intersection and in-flight cells both show the skeleton — an
+         em-dash would read as "no data" for rows not yet fetched. -->
+    <div
+      v-else-if="buckets === null || buckets === undefined"
+      class="tw:flex tw:items-end tw:gap-[0.0938rem] tw:h-7 tw:animate-pulse"
+      data-test="rum-error-trend-cell-loading"
+      :aria-label="t('rum.loadingMsg')"
     >
       <span
-        v-for="(value, index) in displayBuckets"
+        v-for="index in 12"
         :key="index"
-        class="trend-bar tw:w-1.5"
-        :class="
-          value > 0
-            ? isUnhandled
-              ? 'trend-bar--unhandled'
-              : 'trend-bar--handled'
-            : 'trend-bar--empty'
-        "
-        :style="{ height: barHeight(value) }"
+        class="trend-bar trend-bar--empty tw:w-1.5"
+        :style="{ height: `${20 + ((index * 11) % 60)}%` }"
       />
     </div>
-    <small
-      class="trend-annotation"
-      :class="`trend-annotation--${annotation.kind}`"
-      data-test="rum-error-trend-cell-annotation"
-    >{{ annotationLabel }}</small>
-  </div>
 
-  <span
-    v-else
-    class="tw:text-[var(--o2-text-muted)]"
-    :title="t('rum.trendTopIssuesOnly')"
-    data-test="rum-error-trend-cell-empty"
-  >—</span>
+    <span
+      v-else
+      class="tw:text-[var(--o2-text-muted)]"
+      :title="t('rum.trendNoData')"
+      data-test="rum-error-trend-cell-empty"
+    >—</span>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   computeTrendAnnotation,
@@ -78,17 +84,63 @@ import {
 } from "@/utils/rum/errorIssueUtils";
 
 const props = defineProps<{
-  /** Zero-filled histogram buckets; null when trend wasn't fetched. */
+  /**
+   * Zero-filled histogram buckets. null/undefined = not fetched yet
+   * (skeleton), [] = fetched but empty/failed (em-dash).
+   */
   buckets: number[] | null;
   status: IssueStatus;
   handling?: string;
-  loading?: boolean;
+}>();
+
+const emit = defineEmits<{
+  /** Fired once when the cell first scrolls into view — parent fetches. */
+  visible: [];
 }>();
 
 const { t } = useI18n();
 
 /** Cap the sparkline at this many bars regardless of window resolution. */
 const MAX_BARS = 24;
+
+const rootEl = ref<HTMLElement | null>(null);
+const requested = ref(false);
+let observer: IntersectionObserver | null = null;
+
+const requestTrend = () => {
+  if (requested.value) return;
+  requested.value = true;
+  emit("visible");
+};
+
+// True lazy loading: the table's virtualizer over-renders beyond the
+// viewport, so mounting is NOT visibility — only request the trend when
+// the cell actually scrolls into view. Disconnect after the first
+// trigger; the composable's cache makes re-entering rows instant.
+onMounted(() => {
+  if (props.buckets != null) return;
+  if (typeof IntersectionObserver === "undefined" || !rootEl.value) {
+    requestTrend();
+    return;
+  }
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        requestTrend();
+        observer?.disconnect();
+        observer = null;
+      }
+    },
+    // Prefetch slightly ahead of the fold so scrolling feels instant.
+    { rootMargin: "200px 0px" },
+  );
+  observer.observe(rootEl.value);
+});
+
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  observer = null;
+});
 
 const isUnhandled = computed(() => props.handling !== "handled");
 

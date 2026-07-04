@@ -45,6 +45,7 @@ const mockIsLoadingChart = ref(false);
 const mockIsLoadingKpis = ref(false);
 const mockIsLoadingTrends = ref(false);
 const mockFetchAll = vi.fn().mockResolvedValue(undefined);
+const mockFetchTrend = vi.fn().mockResolvedValue(undefined);
 
 // ---------------------------------------------------------------------------
 // vi.mock() calls — MUST appear before any imports of the components that use
@@ -64,6 +65,7 @@ vi.mock("@/composables/rum/useErrorIssuesData", () => ({
     isLoadingKpis: mockIsLoadingKpis,
     isLoadingTrends: mockIsLoadingTrends,
     fetchAll: mockFetchAll,
+    fetchTrend: mockFetchTrend,
   }),
 }));
 

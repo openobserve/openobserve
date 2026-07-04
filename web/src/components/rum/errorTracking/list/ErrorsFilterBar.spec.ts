@@ -445,7 +445,9 @@ describe("ErrorsFilterBar", () => {
       const options = select.findAll("option");
 
       expect(options[0].text()).toBe("All");
-      expect((options[0].element as HTMLOptionElement).value).toBe("");
+      // Sentinel value — OSelect treats "" as "no selection", so the All
+      // option carries "__all__" internally; the component still emits "".
+      expect((options[0].element as HTMLOptionElement).value).toBe("__all__");
     });
 
     it("renders one option per entry in the services prop", () => {

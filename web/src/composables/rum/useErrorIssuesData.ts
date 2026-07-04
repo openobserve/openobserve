@@ -21,8 +21,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import {
   ISSUES_LIMIT,
-  TREND_TOP_N,
   buildDenominatorsSql,
+  buildDeployLookbackSql,
   buildDeploysSql,
   buildErrorKpisSql,
   buildErrorsHistogramSql,
@@ -38,8 +38,10 @@ import {
   computeDeploySpikeFactor,
   computeIssueStatus,
   intervalToMicros,
+  issueKey,
   pickLatestDeploy,
   type DeployInfo,
+  type IssueSignature,
   type IssueStatus,
 } from "@/utils/rum/errorIssueUtils";
 
@@ -86,7 +88,6 @@ const useErrorIssuesData = () => {
   const isLoadingIssues = ref(false);
   const isLoadingChart = ref(false);
   const isLoadingKpis = ref(false);
-  const isLoadingTrends = ref(false);
 
   // Supersede in-flight runs: only the latest fetchAll may commit results.
   let runId = 0;
@@ -131,12 +132,14 @@ const useErrorIssuesData = () => {
     sql: string,
     params: FetchIssuesParams,
     size: number,
+    rangeOverride?: { startTime: number; endTime: number },
   ): Promise<any[]> => {
+    const range = rangeOverride ?? params;
     const req = buildQueryPayload({
       sqlMode: false,
       streamName: "_rumdata",
       timestamp_column: store.state.zoConfig.timestamp_column,
-      timestamps: { startTime: params.startTime, endTime: params.endTime },
+      timestamps: { startTime: range.startTime, endTime: range.endTime },
       size,
     } as any);
     // buildQueryPayload encodes its template SQL before we override it, so
@@ -158,35 +161,89 @@ const useErrorIssuesData = () => {
       .then((res) => res.data.hits ?? []);
   };
 
-  const fetchTrends = async (
-    ctx: IssueQueryContext,
-    params: FetchIssuesParams,
-    interval: string,
-    intervalMicros: number,
-    currentRun: number,
-  ) => {
-    const topMessages = issues.value
-      .slice(0, TREND_TOP_N)
-      .map((issue) => issue.error_message ?? "")
-      .filter(Boolean);
-    const sql = buildTrendsSql(ctx, interval, topMessages);
-    if (!sql) return;
-    isLoadingTrends.value = true;
-    try {
-      const hits = await runSearch(sql, params, 5000);
-      if (currentRun !== runId) return;
-      trendBuckets.value = pivotTrends(
-        hits,
-        params.startTime,
-        params.endTime,
-        intervalMicros,
-      );
-    } catch {
-      // Non-fatal: rows render without sparklines.
-      if (currentRun === runId) trendBuckets.value = {};
-    } finally {
-      if (currentRun === runId) isLoadingTrends.value = false;
+  // ── Lazy per-row trends ─────────────────────────────────────────
+  // Trend sparklines are fetched per issue when the row scrolls into
+  // view (same pattern as the sessions activity sparkline): cached by
+  // issue key, deduplicated in flight, capped at 4 concurrent queries.
+  const TREND_CONCURRENCY = 4;
+  let trendContext: {
+    ctx: IssueQueryContext;
+    params: FetchIssuesParams;
+    interval: string;
+    intervalMicros: number;
+  } | null = null;
+  const trendInFlight = new Map<string, Promise<void>>();
+  let trendActiveQueries = 0;
+  const trendQueue: Array<() => void> = [];
+
+  const acquireTrendSlot = (): Promise<void> =>
+    new Promise((resolve) => {
+      if (trendActiveQueries < TREND_CONCURRENCY) {
+        trendActiveQueries++;
+        resolve();
+      } else {
+        trendQueue.push(() => {
+          trendActiveQueries++;
+          resolve();
+        });
+      }
+    });
+
+  const releaseTrendSlot = () => {
+    trendActiveQueries--;
+    trendQueue.shift()?.();
+  };
+
+  /**
+   * Fetch the histogram for one issue's sparkline. `trendBuckets[key]`
+   * stays absent until resolution (cell shows a skeleton), then holds the
+   * bucket array — empty on failure/no data (cell shows an em-dash).
+   */
+  const fetchTrend = (issue: IssueSignature): Promise<void> => {
+    const key = issueKey(issue);
+    if (trendBuckets.value[key] || !trendContext) return Promise.resolve();
+    const inFlight = trendInFlight.get(key);
+    if (inFlight) return inFlight;
+
+    const currentRun = runId;
+    const { ctx, params, interval, intervalMicros } = trendContext;
+    const sql = buildTrendsSql(ctx, interval, [issue.error_message ?? ""]);
+    if (!sql) {
+      trendBuckets.value = { ...trendBuckets.value, [key]: [] };
+      return Promise.resolve();
     }
+
+    const request = acquireTrendSlot()
+      .then(() => {
+        if (currentRun !== runId) return [];
+        return runSearch(sql, params, 2000);
+      })
+      .then((hits) => {
+        if (currentRun !== runId) return;
+        const pivoted = pivotTrends(
+          hits,
+          params.startTime,
+          params.endTime,
+          intervalMicros,
+        );
+        // A message shared by several signatures resolves siblings too.
+        trendBuckets.value = {
+          ...trendBuckets.value,
+          [key]: pivoted[key] ?? [],
+          ...pivoted,
+        };
+      })
+      .catch(() => {
+        if (currentRun === runId) {
+          trendBuckets.value = { ...trendBuckets.value, [key]: [] };
+        }
+      })
+      .finally(() => {
+        releaseTrendSlot();
+        trendInFlight.delete(key);
+      });
+    trendInFlight.set(key, request);
+    return request;
   };
 
   const fetchAll = async (params: FetchIssuesParams): Promise<void> => {
@@ -206,6 +263,10 @@ const useErrorIssuesData = () => {
     isLoadingChart.value = true;
     isLoadingKpis.value = true;
     trendBuckets.value = {};
+    // New run: lazy trend fetches use this context; stale in-flight
+    // requests are discarded by the runId guard.
+    trendContext = { ctx, params, interval, intervalMicros };
+    trendInFlight.clear();
 
     const [issuesR, chartR, kpisR, denomR, deploysR] =
       await Promise.allSettled([
@@ -225,12 +286,37 @@ const useErrorIssuesData = () => {
             firstSeen: Number(hit.first_seen) || 0,
           }))
         : [];
-    latestDeploy.value = pickLatestDeploy(
+    let deployCandidate = pickLatestDeploy(
       deploys,
       params.startTime,
       params.endTime,
       intervalMicros,
     );
+    // Verify the candidate is genuinely new: MIN(_timestamp) is bounded by
+    // the window, so a long-lived version with sparse traffic can "first
+    // appear" mid-window and fake a deploy. Any events in the equal-length
+    // lookback range before the window disqualify it. Unverifiable (query
+    // error) also hides the marker — a false deploy is worse than none.
+    if (deployCandidate) {
+      const lookbackSpan = params.endTime - params.startTime;
+      try {
+        const lookbackHits = await runSearch(
+          buildDeployLookbackSql(ctx, deployCandidate.version),
+          params,
+          10,
+          {
+            startTime: params.startTime - lookbackSpan,
+            endTime: params.startTime - 1,
+          },
+        );
+        if (currentRun !== runId) return;
+        if (Number(lookbackHits[0]?.prior_events) > 0) deployCandidate = null;
+      } catch {
+        if (currentRun !== runId) return;
+        deployCandidate = null;
+      }
+    }
+    latestDeploy.value = deployCandidate;
     const deployTs = latestDeploy.value?.firstSeen ?? null;
 
     if (issuesR.status === "fulfilled") {
@@ -283,8 +369,6 @@ const useErrorIssuesData = () => {
       totalUsers: Number(denomHit?.total_users) || 0,
     };
     isLoadingKpis.value = false;
-
-    await fetchTrends(ctx, params, interval, intervalMicros, currentRun);
   };
 
   return {
@@ -298,8 +382,8 @@ const useErrorIssuesData = () => {
     isLoadingIssues,
     isLoadingChart,
     isLoadingKpis,
-    isLoadingTrends,
     fetchAll,
+    fetchTrend,
     // Exposed for callers needing the users-field fallback (e.g. columns).
     pickUserField,
   };

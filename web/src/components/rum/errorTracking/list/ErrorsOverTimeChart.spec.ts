@@ -127,9 +127,8 @@ describe("ErrorsOverTimeChart", () => {
       expect(wrapper.find("h4").text()).toContain("Errors over time");
     });
 
-    it("renders the legend subtitle text", () => {
-      expect(wrapper.find("small").text()).toContain("handled / unhandled");
-    });
+    // The "handled / unhandled" subtitle was removed — the ECharts legend
+    // already labels both series.
   });
 
   // -------------------------------------------------------------------------

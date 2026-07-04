@@ -19,10 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="card-container tw:flex tw:flex-col tw:h-full tw:px-2.5 tw:py-1.5 tw:min-w-0"
     data-test="rum-errors-over-time-chart"
   >
-    <div class="tw:flex tw:items-center tw:justify-between">
-      <h4>{{ t("rum.errorsOverTime") }}</h4>
-      <small>{{ t("rum.handledUnhandledLegend") }}</small>
-    </div>
+    <h4>{{ t("rum.errorsOverTime") }}</h4>
 
     <div
       v-if="loading"

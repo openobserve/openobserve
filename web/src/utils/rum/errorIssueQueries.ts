@@ -181,6 +181,19 @@ export const buildDeploysSql = (ctx: IssueQueryContext): string =>
   ` FROM "${ctx.streamName}" WHERE version IS NOT NULL${serviceClause(ctx)}` +
   ` GROUP BY version ORDER BY first_seen DESC LIMIT 10`;
 
+/**
+ * Q6 — deploy verification: did the candidate version already produce
+ * events BEFORE the window? Run against a lookback range preceding the
+ * window; any hit means the version predates it (its in-window MIN was
+ * just sparse traffic, not a deploy) and no marker should be shown.
+ */
+export const buildDeployLookbackSql = (
+  ctx: IssueQueryContext,
+  version: string,
+): string =>
+  `SELECT COUNT(*) AS prior_events FROM "${ctx.streamName}"` +
+  ` WHERE version='${escapeSqlString(version)}'${serviceClause(ctx)}`;
+
 // ── Pivots ──────────────────────────────────────────────────────────
 
 export interface StackedBucket {

@@ -74,12 +74,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >{{ t("rum.service") }}</label>
       <OSelect
         id="rum-errors-filter-service"
-        :model-value="service"
+        :model-value="service || ALL_SERVICES"
         :options="serviceOptions"
         size="sm"
         class="tw:min-w-[9rem]"
         data-test="rum-errors-filter-service-select"
-        @update:model-value="(v: any) => emit('update:service', String(v ?? ''))"
+        @update:model-value="onServiceSelect"
       />
     </div>
   </div>
@@ -118,8 +118,18 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
+// OSelect treats "" as "no selection" (placeholder), so the All option
+// needs a real sentinel value; the emitted contract stays "" = all.
+// Underscored to avoid colliding with a service actually named "all".
+const ALL_SERVICES = "__all__";
+
 const serviceOptions = computed(() => [
-  { label: t("rum.all"), value: "" },
+  { label: t("rum.all"), value: ALL_SERVICES },
   ...props.services.map((service) => ({ label: service, value: service })),
 ]);
+
+const onServiceSelect = (value: unknown) => {
+  const selected = String(value ?? ALL_SERVICES);
+  emit("update:service", selected === ALL_SERVICES ? "" : selected);
+};
 </script>

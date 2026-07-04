@@ -145,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:h-full"
             data-test="rum-app-errors-table"
             row-class="tw:cursor-pointer"
+            :get-row-status-color="getIssueStatusColor"
             @row-click="handleRowClick"
           >
             <template #empty>
@@ -158,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :buckets="trendBuckets[issueKey(row)] ?? null"
                 :status="row.status"
                 :handling="row.error_handling"
-                :loading="isLoadingTrends"
+                @visible="fetchTrend(row)"
               />
             </template>
             <template #cell-events="{ row }">
@@ -332,8 +333,8 @@ const {
   isLoadingIssues,
   isLoadingChart,
   isLoadingKpis,
-  isLoadingTrends,
   fetchAll,
+  fetchTrend,
 } = useErrorIssuesData();
 const store = useStore();
 const isLoading: Ref<true[]> = ref([]);
@@ -607,6 +608,14 @@ const handleErrorTypeClick = async (payload: any) => {
 
 const handleRowClick = (row: any) => {
   handleErrorTypeClick({ row });
+};
+
+// Severity spine flush against the row's left edge — same mechanism and
+// colors as the sessions table, for cross-page consistency.
+const getIssueStatusColor = (row: any) => {
+  if (row.error_handling === "handled")
+    return "var(--o2-severity-warning-color)";
+  return "var(--o2-severity-error-color)";
 };
 
 function restoreUrlQueryParams() {
