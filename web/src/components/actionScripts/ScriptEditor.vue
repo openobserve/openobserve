@@ -34,7 +34,7 @@
         data-test="vrl-function-test-events-editor"
         ref="eventsEditorRef"
         :editor-id="`test-function-events-input-editor-${file.name}`"
-        class="monaco-editor test-function-input-editor tw:h-full"
+        class="test-function-input-editor tw:w-full tw:min-h-40 tw:rounded tw:h-full"
         v-model:query="inputScript"
         :language="file.language"
       />
@@ -83,11 +83,3 @@ const inputScript = computed({
 });
 </script>
 
-<style scoped>
-/* Add your styles here */
-.monaco-editor {
-  width: 100%;
-  min-height: 10rem;
-  border-radius: 5px;
-}
-</style>

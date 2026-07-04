@@ -106,9 +106,11 @@ pub async fn create_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
         })?;
     }
     let channel = channel
-        .connect_timeout(std::time::Duration::from_secs(
-            config::get_config().grpc.connect_timeout,
-        ))
+        .initial_stream_window_size(config::GRPC_HTTP2_STREAM_WINDOW_SIZE)
+        .initial_connection_window_size(config::GRPC_HTTP2_CONNECTION_WINDOW_SIZE)
+        .http2_adaptive_window(cfg.grpc.http2_adaptive_window)
+        .tcp_nodelay(true)
+        .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
         .connect()
         .await
         .map_err(|err| {

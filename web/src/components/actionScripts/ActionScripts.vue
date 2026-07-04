@@ -112,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OButton
                 :data-test="`alert-list-${row.name}-update-alert`"
+                data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alerts.edit')"
@@ -120,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               /></OButton>
               <OButton
                 :data-test="`alert-list-${row.name}-delete-alert`"
+                data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alerts.delete')"
@@ -870,35 +872,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.alerts-tabs {
-  .o-tabs {
-    &--vertical {
-      margin: 1.5rem 1rem 0 0;
-
-      .o-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-
-        &__content.tab_content {
-          .o-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-
-        &--active {
-          background-color: $accent;
-        }
-      }
-    }
-  }
-}
-.clone-alert-popup {
-  width: 400px;
-}
-</style>

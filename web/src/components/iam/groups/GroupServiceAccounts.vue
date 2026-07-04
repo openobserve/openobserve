@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex tw:flex-col tw:h-full">
       <div
         data-test="iam-service-accounts-selection-filters"
-       class="tw:flex tw:justify-start tw:px-3 tw:py-2 card-container tw:flex-shrink-0"
+       class="tw:flex tw:justify-start tw:px-3 tw:py-2 card-container tw:shrink-0"
       >
         <div data-test="iam-service-accounts-selection-show-toggle" class="tw:mr-3">
           <div class="tw:flex tw:items-center">
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             data-test="service-accounts-list-search-input"
             v-model="userSearchKey"
-            class="tw:h-[36px] tw:w-[200px]"
+            class="tw:h-9 tw:w-50"
             placeholder="Search Service Accounts"
           />
         </div>
@@ -280,6 +280,4 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   };
   
   </script>
-  
-  <style scoped></style>
   

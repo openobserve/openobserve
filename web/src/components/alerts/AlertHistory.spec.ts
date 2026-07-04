@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import AlertHistory from "@/components/alerts/AlertHistory.vue";
+import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -413,42 +414,65 @@ describe("AlertHistory.vue", () => {
     });
   });
 
-  describe("getStatusVariant()", () => {
-    it("returns success-outline for success / ok / completed", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.getStatusVariant("success")).toBe("success-outline");
-      expect(vm.getStatusVariant("ok")).toBe("success-outline");
-      expect(vm.getStatusVariant("completed")).toBe("success-outline");
+  describe("status badge — alertState registry (replaces getStatusVariant)", () => {
+    it("ok / success / normal → green success-soft + check icon", () => {
+      for (const s of ["ok", "success", "normal"]) {
+        const r = resolveBadge("alertState", s);
+        expect(r.variant, s).toBe("success-soft");
+        expect(r.icon, s).toBe("check-circle-outline");
+      }
+      expect(resolveBadge("alertState", "ok").label).toBe("Ok");
     });
 
-    it("returns error-outline for error / failed", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.getStatusVariant("error")).toBe("error-outline");
-      expect(vm.getStatusVariant("failed")).toBe("error-outline");
+    it("condition_not_satisfied → green 'Ok' (matches the histogram count)", () => {
+      const r = resolveBadge("alertState", "condition_not_satisfied");
+      expect(r.variant).toBe("success-soft");
+      expect(r.label).toBe("Ok");
+      expect(r.icon).toBe("check-circle-outline");
     });
 
-    it("returns warning-outline for warning", async () => {
-      await mountComponent();
-      expect((wrapper.vm as any).getStatusVariant("warning")).toBe("warning-outline");
+    it("error / firing / anomaly → red error-soft", () => {
+      for (const s of ["error", "firing", "anomaly"]) {
+        expect(resolveBadge("alertState", s).variant, s).toBe("error-soft");
+      }
+      expect(resolveBadge("alertState", "firing").icon).toBe("error-outline");
     });
 
-    it("returns primary-outline for pending / running", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.getStatusVariant("pending")).toBe("primary-outline");
-      expect(vm.getStatusVariant("running")).toBe("primary-outline");
+    it("failed → red error-soft + cancel icon", () => {
+      const r = resolveBadge("alertState", "failed");
+      expect(r.variant).toBe("error-soft");
+      expect(r.icon).toBe("cancel");
     });
 
-    it("returns default-outline for unknown status", async () => {
-      await mountComponent();
-      expect((wrapper.vm as any).getStatusVariant("xyz")).toBe("default-outline");
+    it("skipped → warning-soft + block icon", () => {
+      const r = resolveBadge("alertState", "skipped");
+      expect(r.variant).toBe("warning-soft");
+      expect(r.icon).toBe("block");
     });
 
-    it("handles undefined without crashing", async () => {
-      await mountComponent();
-      expect(() => (wrapper.vm as any).getStatusVariant(undefined)).not.toThrow();
+    it("flapping → warning-soft + 'Flapping' label", () => {
+      const r = resolveBadge("alertState", "flapping");
+      expect(r.variant).toBe("warning-soft");
+      expect(r.label).toBe("Flapping");
+    });
+
+    it("pending → blue-soft + schedule icon", () => {
+      const r = resolveBadge("alertState", "pending");
+      expect(r.variant).toBe("blue-soft");
+      expect(r.icon).toBe("schedule");
+    });
+
+    it("unknown status → neutral fallback + help-outline (no crash)", () => {
+      const r = resolveBadge("alertState", "totally-unknown");
+      expect(r.variant).toBe("default-soft");
+      expect(r.icon).toBe("help-outline");
+      expect(() => resolveBadge("alertState", undefined as any)).not.toThrow();
+    });
+
+    it("completed → green success-soft + check icon (not red)", () => {
+      const r = resolveBadge("alertState", "completed");
+      expect(r.variant).toBe("success-soft");
+      expect(r.icon).toBe("check-circle-outline");
     });
   });
 

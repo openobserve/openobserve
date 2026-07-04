@@ -1,5 +1,4 @@
 @import "./base.css";
-@import "./inputs.scss";
 
 #app {
   max-width: 1280px;

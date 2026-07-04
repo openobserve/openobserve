@@ -1,4 +1,4 @@
-<!-- right 2026 OpenObserve Inc.
+﻿<!-- right 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md search-job-inspector tw:p-0">
+  <div class="tw:rounded-md tw:p-0 tw:bg-(--q-background)">
     <div class="tw:w-full tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
       <!-- Header Card -->
       <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem] tw:mx-2.5 tw:shrink-0">
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:items-center tw:justify-center tw:transition-all"
               :class="[
                 store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200',
-                hasNoData ? 'tw:opacity-50 tw:cursor-not-allowed' : 'tw:cursor-pointer hover:tw:border-primary hover:tw:shadow-lg'
+                hasNoData ? 'tw:opacity-50 tw:cursor-not-allowed' : 'tw:cursor-pointer tw:hover:border-primary tw:hover:shadow-lg'
               ]"
               @click="!hasNoData && (showSqlDialog = true)"
             >
@@ -281,23 +281,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :persist-columns="true"
             table-id="logs-search-job-inspector"
             style="width: 100%;"
-            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+            class="o2-table o2-row-md o2-table-header-sticky"
             data-test="inspector-events-table"
           >
             <template #cell-index="{ row }">
-              <span class="tree-index-text">{{ row.index }}</span>
+              <span class="tw:inline-block">{{ row.index }}</span>
             </template>
 
             <template #cell-duration="{ row }">
-              <div class="duration-cell">
+              <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-[150px]">
                 <div
-                  class="duration-bar"
+                  class="tw:h-5 tw:rounded-[3px] tw:min-w-[4px] tw:transition-[width] tw:duration-300 tw:ease-in-out"
                   :style="{
                     width: calculateBarWidth(row.duration) + '%',
                     backgroundColor: getDurationColor(row.duration),
                   }"
                 ></div>
-                <span class="duration-text">{{ formatDuration(row.duration) }}</span>
+                <span class="tw:text-[13px] tw:whitespace-nowrap tw:min-w-[50px]">{{ formatDuration(row.duration) }}</span>
               </div>
             </template>
 
@@ -336,8 +336,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="copiedSql ? 'Copied!' : 'SQL'" />
         </OButton>
       </template>
-      <div :class="['sql-query-container', store.state.theme === 'dark' ? 'sql-query-container--dark' : '']">
-        <pre class="sql-query" data-test="inspector-sql-query-content">{{ profileData?.sql || 'No SQL query available' }}</pre>
+      <div
+        class="tw:rounded tw:p-4 tw:max-h-[calc(100vh-150px)] tw:overflow-auto"
+        :class="store.state.theme === 'dark' ? 'tw:bg-[#1e1e1e]' : 'tw:bg-[#f5f5f5]'"
+      >
+        <pre
+          class="tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:m-0 tw:whitespace-pre-wrap tw:break-words"
+          data-test="inspector-sql-query-content"
+        >{{ profileData?.sql || 'No SQL query available' }}</pre>
       </div>
     </ODrawer>
 
@@ -736,85 +742,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.search-job-inspector {
-  background-color: var(--q-background);
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.stat-label {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  opacity: 0.7;
-}
-
-.stat-value {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 2;
-  color: var(--q-primary);
-}
-
-.stat-value-small {
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.4;
-}
-
-.duration-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 150px;
-}
-
-.duration-bar {
-  height: 20px;
-  border-radius: 3px;
-  min-width: 4px;
-  transition: width 0.3s ease;
-}
-
-.duration-text {
-  font-size: 13px;
-  white-space: nowrap;
-  min-width: 50px;
-}
-
-.sql-query-container {
-  background-color: #f5f5f5;
-  border-radius: 4px;
-  padding: 16px;
-  max-height: calc(100vh - 150px);
-  overflow: auto;
-}
-
-.sql-query-container--dark {
-  background-color: #1e1e1e;
-}
-
-.sql-query {
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.trace-id {
-  word-break: break-all;
-}
-
-// Index text — consistent spacing
-.tree-index-text {
-  display: inline-block;
-}
-</style>

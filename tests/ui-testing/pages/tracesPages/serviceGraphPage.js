@@ -310,14 +310,15 @@ export class ServiceGraphPage {
   }
 
   async getHealthStatus() {
-    // .health-badge is a plain CSS class on a <span> in the ODrawer #header-right slot
-    const badge = this.page.locator(`${this.sidePanel} .health-badge`);
-    const badgeExists = await badge.count() > 0;
-    if (!badgeExists) return 'unknown';
-    const classes = await badge.getAttribute('class') || '';
-    if (classes.includes('critical')) return 'critical';
-    if (classes.includes('degraded')) return 'degraded';
-    if (classes.includes('healthy')) return 'healthy';
+    // The health badge is an OTag with data-test="service-health-badge" whose visible
+    // text is the status label (Healthy / Degraded / Critical). The old `.health-badge`
+    // class + status modifier classes were dropped when it moved to the OTag component.
+    const badge = this.page.locator(`${this.sidePanel} [data-test="service-health-badge"]`);
+    if (await badge.count() === 0) return 'unknown';
+    const label = ((await badge.first().textContent()) || '').trim().toLowerCase();
+    if (label.includes('critical')) return 'critical';
+    if (label.includes('degraded')) return 'degraded';
+    if (label.includes('healthy')) return 'healthy';
     return 'unknown';
   }
 

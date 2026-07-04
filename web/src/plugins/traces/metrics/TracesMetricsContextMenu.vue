@@ -18,28 +18,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="visible"
     ref="menuRef"
-    class="traces-metrics-context-menu"
+    class="tw:fixed tw:z-[9999] tw:bg-white tw:border tw:border-solid tw:border-[var(--o2-border)] tw:rounded tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)] tw:min-w-[200px] tw:py-1 tw:dark:bg-[#2c2c2c] tw:dark:border-[#404040] tw:dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
     :style="menuStyle"
     @click.stop
     data-test="traces-metrics-context-menu"
   >
     <div
-      class="menu-item"
+      class="tw:flex tw:items-center tw:px-4 tw:py-2 tw:cursor-pointer tw:transition-colors tw:text-[13px] tw:text-[#333] tw:select-none tw:dark:text-[var(--o2-border)] tw:hover:bg-[#f5f5f5] tw:dark:hover:bg-[#383838] tw:active:bg-[var(--o2-border)] tw:dark:active:bg-[#404040]"
       @click="handleMenuItemClick('gte')"
       @mouseenter="hoveredItem = 'gte'"
       @mouseleave="hoveredItem = null"
-      :class="{ 'hovered': hoveredItem === 'gte' }"
+      :class="{ 'tw:bg-[#f5f5f5]! tw:dark:bg-[#383838]!': hoveredItem === 'gte' }"
       data-test="context-menu-gte"
     >
       <OIcon name="arrow-upward" size="xs" class="tw:mr-2" />
       <span>{{ fieldName }} >= {{ formattedValue }}</span>
     </div>
     <div
-      class="menu-item"
+      class="tw:flex tw:items-center tw:px-4 tw:py-2 tw:cursor-pointer tw:transition-colors tw:text-[13px] tw:text-[#333] tw:select-none tw:dark:text-[var(--o2-border)] tw:hover:bg-[#f5f5f5] tw:dark:hover:bg-[#383838] tw:active:bg-[var(--o2-border)] tw:dark:active:bg-[#404040]"
       @click="handleMenuItemClick('lte')"
       @mouseenter="hoveredItem = 'lte'"
       @mouseleave="hoveredItem = null"
-      :class="{ 'hovered': hoveredItem === 'lte' }"
+      :class="{ 'tw:bg-[#f5f5f5]! tw:dark:bg-[#383838]!': hoveredItem === 'lte' }"
       data-test="context-menu-lte"
     >
       <OIcon name="arrow-downward" size="xs" class="tw:mr-2" />
@@ -149,59 +149,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.traces-metrics-context-menu {
-  position: fixed;
-  z-index: 9999;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
-  padding: 4px 0;
-
-  .menu-item {
-    display: flex;
-    align-items: center;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    font-size: 13px;
-    color: #333;
-
-    &.hovered,
-    &:hover {
-      background-color: #f5f5f5;
-    }
-
-    &:active {
-      background-color: #e0e0e0;
-    }
-
-    span {
-      user-select: none;
-    }
-  }
-}
-
-body.body--dark {
-  .traces-metrics-context-menu {
-    background: #2c2c2c;
-    border-color: #404040;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-
-    .menu-item {
-      color: #e0e0e0;
-
-      &.hovered,
-      &:hover {
-        background-color: #383838;
-      }
-
-      &:active {
-        background-color: #404040;
-      }
-    }
-  }
-}
-</style>

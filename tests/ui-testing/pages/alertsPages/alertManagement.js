@@ -155,16 +155,19 @@ export class AlertManagement {
         await kebabButton.waitFor({ state: 'visible', timeout: 5000 });
         await kebabButton.click();
 
+        // Target the Delete item by data-test (robust to label/shortcut-hint changes)
+        const deleteOption = this.page.locator(`[data-test="alert-list-${alertName}-delete-alert"]`);
+
         // Wait for delete option, retry if needed
         try {
-            await this.page.getByText('Delete', { exact: true }).waitFor({ state: 'visible', timeout: 3000 });
+            await deleteOption.waitFor({ state: 'visible', timeout: 3000 });
         } catch (e) {
             testLogger.warn('Delete option not visible after first kebab click, retrying', { alertName });
             await kebabButton.click();
-            await this.page.getByText('Delete', { exact: true }).waitFor({ state: 'visible', timeout: 5000 });
+            await deleteOption.waitFor({ state: 'visible', timeout: 5000 });
         }
 
-        await this.page.getByText('Delete', { exact: true }).click();
+        await deleteOption.click();
         await this.page.locator(this.locators.confirmButton).click();
         await expect(this.page.locator(`[data-test-message="${this.locators.alertDeletedMessage}"]`)).toBeVisible();
         await this.page.locator(`[data-test-message="${this.locators.alertDeletedMessage}"]`).waitFor({ state: 'hidden' });
@@ -270,7 +273,7 @@ export class AlertManagement {
                     .locator(`[data-test="alert-list-${alertName}-more-options"]`).click();
                 await this.page.waitForTimeout(1000);
 
-                await this.page.getByText('Delete').click();
+                await this.page.locator(`[data-test="alert-list-${alertName}-delete-alert"]`).click();
                 await this.page.waitForTimeout(1000);
                 await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
                 await expect(this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: 'Alert deleted' })).toBeVisible();

@@ -268,13 +268,16 @@ describe("DashboardHeader", () => {
       expect(wrapper.find('[data-test="dashboard-header-right-slot-container"]').exists()).toBe(true);
     });
 
-    it("should have separator with correct classes", () => {
+    it("should render the separator with its data-test attribute", () => {
       wrapper = createWrapper();
 
       const separator = wrapper.findComponent({ name: 'OSeparator' });
       expect(separator.exists()).toBe(true);
-      // tw:mb-2 replaces q-mb-sm.
-      expect(separator.classes().some((c) => c.includes("mb-2"))).toBe(true);
+      // Spacing now lives on the header row (tw:my-2 tw:mx-2); the separator
+      // itself carries no margin class after the OTable/layout migration.
+      expect(separator.attributes("data-test")).toBe(
+        "dashboard-header-separator",
+      );
     });
 
     it("should maintain layout structure without back button", () => {

@@ -254,7 +254,7 @@ impl MemorySize for Template {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum TemplateType {
     #[default]

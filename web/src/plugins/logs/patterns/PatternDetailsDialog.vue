@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -38,12 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ selectedPattern?.pattern?.description || t('search.patternDetailsTitle') }}
           </h4>
           <template v-if="selectedPattern">
-            <OBadge variant="default-soft" size="sm" class="tw:shrink-0">
+            <OTag type="countChip" value="neutral" class="tw:shrink-0">
               {{ selectedTemplateTokens.length }} {{ selectedTemplateTokens.length === 1 ? 'token' : 'tokens' }}
-            </OBadge>
-            <OBadge variant="default-soft" size="sm" class="tw:shrink-0">
+            </OTag>
+            <OTag type="countChip" value="neutral" class="tw:shrink-0">
               {{ patternWildcardCount }} {{ patternWildcardCount === 1 ? 'variable slot' : 'variable slots' }}
-            </OBadge>
+            </OTag>
           </template>
         </div>
         <!-- Row 2: full-width module path, truncates at edge -->
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.patternTemplate") }}
           </div>
           <div
-            class="tw:px-2.5 tw:py-1.5 pattern-detail-text tw:text-[0.8125rem] tw:leading-[1.6] tw:rounded tw:border-l-4 tw:border-solid tw:border-l-[var(--o2-primary-color)] tw:break-all tw:flex tw:flex-wrap tw:items-baseline tw:gap-x-[2px] tw:gap-y-[2px]"
+            class="tw:px-2.5 tw:py-1.5 tw:font-mono tw:text-[0.8125rem] tw:leading-[1.6] tw:rounded tw:border-l-4 tw:border-solid tw:border-l-[var(--o2-primary-color)] tw:break-all tw:flex tw:flex-wrap tw:items-baseline tw:gap-x-[2px] tw:gap-y-[2px]"
             :class="
               store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'tw:bg-gray-100'
             "
@@ -175,13 +175,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
                 @mouseleave="onMouseLeave"
               >
-                <OBadge
-                  size="sm"
-                  class="wildcard-chip-detail tw:my-0 tw:mx-0"
+                <OTag
+                  type="wildcardChip"
                   :class="wildcardChipColor(tok.value, tok.sampleValues)"
                 >
                   {{ wildcardLabel(tok.value, tok.sampleValues) }}
-                </OBadge>
+                </OTag>
               </span>
             </template>
           </div>
@@ -216,14 +215,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-type="{ row }">
               <div class="tw:text-left">
-                <OBadge
-                  size="sm"
-                  :class="
-                    store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-200'
-                  "
-                >
-                  {{ row.var_type || "unknown" }}
-                </OBadge>
+                <OTag
+                  type="fieldType"
+                  :value="row.var_type"
+                  :label="row.var_type || 'unknown'"
+                />
               </div>
             </template>
           </OTable>
@@ -243,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(example, exIdx) in selectedPattern.pattern.examples"
             :key="exIdx"
-            class="tw:px-[0.625rem] tw:py-[0.375rem] tw:mb-[0.375rem] pattern-detail-text tw:text-[0.75rem] tw:leading-[1.6] tw:rounded tw:break-all tw:whitespace-pre-wrap tw:border-l-[0.1875rem] tw:border-solid"
+            class="tw:px-[0.625rem] tw:py-[0.375rem] tw:mb-[0.375rem] tw:font-mono tw:text-[0.75rem] tw:leading-[1.6] tw:rounded tw:break-all tw:whitespace-pre-wrap tw:border-l-[0.1875rem] tw:border-solid"
             :class="[
               store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-l-[#3a3a3a]' : 'tw:bg-gray-50 tw:border-l-[#e0e0e0]'
             ]"
@@ -317,7 +313,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -392,23 +388,6 @@ const variableColumns = computed<OTableColumnDef[]>(() => [
 ]);
 </script>
 
-<style lang="scss">
+<style>
 @import "@/assets/styles/log-highlighting.css";
-</style>
-
-<style scoped lang="scss">
-.pattern-detail-text {
-  font-family: monospace;
-}
-
-.wildcard-chip-detail {
-  font-family: monospace;
-  font-size: 0.75rem;
-  font-weight: bold;
-  height: 1.125rem;
-  padding: 0 0.3125rem;
-  border-radius: 0.1875rem;
-  line-height: 1.125rem;
-  flex-shrink: 0;
-}
 </style>

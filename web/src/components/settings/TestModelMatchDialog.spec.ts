@@ -708,40 +708,31 @@ describe("TestModelMatchDialog", () => {
     });
   });
 
-  describe("sourceColor / sourceLabel", () => {
-    it("returns primary/Your Org for org source", () => {
+  describe("sourceLabel", () => {
+    it("returns Your Org for org source", () => {
       wrapper = mountDialog({ modelValue: true });
       const vm: any = wrapper.vm;
-      expect(vm.sourceColor({ source: "org" })).toBe("primary");
       expect(vm.sourceLabel({ source: "org" })).toBe("Your Org");
     });
 
-    it("returns primary/Your Org when source is missing", () => {
+    it("returns Your Org when source is missing", () => {
       wrapper = mountDialog({ modelValue: true });
-      const vm: any = wrapper.vm;
-      expect(vm.sourceColor({})).toBe("primary");
-      expect(vm.sourceLabel({})).toBe("Your Org");
+      expect((wrapper.vm as any).sourceLabel({})).toBe("Your Org");
     });
 
-    it("returns default-outline/Global for meta_org source", () => {
+    it("returns Global for meta_org source", () => {
       wrapper = mountDialog({ modelValue: true });
-      const vm: any = wrapper.vm;
-      expect(vm.sourceColor({ source: "meta_org" })).toBe("default-outline");
-      expect(vm.sourceLabel({ source: "meta_org" })).toBe("Global");
+      expect((wrapper.vm as any).sourceLabel({ source: "meta_org" })).toBe("Global");
     });
 
-    it("returns default/Built-in for built_in source", () => {
+    it("returns Built-in for built_in source", () => {
       wrapper = mountDialog({ modelValue: true });
-      const vm: any = wrapper.vm;
-      expect(vm.sourceColor({ source: "built_in" })).toBe("default");
-      expect(vm.sourceLabel({ source: "built_in" })).toBe("Built-in");
+      expect((wrapper.vm as any).sourceLabel({ source: "built_in" })).toBe("Built-in");
     });
 
-    it("returns default/Built-in for any other source", () => {
+    it("returns Built-in for any other source", () => {
       wrapper = mountDialog({ modelValue: true });
-      const vm: any = wrapper.vm;
-      expect(vm.sourceColor({ source: "something" })).toBe("default");
-      expect(vm.sourceLabel({ source: "something" })).toBe("Built-in");
+      expect((wrapper.vm as any).sourceLabel({ source: "something" })).toBe("Built-in");
     });
   });
 

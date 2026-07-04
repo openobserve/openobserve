@@ -15,6 +15,7 @@ vi.mock('@/services/iam', () => ({
   bulkDeleteRoles: vi.fn(async () => ({
     data: { successful: ['Admin', 'Viewer'], unsuccessful: [] },
   })),
+  getRoleUsers: vi.fn(async () => ({ data: ['user1@o2.ai', 'user2@o2.ai'] })),
 }));
 
 vi.mock('@/services/reodotdev_analytics', () => ({
@@ -26,7 +27,7 @@ vi.mock('@/lib/feedback/Toast/useToast', () => ({
 }));
 
 import AppRoles from '@/components/iam/roles/AppRoles.vue';
-import { getRoles, deleteRole, bulkDeleteRoles } from '@/services/iam';
+import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers } from '@/services/iam';
 
 const node = document.createElement('div');
 node.setAttribute('id', 'app-roles-test');
@@ -200,6 +201,50 @@ describe('AppRoles - hideForm', () => {
   });
 });
 
+// 4b. onRoleAdded — auto-route after create
+describe('AppRoles - onRoleAdded', () => {
+  it('routes to editRole on the permissions tab after create', async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, 'push');
+    (wrapper.vm as any).onRoleAdded({ role_name: 'NewRole' });
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'editRole',
+        params: { role_name: 'NewRole' },
+        query: expect.objectContaining({ tab: 'permissions' }),
+      }),
+    );
+  });
+
+  it('forwards the readonly preset in the query', async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, 'push');
+    (wrapper.vm as any).onRoleAdded({ role_name: 'RO', startFrom: 'readonly' });
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: expect.objectContaining({ preset: 'readonly' }),
+      }),
+    );
+  });
+
+  it('does not set a preset for the custom start option', async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, 'push');
+    (wrapper.vm as any).onRoleAdded({ role_name: 'C', startFrom: 'custom' });
+    const call = spy.mock.calls[0][0] as any;
+    expect(call.query.preset).toBeUndefined();
+  });
+
+  it('falls back to refreshing the list when no role_name is provided', async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, 'push');
+    vi.mocked(getRoles).mockClear();
+    (wrapper.vm as any).onRoleAdded({});
+    expect(spy).not.toHaveBeenCalled();
+    expect(getRoles).toHaveBeenCalled();
+  });
+});
+
 // 7. showConfirmDialog
 describe('AppRoles - showConfirmDialog', () => {
   it('sets deleteConformDialog.show to true', async () => {
@@ -213,6 +258,53 @@ describe('AppRoles - showConfirmDialog', () => {
     const row = { role_name: 'Viewer' };
     (wrapper.vm as any).showConfirmDialog(row);
     expect((wrapper.vm as any).deleteConformDialog.data).toEqual(row);
+  });
+
+  it('builds a blast-radius warning with the live user count', async () => {
+    const wrapper = await mountAppRoles();
+    await (wrapper.vm as any).showConfirmDialog({ role_name: 'Admin' });
+    await flushPromises();
+    expect(getRoleUsers).toHaveBeenCalledWith(
+      'Admin',
+      store.state.selectedOrganization.identifier,
+    );
+    // Two mocked users → message mentions "2".
+    expect((wrapper.vm as any).deleteImpactMessage).toContain('2');
+  });
+
+  it('keeps a generic warning when the user-count lookup fails', async () => {
+    vi.mocked(getRoleUsers).mockRejectedValueOnce(new Error('boom'));
+    const wrapper = await mountAppRoles();
+    await (wrapper.vm as any).showConfirmDialog({ role_name: 'Admin' });
+    await flushPromises();
+    // Falls back to the count=0 message rather than throwing.
+    expect((wrapper.vm as any).deleteImpactMessage).toBeTruthy();
+  });
+});
+
+// bulk-delete blast-radius message
+describe('AppRoles - openBulkDeleteDialog', () => {
+  it('shows the live user count when exactly one role is selected', async () => {
+    const wrapper = await mountAppRoles();
+    (wrapper.vm as any).selectedRoleNames = ['Admin'];
+    await (wrapper.vm as any).openBulkDeleteDialog();
+    await flushPromises();
+    expect(getRoleUsers).toHaveBeenCalledWith(
+      'Admin',
+      store.state.selectedOrganization.identifier,
+    );
+    // Two mocked users → message mentions "2".
+    expect((wrapper.vm as any).bulkDeleteImpactMessage).toContain('2');
+  });
+
+  it('uses static copy (no count fetch) when multiple roles are selected', async () => {
+    const wrapper = await mountAppRoles();
+    vi.mocked(getRoleUsers).mockClear();
+    (wrapper.vm as any).selectedRoleNames = ['Admin', 'Viewer'];
+    await (wrapper.vm as any).openBulkDeleteDialog();
+    await flushPromises();
+    expect(getRoleUsers).not.toHaveBeenCalled();
+    expect((wrapper.vm as any).bulkDeleteImpactMessage).toBeTruthy();
   });
 });
 

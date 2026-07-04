@@ -5,7 +5,7 @@
 //  • Before the first submit: NO validation — no errors while typing OR on blur.
 //  • First submit: every field's error is revealed (markAllBlurred + validate).
 //  • After the first submit: errors revalidate live on every change.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent } from "vue";
 import { z } from "zod";
@@ -62,10 +62,12 @@ describe("OForm schema validation timing (submit-then-change)", () => {
 
     await input.setValue("validname"); // valid — no blur needed
     await flushPromises();
-    expect(err(w)).toBe("(none)"); // clears on change
+    // Revalidation is async (TanStack validate → error state → re-render); poll
+    // until it settles rather than assuming a single microtask flush is enough.
+    await vi.waitFor(() => expect(err(w)).toBe("(none)")); // clears on change
 
     await input.setValue("bad!"); // invalid again — no blur
     await flushPromises();
-    expect(err(w)).toBe("Bad chars"); // reappears on change
+    await vi.waitFor(() => expect(err(w)).toBe("Bad chars")); // reappears on change
   });
 });

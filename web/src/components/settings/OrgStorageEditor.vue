@@ -86,34 +86,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:text-sm tw:font-medium tw:mb-2" style="font-weight: 500">
               Select Storage Provider <span class="text-red">*</span>
             </div>
-            <div class="destination-type-grid">
+            <div class="destination-type-grid tw:grid tw:gap-3" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));">
               <div
                 v-for="provider in availableProviders"
                 :key="provider.value"
                 :data-test="`storage-settings-provider-card-${provider.value}`"
-                class="destination-type-card"
-                :class="{
-                  selected: selectedProvider === provider.value,
-                  'dark-mode': store.state.theme === 'dark',
-                }"
+                class="tw:group/card tw:relative tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-5 tw:px-3 tw:border-2 tw:rounded-xl tw:cursor-pointer tw:transition-all tw:duration-300 tw:min-h-30 tw:hover:-translate-y-0.5"
+                :class="[
+                  { selected: selectedProvider === provider.value },
+                  store.state.theme === 'dark'
+                    ? 'tw:bg-[#1e1e1e] tw:border-[#424242] tw:hover:border-[#5d9cec] tw:hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
+                    : 'tw:bg-white tw:border-(--o2-border) tw:hover:border-(--o2-border-color) tw:hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
+                ]"
+                :style="selectedProvider === provider.value && store.state.theme !== 'dark'
+                  ? 'border-color: var(--o2-border-color); background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%); box-shadow: 0 4px 16px rgba(25,118,210,0.2);'
+                  : selectedProvider === provider.value && store.state.theme === 'dark'
+                  ? 'border-color: #5d9cec; background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%); box-shadow: 0 4px 16px rgba(93,156,236,0.25);'
+                  : ''"
                 @click="selectedProvider = provider.value"
               >
                 <img
                   v-if="provider.image"
                   :src="provider.image"
                   :alt="provider.label"
-                  class="card-image"
+                  class="card-image tw:w-[48px] tw:h-[48px] tw:mb-2 tw:object-contain"
                 />
                 <OIcon
                   v-else
                   :name="provider.icon"
                   size="lg"
-                  class="card-icon"
+                  class="tw:mb-2 tw:text-[#666] tw:[transition:color_0.3s_ease] tw:group-[.selected]/card:text-(--o2-border-color) tw:dark:group-[.selected]/card:text-[#5d9cec]"
                 />
-                <div class="card-label">{{ provider.label }}</div>
+                <div class="tw:text-[13px] tw:font-medium tw:text-center tw:[line-height:1.3] tw:mt-1 tw:text-[var(--o2-text-primary)] tw:group-[.selected]/card:text-[#333333] tw:dark:group-[.selected]/card:text-white">{{ provider.label }}</div>
                 <div
                   v-if="selectedProvider === provider.value"
-                  class="check-icon"
+                  class="check-icon tw:absolute tw:top-[0.375rem] tw:right-[0.375rem] tw:w-[1.25rem] tw:h-[1.25rem] tw:rounded-full tw:overflow-hidden tw:bg-[var(--o2-positive)] tw:text-white tw:flex tw:items-center tw:justify-center tw:z-[1]"
                 >
                   <OIcon name="check" size="xs" />
                 </div>
@@ -653,109 +660,3 @@ watch(selectedProvider, (newProvider) => {
 });
 </script>
 
-<style lang="scss" scoped>
-.destination-type-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
-}
-
-.destination-type-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 12px;
-  background: #ffffff;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  min-height: 120px;
-
-  &:hover {
-    border-color: var(--o2-border-color);
-    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
-    transform: translateY(-2px);
-  }
-
-  &.selected {
-    border-color: var(--o2-border-color);
-    background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
-    box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
-
-    .card-icon { color: var(--o2-border-color); }
-    .card-label { color: #333333; }
-  }
-
-  &.dark-mode {
-    background: #1e1e1e;
-    border-color: #424242;
-
-    &:hover {
-      border-color: #5d9cec;
-      box-shadow: 0 4px 12px rgba(93, 156, 236, 0.2);
-    }
-
-    &.selected {
-      border-color: #5d9cec;
-      background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%);
-      box-shadow: 0 4px 16px rgba(93, 156, 236, 0.25);
-
-      .card-icon { color: #5d9cec; }
-      .card-label { color: #ffffff; }
-    }
-  }
-
-  .card-icon {
-    margin-bottom: 8px;
-    color: #666;
-    transition: color 0.3s ease;
-  }
-
-  .card-image {
-    width: 48px;
-    height: 48px;
-    margin-bottom: 8px;
-    object-fit: contain;
-  }
-
-  .card-label {
-    font-size: 13px;
-    font-weight: 500;
-    text-align: center;
-    line-height: 1.3;
-    margin-top: 4px;
-    color: var(--o2-text-primary);
-  }
-
-  .check-icon {
-    position: absolute;
-    top: 0.375rem;
-    right: 0.375rem;
-    width: 1.25rem;
-    height: 1.25rem;
-    border-radius: 50%;
-    overflow: hidden;
-    background: var(--o2-positive);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1;
-  }
-}
-</style>
-
-<style lang="scss">
-.storage-settings-editor {
-  .q-field--labeled.showLabelOnTop .q-field__bottom {
-    padding: 0.275rem 0 0 !important;
-  }
-
-  .q-field--labeled.showLabelOnTop {
-    padding-top: 20px;
-  }
-}
-</style>

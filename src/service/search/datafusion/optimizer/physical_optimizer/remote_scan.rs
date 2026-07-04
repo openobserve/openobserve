@@ -329,21 +329,37 @@ impl TreeNodeRewriter for RemoteScanRewriter {
     }
 }
 
-// If partial reduce is enabled and the input is a Partial AggregateExec,
-// wrap it with a PartialReduce AggregateExec.
+// If partial reduce is enabled and the input is a partial aggregate, wrap it
+// with a PartialReduce AggregateExec.
 fn wrap_partial_reduce(
     partial_reduce_enabled: bool,
+    input: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    let Some(agg) = input.downcast_ref::<AggregateExec>() else {
+        return Ok(input);
+    };
+    wrap_partial_reduce_for_aggregate(partial_reduce_enabled, agg, input.clone())
+}
+
+// If partial reduce is enabled and `agg` is a partial aggregate, wrap `input`
+// with a PartialReduce AggregateExec. `input` can be either the original partial
+// aggregate itself or another plan producing that aggregate's partial-output
+// schema, such as a RemoteScanExec on a super-cluster region leader.
+pub(crate) fn wrap_partial_reduce_for_aggregate(
+    partial_reduce_enabled: bool,
+    agg: &AggregateExec,
     input: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     if !partial_reduce_enabled {
         return Ok(input);
     }
-    let Some(agg) = input.downcast_ref::<AggregateExec>() else {
-        return Ok(input);
-    };
-    if *agg.mode() != AggregateMode::Partial {
+    if !matches!(
+        *agg.mode(),
+        AggregateMode::Partial | AggregateMode::PartialReduce
+    ) {
         return Ok(input);
     }
+
     // PartialReduce receives Partial's output, so group expressions must be
     // simple Column refs into that schema rather than the original scan-level exprs.
     let partial_schema = input.schema();
@@ -361,19 +377,32 @@ fn wrap_partial_reduce(
         .collect::<Result<_>>()?;
     // null_expr entries are schema-independent NULL literals used by GROUPING SETS
     let null_exprs: Vec<(Arc<dyn PhysicalExpr>, String)> = agg.group_expr().null_expr().to_vec();
+    // Reuse the group-key Column refs as the hash-partition keys.
+    let hash_exprs: Vec<Arc<dyn PhysicalExpr>> = group_exprs
+        .iter()
+        .map(|(expr, _)| Arc::clone(expr))
+        .collect();
     let new_group_by = PhysicalGroupBy::new(
         group_exprs,
         null_exprs,
         agg.group_expr().groups().to_vec(),
         !agg.group_expr().is_single(),
     );
-    let coalesce_partition_exec = Arc::new(CoalescePartitionsExec::new(input.clone()));
+    let reduce_input: Arc<dyn ExecutionPlan> = if !hash_exprs.is_empty() {
+        let num_partitions = input.output_partitioning().partition_count();
+        Arc::new(RepartitionExec::try_new(
+            input.clone(),
+            Partitioning::Hash(hash_exprs, num_partitions),
+        )?)
+    } else {
+        Arc::new(CoalescePartitionsExec::new(input.clone()))
+    };
     Ok(Arc::new(AggregateExec::try_new(
         AggregateMode::PartialReduce,
         new_group_by,
         agg.aggr_expr().to_vec(),
         vec![None; agg.aggr_expr().len()],
-        coalesce_partition_exec,
+        reduce_input,
         agg.input_schema(),
     )?) as Arc<dyn ExecutionPlan>)
 }
@@ -602,6 +631,114 @@ mod tests {
             .expect("group expr should be a Column reference into partial output schema");
         assert_eq!(col_expr.name(), "a");
         assert_eq!(col_expr.index(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_multi_partition_group_by_hash_repartitions()
+    -> datafusion::common::Result<()> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let group_by = PhysicalGroupBy::new(
+            vec![(col("a", &schema)?, "a".to_string())],
+            vec![],
+            vec![vec![false]],
+            false,
+        );
+        // Partial agg over a 4-partition input -> 4 output partitions.
+        let agg = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&schema)).with_partitions(4)),
+            Arc::clone(&schema),
+        )?;
+        let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
+        let result = wrap_partial_reduce(true, input)?;
+        let result_agg = result.downcast_ref::<AggregateExec>().unwrap();
+        assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
+        // PartialReduce preserves the partial agg's partition count (partition-local reduce).
+        assert_eq!(result.output_partitioning().partition_count(), 4);
+        // Its child must be a Hash RepartitionExec on the group key into 4 partitions,
+        // so each group key lands in exactly one bucket (no duplication across buckets).
+        let child = result.children()[0].clone();
+        let repartition = child
+            .downcast_ref::<RepartitionExec>()
+            .expect("a multi-partition GROUP BY should hash-partition the partial output");
+        match repartition.partitioning() {
+            Partitioning::Hash(exprs, n) => {
+                assert_eq!(*n, 4);
+                assert_eq!(exprs.len(), 1, "should hash on the single group key");
+            }
+            other => panic!("expected Hash partitioning, got {other:?}"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_multi_partition_no_group_by_falls_back_to_coalesce()
+    -> datafusion::common::Result<()> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let group_by = PhysicalGroupBy::new(vec![], vec![], vec![vec![]], false);
+        // Partial agg over a 4-partition input but with no GROUP BY.
+        let agg = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&schema)).with_partitions(4)),
+            Arc::clone(&schema),
+        )?;
+        let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
+        // No GROUP BY: can't hash-partition even with multiple input partitions -> coalesce to one.
+        let result = wrap_partial_reduce(true, input)?;
+        assert_eq!(result.children()[0].name(), "CoalescePartitionsExec");
+        assert_eq!(result.output_partitioning().partition_count(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_for_partial_reduce_source_accepts_remote_output()
+    -> datafusion::common::Result<()> {
+        let scan_schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let group_by = PhysicalGroupBy::new(
+            vec![(col("a", &scan_schema)?, "a".to_string())],
+            vec![],
+            vec![vec![false]],
+            false,
+        );
+        let partial = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&scan_schema)).with_partitions(4)),
+            Arc::clone(&scan_schema),
+        )?;
+        let partial_plan: Arc<dyn ExecutionPlan> = Arc::new(partial);
+        let source_plan = wrap_partial_reduce(true, partial_plan)?;
+        let source_agg = source_plan
+            .downcast_ref::<AggregateExec>()
+            .expect("source plan should be a PartialReduce aggregate");
+        assert_eq!(*source_agg.mode(), AggregateMode::PartialReduce);
+
+        // Simulate a super-cluster region leader: the local RemoteScanExec is not
+        // itself an AggregateExec, but it emits the source aggregate's partial schema.
+        let remote_output: Arc<dyn ExecutionPlan> =
+            Arc::new(EmptyExec::new(source_plan.schema().clone()).with_partitions(4));
+        let result = wrap_partial_reduce_for_aggregate(true, source_agg, remote_output)?;
+        let result_agg = result.downcast_ref::<AggregateExec>().unwrap();
+        assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
+        assert_eq!(result_agg.group_expr().expr().len(), 1);
+
+        let child = result.children()[0].clone();
+        let repartition = child
+            .downcast_ref::<RepartitionExec>()
+            .expect("region-level grouped reduce should hash-partition remote output");
+        assert!(matches!(
+            repartition.partitioning(),
+            Partitioning::Hash(_, 4)
+        ));
         Ok(())
     }
 

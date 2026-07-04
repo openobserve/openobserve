@@ -9,6 +9,7 @@ import {
   TooltipArrow,
 } from "reka-ui";
 import { ref, computed, onMounted, onUnmounted, useSlots } from "vue";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 
 const props = withDefaults(defineProps<TooltipProps>(), {
   side: "top",
@@ -32,6 +33,10 @@ const childAnchorRef = ref<HTMLSpanElement | null>(null);
 const parentEl = ref<Element | null>(null);
 const childOpen = ref(false);
 let cleanupFn: (() => void) | null = null;
+// Pending open timer for the hover delay (child mode). Wrapper mode gets its
+// delay for free from reka's `delay-duration`; child mode wires its own hover
+// listeners, so it has to honour `props.delay` here too.
+let childShowTimer: ReturnType<typeof setTimeout> | null = null;
 
 onMounted(() => {
   if (!hasDefaultSlot.value && childAnchorRef.value) {
@@ -54,8 +59,27 @@ onMounted(() => {
     }
     parentEl.value = candidate;
     if (parentEl.value) {
-      const show = () => { if (!props.disabled) childOpen.value = true; };
-      const hide = () => { childOpen.value = false; };
+      // Open after `props.delay` ms of hover (matching wrapper mode); leaving
+      // before then cancels the pending open so a quick pass-over shows nothing.
+      const show = () => {
+        if (props.disabled) return;
+        if (childShowTimer) clearTimeout(childShowTimer);
+        if (props.delay > 0) {
+          childShowTimer = setTimeout(() => {
+            childOpen.value = true;
+            childShowTimer = null;
+          }, props.delay);
+        } else {
+          childOpen.value = true;
+        }
+      };
+      const hide = () => {
+        if (childShowTimer) {
+          clearTimeout(childShowTimer);
+          childShowTimer = null;
+        }
+        childOpen.value = false;
+      };
       parentEl.value.addEventListener("mouseenter", show);
       parentEl.value.addEventListener("mouseleave", hide);
       cleanupFn = () => {
@@ -66,7 +90,10 @@ onMounted(() => {
   }
 });
 
-onUnmounted(() => cleanupFn?.());
+onUnmounted(() => {
+  if (childShowTimer) clearTimeout(childShowTimer);
+  cleanupFn?.();
+});
 
 const effectiveSideOffset = computed(() => props.sideOffset);
 
@@ -118,7 +145,14 @@ const contentClasses = computed(() => [
           :style="contentStyle"
           :class="contentClasses"
         >
-          <slot name="content">{{ content }}</slot>
+          <span class="tw:inline-flex tw:items-center tw:gap-1.5">
+            <slot name="content">{{ content }}</slot>
+            <OShortcut
+              v-if="shortcut || shortcutId"
+              :keys="shortcut"
+              :id="shortcutId"
+            />
+          </span>
           <TooltipArrow
             :width="10"
             :height="5"
@@ -154,7 +188,14 @@ const contentClasses = computed(() => [
             :style="contentStyle"
             :class="contentClasses"
           >
-            <slot name="content">{{ content }}</slot>
+            <span class="tw:inline-flex tw:items-center tw:gap-1.5">
+              <slot name="content">{{ content }}</slot>
+              <OShortcut
+              v-if="shortcut || shortcutId"
+              :keys="shortcut"
+              :id="shortcutId"
+            />
+            </span>
             <TooltipArrow
               :width="10"
               :height="5"

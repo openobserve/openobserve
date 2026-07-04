@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -66,21 +66,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="summary-bar tw:mb-3">
           <div class="tw:flex tw:gap-2 tw:items-center">
             <div class="col-auto">
-              <OBadge variant="success">
+              <OTag type="diffCategory" value="new">
                 <strong>{{ diffData.additions.length }}</strong
                 >&nbsp;New
-              </OBadge>
+              </OTag>
             </div>
             <div class="col-auto">
-              <OBadge variant="warning">
+              <OTag type="diffCategory" value="modified">
                 <strong>{{ diffData.modifications.length }}</strong
                 >&nbsp;Modified
-              </OBadge>
+              </OTag>
             </div>
             <div class="col-auto">
-              <OBadge variant="default">
+              <OTag type="diffCategory" value="unchanged">
                 {{ diffData.unchanged.length }} Unchanged
-              </OBadge>
+              </OTag>
             </div>
           </div>
         </div>
@@ -107,10 +107,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Groups List -->
-        <div class="groups-list">
+        <div class="tw:max-h-[calc(100vh-400px)] tw:overflow-y-auto">
           <!-- Additions -->
           <div v-if="diffData.additions.length > 0" class="tw:mb-3">
-            <div class="section-header tw:text-green-500 tw:p-2">
+            <div class="tw:text-sm tw:font-semibold tw:border-b tw:border-[var(--color-separator)] tw:text-green-500 tw:p-2">
               <OIcon name="add-circle" size="sm" />
               New ({{ selectedAdditions.length }}/{{
                 diffData.additions.length
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="group in diffData.additions"
                 :key="group.id"
                 data-test="semantic-groups-drawer-addition-item"
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
                 @click="toggleAddition(group.id)"
               >
                 <div class="tw:flex tw:items-center tw:shrink-0">
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Modifications -->
           <div v-if="diffData.modifications.length > 0" class="tw:mb-3">
-            <div class="section-header tw:text-amber-500 tw:p-2">
+            <div class="tw:text-sm tw:font-semibold tw:border-b tw:border-[var(--color-separator)] tw:text-amber-500 tw:p-2">
               <OIcon name="edit" size="sm" />
               Modified ({{ selectedModifications.length }}/{{
                 diffData.modifications.length
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="mod in diffData.modifications"
                 :key="mod.proposed.id"
                 data-test="semantic-groups-drawer-modification-item"
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
                 @click="toggleModification(mod.proposed.id)"
               >
                 <div class="tw:flex tw:items-center tw:shrink-0">
@@ -249,14 +249,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:text-sm tw:font-medium tw:mb-2">
         Fields ({{ selectedGroup?.fields.length }})
       </div>
-      <OBadge
+      <OTag
         v-for="field in selectedGroup?.fields"
         :key="field"
-        variant="primary"
+        type="fieldNameChip"
+        value="highlight"
         class="tw:m-1"
       >
         {{ field }}
-      </OBadge>
+      </OTag>
     </div>
   </ODialog>
 
@@ -276,16 +277,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-xs tw:mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="field-chips-container">
-          <OBadge
+        <div class="tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--q-dark)] tw:rounded">
+          <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
-            variant="default"
-            size="sm"
+            type="fieldNameChip"
+            value="muted"
             class="tw:m-1"
           >
             {{ field }}
-          </OBadge>
+          </OTag>
         </div>
       </div>
       <div class="tw:w-1/2">
@@ -293,22 +294,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-xs tw:mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="field-chips-container">
-          <OBadge
+        <div class="tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--q-dark)] tw:rounded">
+          <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
-            :variant="isNewField(field) ? 'success' : 'default'"
-            size="sm"
+            type="fieldDiffStatus"
+            :value="isNewField(field) ? 'new' : 'existing'"
             class="tw:m-1"
           >
             {{ field }}
-            <OIcon
-              v-if="isNewField(field)"
-              name="add"
-              size="xs"
-              class="tw:ml-1"
-            />
-          </OBadge>
+            <template #trailing>
+              <OIcon
+                v-if="isNewField(field)"
+                name="add"
+                size="xs"
+                class="tw:ml-1"
+              />
+            </template>
+          </OTag>
         </div>
       </div>
     </div>
@@ -320,7 +323,7 @@ import { ref, computed, watch } from "vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import alertsService from "@/services/alerts";
@@ -546,24 +549,3 @@ const handleClose = () => {
   handleOpenChange(false);
 };
 </script>
-
-<style lang="scss" scoped>
-.section-header {
-  font-size: 14px;
-  font-weight: 600;
-  border-bottom: 1px solid var(--color-separator);
-}
-
-.groups-list {
-  max-height: calc(100vh - 400px);
-  overflow-y: auto;
-}
-
-.field-chips-container {
-  max-height: 250px;
-  overflow-y: auto;
-  padding: 8px;
-  background: var(--q-dark);
-  border-radius: 4px;
-}
-</style>

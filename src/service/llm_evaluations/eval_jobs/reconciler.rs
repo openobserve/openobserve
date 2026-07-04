@@ -273,11 +273,16 @@ fn build_pipeline_from_job(
 /// `job` right now. Used by `reconcile` to skip needless updates.
 ///
 /// Salient fields:
+/// - pipeline kind
 /// - source stream (org/name/type)
 /// - eval node sampling_rate
 /// - eval node scorers
 /// - optional filter node condition
 pub(crate) fn pipeline_matches_job(pipeline: &Pipeline, job: &OnlineEvalJob) -> bool {
+    if pipeline.kind != PipelineKind::Evaluation {
+        return false;
+    }
+
     // Source stream
     let expected_stream = StreamParams::new(
         &job.org_id,
@@ -630,6 +635,15 @@ mod tests {
         let job = sample_job();
         let pipeline = build_pipeline_from_job(&job, "pipe-1", true, 1);
         assert!(pipeline_matches_job(&pipeline, &job));
+    }
+
+    #[test]
+    fn test_pipeline_matches_job_false_on_kind_drift() {
+        let job = sample_job();
+        let mut pipeline = build_pipeline_from_job(&job, "pipe-1", true, 1);
+        pipeline.kind = PipelineKind::User;
+
+        assert!(!pipeline_matches_job(&pipeline, &job));
     }
 
     #[test]

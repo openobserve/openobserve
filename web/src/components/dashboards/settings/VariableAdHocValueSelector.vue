@@ -127,38 +127,8 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.and-border {
-  padding: 4px 6px;
-  border-radius: 4px;
-  // background-color: $grey-4;
-  font-size: smaller;
-}
-
-.title {
-  padding: 10px 8px;
-  border-radius: 4px;
-  // background-color: $grey-4;
-  font-size: small;
-  font-weight: bold;
-}
-
-.operator {
-  border-left: 1px solid $grey-4;
-  border-right: 1px solid $grey-4;
-}
-
-.close {
-  height: 100%;
-  // border-top: 1px solid $grey-4;
-  border-left: 1px solid $grey-4;
-  // border-bottom: 1px solid $grey-4;
-  // background-color: $grey-3;
-  border-radius: 0 !important;
-}
-.printMode {
-  .hideOnPrintMode {
-    display: none;
-  }
+<style>
+.printMode .hideOnPrintMode {
+  display: none;
 }
 </style>

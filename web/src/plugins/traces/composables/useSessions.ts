@@ -16,9 +16,8 @@
 import { ref } from "vue";
 import { useStore } from "vuex";
 import sessionsService from "@/services/sessions";
-import useHttpStreaming from "@/composables/useStreamingSearch";
-import { generateTraceContext } from "@/utils/zincutils";
 import { useLLMStreamQuery } from "./useLLMStreamQuery";
+import { compactSql } from "../config/llmInsightsPanels";
 
 export interface SessionDetail {
   sessionId: string;
@@ -31,6 +30,13 @@ export interface SessionDetail {
   outputTokens: number;
   tokens: number;
   cost: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputCost: number;
+  cacheCreationInputCost: number;
+  estimatedCostWithoutCache: number;
+  cacheReadSavings: number;
+  netCacheImpact: number;
   errorCount: number;
   status: "ok" | "error";
 }
@@ -44,12 +50,26 @@ export interface SessionTraceRow {
   outputTokens: number;
   tokens: number;
   cost: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputCost: number;
+  cacheCreationInputCost: number;
+  estimatedCostWithoutCache: number;
+  cacheReadSavings: number;
+  netCacheImpact: number;
   errorCount: number;
   status: "ok" | "error";
   /** Primary model (first entry in the trace's models array). */
   model: string | null;
   /** All models used across spans in this trace. */
   models: string[];
+  /**
+   * Current turn's user question — the last user-role entry in this trace's
+   * `gen_ai_input_messages` (the full prompt carries history; the last user
+   * message is this turn's ask). Drives the turn-preview hover card. Empty
+   * string when no user message is present.
+   */
+  turnUserMessage: string;
 }
 
 /** Single message inside a turn (USER block / ASSISTANT block). */
@@ -99,6 +119,13 @@ export interface SessionRow {
   outputTokens: number;
   tokens: number;
   cost: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputCost: number;
+  cacheCreationInputCost: number;
+  estimatedCostWithoutCache: number;
+  cacheReadSavings: number;
+  netCacheImpact: number;
   errorCount: number;
   /** Derived from error_count: any error span → "error", else "ok". */
   status: "ok" | "error";
@@ -127,16 +154,9 @@ export function useSessions() {
   const store = useStore();
   // `fetchTurnDetail` still uses the raw SQL streaming search to grab
   // the messages of a single trace when its row is expanded — the
-  // session-list endpoint and the trace `latest_stream` endpoint
+  // session-list and session-detail endpoints
   // don't expose final assistant text or per-span output.
   const { executeQuery, cancelAll } = useLLMStreamQuery();
-  // The trace `latest_stream` endpoint (server-side aggregation per
-  // trace, LLM-aware fields) drives the per-turn list inside a
-  // session. Lifted out of `useLLMStreamQuery` because the URL +
-  // payload shape differs (GET with query params, not a POST SQL).
-  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
-    useHttpStreaming();
-  const activeLatestStreamTraceIds = new Set<string>();
 
   const sessions = ref<SessionRow[]>([]);
   const total = ref(0);
@@ -152,10 +172,8 @@ export function useSessions() {
    *
    * `page` is zero-indexed.
    *
-   * Note: the response does not include user_id / service_name /
-   * span_status, so derived fields like "status pill" or "user
-   * avatar" are not available in the list view. Detail page still
-   * uses `fetchSession` (SQL path) for those.
+   * Note: the response does not include service_name/span_status details for
+   * each turn. The detail page uses `fetchSession` for per-turn rows.
    */
   async function fetchPage(
     streamName: string,
@@ -163,6 +181,7 @@ export function useSessions() {
     endTime: number,
     page: number,
     pageSize: number,
+    filter = "",
   ): Promise<void> {
     if (!streamName || !startTime || !endTime) return;
     loading.value = true;
@@ -177,6 +196,7 @@ export function useSessions() {
         endTime,
         page,
         pageSize,
+        filter,
       });
       const body = res.data;
       sessions.value = (body.hits || []).map((h) => {
@@ -192,6 +212,13 @@ export function useSessions() {
           outputTokens: Number(h.gen_ai_usage_output_tokens) || 0,
           tokens: Number(h.gen_ai_usage_total_tokens) || 0,
           cost: Number(h.gen_ai_usage_cost) || 0,
+          cacheReadInputTokens: Number(h.gen_ai_usage_cache_read_input_tokens) || 0,
+          cacheCreationInputTokens: Number(h.gen_ai_usage_cache_creation_input_tokens) || 0,
+          cacheReadInputCost: Number(h.gen_ai_usage_cost_cache_read_input) || 0,
+          cacheCreationInputCost: Number(h.gen_ai_usage_cost_cache_creation_input) || 0,
+          estimatedCostWithoutCache: Number(h.gen_ai_usage_cost_estimated_without_cache) || 0,
+          cacheReadSavings: Number(h.gen_ai_usage_cost_cache_read_savings) || 0,
+          netCacheImpact: Number(h.gen_ai_usage_cost_net_cache_impact) || 0,
           errorCount,
           status: errorCount > 0 ? "error" : "ok",
           userId: usersArr[0] || "",
@@ -218,13 +245,9 @@ export function useSessions() {
    * Fetch the per-turn trace list for a single session and derive the
    * session-level rollup client-side.
    *
-   * Single SQL call (GROUP BY trace_id). The session header KPIs —
-   * turns, duration, tokens, cost, error count — are reductions over
-   * the trace list, so issuing a second GROUP BY session_id query
-   * would just duplicate work the server already did. `user_id` and
-   * `service_name` are picked up per-trace and consolidated to the
-   * first non-null value (they're effectively constant within a
-   * session).
+   * The backend returns the same trace-summary hit shape that this mapper
+   * already consumes, but with per-turn status computed from all spans in each
+   * trace.
    */
   async function fetchSession(
     streamName: string,
@@ -235,22 +258,17 @@ export function useSessions() {
     if (!streamName || !sessionId || !startTime || !endTime) {
       return { detail: null, traces: [] };
     }
-    // Escape single quotes so a malformed session id can't break the
-    // server's filter-to-WHERE expansion.
-    const safeId = sessionId.replace(/'/g, "''");
-    const filter = `gen_ai_conversation_id='${safeId}'`;
-
-    // Hit the existing per-stream traces endpoint instead of running
-    // a one-off GROUP BY ourselves. Server-side it's the same shape
-    // OpenObserve already uses for the Traces tab, and on LLM
-    // streams it adds gen_ai_usage_* totals + the first chat span's
-    // input messages — exactly what the session-detail page needs.
-    const accumulated: any[] = await streamLatestTraces(
+    const orgId = store.state.selectedOrganization?.identifier || "default";
+    const res = await sessionsService.details({
+      orgId,
       streamName,
-      filter,
+      sessionId,
       startTime,
       endTime,
-    );
+      from: 0,
+      size: 1000,
+    });
+    const accumulated: any[] = res.data?.hits || [];
 
     if (accumulated.length === 0) {
       return { detail: null, traces: [] };
@@ -278,6 +296,18 @@ export function useSessions() {
     // 1_000_000 / 1_000 respectively, i.e. they expect nanoseconds.
     // We keep the unit convention (nanos) so the existing template
     // keeps formatting correctly without touching the UI layer.
+    //
+    // Parse the per-trace user question from `gen_ai_input_messages` (already
+    // in the response) so the turn-preview hover card has a message preview
+    // without a second fetch. Lazy-import keeps the list-only path light.
+    const { messagesFromInput } = await import("../threadView.utils");
+    const userMessageOf = (raw: any): string => {
+      const msgs = messagesFromInput(raw);
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === "user" && msgs[i].content) return msgs[i].content;
+      }
+      return "";
+    };
     const traces: SessionTraceRow[] = accumulated.map((r: any) => {
       const spansArr = Array.isArray(r.spans) ? r.spans : [];
       const spanCount = Number(spansArr[0]) || 0;
@@ -300,10 +330,18 @@ export function useSessions() {
         outputTokens: Number(r.gen_ai_usage_output_tokens) || 0,
         tokens: Number(r.gen_ai_usage_total_tokens) || 0,
         cost: Number(r.gen_ai_usage_cost) || 0,
+        cacheReadInputTokens: Number(r.gen_ai_usage_cache_read_input_tokens) || 0,
+        cacheCreationInputTokens: Number(r.gen_ai_usage_cache_creation_input_tokens) || 0,
+        cacheReadInputCost: Number(r.gen_ai_usage_cost_cache_read_input) || 0,
+        cacheCreationInputCost: Number(r.gen_ai_usage_cost_cache_creation_input) || 0,
+        estimatedCostWithoutCache: Number(r.gen_ai_usage_cost_estimated_without_cache) || 0,
+        cacheReadSavings: Number(r.gen_ai_usage_cost_cache_read_savings) || 0,
+        netCacheImpact: Number(r.gen_ai_usage_cost_net_cache_impact) || 0,
         errorCount,
         status: errorCount > 0 ? "error" : "ok",
         model: modelsArr[0] ?? null,
         models: modelsArr,
+        turnUserMessage: userMessageOf(r.gen_ai_input_messages),
         serviceName: svcArr[0]?.service_name
           ? String(svcArr[0].service_name)
           : null,
@@ -317,6 +355,13 @@ export function useSessions() {
     let totalOutputTokens = 0;
     let totalTokens = 0;
     let totalCost = 0;
+    let totalCacheReadInputTokens = 0;
+    let totalCacheCreationInputTokens = 0;
+    let totalCacheReadInputCost = 0;
+    let totalCacheCreationInputCost = 0;
+    let totalEstimatedCostWithoutCache = 0;
+    let totalCacheReadSavings = 0;
+    let totalNetCacheImpact = 0;
     let totalErrors = 0;
     let serviceName: string | null = null;
     for (let i = 0; i < accumulated.length; i++) {
@@ -330,6 +375,13 @@ export function useSessions() {
       totalOutputTokens += t.outputTokens;
       totalTokens += t.tokens;
       totalCost += t.cost;
+      totalCacheReadInputTokens += t.cacheReadInputTokens;
+      totalCacheCreationInputTokens += t.cacheCreationInputTokens;
+      totalCacheReadInputCost += t.cacheReadInputCost;
+      totalCacheCreationInputCost += t.cacheCreationInputCost;
+      totalEstimatedCostWithoutCache += t.estimatedCostWithoutCache;
+      totalCacheReadSavings += t.cacheReadSavings;
+      totalNetCacheImpact += t.netCacheImpact;
       totalErrors += t.errorCount;
       if (!serviceName && t.serviceName) serviceName = t.serviceName;
     }
@@ -347,71 +399,18 @@ export function useSessions() {
       outputTokens: totalOutputTokens,
       tokens: totalTokens,
       cost: totalCost,
+      cacheReadInputTokens: totalCacheReadInputTokens,
+      cacheCreationInputTokens: totalCacheCreationInputTokens,
+      cacheReadInputCost: totalCacheReadInputCost,
+      cacheCreationInputCost: totalCacheCreationInputCost,
+      estimatedCostWithoutCache: totalEstimatedCostWithoutCache,
+      cacheReadSavings: totalCacheReadSavings,
+      netCacheImpact: totalNetCacheImpact,
       errorCount: totalErrors,
       status: totalErrors > 0 ? "error" : "ok",
     };
 
     return { detail, traces };
-  }
-
-  /**
-   * Drive the `/api/{org}/{stream}/traces/latest_stream` HTTP/2
-   * streaming GET via the shared streaming-search composable. Accumulates
-   * hits across all SSE chunks and resolves once the server signals
-   * `complete`. Tracks the trace_id so `cancelAll` can abort an
-   * in-flight session-detail fetch on tab switch / unmount.
-   */
-  function streamLatestTraces(
-    streamName: string,
-    filter: string,
-    startTime: number,
-    endTime: number,
-  ): Promise<any[]> {
-    return new Promise((resolve, reject) => {
-      const traceId = generateTraceContext().traceId;
-      activeLatestStreamTraceIds.add(traceId);
-      const hits: any[] = [];
-
-      fetchQueryDataWithHttpStream(
-        {
-          queryReq: {
-            stream_name: streamName,
-            filter,
-            start_time: startTime,
-            end_time: endTime,
-            from: 0,
-            size: 1000,
-          },
-          type: "traces",
-          traceId,
-          org_id: store.state.selectedOrganization?.identifier,
-        },
-        {
-          data: (_payload: any, response: any) => {
-            const chunkHits: any[] = response.content?.results?.hits || [];
-            if (chunkHits.length > 0) hits.push(...chunkHits);
-          },
-          error: (response: any) => {
-            activeLatestStreamTraceIds.delete(traceId);
-            const body = response?.content ?? response ?? {};
-            const message =
-              body.message ||
-              body.error ||
-              body.error_detail ||
-              "Failed to fetch session traces";
-            const err: any = new Error(message);
-            err.status = body.status;
-            err.raw = response;
-            reject(err);
-          },
-          complete: () => {
-            activeLatestStreamTraceIds.delete(traceId);
-            resolve(hits);
-          },
-          reset: () => {},
-        },
-      );
-    });
   }
 
   /**
@@ -439,7 +438,7 @@ export function useSessions() {
     // but that meant a second parallel COUNT query was needed for LLM/tool
     // call badge counts. Removing the filter lets us compute the counts
     // client-side from the same result set, halving the number of API calls.
-    const sql = `
+    const sql = compactSql(`
       SELECT
         gen_ai_input_messages,
         gen_ai_output_messages,
@@ -452,7 +451,7 @@ export function useSessions() {
         AND gen_ai_operation_name IS NOT NULL
       ORDER BY start_time ASC
       LIMIT 50
-    `;
+    `);
 
     const LLM_OPS = new Set(["chat", "text_completion", "generate_content", "embeddings"]);
 
@@ -530,21 +529,48 @@ export function useSessions() {
   }
 
   /**
-   * Cancel every in-flight stream this composable owns: SQL streams
-   * from `useLLMStreamQuery` AND any `latest_stream` GET requests we
-   * started for the session-detail page. Called from the parent on
-   * unmount so server-side work isn't kept around after the tab goes
-   * away.
+   * Fetch all gen_ai spans across a session's traces — the raw span rows the
+   * `ThreadView` component renders from (it groups by `trace_id` and classifies
+   * by `gen_ai_operation_name`). Used by the session-detail "Pretty" transcript
+   * view. Filters by the session's trace ids (rather than conversation_id) so
+   * tool-execution spans are included, and selects exactly the columns
+   * `ThreadView` reads.
+   */
+  async function fetchSessionSpans(
+    streamName: string,
+    traceIds: string[],
+    startTime: number,
+    endTime: number,
+  ): Promise<any[]> {
+    if (!streamName || !traceIds.length || !startTime || !endTime) return [];
+    const inList = traceIds
+      .map((id) => `'${String(id).replace(/'/g, "''")}'`)
+      .join(",");
+    const sql = compactSql(`
+      SELECT
+        span_id, trace_id, operation_name, gen_ai_operation_name,
+        tool_name, gen_ai_tool_name, tool_args,
+        duration, start_time, end_time,
+        span_status, status_message,
+        gen_ai_request_model, gen_ai_response_model,
+        gen_ai_usage_cost, gen_ai_usage_total_tokens,
+        gen_ai_input_messages, gen_ai_output_messages
+      FROM "${streamName}"
+      WHERE trace_id IN (${inList})
+        AND gen_ai_operation_name IS NOT NULL
+      ORDER BY start_time ASC
+      LIMIT 2000
+    `);
+    return (await executeQuery(sql, startTime, endTime)) || [];
+  }
+
+  /**
+   * Cancel in-flight SQL streams from `useLLMStreamQuery`. Called from the
+   * parent on unmount so server-side turn-detail work isn't kept around after
+   * the tab goes away.
    */
   function cancelAllSessionStreams() {
     cancelAll();
-    activeLatestStreamTraceIds.forEach((id) => {
-      cancelStreamQueryBasedOnRequestId({
-        trace_id: id,
-        org_id: store.state.selectedOrganization?.identifier,
-      });
-    });
-    activeLatestStreamTraceIds.clear();
   }
 
   return {
@@ -556,6 +582,7 @@ export function useSessions() {
     fetchPage,
     fetchSession,
     fetchTurnDetail,
+    fetchSessionSpans,
     cancelAll: cancelAllSessionStreams,
   };
 }

@@ -85,10 +85,10 @@
     <!-- Universal Last Refreshed Clock Icon and Time -->
     <span
       v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView"
-      class="lastRefreshedAt"
+      class="lastRefreshedAt tw:text-[smaller] tw:ml-1.25 tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
       data-test="panel-last-refreshed-at"
     >
-      <span class="lastRefreshedAtIcon">
+      <span class="lastRefreshedAtIcon tw:text-[smaller] tw:mr-0.5">
         🕑
         <OTooltip side="bottom" align="end">
           <template #content>Last Refreshed: <RelativeTime :timestamp="lastTriggeredAt" /></template>
@@ -163,28 +163,12 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.warning {
-  color: var(--q-warning);
+<style>
+.lastRefreshedAt::after {
+  content: "";
 }
-.lastRefreshedAt {
-  font-size: smaller;
-  margin-left: 5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 
-  &::after {
-    content: "";
-  }
-
-  &::before {
-    content: "";
-  }
-
-  & .lastRefreshedAtIcon {
-    font-size: smaller;
-    margin-right: 2px;
-  }
+.lastRefreshedAt::before {
+  content: "";
 }
 </style>

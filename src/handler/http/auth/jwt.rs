@@ -605,73 +605,78 @@ async fn map_group_to_custom_role(
         let mut add_tuples = vec![];
         let mut remove_tuples = vec![];
 
-        // Add new orgs to user's organizations list with default role
-        for org_name in custom_orgs.keys() {
-            if !existing_org_names.contains(org_name) {
-                let new_org = UserOrg {
-                    role: role.clone(),
-                    name: org_name.clone(),
-                    org_name: org_name.clone(),
-                    token: Default::default(),
-                    rum_token: Default::default(),
-                };
-                existing_user.organizations.push(new_org.clone());
+        // Org membership is only managed via the claim parser. When custom claim
+        // parsing is disabled, map_group_to_role only maps groups to custom roles
+        // within the default org, so we must not touch the user's org mappings.
+        if openfga_cfg.custom_claim_parsing_enabled {
+            // Add new orgs to user's organizations list with default role
+            for org_name in custom_orgs.keys() {
+                if !existing_org_names.contains(org_name) {
+                    let new_org = UserOrg {
+                        role: role.clone(),
+                        name: org_name.clone(),
+                        org_name: org_name.clone(),
+                        token: Default::default(),
+                        rum_token: Default::default(),
+                    };
+                    existing_user.organizations.push(new_org.clone());
 
-                // Add user to org in the database
-                if let Err(e) = db::org_users::add(
-                    org_name,
-                    user_email,
-                    role.clone(),
-                    &new_org.token,
-                    new_org.rum_token.clone(),
-                )
-                .await
-                {
-                    log::error!("Error adding user to org {org_name} in DB: {e}");
-                }
-
-                // Add user to org tuples for OpenFGA
-                if openfga_cfg.enabled {
-                    get_add_user_to_org_tuples(
+                    // Add user to org in the database
+                    if let Err(e) = db::org_users::add(
                         org_name,
                         user_email,
-                        &role.to_string(),
-                        &mut add_tuples,
-                    );
+                        role.clone(),
+                        &new_org.token,
+                        new_org.rum_token.clone(),
+                    )
+                    .await
+                    {
+                        log::error!("Error adding user to org {org_name} in DB: {e}");
+                    }
+
+                    // Add user to org tuples for OpenFGA
+                    if openfga_cfg.enabled {
+                        get_add_user_to_org_tuples(
+                            org_name,
+                            user_email,
+                            &role.to_string(),
+                            &mut add_tuples,
+                        );
+                    }
                 }
             }
-        }
 
-        // Remove orgs no longer assigned via group membership (default org is never removed)
-        for existing_org in existing_user.organizations.iter() {
-            if existing_org.name != dex_cfg.default_org
-                && !custom_orgs.contains_key(&existing_org.name)
-            {
-                match users::remove_user_from_org(
-                    &existing_org.name,
-                    user_email,
-                    &config::get_config().auth.root_user_email,
-                )
-                .await
+            // Remove orgs no longer assigned via group membership (default org is never removed)
+            for existing_org in existing_user.organizations.iter() {
+                if existing_org.name != dex_cfg.default_org
+                    && !custom_orgs.contains_key(&existing_org.name)
                 {
-                    Ok(_) => {
-                        log::info!(
-                            "group_to_custom_role: User removed from org {} (group no longer assigned)",
-                            existing_org.name
-                        );
-                        if openfga_cfg.enabled {
-                            remove_tuples.push(get_user_role_deletion_tuple(
-                                &existing_org.role.to_string(),
-                                user_email,
-                                &existing_org.name,
-                            ));
+                    match users::remove_user_from_org(
+                        &existing_org.name,
+                        user_email,
+                        &config::get_config().auth.root_user_email,
+                    )
+                    .await
+                    {
+                        Ok(_) => {
+                            log::info!(
+                                "group_to_custom_role: User removed from org {} (group no longer assigned)",
+                                existing_org.name
+                            );
+                            if openfga_cfg.enabled {
+                                remove_tuples.push(get_user_role_deletion_tuple(
+                                    &existing_org.role.to_string(),
+                                    user_email,
+                                    &existing_org.name,
+                                ));
+                            }
                         }
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "group_to_custom_role: Error removing user from org {}: {e}",
-                            existing_org.name
-                        );
+                        Err(e) => {
+                            log::error!(
+                                "group_to_custom_role: Error removing user from org {}: {e}",
+                                existing_org.name
+                            );
+                        }
                     }
                 }
             }

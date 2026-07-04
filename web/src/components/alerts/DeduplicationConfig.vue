@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="deduplication-config tw:p-0 tw:m-0">
+  <div data-test="alerts-deduplication-config" class="tw:w-full tw:p-0 tw:m-0">
     <div class="tw:w-full">
       <div class="tw:w-full">
         <AlertsContainer
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div v-if="isExpanded" class="tw:w-full tw:flex alert-setup-container">
+      <div v-if="isExpanded" class="tw:w-full tw:flex tw:px-4">
         <OSeparator class="tw:my-2"/>
         <div class="tw:mt-2 tw:w-full tw:pl-3">
             <!-- Fingerprint Fields -->
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
                   />
               </div>
-              <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
+              <div class="tw:text-sm tw:text-gray-600 tw:dark:text-gray-400 tw:mb-2">
                 {{ t("alerts.deduplication.fingerprintFieldsHint") }}
               </div>
               <OSelect
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :content="t('alerts.deduplication.timeWindowTooltip')"
                   />
               </div>
-              <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
+              <div class="tw:text-sm tw:text-gray-600 tw:dark:text-gray-400 tw:mb-2">
                 {{ t("alerts.deduplication.timeWindowHint") }}
               </div>
               <OInput
@@ -203,12 +203,3 @@ watch(
 );
 </script>
 
-<style scoped lang="scss">
-.deduplication-config {
-  width: 100%;
-}
-
-.alert-setup-container {
-  padding: 0 16px;
-}
-</style>

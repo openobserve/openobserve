@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="showInvitations && config.isCloud == 'true'">
     <div class="tw:flex relative-position tw:px-3 tw:pt-2">
       <img
-        class="appLogo"
+        class="tw:w-auto tw:max-w-50 tw:h-10 tw:max-h-10 tw:cursor-pointer"
         loading="lazy"
         :src="
           store?.state?.theme == 'dark'
@@ -400,23 +400,4 @@ export default defineComponent({
   },
 });
 </script>
-<style lang="scss" scoped>
-.appLogo {
-  width: auto;
-  max-width: 200px;
-  height: 40px;
-  max-height: 40px;
-  cursor: pointer;
 
-  &__mini {
-    margin-right: 0.25rem;
-    // margin-left: 0.25rem;
-    height: 30px;
-    width: 30px;
-  }
-}
-</style>
-
-<style lang="scss">
-@import "@/styles/app.scss";
-</style>

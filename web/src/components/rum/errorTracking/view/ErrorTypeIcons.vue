@@ -54,4 +54,3 @@ const typeIcons = computed(() => {
 });
 </script>
 
-<style scoped></style>

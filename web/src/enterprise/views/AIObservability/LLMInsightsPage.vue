@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <AppPageHeader
       :title="t('aiObservability.nav.llmInsights')"
+      :subtitle="t('aiObservability.subtitle.llmInsights')"
       icon="dashboard"
       class="tw:px-4 tw:border-b tw:border-border-default"
     >
@@ -39,19 +40,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:h-[2rem]"
           @on:date-change="onDateChange"
         />
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
-          :loading="isRefreshing"
-          title="Refresh"
-          data-test="ai-llm-insights-refresh-btn"
-          @click="refresh"
-        />
+        <!-- Whole-page last-refresh + refresh control (logs-style): relative
+             time + freshness dot, ticking on its own. -->
+        <div
+          class="tw:inline-flex tw:items-center tw:border tw:border-border-default tw:rounded-md tw:px-1 tw:h-[2rem] tw:overflow-hidden"
+        >
+          <ORefreshButton
+            :last-run-at="dashboardLastRunAt"
+            :loading="isLoading"
+            :disabled="isLoading"
+            data-test="ai-llm-insights-refresh-btn"
+            @click="refresh"
+          />
+        </div>
       </template>
     </AppPageHeader>
 
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:px-4 tw:py-3">
+    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <LLMInsightsDashboard
         ref="dashboardRef"
         :stream-name="streamName"
@@ -64,13 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
 import LLMInsightsDashboard from "@/plugins/traces/LLMInsightsDashboard.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import {
   useAiDateRange,
@@ -95,6 +100,17 @@ const streamName = ref("");
 const dateTimeRef = ref<any>(null);
 const dashboardRef = ref<any>(null);
 const isRefreshing = ref(false);
+
+// Whole-page "last refresh" indicator (logs-style). The dashboard stamps
+// `lastRunAt` when its KPI fetch settles and exposes its own `loading`; we OR in
+// the page-level `isRefreshing` so the button spins from the moment of click
+// (covering the relative-window re-anchor before the dashboard load starts).
+const dashboardLastRunAt = computed<number | null>(
+  () => dashboardRef.value?.lastRunAt ?? null,
+);
+const isLoading = computed(
+  () => isRefreshing.value || dashboardRef.value?.loading || false,
+);
 
 function applyRelative(period: string) {
   const range = getConsumableRelativeTime(period);

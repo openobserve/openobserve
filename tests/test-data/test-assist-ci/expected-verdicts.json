@@ -1,0 +1,20 @@
+{
+  "90001": {
+    "fixture": "bug-001-fixed.json",
+    "expected_status": "FIXED",
+    "expected_confidence": "HIGH"
+  },
+  "90002": {
+    "fixture": "bug-002-image-attachment.json",
+    "expected_status": null,
+    "expected_confidence": null,
+    "expected_pipeline_signals": {
+      "attachments_summary_exists": true,
+      "attachments_summary_non_empty": true,
+      "analyst_area": "Streams",
+      "analyst_testability_at_least": "MEDIUM"
+    },
+    "notes": "Fixture exercises the vision preprocessor. Success is measured via expected_pipeline_signals — not the final verdict — because visual layout bugs are hard to auto-verify. expected_status/confidence are null to explicitly signal that the harness must NOT assert on the Validator verdict for this fixture. Success = vision preprocessor produced a non-empty attachments.md AND the Analyst used it to classify area=Streams AND didn't SKIP for 'no repro steps'."
+  }
+}
+

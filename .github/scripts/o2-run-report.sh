@@ -34,23 +34,34 @@ gh_get(){ curl -s -H "Authorization: token ${GH_TOKEN}" -H "Accept: application/
 
 # wall-clock of one attempt = max(completed) - min(started) across its jobs (clamped non-negative
 # to guard against clock-skew where a completed_at precedes a started_at).
-attempt_wall(){ jq '[.jobs[]|select(.completed_at!=null and .started_at!=null)] as $j
-  | (if ($j|length)>0 then (($j|map(.completed_at|fromdateiso8601)|max)-($j|map(.started_at|fromdateiso8601)|min)) else 0 end)
+# $1 = floor epoch (the attempt's run_started_at). On a RE-RUN, GitHub's per-attempt jobs API
+# carries over jobs that did NOT re-run with their ORIGINAL (earlier-attempt) timestamps, so a
+# naive min(started) spans the idle gap between a failed run and a much-later manual re-run —
+# inflating the duration by hours. Flooring the start at run_started_at counts only this
+# attempt's actual work (no effect on normal runs, where min(started) >= run_started_at).
+attempt_wall(){ jq --argjson floor "${1:-0}" '[.jobs[]|select(.completed_at!=null and .started_at!=null)] as $j
+  | (if ($j|length)>0 then (($j|map(.completed_at|fromdateiso8601)|max)-([($j|map(.started_at|fromdateiso8601)|min), $floor]|max)) else 0 end)
   | if . < 0 then 0 else . end'; }
+# Epoch seconds of a run/attempt object's run_started_at (0 if absent).
+run_started_epoch(){ jq 'if .run_started_at then (.run_started_at|fromdateiso8601) else 0 end'; }
 
 RUN_JSON=$(gh_get "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" 2>/dev/null)
 [ -n "$RUN_JSON" ] || { echo "::warning::could not fetch run object — skipping"; exit 0; }
 ATT="${GITHUB_RUN_ATTEMPT:-1}"
+# This attempt's start — the floor for its wall-clock (see attempt_wall).
+RUN_STARTED=$(printf '%s' "$RUN_JSON" | run_started_epoch 2>/dev/null || echo 0)
+[ -n "$RUN_STARTED" ] || RUN_STARTED=0
 
 THIS_JOBS=$(gh_get "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${ATT}/jobs?per_page=100" 2>/dev/null)
-FINAL_DUR=$(printf '%s' "$THIS_JOBS" | attempt_wall 2>/dev/null || echo 0)
+FINAL_DUR=$(printf '%s' "$THIS_JOBS" | attempt_wall "$RUN_STARTED" 2>/dev/null || echo 0)
 
 # total across attempts: add each prior attempt's wall-clock.
 TOTAL_DUR="$FINAL_DUR"
 if [ "$ATT" -gt 1 ] 2>/dev/null; then
   SUM="$FINAL_DUR"
   for n in $(seq 1 $((ATT-1))); do
-    W=$(gh_get "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${n}/jobs?per_page=100" 2>/dev/null | attempt_wall 2>/dev/null || echo 0)
+    NFLOOR=$(gh_get "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${n}" 2>/dev/null | run_started_epoch 2>/dev/null || echo 0)
+    W=$(gh_get "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${n}/jobs?per_page=100" 2>/dev/null | attempt_wall "${NFLOOR:-0}" 2>/dev/null || echo 0)
     SUM=$(awk -v a="$SUM" -v b="$W" 'BEGIN{print a+b}')
   done
   TOTAL_DUR="$SUM"
