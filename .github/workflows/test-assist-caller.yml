@@ -91,9 +91,10 @@ jobs:
           if [ "$IS_DISPATCH" = "true" ]; then
             FIXTURE="$DISPATCH_FIXTURE"; WRITE="$DISPATCH_WRITE"; ACTOR="$DISPATCH_ACTOR"
           else
-            # Comment door defaults: fixture OFF (use the real issue), write OFF (dry-run).
-            # WRITE flip happens via manual dispatch until we trust verdict accuracy.
-            FIXTURE="false"; WRITE="false"; ACTOR="$COMMENT_LOGIN"
+            # Comment door defaults: fixture OFF (use the real issue), write ON (auto-post verdicts).
+            # Auto-post is additionally gated on the engine side by vars.TEST_ASSIST_AUTO_POST=='true'
+            # on o2-enterprise — that repo var is the kill switch to silence all posts org-wide.
+            FIXTURE="false"; WRITE="true"; ACTOR="$COMMENT_LOGIN"
           fi
           ACTOR=$(printf '%s' "$ACTOR" | tr -cd 'A-Za-z0-9-')   # GitHub login charset; defensive
           { echo "issue=$ISSUE"; echo "fixture=$FIXTURE"; echo "write=$WRITE"; echo "actor=$ACTOR"; } >> "$GITHUB_OUTPUT"
