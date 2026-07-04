@@ -42,9 +42,34 @@ pub fn init_vrl_runtime() -> vrl::compiler::runtime::Runtime {
     vrl::compiler::runtime::Runtime::new(vrl::prelude::state::RuntimeState::default())
 }
 
+/// Identifiers of VRL stdlib functions that perform outbound network I/O.
+///
+/// These functions let VRL programs issue arbitrary HTTP / DNS requests from
+/// inside the OpenObserve process. The VRL runtime does not respect the app's
+/// `SsrfGuard`, so if we expose these to user-supplied VRL (e.g. via
+/// `POST /api/{org}/functions/test`, pipeline transforms, or the search
+/// `query_fn`), an org admin can turn the server into a server-side request
+/// forwarder — reaching loopback, the cloud instance metadata service, or
+/// forging Authorization headers against internal ingest APIs to poison
+/// another tenant's streams (see TC-7BBD9F20).
+///
+/// The runtime-level fix is to never register these functions with the VRL
+/// compiler in the first place; a program that references them then fails to
+/// compile with an "undefined function" diagnostic, before any I/O can occur.
+///
+/// This deny-list intentionally excludes VRL's core parsing / encoding /
+/// transformation functions (`parse_json`, `upcase`, `encode_json`, ...): those
+/// are pure and safe.
+const VRL_BLOCKED_NETWORK_FUNCTIONS: &[&str] = &["http_request", "dns_lookup", "reverse_dns"];
+
 pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
     let en_tables = ENRICHMENT_TABLES.clone();
-    let mut functions = vrl::stdlib::all();
+    // Build the allowed VRL function list by filtering vrl::stdlib::all() to
+    // strip any outbound-network function. See VRL_BLOCKED_NETWORK_FUNCTIONS.
+    let mut functions: Vec<Box<dyn vrl::compiler::Function>> = vrl::stdlib::all()
+        .into_iter()
+        .filter(|f| !VRL_BLOCKED_NETWORK_FUNCTIONS.contains(&f.identifier()))
+        .collect();
     functions.append(&mut vector_enrichment::vrl_functions());
     let registry = TableRegistry::default();
     let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
@@ -168,5 +193,90 @@ mod tests {
         let config = get_vrl_compiler_config("nonexistent_org");
         let registry = config.config.get_custom::<TableRegistry>().unwrap();
         assert!(registry.table_ids().is_empty());
+    }
+
+    /// Security regression: outbound-network VRL stdlib functions
+    /// (`http_request`, `dns_lookup`, `reverse_dns`) MUST NOT be exposed to
+    /// user-supplied VRL. `http_request!()` in particular gives any org admin
+    /// who reaches `/api/{org}/functions/test` a server-side request forger
+    /// that runs from inside the OpenObserve process (SSRF into loopback +
+    /// internal APIs, cross-tenant data poisoning). See TC-7BBD9F20.
+    ///
+    /// The allowed VRL function list built by `get_vrl_compiler_config` must
+    /// therefore contain none of the outbound-network functions.
+    #[test]
+    fn test_vrl_compiler_config_excludes_outbound_network_functions() {
+        let config = get_vrl_compiler_config("default");
+        let identifiers: Vec<&'static str> =
+            config.functions.iter().map(|f| f.identifier()).collect();
+
+        for banned in ["http_request", "dns_lookup", "reverse_dns"] {
+            assert!(
+                !identifiers.contains(&banned),
+                "VRL stdlib exposed outbound-network function `{banned}` to \
+                 user code; this enables SSRF from the function-test endpoint \
+                 (see TC-7BBD9F20). Deny it in get_vrl_compiler_config()."
+            );
+        }
+    }
+
+    /// Security regression: a VRL program that references `http_request!()`
+    /// must fail to compile through `get_vrl_compiler_config`'s allowed
+    /// function list — because the function is not registered, VRL should
+    /// raise an "undefined function" style diagnostic at compile time.
+    ///
+    /// Paired positive-control below asserts a harmless VRL program still
+    /// compiles, so this red is provably the network-function block, not a
+    /// broken VRL setup.
+    #[test]
+    fn test_vrl_program_using_http_request_fails_to_compile() {
+        let vrl_config = get_vrl_compiler_config("default");
+        let external = vrl::prelude::state::ExternalEnv::default();
+        let src = r#"
+            .r = http_request!("http://127.0.0.1:5080/api/whatever/_json",
+                               method: "POST",
+                               headers: {},
+                               body: "{}")
+            .
+        "#;
+        let result = vrl::compiler::compile_with_external(
+            src,
+            &vrl_config.functions,
+            &external,
+            vrl_config.config,
+        );
+        assert!(
+            result.is_err(),
+            "VRL program calling http_request!() compiled successfully; \
+             this is the SSRF surface from TC-7BBD9F20 — http_request must \
+             not be in the allowed VRL function list."
+        );
+    }
+
+    /// Positive control for
+    /// `test_vrl_program_using_http_request_fails_to_compile`:
+    /// a benign VRL program that uses core transformation functions
+    /// (`upcase`, field assignment) MUST still compile, so the red above
+    /// is provably specific to the outbound-network function rather than a
+    /// broken compiler setup.
+    #[test]
+    fn test_vrl_program_using_safe_stdlib_still_compiles() {
+        let vrl_config = get_vrl_compiler_config("default");
+        let external = vrl::prelude::state::ExternalEnv::default();
+        let src = r#"
+            .greeting = upcase("hello")
+            .
+        "#;
+        let result = vrl::compiler::compile_with_external(
+            src,
+            &vrl_config.functions,
+            &external,
+            vrl_config.config,
+        );
+        assert!(
+            result.is_ok(),
+            "Benign VRL program failed to compile; the network-function \
+             deny-list must not remove core transformation functions."
+        );
     }
 }
