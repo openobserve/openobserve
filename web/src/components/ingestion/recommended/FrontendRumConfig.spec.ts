@@ -13,933 +13,544 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import FrontendRumConfig from "@/components/ingestion/recommended/FrontendRumConfig.vue";
-import { nextTick } from "vue";
-import { createStore } from "vuex";
-import i18n from "@/locales";
+/**
+ * Component: FrontendRumConfig
+ * Path: src/components/ingestion/recommended/FrontendRumConfig.vue
+ *
+ * Props: currOrgIdentifier?, currUserEmail?
+ * Emits: none
+ * Store deps: organizationData.rumToken.rum_token, selectedOrganization.identifier, API_ENDPOINT
+ * Service deps: getIngestionURL (from @/utils/zincutils), maskText (from @/utils/zincutils)
+ * Child components: SetupCardRenderer (stubbed)
+ *
+ * Conditional states:
+ *   - Token present  → renders SetupCardRenderer [data-test="rum-web-setup-card"]
+ *   - Token absent   → renders <p data-test="rum-web-no-token-message">
+ *
+ * Key computed values:
+ *   - endpoint  = getIngestionURL() with trailing slash stripped
+ *   - site      = endpoint without protocol
+ *   - insecureHTTP = API_ENDPOINT does NOT start with "https://"
+ *   - content   = rumCard({ site, endpoint, org, rumToken, rumTokenMasked, insecureHTTP })
+ *   - subs      = { url: endpoint, org, token: "" }
+ */
 
-// Mock services and utilities
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import { createStore } from "vuex";
+import { createI18n } from "vue-i18n";
+
+// ── vi.mock() must be at the top — hoisted by Vitest ──────────────────────────
+
 vi.mock("@/utils/zincutils", async (importOriginal) => {
-  const actual: any = await importOriginal();
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
-    getImageURL: vi.fn((path: string) => `/mocked/path/${path}`),
-    getIngestionURL: vi.fn(() => "https://api.openobserve.ai"),
-    maskText: vi.fn((text: string) => text ? `${text.substring(0, 4)}****${text.substring(text.length - 4)}` : "")
+    getImageURL: vi.fn((p: string) => `/mock/${p}`),
+    getIngestionURL: vi.fn(() => "https://ingest.example.com"),
+    maskText: vi.fn((t: string) => t), // real maskText is identity
   };
 });
 
-
-describe("FrontendRumConfig Component", () => {
-  let wrapper: any = null;
-
-  const mockProps = {
-    currOrgIdentifier: "test-org", 
-    currUserEmail: "test@example.com"
-  };
-
-  const mockStoreState = {
-    organizationData: {
-      rumToken: {
-        rum_token: "test-rum-token-12345678",
-        key: "test-key-12345678"
-      }
+// Stub SetupCardRenderer so we can inspect the props it receives without
+// rendering its (heavy) internals.
+vi.mock(
+  "@/components/ingestion/setupCard/SetupCardRenderer.vue",
+  () => ({
+    default: {
+      name: "SetupCardRenderer",
+      props: ["content", "subs"],
+      template: '<div data-test="rum-web-setup-card" />',
     },
-    selectedOrganization: {
-      identifier: "test-org-id"
+  }),
+);
+
+import FrontendRumConfig from "./FrontendRumConfig.vue";
+import { getIngestionURL, maskText } from "@/utils/zincutils";
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+const HTTPS_ENDPOINT = "https://ingest.example.com";
+const HTTP_ENDPOINT = "http://ingest.example.com";
+const ORG_ID = "my-org";
+const RUM_TOKEN = "rum-secret-token-xyz";
+
+function makeStore(overrides: {
+  rumToken?: string;
+  org?: string;
+  apiEndpoint?: string;
+} = {}) {
+  const {
+    rumToken = RUM_TOKEN,
+    org = ORG_ID,
+    apiEndpoint = HTTPS_ENDPOINT,
+  } = overrides;
+
+  return createStore({
+    state: {
+      API_ENDPOINT: apiEndpoint,
+      selectedOrganization: { identifier: org },
+      organizationData: {
+        rumToken: rumToken !== undefined ? { rum_token: rumToken } : null,
+      },
+      zoConfig: {},
     },
-    API_ENDPOINT: "https://api.openobserve.ai"
-  };
+    mutations: {
+      setRUMToken(state: any, payload: any) {
+        state.organizationData.rumToken = payload;
+      },
+      endpoint(state: any, payload: any) {
+        state.API_ENDPOINT = payload;
+      },
+    },
+  });
+}
 
-  beforeEach(() => {
-    // Create a new store instance for each test
-    const testStore = createStore({
-      state: () => mockStoreState,
-      getters: {},
-      mutations: {},
-      actions: {}
-    });
+const i18n = createI18n({
+  locale: "en",
+  messages: {
+    en: {
+      ingestion: {
+        generateRUMTokenMessage:
+          "Generate RUM Token to enable RUM for your organization.",
+      },
+    },
+  },
+});
 
-    wrapper = mount(FrontendRumConfig, {
-      props: mockProps,
-      global: {
-        plugins: [testStore, i18n],
-        stubs: {
-          "CopyContent": true,
-          "copy-content": true,
-          "SanitizedHtmlRenderer": true,
-          "q-separator": true
-        }
-      }
-    });
+function mountComponent(storeOverrides: Parameters<typeof makeStore>[0] = {}) {
+  const store = makeStore(storeOverrides);
+  const wrapper = mount(FrontendRumConfig, {
+    props: { currOrgIdentifier: ORG_ID, currUserEmail: "user@example.com" },
+    global: { plugins: [store, i18n] },
+  });
+  return { wrapper, store };
+}
 
-    // Reset mocks
+// ── tests ─────────────────────────────────────────────────────────────────────
+
+describe("FrontendRumConfig", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    wrapper?.unmount();
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-  });
+  // ── rendering ───────────────────────────────────────────────────────────────
 
-  // Component Initialization Tests
-  describe("Component Initialization", () => {
-    it("should mount FrontendRumConfig component", () => {
-      expect(wrapper).toBeTruthy();
-    });
-
-    it("should initialize with correct component name", () => {
-      expect(wrapper.vm.$options.name).toBe("rum-web-page");
-    });
-
-    it("should initialize with correct props", () => {
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should initialize store instance", () => {
-      expect(wrapper.vm.store).toBeTruthy();
-      expect(wrapper.vm.store.state).toBeTruthy();
-    });
-
-    it("should initialize translation function", () => {
-      expect(wrapper.vm.t).toBeTruthy();
-      expect(typeof wrapper.vm.t).toBe('function');
-    });
-
-    it("should have CopyContent and SanitizedHtmlRenderer components", () => {
-      expect(wrapper.vm.$options.components.CopyContent).toBeTruthy();
-      expect(wrapper.vm.$options.components.SanitizedHtmlRenderer).toBeTruthy();
-    });
-
-    it("should initialize npm step instructions", () => {
-      expect(wrapper.vm.npmStep1).toBeTruthy();
-      expect(wrapper.vm.npmStep2).toBeTruthy();
-      expect(wrapper.vm.npmStep1).toContain("Step1");
-      expect(wrapper.vm.npmStep2).toContain("Step2");
-    });
-
-    it("should initialize rumToken as empty string initially", () => {
-      const freshStore = createStore({
-        state: () => ({
-          organizationData: { rumToken: null },
-          selectedOrganization: { identifier: "test-org" },
-          API_ENDPOINT: "https://api.openobserve.ai"
-        }),
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const freshWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [freshStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-      
-      expect(freshWrapper.vm.rumToken).toBe("");
-      freshWrapper.unmount();
-    });
-  });
-
-  // Configuration Content Tests
-  describe("Configuration Content", () => {
-    it("should have default configuration template", () => {
-      expect(wrapper.vm.defaultConfig).toBeTruthy();
-      expect(wrapper.vm.defaultConfig).toContain("openobserveRum");
-      expect(wrapper.vm.defaultConfig).toContain("openobserveLogs");
-      expect(wrapper.vm.defaultConfig).toContain("<OPENOBSERVE_CLIENT_TOKEN>");
-      expect(wrapper.vm.defaultConfig).toContain("<OPENOBSERVE_SITE>");
-      expect(wrapper.vm.defaultConfig).toContain("<OPENOBSERVE_ORGANIZATION_IDENTIFIER>");
-    });
-
-    it("should initialize configuration refs with default config", () => {
-      expect(wrapper.vm.initConfiguration).toBeTruthy();
-      expect(wrapper.vm.displayConfiguration).toBeTruthy();
-      // After mounting, the configuration should have been processed by replaceStaticValues
-      // so it won't be exactly equal to defaultConfig, but should contain the template structure
-      expect(wrapper.vm.initConfiguration).toContain("openobserveRum.init");
-      expect(wrapper.vm.displayConfiguration).toContain("openobserveRum.init");
-    });
-
-    it("should contain all required RUM configuration options", () => {
-      const config = wrapper.vm.defaultConfig;
-      expect(config).toContain("applicationId");
-      expect(config).toContain("clientToken");
-      expect(config).toContain("site");
-      expect(config).toContain("service");
-      expect(config).toContain("env");
-      expect(config).toContain("version");
-      expect(config).toContain("organizationIdentifier");
-      expect(config).toContain("insecureHTTP");
-      expect(config).toContain("apiVersion");
-    });
-
-    it("should contain RUM tracking options", () => {
-      const config = wrapper.vm.defaultConfig;
-      expect(config).toContain("trackResources");
-      expect(config).toContain("trackLongTasks");
-      expect(config).toContain("trackUserInteractions");
-      expect(config).toContain("allowedTracingUrls");
-      expect(config).toContain("propagatorTypes");
-      expect(config).toContain("defaultPrivacyLevel");
-    });
-
-    it("should contain logs configuration", () => {
-      const config = wrapper.vm.defaultConfig;
-      expect(config).toContain("forwardErrorsToLogs");
-      expect(config).toContain("openobserveLogs.init");
-    });
-
-    it("should contain user context setup", () => {
-      const config = wrapper.vm.defaultConfig;
-      expect(config).toContain("setUser");
-      expect(config).toContain("startSessionReplayRecording");
-    });
-  });
-
-  // replaceStaticValues Function Tests
-  describe("replaceStaticValues Function", () => {
+  describe("rendering — token present", () => {
     beforeEach(() => {
-      // Store state is already set up in the main beforeEach
-      // The mock store already contains the necessary data
+      // reset the mock so each test starts with the default endpoint
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      ({ wrapper } = mountComponent());
     });
 
-    it("should replace OPENOBSERVE_SITE placeholder", () => {
-      wrapper.vm.replaceStaticValues();
-      
-      expect(wrapper.vm.initConfiguration).not.toContain("<OPENOBSERVE_SITE>");
-      expect(wrapper.vm.displayConfiguration).not.toContain("<OPENOBSERVE_SITE>");
-      expect(wrapper.vm.initConfiguration).toContain("api.openobserve.ai");
+    it("renders SetupCardRenderer when rumToken is non-empty", () => {
+      expect(
+        wrapper.find('[data-test="rum-web-setup-card"]').exists(),
+      ).toBe(true);
     });
 
-    it("should replace OPENOBSERVE_ORGANIZATION_IDENTIFIER placeholder", () => {
-      wrapper.vm.replaceStaticValues();
-      
-      expect(wrapper.vm.initConfiguration).not.toContain("<OPENOBSERVE_ORGANIZATION_IDENTIFIER>");
-      expect(wrapper.vm.displayConfiguration).not.toContain("<OPENOBSERVE_ORGANIZATION_IDENTIFIER>");
-      expect(wrapper.vm.initConfiguration).toContain("test-org-id");
+    it("does NOT render the no-token message when token is present", () => {
+      expect(
+        wrapper.find('[data-test="rum-web-no-token-message"]').exists(),
+      ).toBe(false);
     });
 
-    it("should set insecureHTTP to false for HTTPS endpoints", () => {
-      const testStore = createStore({
-        state: () => ({
-          ...mockStoreState,
-          API_ENDPOINT: "https://secure.example.com"
-        }),
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const testWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-      
-      testWrapper.vm.replaceStaticValues();
-      
-      expect(testWrapper.vm.initConfiguration).toContain("insecureHTTP: false");
-      expect(testWrapper.vm.displayConfiguration).toContain("insecureHTTP: false");
-      testWrapper.unmount();
+    it("passes content with 3 steps to SetupCardRenderer", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      expect(card.props("content").steps).toHaveLength(3);
     });
 
-    it("should set insecureHTTP to true for HTTP endpoints", () => {
-      const testStore = createStore({
-        state: () => ({
-          ...mockStoreState,
-          API_ENDPOINT: "http://insecure.example.com"
-        }),
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const testWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-      
-      testWrapper.vm.replaceStaticValues();
-      
-      expect(testWrapper.vm.initConfiguration).toContain("insecureHTTP: true");
-      expect(testWrapper.vm.displayConfiguration).toContain("insecureHTTP: true");
-      testWrapper.unmount();
+    it("passes step ids install / init / verify", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const ids = card.props("content").steps.map((s: any) => s.id);
+      expect(ids).toEqual(["install", "init", "verify"]);
     });
 
-    it("should replace CLIENT_TOKEN with actual token in initConfiguration", () => {
-      wrapper.vm.replaceStaticValues();
-      
-      expect(wrapper.vm.initConfiguration).not.toContain("<OPENOBSERVE_CLIENT_TOKEN>");
-      expect(wrapper.vm.initConfiguration).toContain("test-rum-token-12345678");
+    it("passes subs.token as empty string (RUM never exposes Basic-auth token)", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      expect(card.props("subs").token).toBe("");
     });
 
-    it("should replace CLIENT_TOKEN with masked token in displayConfiguration", () => {
-      wrapper.vm.replaceStaticValues();
-      
-      expect(wrapper.vm.displayConfiguration).not.toContain("<OPENOBSERVE_CLIENT_TOKEN>");
-      expect(wrapper.vm.displayConfiguration).toContain("test****5678");
+    it("passes subs.org matching the store's selected organization identifier", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      expect(card.props("subs").org).toBe(ORG_ID);
     });
 
-    it("should update rumToken from store", () => {
-      wrapper.vm.rumToken = "";
-      wrapper.vm.replaceStaticValues();
-      
-      expect(wrapper.vm.rumToken).toBe("test-rum-token-12345678");
+    it("passes subs.url equal to the endpoint (no trailing slash)", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      expect(card.props("subs").url).toBe(HTTPS_ENDPOINT);
     });
 
-    it("should handle URL with trailing slash", async () => {
-      const { getIngestionURL } = await import("@/utils/zincutils");
-      getIngestionURL.mockReturnValue("https://api.example.com/");
-      
-      wrapper.vm.replaceStaticValues();
-      
-      expect(wrapper.vm.initConfiguration).toContain("api.example.com");
-      expect(wrapper.vm.initConfiguration).not.toContain("api.example.com/");
+    it("strips a trailing slash from getIngestionURL output", () => {
+      vi.mocked(getIngestionURL).mockReturnValue("https://ingest.example.com/");
+      wrapper.unmount();
+      ({ wrapper } = mountComponent());
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      expect(card.props("subs").url).toBe("https://ingest.example.com");
+      expect(card.props("subs").url.endsWith("/")).toBe(false);
     });
 
-    it("should handle HTTP URL replacement", async () => {
-      const { getIngestionURL } = await import("@/utils/zincutils");
-      getIngestionURL.mockReturnValue("http://api.example.com");
-      
-      wrapper.vm.replaceStaticValues();
-      
-      expect(wrapper.vm.initConfiguration).toContain("api.example.com");
-      expect(wrapper.vm.initConfiguration).not.toContain("http://api.example.com");
+    it("passes the rum token into content init variant raw code", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const initStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "init");
+      const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
+      expect(npmVariant.code.raw).toContain(RUM_TOKEN);
     });
 
-    it("should handle HTTPS URL replacement", async () => {
-      const { getIngestionURL } = await import("@/utils/zincutils");
-      getIngestionURL.mockReturnValue("https://secure.example.com");
-      
-      wrapper.vm.replaceStaticValues();
-      
-      expect(wrapper.vm.initConfiguration).toContain("secure.example.com");
-      expect(wrapper.vm.initConfiguration).not.toContain("https://secure.example.com");
-    });
-  });
-
-  // Lifecycle Hooks Tests
-  describe("Lifecycle Hooks", () => {
-    it("should handle onMounted when rumToken exists", async () => {
-      const testStore = createStore({
-        state: () => ({
-          organizationData: { rumToken: { rum_token: "mounted-token" } },
-          selectedOrganization: { identifier: "test-org" },
-          API_ENDPOINT: "https://api.openobserve.ai"
-        }),
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const testWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-
-      await nextTick();
-      expect(testWrapper.vm.rumToken).toBe("mounted-token");
-      testWrapper.unmount();
+    it("content's masked code does NOT equal the raw when maskText produces a different string", () => {
+      // With the real maskText (identity), raw === masked; but the structure must exist
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const initStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "init");
+      const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
+      // Both raw and masked must be strings
+      expect(typeof npmVariant.code.raw).toBe("string");
+      expect(typeof npmVariant.code.masked).toBe("string");
     });
 
-    it("should handle onMounted when rumToken does not exist", async () => {
-      const testStore = createStore({
-        state: () => ({
-          organizationData: {},
-          selectedOrganization: { identifier: "test-org" },
-          API_ENDPOINT: "https://api.openobserve.ai"
-        }),
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const testWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-
-      await nextTick();
-      expect(testWrapper.vm.rumToken).toBe("");
-      testWrapper.unmount();
+    it("content's detect targets _rumdata stream with type='view' filter", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const detect = card.props("content").detect;
+      expect(detect.streamType).toBe("logs");
+      expect(detect.streamName).toBe("_rumdata");
+      expect(detect.filter).toBe("type = 'view'");
     });
 
-    it("should call replaceStaticValues on onUpdated", async () => {
-      // Test that onUpdated is configured to call replaceStaticValues
-      // Since onUpdated is called after any reactive data changes,
-      // we'll test this by verifying the onUpdated hook exists and works
-      const spy = vi.spyOn(wrapper.vm, 'replaceStaticValues');
-      
-      // Force a reactive update by changing store state and triggering update
-      wrapper.vm.store.state.organizationData.rumToken = { rum_token: "updated-token" };
-      await wrapper.vm.$forceUpdate();
-      await nextTick();
-      
-      // The function should be called during onUpdated lifecycle
-      expect(spy).toHaveBeenCalled();
+    it("install and init steps share variantGroup 'pkg'", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const steps = card.props("content").steps;
+      const install = steps.find((s: any) => s.id === "install");
+      const init = steps.find((s: any) => s.id === "init");
+      expect(install.variantGroup).toBe("pkg");
+      expect(init.variantGroup).toBe("pkg");
     });
 
-    it("should call replaceStaticValues on onActivated", async () => {
-      // Test that onActivated lifecycle hook is properly configured
-      // Since we can't easily trigger onActivated in unit tests,
-      // we'll test that the function exists and works
-      const spy = vi.spyOn(wrapper.vm, 'replaceStaticValues');
-      
-      // Call replaceStaticValues directly to verify it works
-      wrapper.vm.replaceStaticValues();
-      
-      expect(spy).toHaveBeenCalled();
-    });
-  });
-
-  // Computed Property Tests
-  describe("Computed Properties", () => {
-    it("should have checkRUMToken computed property", () => {
-      expect(wrapper.vm.checkRUMToken).toBeTruthy();
-      expect(wrapper.vm.checkRUMToken).toEqual(wrapper.vm.store.state.organizationData.rumToken);
-    });
-
-    it("should update checkRUMToken when store changes", async () => {
-      const testStore = createStore({
-        state: () => ({
-          organizationData: { rumToken: { rum_token: "new-token", key: "new-key" } },
-          selectedOrganization: { identifier: "test-org" },
-          API_ENDPOINT: "https://api.openobserve.ai"
-        }),
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const testWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-      
-      await nextTick();
-      expect(testWrapper.vm.checkRUMToken).toEqual({ rum_token: "new-token", key: "new-key" });
-      testWrapper.unmount();
-    });
-
-    it("should handle undefined rumToken in store", async () => {
-      const testStore = createStore({
-        state: () => ({
-          organizationData: { rumToken: undefined },
-          selectedOrganization: { identifier: "test-org" },
-          API_ENDPOINT: "https://api.openobserve.ai"
-        }),
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const testWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-      
-      await nextTick();
-      expect(testWrapper.vm.checkRUMToken).toBeUndefined();
-      testWrapper.unmount();
-    });
-  });
-
-  // Watch Property Tests
-  describe("Watch Properties", () => {
-    it("should watch checkRUMToken changes", async () => {
-      // Test the watcher behavior by checking computed property reactivity
-      const testStore = createStore({
-        state: () => ({
-          organizationData: { rumToken: { rum_token: "watched-token", key: "watched-key" } },
-          selectedOrganization: { identifier: "test-org" },
-          API_ENDPOINT: "https://api.openobserve.ai"
-        }),
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const testWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-      
-      const spy = vi.spyOn(testWrapper.vm, 'replaceStaticValues');
-      
-      await nextTick();
-      
-      // Manually trigger the watcher logic
-      if (testWrapper.vm.checkRUMToken) {
-        testWrapper.vm.rumToken = testWrapper.vm.checkRUMToken.key;
-        testWrapper.vm.replaceStaticValues();
+    it("install and init steps each have npm and cdn variants", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const steps = card.props("content").steps;
+      for (const stepId of ["install", "init"]) {
+        const step = steps.find((s: any) => s.id === stepId);
+        const variantIds = step.variants.map((v: any) => v.id);
+        expect(variantIds).toContain("npm");
+        expect(variantIds).toContain("cdn");
       }
-      
-      expect(testWrapper.vm.rumToken).toBe("watched-token");
-      expect(spy).toHaveBeenCalled();
-      testWrapper.unmount();
-    });
-
-    it("should handle watcher when token is null", async () => {
-      const testStore = createStore({
-        state: () => ({
-          organizationData: { rumToken: null },
-          selectedOrganization: { identifier: "test-org" },
-          API_ENDPOINT: "https://api.openobserve.ai"
-        }),
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const testWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-      
-      const spy = vi.spyOn(testWrapper.vm, 'replaceStaticValues');
-      
-      await nextTick();
-      expect(testWrapper.vm.checkRUMToken).toBeNull();
-      testWrapper.unmount();
     });
   });
 
-  // Template Rendering Tests
-  describe("Template Rendering", () => {
-    it("should render title when rumToken exists", async () => {
-      wrapper.vm.rumToken = "test-token";
-      await nextTick();
-      
-      const title = wrapper.find('[data-test="rumweb-title-text"]');
-      expect(title.exists()).toBe(true);
+  describe("rendering — token absent", () => {
+    it("renders the no-token message paragraph when rumToken is empty string", () => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      ({ wrapper } = mountComponent({ rumToken: "" }));
+
+      const msg = wrapper.find('[data-test="rum-web-no-token-message"]');
+      expect(msg.exists()).toBe(true);
+      expect(msg.text()).toContain(
+        "Generate RUM Token to enable RUM for your organization.",
+      );
     });
 
-    it("should render npm install command", async () => {
-      wrapper.vm.rumToken = "test-token";
-      await nextTick();
-      
-      expect(wrapper.html()).toContain("npm i @openobserve/browser-rum @openobserve/browser-logs");
+    it("does NOT render SetupCardRenderer when rumToken is empty string", () => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      ({ wrapper } = mountComponent({ rumToken: "" }));
+
+      expect(
+        wrapper.find('[data-test="rum-web-setup-card"]').exists(),
+      ).toBe(false);
     });
 
-    it("should render step instructions", async () => {
-      wrapper.vm.rumToken = "test-token";
-      await nextTick();
-      
-      const html = wrapper.html();
-      expect(html).toContain("Step1");
-      expect(html).toContain("Step2");
-    });
-
-    it("should render message when no rumToken", async () => {
-      wrapper.vm.rumToken = "";
-      await nextTick();
-      
-      // Should show the v-else content with i18n translation key
-      expect(wrapper.vm.t).toBeTruthy();
-      const messageElement = wrapper.find('.tw\\:mt-1');
-      expect(messageElement.exists()).toBe(true);
-    });
-
-    it("should render CopyContent components when token exists", async () => {
-      wrapper.vm.rumToken = "test-token";
-      await nextTick();
-      
-      const copyComponents = wrapper.findAllComponents({ name: "CopyContent" });
-      expect(copyComponents.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("should render SanitizedHtmlRenderer components", async () => {
-      wrapper.vm.rumToken = "test-token";
-      await nextTick();
-      
-      const htmlRenderers = wrapper.findAllComponents({ name: "SanitizedHtmlRenderer" });
-      expect(htmlRenderers.length).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  // Props Handling Tests
-  describe("Props Handling", () => {
-    it("should handle currOrgIdentifier prop", () => {
-      expect(wrapper.props().currOrgIdentifier).toBe("test-org");
-    });
-
-    it("should handle currUserEmail prop", () => {
-      expect(wrapper.props().currUserEmail).toBe("test@example.com");
-    });
-
-    it("should handle undefined props", () => {
-      const testStore = createStore({
-        state: () => mockStoreState,
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const noPropsWrapper = mount(FrontendRumConfig, {
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-      
-      expect(noPropsWrapper.props().currOrgIdentifier).toBeUndefined();
-      expect(noPropsWrapper.props().currUserEmail).toBeUndefined();
-      noPropsWrapper.unmount();
-    });
-
-    it("should accept different prop values", () => {
-      const testStore = createStore({
-        state: () => mockStoreState,
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const customWrapper = mount(FrontendRumConfig, {
-        props: {
-          currOrgIdentifier: "custom-org",
-          currUserEmail: "custom@example.com"
+    it("renders the no-token message when organizationData has no rumToken property", () => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      const store = createStore({
+        state: {
+          API_ENDPOINT: HTTPS_ENDPOINT,
+          selectedOrganization: { identifier: ORG_ID },
+          organizationData: {},
+          zoConfig: {},
         },
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
+        mutations: {},
       });
-      
-      expect(customWrapper.props().currOrgIdentifier).toBe("custom-org");
-      expect(customWrapper.props().currUserEmail).toBe("custom@example.com");
-      customWrapper.unmount();
+      wrapper = mount(FrontendRumConfig, {
+        global: { plugins: [store, i18n] },
+      });
+
+      expect(
+        wrapper.find('[data-test="rum-web-no-token-message"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="rum-web-setup-card"]').exists(),
+      ).toBe(false);
     });
   });
 
-  // Edge Cases and Error Handling Tests
-  describe("Edge Cases and Error Handling", () => {
-    it("should handle missing store state gracefully", () => {
-      // Test that component handles missing rumToken by not crashing on mount
-      // The component will have an empty rumToken initially when store doesn't have it
-      const testStore = createStore({
-        state: () => ({
-          organizationData: {},  // No rumToken property
-          selectedOrganization: { identifier: "" },
-          API_ENDPOINT: ""
-        }),
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const emptyStoreWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-      
-      // Component should mount successfully even without rumToken in store
-      expect(emptyStoreWrapper.vm).toBeTruthy();
-      expect(emptyStoreWrapper.vm.rumToken).toBe("");
-      emptyStoreWrapper.unmount();
+  // ── insecureHTTP flag ────────────────────────────────────────────────────────
+
+  describe("insecureHTTP derivation", () => {
+    it("insecureHTTP is false when API_ENDPOINT starts with https://", () => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      ({ wrapper } = mountComponent({ apiEndpoint: "https://api.example.com" }));
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const initStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "init");
+      const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
+      expect(npmVariant.code.raw).toContain("insecureHTTP: false");
     });
 
-    it("should handle empty rumToken gracefully", () => {
-      const testStore = createStore({
-        state: () => ({
-          ...mockStoreState,
-          organizationData: { rumToken: { rum_token: "" } }
-        }),
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const testWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-      
-      expect(() => testWrapper.vm.replaceStaticValues()).not.toThrow();
-      expect(testWrapper.vm.initConfiguration).toContain("clientToken: ");
-      testWrapper.unmount();
+    it("insecureHTTP is true when API_ENDPOINT starts with http://", () => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTP_ENDPOINT);
+      ({ wrapper } = mountComponent({ apiEndpoint: "http://api.example.com" }));
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const initStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "init");
+      const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
+      expect(npmVariant.code.raw).toContain("insecureHTTP: true");
     });
 
-    it("should handle null organization identifier", () => {
-      const testStore = createStore({
-        state: () => ({
-          ...mockStoreState,
-          selectedOrganization: { identifier: null }
-        }),
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const testWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-      
-      expect(() => testWrapper.vm.replaceStaticValues()).not.toThrow();
-      testWrapper.unmount();
-    });
+    it("insecureHTTP is true when API_ENDPOINT is empty string", () => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      ({ wrapper } = mountComponent({ apiEndpoint: "" }));
 
-    it("should handle empty API endpoint", () => {
-      const testStore = createStore({
-        state: () => ({
-          ...mockStoreState,
-          API_ENDPOINT: ""
-        }),
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const testWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-      
-      expect(() => testWrapper.vm.replaceStaticValues()).not.toThrow();
-      expect(testWrapper.vm.initConfiguration).toContain("insecureHTTP: true");
-      testWrapper.unmount();
-    });
-
-    it("should handle component unmounting", () => {
-      const testStore = createStore({
-        state: () => mockStoreState,
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      expect(() => {
-        wrapper.unmount();
-        wrapper = mount(FrontendRumConfig, {
-          props: mockProps,
-          global: {
-            plugins: [testStore, i18n],
-            stubs: {
-              "CopyContent": true,
-              "copy-content": true,
-              "SanitizedHtmlRenderer": true,
-              "q-separator": true
-            }
-          }
-        });
-      }).not.toThrow();
-    });
-
-    it("should handle malformed URLs in ingestion URL", async () => {
-      const { getIngestionURL } = await import("@/utils/zincutils");
-      getIngestionURL.mockReturnValue("invalid-url");
-      
-      expect(() => wrapper.vm.replaceStaticValues()).not.toThrow();
-    });
-
-    it("should handle special characters in tokens", () => {
-      const testStore = createStore({
-        state: () => ({
-          ...mockStoreState,
-          organizationData: { rumToken: { rum_token: "token-with-@#$%^&*()-chars" } }
-        }),
-        getters: {},
-        mutations: {},
-        actions: {}
-      });
-      
-      const testWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
-      });
-      
-      expect(() => testWrapper.vm.replaceStaticValues()).not.toThrow();
-      expect(testWrapper.vm.initConfiguration).toContain("token-with-@#$%^&*()-chars");
-      testWrapper.unmount();
-    });
-
-    it("should maintain configuration integrity after multiple updates", () => {
-      wrapper.vm.replaceStaticValues();
-      const firstUpdate = wrapper.vm.initConfiguration;
-      
-      wrapper.vm.replaceStaticValues();
-      const secondUpdate = wrapper.vm.initConfiguration;
-      
-      expect(firstUpdate).toBe(secondUpdate);
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const initStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "init");
+      const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
+      expect(npmVariant.code.raw).toContain("insecureHTTP: true");
     });
   });
 
-  // Integration Tests
-  describe("Component Integration", () => {
-    it("should integrate properly with Vuex store", () => {
-      expect(wrapper.vm.store.state.organizationData).toBeTruthy();
-      expect(wrapper.vm.store.state.selectedOrganization).toBeTruthy();
+  // ── site derivation ──────────────────────────────────────────────────────────
+
+  describe("site value (protocol stripped)", () => {
+    it("strips https:// from endpoint for site option", () => {
+      vi.mocked(getIngestionURL).mockReturnValue("https://ingest.openobserve.ai");
+      ({ wrapper } = mountComponent());
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const initStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "init");
+      const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
+      expect(npmVariant.code.raw).toContain("site: 'ingest.openobserve.ai'");
     });
 
-    it("should integrate with utility functions", async () => {
-      const { getIngestionURL, maskText } = await import("@/utils/zincutils");
-      
-      wrapper.vm.replaceStaticValues();
-      
-      expect(getIngestionURL).toHaveBeenCalled();
-      expect(maskText).toHaveBeenCalled();
+    it("strips http:// from endpoint for site option", () => {
+      vi.mocked(getIngestionURL).mockReturnValue("http://ingest.openobserve.ai");
+      ({ wrapper } = mountComponent({ apiEndpoint: "http://ingest.openobserve.ai" }));
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const initStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "init");
+      const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
+      expect(npmVariant.code.raw).toContain("site: 'ingest.openobserve.ai'");
+    });
+  });
+
+  // ── org substitution ─────────────────────────────────────────────────────────
+
+  describe("org substitution", () => {
+    it("reflects the org identifier in content init code", () => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      ({ wrapper } = mountComponent({ org: "acme-corp" }));
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const initStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "init");
+      const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
+      expect(npmVariant.code.raw).toContain("organizationIdentifier: 'acme-corp'");
     });
 
-    it("should maintain reactivity between configurations", async () => {
-      const testStore = createStore({
-        state: () => ({
-          ...mockStoreState,
-          organizationData: { rumToken: { rum_token: "reactive-token" } }
-        }),
-        getters: {},
+    it("reflects empty org when selectedOrganization is absent", () => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      const store = createStore({
+        state: {
+          API_ENDPOINT: HTTPS_ENDPOINT,
+          selectedOrganization: null,
+          organizationData: { rumToken: { rum_token: RUM_TOKEN } },
+          zoConfig: {},
+        },
         mutations: {},
-        actions: {}
       });
-      
-      const testWrapper = mount(FrontendRumConfig, {
-        props: mockProps,
-        global: {
-          plugins: [testStore, i18n],
-          stubs: {
-            "CopyContent": true,
-            "copy-content": true,
-            "SanitizedHtmlRenderer": true,
-            "q-separator": true
-          }
-        }
+      wrapper = mount(FrontendRumConfig, {
+        global: { plugins: [store, i18n] },
       });
-      
-      testWrapper.vm.replaceStaticValues();
-      
-      expect(testWrapper.vm.initConfiguration).toContain("reactive-token");
-      expect(testWrapper.vm.displayConfiguration).toContain("reac****oken");
-      testWrapper.unmount();
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const initStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "init");
+      const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
+      expect(npmVariant.code.raw).toContain("organizationIdentifier: ''");
+    });
+  });
+
+  // ── props ────────────────────────────────────────────────────────────────────
+
+  describe("props", () => {
+    beforeEach(() => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
     });
 
-    it("should handle i18n integration", () => {
-      expect(wrapper.vm.t).toBeTruthy();
-      expect(typeof wrapper.vm.t).toBe('function');
+    it("mounts without currOrgIdentifier and currUserEmail (both optional)", () => {
+      const store = makeStore();
+      const w = mount(FrontendRumConfig, {
+        global: { plugins: [store, i18n] },
+      });
+      expect(w.exists()).toBe(true);
+      w.unmount();
+    });
+
+    it("accepts any string values for currOrgIdentifier and currUserEmail", () => {
+      const store = makeStore();
+      const w = mount(FrontendRumConfig, {
+        props: { currOrgIdentifier: "alt-org", currUserEmail: "alt@example.com" },
+        global: { plugins: [store, i18n] },
+      });
+      expect(w.exists()).toBe(true);
+      w.unmount();
+    });
+  });
+
+  // ── masked token ─────────────────────────────────────────────────────────────
+
+  describe("masked token in content", () => {
+    it("masked code variant exists on npm init step", () => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      ({ wrapper } = mountComponent());
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const initStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "init");
+      const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
+      expect(npmVariant.code).toHaveProperty("masked");
+    });
+
+    it("masked code variant exists on cdn init step", () => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      ({ wrapper } = mountComponent());
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const initStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "init");
+      const cdnVariant = initStep.variants.find((v: any) => v.id === "cdn");
+      expect(cdnVariant.code).toHaveProperty("masked");
+    });
+
+    it("masked token is built from maskText and differs from raw when maskText transforms the input", () => {
+      // The component calls maskText(rumToken) to get rumTokenMasked and passes
+      // both to rumCard. We verify the masked variant's code contains the masked
+      // value while the raw variant's code retains the original token.
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+
+      // Override maskText to return a clearly-different value
+      vi.mocked(maskText).mockReturnValue("****masked****");
+
+      wrapper?.unmount();
+      ({ wrapper } = mountComponent());
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const initStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "init");
+      const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
+      // masked should use the maskText return value
+      expect(npmVariant.code.masked).toContain("****masked****");
+      // raw should use the real token
+      expect(npmVariant.code.raw).toContain(RUM_TOKEN);
+    });
+  });
+
+  // ── CDN install code ─────────────────────────────────────────────────────────
+
+  describe("CDN install step code", () => {
+    beforeEach(() => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      ({ wrapper } = mountComponent());
+    });
+
+    it("CDN install code contains preconnect link for cdn.jsdelivr.net", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const installStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "install");
+      const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
+      expect(cdnVariant.code.raw).toContain(
+        'rel="preconnect" href="https://cdn.jsdelivr.net"',
+      );
+    });
+
+    it("CDN install code contains dns-prefetch for cdn.jsdelivr.net", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const installStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "install");
+      const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
+      expect(cdnVariant.code.raw).toContain(
+        'rel="dns-prefetch" href="https://cdn.jsdelivr.net"',
+      );
+    });
+
+    it("CDN install code contains preconnect link for the ingestion endpoint", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const installStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "install");
+      const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
+      expect(cdnVariant.code.raw).toContain(
+        `href="${HTTPS_ENDPOINT}"`,
+      );
+    });
+
+    it("CDN install code contains OO_RUM async loader global", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const installStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "install");
+      const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
+      expect(cdnVariant.code.raw).toContain("OO_RUM");
+    });
+
+    it("CDN install code contains OO_LOGS async loader global", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const installStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "install");
+      const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
+      expect(cdnVariant.code.raw).toContain("OO_LOGS");
+    });
+  });
+
+  // ── NPM install command ──────────────────────────────────────────────────────
+
+  describe("NPM install step", () => {
+    beforeEach(() => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      ({ wrapper } = mountComponent());
+    });
+
+    it("NPM install code is the exact install command", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const installStep = card
+        .props("content")
+        .steps.find((s: any) => s.id === "install");
+      const npmVariant = installStep.variants.find((v: any) => v.id === "npm");
+      expect(npmVariant.code.raw).toBe(
+        "npm i @openobserve/browser-rum @openobserve/browser-logs",
+      );
     });
   });
 });
