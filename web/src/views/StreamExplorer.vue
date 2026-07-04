@@ -10,7 +10,7 @@
       :is-loading="isLoading"
       @change:date-time="updateDateTime"
     />
-    <div class="stream-data-table">
+    <div class="tw:h-[calc(100vh-197px)]">
       <OTable
         data-test="stream-explorer-results-table"
         class="tw:h-full"
@@ -242,9 +242,3 @@ const updateDateTime = (value: IDateTime) => {
   }
 };
 </script>
-
-<style scoped lang="scss">
-.stream-data-table {
-  height: calc(100vh - (140px + 57px));
-}
-</style>

@@ -67,7 +67,7 @@ describe('ScriptToolbar.vue', () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.text()).toContain('Add Action');
-      const toolbar = wrapper.find('.action-scripts-toolbar');
+      const toolbar = wrapper.find('[data-test="add-script-toolbar"]');
       expect(toolbar.exists()).toBe(true);
       expect(toolbar.classes()).toContain('tw:flex');
       expect(toolbar.classes()).toContain('tw:justify-between');

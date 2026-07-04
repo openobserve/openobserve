@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :name="job.status === 'completed' ? 'check-circle' : job.status === 'failed' ? 'warning' : job.status === 'processing' ? 'sync' : 'schedule'"
                     size="sm"
                     :class="[
-                      { 'rotate-animation': job.status === 'processing' },
+                      job.status === 'processing' ? 'tw:[animation:rotate_2s_linear_infinite]' : '',
                       job.status === 'completed' ? 'tw:text-[var(--o2-positive)]' :
                       job.status === 'failed' ? 'tw:text-[var(--o2-negative)]' :
                       job.status === 'processing' ? 'tw:text-[var(--o2-primary)]' :
@@ -547,46 +547,13 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-#editor {
-  width: 100%;
-  min-height: 15rem;
-  padding-bottom: 14px;
-  resize: both;
-}
-
-.rotate-animation {
-  animation: rotate 2s linear infinite;
-}
-
+<style>
 @keyframes rotate {
   from {
     transform: rotate(0deg);
   }
   to {
     transform: rotate(360deg);
-  }
-}
-</style>
-<style lang="scss">
-.no-case .q-field__native span {
-  text-transform: none !important;
-}
-
-.lookup-table-file-uploader {
-  .q-field__label {
-    left: -30px;
-  }
-}
-
-.lookup-table-append-toggle {
-  .q-toggle__inner {
-    padding: 0.325em !important;
-    font-size: 40px !important;
-  }
-
-  .q-toggle__thumb:before {
-    background: transparent !important;
   }
 }
 </style>

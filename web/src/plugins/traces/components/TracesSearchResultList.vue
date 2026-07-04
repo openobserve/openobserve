@@ -400,12 +400,8 @@ const totalPages = computed(() =>
 );
 </script>
 
-<style lang="scss" scoped>
-@import "@/styles/pagination.scss";
-
-:deep(.traces-table-container) {
-  .table-container {
-    border-radius: 0 !important;
-  }
+<style>
+.traces-table-container .table-container {
+  border-radius: 0 !important;
 }
 </style>

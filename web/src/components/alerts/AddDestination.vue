@@ -84,11 +84,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="tw:text-sm">{{
                     getDestinationTypeName(formData.destination_type)
                   }}</span>
-                  <OBadge
-                    size="sm"
-                    variant="default"
+                  <OTag
+                    type="readonlyFlag"
+                    value="readonly"
                     class="tw:ml-2"
-                    >{{ t("alert_destinations.readonly") }}</OBadge
+                    >{{ t("alert_destinations.readonly") }}</OTag
                   >
                 </div>
               </div>
@@ -343,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div
-                class="tw:py-1 destination-method-select"
+                class="tw:py-1"
                 :class="{ 'tw:w-1/4': !isAlerts, 'tw:w-1/2': isAlerts }"
               >
                 <OSelect
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="!isAlerts"
-                class="tw:w-1/4 tw:py-1 destination-method-select"
+                class="tw:w-1/4 tw:py-1"
               >
                 <OSelect
                   data-test="add-destination-output-format-select"
@@ -553,7 +553,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type {
   Template,
@@ -892,6 +892,10 @@ const setupDestinationData = () => {
             if (key.startsWith("credential_")) {
               const credentialKey = key.replace("credential_", "");
               credentials[credentialKey] = value;
+            } else if (key === "routing_key") {
+              // PagerDuty stores the integration key as the bare `routing_key`
+              // metadata variable (substituted into the request body).
+              credentials.integrationKey = value;
             }
           });
         } catch (e) {
@@ -917,9 +921,12 @@ const setupDestinationData = () => {
           : props.destination.emails;
       }
 
-      // For PagerDuty, integrationKey is in headers (if present)
+      // For PagerDuty, integrationKey is restored from the routing_key metadata
+      // above. Fall back to the legacy X-Routing-Key header for destinations
+      // saved before the key was moved into the request body.
       if (
         typeId === "pagerduty" &&
+        !credentials.integrationKey &&
         props.destination.headers?.["X-Routing-Key"]
       ) {
         credentials.integrationKey = props.destination.headers["X-Routing-Key"];
@@ -1357,100 +1364,3 @@ const filterActions = (val: string, update: any) => {
   filterColumns(actionOptions.value, val, update);
 };
 </script>
-<style lang="scss" scoped>
-#editor {
-  width: 100%;
-  min-height: 5rem;
-  padding-bottom: 14px;
-  resize: both;
-}
-
-.page-content {
-  height: calc(100vh - 112px);
-}
-</style>
-<style lang="scss">
-.destination-method-select {
-  .q-field__native > :first-child {
-    text-transform: uppercase !important;
-  }
-}
-
-.no-case .q-field__native span {
-  text-transform: none !important;
-}
-
-// Destination Type Selection Grid Styles
-.destination-type-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 1rem;
-  margin-top: 0.5rem;
-}
-
-.destination-type-card {
-  border: 2px solid var(--o2-border-color);
-  border-radius: 8px;
-  padding: 1rem;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background: var(--o2-card-bg);
-  min-height: 120px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-
-  &:hover {
-    border-color: var(--q-primary);
-    box-shadow: 0 4px 12px rgba(89, 96, 178, 0.15);
-    transform: translateY(-2px);
-  }
-
-  &.selected {
-    border-color: var(--q-primary);
-    background: linear-gradient(
-      135deg,
-      var(--q-primary) 0%,
-      color-mix(in srgb, var(--q-primary) 85%, black) 100%
-    );
-    color: white;
-    box-shadow: 0 4px 16px rgba(89, 96, 178, 0.3);
-
-    .destination-type-label {
-      color: white;
-    }
-  }
-}
-
-.destination-type-content {
-  margin-bottom: 0.75rem;
-}
-
-.destination-type-image {
-  width: 32px;
-  height: 32px;
-  object-fit: contain;
-}
-
-.destination-type-icon {
-  color: var(--o2-icon-color);
-
-  .selected & {
-    color: white;
-  }
-}
-
-.destination-type-label {
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: var(--q-text-primary);
-  margin: 0;
-
-  &.active {
-    color: white;
-  }
-}
-</style>

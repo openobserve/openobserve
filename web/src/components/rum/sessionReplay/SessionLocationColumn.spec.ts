@@ -127,16 +127,19 @@ describe("SessionLocationColumn", () => {
       expect(wrapper.text()).toContain("New York");
     });
 
-    it("shows Unknown when city is null", async () => {
+    it("hides the city and its separator when city is null", async () => {
       // Arrange
       wrapper = mountComponent({ ...mockColumn, city: null as any });
       await flushPromises();
 
-      // Assert
-      expect(wrapper.text()).toContain("Unknown");
+      // Assert — remaining parts render without a dangling separator
+      expect(wrapper.text()).not.toContain("Unknown");
+      expect(wrapper.text()).toContain("Chrome");
+      expect(wrapper.text()).toContain("Windows");
+      expect(wrapper.findAll('[data-test="circle-icon"]').length).toBe(1);
     });
 
-    it("shows Unknown when city is undefined", async () => {
+    it("hides the city and its separator when city is undefined", async () => {
       // Arrange
       const col = { ...mockColumn };
       delete (col as any).city;
@@ -144,7 +147,10 @@ describe("SessionLocationColumn", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.text()).toContain("Unknown");
+      expect(wrapper.text()).not.toContain("Unknown");
+      expect(wrapper.text()).toContain("Chrome");
+      expect(wrapper.text()).toContain("Windows");
+      expect(wrapper.findAll('[data-test="circle-icon"]').length).toBe(1);
     });
   });
 
@@ -202,15 +208,16 @@ describe("SessionLocationColumn", () => {
       expect(wrapper.text()).toContain("Unknown");
     });
 
-    it("shows only provided fields and Unknown for missing ones", async () => {
+    it("shows only provided fields without dangling separators", async () => {
       // Arrange
       wrapper = mountComponent({ country: "Germany", browser: "Safari" } as any);
       await flushPromises();
 
-      // Assert
+      // Assert — single known detail part, so no separators at all
       expect(wrapper.text()).toContain("Germany");
       expect(wrapper.text()).toContain("Safari");
-      expect(wrapper.text()).toContain("Unknown");
+      expect(wrapper.text()).not.toContain("Unknown");
+      expect(wrapper.findAll('[data-test="circle-icon"]').length).toBe(0);
     });
 
     it("renders without crash for very long location strings", async () => {

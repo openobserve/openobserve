@@ -35,6 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <component v-else :is="tab.icon" class="tw:size-3.5 tw:shrink-0" />
       </template>
       {{ tab.label }}
+      <span
+        v-if="tab.dirty"
+        class="tw:ml-1.5 tw:w-2 tw:h-2 tw:rounded-full tw:bg-button-primary tw:shrink-0"
+        :title="dirtyTitle"
+        :data-test="`tab-${tab.value}-dirty-dot`"
+        aria-hidden="true"
+      />
       <OTooltip v-if="tab.tooltipLabel" :content="tab.tooltipLabel" />
     </OToggleGroupItem>
   </OToggleGroup>
@@ -58,6 +65,9 @@ interface Tab {
   tooltipLabel?: string;
   hide?: boolean;
   icon?: Component | string;
+  // When true, renders a small unsaved-changes dot to the right of the label.
+  // Optional and defaults to undefined, so existing callers are unaffected.
+  dirty?: boolean;
 }
 
 const emit = defineEmits(["update:activeTab"]);
@@ -68,10 +78,13 @@ const props = withDefaults(
     tabs: Tab[];
     activeTab: string;
     size?: ToggleGroupItemSize;
+    // Tooltip shown when hovering an unsaved-changes dot (optional).
+    dirtyTitle?: string;
   }>(),
   {
     show: true,
     size: "sm",
+    dirtyTitle: "",
   }
 );
 

@@ -368,7 +368,7 @@ export default class DashboardFilter {
     const idx = String(conditionIndex);
 
     // Step 1: Locate the specific group by its style attribute
-    const groupLocator = this.page.locator(`.group[style*="--group-index: ${groupIndex}"]`);
+    const groupLocator = this.page.locator(`[data-test="dashboard-group"][style*="--group-index: ${groupIndex}"]`);
     await groupLocator.waitFor({ state: "visible", timeout: 5000 });
 
     // Step 2: Find all label buttons within this specific group and click the one at conditionIndex

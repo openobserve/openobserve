@@ -197,7 +197,7 @@ describe("ApiDashboard", () => {
     it("renders the api-performance-dashboards container", () => {
       // Arrange (done in beforeEach)
       // Act
-      const container = wrapper.find(".api-performance-dashboards");
+      const container = wrapper.find('[data-test="api-performance-dashboards"]');
 
       // Assert
       expect(container.exists()).toBe(true);

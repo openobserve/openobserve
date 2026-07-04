@@ -264,7 +264,7 @@ describe("PipelineFlow.vue", () => {
   // Test 8: Empty canvas text is shown when no nodes
   it("should show empty canvas text when no nodes exist", () => {
     wrapper = mountComponent();
-    const emptyTextEl = wrapper.find('.empty-text');
+    const emptyTextEl = wrapper.find('[data-test="pipeline-flow-empty-text"]');
     expect(emptyTextEl.exists()).toBe(true);
     expect(emptyTextEl.text()).toBe('Drag and drop nodes here');
   });

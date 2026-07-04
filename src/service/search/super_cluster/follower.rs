@@ -27,7 +27,7 @@ use config::{
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
-    physical_plan::ExecutionPlan,
+    physical_plan::{ExecutionPlan, aggregates::AggregateExec},
     prelude::SessionContext,
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
@@ -50,6 +50,7 @@ use crate::service::{
                 remote_scan_exec::RemoteScanExec,
             },
             exec::{DataFusionContextBuilder, register_udf},
+            optimizer::physical_optimizer::remote_scan::wrap_partial_reduce_for_aggregate,
         },
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         work_group::DeferredLock,
@@ -281,14 +282,11 @@ pub async fn search(
     );
     remote_scan_node.set_is_super_cluster(false);
 
-    // add sort preserving merge node to preserving the order
-    if physical_plan.name() == "SortPreservingMergeExec" {
-        let top_merge_node = physical_plan.clone();
-        let remote_scan_exec = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
-        physical_plan = top_merge_node.with_new_children(vec![remote_scan_exec])?;
-    } else {
-        physical_plan = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
-    }
+    physical_plan = add_region_remote_scan_partial_reduce(
+        cfg.common.feature_partial_reduce_enabled,
+        physical_plan,
+        remote_scan_node,
+    )?;
 
     log::info!("[trace_id {trace_id}] flight->follower_leader: generate physical plan finish");
 
@@ -300,6 +298,33 @@ pub async fn search(
     };
 
     Ok((ctx, physical_plan, _lock, scan_stats))
+}
+
+fn add_region_remote_scan_partial_reduce(
+    partial_reduce_enabled: bool,
+    physical_plan: Arc<dyn ExecutionPlan>,
+    remote_scan_node: RemoteScanNode,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    // Preserve the existing sort-preserving merge shape for ordered plans.
+    if physical_plan.name() == "SortPreservingMergeExec" {
+        let top_merge_node = physical_plan.clone();
+        let remote_scan_exec = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
+        return Ok(top_merge_node.with_new_children(vec![remote_scan_exec])?);
+    }
+
+    let source_plan = physical_plan.clone();
+    let remote_scan_exec: Arc<dyn ExecutionPlan> =
+        Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
+
+    let Some(agg) = source_plan.downcast_ref::<AggregateExec>() else {
+        return Ok(remote_scan_exec);
+    };
+
+    Ok(wrap_partial_reduce_for_aggregate(
+        partial_reduce_enabled,
+        agg,
+        remote_scan_exec,
+    )?)
 }
 
 #[tracing::instrument(
@@ -332,4 +357,77 @@ pub async fn get_file_id_lists(
     )
     .await?;
     Ok(file_id_list)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::physical_plan::{
+        aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
+        empty::EmptyExec,
+        expressions::col,
+        repartition::RepartitionExec,
+    };
+
+    use super::*;
+
+    #[derive(Debug)]
+    struct TestNode;
+
+    impl config::meta::cluster::NodeInfo for TestNode {
+        fn get_grpc_addr(&self) -> String {
+            "http://localhost:5081".to_string()
+        }
+
+        fn get_auth_token(&self) -> String {
+            "token".to_string()
+        }
+
+        fn get_name(&self) -> String {
+            "test-node".to_string()
+        }
+
+        fn is_local(&self) -> bool {
+            false
+        }
+    }
+
+    #[test]
+    fn test_region_remote_scan_wraps_partial_aggregate() -> datafusion::common::Result<()> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let group_by = PhysicalGroupBy::new(
+            vec![(col("a", &schema)?, "a".to_string())],
+            vec![],
+            vec![vec![false]],
+            false,
+        );
+        let partial_agg = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&schema)).with_partitions(2)),
+            Arc::clone(&schema),
+        )?;
+        let physical_plan: Arc<dyn ExecutionPlan> = Arc::new(partial_agg);
+        let remote_scan_node = RemoteScanNode {
+            nodes: vec![Arc::new(TestNode)],
+            ..Default::default()
+        };
+
+        let result = add_region_remote_scan_partial_reduce(true, physical_plan, remote_scan_node)
+            .map_err(|e| datafusion::error::DataFusionError::Internal(e.to_string()))?;
+        let result_agg = result
+            .downcast_ref::<AggregateExec>()
+            .expect("region leader should add an outer PartialReduce aggregate");
+        assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
+
+        let repartition = result.children()[0]
+            .downcast_ref::<RepartitionExec>()
+            .expect("GROUP BY region reduce should hash-partition remote output");
+        assert_eq!(repartition.children()[0].name(), "RemoteScanExec");
+        Ok(())
+    }
 }

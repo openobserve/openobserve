@@ -14,6 +14,7 @@ import {
   formatCostCell,
   chipColor,
   formatTimeLabel,
+  formatBucketTooltip,
 } from "./llmTrendPanel.utils";
 
 // ===========================================================================
@@ -159,6 +160,21 @@ describe("formatTimeCell", () => {
   it("falls back to the raw input string for unparseable values", () => {
     expect(formatTimeCell("totally not a date")).toBe("totally not a date");
   });
+
+  // Timezone-aware: a UTC instant renders as that zone's wall clock.
+  // Asia/Kolkata is UTC+5:30 with no DST → deterministic.
+  it("renders a UTC string in the selected timezone", () => {
+    expect(formatTimeCell("2026-05-08T06:00:00Z", "UTC")).toBe("06:00:00");
+    expect(formatTimeCell("2026-05-08T06:00:00Z", "Asia/Kolkata")).toBe(
+      "11:30:00",
+    );
+  });
+
+  it("converts a microsecond epoch into the selected timezone", () => {
+    const us = Date.UTC(2026, 4, 8, 6, 0, 0) * 1000; // 2026-05-08T06:00:00Z
+    expect(formatTimeCell(us, "UTC")).toBe("06:00:00");
+    expect(formatTimeCell(us, "Asia/Kolkata")).toBe("11:30:00");
+  });
 });
 
 // ===========================================================================
@@ -287,5 +303,38 @@ describe("formatTimeLabel", () => {
     const result = formatTimeLabel("2026-05-08T03:04:05Z");
     // hh / mm are at least 2 chars each.
     expect(result).toMatch(/^\d{2}:\d{2}$/);
+  });
+
+  // Timezone-aware: the no-offset UTC bucket string is shifted into the
+  // selected zone for display. This is the core fix — the axis used to
+  // always echo UTC regardless of the user's timezone selection.
+  it("renders the bucket in the selected timezone", () => {
+    expect(formatTimeLabel("2026-05-08T06:00:00", "UTC")).toBe("06:00");
+    expect(formatTimeLabel("2026-05-08T06:00:00", "Asia/Kolkata")).toBe(
+      "11:30",
+    );
+  });
+
+  it("defaults to UTC when no timezone is given", () => {
+    expect(formatTimeLabel("2026-05-08T06:00:00")).toBe("06:00");
+  });
+});
+
+// ===========================================================================
+// formatBucketTooltip
+// ===========================================================================
+
+describe("formatBucketTooltip", () => {
+  it("formats the tooltip header in the selected timezone", () => {
+    expect(formatBucketTooltip("2026-05-08T06:00:00", "UTC")).toBe(
+      "May 8, 06:00",
+    );
+    expect(formatBucketTooltip("2026-05-08T06:00:00", "Asia/Kolkata")).toBe(
+      "May 8, 11:30",
+    );
+  });
+
+  it("falls back to the raw input when parsing fails", () => {
+    expect(formatBucketTooltip("not a date")).toBe("not a date");
   });
 });

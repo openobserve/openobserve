@@ -266,7 +266,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_pagerduty".to_string(),
-                    body: r#"{"event_action": "trigger", "payload": {"summary": "Alert: {alert_name}"}}"#.to_string(),
+                    body: r#"{"payload": {"summary": "OpenObserve Alert: {alert_name}", "severity": "{severity}", "source": "{source}"}, "routing_key": "{routing_key}", "event_action": "trigger"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],

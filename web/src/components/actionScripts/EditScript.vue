@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:mt-3"
                 >
                   <div class="tw:flex tw:items-center">
-                    <div class="service-account-selector">
+                    <div>
                       <div
                         data-test="add-action-script-service-account-title"
                         class="tw:mb-1 tw:font-bold tw:text-gray-500"
@@ -1055,17 +1055,3 @@ onMounted(async () => {
   await getServiceAccounts();
 });
 </script>
-
-<style scoped lang="scss">
-.lookup-table-file-uploader {
-  :deep(.q-field__label) {
-    left: -30px;
-  }
-}
-
-.service-account-selector {
-  :deep(.q-field__control-container .q-field__native > :first-child) {
-    text-transform: none !important;
-  }
-}
-</style>

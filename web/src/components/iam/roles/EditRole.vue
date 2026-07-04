@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="edit-role-tabs"
               :tabs="tabs"
               :active-tab="activeTab"
+              :dirty-title="t('iam.editRole.unsavedDot.title')"
               @update:active-tab="updateActiveTab"
             />
     </div>
@@ -54,8 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="activeTab === 'serviceAccounts'"
           :groupUsers="roleUsers"
           :activeTab="activeTab"
-          :added-users="addedUsers"
-          :removed-users="removedUsers"
+          :added-users="addedServiceAccounts"
+          :removed-users="removedServiceAccounts"
         />
 
         <div
@@ -196,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <query-editor
                     data-test="logs-vrl-function-editor"
                     editor-id="add-function-editor"
-                    class="monaco-editor tw:mt-2"
+                    class="tw:mt-2"
                     language="json"
                     ref="permissionJsonEditorRef"
                     v-model:query="permissionsJsonValue"
@@ -264,6 +265,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       </div>
   </div>
+  <ConfirmDialog
+    :title="t('iam.editRole.leaveConfirm.title')"
+    :message="t('iam.editRole.leaveConfirm.message')"
+    @update:ok="onLeaveConfirm(true)"
+    @update:cancel="onLeaveConfirm(false)"
+    v-model="leaveConfirm.show"
+  />
 </template>
 
 <script setup lang="ts">
@@ -280,8 +288,9 @@ import type { Resource, Entity, Permission } from "@/ts/interfaces";
 import PermissionsTable from "@/components/iam/roles/PermissionsTable.vue";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
-import { useRouter } from "vue-router";
+import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import {
   updateRole,
   getResources,
@@ -368,11 +377,63 @@ const permissionsJsonValue = ref("");
 const addedUsers = ref(new Set());
 const removedUsers = ref(new Set());
 
+// Service-account membership is staged in its own pair of sets so the Users and
+// Service Accounts tabs track dirty state independently (they're sent together
+// as users in the save payload, since the backend treats both as principals).
+const addedServiceAccounts = ref(new Set());
+const removedServiceAccounts = ref(new Set());
+
 const roleUsers: Ref<string[]> = ref([]);
 
 const permissionsUiType = ref("table");
 
 const { getStreams } = useStreams();
+
+// Per-tab unsaved-changes flags. Each tab tracks only its own pending changes.
+const isPermissionsDirty = computed(
+  () =>
+    Object.keys(addedPermissions.value).length > 0 ||
+    Object.keys(removedPermissions.value).length > 0,
+);
+
+const isUsersDirty = computed(
+  () => addedUsers.value.size > 0 || removedUsers.value.size > 0,
+);
+
+const isServiceAccountsDirty = computed(
+  () =>
+    addedServiceAccounts.value.size > 0 ||
+    removedServiceAccounts.value.size > 0,
+);
+
+const isAnyDirty = computed(
+  () =>
+    isPermissionsDirty.value ||
+    isUsersDirty.value ||
+    isServiceAccountsDirty.value,
+);
+
+// Route-leave guard: warn before discarding unsaved permission/membership
+// changes. The pending navigation is held until the user resolves the dialog.
+const leaveConfirm = ref<{
+  show: boolean;
+  resolve: ((proceed: boolean) => void) | null;
+}>({ show: false, resolve: null });
+
+const onLeaveConfirm = (proceed: boolean) => {
+  leaveConfirm.value.show = false;
+  leaveConfirm.value.resolve?.(proceed);
+  leaveConfirm.value.resolve = null;
+};
+
+onBeforeRouteLeave(() => {
+  if (!isAnyDirty.value) return true;
+
+  return new Promise<boolean>((resolve) => {
+    leaveConfirm.value.resolve = resolve;
+    leaveConfirm.value.show = true;
+  });
+});
 
 const tabs = computed(() => {
   const baseTabs = [
@@ -380,11 +441,13 @@ const tabs = computed(() => {
       value: "permissions",
       label: "Permissions",
       icon: "shield",
+      dirty: isPermissionsDirty.value,
     },
     {
       value: "users",
       label: "Users",
       icon: "group",
+      dirty: isUsersDirty.value,
     },
   ];
 
@@ -393,6 +456,7 @@ const tabs = computed(() => {
       value: "serviceAccounts",
       label: "Service Accounts",
       icon: "smart-toy",
+      dirty: isServiceAccountsDirty.value,
     });
   }
 
@@ -468,6 +532,21 @@ const getRoleDetails = () => {
       savePermissionHash();
       await updateRolePermissions(permissions.value);
       isFetchingInitialRoles.value = false;
+
+      // A brand-new role has no saved permissions, so the default "Selected"
+      // filter renders an empty matrix that looks broken. Default to "All" so
+      // the user sees the full permission grid to start checking boxes.
+      if (selectedPermissionsHash.value.size === 0) {
+        filter.value.permissions = "all";
+
+        // "Read-only" preset (from the Add Role dialog) seeds AllowList +
+        // AllowGet across all top-level resources so evaluators get a safe,
+        // non-empty starting point. These land as pending "added" permissions
+        // the user can still tweak before saving.
+        if (router.currentRoute.value.query.preset === "readonly") {
+          seedReadonlyPreset();
+        }
+      }
 
       updateTableData();
     })
@@ -867,6 +946,23 @@ const cancelPermissionsUpdate = () => {
         }
      } 
 );
+};
+
+// Seed AllowList + AllowGet on every visible top-level resource. Mirrors a
+// user manually checking those two columns, so the changes flow through the
+// normal added/removed-permission bookkeeping and the Save payload.
+const seedReadonlyPreset = () => {
+  const readonlyPerms = ["AllowList", "AllowGet"];
+  permissionsState.permissions.forEach((resource: Resource) => {
+    readonlyPerms.forEach((perm) => {
+      const permDetail = resource.permission?.[perm as "AllowList"];
+      // Only seed permissions the resource actually exposes and that are not
+      // already selected.
+      if (!permDetail || !permDetail.show || permDetail.value) return;
+      permDetail.value = true;
+      handlePermissionChange(resource, perm);
+    });
+  });
 };
 
 const handlePermissionChange = (row: any, permission: string) => {
@@ -2294,11 +2390,17 @@ const updateResourceResource = (
 const saveRole = () => {
   if (permissionsUiType.value === "json") updateJsonInTable();
 
+  // Users and service accounts are both sent as users; merge the two staging
+  // sets (dedup via Set) for the request payload.
   const payload = {
     add: Object.values(addedPermissions.value),
     remove: Object.values(removedPermissions.value),
-    add_users: Array.from(addedUsers.value) as string[],
-    remove_users: Array.from(removedUsers.value) as string[],
+    add_users: Array.from(
+      new Set([...addedUsers.value, ...addedServiceAccounts.value]),
+    ) as string[],
+    remove_users: Array.from(
+      new Set([...removedUsers.value, ...removedServiceAccounts.value]),
+    ) as string[],
   };
 
   if (
@@ -2352,16 +2454,26 @@ const saveRole = () => {
       removedPermissions.value = {};
 
       roleUsers.value = roleUsers.value.filter(
-        (user) => !removedUsers.value.has(user),
+        (user) =>
+          !removedUsers.value.has(user) &&
+          !removedServiceAccounts.value.has(user),
       );
 
       addedUsers.value.forEach((value: any) => {
         roleUsers.value.push(value);
       });
 
+      addedServiceAccounts.value.forEach((value: any) => {
+        roleUsers.value.push(value);
+      });
+
       addedUsers.value = new Set([]);
 
       removedUsers.value = new Set([]);
+
+      addedServiceAccounts.value = new Set([]);
+
+      removedServiceAccounts.value = new Set([]);
     })
     .catch((err) => {
       if (err.response.status != 403) {
@@ -2429,4 +2541,3 @@ const toggleHelpSection = async () => {
   permissionJsonEditorRef.value.resetEditorLayout();
 };
 </script>
-<style scoped></style>

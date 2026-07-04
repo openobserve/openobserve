@@ -64,7 +64,7 @@ withDefaults(
 );
 </script>
 
-<style scoped>
+<style>
 .es-cursor {
   animation: es-blink 1.1s steps(1, end) infinite;
 }

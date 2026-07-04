@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <div
-      class="sql-bar tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-x-3"
+      class="sql-bar tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-x-3 tw:h-10"
       :style="{
         backgroundColor:
           store.state.theme === 'dark'
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="editingQueryIndex === index"
                 @click.stop
-                class="tw:inline-block query-tab-name-input-wrap"
+                class="tw:inline-block tw:w-22.5 tw:min-w-12.5 tw:max-w-40"
               >
                 <OInput
                   ref="renameInputRef"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-else
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
-                class="query-tab-name-text"
+                class="tw:cursor-default tw:select-none tw:whitespace-nowrap"
                 style="font-size: 12px"
                 :title="'Double-click to rename'"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'visibility-off'
                       : 'visibility'
                   "
-                  class="tw:ml-1 dashboard-query-visibility-icon"
+                  class="tw:ml-1 tw:opacity-[0.7] tw:transition-all tw:duration-150 tw:hover:opacity-100 tw:hover:bg-[var(--o2-hover-gray)] tw:hover:rounded-full"
                   @click.stop="toggleQueryVisibility(index)"
                   @mousedown.stop.prevent
                   @pointerdown.stop.prevent
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 name="close"
                 size="sm"
-                class="dashboard-query-remove-icon"
+                class="tw:opacity-60 tw:transition-all tw:duration-150 tw:hover:opacity-100 tw:hover:bg-[var(--o2-hover-gray)] tw:hover:rounded-full"
                 @click.stop.prevent="removeTab(index)"
                 @mousedown.stop.prevent
                 @pointerdown.stop.prevent
@@ -138,15 +138,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- D5: Warning for restricted chart types with multiple queries.
              Outlined soft-background chip (warning-soft variant + ring),
              height-aligned (h-8) with the toolbar's size="sm" buttons. -->
-        <OBadge
+        <OTag
           v-if="multiQueryWarning"
-          variant="warning-soft"
-          size="sm"
-          icon="info-outline"
-          class="dashboard-multi-query-warning tw:h-8 tw:mr-2 tw:ring-1 tw:ring-inset tw:ring-current"
+          type="warningNote"
+          class="dashboard-multi-query-warning tw:h-8 tw:mr-2"
         >
           {{ multiQueryWarning }}
-        </OBadge>
+        </OTag>
       </div>
       <div class="tw:flex tw:items-center tw:gap-3 tw:shrink-0">
         <OSwitch
@@ -197,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
           >
             <template #separator>
-              <div class="tw:w-1 tw:h-full tw:bg-(--o2-border) tw:transition-colors hover:tw:bg-[orange]"></div>
+              <div class="tw:w-1 tw:h-full tw:bg-(--o2-border) tw:transition-colors tw:hover:bg-[orange]"></div>
             </template>
             <template #before>
               <UnifiedQueryEditor
@@ -264,9 +262,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].vrlFunctionQuery && functionEditorPlaceholderFlag"
-                    class="query-editor-placeholder-overlay"
+                    class="tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:pt-0.75 tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
                   >
-                    <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
+                    <span class="tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:dark:text-[#718096] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ vrlPlaceholder }}</span>
                   </div>
                 </div>
                 <div style="flex-shrink: 0; width: 100%">
@@ -348,7 +346,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
@@ -365,7 +363,7 @@ export default defineComponent({
     OIcon,
     OSplitter,
     OInput,
-    OBadge,
+    OTag,
   },
   emits: ["searchdata", "run-query"],
   methods: {
@@ -972,109 +970,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<!-- removed scope due to VRL background image issue-->
-<style lang="scss">
-.sql-bar {
-  height: 40px;
-}
-
-.dashboard-query-remove-icon {
-  opacity: 0.6;
-  transition: opacity 0.15s, background-color 0.15s;
-
-  &:hover {
-    opacity: 1;
-    background-color: var(--o2-hover-gray);
-    border-radius: 50%;
-  }
-}
-
-.dashboard-query-visibility-icon {
-  opacity: 0.7;
-  transition: opacity 0.15s, background-color 0.15s;
-
-  &:hover {
-    opacity: 1;
-    background-color: var(--o2-hover-gray);
-    border-radius: 50%;
-  }
-}
-
-.query-tab-name-text {
-  cursor: default;
-  user-select: none;
-  white-space: nowrap;
-}
-
-.query-tab-name-input-wrap {
-  width: 90px;
-  min-width: 50px;
-  max-width: 160px;
-}
-
-
-// .query-tabs-container {
-//   width: 100%;
-//   display: flex;
-//   flex-direction: row;
-//   justify-content: flex-start;
-//   align-items: center;
-// }
-
-// .query-tab {
-//   display: flex;
-//   flex-direction: row;
-//   align-items: center;
-//   margin-right: 10px;
-//   padding: 5px;
-
-//   &:hover {
-//         background-color: #eaeaeaa5;
-//     }
-// }
-
-// .tab-label {
-//   margin-right: 5px;
-// }
-
-// .remove-button {
-//   cursor: pointer;
-//   display: flex;
-//   align-items: center;
-//   justify-content: center;
-//   width: 20px;
-//   height: 20px;
-// }
-
-// .query-tab.active {
-//     border-bottom: 3px solid #000;
-// }
-
-.query-editor-placeholder-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-start;
-  padding: 0.1875rem 0.5rem 0 2.15rem;
-  pointer-events: none;
-  z-index: 1;
-  user-select: none;
-
-  .query-editor-placeholder-typewriter {
-    font-family: monospace;
-    font-size: var(--text-base);
-    line-height: 1.3125rem;
-    color: #a0aec0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-:global(.body--dark) .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
-  color: #718096;
-}
-</style>

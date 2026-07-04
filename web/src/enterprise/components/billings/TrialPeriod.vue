@@ -17,10 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="showTrialPeriodMsg"
-    class="trial-banner tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:rounded-md tw:w-full"
+    data-test="trial-period-container"
+    class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:rounded-md tw:w-full tw:bg-(--o2-status-warning-bg) tw:border tw:border-(--o2-status-warning-text) tw:text-(--o2-status-warning-text)"
   >
     <!-- Warning icon -->
-    <OIcon name="warning" size="sm" class="tw:shrink-0 trial-banner-icon" />
+    <OIcon name="warning" size="sm" class="tw:shrink-0 tw:text-(--o2-status-warning-text)" />
 
     <!-- Message + subtitle on one line -->
     <p class="tw:flex-1 tw:min-w-0 tw:m-0 tw:text-sm tw:truncate">
@@ -130,15 +131,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-.trial-banner {
-  background-color: var(--o2-status-warning-bg);
-  border: 1px solid var(--o2-status-warning-text);
-  color: var(--o2-status-warning-text);
-}
-
-.trial-banner-icon {
-  color: var(--o2-status-warning-text);
-}
-</style>

@@ -358,8 +358,7 @@ defineExpose({
 });
 </script>
 
-<style scoped></style>
-<style lang="scss">
+<style>
 .iam-permissions-table {
   th{
     height: 48px !important;

@@ -87,5 +87,3 @@ defineExpose({
   getOtelHttpConfig
 });
 </script>
-
-<style scoped></style>

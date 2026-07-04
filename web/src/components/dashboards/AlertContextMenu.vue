@@ -19,32 +19,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="visible"
       ref="menuRef"
-      class="alert-context-menu"
+      class="tw:fixed tw:z-9999 tw:bg-white tw:dark:bg-[#2c2c2c] tw:border tw:border-(--o2-border) tw:dark:border-[#404040] tw:rounded tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)] tw:dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)] tw:min-w-70 tw:py-1 tw:px-0"
       :style="menuStyle"
       @click.stop
       data-test="alert-context-menu"
     >
       <div
-        class="menu-item"
+        class="tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm tw:text-[#333] tw:hover:bg-[#f5f5f5] tw:active:bg-[var(--o2-border)] tw:dark:text-[var(--o2-border)] tw:dark:hover:bg-[#383838] tw:dark:active:bg-[#404040]"
         @click="handleMenuItemClick('above')"
-        @mouseenter="hoveredItem = 'above'"
-        @mouseleave="hoveredItem = null"
-        :class="{ 'hovered': hoveredItem === 'above' }"
         data-test="alert-context-menu-above"
       >
         <OIcon name="arrow-upward" size="sm" class="tw:mr-2" />
-        <span>Create Alert with threshold above {{ formattedValue }}</span>
+        <span class="tw:select-none">Create Alert with threshold above {{ formattedValue }}</span>
       </div>
       <div
-        class="menu-item"
+        class="tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm tw:text-[#333] tw:hover:bg-[#f5f5f5] tw:active:bg-[var(--o2-border)] tw:dark:text-[var(--o2-border)] tw:dark:hover:bg-[#383838] tw:dark:active:bg-[#404040]"
         @click="handleMenuItemClick('below')"
-        @mouseenter="hoveredItem = 'below'"
-        @mouseleave="hoveredItem = null"
-        :class="{ 'hovered': hoveredItem === 'below' }"
         data-test="alert-context-menu-below"
       >
         <OIcon name="arrow-downward" size="sm" class="tw:mr-2" />
-        <span>Create Alert with threshold below {{ formattedValue }}</span>
+        <span class="tw:select-none">Create Alert with threshold below {{ formattedValue }}</span>
       </div>
     </div>
   </teleport>
@@ -80,7 +74,6 @@ export default defineComponent({
   emits: ['select', 'close'],
   setup(props, { emit }) {
     const menuRef = ref<HTMLElement | null>(null);
-    const hoveredItem = ref<string | null>(null);
 
     const formattedValue = computed(() => {
       if (typeof props.value === 'number') {
@@ -137,7 +130,6 @@ export default defineComponent({
 
     return {
       menuRef,
-      hoveredItem,
       formattedValue,
       menuStyle,
       handleMenuItemClick,
@@ -146,59 +138,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.alert-context-menu {
-  position: fixed;
-  z-index: 9999;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  min-width: 280px;
-  padding: 4px 0;
-
-  .menu-item {
-    display: flex;
-    align-items: center;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    font-size: 14px;
-    color: #333;
-
-    &.hovered,
-    &:hover {
-      background-color: #f5f5f5;
-    }
-
-    &:active {
-      background-color: #e0e0e0;
-    }
-
-    span {
-      user-select: none;
-    }
-  }
-}
-
-body.body--dark {
-  .alert-context-menu {
-    background: #2c2c2c;
-    border-color: #404040;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-
-    .menu-item {
-      color: #e0e0e0;
-
-      &.hovered,
-      &:hover {
-        background-color: #383838;
-      }
-
-      &:active {
-        background-color: #404040;
-      }
-    }
-  }
-}
-</style>
