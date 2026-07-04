@@ -42,62 +42,62 @@
         >
           <!-- Border Color -->
           <div
-            class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
+            class="tw:mb-0! tw:whitespace-nowrap tw:text-(--o2-text-4)! tw:font-bold tw:text-xs"
           >
             Border Color
-            <span class="sg-legend-subtitle">| Errors</span>
+            <span class="tw:font-normal tw:opacity-55">| Errors</span>
           </div>
           <div class="tw:flex! tw:flex-row tw:gap-2">
             <div
-              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+              class="tw:flex tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
             >
-              <div class="sg-legend-dot" style="border-color: #52c41a"></div>
+              <div class="tw:w-3 tw:h-3 tw:rounded-full tw:border-2 tw:border-solid tw:bg-transparent" style="border-color: #52c41a"></div>
               <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
                 <div
-                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                  class="tw:text-left tw:text-(--o2-text-2)! tw:text-[11px] tw:font-semibold"
                 >
                   Healthy
                 </div>
-                <div class="sg-legend-color-value tw:text-left">&lt; 1%</div>
+                <div class="tw:text-left tw:text-[10px] tw:opacity-55">&lt; 1%</div>
               </div>
             </div>
             <div
-              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+              class="tw:flex tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
             >
-              <div class="sg-legend-dot" style="border-color: #faad14"></div>
+              <div class="tw:w-3 tw:h-3 tw:rounded-full tw:border-2 tw:border-solid tw:bg-transparent" style="border-color: #faad14"></div>
               <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
                 <div
-                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                  class="tw:text-left tw:text-(--o2-text-2)! tw:text-[11px] tw:font-semibold"
                 >
                   Degraded
                 </div>
-                <div class="sg-legend-color-value tw:text-left">1 – 5%</div>
+                <div class="tw:text-left tw:text-[10px] tw:opacity-55">1 – 5%</div>
               </div>
             </div>
             <div
-              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+              class="tw:flex tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
             >
-              <div class="sg-legend-dot" style="border-color: #fa8c16"></div>
+              <div class="tw:w-3 tw:h-3 tw:rounded-full tw:border-2 tw:border-solid tw:bg-transparent" style="border-color: #fa8c16"></div>
               <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
                 <div
-                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                  class="tw:text-left tw:text-(--o2-text-2)! tw:text-[11px] tw:font-semibold"
                 >
                   Warning
                 </div>
-                <div class="sg-legend-color-value tw:text-left">5 – 10%</div>
+                <div class="tw:text-left tw:text-[10px] tw:opacity-55">5 – 10%</div>
               </div>
             </div>
             <div
-              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+              class="tw:flex tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
             >
-              <div class="sg-legend-dot" style="border-color: #f5222d"></div>
+              <div class="tw:w-3 tw:h-3 tw:rounded-full tw:border-2 tw:border-solid tw:bg-transparent" style="border-color: #f5222d"></div>
               <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
                 <div
-                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                  class="tw:text-left tw:text-(--o2-text-2)! tw:text-[11px] tw:font-semibold"
                 >
                   Critical
                 </div>
-                <div class="sg-legend-color-value tw:text-left">&gt; 10%</div>
+                <div class="tw:text-left tw:text-[10px] tw:opacity-55">&gt; 10%</div>
               </div>
             </div>
           </div>
@@ -114,32 +114,32 @@
         >
           <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
           <div
-            class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
+            class="tw:mb-0! tw:whitespace-nowrap tw:text-(--o2-text-4)! tw:font-bold tw:text-xs"
           >
             Node Size
-            <span class="sg-legend-subtitle">| Requests</span>
+            <span class="tw:font-normal tw:opacity-55">| Requests</span>
           </div>
-          <div class="sg-legend-row sg-legend-sizes tw:py-0!">
+          <div class="tw:flex tw:items-center tw:gap-1 tw:py-0!">
             <div
-              class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
+              class="tw:flex tw:flex-row tw:items-center tw:gap-1.5"
             >
               <div
-                class="sg-legend-circle"
+                class="tw:rounded-full tw:border-2 tw:border-solid tw:bg-transparent tw:shrink-0"
                 style="width: 16px; height: 16px; border-color: #52c41a"
               ></div>
-              <span class="sg-legend-label tw:text-[var(--o2-text-2)]!"
+              <span class="tw:text-[11px] tw:text-(--o2-text-2)!"
                 >Low</span
               >
             </div>
-            <div class="sg-legend-size-dots tw:mb-0">···</div>
+            <div class="tw:opacity-35 tw:text-[16px] tw:tracking-[2px] tw:mb-0">···</div>
             <div
-              class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
+              class="tw:flex tw:flex-row tw:items-center tw:gap-1.5"
             >
               <div
-                class="sg-legend-circle"
+                class="tw:rounded-full tw:border-2 tw:border-solid tw:bg-transparent tw:shrink-0"
                 style="width: 28px; height: 28px; border-color: #52c41a"
               ></div>
-              <span class="sg-legend-label tw:text-[var(--o2-text-2)]!"
+              <span class="tw:text-[11px] tw:text-(--o2-text-2)!"
                 >High</span
               >
             </div>
@@ -148,14 +148,14 @@
       </div>
     </div>
     <OCardSection
-      class="tw:flex-1 tw:min-h-0  service-graph-container"
+      class="tw:flex-1 tw:min-h-0 tw:relative tw:overflow-hidden service-graph-container"
     >
       <!-- Graph Visualization -->
-      <OCard class="graph-card tw:h-full">
+      <OCard class="tw:rounded-lg tw:shadow-sm tw:h-full">
         <OCardSection class="tw:p-0 tw:h-full" style="height: 100%">
           <div
             data-test="service-graph-container"
-            class="graph-container tw:h-full tw:bg-[var(--o2-bg)]"
+            class="graph-container tw:h-full tw:w-full tw:rounded tw:overflow-hidden tw:bg-[var(--o2-bg)]"
             style="position: relative"
           >
             <div v-if="loading" class="tw:flex tw:items-center tw:justify-center tw:h-full">
@@ -195,7 +195,7 @@
             <div
               v-else
               ref="graphContainerRef"
-              class="tw:h-full graph-with-panel-container"
+              class="tw:h-full tw:relative tw:overflow-hidden"
             >
               <ChartRenderer
                 ref="chartRendererRef"
@@ -1450,8 +1450,6 @@ export default defineComponent({
             params.data.name,
           );
         }
-      } else {
-        console.log("[ServiceGraph] Click not on a node or edge, ignoring");
       }
     };
 
@@ -1499,216 +1497,16 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.stat-card {
-  transition: all 0.3s ease;
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
-}
-
-.graph-card {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.graph-container {
-  position: relative;
-  width: 100%;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.sg-info-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 10;
-  transition: transform 0.2s ease;
-}
-
-.sg-info-btn:hover {
-  transform: scale(1.1);
-}
-
-:global(.sg-legend-tooltip),
-:global(.sg-legend-tooltip.q-tooltip) {
-  padding: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  color: inherit !important;
-}
-
-:global(.sg-legend) {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 14px 16px;
-  min-width: 260px;
-  color: #374151;
-  font-size: 12px;
-}
-
-:global(.body--dark .sg-legend) {
-  background: #1f2937;
-  border-color: #374151;
-  color: #e5e7eb;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-}
-
-:global(.sg-legend-title) {
-  font-weight: 700;
-  font-size: 12px;
-  margin-bottom: 10px;
-  color: inherit;
-}
-
-:global(.sg-legend-subtitle) {
-  font-weight: 400;
-  opacity: 0.55;
-}
-
-:global(.sg-legend-divider) {
-  border-top: 1px solid #e5e7eb;
-  margin: 12px 0;
-}
-
-:global(.body--dark .sg-legend-divider) {
-  border-color: #374151;
-}
-
-:global(.sg-legend-sizes) {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 0 6px;
-}
-
-:global(.sg-legend-size-item) {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-}
-
-:global(.sg-legend-circle) {
-  border-radius: 50%;
-  border-width: 2px;
-  border-style: solid;
-  background: transparent;
-  flex-shrink: 0;
-}
-
-:global(.sg-legend-size-dots) {
-  opacity: 0.35;
-  font-size: 16px;
-  letter-spacing: 2px;
-}
-
-:global(.sg-legend-label) {
-  font-size: 11px;
-}
-
-:global(.sg-legend-color-row) {
-  display: flex;
-  gap: 12px;
-}
-
-:global(.sg-legend-color-item) {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-}
-
-:global(.sg-legend-dot) {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border-width: 2px;
-  border-style: solid;
-  background: transparent;
-}
-
-:global(.sg-legend-color-label) {
-  font-size: 11px;
-  font-weight: 600;
-  text-align: center;
-  color: inherit;
-}
-
-:global(.sg-legend-color-value) {
-  font-size: 10px;
-  opacity: 0.55;
-  text-align: center;
-}
-
-:global(.sg-legend--floating) {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 16px;
-  min-width: unset;
-  padding: 10px 16px;
-}
-
-:global(.sg-legend--floating .sg-legend-title) {
-  margin-bottom: 0;
-  white-space: nowrap;
-}
-
-:global(.sg-legend--floating .sg-legend-color-row) {
-  gap: 16px;
-}
-
-:global(.sg-legend--floating .sg-legend-color-item) {
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-  flex: unset;
-}
-
-:global(.sg-legend--floating .sg-legend-color-item > div) {
-  display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 4px;
-}
-
-:global(.sg-legend--floating .sg-legend-color-label),
-:global(.sg-legend--floating .sg-legend-color-value) {
-  text-align: left;
-}
-
+<!-- Flowing edge animation — non-scoped so it reaches inside ECharts SVG output -->
+<style>
 .service-graph-container {
-  position: relative;
-  overflow: hidden;
   background: #0f1419 !important;
 }
 
 .body--light .service-graph-container {
-  background: #ffffff !important; // White background for light mode
+  background: #ffffff !important;
 }
 
-.graph-with-panel-container {
-  position: relative;
-  overflow: hidden;
-}
-
-code {
-  background: #f0f0f0;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-family: "Courier New", monospace;
-  font-size: 0.9em;
-}
-</style>
-
-<!-- Flowing edge animation — non-scoped so it reaches inside ECharts SVG output -->
-<style lang="scss">
 @keyframes sg-edge-flow {
   from {
     stroke-dashoffset: 14;

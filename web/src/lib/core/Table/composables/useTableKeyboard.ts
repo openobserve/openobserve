@@ -30,6 +30,8 @@ export function useTableKeyboard<TData>(
     // Only handle when focused within the table container
     if (!containerRef.value?.contains(target)) return;
 
+    if (target.closest("button, a, input, select, textarea, label, [role='button']")) return;
+
     const rows = table.getRowModel().rows;
     if (rows.length === 0) return;
 

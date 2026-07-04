@@ -419,34 +419,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.confirmBody {
-  padding: 11px 1.375rem 0;
-  font-size: 0.875rem;
-  text-align: center;
-  font-weight: 700;
-
-  .head {
-    line-height: 2.125rem;
-    margin-bottom: 0.5rem;
-    color: $dark-page;
-  }
-
-  .para {
-    color: $light-text;
-  }
-}
-
-.confirmActions {
-  justify-content: center;
-  padding: 1.25rem 1.375rem 1.625rem;
-  display: flex;
-}
-
-.no-hover {
-  &:hover {
-    color: black !important;
-  }
-}
-</style>

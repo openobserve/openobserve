@@ -459,7 +459,8 @@ describe("ColorPaletteDropDown", () => {
 
       const flexContainer = wrapper.find('[data-test="dashboard-color-palette-flex-container"]');
       expect(flexContainer.exists()).toBeTruthy();
-      expect(flexContainer.classes()).toContain("color-palette-row");
+      expect(flexContainer.classes()).toContain("tw:flex");
+      expect(flexContainer.classes()).toContain("tw:items-center");
     });
 
     it("should render q-select with correct props", () => {
@@ -494,7 +495,8 @@ describe("ColorPaletteDropDown", () => {
 
       const wrapper_element = wrapper.find('[data-test="dashboard-color-palette-color-input-wrapper"]');
       expect(wrapper_element.exists()).toBeTruthy();
-      expect(wrapper_element.classes()).toContain("color-swatch-wrapper");
+      expect(wrapper_element.classes()).toContain("tw:inline-flex");
+      expect(wrapper_element.classes()).toContain("tw:items-center");
     });
 
     it("should not show series by toggle by default", () => {

@@ -122,12 +122,16 @@ describe("OperationsList", () => {
 
     it("should display layout name", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".layout-name").text()).toBe("Operations");
+      expect(
+        wrapper.find('[data-test="promql-operations-list-label"]').text(),
+      ).toBe("Operations");
     });
 
     it("should render operation items", () => {
       wrapper = createWrapper();
-      const operations = wrapper.findAll(".operation-item");
+      const operations = wrapper.findAll(
+        '[data-test="promql-operations-item"]',
+      );
       expect(operations.length).toBe(mockOperations.length);
     });
 

@@ -640,8 +640,12 @@ describe("CustomNode.vue", () => {
         },
       });
 
-      expect(wrapper.find(".error-badge").exists()).toBe(true);
-      expect(wrapper.find(".error-count").text()).toBe("5");
+      expect(
+        wrapper.find('[data-test="pipeline-node-error-badge"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="pipeline-node-error-count"]').text(),
+      ).toBe("5");
     });
   });
 

@@ -222,8 +222,10 @@ describe("MetricLegends", () => {
     });
 
     it("should render legend grid", () => {
-      const legendGrid = wrapper.find('.legend-grid');
+      // legend-grid scoped class replaced by Tailwind grid utilities
+      const legendGrid = wrapper.find(".legends .tw\\:grid");
       expect(legendGrid.exists()).toBe(true);
+      expect(legendGrid.classes()).toContain("tw:grid-cols-2");
     });
   });
 

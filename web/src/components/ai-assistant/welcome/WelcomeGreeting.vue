@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -21,128 +21,61 @@ const logoSrc = computed(() =>
 </script>
 
 <template>
-  <header class="welcome-hero">
-    <div class="welcome-hero__row">
-      <div class="welcome-hero__logo-wrap">
-        <span class="welcome-hero__logo-halo" aria-hidden="true"></span>
-        <img :src="logoSrc" alt="O2 Assistant" class="welcome-hero__logo" />
+  <header class="welcome-hero tw:flex tw:flex-col tw:items-center tw:text-center tw:gap-[0.625rem] tw:max-w-[44rem]">
+    <div class="welcome-hero__row tw:flex tw:items-center tw:gap-[0.875rem]">
+      <div class="welcome-hero__logo-wrap tw:relative tw:inline-flex">
+        <span class="welcome-hero__logo-halo tw:absolute tw:inset-[-18px] tw:rounded-full tw:bg-[radial-gradient(closest-side,rgba(123,97,255,0.35),rgba(245,158,11,0.12)_55%,transparent_70%)] tw:blur-[14px] tw:pointer-events-none tw:z-0" aria-hidden="true"></span>
+        <img :src="logoSrc" alt="O2 Assistant" class="welcome-hero__logo tw:relative tw:z-1 tw:w-14 tw:h-14" />
       </div>
 
-      <div class="welcome-hero__heading-block">
-        <h1 class="welcome-hero__title">
+      <div class="welcome-hero__heading-block tw:flex tw:items-center">
+        <div class="welcome-hero__title tw:m-0 tw:text-[32px] tw:font-bold tw:tracking-[-0.01em] tw:leading-[1.15] tw:text-[var(--color-typography-body)] tw:flex tw:items-center tw:gap-2">
           {{ greeting }}
-          <span class="welcome-hero__wave" aria-hidden="true">👋</span>
-        </h1>
+          <span class="welcome-hero__wave tw:text-[26px] tw:leading-none tw:inline-block tw:[animation:wave_2.4s_ease-in-out_0.4s_2] tw:[transform-origin:70%_70%]" aria-hidden="true">👋</span>
+        </div>
       </div>
     </div>
 
-    <p class="welcome-hero__tagline">
+    <div class="welcome-hero__tagline tw:mt-1 tw:text-[13.5px] tw:leading-[1.6] tw:text-[var(--color-typography-meta)] tw:max-w-[38rem] tw:m-0">
       {{ t("aiAssistant.welcome.taglineLead") }}
-      <span class="welcome-hero__highlight">{{
+      <span class="welcome-hero__highlight tw:font-semibold tw:bg-[linear-gradient(90deg,#f59e0b,#ec4899,#7b61ff)] tw:[background-clip:text] tw:[-webkit-background-clip:text] tw:text-transparent">{{
         t("aiAssistant.welcome.taglineHighlight")
       }}</span
       >{{ t("aiAssistant.welcome.taglineTail") }}
-      <span class="welcome-hero__code welcome-hero__code--sql">{{
+      <span class="welcome-hero__code welcome-hero__code--sql tw:font-[var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)] tw:text-xs tw:font-semibold tw:py-[1px] tw:px-[6px] tw:rounded tw:tracking-[0.01em] tw:text-[#7b61ff] tw:bg-[rgba(123,97,255,0.1)]">{{
         t("aiAssistant.welcome.taglineSql")
       }}</span>,
-      <span class="welcome-hero__code welcome-hero__code--vrl">{{
+      <span class="welcome-hero__code welcome-hero__code--vrl tw:font-[var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)] tw:text-xs tw:font-semibold tw:py-[1px] tw:px-[6px] tw:rounded tw:tracking-[0.01em] tw:text-[#f59e0b] tw:bg-[rgba(245,158,11,0.12)]">{{
         t("aiAssistant.welcome.taglineVrl")
       }}</span>
       and
-      <span class="welcome-hero__code welcome-hero__code--promql">{{
+      <span class="welcome-hero__code welcome-hero__code--promql tw:font-[var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)] tw:text-xs tw:font-semibold tw:py-[1px] tw:px-[6px] tw:rounded tw:tracking-[0.01em] tw:text-[#10b981] tw:bg-[rgba(16,185,129,0.12)]">{{
         t("aiAssistant.welcome.taglinePromql")
       }}</span>
       — {{ t("aiAssistant.welcome.taglineAnd") }}
-    </p>
+    </div>
 
-    <div v-if="email" class="welcome-hero__meta">
-      <span class="welcome-hero__meta-item">
-        <span class="welcome-hero__meta-label">{{
+    <div v-if="email" class="welcome-hero__meta tw:inline-flex tw:flex-wrap tw:items-center tw:justify-center tw:gap-x-2 tw:gap-y-[0.375rem] tw:mt-[0.375rem] tw:py-[0.375rem] tw:px-3 tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-border-default)_30%,transparent)] tw:text-[11.5px]">
+      <span class="welcome-hero__meta-item tw:inline-flex tw:items-center tw:gap-1">
+        <span class="welcome-hero__meta-label tw:text-[var(--color-typography-meta)]">{{
           t("aiAssistant.welcome.signedInAs")
         }}</span>
-        <span class="welcome-hero__meta-value">{{ email }}</span>
+        <span class="welcome-hero__meta-value tw:text-[var(--color-typography-body)] tw:font-semibold">{{ email }}</span>
       </span>
-      <span v-if="role" class="welcome-hero__meta-dot" aria-hidden="true"
+      <span v-if="role" class="welcome-hero__meta-dot tw:text-[var(--color-typography-meta)] tw:opacity-50" aria-hidden="true"
         >·</span
       >
-      <span v-if="role" class="welcome-hero__meta-item">
-        <span class="welcome-hero__meta-label">{{
+      <span v-if="role" class="welcome-hero__meta-item tw:inline-flex tw:items-center tw:gap-1">
+        <span class="welcome-hero__meta-label tw:text-[var(--color-typography-meta)]">{{
           t("aiAssistant.welcome.role")
         }}</span>
-        <span class="welcome-hero__meta-value">{{ role }}</span>
+        <span class="welcome-hero__meta-value tw:text-[var(--color-typography-body)] tw:font-semibold">{{ role }}</span>
       </span>
     </div>
   </header>
 </template>
 
-<style scoped lang="scss">
-.welcome-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 0.625rem;
-  max-width: 44rem;
-}
-
-.welcome-hero__row {
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-}
-
-.welcome-hero__logo-wrap {
-  position: relative;
-  display: inline-flex;
-}
-
-.welcome-hero__logo-halo {
-  position: absolute;
-  inset: -18px;
-  border-radius: 9999px;
-  background: radial-gradient(
-    closest-side,
-    rgba(123, 97, 255, 0.35),
-    rgba(245, 158, 11, 0.12) 55%,
-    transparent 70%
-  );
-  filter: blur(14px);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.welcome-hero__logo {
-  position: relative;
-  z-index: 1;
-  width: 56px;
-  height: 56px;
-}
-
-.welcome-hero__heading-block {
-  display: flex;
-  align-items: center;
-}
-
-.welcome-hero__title {
-  margin: 0;
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.15;
-  color: var(--color-typography-body);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.welcome-hero__wave {
-  font-size: 26px;
-  line-height: 1;
-  display: inline-block;
-  animation: wave 2.4s ease-in-out 0.4s 2;
-  transform-origin: 70% 70%;
-}
-
+<style>
 @keyframes wave {
   0%,
   100% {
@@ -160,81 +93,5 @@ const logoSrc = computed(() =>
   80% {
     transform: rotate(-4deg);
   }
-}
-
-.welcome-hero__tagline {
-  margin: 0.25rem 0 0;
-  font-size: 13.5px;
-  line-height: 1.6;
-  color: var(--color-typography-meta);
-  max-width: 38rem;
-}
-
-.welcome-hero__highlight {
-  font-weight: 600;
-  background: linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.welcome-hero__code {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 4px;
-  letter-spacing: 0.01em;
-}
-
-.welcome-hero__code--sql {
-  color: #7b61ff;
-  background: rgba(123, 97, 255, 0.1);
-}
-
-.welcome-hero__code--vrl {
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.12);
-}
-
-.welcome-hero__code--promql {
-  color: #10b981;
-  background: rgba(16, 185, 129, 0.12);
-}
-
-.welcome-hero__meta {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.375rem 0.5rem;
-  margin-top: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  border-radius: 9999px;
-  background: color-mix(
-    in srgb,
-    var(--color-border-default) 30%,
-    transparent
-  );
-  font-size: 11.5px;
-}
-
-.welcome-hero__meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.welcome-hero__meta-label {
-  color: var(--color-typography-meta);
-}
-
-.welcome-hero__meta-value {
-  color: var(--color-typography-body);
-  font-weight: 600;
-}
-
-.welcome-hero__meta-dot {
-  color: var(--color-typography-meta);
-  opacity: 0.5;
 }
 </style>

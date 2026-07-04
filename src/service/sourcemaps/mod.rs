@@ -139,6 +139,12 @@ pub async fn process_zip(
         map_pairs.push((expected_minified.to_string(), (mapfile, path)));
     }
 
+    if map_pairs.is_empty() {
+        return Err(anyhow::anyhow!(
+            "No valid sourcemap files found in uploaded zip, currently only .js and .js.map files are supported"
+        ));
+    }
+
     let mut source_maps = Vec::with_capacity(map_pairs.len());
     let mut source_map_paths = Vec::with_capacity(map_pairs.len());
 

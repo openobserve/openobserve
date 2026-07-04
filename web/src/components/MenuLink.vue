@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[0.71875rem] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight"
+        class="nav-menu-item-label tw:text-[0.71875rem] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight tw:line-clamp-2 tw:wrap-normal tw:break-normal tw:[hyphens:none]"
         :class="isActive
           ? activeLabelClass
           : 'tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
@@ -300,26 +300,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-/* Locale-robust label wrapping for the narrow rail.
-   - Wrap only at word boundaries (spaces): multi-word labels like
-     "Data sources" split into two clean lines, while single words such as
-     "Management" or "Incidents" stay on one line instead of being chopped into
-     a hanging fragment ("Manageme / nt").
-   - Clamp to two lines and hide the overflow so a verbose single-word
-     translation (e.g. German "Einstellungen") truncates with an ellipsis on
-     one tidy line rather than blowing up the row height; the full text is still
-     available via the anchor's title tooltip and aria-label.
-   - hyphens:none guarantees we never insert a dash character. */
-.nav-menu-item-label {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  overflow-wrap: normal;
-  word-break: normal;
-  hyphens: none;
-}
-</style>

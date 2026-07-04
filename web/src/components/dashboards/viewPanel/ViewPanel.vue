@@ -10,7 +10,7 @@
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
- limitations under the License. 
+ limitations under the License.
 -->
 
 <!-- eslint-disable vue/no-unused-components -->
@@ -27,7 +27,7 @@
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
-          class="viewpanel-icons"
+          class="tw:h-8 tw:transition-all tw:duration-200 tw:hover:bg-[var(--color-interactive-hover-bg)]"
           style="width: 150px"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
         />
@@ -35,7 +35,7 @@
         <DateTimePickerDashboard
           v-model="selectedDate"
           ref="dateTimePickerRef"
-          class="viewpanel-icons"
+          class="tw:h-8 tw:min-h-8 tw:transition-all tw:duration-200 tw:hover:bg-[var(--color-interactive-hover-bg)]"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
           @hide="setTimeForVariables()"
@@ -47,7 +47,7 @@
             store.state?.zoConfig?.min_auto_refresh_interval || 5
           "
           @trigger="refreshData"
-          class="viewpanel-icons"
+          class="tw:h-8 tw:transition-all tw:duration-200 tw:hover:bg-[var(--color-interactive-hover-bg)]"
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <OButton
@@ -90,7 +90,7 @@
       <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
         <div class="tw:flex" style="height: 100%; width: 100%">
           <div class="tw:flex tw:flex-col" style="height: 100%; width: 100%">
-            <div class="layout-panel-container tw:flex tw:flex-col" style="height: 100%">
+            <div class="tw:flex tw:flex-col" style="height: 100%">
               <VariablesValueSelector
                 :variablesConfig="currentDashboardData.data?.variables"
                 :showDynamicFilters="
@@ -911,47 +911,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.layout-panel-container {
-  display: flex;
-  flex-direction: column;
-}
-
-.warning {
-  color: var(--q-warning);
-}
-
-.viewpanel-icons {
-  height: 32px;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
-
-  :deep(.date-time-button) {
-    height: 32px;
-    min-height: 32px;
-  }
-
-  :deep(.q-btn-dropdown) {
-    height: 32px;
-    min-height: 32px;
-    padding: 0 8px;
-
-    .q-btn__content {
-      line-height: normal;
-      align-items: center;
-    }
-  }
-}
-
-.el-border {
-  transition: background-color 0.2s ease;
-
-  &:hover {
-    background-color: var(--o2-hover-accent) !important;
-  }
-}
-</style>

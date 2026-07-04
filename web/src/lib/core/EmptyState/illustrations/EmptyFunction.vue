@@ -64,7 +64,7 @@ withDefaults(
 );
 </script>
 
-<style scoped>
+<style>
 .es-token {
   transform-box: view-box;
   animation: es-flow 2.8s ease-in-out infinite;

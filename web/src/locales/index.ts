@@ -15,6 +15,7 @@
 
 import { createI18n } from "vue-i18n"; // import from runtime only
 import { getLanguage } from "../utils/cookies";
+import { setBadgeTranslator } from "@/lib/core/Badge/badgeI18n";
 
 // User defined lang
 import zhLocale from "./languages/zh.json";
@@ -91,5 +92,9 @@ const i18n = createI18n({
   fallbackLocale: "en-gb",
   messages: messages,
 });
+
+// Wire the badge registry's i18n resolver (OTag labelKey → translated text)
+// without coupling the low-level OTag component to this module graph.
+setBadgeTranslator((key: string) => i18n.global.t(key as never));
 
 export default i18n;

@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template v-slot:before>
             <div class="tw:px-2 tw:pt-2 tw:pb-3 card-container tw:h-full tw:flex tw:flex-col tw:min-h-0">
-              <div class="add-function-name-input tw:pb-2 o2-input tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+              <div class="tw:pb-2 o2-input tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
                   <FullViewContainer
                     name="function"
                     v-model:is-expanded="expandState.functions"
@@ -85,9 +85,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div
                       v-if="!formData.function && functionEditorPlaceholderFlag"
-                      class="query-editor-placeholder-overlay"
+                      class="tw:absolute tw:inset-0 tw:flex tw:items-start tw:pt-0.75 tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
                     >
-                      <span class="query-editor-placeholder-typewriter">{{
+                      <span class="tw:[font-family:monospace] tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:dark:text-[#718096] tw:whitespace-nowrap tw:overflow-hidden tw:[text-overflow:ellipsis]">{{
                         formData.transType === '1' ? jsPlaceholder : vrlPlaceholder
                       }}</span>
                     </div>
@@ -536,7 +536,6 @@ export default defineComponent({
 
     // Unified Query Editor: Handle language change
     const handleLanguageChange = (newLanguage: 'vrl' | 'javascript') => {
-      console.log('[AddFunction] Language changed to:', newLanguage);
       // Update transType: '1' for JavaScript, '0' for VRL
       formData.value.transType = newLanguage === 'javascript' ? '1' : '0';
     };
@@ -545,7 +544,6 @@ export default defineComponent({
      * Handle NLP mode toggle from AI icon in editor
      */
     const handleToggleNlpMode = () => {
-      console.log('[AddFunction] Toggling NLP mode from AI icon');
       // UnifiedQueryEditor manages its own NLP mode state internally
     };
 
@@ -553,7 +551,6 @@ export default defineComponent({
      * Handle generation start event from UnifiedQueryEditor
      */
     const handleGenerationStart = () => {
-      console.log('[AddFunction] AI generation started');
       // Can add loading indicators here if needed
     };
 
@@ -561,7 +558,6 @@ export default defineComponent({
      * Handle generation end event from UnifiedQueryEditor
      */
     const handleGenerationEnd = () => {
-      console.log('[AddFunction] AI generation ended');
       // Can remove loading indicators here if needed
     };
 
@@ -569,13 +565,11 @@ export default defineComponent({
      * Handle successful generation from UnifiedQueryEditor
      */
     const handleGenerationSuccess = (payload: {type: string, message: string}) => {
-      console.log('[AddFunction] AI generation success:', payload.type);
       // Function code is already updated via @update:query handler
     };
 
     // Unified Query Editor: Handle Ask AI
     const handleAskAI = async (naturalLanguage: string, language: 'vrl' | 'javascript') => {
-      console.log('[AddFunction] Ask AI for language:', language, 'input:', naturalLanguage);
 
       // Enable AI chat if not already enabled
       if (!store.state.isAiChatEnabled) {
@@ -654,98 +648,8 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.monaco-editor {
-  width: 100%;
-  border-radius: 5px;
-}
-
-.add-function-name-input {
-  :deep(.q-field--dense .q-field__control) {
-    height: 36px;
-    min-height: auto;
-    border-radius: 3px;
-
-    .q-field__control-container {
-      height: 32px;
-
-      .q-field__native {
-        height: 32px !important;
-      }
-    }
-
-    .q-field__marginal {
-      height: 32px;
-      min-height: auto;
-    }
-  }
-
-  :deep(.q-field__bottom) {
-    padding-top: 4px !important;
-    min-height: auto;
-  }
-}
-
-.function-stream-select-input {
-  :deep(.q-field--auto-height .q-field__control) {
-    height: 32px;
-    min-height: auto;
-
-    .q-field__control-container {
-      height: 32px;
-
-      .q-field__native {
-        min-height: 32px !important;
-        height: 32px !important;
-      }
-    }
-
-    .q-field__marginal {
-      height: 32px;
-      min-height: auto;
-    }
-  }
-}
-
-.functions-duration-input {
-  :deep(.date-time-button) {
-    width: 100%;
-  }
-}
-
+<style>
 .ai-chat-with-offset {
   --ai-chat-offset: 75px;
-}
-
-.query-editor-placeholder-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-start;
-  padding: 0.1875rem 0.5rem 0 2.15rem;
-  pointer-events: none;
-  z-index: 1;
-  user-select: none;
-
-  .query-editor-placeholder-typewriter {
-    font-family: monospace;
-    font-size: var(--text-base);
-    line-height: 1.3125rem;
-    color: #a0aec0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-:global(.body--dark) .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
-  color: #718096;
-}
-</style>
-<style>
-.no-case .q-field__native span {
-  text-transform: none !important;
 }
 </style>

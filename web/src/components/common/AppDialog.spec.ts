@@ -36,7 +36,7 @@ describe('AppDialog.vue', () => {
 
     it('does not render when modelValue is false', () => {
       wrapper = createWrapper({ modelValue: false });
-      const backdrop = wrapper.find('.app-dialog-backdrop');
+      const backdrop = wrapper.find('[data-test="common-app-dialog-backdrop"]');
       expect(backdrop.exists()).toBe(false);
     });
 
@@ -59,16 +59,16 @@ describe('AppDialog.vue', () => {
       wrapper = createWrapper({ modelValue: true });
       
       // Check DOM directly since component uses Teleport
-      expect(document.querySelector('.app-dialog-backdrop')).toBeTruthy();
-      expect(document.querySelector('.app-dialog')).toBeTruthy();
-      expect(document.querySelector('.app-dialog-content')).toBeTruthy();
+      expect(document.querySelector('[data-test="common-app-dialog-backdrop"]')).toBeTruthy();
+      expect(document.querySelector('[data-test="common-app-dialog"]')).toBeTruthy();
+      expect(document.querySelector('[data-test="common-app-dialog-content"]')).toBeTruthy();
     });
 
     it('sets correct ARIA attributes', () => {
       wrapper = createWrapper({ modelValue: true });
       
       // Check DOM directly since component uses Teleport
-      const dialog = document.querySelector('.app-dialog');
+      const dialog = document.querySelector('[data-test="common-app-dialog"]');
       expect(dialog?.getAttribute('role')).toBe('dialog');
       expect(dialog?.getAttribute('aria-modal')).toBe('true');
     });
@@ -123,7 +123,7 @@ describe('AppDialog.vue', () => {
       wrapper = createWrapper({ modelValue: true, closeOnBackdropClick: true });
       
       // Find backdrop in DOM directly
-      const backdrop = document.querySelector('.app-dialog-backdrop') as HTMLElement;
+      const backdrop = document.querySelector('[data-test="common-app-dialog-backdrop"]') as HTMLElement;
       expect(backdrop).toBeTruthy();
       
       backdrop?.click();
@@ -135,7 +135,7 @@ describe('AppDialog.vue', () => {
     it('does not call handleClose when backdrop is clicked and closeOnBackdropClick is false', async () => {
       wrapper = createWrapper({ modelValue: true, closeOnBackdropClick: false });
       
-      const backdrop = document.querySelector('.app-dialog-backdrop') as HTMLElement;
+      const backdrop = document.querySelector('[data-test="common-app-dialog-backdrop"]') as HTMLElement;
       expect(backdrop).toBeTruthy();
       
       backdrop?.click();
@@ -147,7 +147,7 @@ describe('AppDialog.vue', () => {
     it('prevents event propagation when dialog content is clicked', async () => {
       wrapper = createWrapper({ modelValue: true });
       
-      const dialog = document.querySelector('.app-dialog') as HTMLElement;
+      const dialog = document.querySelector('[data-test="common-app-dialog"]') as HTMLElement;
       expect(dialog).toBeTruthy();
       
       dialog?.click();
@@ -361,7 +361,7 @@ describe('AppDialog.vue', () => {
     it('handles multiple rapid backdrop clicks', async () => {
       wrapper = createWrapper({ modelValue: true, closeOnBackdropClick: true });
       
-      const backdrop = document.querySelector('.app-dialog-backdrop') as HTMLElement;
+      const backdrop = document.querySelector('[data-test="common-app-dialog-backdrop"]') as HTMLElement;
       
       // Rapid clicks
       backdrop?.click();
@@ -418,7 +418,7 @@ describe('AppDialog.vue', () => {
       });
       
       // Test that new prop values are respected
-      const backdrop = document.querySelector('.app-dialog-backdrop') as HTMLElement;
+      const backdrop = document.querySelector('[data-test="common-app-dialog-backdrop"]') as HTMLElement;
       backdrop?.click();
       
       expect(wrapper.emitted('update:modelValue')).toBeFalsy();
@@ -435,7 +435,7 @@ describe('AppDialog.vue', () => {
       wrapper = createWrapper({ modelValue: true });
       
       // Check that the backdrop is actually in the body
-      const backdrop = document.querySelector('.app-dialog-backdrop');
+      const backdrop = document.querySelector('[data-test="common-app-dialog-backdrop"]');
       expect(backdrop).toBeTruthy();
       expect(document.body.contains(backdrop)).toBe(true);
     });

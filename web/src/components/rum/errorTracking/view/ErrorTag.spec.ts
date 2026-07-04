@@ -69,12 +69,6 @@ describe("ErrorTag Component", () => {
     expect(wrapper.text()).toContain("web-application");
   });
 
-  it("renders the separator between key and value", () => {
-    // Arrange + Act handled in beforeEach
-
-    // Assert
-    expect(wrapper.find('[data-test="separator"]').exists()).toBe(true);
-  });
 
   it("shows updated key text when tag prop changes", async () => {
     // Arrange
@@ -179,18 +173,9 @@ describe("ErrorTag Component", () => {
     expect(ErrorTag.props?.tag?.type).toBe(Object);
   });
 
-  it("renders a div as root element", () => {
-    // Arrange + Act handled in beforeEach
-
-    // Assert
-    expect(wrapper.element.tagName).toBe("DIV");
-  });
-
-  it("has three direct child elements (key, separator, value)", () => {
-    // Arrange + Act handled in beforeEach
-
-    // Assert
-    const children = wrapper.element.children;
-    expect(children).toHaveLength(3);
+  it("renders the dimension chip with key and value", () => {
+    // ErrorTag now delegates to <ODimensionChip>; assert content, not structure.
+    expect(wrapper.text()).toContain(wrapper.props("tag").key);
+    expect(wrapper.text()).toContain(wrapper.props("tag").value);
   });
 });

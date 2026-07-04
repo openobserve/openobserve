@@ -16,23 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
     <!-- Header -->
-    <div class="tw:flex tw:items-center tw:flex-nowrap tw:mx-3 tw:pt-2">
-      <div class="tw:flex tw:items-center tw:py-2">
-        <div
-          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
-          :title="t('common.goBack')"
-          @click="$emit('cancel:hideform')"
-        >
-          <OIcon name="arrow-back-ios-new" size="xs" />
-        </div>
-        <div class="tw:flex tw:flex-col">
-          <div class="tw:text-xl tw:font-semibold">
-            {{ isEditing ? t("aiToolset.update") : t("aiToolset.add") }}
-          </div>
-        </div>
-      </div>
-    </div>
-    <OSeparator />
+    <AppPageHeader
+      :title="isEditing ? t('aiToolset.update') : t('aiToolset.add')"
+      :back="{
+        label: t('aiToolset.header'),
+        onClick: () => $emit('cancel:hideform'),
+        dataTest: 'ai-toolset-back-btn',
+      }"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    />
 
     <!-- Inline page form. The form is created in setup() via useOForm (headless)
          so this owner can read `kind`/arrays/skill content reactively to drive
@@ -114,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(header, idx) in mcpHeaders"
               :key="idx"
-              class="tw:flex tw:gap-2 tw:mb-2"
+              class="tw:flex tw:items-end tw:gap-2 tw:mb-2"
             >
               <OFormInput
                 :name="`mcp.headers[${idx}].key`"
@@ -143,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="delete" size="xs" />
               </OButton>
             </div>
-            <OButton variant="ghost" size="sm" class="tw:mb-4" @click="addHeader" icon-left="add">
+            <OButton variant="outline" size="sm" class="tw:mb-4" @click="addHeader" icon-left="add">
               {{ t("aiToolset.addHeader") }}
             </OButton>
           </template>
@@ -158,17 +150,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="tw:text-xs tw:text-gray-400"
                   >{{ t("aiToolset.presets") }}:</span
                 >
-                <OBadge
+                <OTag
                   v-for="preset in CLI_PRESETS"
                   :key="preset.id"
+                  type="cliPreset"
+                  :value="preset.id"
                   clickable
-                  variant="primary-soft"
                   class="tw:cursor-pointer"
                   :data-test="`cli-preset-${preset.id}`"
                   @click="applyPreset(preset)"
                 >
                   {{ preset.label }}
-                </OBadge>
+                </OTag>
               </div>
             </div>
             <div class="o2-input tw:mb-4">
@@ -221,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(env, idx) in cliEnvVars"
               :key="'env-' + idx"
-              class="tw:flex tw:gap-2 tw:mb-2"
+              class="tw:flex tw:items-end tw:gap-2 tw:mb-2"
             >
               <OFormInput
                 :name="`cli.env[${idx}].key`"
@@ -250,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="delete" size="xs" />
               </OButton>
             </div>
-            <OButton variant="ghost" size="sm" class="tw:mb-4" @click="addEnvVar" icon-left="add">
+            <OButton variant="outline" size="sm" class="tw:mb-4" @click="addEnvVar" icon-left="add">
               {{ t("aiToolset.addEnvVar") }}
             </OButton>
 
@@ -286,14 +279,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <query-editor
                 :editor-id="`cred-file-editor-${idx}`"
-                class="monaco-editor-cred"
+                class="tw:w-full tw:min-h-50! tw:rounded-[5px] tw:border tw:border-(--o2-border-color) tw:resize-y tw:overflow-auto"
                 language="yaml"
                 :query="cred.value"
                 @update:query="(v: string) => setCredValue(idx, v)"
               />
             </div>
             <OButton
-              variant="ghost"
+              variant="outline"
               size="sm"
               class="tw:mb-4"
               @click="addCredFile"
@@ -316,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <query-editor
               data-test="ai-toolset-skill-content"
               editor-id="skill-content-editor"
-              class="monaco-editor tw:mb-3"
+              class="tw:w-full tw:min-h-100! tw:rounded-[5px] tw:border tw:border-(--o2-border-color) tw:resize-y tw:overflow-auto tw:mb-3"
               language="markdown"
               :query="skillContent"
               @update:query="(v: string) => setSkillContent(v)"
@@ -332,7 +325,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Footer -->
         <div
-          class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-t-[1px] tw:sticky tw:bottom-0 tw:bg-white dark:tw:bg-[#1a1a1a]"
+          class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-t tw:border-border-default tw:sticky tw:bottom-0"
+          :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-primary-background)' : 'tw:bg-white'"
         >
           <OButton
             data-test="ai-toolset-save-btn"
@@ -372,13 +366,13 @@ import { useI18n } from "vue-i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import type { ToolsetKind } from "@/services/ai_toolsets";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -395,8 +389,8 @@ const QueryEditor = defineAsyncComponent(
 export default defineComponent({
   name: "AddAiToolset",
   components: {
-    OSeparator,
-    OBadge,
+    AppPageHeader,
+    OTag,
     OButton,
     OIcon,
     OForm,
@@ -697,6 +691,8 @@ export default defineComponent({
 
     return {
       t,
+      // Exposed for the theme-aware footer background (`store.state.theme`).
+      store,
       // 🔑 Options-API: the form MUST be returned so `:form` resolves in the
       // template (else <OForm> gets no form and validation silently no-ops).
       form,
@@ -727,25 +723,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-/* Skill definition editor — full-height markdown area */
-.monaco-editor {
-  width: 100%;
-  min-height: 400px !important;
-  border-radius: 5px;
-  border: 1px solid var(--o2-border-color);
-  resize: vertical;
-  overflow: auto;
-}
-
-/* Credential file editor — generous but shorter than skill */
-.monaco-editor-cred {
-  width: 100%;
-  min-height: 200px !important;
-  border-radius: 5px;
-  border: 1px solid var(--o2-border-color);
-  resize: vertical;
-  overflow: auto;
-}
-</style>

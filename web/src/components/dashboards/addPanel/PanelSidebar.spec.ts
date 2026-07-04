@@ -136,7 +136,7 @@ describe("PanelSidebar", () => {
       const icon = wrapper.find('[data-test="dashboard-sidebar"]');
       expect(icon.exists()).toBe(true);
       expect(icon.attributes("name")).toBe("expand-all");
-      expect(icon.classes()).toContain("collapsed-icon");
+      expect(icon.classes()).toContain("tw:mt-[10px]");
       expect(icon.classes()).toContain("rotate-90");
     });
 
@@ -197,7 +197,7 @@ describe("PanelSidebar", () => {
     it("should apply correct CSS classes in expanded state", () => {
       wrapper = createWrapper({ modelValue: true });
       
-      expect(wrapper.find('[data-test="panel-sidebar-root"]').classes()).toContain("open");
+      expect(wrapper.find('[data-test="panel-sidebar-root"]').classes()).toContain("tw:w-75");
     });
 
     it("should show sidebar content when expanded", () => {
@@ -428,20 +428,20 @@ describe("PanelSidebar", () => {
 
       const sidebar = wrapper.find('[data-test="panel-sidebar-root"]');
       expect(sidebar.exists()).toBe(true);
-      expect(sidebar.classes()).toContain("open");
+      expect(sidebar.classes()).toContain("tw:w-75");
     });
 
     it("should not apply open class when collapsed", () => {
       wrapper = createWrapper({ modelValue: false });
-      
-      expect(wrapper.find('[data-test="panel-sidebar-root"]').classes()).not.toContain("open");
+
+      expect(wrapper.find('[data-test="panel-sidebar-root"]').classes()).not.toContain("tw:w-75");
     });
 
     it("should apply correct icon classes", () => {
       wrapper = createWrapper({ modelValue: false });
 
       const icon = wrapper.find('[data-test="dashboard-sidebar"]');
-      expect(icon.classes()).toContain("collapsed-icon");
+      expect(icon.classes()).toContain("tw:mt-[10px]");
       expect(icon.classes()).toContain("rotate-90");
     });
 

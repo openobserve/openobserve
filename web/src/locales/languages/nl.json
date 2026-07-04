@@ -475,7 +475,9 @@
     "actions": "Acties",
     "incidents": "Incidenten",
     "evals": "Evalen",
-    "aiObservability": "AI-waarneembaarheid"
+    "keyboardShortcuts": "Sneltoetsen",
+    "aiObservability": "AI-waarneembaarheid",
+    "aiAssistant": "AI-assistent"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",
@@ -3123,6 +3125,25 @@
     "aiToolsets": "AI-toolsets",
     "llmModelPricing": "Prijzen van het LLM-model",
     "ingestionTokens": "Tokens voor inname",
+    "genAiAgentMapping": {
+      "tabLabel": "In kaart brengen van GenAI-agenten",
+      "title": "In kaart brengen van GenAI-agenten",
+      "description": "Configureer de telemetriekenmerken die worden gebruikt om de identiteit van agenten te normaliseren voor LLM-traceringen en evaluaties.",
+      "howItWorksTitle": "Hoe het in kaart brengen werkt",
+      "howItWorksDescription": "OpenObserve behoudt eerst de standaard gen_ai.agent.name en gen_ai.agent.id attributen. Deze lijsten worden alleen gecontroleerd als de standaardattributen ontbreken of leeg zijn. Voeg één inkomend telemetriekenmerk per regel toe.",
+      "agentNameFields": "Terugvalvelden voor de naam van de agent",
+      "agentNameHelp": "Inkomende attributen om te gebruiken als noodoplossing voor gen_ai.agent.name.",
+      "agentIdFields": "Terugvalvelden voor Agent-ID",
+      "agentIdHelp": "Inkomende attributen om te gebruiken als noodoplossing voor gen_ai.agent.id.",
+      "fieldsPlaceholder": "agent.naam\nllm.agent.name",
+      "applyDefaults": "Standaardwaarden toepassen",
+      "resetToEmpty": "Terugzetten naar leeg",
+      "defaultsSource": "De standaardinstellingen worden geladen vanuit openobserve/sdr_patterns en kunnen worden gewijzigd voordat ze voor deze organisatie worden opgeslagen.",
+      "saved": "De toewijzing van GenAI-agenten is met succes opgeslagen",
+      "loadFailed": "Het laden van de GenAI-agenttoewijzing is mislukt",
+      "saveFailed": "Kon de toewijzing van de GenAI-agent niet opslaan",
+      "defaultsLoadFailed": "Het laden van de standaardinstellingen voor GenAI-agenttoewijzing is mislukt"
+    },
     "groupGeneral": "Algemeen",
     "groupAccessSecurity": "Toegang en beveiliging",
     "groupDestinationsTemplates": "Bestemmingen en sjablonen",
@@ -5697,6 +5718,83 @@
       "description": "LLM-providers slaan de verbindingsgegevens (eindpunt + inloggegevens) op voor de taalmodellen die uw LLM Judge-scorers aanroepen. Voeg er een toe om te beginnen met het uitvoeren van evaluaties op basis van rechters."
     }
   },
+  "shortcuts": {
+    "title": "Sneltoetsen",
+    "mac": "Mac",
+    "windowsLinux": "Windows/Linux",
+    "toggleHint": "om dit paneel in of uit te schakelen",
+    "pages": {
+      "global": "Globaal",
+      "logs": "Logboeken",
+      "dashboardsList": "Dashboards",
+      "dashboards": "Dashboard-weergave",
+      "dashboardsPanel": "Dashboard — Paneel (plaats de muisaanwijzer op een paneel)",
+      "metrics": "Metrieken",
+      "traces": "Sporen",
+      "alerts": "Waarschuwingen",
+      "streams": "Streams",
+      "pipelines": "Pijpleidingen",
+      "functions": "Functies",
+      "reports": "Rapporten"
+    },
+    "actions": {
+      "openCheatsheet": "Cheatsheet voor sneltoetsen openen",
+      "closeDialog": "Elke dialoog, lade of modaal sluiten",
+      "focusSearch": "Focuszoekbalk",
+      "logsRunQuery": "Zoekopdracht uitvoeren",
+      "logsRefresh": "Zoekopdracht verversen/opnieuw uitvoeren",
+      "logsToggleHistogram": "Histogram omschakelen",
+      "logsToggleSidebar": "Velden in- en uitschakelen in de zijbalk",
+      "dashboardsListAdd": "Nieuw dashboard",
+      "dashboardsListImport": "Dashboard importeren",
+      "dashboardsListRefresh": "Lijst verversen",
+      "dashboardRefresh": "Alle panelen verversen",
+      "dashboardAddPanel": "Nieuw paneel toevoegen",
+      "dashboardSave": "Dashboard opslaan",
+      "dashboardFullscreen": "Volledig scherm in- en uitschakelen",
+      "panelView": "Paneel op volledig scherm bekijken",
+      "panelEdit": "Paneel bewerken",
+      "panelDuplicate": "Paneel dupliceren",
+      "panelDelete": "Paneel verwijderen",
+      "metricsRunQuery": "Voer een ProMQL-query uit",
+      "metricsRefresh": "Vernieuwen",
+      "tracesSearch": "Zoek naar sporen",
+      "tracesRefresh": "Vernieuwen",
+      "alertsCreate": "Nieuwe waarschuwing aanmaken",
+      "alertsRefresh": "Waarschuwingslijst vernieuwen",
+      "alertsClose": "Lade met waarschuwingsdetails sluiten",
+      "streamsAdd": "Nieuwe stream toevoegen",
+      "streamsRefresh": "Lijst verversen",
+      "pipelinesAdd": "Maak een nieuwe pijplijn",
+      "pipelinesImport": "Pijplijn importeren",
+      "pipelinesRefresh": "Lijst verversen",
+      "functionsAdd": "Nieuwe functie toevoegen",
+      "functionsRefresh": "Lijst verversen",
+      "reportsAdd": "Maak een nieuw rapport",
+      "reportsRefresh": "Lijst verversen"
+    },
+    "search": "Sneltoetsen zoeken...",
+    "noResults": "Geen sneltoetsen gevonden",
+    "subtitle": "Druk op? overal · klik op een willekeurige rij om te activeren",
+    "footerClose": "dichtbij",
+    "footerReopen": "heropenen",
+    "footerRun": "klik op de rij om uit te voeren",
+    "footerMacHint": "⌘ = Cmd op Mac · Ctrl op Windows",
+    "modules": {
+      "global": "Globaal",
+      "logs": "Logboeken",
+      "dashboards": "Dashboards",
+      "metrics": "Metrieken",
+      "traces": "Sporen",
+      "alerts": "Waarschuwingen",
+      "streams": "Streams",
+      "pipelines": "Pijpleidingen",
+      "functions": "Functies",
+      "reports": "Rapporten",
+      "iam": "IAM",
+      "runningQueries": "Zoekopdrachten uitvoeren"
+    }
+  },
   "aiObservability": {
     "title": "LLM-waarneembaarheid",
     "sections": {
@@ -5756,6 +5854,14 @@
         "title": "Recente fouten",
         "subtitle": "laatste 10 mislukte overspanningen"
       }
+    },
+    "subtitle": {
+      "llmInsights": "Volg latentie, fouten, tokens en kosten in al je LLM-verkeer",
+      "sessions": "Bekijk en inspecteer de sessies van agenten beurtelings",
+      "quality": "Scoor en volg de kwaliteit van je LLM-reacties",
+      "evalJobs": "Voer evaluatietaken uit en controleer ze tijdens al je sessies",
+      "scorers": "Creëer en beheer de scorers die LLM-resultaten beoordelen",
+      "scoreConfigs": "Configureer de scorerubrieken die voor uw evaluaties worden gebruikt"
     }
   },
   "logs": {

@@ -57,6 +57,7 @@ pub async fn merge_parquet_files_with_downsampling(
     bloom_filter_fields: &[String],
     rule: &DownsamplingRule,
     metadata: &FileMeta,
+    file_format: FileFormat,
 ) -> Result<MergeParquetResult> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -107,7 +108,7 @@ pub async fn merge_parquet_files_with_downsampling(
     });
 
     // Write batches to the appropriate format
-    let (bufs, file_metas) = match cfg.common.file_format {
+    let (bufs, file_metas) = match file_format {
         FileFormat::Parquet => {
             write_downsampled_parquet(rx, &schema, bloom_filter_fields, metadata, &cfg).await?
         }
@@ -133,7 +134,11 @@ pub async fn merge_parquet_files_with_downsampling(
         start.elapsed().as_millis()
     );
 
-    Ok(MergeParquetResult::Multiple { bufs, file_metas })
+    Ok(MergeParquetResult::Multiple {
+        bufs,
+        file_metas,
+        file_format,
+    })
 }
 
 async fn write_downsampled_parquet(

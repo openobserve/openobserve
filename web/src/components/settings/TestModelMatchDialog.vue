@@ -15,34 +15,33 @@
   >
 
     <!-- Two-column body -->
-    <div class="tmm-body" style="height: 100%">
+    <div class="tw:flex tw:flex-1 tw:overflow-hidden tw:min-h-0" style="height: 100%">
         <!-- ── Left: Inputs ── -->
-        <div class="tmm-inputs-panel">
+        <div class="tw:w-[340px] tw:shrink-0 tw:overflow-y-auto tw:py-5 tw:pr-5 tw:pl-6 tw:flex tw:flex-col tw:gap-5">
           <!-- Model Name -->
-          <div class="tmm-section">
-            <label class="tmm-label"
+          <div class="tw:flex tw:flex-col tw:gap-[6px]">
+            <label class="tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary)"
               >{{ t("modelPricing.modelNameInput") }}
-              <span class="tmm-required">*</span></label
+              <span class="tw:text-[#ef4444]">*</span></label
             >
-            <div class="tmm-label-hint">
+            <div class="tw:text-xs tw:opacity-50 tw:leading-normal tw:mb-0.5">
               {{ t("modelPricing.modelNameHint") }}
             </div>
             <OInput
               ref="modelInputRef"
               v-model="testModelName"
               placeholder="e.g. gpt-4-turbo"
-              class="tmm-model-input"
               data-test="test-match-model-input"
             >
               <template #icon-left>
-                <OIcon name="smart-toy" size="sm" class="tmm-search-icon" />
+                <OIcon name="smart-toy" size="sm" class="tw:opacity-[0.35] tw:shrink-0" />
               </template>
               <template #icon-right>
                 <OButton
                   v-if="testModelName"
                   variant="ghost"
                   size="icon"
-                  class="tmm-clear-btn"
+                  class="tw:opacity-[0.35] tw:hover:opacity-70"
                   @click="clearAndFocus"
                   data-test="test-match-clear-btn"
                 >
@@ -54,20 +53,20 @@
         </div>
 
         <!-- ── Vertical divider ── -->
-        <div class="tmm-col-divider"></div>
+        <div class="tw:w-px tw:bg-(--o2-border-color) tw:shrink-0"></div>
 
         <!-- ── Right: Live Results ── -->
-        <div class="tmm-results-panel">
+        <div class="tw:flex-1 tw:overflow-y-auto tw:py-5 tw:pl-5 tw:pr-6">
           <transition name="tmm-fade" mode="out-in">
             <!-- Empty state -->
             <div
               v-if="!testModelName"
               key="empty"
-              class="tmm-empty-state"
+              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:min-h-[200px] tw:gap-[10px]"
               data-test="test-match-empty"
             >
-              <OIcon name="manage-search" size="xl" class="tmm-empty-icon" />
-              <div class="tmm-empty-text">
+              <OIcon name="manage-search" size="xl" class="tw:opacity-[0.12]" />
+              <div class="tw:text-[13px] tw:opacity-[0.35] tw:text-center">
                 {{ t("modelPricing.enterModelName") }}
               </div>
             </div>
@@ -76,11 +75,11 @@
             <div
               v-else-if="testResult === null"
               key="waiting"
-              class="tmm-empty-state"
+              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:min-h-[200px] tw:gap-[10px]"
               data-test="test-match-waiting"
             >
-              <OIcon name="ads-click" size="xl" class="tmm-empty-icon" />
-              <div class="tmm-empty-text">
+              <OIcon name="ads-click" size="xl" class="tw:opacity-[0.12]" />
+              <div class="tw:text-[13px] tw:opacity-[0.35] tw:text-center">
                 {{ t("modelPricing.clickToTest") }}
               </div>
             </div>
@@ -89,18 +88,18 @@
             <div
               v-else-if="!testResult?.matched"
               key="no-match"
-              class="tmm-result-area"
+              class="tw:flex tw:flex-col tw:gap-3"
               data-test="test-match-no-result"
             >
-              <div class="tmm-status-card tmm-status-card--error">
-                <div class="tmm-status-icon-wrap tmm-status-icon-wrap--error">
+              <div class="tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-[14px] tw:rounded-lg tw:border tw:bg-[rgba(239,68,68,0.04)] tw:border-[rgba(239,68,68,0.15)] tw:dark:bg-[rgba(239,68,68,0.08)] tw:dark:border-[rgba(239,68,68,0.2)]">
+                <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[rgba(239,68,68,0.1)] tw:text-[#dc2626]">
                   <OIcon name="error-outline" size="md" />
                 </div>
                 <div>
-                  <div class="tmm-status-title">
+                  <div class="tw:text-[13px] tw:font-bold tw:text-[#b91c1c] tw:dark:text-[#fca5a5]">
                     {{ t("modelPricing.noMatchFound") }}
                   </div>
-                  <div class="tmm-status-desc">
+                  <div class="tw:text-xs tw:mt-0.5 tw:opacity-70">
                     {{
                       t("modelPricing.noMatchDesc", {
                         modelName: testModelName,
@@ -109,11 +108,11 @@
                   </div>
                 </div>
               </div>
-              <div class="tmm-suggestions">
-                <div class="tmm-suggestions-title">
+              <div class="tw:py-3 tw:px-[14px] tw:rounded-lg tw:bg-[rgba(0,0,0,0.02)] tw:dark:bg-[rgba(255,255,255,0.02)] tw:border tw:border-(--o2-border-color)">
+                <div class="tw:text-[11px] tw:font-semibold tw:opacity-55 tw:mb-[6px]">
                   {{ t("modelPricing.troubleshootingTitle") }}
                 </div>
-                <ul class="tmm-suggestions-list">
+                <ul class="tw:m-0 tw:pl-4 tw:text-xs tw:leading-[1.9] tw:opacity-60">
                   <li>{{ t("modelPricing.tip1") }}</li>
                   <li>{{ t("modelPricing.tip2") }}</li>
                   <li>{{ t("modelPricing.tip3") }}</li>
@@ -125,63 +124,64 @@
             <div
               v-else
               key="match"
-              class="tmm-result-area"
+              class="tw:flex tw:flex-col tw:gap-3"
               data-test="test-match-result"
             >
               <!-- Match status -->
-              <div class="tmm-status-card tmm-status-card--success">
-                <div class="tmm-status-icon-wrap tmm-status-icon-wrap--success">
+              <div class="tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-[14px] tw:rounded-lg tw:border tw:bg-[rgba(22,163,74,0.05)] tw:border-[rgba(22,163,74,0.2)] tw:dark:bg-[rgba(22,163,74,0.08)] tw:dark:border-[rgba(22,163,74,0.25)]">
+                <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[rgba(22,163,74,0.12)] tw:text-[#16a34a]">
                   <OIcon name="check-circle" size="md" />
                 </div>
                 <div class="tw:flex-1 tw:min-w-0">
-                  <div class="tmm-status-title">
+                  <div class="tw:text-[13px] tw:font-bold tw:text-[#15803d] tw:dark:text-[#4ade80]">
                     {{ t("modelPricing.matchFound") }}
                   </div>
-                  <div class="tmm-status-desc tw:truncate">
-                    <code class="tmm-model-badge">{{
+                  <div class="tw:text-xs tw:mt-0.5 tw:opacity-70 tw:truncate">
+                    <code class="tw:inline tw:py-px tw:px-[6px] tw:rounded tw:text-xs tw:font-semibold tw:font-[SF_Mono,JetBrains_Mono,monospace] tw:bg-[rgba(22,163,74,0.08)] tw:border tw:border-[rgba(22,163,74,0.2)] tw:text-inherit">{{
                       testResult.matched.name
                     }}</code>
                   </div>
                 </div>
-                <OBadge
-                  :variant="sourceColor(testResult.matched)"
-                  class="tmm-source-badge"
+                <OTag
+                  type="modelSource"
+                  :value="testResult.matched.source || 'org'"
+                  class="tw:shrink-0 tw:text-[11px] tw:font-semibold tw:ml-auto"
                 >
                   {{ sourceLabel(testResult.matched) }}
-                </OBadge>
+                </OTag>
               </div>
 
               <!-- Priority flow -->
-              <div class="tmm-flow">
-                <div class="tmm-flow-title">
+              <div class="tw:py-3 tw:px-[14px] tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:bg-[rgba(0,0,0,0.015)] tw:dark:bg-[rgba(255,255,255,0.02)]">
+                <div class="tw:text-[10px] tw:font-semibold tw:opacity-40 tw:mb-2">
                   {{ t("modelPricing.matchPriority") }}
                 </div>
-                <div class="tmm-flow-steps">
+                <div class="tw:flex tw:items-center tw:gap-[6px] tw:flex-wrap">
                   <template
                     v-for="(step, sIdx) in matchFlowSteps"
                     :key="step.key"
                   >
-                    <div class="tmm-flow-arrow" v-if="sIdx > 0">
+                    <div class="tw:opacity-30" v-if="sIdx > 0">
                       <OIcon name="arrow-forward" size="xs" />
                     </div>
                     <div
-                      class="tmm-flow-step"
+                      class="tw:flex tw:items-center tw:gap-[5px] tw:py-[5px] tw:px-[10px] tw:rounded-md tw:border tw:border-(--o2-border-color) tw:text-[11px] tw:font-medium tw:bg-transparent"
                       :class="{
-                        'tmm-flow-step--winner': step.key === winnerSource,
-                        'tmm-flow-step--dimmed': step.key !== winnerSource,
+                        'tw:border-[#16a34a] tw:bg-[rgba(22,163,74,0.06)] tw:font-bold tw:dark:bg-[rgba(22,163,74,0.1)]': step.key === winnerSource,
+                        'tw:opacity-40': step.key !== winnerSource,
                       }"
                     >
                       <OIcon
                         :name="step.icon"
                         size="sm"
-                        class="tmm-flow-step-icon"
+                        class="tw:opacity-60"
                       />
-                      <span class="tmm-flow-step-label">{{ step.label }}</span>
+                      <span>{{ step.label }}</span>
                       <OIcon
                         v-if="step.key === winnerSource"
                         name="check-circle"
                         size="xs"
-                        class="tmm-flow-step-check"
+                        class="tw:text-[#16a34a]"
                       />
                     </div>
                   </template>
@@ -189,48 +189,48 @@
               </div>
 
               <!-- Tier + cost card -->
-              <div class="tmm-cost-card">
-                <div class="tmm-cost-header">
+              <div class="tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:overflow-hidden">
+                <div class="tw:py-3 tw:px-[14px] tw:bg-[rgba(0,0,0,0.02)] tw:dark:bg-[rgba(255,255,255,0.03)] tw:border-b tw:border-(--o2-border-color)">
                   <div>
-                    <div class="tmm-cost-tier-name">
+                    <div class="tw:text-[13px] tw:font-bold">
                       {{ testResult.tier || "Default" }}
                     </div>
                     <div
-                      class="tmm-cost-tier-desc"
+                      class="tw:text-[11px] tw:opacity-50 tw:mt-0.5"
                       v-if="matchedTierDef?.condition"
                     >
                       Condition:
-                      <code
+                      <code class="tmm-cost-tier-desc-code tw:py-px tw:px-1 tw:rounded-[3px] tw:bg-[rgba(0,0,0,0.05)] tw:dark:bg-[rgba(255,255,255,0.08)] tw:text-[11px]"
                         >{{ matchedTierDef.condition.usage_key }}
                         {{ operatorSymbol(matchedTierDef.condition.operator) }}
                         {{ matchedTierDef.condition.value }}</code
                       >
                     </div>
-                    <div class="tmm-cost-tier-desc" v-else>
+                    <div class="tw:text-[11px] tw:opacity-50 tw:mt-0.5" v-else>
                       {{ t("modelPricing.defaultPricingTier") }}
                     </div>
                   </div>
                 </div>
 
-                <div class="tmm-cost-table" v-if="pricingRows.length > 0">
-                  <div class="tmm-cost-table-head">
-                    <span>{{ t("modelPricing.usageType") }}</span>
-                    <span class="tw:text-right">{{
+                <div class="tw:text-xs" v-if="pricingRows.length > 0">
+                  <div class="tw:grid tw:gap-2 tw:py-[7px] tw:px-[14px] tw:border-b tw:border-(--o2-border-color) tw:bg-[rgba(0,0,0,0.015)] tw:dark:bg-[rgba(255,255,255,0.02)] tw:[grid-template-columns:1.5fr_1fr]">
+                    <span class="tw:text-[10px] tw:font-semibold tw:opacity-40">{{ t("modelPricing.usageType") }}</span>
+                    <span class="tw:text-[10px] tw:font-semibold tw:opacity-40 tw:text-right">{{
                       t("modelPricing.pricePerMTokens")
                     }}</span>
                   </div>
                   <div
                     v-for="row in pricingRows"
                     :key="row.key"
-                    class="tmm-cost-table-row"
+                    class="tmm-cost-table-row tw:grid tw:gap-2 tw:py-2 tw:px-[14px] tw:text-xs tw:border-b tw:border-[rgba(0,0,0,0.04)] tw:dark:border-[rgba(255,255,255,0.04)] tw:hover:bg-[rgba(0,0,0,0.015)] tw:dark:hover:bg-[rgba(255,255,255,0.02)] tw:[grid-template-columns:1.5fr_1fr]"
                   >
-                    <span class="tmm-cost-usage-key">{{ row.key }}</span>
-                    <span class="tmm-cost-value tw:text-right"
+                    <span class="tw:font-semibold tw:font-[SF_Mono,JetBrains_Mono,monospace] tw:text-[11px]">{{ row.key }}</span>
+                    <span class="tw:font-semibold tw:[font-variant-numeric:tabular-nums] tw:text-right"
                       >${{ formatRate(row.rate) }}</span
                     >
                   </div>
                 </div>
-                <div v-else class="tmm-cost-empty">
+                <div v-else class="tw:flex tw:items-center tw:gap-[7px] tw:p-[14px] tw:text-xs tw:opacity-40 tw:italic">
                   <OIcon name="info-outline" size="sm" />
                   {{ t("modelPricing.noPricingForTier") }}
                 </div>
@@ -251,8 +251,7 @@ import modelPricingService from "@/services/model_pricing";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 
 const props = defineProps({
@@ -380,11 +379,6 @@ function operatorSymbol(op: string) {
   return map[op] || op;
 }
 
-function sourceColor(model: any): BadgeVariant {
-  if (!model.source || model.source === "org") return "primary";
-  if (model.source === "meta_org") return "default-outline";
-  return "default";
-}
 function sourceLabel(model: any) {
   if (!model.source || model.source === "org") return "Your Org";
   if (model.source === "meta_org") return "Global";
@@ -398,648 +392,24 @@ function formatRate(rate: number) {
 }
 </script>
 
-<style lang="scss" scoped>
-/* ── Header ─────────────────────────────────────────── */
-.tmm-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+<style>
+/* :last-child pseudo selector — kept in <style> per project rules */
+.tmm-cost-table-row:last-child {
+  border-bottom: none;
 }
 
-.tmm-title {
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-.tmm-subtitle {
-  font-size: 13px;
-  opacity: 0.5;
-  margin-top: 3px;
-}
-
-.tmm-close-btn {
-  margin-top: -4px;
-  margin-right: -8px;
-  opacity: 0.45;
-  transition: opacity 0.15s;
-  &:hover {
-    opacity: 1;
-  }
-}
-
-/* ── Two-column body ────────────────────────────────── */
-.tmm-body {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  min-height: 0;
-}
-
-.tmm-inputs-panel {
-  width: 340px;
-  flex-shrink: 0;
-  overflow-y: auto;
-  padding: 20px 20px 20px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.tmm-col-divider {
-  width: 1px;
-  background: var(--o2-border-color);
-  flex-shrink: 0;
-}
-
-.tmm-results-panel {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px 24px 20px 20px;
-}
-
-/* ── Section ────────────────────────────────────────── */
-.tmm-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.tmm-section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tmm-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.tmm-required {
-  color: #ef4444;
-}
-
-.tmm-label-hint {
-  font-size: 12px;
-  opacity: 0.5;
-  line-height: 1.5;
-  margin-bottom: 2px;
-}
-
-.tmm-optional-badge {
-  font-size: 10px;
-  font-weight: 500;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.06);
-  color: rgba(0, 0, 0, 0.45);
-
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.45);
-  }
-}
-
-/* ── Search Bar ─────────────────────────────────────── */
-.tmm-search-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  height: 40px;
-  border-radius: 8px;
-  border: 1.5px solid var(--o2-border-color);
-  background: transparent;
-  transition: all 0.15s ease;
-
-  &:hover {
-    border-color: rgba(89, 96, 178, 0.35);
-  }
-
-  &--focus {
-    border-color: #5960b2;
-    box-shadow: 0 0 0 3px rgba(89, 96, 178, 0.12);
-
-    .body--dark & {
-      box-shadow: 0 0 0 3px rgba(89, 96, 178, 0.2);
-    }
-  }
-}
-
-.tmm-search-icon {
-  opacity: 0.35;
-  flex-shrink: 0;
-}
-
-.tmm-search-input {
-  flex: 1;
-  border: none;
-  outline: none;
-  background: transparent;
-  font-size: 13px;
-  font-family: "SF Mono", "JetBrains Mono", monospace;
-  color: inherit;
-
-  &::placeholder {
-    color: rgba(0, 0, 0, 0.25);
-    font-family: inherit;
-  }
-  .body--dark &::placeholder {
-    color: rgba(255, 255, 255, 0.25);
-  }
-}
-
-.tmm-clear-btn {
-  opacity: 0.35;
-  &:hover {
-    opacity: 0.7;
-  }
-}
-
-/* ── Templates ──────────────────────────────────────── */
-.tmm-templates {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 2px;
-}
-
-.tmm-templates-label {
-  font-size: 11px;
-  font-weight: 500;
-  opacity: 0.5;
-}
-
-.tmm-template-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border: 1px solid var(--o2-border-color);
-  border-radius: 6px;
-  background: transparent;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-  color: inherit;
-
-  &:hover {
-    border-color: var(--tpl-color);
-  }
-  &--active {
-    border-color: var(--tpl-color);
-    font-weight: 600;
-  }
-}
-
-.tmm-template-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--tpl-color);
-}
-
-/* ── Usage Table ────────────────────────────────────── */
-.tmm-usage-table {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-top: 4px;
-}
-
-.tmm-usage-head {
-  display: grid;
-  grid-template-columns: 1fr 1fr 32px;
-  gap: 6px;
-  padding: 0 2px;
-
-  span {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0;
-    opacity: 0.4;
-  }
-}
-
-.tmm-usage-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr 32px;
-  gap: 6px;
-  margin-bottom: 6px;
-  align-items: center;
-}
-
-.tmm-usage-input {
-  :deep(.q-field__control) {
-    border-radius: 6px;
-    height: 32px;
-  }
-}
-
-.tmm-add-usage-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 6px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  color: #5960b2;
-  align-self: flex-start;
-  border-radius: 4px;
-  transition: background 0.15s;
-  margin-top: 2px;
-
-  &:hover {
-    background: rgba(89, 96, 178, 0.08);
-  }
-}
-
-/* ── Empty State ────────────────────────────────────── */
-.tmm-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  min-height: 200px;
-  gap: 10px;
-}
-
-.tmm-empty-icon {
-  opacity: 0.12;
-}
-
-.tmm-empty-text {
-  font-size: 13px;
-  opacity: 0.35;
-  text-align: center;
-}
-
-/* ── Result Area ────────────────────────────────────── */
-.tmm-result-area {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* ── Status Card ────────────────────────────────────── */
-.tmm-status-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 8px;
-}
-
-.tmm-status-card--success {
-  background: rgba(22, 163, 74, 0.05);
-  border: 1px solid rgba(22, 163, 74, 0.2);
-  .body--dark & {
-    background: rgba(22, 163, 74, 0.08);
-    border-color: rgba(22, 163, 74, 0.25);
-  }
-}
-
-.tmm-status-card--error {
-  background: rgba(239, 68, 68, 0.04);
-  border: 1px solid rgba(239, 68, 68, 0.15);
-  .body--dark & {
-    background: rgba(239, 68, 68, 0.08);
-    border-color: rgba(239, 68, 68, 0.2);
-  }
-}
-
-.tmm-status-icon-wrap {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.tmm-status-icon-wrap--success {
-  background: rgba(22, 163, 74, 0.12);
-  color: #16a34a;
-}
-.tmm-status-icon-wrap--error {
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
-}
-
-.tmm-status-title {
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.tmm-status-card--success .tmm-status-title {
-  color: #15803d;
-  .body--dark & {
-    color: #4ade80;
-  }
-}
-.tmm-status-card--error .tmm-status-title {
-  color: #b91c1c;
-  .body--dark & {
-    color: #fca5a5;
-  }
-}
-
-.tmm-status-desc {
-  font-size: 12px;
-  margin-top: 2px;
-  opacity: 0.7;
-}
-
-.tmm-model-badge {
-  display: inline;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  font-family: "SF Mono", "JetBrains Mono", monospace;
-  background: rgba(22, 163, 74, 0.08);
-  border: 1px solid rgba(22, 163, 74, 0.2);
-  color: inherit;
-}
-
-.tmm-source-badge {
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 600;
-  margin-left: auto;
-}
-
-/* ── Suggestions ────────────────────────────────────── */
-.tmm-suggestions {
-  padding: 12px 14px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.02);
-  border: 1px solid var(--o2-border-color);
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.02);
-  }
-}
-
-.tmm-suggestions-title {
-  font-size: 11px;
-  font-weight: 600;
-  opacity: 0.55;
-  margin-bottom: 6px;
-}
-
-.tmm-suggestions-list {
-  margin: 0;
-  padding-left: 16px;
-  font-size: 12px;
-  line-height: 1.9;
-  opacity: 0.6;
-}
-
-/* ── Match Flow ─────────────────────────────────────── */
-.tmm-flow {
-  padding: 12px 14px;
-  border: 1px solid var(--o2-border-color);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.015);
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.02);
-  }
-}
-
-.tmm-flow-title {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0;
-  opacity: 0.4;
-  margin-bottom: 8px;
-}
-
-.tmm-flow-steps {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.tmm-flow-step {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--o2-border-color);
-  font-size: 11px;
-  font-weight: 500;
-  background: transparent;
-}
-
-.tmm-flow-step--winner {
-  border-color: #16a34a;
-  background: rgba(22, 163, 74, 0.06);
-  font-weight: 700;
-  .body--dark & {
-    background: rgba(22, 163, 74, 0.1);
-  }
-}
-
-.tmm-flow-step--dimmed {
-  opacity: 0.4;
-}
-.tmm-flow-step-icon {
-  opacity: 0.6;
-}
-.tmm-flow-step-check {
-  color: #16a34a;
-}
-.tmm-flow-arrow {
-  opacity: 0.3;
-}
-
-/* ── Cost Card ──────────────────────────────────────── */
-.tmm-cost-card {
-  border: 1px solid var(--o2-border-color);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.tmm-cost-header {
-  padding: 12px 14px;
-  background: rgba(0, 0, 0, 0.02);
-  border-bottom: 1px solid var(--o2-border-color);
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.03);
-  }
-}
-
-.tmm-cost-tier-name {
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.tmm-cost-tier-desc {
-  font-size: 11px;
-  opacity: 0.5;
-  margin-top: 2px;
-
-  code {
-    padding: 1px 4px;
-    border-radius: 3px;
-    background: rgba(0, 0, 0, 0.05);
-    font-size: 11px;
-    .body--dark & {
-      background: rgba(255, 255, 255, 0.08);
-    }
-  }
-}
-
-/* ── Cost Table ─────────────────────────────────────── */
-.tmm-cost-table-head {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr;
-  gap: 8px;
-  padding: 7px 14px;
-  border-bottom: 1px solid var(--o2-border-color);
-  background: rgba(0, 0, 0, 0.015);
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.02);
-  }
-
-  span {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0;
-    opacity: 0.4;
-  }
-}
-
-.tmm-cost-table-row {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr;
-  gap: 8px;
-  padding: 8px 14px;
-  font-size: 12px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-  .body--dark & {
-    border-bottom-color: rgba(255, 255, 255, 0.04);
-  }
-  &:last-child {
-    border-bottom: none;
-  }
-  &:hover {
-    background: rgba(0, 0, 0, 0.015);
-    .body--dark & {
-      background: rgba(255, 255, 255, 0.02);
-    }
-  }
-}
-
-.tmm-cost-usage-key {
-  font-weight: 600;
-  font-family: "SF Mono", "JetBrains Mono", monospace;
-  font-size: 11px;
-}
-
-.tmm-cost-tokens {
-  font-variant-numeric: tabular-nums;
-  opacity: 0.65;
-}
-.tmm-cost-rate {
-  font-variant-numeric: tabular-nums;
-  opacity: 0.5;
-  font-size: 11px;
-}
-.tmm-cost-value {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.tmm-cost-empty {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 14px;
-  font-size: 12px;
-  opacity: 0.4;
-  font-style: italic;
-}
-
-/* ── Total row ──────────────────────────────────────── */
-.tmm-cost-total {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px;
-  border-top: 1px solid var(--o2-border-color);
-  background: rgba(0, 0, 0, 0.02);
-  font-size: 13px;
-  font-weight: 700;
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.03);
-  }
-}
-
-.tmm-cost-total-value {
-  font-size: 17px;
-  font-weight: 700;
-  color: #16a34a;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  .body--dark & {
-    color: #4ade80;
-  }
-}
-
-/* ── Footer ─────────────────────────────────────────── */
-.tmm-footer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tmm-reset-btn {
-  font-size: 12px;
-  opacity: 0.55;
-  &:hover {
-    opacity: 1;
-  }
-}
-
-.tmm-close-footer-btn {
-  font-weight: 600;
-  font-size: 13px;
-}
-
-/* ── Animations ─────────────────────────────────────── */
+/* ── Transition animations ── */
 .tmm-fade-enter-active,
 .tmm-fade-leave-active {
   transition: all 0.18s ease;
 }
+
 .tmm-fade-enter-from {
   opacity: 0;
   transform: translateY(5px);
 }
+
 .tmm-fade-leave-to {
   opacity: 0;
-}
-
-.tmm-row-enter-active {
-  transition: all 0.18s ease;
-}
-.tmm-row-leave-active {
-  transition: all 0.12s ease;
-}
-.tmm-row-enter-from,
-.tmm-row-leave-to {
-  opacity: 0;
-  transform: translateX(-8px);
 }
 </style>

@@ -29,6 +29,13 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
+// Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
+const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
+const wrapperAttrs = computed(() => {
+  const { tabindex, ...rest } = $attrs;
+  return rest;
+});
+
 const props = withDefaults(defineProps<ComboboxProps>(), {
   items: () => [],
   disabled: false,
@@ -168,7 +175,7 @@ const hasInsideLabel = computed(
 <template>
   <div
     ref="rootEl"
-    v-bind="$attrs"
+    v-bind="wrapperAttrs"
     class="tw:flex tw:flex-col tw:gap-1 tw:w-full"
     :data-test="parentDataTest"
   >
@@ -212,6 +219,7 @@ const hasInsideLabel = computed(
           :name="name"
           :placeholder="placeholder"
           :disabled="disabled"
+          :tabindex="inputTabindex"
           auto-complete="off"
           :class="[
             'tw:w-full tw:rounded-md tw:border tw:ps-3 tw:pe-3',

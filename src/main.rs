@@ -438,6 +438,13 @@ async fn main() -> Result<(), anyhow::Error> {
         {
             log::error!("Failed to flush service discovery: {}", e);
         }
+
+        log::info!("Flushing Gen-AI agent registry...");
+        if let Err(e) =
+            o2_enterprise::enterprise::llm_evaluations::agent_registry::flush_all().await
+        {
+            log::error!("Failed to flush Gen-AI agent registry: {}", e);
+        }
     }
 
     // leave the cluster
@@ -525,6 +532,8 @@ async fn init_common_grpc_server(
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+    // Batches are already ZSTD-compressed (Arrow IPC); gzip is dropped client-side only.
+    // Server keeps compression so old clients still work during a rolling upgrade.
     let flight_svc = FlightServiceServer::new(FlightServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -556,6 +565,11 @@ async fn init_common_grpc_server(
     } else {
         tonic::transport::Server::builder()
     };
+    let builder = builder
+        .initial_stream_window_size(config::GRPC_HTTP2_STREAM_WINDOW_SIZE)
+        .initial_connection_window_size(config::GRPC_HTTP2_CONNECTION_WINDOW_SIZE)
+        .http2_adaptive_window(Some(cfg.grpc.http2_adaptive_window))
+        .tcp_nodelay(true);
     let ret = builder
         .layer(tonic::service::InterceptorLayer::new(check_auth))
         .add_service(event_svc)
@@ -621,6 +635,11 @@ async fn init_router_grpc_server(
     } else {
         tonic::transport::Server::builder()
     };
+    let builder = builder
+        .initial_stream_window_size(config::GRPC_HTTP2_STREAM_WINDOW_SIZE)
+        .initial_connection_window_size(config::GRPC_HTTP2_CONNECTION_WINDOW_SIZE)
+        .http2_adaptive_window(Some(cfg.grpc.http2_adaptive_window))
+        .tcp_nodelay(true);
     let ret = builder
         .layer(tonic::service::InterceptorLayer::new(check_auth))
         .add_service(logs_svc)

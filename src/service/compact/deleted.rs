@@ -86,11 +86,7 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
             if file.flattened {
                 Some((
                     file.account.to_string(),
-                    format!(
-                        "files{}/{}",
-                        config::get_config().common.column_all,
-                        file.file.strip_prefix("files/").unwrap()
-                    ),
+                    super::flatten::generate_flatten_file_key(&file.file),
                 ))
             } else {
                 None

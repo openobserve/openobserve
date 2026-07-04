@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Outer wrapper: full panel height, flex-column so pagination sits below the scroll area -->
   <div
-    class="my-sticky-virtscroll-table tw:h-full tw:flex tw:flex-col tw:rounded-none!"
+    class="my-sticky-virtscroll-table tw:h-full tw:flex tw:flex-col tw:rounded-none! tw:overflow-hidden"
     :data-sticky-id="tableId"
     :class="{ 'pivot-sticky-totals': stickyRowTotals, 'wrap-enabled': wrap }"
     :style="store.state.printMode ? { position: 'static' } : {}"
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="col in pivotRowColumns"
               :key="'rh_' + col.name"
               :rowspan="pivotHeaderLevels.length"
-              class="pivot-group-header tw:cursor-pointer tw:px-2 tw:text-left"
+              class="tw:cursor-pointer tw:px-2 tw:text-center tw:font-semibold tw:align-middle tw:whitespace-nowrap tw:py-[5px] tw:[border-right:1px_solid_var(--o2-pivot-header-border)] tw:[border-bottom:1px_solid_var(--o2-pivot-header-border)] tw:bg-(--o2-sticky-col-header-bg)"
               :style="getStickyColumnStyle(col) as any"
               @click="handlePivotSort(col.name)"
             >
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 class="tw:ml-1 pivot-sort-icon"
                 :class="{
-                  'pivot-sort-active': pivotSortState.sortBy === col.name,
+                  'pivot-sort-active tw:text-[var(--o2-primary-color)]': pivotSortState.sortBy === col.name,
                 }"
               />
             </th>
@@ -97,18 +97,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(cell, cellIdx) in level.cells"
               :key="'c_' + levelIdx + '_' + cellIdx"
               :data-test="`o2-table-pivot-th-${levelIdx}-${cellIdx}`"
+              :data-test-pivot-type="level.isLeaf ? 'value' : 'group'"
               :colspan="cell.colspan"
               :rowspan="cell.rowspan || 1"
               class="tw:px-2"
               :class="[
                 level.isLeaf
-                  ? 'pivot-value-header'
-                  : 'pivot-group-header tw:text-center',
+                  ? 'tw:text-center tw:font-medium tw:text-[0.85em] tw:align-middle tw:py-[5px] tw:[border-right:1px_solid_var(--o2-pivot-header-border)] tw:[border-bottom:1px_solid_var(--o2-pivot-header-border)] tw:bg-(--o2-sticky-col-header-bg)'
+                  : 'tw:text-center tw:font-semibold tw:align-middle tw:whitespace-nowrap tw:py-[5px] tw:[border-right:1px_solid_var(--o2-pivot-header-border)] tw:[border-bottom:1px_solid_var(--o2-pivot-header-border)] tw:bg-(--o2-sticky-col-header-bg)',
                 {
                   'pivot-section-border':
                     cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
                 },
-                { 'pivot-total-col': stickyColTotals && cell._isTotalHeader },
+                { 'pivot-total-col tw:font-semibold': stickyColTotals && cell._isTotalHeader },
                 { 'tw:cursor-pointer': cell._sortColumn },
               ]"
               :style="
@@ -127,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 class="tw:ml-1 pivot-sort-icon"
                 :class="{
-                  'pivot-sort-active':
+                  'pivot-sort-active tw:text-[var(--o2-primary-color)]':
                     pivotSortState.sortBy === cell._sortColumn,
                 }"
               />
@@ -187,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : '',
                 (header.column.columnDef.meta as any)?.headerClass ?? '',
                 {
-                  'pivot-total-col':
+                  'pivot-total-col tw:font-semibold':
                     stickyColTotals &&
                     (header.column.columnDef.meta as any)?._isTotalColumn,
                 },
@@ -499,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr
             v-for="r in SKEL_ROW_COUNT"
             :key="`skel-${r}`"
-            class="o2-skel-row tw:flex tw:items-center tw:w-full"
+            class="tw:flex tw:items-center tw:w-full tw:opacity-0 tw:border-b tw:border-b-[var(--o2-tag-grey-1)] tw:h-7 tw:[animation:o2-skel-row-in_320ms_ease-out_forwards] tw:motion-reduce:opacity-100 tw:motion-reduce:animate-none"
             :style="{ animationDelay: `${(r - 1) * 40}ms` }"
           >
             <!-- No columns yet (first paint) — full-width shimmer bar -->
@@ -508,7 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:w-full tw:px-4 tw:overflow-hidden"
             >
               <span
-                class="o2-skel-pill tw:inline-block tw:h-3 tw:rounded-md"
+                class="tw:inline-block tw:h-3 tw:rounded-md tw:[background:linear-gradient(90deg,var(--color-grey-100)_0%,rgba(255,255,255,0.65)_50%,var(--color-grey-100)_100%)] tw:[background-size:200%_100%] tw:[animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] tw:dark:[background:linear-gradient(90deg,var(--color-grey-600)_0%,rgba(255,255,255,0.03)_50%,var(--color-grey-600)_100%)] tw:motion-reduce:animate-none"
                 :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
                 aria-hidden="true"
               />
@@ -523,7 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="skelTdStyle(header, c)"
               >
                 <span
-                  class="o2-skel-pill tw:inline-block tw:h-3 tw:rounded-md"
+                  class="tw:inline-block tw:h-3 tw:rounded-md tw:[background:linear-gradient(90deg,var(--color-grey-100)_0%,rgba(255,255,255,0.65)_50%,var(--color-grey-100)_100%)] tw:[background-size:200%_100%] tw:[animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] tw:dark:[background:linear-gradient(90deg,var(--color-grey-600)_0%,rgba(255,255,255,0.03)_50%,var(--color-grey-600)_100%)] tw:motion-reduce:animate-none"
                   :style="{
                     width:
                       c === 0
@@ -568,16 +569,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="row.id"
               :data-index="idx"
               :ref="(node: any) => measureDashboardRow(node)"
-              class="dashboard-data-row tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
+              class="dashboard-data-row tw:cursor-pointer tw:hover:bg-[var(--o2-hover-gray)]"
               :class="{ 'tw:border-b': !usesSeparateBorders }"
               data-test="dashboard-data-row"
+              tabindex="0"
               @click="handleDataRowClick(row.original, idx as number, $event)"
+              @keydown="handleDataRowKeydown($event, row.original, idx as number)"
             >
               <td
                 v-for="(cell, cellIndex) in row.getVisibleCells()"
                 :key="cell.id"
                 data-test="dashboard-data-row-cell"
-                class="tw:py-1 tw:px-2 tw:overflow-hidden tw:relative table-cell copy-cell-td"
+                class="tw:py-1 tw:px-2 tw:overflow-hidden tw:relative table-cell tw:group/copy"
                 :class="[
                   (cell.column.columnDef.meta as any)?.align === 'center'
                     ? 'tw:text-center!'
@@ -587,11 +590,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : '',
                   (cell.column.columnDef.meta as any)?.cellClass ?? '',
                   {
-                    'sticky-column': (cell.column.columnDef.meta as any)
+                    'sticky-column tw:bg-inherit': (cell.column.columnDef.meta as any)
                       ?.sticky,
                   },
                   {
-                    'pivot-total-col':
+                    'pivot-total-col tw:font-semibold':
                       stickyColTotals &&
                       (cell.column.columnDef.meta as any)?._isTotalColumn,
                   },
@@ -602,7 +605,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     row.original,
                     (cell.column.columnDef.meta as any)?._col,
                   )
-                    ? 'pivot-no-border'
+                    ? 'pivot-no-border tw:border-b-0!'
                     : '',
                 ]"
                 :style="[
@@ -646,13 +649,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'right' &&
                         shouldShowCopyButton(cell.getValue())
                       "
-                      class="copy-btn tw:mr-1"
+                      class="tw:mr-1 tw:opacity-0 tw:transition-opacity tw:duration-[150ms] tw:inline-flex tw:items-center tw:leading-none tw:group-hover/copy:opacity-100"
                       data-test="dashboard-table-cell-copy-btn"
                       :data-copied="isCellCopied(idx as number, cell.column.id) ? 'true' : undefined"
                     >
                       <OButton
                         variant="ghost"
                         size="icon-xs-sq"
+                        class="tw:h-[16px]! tw:w-[16px]! tw:min-h-0!"
                         @click.stop="
                           copyCellContent(
                             getCellDisplayValue(cell),
@@ -699,13 +703,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'right' &&
                         shouldShowCopyButton(cell.getValue())
                       "
-                      class="copy-btn tw:ml-1"
+                      class="tw:ml-1 tw:opacity-0 tw:transition-opacity tw:duration-[150ms] tw:inline-flex tw:items-center tw:leading-none tw:group-hover/copy:opacity-100"
                       data-test="dashboard-table-cell-copy-btn"
                       :data-copied="isCellCopied(idx as number, cell.column.id) ? 'true' : undefined"
                     >
                       <OButton
                         variant="ghost"
                         size="icon-xs-sq"
+                        class="tw:h-[16px]! tw:w-[16px]! tw:min-h-0!"
                         @click.stop="
                           copyCellContent(
                             getCellDisplayValue(cell),
@@ -765,7 +770,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 formattedRows?.[virtualRow.index]?.original?.isExpandedRow
               "
               :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-              class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b tw:border-b-[var(--o2-tag-grey-1)] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
+              class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b tw:border-b-[var(--o2-tag-grey-1)] tw:cursor-pointer tw:hover:bg-[var(--o2-hover-gray)] tw:transition-colors tw:duration-150 tw:ease-in-out"
               :class="[
                 defaultColumns &&
                 !wrap &&
@@ -782,7 +787,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'tw:bg-zinc-700'
                     : 'tw:bg-zinc-300'
                   : '',
-                'table-row-hover',
                 !(formattedRows[virtualRow.index]?.original as any)
                   ?.isExpandedRow
                   ? rowClass?.(formattedRows[virtualRow.index]?.original as any)
@@ -841,7 +845,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     '-' +
                     cell.column.columnDef.id
                   "
-                  class="tw:py-none tw:px-2 tw:items-center tw:justify-start tw:relative table-cell copy-cell-td"
+                  class="tw:py-none tw:px-2 tw:items-center tw:justify-start tw:relative table-cell tw:group/copy"
                   :class="[
                     ...tableCellClass,
                     { 'tw:pl-2': cellIndex === 0 },
@@ -853,11 +857,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : '',
                     (cell.column.columnDef.meta as any)?.cellClass ?? '',
                     {
-                      'sticky-column': (cell.column.columnDef.meta as any)
+                      'sticky-column tw:bg-inherit': (cell.column.columnDef.meta as any)
                         ?.sticky,
                     },
                     {
-                      'pivot-total-col':
+                      'pivot-total-col tw:font-semibold':
                         stickyColTotals &&
                         (cell.column.columnDef.meta as any)?._isTotalColumn,
                     },
@@ -865,7 +869,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       cell.row.original,
                       (cell.column.columnDef.meta as any)?._col,
                     )
-                      ? 'pivot-no-border'
+                      ? 'pivot-no-border tw:border-b-0!'
                       : '',
                   ]"
                   :style="[
@@ -956,13 +960,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               'right' &&
                             shouldShowCopyButton(cell.getValue())
                           "
-                          class="copy-btn tw:mr-1"
+                          class="tw:mr-1 tw:opacity-0 tw:transition-opacity tw:duration-[150ms] tw:inline-flex tw:items-center tw:leading-none tw:group-hover/copy:opacity-100"
                           data-test="dashboard-table-cell-copy-btn"
                           :data-copied="isCellCopied(virtualRow.index, cell.column.id) ? 'true' : undefined"
                         >
                           <OButton
                             variant="ghost"
                             size="icon-xs-sq"
+                            class="tw:h-[16px]! tw:w-[16px]! tw:min-h-0!"
                             @click.stop="
                               copyCellContent(
                                 getCellDisplayValue(cell),
@@ -1048,13 +1053,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               'right' &&
                             shouldShowCopyButton(cell.getValue())
                           "
-                          class="copy-btn tw:ml-1"
+                          class="tw:ml-1 tw:opacity-0 tw:transition-opacity tw:duration-[150ms] tw:inline-flex tw:items-center tw:leading-none tw:group-hover/copy:opacity-100"
                           data-test="dashboard-table-cell-copy-btn"
                           :data-copied="isCellCopied(virtualRow.index, cell.column.id) ? 'true' : undefined"
                         >
                           <OButton
                             variant="ghost"
                             size="icon-xs-sq"
+                            class="tw:h-[16px]! tw:w-[16px]! tw:min-h-0!"
                             @click.stop="
                               copyCellContent(
                                 getCellDisplayValue(cell),
@@ -1102,15 +1108,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <td
               v-for="col in (columns as any[]) || []"
               :key="'ft_' + col.name"
-              class="tw:px-2"
+              class="tw:px-2 tw:bg-[#f5f5f5] tw:sticky tw:bottom-0"
               :class="[
                 col.align === 'right'
                   ? 'tw:text-right'
                   : col.align === 'center'
                     ? 'tw:text-center'
                     : 'tw:text-left',
-                { 'sticky-column': col.sticky },
-                { 'pivot-total-col': stickyColTotals && col._isTotalColumn },
+                { 'sticky-column tw:bg-inherit': col.sticky },
+                { 'pivot-total-col tw:font-semibold': stickyColTotals && col._isTotalColumn },
               ]"
               :style="
                 [
@@ -2464,6 +2470,24 @@ const handleDataRowClick = (row: any, index: number, event?: MouseEvent) => {
   }
 };
 
+// Keyboard access for clickable data rows: Enter/Space activate, arrows move focus.
+const handleDataRowKeydown = (event: KeyboardEvent, row: any, index: number) => {
+  if (event.target !== event.currentTarget) return;
+  const current = event.currentTarget as HTMLElement;
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    handleDataRowClick(row, index);
+  } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const next = event.key === "ArrowDown" ? "nextElementSibling" : "previousElementSibling";
+    let sibling = current[next] as HTMLElement | null;
+    while (sibling && !sibling.matches("tr[tabindex]")) {
+      sibling = sibling[next] as HTMLElement | null;
+    }
+    sibling?.focus();
+  }
+};
+
 const expandFunctionError = () => {
   isFunctionErrorOpen.value = !isFunctionErrorOpen.value;
 };
@@ -2547,140 +2571,7 @@ defineExpose({
 <style>
 @import "@/assets/styles/log-highlighting.css";
 </style>
-<style scoped lang="scss">
-
-
-// Outer wrapper for the table (used for sticky-column CSS scoping via data-sticky-id)
-.my-sticky-virtscroll-table {
-  overflow: hidden;
-}
-
-// Add explicit hover styles for log rows
-.table-row-hover {
-  transition: background-color 0.15s ease-in-out;
-
-  &:hover {
-    background-color: var(--o2-hover-gray) !important;
-  }
-}
-
-// ── Dashboard / pivot table styles ──────────────────────────────────────────
-
-// Pivot multi-level header cells - sticky with border and shadow
-.pivot-group-header {
-  text-align: center;
-  font-weight: 600;
-  vertical-align: middle;
-  white-space: nowrap;
-  padding-top: 5px;
-  padding-bottom: 5px;
-  border-right: 1px solid rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
-  background-color: #E0E0E0;
-}
-
-.pivot-value-header {
-  text-align: center;
-  font-weight: 500;
-  font-size: 0.85em;
-  vertical-align: middle;
-  padding-top: 5px;
-  padding-bottom: 5px;
-  border-right: 1px solid rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
-  background-color: #E0E0E0;
-}
-
-.body--dark .pivot-group-header {
-  background-color: #565656;
-  border-right-color: rgba(255, 255, 255, 0.12);
-  border-bottom-color: rgba(255, 255, 255, 0.12);
-}
-
-.body--dark .pivot-value-header {
-  background-color: #565656;
-  border-right-color: rgba(255, 255, 255, 0.12);
-  border-bottom-color: rgba(255, 255, 255, 0.12);
-}
-
-// Column separator between pivot sections
-.pivot-section-border {
-  border-left: 2px solid rgba(0, 0, 0, 0.2) !important;
-}
-
-// Right-sticky total column body cells
-.pivot-total-col {
-  font-weight: 600;
-}
-
-// Cells tw:hidden by pivot row merging (duplicates suppressed)
-.pivot-no-border {
-  border-bottom: none !important;
-}
-
-// Left-sticky columns
-.sticky-column {
-  background-color: inherit;
-}
-
-// Sticky total row at bottom
-.pivot-sticky-total-row {
-  font-weight: bold;
-  position: sticky;
-  bottom: 0;
-  z-index: 9;
-  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
-
-  td {
-    background-color: var(--q-color-grey-2, #f5f5f5);
-    position: sticky;
-    bottom: 0;
-  }
-}
-
-// Sort icon shown in pivot header clicks
-.pivot-sort-icon {
-  vertical-align: middle;
-  opacity: 0;
-  transition: opacity 0.2s;
-
-  &.pivot-sort-active {
-    opacity: 1 !important;
-    color: var(--q-primary);
-  }
-}
-
-// ── Loading skeleton ─────────────────────────────────────────────
-.o2-skel-row {
-  opacity: 0;
-  animation: o2-skel-row-in 320ms ease-out forwards;
-  border-bottom: 1px solid var(--o2-tag-grey-1);
-  height: 1.75rem;
-}
-
-.o2-skel-pill {
-  // Light mode — grey-100 shimmer (matches logs/histogram skeletons)
-  background: linear-gradient(
-    90deg,
-    var(--color-grey-100) 0%,
-    rgba(255, 255, 255, 0.65) 50%,
-    var(--color-grey-100) 100%
-  );
-  background-size: 200% 100%;
-  animation: o2-skel-shimmer 1.5s ease-in-out infinite;
-
-  // Dark mode — grey-600 shimmer
-  .body--dark & {
-    background: linear-gradient(
-      90deg,
-      var(--color-grey-600) 0%,
-      rgba(255, 255, 255, 0.03) 50%,
-      var(--color-grey-600) 100%
-    );
-    background-size: 200% 100%;
-  }
-}
-
+<style>
 @keyframes o2-skel-shimmer {
   0% {
     background-position: 200% 0;
@@ -2698,38 +2589,6 @@ defineExpose({
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .o2-skel-row {
-    opacity: 1;
-    animation: none;
-  }
-  .o2-skel-pill {
-    animation: none;
-  }
-}
-
-// Copy button — only visible on cell hover, sized to match text so it
-// doesn't inflate the row height.
-.copy-cell-td {
-  .copy-btn {
-    opacity: 0;
-    transition: opacity 0.15s;
-    display: inline-flex;
-    align-items: center;
-    line-height: 1;
-
-    :deep(button) {
-      height: 16px !important;
-      width: 16px !important;
-      min-height: unset !important;
-    }
-  }
-
-  &:hover .copy-btn {
-    opacity: 1;
   }
 }
 </style>

@@ -199,7 +199,7 @@ describe("TraceCorrelationCard", () => {
 
     it("renders trace-id-text element when traceId is provided", () => {
       // Assert
-      expect(wrapper.find(".trace-id-text").exists()).toBe(true);
+      expect(wrapper.find('[data-test="trace-correlation-card-trace-id-text"]').exists()).toBe(true);
     });
 
     it("displays span ID section when spanId is provided", () => {
@@ -209,7 +209,7 @@ describe("TraceCorrelationCard", () => {
 
     it("renders span-id-text element when spanId is provided", () => {
       // Assert
-      expect(wrapper.find(".span-id-text").exists()).toBe(true);
+      expect(wrapper.find('[data-test="trace-correlation-card-span-id-text"]').exists()).toBe(true);
     });
   });
 
@@ -273,7 +273,7 @@ describe("TraceCorrelationCard", () => {
   describe("trace ID formatting", () => {
     it("truncates long trace ID to start...end format", () => {
       // Act
-      const traceIdText = wrapper.find(".trace-id-text");
+      const traceIdText = wrapper.find('[data-test="trace-correlation-card-trace-id-text"]');
 
       // Assert
       expect(traceIdText.text()).toMatch(/^test-tra\.\.\.23456789$/);
@@ -288,7 +288,7 @@ describe("TraceCorrelationCard", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.find(".trace-id-text").text()).toBe("short-id");
+      expect(wrapper.find('[data-test="trace-correlation-card-trace-id-text"]').text()).toBe("short-id");
     });
   });
 
@@ -756,7 +756,7 @@ describe("TraceCorrelationCard", () => {
       await flushPromises();
 
       // Assert
-      const traceIdText = wrapper.find(".trace-id-text");
+      const traceIdText = wrapper.find('[data-test="trace-correlation-card-trace-id-text"]');
       expect(traceIdText.text().length).toBeLessThan(50);
     });
 

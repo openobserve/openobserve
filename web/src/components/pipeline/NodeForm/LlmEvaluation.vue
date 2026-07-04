@@ -392,10 +392,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss">
-.stream-routing-title {
-  font-size: 18px;
-  padding-top: 16px;
-}
-</style>

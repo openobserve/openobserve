@@ -28,6 +28,7 @@ if (import.meta.env.DEV && !form) {
       <OInput
         v-bind="$attrs"
         :label="props.label"
+        :label-position="props.labelPosition"
         :placeholder="props.placeholder"
         :type="props.type"
         :disabled="props.disabled"
@@ -57,10 +58,8 @@ if (import.meta.env.DEV && !form) {
         @update:model-value="(val: unknown) => field.handleChange(val)"
         @blur="field.handleBlur"
       >
-        <!-- Forward OInput's presentational slots (e.g. a password-visibility
-             toggle in #icon-right) so form fields keep full OInput affordances.
-             Explicit per-slot (matching OFormSelect's house style) so a shared-
-             foundation reviewer can see exactly what's forwarded. -->
+        <!-- Forward OInput's presentational slots (e.g. a password visibility
+             toggle in #icon-right) so form fields keep full OInput affordances. -->
         <template v-if="$slots['icon-left']" #icon-left>
           <slot name="icon-left" />
         </template>

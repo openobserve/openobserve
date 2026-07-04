@@ -28,6 +28,14 @@ use crate::service::traces::otel::{
     extractors::{parse_json_value, set_val_if_not_zero},
 };
 
+#[derive(Clone, Debug, Default)]
+pub struct UsageDetails {
+    pub usage: HashMap<String, i64>,
+    /// Whether the extracted `input` token count already includes cache-read/cache-creation
+    /// tokens. Current GenAI semconv says it should; provider-native legacy fields often do not.
+    pub input_includes_cache: bool,
+}
+
 pub struct UsageExtractor;
 
 impl UsageExtractor {
@@ -37,73 +45,213 @@ impl UsageExtractor {
         attributes: &HashMap<String, json::Value>,
         instrumentation_scope_name: &str,
     ) -> HashMap<String, i64> {
+        self.extract_usage_details(attributes, instrumentation_scope_name)
+            .usage
+    }
+
+    pub fn extract_usage_details(
+        &self,
+        attributes: &HashMap<String, json::Value>,
+        instrumentation_scope_name: &str,
+    ) -> UsageDetails {
         let mut usage = HashMap::new();
+        let mut input_includes_cache = false;
 
         // LLM Usage Total Tokens
-        if let Some(v) = attributes.get(LLMAttributes::USAGE_TOTAL_TOKENS)
-            && let Some(num) = extract_i64(v)
-        {
+        if let Some(num) = extract_i64_any(
+            attributes,
+            &[LLMAttributes::USAGE_TOTAL_TOKENS, "llm_usage_total_tokens"],
+        ) {
             set_val_if_not_zero(&mut usage, "total".to_string(), num);
         }
 
         // Standard Gen-AI attributes
         let token_keys = [
-            (GenAiAttributes::USAGE_INPUT_TOKENS, "input"),
-            (GenAiAttributes::USAGE_OUTPUT_TOKENS, "output"),
-            (GenAiAttributes::USAGE_TOTAL_TOKENS, "total"),
-            (GenAiAttributes::USAGE_PROMPT_TOKENS, "input"),
-            (GenAiAttributes::USAGE_COMPLETION_TOKENS, "output"),
-            // Canonical names match Langfuse/industry convention so users can define
-            // matching pricing keys without guessing internal normalizations.
             (
-                GenAiAttributes::USAGE_CACHE_READ_TOKENS,
-                "cache_read_input_tokens",
+                &[
+                    GenAiAttributes::USAGE_INPUT_TOKENS,
+                    "gen_ai_usage_input_tokens",
+                ][..],
+                "input",
             ),
             (
-                GenAiAttributes::USAGE_CACHE_WRITE_TOKENS,
-                "cache_creation_input_tokens",
+                &[
+                    GenAiAttributes::USAGE_OUTPUT_TOKENS,
+                    "gen_ai_usage_output_tokens",
+                ][..],
+                "output",
+            ),
+            (
+                &[
+                    GenAiAttributes::USAGE_TOTAL_TOKENS,
+                    "gen_ai_usage_total_tokens",
+                ][..],
+                "total",
+            ),
+            (
+                &[
+                    GenAiAttributes::USAGE_PROMPT_TOKENS,
+                    "gen_ai_usage_prompt_tokens",
+                ][..],
+                "input",
+            ),
+            (
+                &[
+                    GenAiAttributes::USAGE_COMPLETION_TOKENS,
+                    "gen_ai_usage_completion_tokens",
+                ][..],
+                "output",
             ),
         ];
 
-        for (key, usage_key) in &token_keys {
-            if let Some(value) = attributes.get(*key)
-                && let Some(num) = extract_i64(value)
-            {
+        for (keys, usage_key) in &token_keys {
+            if let Some(num) = extract_i64_any(attributes, keys) {
+                if *usage_key == "input" {
+                    input_includes_cache = true;
+                }
                 set_val_if_not_zero(&mut usage, usage_key.to_string(), num);
             }
         }
 
-        // OpenInference
-        if let Some(v) = attributes.get(OpenInferenceAttributes::LLM_TOKEN_COUNT_PROMPT)
-            && let Some(num) = extract_i64(v)
-        {
-            set_val_if_not_zero(&mut usage, "input".to_string(), num);
+        // Official GenAI cache-token fields are included in gen_ai.usage.input_tokens.
+        if let Some(num) = extract_i64_any(
+            attributes,
+            &[
+                GenAiAttributes::USAGE_CACHE_READ_INPUT_TOKENS,
+                "gen_ai_usage_cache_read_input_tokens",
+            ],
+        ) {
+            set_val_if_not_zero(&mut usage, "cache_read_input_tokens".to_string(), num);
+            input_includes_cache = true;
+        } else if let Some(num) = extract_i64_any(attributes, &["cache_read_input_tokens"]) {
+            set_val_if_not_zero(&mut usage, "cache_read_input_tokens".to_string(), num);
+            input_includes_cache = false;
+        } else if let Some(num) = extract_i64_any(
+            attributes,
+            &[
+                "gen_ai.usage.prompt_tokens_details.cached_tokens",
+                "gen_ai_usage_prompt_tokens_details_cached_tokens",
+                "prompt_tokens_details.cached_tokens",
+                "prompt_tokens_details_cached_tokens",
+            ],
+        ) {
+            set_val_if_not_zero(&mut usage, "cache_read_input_tokens".to_string(), num);
+            input_includes_cache = true;
+        } else if let Some(num) = extract_i64_any(
+            attributes,
+            &[
+                GenAiAttributes::USAGE_CACHE_READ_TOKENS,
+                "gen_ai_usage_cache_read_tokens",
+            ],
+        ) {
+            set_val_if_not_zero(&mut usage, "cache_read_input_tokens".to_string(), num);
+            input_includes_cache = false;
+        } else if let Some(num) = extract_i64_any(
+            attributes,
+            &[
+                GenAiAttributes::USAGE_CACHED_TOKENS,
+                "gen_ai_usage_cached_tokens",
+                "cached_tokens",
+            ],
+        ) {
+            set_val_if_not_zero(&mut usage, "cache_read_input_tokens".to_string(), num);
+            input_includes_cache = false;
+        } else if let Some(num) = extract_i64_any(
+            attributes,
+            &[
+                GenAiAttributes::USAGE_PROMPT_CACHE_HIT_TOKENS,
+                "gen_ai_usage_prompt_cache_hit_tokens",
+                "prompt_cache_hit_tokens",
+            ],
+        ) {
+            set_val_if_not_zero(&mut usage, "cache_read_input_tokens".to_string(), num);
+            input_includes_cache = false;
         }
-        if let Some(v) = attributes.get(OpenInferenceAttributes::LLM_TOKEN_COUNT_COMPLETION)
-            && let Some(num) = extract_i64(v)
-        {
+
+        if let Some(num) = extract_i64_any(
+            attributes,
+            &[
+                GenAiAttributes::USAGE_CACHE_CREATION_INPUT_TOKENS,
+                "gen_ai_usage_cache_creation_input_tokens",
+            ],
+        ) {
+            set_val_if_not_zero(&mut usage, "cache_creation_input_tokens".to_string(), num);
+            input_includes_cache = true;
+        } else if let Some(num) = extract_i64_any(attributes, &["cache_creation_input_tokens"]) {
+            set_val_if_not_zero(&mut usage, "cache_creation_input_tokens".to_string(), num);
+            input_includes_cache = false;
+        } else if let Some(num) = extract_i64_any(
+            attributes,
+            &[
+                GenAiAttributes::USAGE_CACHE_WRITE_TOKENS,
+                "gen_ai_usage_cache_write_tokens",
+            ],
+        ) {
+            set_val_if_not_zero(&mut usage, "cache_creation_input_tokens".to_string(), num);
+            input_includes_cache = false;
+        }
+
+        if let Some(num) = extract_i64_any(
+            attributes,
+            &[
+                GenAiAttributes::USAGE_PROMPT_CACHE_MISS_TOKENS,
+                "gen_ai_usage_prompt_cache_miss_tokens",
+                "prompt_cache_miss_tokens",
+            ],
+        ) {
+            set_val_if_not_zero(&mut usage, "input".to_string(), num);
+            input_includes_cache = false;
+        }
+
+        // OpenInference
+        if let Some(num) = extract_i64_any(
+            attributes,
+            &[
+                OpenInferenceAttributes::LLM_TOKEN_COUNT_PROMPT,
+                "llm_token_count_prompt",
+            ],
+        ) {
+            set_val_if_not_zero(&mut usage, "input".to_string(), num);
+            if !has_provider_native_cache_tokens(attributes) {
+                input_includes_cache = true;
+            }
+        }
+        if let Some(num) = extract_i64_any(
+            attributes,
+            &[
+                OpenInferenceAttributes::LLM_TOKEN_COUNT_COMPLETION,
+                "llm_token_count_completion",
+            ],
+        ) {
             set_val_if_not_zero(&mut usage, "output".to_string(), num);
         }
 
         // Vercel AI SDK
         if instrumentation_scope_name == "ai" {
-            if let Some(v) = attributes
-                .get(GenAiAttributes::USAGE_INPUT_TOKENS)
-                .or_else(|| attributes.get(GenAiAttributes::USAGE_PROMPT_TOKENS))
-                && let Some(num) = extract_i64(v)
-            {
+            if let Some(num) = extract_i64_any(
+                attributes,
+                &[
+                    GenAiAttributes::USAGE_INPUT_TOKENS,
+                    "gen_ai_usage_input_tokens",
+                    GenAiAttributes::USAGE_PROMPT_TOKENS,
+                    "gen_ai_usage_prompt_tokens",
+                ],
+            ) {
                 set_val_if_not_zero(&mut usage, "input".to_string(), num);
+                input_includes_cache = true;
             }
-            if let Some(v) = attributes
-                .get(GenAiAttributes::USAGE_OUTPUT_TOKENS)
-                .or_else(|| attributes.get(GenAiAttributes::USAGE_COMPLETION_TOKENS))
-                && let Some(num) = extract_i64(v)
-            {
+            if let Some(num) = extract_i64_any(
+                attributes,
+                &[
+                    GenAiAttributes::USAGE_OUTPUT_TOKENS,
+                    "gen_ai_usage_output_tokens",
+                    GenAiAttributes::USAGE_COMPLETION_TOKENS,
+                    "gen_ai_usage_completion_tokens",
+                ],
+            ) {
                 set_val_if_not_zero(&mut usage, "output".to_string(), num);
             }
-            if let Some(v) = attributes.get(VercelAiSdkAttributes::USAGE_TOKENS)
-                && let Some(num) = extract_i64(v)
-            {
+            if let Some(num) = extract_i64_any(attributes, &[VercelAiSdkAttributes::USAGE_TOKENS]) {
                 set_val_if_not_zero(&mut usage, "total".to_string(), num);
             }
         }
@@ -134,7 +282,10 @@ impl UsageExtractor {
             }
         }
 
-        usage
+        UsageDetails {
+            usage,
+            input_includes_cache,
+        }
     }
 
     /// Extract cost details
@@ -166,6 +317,27 @@ impl UsageExtractor {
 
         cost
     }
+}
+
+fn extract_i64_any(attributes: &HashMap<String, json::Value>, keys: &[&str]) -> Option<i64> {
+    keys.iter()
+        .find_map(|key| attributes.get(*key).and_then(extract_i64))
+}
+
+fn has_provider_native_cache_tokens(attributes: &HashMap<String, json::Value>) -> bool {
+    [
+        GenAiAttributes::USAGE_CACHED_TOKENS,
+        "gen_ai_usage_cached_tokens",
+        "cached_tokens",
+        GenAiAttributes::USAGE_PROMPT_CACHE_HIT_TOKENS,
+        "gen_ai_usage_prompt_cache_hit_tokens",
+        "prompt_cache_hit_tokens",
+        GenAiAttributes::USAGE_PROMPT_CACHE_MISS_TOKENS,
+        "gen_ai_usage_prompt_cache_miss_tokens",
+        "prompt_cache_miss_tokens",
+    ]
+    .iter()
+    .any(|key| attributes.contains_key(*key))
 }
 
 #[cfg(test)]
@@ -321,6 +493,49 @@ mod tests {
         );
         let usage = UsageExtractor.extract_usage(&attrs, "");
         assert_eq!(usage.get("cache_creation_input_tokens"), Some(&10i64));
+    }
+
+    #[test]
+    fn test_extract_usage_official_cache_input_tokens() {
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(100i64));
+        attrs.insert(
+            "gen_ai.usage.cache_read.input_tokens".to_string(),
+            json::json!(70i64),
+        );
+        attrs.insert(
+            "gen_ai.usage.cache_creation.input_tokens".to_string(),
+            json::json!(10i64),
+        );
+
+        let details = UsageExtractor.extract_usage_details(&attrs, "");
+
+        assert_eq!(details.usage.get("input"), Some(&100i64));
+        assert_eq!(details.usage.get("cache_read_input_tokens"), Some(&70i64));
+        assert_eq!(
+            details.usage.get("cache_creation_input_tokens"),
+            Some(&10i64)
+        );
+        assert!(details.input_includes_cache);
+    }
+
+    #[test]
+    fn test_extract_usage_deepseek_cache_hit_miss_tokens() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.usage.prompt_cache_hit_tokens".to_string(),
+            json::json!(70i64),
+        );
+        attrs.insert(
+            "gen_ai.usage.prompt_cache_miss_tokens".to_string(),
+            json::json!(30i64),
+        );
+
+        let details = UsageExtractor.extract_usage_details(&attrs, "");
+
+        assert_eq!(details.usage.get("input"), Some(&30i64));
+        assert_eq!(details.usage.get("cache_read_input_tokens"), Some(&70i64));
+        assert!(!details.input_includes_cache);
     }
 
     #[test]
