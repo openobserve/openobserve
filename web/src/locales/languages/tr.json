@@ -132,7 +132,11 @@
     "error": "Hata",
     "db": "Veritabanı",
     "discardChanges": "Değişiklikleri iptal et",
-    "unsavedChanges": "Kaydedilmemiş değişiklikler"
+    "unsavedChanges": "Kaydedilmemiş değişiklikler",
+    "clearFilter": "Filtreyi temizle",
+    "noMatches": "Eşleşme yok",
+    "remove": "Kaldır",
+    "export": "İhracat"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -425,7 +429,18 @@
     "menuGroupExplain": "Açıklamak",
     "fieldValuesEmpty": "Değer bulunamadı.",
     "fieldValuesEmptyHint": "Değerleri görmek için daha geniş bir zaman aralığı deneyin.",
-    "selectLogsStreamFirst": "Önce Günlükler akışını seçin"
+    "selectLogsStreamFirst": "Önce Günlükler akışını seçin",
+    "menuMore": "Daha",
+    "searchInspect": "Arayın İnceleyin",
+    "vrlOnlyForTableWarning": "VRL işlevi yalnızca tablo grafiği için desteklenir.",
+    "customDownloadTitle": "Özel İndirme",
+    "selectFunctionNamePlaceholder": "İşlev Adını Seçin",
+    "confirmFunctionUpdateTitle": "Güncellemeyi Onayla",
+    "confirmFunctionUpdateMsg": "{name} işlevini güncellemek istediğinizden emin misiniz?",
+    "traceIdLabel": "İzleme kimliği:",
+    "enterTraceIdPlaceholder": "İzleme kimliğini girin",
+    "changeQueryModeTitle": "Sorgu Modunu Değiştir",
+    "changeQueryModeConfirm": "Sorgu modunu değiştirmek istediğinizden emin misiniz? X Ekseni, Y Ekseni ve Filtreler için kaydedilen veriler silinecektir."
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -460,7 +475,9 @@
     "actions": "Eylemler",
     "incidents": "Olaylar",
     "evals": "Evalar",
-    "aiObservability": "Yapay Zeka Gözlemlenebilirliği"
+    "keyboardShortcuts": "Klavye Kısayolları",
+    "aiObservability": "Yapay Zeka Gözlemlenebilirliği",
+    "aiAssistant": "Yapay Zeka Asistanı"
   },
   "rum": {
     "title": "Gerçek Kullanıcı İzleme",
@@ -539,7 +556,14 @@
       "learnMore": "Daha fazla bilgi edinin:",
       "quickImpl": "Hızlı uygulama kılavuzu",
       "blogPost": "Ön uç izleme temelleri"
-    }
+    },
+    "sourceMaps": "Kaynak Haritalar",
+    "service": "Hizmet",
+    "environment": "Çevre",
+    "applyFilters": "Filtreleri Uygula",
+    "uploadSourceMaps": "Kaynak Haritaları Yükle",
+    "files": "Dosyalar",
+    "uploadedAt": "Yüklenen"
   },
   "about": {
     "name": "Açık Gözlem",
@@ -791,6 +815,10 @@
         "service_maps": {
           "name": "Servis Haritaları",
           "note": "Hizmet bağımlılıklarını görselleştirin"
+        },
+        "byob": {
+          "name": "Kendi Bucket'ınızı Getirin",
+          "note": "Organizasyon verilerinizi kendi bulut bucket'ınıza yönlendirin"
         }
       },
       "buttons": {
@@ -922,7 +950,12 @@
     "authTypeSSO": "SSO",
     "authTypeLocal": "Yerli",
     "noCustomRolesHint": "Özel rol tanımlanmadı - IAM → Roller'de bir tane oluşturun",
-    "externalUserCustomRoleHint": "Harici kullanıcılar yalnızca kaynak sistem üzerinden değiştirilebilir"
+    "externalUserCustomRoleHint": "Harici kullanıcılar yalnızca kaynak sistem üzerinden değiştirilebilir",
+    "subtitle": "Bu organizasyona erişimi olan kişiler",
+    "revokeInvitationTitle": "Davetiyeyi İptal Et",
+    "revokeInvitationMsg": "{email} davetini iptal etmek istediğinizden emin misiniz?",
+    "deleteUsersTitle": "Kullanıcıları Sil",
+    "deleteUsersMsg": "{count} kullanıcıyı silmek istediğinizden emin misiniz?"
   },
   "ticket": {
     "header": "Destek Talepleri",
@@ -984,7 +1017,8 @@
     "proceed_subscription": "Aboneliğe Geçin",
     "subscription_plan": "Abonelik Planı",
     "makeBilledMember": "Bu Kuruluşu {org} Faturalandırma Üyesi Yapın",
-    "manage": "Yönetmek"
+    "manage": "Yönetmek",
+    "nameHelpText": "Yalnızca alfanümerik karakterler, boşluk ve alt çizgi kullanın."
   },
   "template": {
     "header": "Şablonlar",
@@ -1054,7 +1088,10 @@
     "fieldRequired": "Alan zorunludur!",
     "dataType": "Veri Türü",
     "dataTypeRequired": "Veri Türü gereklidir!",
-    "udsFieldAlreadyInSchema": "Seçili bir veya daha fazla alan zaten tanımlanmış şemanın bir parçasıdır"
+    "udsFieldAlreadyInSchema": "Seçili bir veya daha fazla alan zaten tanımlanmış şemanın bir parçasıdır",
+    "subtitle": "Dizin yönetimi ve akış yapılandırması",
+    "streamNameHelpText": "Yalnızca alfanümerik karakterler, alt çizgi ve iki nokta üst üste nokta kullanın.",
+    "deleteAssociatedAlertsPipelines": "Akışla ilişkili tüm Boru Hatlarını ve Uyarıları silme"
   },
   "function": {
     "header": "Fonksiyonlar",
@@ -1114,7 +1151,11 @@
     "vrlFunctionHint": "Geçerli olayı temsil etmek için `.` tuşunu kullanın. Örnek: .new_field = .existing_field + 'işlenmiş'",
     "askAIFunctionPlaceholder": "Yapay zekadan işlevinize yardım etmesini isteyin...",
     "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin",
-    "jsErrorDetails": "JavaScript Hata Ayrıntıları"
+    "jsErrorDetails": "JavaScript Hata Ayrıntıları",
+    "subtitle": "Boru hatlarında uygulanan yeniden kullanılabilir VRL fonksiyonları",
+    "clickTestFunctionHint": "Etkinlikleri görmek için lütfen Test Fonksiyonu'na tıklayın",
+    "pleaseEnterQuery": "Lütfen bir sorgu girin",
+    "enrichmentTablesSubtitle": "Alınan verileri zenginleştiren arama tabloları"
   },
   "confirmDialog": {
     "cancel": "İptal",
@@ -1386,6 +1427,7 @@
     "selectDashboardLabel": "Kontrol Panelini Seçin",
     "selectTabLabel": "Sekme Seç",
     "numbers": "Sayılar",
+    "localeFormat": "Yerel Biçim",
     "nanoseconds": "Nanosaniye (ns)",
     "currency": "Para Birimi",
     "p99": "P99",
@@ -1692,7 +1734,89 @@
     "multiSqlQueryLabelHint": "Açıklamalarda bu sorgu için özel ad (örn., 'Üretim')",
     "multiQueryWarning": "{chartType} için yalnızca Sorgu 1 oluşturulur",
     "trellisNotSupportedWithMultiQuery": "Kafes düzeni birden çok sorgu ile devre dışı bırakılır. Kafes kullanmak için ekstra sorguları kaldırın.",
-    "xAliasInconsistencyWarning": "X ekseni takma adları sorgular arasında tutarsızdır: bazıları histogram kullanır, bazıları kullanmaz. Öngörülebilir sonuçlar için tüm sorgularda aynı takma ad türünü kullanın."
+    "xAliasInconsistencyWarning": "X ekseni takma adları sorgular arasında tutarsızdır: bazıları histogram kullanır, bazıları kullanmaz. Öngörülebilir sonuçlar için tüm sorgularda aynı takma ad türünü kullanın.",
+    "tableFiltering": "Sütun Filtreleme",
+    "columnFormattingTitle": "Sütun Biçimlendirme",
+    "sectionValueFormatting": "Değer Biçimlendirme",
+    "configSectionFieldOverridesAliases": [
+      "Field Overrides",
+      "Override Config",
+      "Override",
+      "Column Formatting"
+    ],
+    "sectionAlignment": "Hizalama",
+    "alignLeft": "Left",
+    "alignCenter": "Center",
+    "alignRight": "Right",
+    "sectionStyling": "Şekillendirme",
+    "sectionConditionalStyling": "Koşullu Stil",
+    "conditionThreshold": "Değer",
+    "conditionAddRule": "+ Kural ekle",
+    "textColor": "Metin",
+    "bgColor": "Arkaplan",
+    "colorNone": "hiçbiri",
+    "conditionNoRules": "Henüz kural yok.",
+    "customColor": "Özel renk",
+    "inlinePreview": "Önizleme",
+    "columnFormattingSubtitle": "Solda kontroller, sağda sütunun canlı bir örneği, böylece bağlam içinde görürsünüz.",
+    "columnFormattingPick": "Bir sütun seçin",
+    "columnFormattingSampleNote": "Bu sütundan örnek satırlar.",
+    "typeNumeric": "Sayı",
+    "typeText": "Metin",
+    "sectionFieldType": "Alan Türü",
+    "conditionIfValue": "Değer ise",
+    "conditionThenText": "sonra metin rengi",
+    "conditionAndBg": "ve arka plan",
+    "opLessThan": "daha az",
+    "opGreaterThan": "daha büyük",
+    "opLessThanEqual": "küçük veya eşit",
+    "opGreaterThanEqual": "daha büyük veya eşit",
+    "opEqual": "eşit",
+    "opNotEqual": "eşit değil",
+    "columnFormattingAddField": "Alan ekle",
+    "columnFormattingAllAdded": "Tüm alanlar eklendi",
+    "columnFormattingNoFields": "Alan eklenmedi",
+    "columnFormattingNoFieldsHint": "Bir sütunu biçimlendirmeye başlamak için yukarıdaki “Alan ekle” yi kullanın.",
+    "columnFormattingEmptyTitle": "Bir sütunu biçimlendirme",
+    "columnFormattingEmptyHint": "Birimler, hizalama, renkler ve koşullu kurallar uygulamak için bir alan seçin.",
+    "columnFormattingNoFieldsToFormat": "Henüz biçimlendirilmiş alan yok",
+    "columnFormattingOneFieldToFormat": "1 alan biçimlendirilmiş",
+    "columnFormattingFieldsToFormat": "biçimlendirilmiş alanlar",
+    "subtitle": "Klasörler arasında gösterge panoları oluşturun, düzenleyin ve paylaşın",
+    "deleteDashboardConfirmTitle": "Gösterge tablosunu sil",
+    "deleteDashboardConfirmMsg": "Kontrol panelini silmek istediğinizden emin misiniz?",
+    "deleteDashboardsConfirmTitle": "Kontrol Panellerini Sil",
+    "deleteDashboardsConfirmMsg": "{count} gösterge tablosunu silmek istediğinizden emin misiniz?",
+    "importCustom": "Özel",
+    "importCustomDesc": "JSON dosyasından veya URL'den içe aktarma",
+    "importTemplates": "Şablonlar",
+    "importTemplatesDesc": "Galeriye göz atın ve içe aktarın",
+    "searchThisFolder": "Bu klasör",
+    "searchThisFolderTitle": "Yalnızca bu klasörü ara",
+    "searchAllFolders": "Tüm klasörler",
+    "searchAllFoldersTitle": "Tüm klasörlerde ara",
+    "reloadDashboards": "Kontrol panellerini yeniden yükle",
+    "editVariable": "Değişkeni Düzenle",
+    "addOption": "Seçenek Ekle",
+    "addFilter": "Filtre Ekle",
+    "noDataFound": "Veri Bulunamadı",
+    "streamSelectTooltip": "Akışı başka bir değere göre dinamik olarak seçmek için bir akış seçin veya $streamVariable gibi bir değişken kullanın.",
+    "fieldSelectTooltip": "Bir alan seçin veya $fieldVariable gibi bir değişken kullanın. Akış bir değişken kullanıyorsa, alan listesi boş olacaktır - alan adını manuel olarak yazın.",
+    "filterInfoTooltip": "Filtrelerde, geçerli değişkenin değerini filtrelemek için başka bir değişkenin değerini kullanabilirsiniz. Bu, diğer değişkenin adı kullanılarak yapılabilir. Örneğin:",
+    "defaultSelectAll": "Varsayılan - Tümünü Seç",
+    "escapeSingleQuotesTooltip": "Etkinleştirilirse, sorguda tek tırnak işaretlerinden kurtulur. Örneğin, `O'Reilly` gibi bir değer `O\"Reilly` olarak değiştirilecektir.",
+    "byDefaultSelect": "Varsayılan Olarak Seçin:",
+    "firstValue": "İlk değer",
+    "allValues": "Tüm değerler",
+    "customValue": "Özel",
+    "showDependencies": "Bağımlılıkları Göster",
+    "deleteVariable": "Değişkeni Sil",
+    "deleteVariableMsg": "Değişkeni silmek istediğinizden emin misiniz?",
+    "appliedToTabs": "Sekmelere uygulanır:",
+    "appliedToPanels": "Panellere uygulanır:",
+    "selectVariableScope": "Değişken kapsamı seçin",
+    "variableScopeHelp": "Genel seçilmişse değişkenler tüm sekmelere ve panellere uygulanacaktır.",
+    "showDynamicFilters": "Dinamik Filtreleri Göster"
   },
   "panel": {
     "header": "Panel",
@@ -1981,7 +2105,14 @@
       "viewOrgGroup": "Organizasyon Grubunu Görüntüle",
       "usageMemberLabel": "Üye Organizasyon",
       "usageAllMembers": "Mevcut Kuruluş",
-      "currentOrgTitle": "Mevcut Kuruluş"
+      "currentOrgTitle": "Mevcut Kuruluş",
+      "childOrgIdColumn": "Alt Organizasyon Tanımlayıcısı",
+      "childOrgNameColumn": "Alt Organizasyon Adı",
+      "notEnabledTitle": "Faturalandırma Grubu Kullanılamıyor",
+      "notEnabledDesc": "Bu organizasyon, faturalandırma grubu başlatmak için etkinleştirilmemiş. Bu özelliğe ihtiyacınız varsa yöneticinizle iletişime geçin.",
+      "memberOrgsTitle": "Üye Organizasyonlar",
+      "searchMemberOrg": "Organizasyon Ara",
+      "noMemberMatch": "Eşleşen Organizasyon Yok"
     }
   },
   "message": {
@@ -2182,7 +2313,43 @@
       "rcaCompleted": "Kök neden analizi tamamlandı",
       "noRcaYet": "Kök neden analizi mevcut değildir. Başlamak için 'Analiz Et'i tıklayın.",
       "search": "Olayları ara...",
-      "sreChat": "SRE Asistanına Sor"
+      "sreChat": "SRE Asistanına Sor",
+      "subtitle": "Olay yönetimi ve takibi",
+      "correlationPrimaryMatch": "Birincil Eşleşme",
+      "correlationSecondaryMatch": "İkincil Eşleşme",
+      "correlationServiceDiscoveryTooltip": "Servis keşfinden alınan önceden hesaplanmış servis kimliği kullanılarak ilişkilendirildi",
+      "correlationPrimaryMatchTooltip": "Birincil eşleştirme ölçütlerine göre ilişkilendirildi",
+      "correlationSecondaryMatchTooltip": "İkincil eşleştirme ölçütlerine göre ilişkilendirildi",
+      "correlationAlertId": "Uyarı ID",
+      "correlationAlertIdTooltip": "Eşleşen boyut bulunamadı — uyarı ID'sine göre izole edildi",
+      "correlatedByServiceDiscovery": "Boyutlar",
+      "correlatedBySemanticGroups": "Boyutlar",
+      "correlatedByAlertId": "Uyarı ID",
+      "goBack": "Geri Dön",
+      "incident": "Olay",
+      "uniqueAlerts": "Benzersiz Uyarılar",
+      "relatedAlerts": "İlgili Uyarılar",
+      "alertTriggers": "Uyarı Tetikleyicileri",
+      "incidentTimeline": "Olay Zaman Çizelgesi",
+      "incidentDetails": "Olay Ayrıntıları",
+      "incidentId": "Olay ID",
+      "incidentName": "Olay Adı",
+      "initialTrigger": "İlk tetikleyici",
+      "noDimensionsAvailable": "Kullanılabilir boyut yok",
+      "noAlertDetailsAvailable": "Kullanılabilir uyarı ayrıntısı yok",
+      "clickOnTriggerToViewDetails": "Ayrıntıları görüntülemek için tablodaki bir tetikleyiciye tıklayın",
+      "refreshCorrelatedData": "İlişkilendirilmiş verileri yenile",
+      "showingCorrelatedLogs": "Olay zaman aralığından ilişkilendirilmiş loglar gösteriliyor",
+      "showingCorrelatedMetrics": "Olay zaman aralığından ilişkilendirilmiş metrikler gösteriliyor",
+      "showingCorrelatedTraces": "Olay zaman aralığından ilişkilendirilmiş izler gösteriliyor",
+      "incidentTitleUpdatedSuccess": "Olay başlığı başarıyla güncellendi",
+      "markAsAcknowledgedTooltip": "Olayı kabul edildi ve üzerinde çalışılıyor olarak işaretle",
+      "markAsResolvedTooltip": "Olayı çözüldü olarak işaretle ve kapat",
+      "reopenIncidentTooltip": "Bu çözülmüş olayı yeniden aç",
+      "editIncidentTitleTooltip": "Olay başlığını düzenle",
+      "firedTimes": "{count} kez tetiklendi",
+      "incidentAnalysis": "Olay Analizi",
+      "noAlertActivityData": "Uyarı etkinlik verisi yok"
     },
     "events": "Olaylar",
     "multiWindow": "Geçmişle karşılaştırın",
@@ -2230,7 +2397,9 @@
       "alertName": "Uyarı Adı",
       "streamInfo": "Veri Kaynağı",
       "alertType": "Uyarı Türü",
-      "queryCondition": "Sorgu Koşulu"
+      "queryCondition": "Sorgu Koşulu",
+      "configuringRealTime": "Şunun için gerçek zamanlı uyarı yapılandırılıyor:",
+      "configuringScheduled": "Şunun için zamanlanmış uyarı yapılandırılıyor:"
     },
     "correlation": {
       "title": "Uyarı Korelasyonu",
@@ -2387,7 +2556,8 @@
       "comparingText": "Geçerli pencere sorgu sonucunu önceki {offset} sorgu sonucuyla karşılaştırma.",
       "addComparisonWindow": "Karşılaştırma Penceresi Ekle",
       "goToConditions": "Koşullara git",
-      "goToConditionsTooltip": "Seçilen karşılaştırma pencereleri için olayları doğrulamak için “Koşullara Git” e tıklayın"
+      "goToConditionsTooltip": "Seçilen karşılaştırma pencereleri için olayları doğrulamak için “Koşullara Git” e tıklayın",
+      "comparisonDisabledTooltip": "Karşılaştırma pencereleri yalnızca SQL modunda desteklenir. Uyarı Kuralları sekmesinde SQL moduna geçin."
     },
     "alertSettings": {
       "cronSchedule": "Cron Programı",
@@ -2399,13 +2569,22 @@
       "frequencyTooltipCron": "Boşlukla ayrılmış 5 alan içeren standart UNIX cron formatı: [Dakika 0-59] [Saat 0-23] [1-31 Ayın Günü] [1-12 Ay veya JAN-DEC] [Haftanın Günü 0-7 veya '1L-7L', Pazar için 0 ve 7].",
       "timezoneWarning": "Uyarı: Görüntülenen saat dilimi yaklaşıktır. Doğru saat dilimini manuel olarak doğrulayın ve seçin.",
       "destinationsTooltip": "Uyarı bildirimleri göndermek için bir veya daha fazla hedef seçin.",
-      "templateTooltip": "İsteğe bağlı: Bu uyarıdaki tüm hedefler için kullanılacak bir şablon seçin. Şablonlar, uyarı mesajlarının biçimini özelleştirmenize olanak tanır. Seçilmezse, her hedef kendi yapılandırılmış şablonunu kullanır."
+      "templateTooltip": "İsteğe bağlı: Bu uyarıdaki tüm hedefler için kullanılacak bir şablon seçin. Şablonlar, uyarı mesajlarının biçimini özelleştirmenize olanak tanır. Seçilmezse, her hedef kendi yapılandırılmış şablonunu kullanır.",
+      "sectionTitle": "Ayarlar",
+      "fieldRequired": "Alan zorunludur!",
+      "noDestinationsAvailable": "Kullanılabilir hedef yok",
+      "refreshDestinations": "En güncel Hedefleri yenile",
+      "createsIncident": "Olay Oluşturur",
+      "createsIncidentTooltip": "Bir uyarı olay oluşturabiliyorsa, ayrı bir bildirim göndermez. Bunun yerine, yeni bir olay oluşturulduğunda veya mevcut bir olaya yeni bir uyarı türü katıldığında olaya ilişkin bir bildirim gönderilir."
     },
     "advanced": {
       "addVariable": "Değişken Ekle",
       "variablesTooltip": "Değişkenler, verileri uyarıdan hedefe iletmek için kullanılır.",
       "rowTemplateTooltip": "Satır Şablonu uyarı mesajını biçimlendirmek için kullanılır.",
-      "templateType": "Şablon Türü:"
+      "templateType": "Şablon Türü:",
+      "noTemplatesAvailable": "Kullanılabilir şablon yok",
+      "refreshTemplates": "En güncel Şablonları yenile",
+      "selectTemplate": "Şablon Seç"
     },
     "addConditions": "Koşulları Ekle",
     "sqlEditor": "SQL Düzenleyici",
@@ -2446,7 +2625,8 @@
       "training": "Eğitim",
       "active": "Aktif",
       "failed": "Başarısız",
-      "disabled": "Engelli"
+      "disabled": "Engelli",
+      "ready": "Hazır"
     },
     "anomalyStepCaptions": {
       "alertSetup": "Dedektörünüzü adlandırın ve izlenecek bir akış seçin",
@@ -2509,7 +2689,28 @@
       "destinationRequired": "En az bir varış noktası gereklidir!",
       "disabledNotificationsInfo": "Anomali algılama çalışmaya devam edecek ve sonuçları _anomaliler akışına yazacaktır. Anormallikler tespit edildiğinde uyarı almak için bildirimleri etkinleştirin."
     },
-    "anomalyName": "Anomali Adı"
+    "anomalyName": "Anomali Adı",
+    "subtitle": "Uyarı kuralları ve bildirim kanalları",
+    "searchThisFolder": "Bu klasör",
+    "searchAllFolders": "Tüm klasörler",
+    "streamConfig": "Akış Yapılandırması",
+    "alertRules": "Uyarı Kuralları",
+    "addCondition": "Koşul Ekle",
+    "conditionOf": "dan",
+    "conditionIs": "dır",
+    "matchingTypeFound": "eşleşen {type} bulundu",
+    "matchingMetricsFound": "eşleşen metrikler bulundu",
+    "metricsValueFieldTooltip": "Metrik akışları, ölçümlerini varsayılan olarak “değer” alanında depolar",
+    "howOftenCheckTooltip": "Bu uyarı durumu ne sıklıkla kontrol edilir",
+    "alertIfNoOfEvents": "Olay sayısı ise uyarı",
+    "alertIfValueIs": "Değer ise uyarı",
+    "havingSeries": "Serilere sahip olmak",
+    "clearMultiWindowsTitle": "Çoklu Pencereleri Temizle?",
+    "lastTrainedAt": "En son eğitildi",
+    "noTemplatesMsg": "Henüz herhangi bir Şablon oluşturmadınız gibi görünüyor. Uyarı oluşturmak için en az bir Hedef ve bir Şablon bulundurmanız gerekir",
+    "createTemplateBtn": "Şablon Oluştur",
+    "noDestinationsMsg": "Görünüşe göre henüz herhangi bir Hedef oluşturmadınız. Uyarı oluşturmak için en az bir Hedef ve bir Şablon bulundurmanız gerekir",
+    "createDestinationBtn": "Hedef Oluştur"
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2794,7 +2995,93 @@
       "noMatchingDimensions": "Eşleşen boyut yok",
       "otherGroup": "Diğer",
       "fallbackGroup": "Yedek",
-      "fallbackNote": "Yedek boyutlar ('service' gibi), ortama özgü hiçbir iş yükü eşleşmediğinde tüm ortamlarda geçerlidir."
+      "fallbackNote": "Yedek boyutlar ('service' gibi), ortama özgü hiçbir iş yükü eşleşmediğinde tüm ortamlarda geçerlidir.",
+      "serviceDiscoveryTab": "Tespit Kuralları",
+      "fieldAliasesTab": "Alan Eşlemeleri",
+      "fieldAliasesSaved": "Alan takma adları başarıyla kaydedildi",
+      "serviceNameFieldAliasNote": "Bu gruba eşlenen gerçek alan adları şurada yapılandırılır:",
+      "viewFieldAliases": "Alan takma adlarını düzenle →",
+      "fieldAliasesSaveError": "Alan takma adları kaydedilemedi",
+      "fieldAliasesUnsavedConfirm": "Kaydedilmemiş alan eşleme değişiklikleriniz var. Bunları iptal edip çıkmak istiyor musunuz?",
+      "duplicateIdsError": "Yinelenen grup ID'leri bulundu: {ids}. Lütfen her grubun benzersiz bir ID'ye sahip olduğundan emin olun.",
+      "duplicateNamesInCategoryError": "\"{category}\" kategorisinde yinelenen \"{name}\" adı bulundu. Bir kategori içindeki her grubun benzersiz bir adı olmalıdır.",
+      "emptyIdError": " kategorisinde boş grup adları var. Lütfen tüm grupların geçerli adlara sahip olduğundan emin olun.",
+      "emptyFieldsError": "En az bir alan adı gereklidir",
+      "lastSeen": "Son Görülme",
+      "serviceIdentitySetupTitle": "Servis Kimliği Kurulumu",
+      "serviceIdentitySetupDescription": "Servislerin telemetri verileriniz genelinde nasıl tanımlandığını yapılandırın",
+      "serviceNameFieldLabel": "Servis Adı Alanı",
+      "serviceNameFieldHelp": "Telemetri verilerinizde servis adını hangi alan tanımlar",
+      "serviceNameFrom": "Servis adı kaynağı",
+      "serviceNameDerivedPrefix": "Servis adı, şurada tanımlanan servis adı alanları kullanılarak türetilir:",
+      "serviceNameFields": "alan takma adları",
+      "serviceNameDetectedFrom": "Servis adı şuradan tespit edildi:",
+      "serviceNameNotDetected": "Verilerinizde henüz bir servis adı alanı tespit edilmedi",
+      "serviceNameNotDetectedHelp": "Telemetrinizin service.name veya benzeri bir alan içerdiğinden emin olun",
+      "serviceNameExpandedHelp": "Verilerinizdeki bu alan adlarının tümü servis adına eşlenir:",
+      "serviceNameConfiguredNotSeen": "yapılandırıldı ancak verilerinizde henüz görülmedi",
+      "customizeFieldMappings": "Alan eşlemelerini özelleştir",
+      "fieldMappingDialogHelp": "Telemetri verileriniz genelinde servis adı olarak tanınması gereken alan adlarını ekleyin veya kaldırın.",
+      "fieldMappingPlaceholder": "Bir alan adı yazıp Enter'a basın",
+      "foundInLogs": "Loglarda Bulundu",
+      "foundInTraces": "İzlerde Bulundu",
+      "foundInMetrics": "Metriklerde Bulundu",
+      "distinguishByLabel": "Servisleri Şuna Göre Ayırt Et",
+      "distinguishByHelp": "Servislerinizin nerede çalıştığını tanımlayan alanları seçin. Örneğin, küme + ad alanı + dağıtım birlikte her servis için benzersiz bir kimlik oluşturur. En fazla 5 alan.",
+      "serviceOptionalLabel": "Servis özniteliği olmadan ilişkilendir",
+      "serviceOptionalHelp": "Akışları yalnızca aşağıdaki öznitelikleri kullanarak eşleştir, servis özniteliklerini yoksay",
+      "noFieldsConfiguredYet": "Henüz ayırt edici alan yapılandırılmadı.",
+      "addField": "Alan ekle",
+      "addFieldTooltip": "Servisleri benzersiz şekilde tanımlamaya yardımcı olmak için başka bir alan ekleyin (en fazla 5). Örnekler: bölge, ad alanı veya ortam.",
+      "addGroup": "Grup ekle",
+      "addGroupTooltip": "Farklı bir ortam için ayrı bir ayırt edici alan kümesi oluşturun (örn. Kubernetes ve AWS için farklı alanlar)",
+      "autoSuggestedBanner": "Bu alanlar otomatik olarak önerildi çünkü az sayıda benzersiz değere (düşük kardinalite) sahipler ve servislerinizin çoğunda görünüyorlar — aynı ada sahip servisleri ayırt etmek için idealdir. Kaydetmeden önce bunları özelleştirebilirsiniz.",
+      "addDisambiguationField": "Başka ekle",
+      "removeDisambiguationField": "Alanı kaldır",
+      "nameFieldLockedNote": "Servis adı alanı ilk yapılandırmadan sonra değiştirilemez",
+      "noGroupsAvailable": "Kullanılabilir alan grubu yok",
+      "selectField": "Bir alan seçin",
+      "detectedLabel": "Verilerinize göre {type} iş yükü tespit ettik.",
+      "suggestionPrompt": "Öneriyi uygulayalım mı?",
+      "applySuggestion": "Öneriyi uygula",
+      "logStreams": "Log akışları",
+      "traceStreams": "İz akışları",
+      "metricStreams": "Metrik akışları",
+      "saveIdentityConfig": "Yapılandırmayı Kaydet",
+      "identityConfigSaved": "Servis kimliği yapılandırması başarıyla kaydedildi",
+      "identityConfigSaveFailed": "Servis kimliği yapılandırması kaydedilemedi",
+      "loadRecommendationsFailed": "Öneriler yüklenemedi",
+      "resetServices": "Servisleri Sıfırla",
+      "resetServicesTooltip": "Keşfedilen tüm servisleri silin. Yeni veri geldikçe otomatik olarak yeniden keşfedileceklerdir.",
+      "resetServicesConfirmTitle": "Keşfedilen Tüm Servisler Sıfırlansın mı?",
+      "resetServicesConfirmMessage": "Bu işlem, bu organizasyon için keşfedilen tüm servisleri silecektir. Yeni telemetri verileri alındıkça servisler otomatik olarak yeniden keşfedilecektir. Bu işlem geri alınamaz.",
+      "resetServicesConfirmWarning": "Yeni telemetri verileri alındıkça servisler otomatik olarak yeniden keşfedilecektir. Bu işlem geri alınamaz.",
+      "resetServicesSuccess": "{count} keşfedilen servis başarıyla silindi.",
+      "resetServicesFailed": "Servisler sıfırlanamadı",
+      "workload": "İş Yükü",
+      "goToConfiguration": "Yapılandırmaya Git",
+      "configureServicesHint": "servislerin nasıl tanımlandığını ve gruplandığını yapılandırmak için.",
+      "filterBy": "Şuna göre filtrele :",
+      "selectFieldPlaceholder": "Alan seç",
+      "selectValuePlaceholder": "Değer seç",
+      "selectFieldFirst": "Önce bir alan seçin",
+      "instanceSingular": "örnek",
+      "instancePlural": "örnekler",
+      "serviceSingular": "Servis",
+      "serviceCountSingular": "{count} Servis",
+      "serviceCountPlural": "{count} Servis",
+      "instancesCount": "({count} örnek)",
+      "noDimensions": "boyut yok",
+      "defaultSetWarningTitle": "İlişkilendirme güvenilmez olabilir.",
+      "defaultSetWarningBody": "Bu örneğin ayırt edici bilgisi yok — herhangi bir iş yükü eşleşmesi olmadan keşfedildi (küme, ad alanı veya ortam bağlamı yok). Loglar ve izler aynı servis adının farklı dağıtımlarından geliyor olabilir.",
+      "instanceIdentity": "Örnek Kimliği",
+      "noDimensionsCatchAll": "Boyut yok — tümünü yakalayan örnek",
+      "streamSources": "Akış Kaynakları",
+      "openInLogsTooltip": "Servis filtresiyle Loglarda aç",
+      "fieldNameMapping": "Alan Adı Eşlemesi",
+      "logsWithCount": "Loglar ({count})",
+      "tracesWithCount": "İzler ({count})",
+      "metricsWithCount": "Metrikler ({count})"
     },
     "pageSubtitle": "Uygulamanızın ayarlarını ayarlama",
     "platformSettings": "Platform Ayarları",
@@ -2837,7 +3124,48 @@
     "usageStreamEnabledLabel": "Kullanım Akışını Etkinleştir",
     "aiToolsets": "Yapay Zeka Araç Setleri",
     "llmModelPricing": "LLM Model Fiyatlandırması",
-    "ingestionTokens": "Yutma Jetonları"
+    "ingestionTokens": "Yutma Jetonları",
+    "genAiAgentMapping": {
+      "tabLabel": "GenAI Aracı Haritalama",
+      "title": "GenAI Aracı Haritalama",
+      "description": "LLM izleri ve değerlendirmeleri için ajan kimliğini normalleştirmek için kullanılan yedek telemetri özniteliklerini yapılandırın.",
+      "howItWorksTitle": "Haritalama nasıl çalışır",
+      "howItWorksDescription": "OpenObserve öncelikle standart gen_ai.agent.name ve gen_ai.agent.id özniteliklerini korur. Bu listeler yalnızca standart öznitelikler eksik veya boş olduğunda kontrol edilir. Satır başına bir gelen telemetri özelliği ekleyin.",
+      "agentNameFields": "Temsilci adı geri dönüş alanları",
+      "agentNameHelp": "gen_ai.agent.name için yedek olarak kullanılacak gelen öznitelikler.",
+      "agentIdFields": "Ajan Kimliği geri dönüş alanları",
+      "agentIdHelp": "gen_ai.agent.id için yedek olarak kullanılacak gelen öznitelikler.",
+      "fieldsPlaceholder": "ajanın adı\nllm.agent.adı",
+      "applyDefaults": "Varsayılanları uygula",
+      "resetToEmpty": "Boşa sıfırla",
+      "defaultsSource": "Varsayılanlar openobserve/sdr_pattern'den yüklenir ve bu kuruluş için kaydedilmeden önce değiştirilebilir.",
+      "saved": "GenAI aracı eşlemesi başarıyla kaydedildi",
+      "loadFailed": "GenAI aracı eşlemesi yüklenemedi",
+      "saveFailed": "GenAI aracı eşlemesi kaydedilemedi",
+      "defaultsLoadFailed": "GenAI aracı eşleme varsayılanları yüklenemedi"
+    },
+    "groupGeneral": "Genel",
+    "groupAccessSecurity": "Erişim ve Güvenlik",
+    "groupDestinationsTemplates": "Hedefler ve Şablonlar",
+    "groupDataAI": "Veri ve Yapay Zeka",
+    "groupOperations": "Operasyonlar",
+    "groupAccount": "Hesap",
+    "generalDesc": "Tema, sorgu varsayılanları ve temel tercihler",
+    "orgDesc": "Organizasyon parametreleri ve tanımlayıcıları",
+    "cipherKeysDesc": "Hassas alanlar için şifreleme anahtarları",
+    "regexPatternsDesc": "Maskeleme için yeniden kullanılabilir regex desenleri",
+    "domainManagementDesc": "Oturum açmayı izin verilen SSO alan adlarıyla kısıtlayın",
+    "alertDestinationsDesc": "Tetiklenen uyarıların iletildiği yer",
+    "pipelineDestinationsDesc": "Pipeline çıktısı için harici hedefler",
+    "templatesDesc": "Yeniden kullanılabilir uyarı mesajı şablonları",
+    "storageSettingsDesc": "Organizasyon bazında depolama yapılandırması",
+    "modelPricingDesc": "LLM model maliyet yapılandırması",
+    "correlationSettingsDesc": "Telemetri ilişkilendirme yapılandırması",
+    "llmProvidersDesc": "Çevrimiçi değerlendirmeler için LLM sağlayıcıları",
+    "queryManagementDesc": "Çalışan sorguları inceleyin ve iptal edin",
+    "nodesDesc": "Küme düğümleri ve durumları",
+    "licenseDesc": "Kurumsal lisans ayrıntıları",
+    "organizationManagementDesc": "Organizasyon oluşturun ve yönetin"
   },
   "iam": {
     "users": "Kullanıcılar",
@@ -2870,7 +3198,19 @@
     "externalUserWarningTitle": "Harici kullanıcı uyarısı",
     "externalUserWarningMessage": "Harici kullanıcıları doğrudan rollere eklemek izin vermez. Bunun yerine Kullanıcı Gruplarına ekleyin.",
     "invitations": "Davetiyeler",
-    "ingestionTokens": "Yutma Jetonları"
+    "ingestionTokens": "Yutma Jetonları",
+    "sectionAccess": "Erişim",
+    "sectionPermissions": "İzinler",
+    "sectionOrganization": "Organizasyon",
+    "usersDesc": "Bu organizasyona erişimi olan kişiler",
+    "serviceAccountsDesc": "API'ler için programlı erişim belirteçleri",
+    "ingestionTokensDesc": "Bu kuruluşa veri almak için belirteçler",
+    "invitationsDesc": "Bekleyen ve gönderilen üye davetleri",
+    "groupsDesc": "Rol atamak için kullanıcıları gruplandırın",
+    "rolesDesc": "İzinleri ve erişim ilkelerini tanımlayın",
+    "quotaDesc": "Rol başına uygulanan kullanım sınırları",
+    "organizationsDesc": "Erişebileceğiniz kuruluşlar",
+    "nameHelpText": "Yalnızca alfanümerik ve '_' karakterleri boşluk olmadan kullanın."
   },
   "pipeline": {
     "header": "Boru hatları",
@@ -3031,7 +3371,14 @@
     "dimensionWidth": "Genişlik (piksel)",
     "dimensionHeight": "Yükseklik (piksel)",
     "imagePreview": "Satır içi gösterge paneli önizleme görüntüsünü ekleyin",
-    "customDimensions": "Özel Boyutlar (Gelişmiş)"
+    "customDimensions": "Özel Boyutlar (Gelişmiş)",
+    "subtitle": "Zamanlanmış raporlar ve dışa aktarmalar",
+    "searchThisFolder": "Bu klasör",
+    "searchAllFolders": "Tüm klasörler",
+    "reloadReports": "Raporları yeniden yükle",
+    "moveToFolder": "Klasöre Taşı",
+    "deleteReportsTitle": "Raporları Sil",
+    "deleteReportsMsg": "{count} raporlarını silmek istediğinizden emin misiniz?"
   },
   "queries": {
     "runningQueries": "Çalışan Sorgular",
@@ -3159,19 +3506,27 @@
         "p99Latency": "P99",
         "avgLatency": "Ortalama Gecikme",
         "lastSeen": "Son Görülen",
-        "operations": "Operasyonlar"
+        "operations": "Operasyonlar",
+        "avgDuration": "Ort. Süre",
+        "maxDuration": "Maks. Süre"
       },
       "status": {
         "healthy": "Sağlıklı",
         "warning": "Uyarı",
-        "degraded": "Bozulmuş"
+        "degraded": "Bozulmuş",
+        "critical": "Kritik"
       },
       "viewTraces": "İzleri Görüntüle",
       "exportCsv": "CSV'yi dışa aktarma",
       "justNow": "Hemen şimdi",
       "minutesAgo": "{n} m önce",
       "hoursAgo": "{n} saat önce",
-      "daysAgo": "{n} d önce"
+      "daysAgo": "{n} d önce",
+      "serviceLabel": "servis",
+      "servicesLabel": "servisler",
+      "legend": {
+        "title": "Hata Oranı"
+      }
     },
     "noErrorPresent": "Bu aralıkta hata yok",
     "httpStatusCode": "HTTP Durum Kodu",
@@ -3209,8 +3564,12 @@
         "duration": "Süre",
         "tokens": "Jetonlar",
         "cost": "Maliyet",
-        "status": "Durum"
-      }
+        "status": "Durum",
+        "user": "Kullanıcı",
+        "firstMessage": "İlk mesaj"
+      },
+      "streamLabel": "Akış",
+      "unknownUser": "Bilinmeyen kullanıcı"
     },
     "sessionDetail": {
       "backToSessions": "Oturumlara Dön",
@@ -3252,7 +3611,15 @@
         "output": "Çıktı",
         "total": "Toplam",
         "cost": "Maliyet",
-        "spans": "Açıklıklar"
+        "spans": "Açıklıklar",
+        "llmCalls": "LLM çağrıları",
+        "toolCalls": "Araç çağrıları",
+        "otherCalls": "Diğer",
+        "otherCallsTooltip": "tanınmayan işlem adlarına sahip gen_ai span'leri:"
+      },
+      "fullscreen": {
+        "expandTurn": "Adımı tam ekranda görüntüle",
+        "close": "Kapat"
       }
     },
     "openInFullView": "Tam görünümde aç",
@@ -3289,11 +3656,28 @@
       "expandRange": "Zaman aralığını genişletin",
       "expandRangeDescAbsolute": "Daha geniş bir göreceli zaman aralığına geçin",
       "removeFilter": "Filtreyi kaldırma",
-      "selectedRange": "Seçilen aralık"
+      "selectedRange": "Seçilen aralık",
+      "descOutOfRange": "Zaman pencereniz bu akıştan herhangi bir veri içermiyor. Verinin en son görüldüğü zamana geçin.",
+      "descDataAtBoundary": "Akışın bu pencerede verisi var ancak hiçbir iz eşleşmedi. Zaman aralığını genişletmeyi deneyin.",
+      "jumpToData": "En son verilere geç"
     },
     "showAll": "Tümünü Göster",
     "filterByErrors": "Hatalara göre filtrele",
-    "clearErrorFilter": "Hata filtresini temizle"
+    "clearErrorFilter": "Hata filtresini temizle",
+    "spansTab": "Açıklıklar",
+    "tracesTab": "İzleri",
+    "serviceGraphTab": "Servis Grafiği",
+    "treeView": "Ağaç Görünümü",
+    "graphView": "Grafik Görünümü",
+    "layoutHorizontal": "Yatay",
+    "layoutVertical": "Dikey",
+    "layoutForce": "Kuvvet Düzeni",
+    "exportTraces": "İzleri Dışa Aktar",
+    "waterfall": "Şelale",
+    "flameGraph": "Alev Grafiği",
+    "traceGraph": "İz Grafiği",
+    "dag": "DAG",
+    "thread": "Konu"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -3463,7 +3847,38 @@
     "failed_to_load": "Desenler yüklenemedi",
     "no_patterns_selected": "Lütfen en az bir desen seçin",
     "name_required": "* İsim zorunludur",
-    "pattern_required": "* Desen gereklidir"
+    "pattern_required": "* Desen gereklidir",
+    "associated_breadcrumb": "Akış Ayrıntıları",
+    "associated_search_placeholder": "Ara",
+    "applied_patterns_count": "Uygulanan Desenler ({count})",
+    "all_patterns_count": "Tüm Desenler ({count})",
+    "no_data_available": "Kullanılabilir veri yok",
+    "no_patterns_applied_title": "Henüz Desen Uygulanmadı",
+    "no_patterns_applied_subtitle": "Alanlarınıza düzenli ifadeler uygulamaya başlamak için desen kitaplığına göz atın.",
+    "pattern_name": "Desen Adı",
+    "when_value_matches": "Değer eşleştiğinde",
+    "redact": "Maskele",
+    "redact_hint": "[REDACTED] ile değiştir",
+    "drop": "At",
+    "drop_hint": "Alanı tamamen at",
+    "hash": "Hash'le",
+    "hash_hint": "Aranabilir hash ile değiştir",
+    "detect_at": "Tespit zamanı",
+    "ingestion": "Veri Alma",
+    "query": "Sorgu",
+    "test_pattern": "Deseni Test Et",
+    "test_input": "Girdiyi Test Et",
+    "regex_pattern_label": "Regex Deseni",
+    "input_string": "Girdi dizesi",
+    "input_string_placeholder": "Örn. 1234567890",
+    "output": "Çıktı",
+    "output_string_placeholder": "Çıktı Dizesi",
+    "click_test_input_hint": "Sonuçları görmek için lütfen Girdiyi Test Et'e tıklayın",
+    "remove_pattern": "Deseni Kaldır",
+    "add_pattern": "Desen Ekle",
+    "remove_pattern_confirm_msg": "Bu deseni alandan kaldırmak istediğinizden emin misiniz?",
+    "failed_to_test_string": "Dize test edilemedi",
+    "select_detect_at_option": "Lütfen tespit zamanı seçeneğini seçin"
   },
   "search_history": {
     "title": "Arama Geçmişi",
@@ -3691,7 +4106,10 @@
         "duration": "Süre",
         "startBeforeEnd": "Başlangıç saati bitiş saatinden önce olmalıdır",
         "endAfterStart": "Bitiş saati başlangıç saatinden sonra olmalıdır"
-      }
+      },
+      "filtersLabel": "Filtreler",
+      "errorDetails": "Log verileri alınırken bir hata oluştu. Lütfen tekrar deneyin.",
+      "viewLogs": "Logları Görüntüle"
     },
     "viewInTraces": "İzlerde Görüntüle",
     "viewInTracesTooltip": "RED metrikler panosu ve tüm ilişkili izlerle izleme sayfasını açın",
@@ -4064,7 +4482,12 @@
     "emptyActionLogs": "Günlükleri keşfedin",
     "emptyActionLogsDesc": "Günlük akışlarınızı arayın ve filtreleyin",
     "emptyActionTraces": "İzleri keşfedin",
-    "emptyActionTracesDesc": "Dağıtılmış izleri ve servis gecikmesini denetleyin"
+    "emptyActionTracesDesc": "Dağıtılmış izleri ve servis gecikmesini denetleyin",
+    "viewAll": "Tümünü görüntüle",
+    "showingOf": "{total} arasından {gösterilen} gösteriliyor",
+    "colErrorRate": "Hata oranı",
+    "colLatency": "Gecikme",
+    "colReqs": "Reqs"
   },
   "chatHistory": {
     "title": "Sohbetler",
@@ -4177,7 +4600,13 @@
       "one": "Bana son saatteki hataları göster...",
       "two": "NGINX günlüklerinden JSON'u ayrıştırmak için VRL yazın...",
       "three": "K8s düğüm sağlığı için bir gösterge tablosu oluşturun..."
-    }
+    },
+    "autoNavigation": {
+      "label": "Otomatik Navigasyon",
+      "enabledTooltip": "Otomatik navigasyon etkin - O2 Asistanı onay olmadan otomatik olarak gezinecek",
+      "disabledTooltip": "Otomatik navigasyon devre dışı - O2 Assistant gezinmeden önce soracak"
+    },
+    "attachImageTooltip": "Görüntüleri ekleyin (PNG, JPEG, maks. 2MB)"
   },
   "emptyState": {
     "noSearchResults": {
@@ -4297,7 +4726,29 @@
       "reports": "raporları",
       "queries": "sorgular",
       "serviceAccounts": "hizmet hesapları",
-      "invitations": "davetiyeleri"
+      "invitations": "davetiyeleri",
+      "searchJobs": "arama işleri",
+      "groups": "gruplar",
+      "roles": "roller",
+      "anomalyConfigs": "anomali tespit yapılandırmaları",
+      "apiLimits": "API limitleri",
+      "roleLimits": "rol limitleri",
+      "ingestionTokens": "veri alma token'ları",
+      "organizations": "organizasyonlar",
+      "alertDestinations": "hedefler",
+      "pipelineDestinations": "hedefler",
+      "alertTemplates": "şablonlar",
+      "evalTemplates": "değerlendirme şablonları",
+      "enrichmentTables": "zenginleştirme tabloları",
+      "cipherKeys": "şifreleme anahtarları",
+      "aiToolsets": "yapay zeka araç setleri",
+      "llmProviders": "LLM sağlayıcıları",
+      "sourceMaps": "kaynak haritaları",
+      "backfillJobs": "geriye dolum işleri",
+      "scorers": "puanlayıcılar",
+      "evalJobs": "değerlendirme işleri",
+      "scoreConfigs": "puan yapılandırmaları",
+      "pipelineHistory": "pipeline geçmişi"
     },
     "noDashboardsInFolder": {
       "title": "Bu klasörde gösterge paneli yok",
@@ -4488,13 +4939,21 @@
     },
     "actions": {
       "edit": "Düzenle",
-      "delete": "Sil"
+      "delete": "Sil",
+      "export": "Dışa Aktar",
+      "activate": "Etkinleştir",
+      "pause": "Duraklat",
+      "activated": "İş etkinleştirildi",
+      "paused": "İş duraklatıldı",
+      "activateError": "İş etkinleştirilemedi",
+      "pauseError": "İş duraklatılamadı"
     },
     "tabs": {
       "jobs": "Eval İş İlanları",
       "scorers": "Gol Sahipleri",
       "scoreConfigs": "Puan Yapılandırmaları",
-      "providers": "Sağlayıcılar"
+      "providers": "Sağlayıcılar",
+      "quality": "Kalite"
     },
     "singular": {
       "jobs": "Değerlendirme İşi",
@@ -4518,7 +4977,11 @@
     "buttons": {
       "cancel": "İptal",
       "create": "Oluştur",
-      "save": "Kaydet"
+      "save": "Kaydet",
+      "close": "Kapat",
+      "remove": "Kaldır",
+      "saveAsDraft": "Taslak Olarak Kaydet",
+      "createAndActivate": "Oluştur ve Etkinleştir"
     },
     "scorerTypeDialog": {
       "title": "Yeni bir Golcü Oluştur",
@@ -4528,7 +4991,11 @@
       "remoteTitle": "Uzaktan",
       "remoteDescription": "Puanlama için kendi HTTP uç noktanızı arayın.",
       "codeTitle": "Kod",
-      "codeDescription": "Yakında geliyor."
+      "codeDescription": "Yakında geliyor.",
+      "llmJudgeCta": "Yargıcı Yapılandır",
+      "remoteCta": "Uç Noktayı Yapılandır",
+      "codeCta": "Gelecekteki bir sürümde kullanılabilir",
+      "comingSoonBadge": "Yakında"
     },
     "provider": {
       "backTo": "Sağlayıcılara Geri Dön",
@@ -4548,7 +5015,15 @@
       "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
       "useAsDefault": "Varsayılan sağlayıcı olarak kullan",
       "authConfigLabel": "Yetkilendirme yapılandırması JSON",
-      "saveError": "Sağlayıcı kaydedilemedi"
+      "saveError": "Sağlayıcı kaydedilemedi",
+      "authConfigHelp": "Kimlik bilgileri beklemede şifrelenir ve kaydedildikten sonra geri okunamaz.",
+      "apiKeyLabel": "API Anahtarı",
+      "apiKeyPlaceholder": "API anahtarını girin",
+      "apiKeyHelp": "Beklemede şifrelenmiş olarak saklanır ve asla geri okunmaz. Mevcut anahtarı korumak için düzenlerken boş bırakın.",
+      "authSection": "Kimlik Doğrulama",
+      "authEditNote": "Kimlik bilgileri geri okunamaz. API anahtarını yalnızca değiştirmek istiyorsanız yeniden girin.",
+      "cannotRename": "Oluşturulduktan sonra yeniden adlandırılamaz.",
+      "availableModelsHelp": "İsteğe bağlı. Bu Sağlayıcıda kullanılabilen modellerin virgülle ayrılmış listesi."
     },
     "scoreConfig": {
       "createTitle": "Yeni Puan Yapılandırması",
@@ -4565,7 +5040,129 @@
         "categorical": "Kategorik",
         "boolean": "Boole'ca"
       },
-      "saveError": "Puan yapılandırması kaydedilemedi"
+      "saveError": "Puan yapılandırması kaydedilemedi",
+      "booleanValues": "true / false",
+      "detail": {
+        "eyebrow": "Puan Yapılandırması",
+        "close": "Kapat",
+        "statusActive": "Etkin",
+        "statusInactive": "Devre Dışı",
+        "createdShort": "Oluşturuldu",
+        "tabs": {
+          "overview": "Genel Bakış",
+          "versions": "Sürümler",
+          "usedBy": "Kullanan"
+        },
+        "descriptionSection": "Açıklama",
+        "configurationSection": "Yapılandırma",
+        "dataTypeLabel": "Veri türü",
+        "rangeLabel": "Aralık",
+        "categoriesLabel": "Kategoriler",
+        "valuesLabel": "Değerler",
+        "thresholdSection": "Sağlıklı eşik",
+        "thresholdHint": "Bir puanı sağlıklı olarak sayar",
+        "noThreshold": "Belirtilmedi",
+        "noThresholdHint": "Eşik belirtilmedi — bu boyuttaki puanlar kalite durumu sinyallerine katkıda bulunmayacaktır.",
+        "usedByIntro": "Bu boyut adıyla bir değer üreten herhangi bir puanlayıcı.",
+        "usedByEmpty": "Henüz hiçbir puanlayıcı bu yapılandırmaya başvurmuyor.",
+        "scorerTypeLlmJudge": "LLM Yargıcı",
+        "scorerTypeRemote": "Uzak",
+        "versionsIntro": "Aralık, kategoriler veya sağlıklı eşikteki her değişiklik yeni bir sürüm oluşturur. Geçmiş puanlar, onları üreten sürüme bağlı kalır.",
+        "activeVersionChip": "Etkin",
+        "lastUpdated": "Son güncelleme",
+        "metadataSection": "Meta Veri",
+        "statusLabel": "Durum",
+        "versionLabel": "Sürüm",
+        "createdLabel": "Oluşturuldu",
+        "updatedLabel": "Güncellendi"
+      },
+      "editTitlePrefix": "Düzenle",
+      "eyebrow": "Puan Yapılandırmaları",
+      "sectionTitle": "Puan Yapılandırmaları",
+      "listTitle": "Puan Yapılandırmaları",
+      "listSubtitle": "Puanlayıcıların ürettiği esnek şema boyutları.",
+      "searchPlaceholder": "Yapılandırmaları ara",
+      "allTypes": "Tüm türler",
+      "newButton": "Yeni puan yapılandırması",
+      "saveButton": "Değişiklikleri kaydet",
+      "createButton": "Oluştur",
+      "columns": {
+        "index": "#",
+        "name": "Ad",
+        "type": "Tür",
+        "rangeValues": "Aralık / değerler",
+        "healthy": "Sağlıklı",
+        "activeVersion": "Etkin sürüm",
+        "usedBy": "Kullanan",
+        "created": "Oluşturuldu",
+        "actions": "İşlemler"
+      },
+      "active": "etkin",
+      "usedByScorers": "{count} puanlayıcı",
+      "usedByScorer": "{count} puanlayıcı",
+      "noHealthy": "—",
+      "createInfoNumeric": "Bu boyuttaki puanların ne zaman sağlıklı sayılacağını tanımlayın. Bu aralığın dışındaki puanlar; iz listelerinde, oturumlarda ve diğer görünümlerde kalite sorunlarını tetikler.",
+      "editInfoBannerEmphasis": {
+        "numeric": "Aralığı veya sağlıklı eşiği değiştirmek {nextVersion} oluşturur.",
+        "categorical": "Kategorileri veya sağlıklı eşiği değiştirmek {nextVersion} oluşturur.",
+        "boolean": "Sağlıklı değeri değiştirmek {nextVersion} oluşturur."
+      },
+      "editInfoBannerDetail": "Geçmiş puanlar, onları üreten sürümle ilişkili kalır. Yalnızca açıklama düzenlemeleri yerinde güncellenir.",
+      "createInfoSubtitle": "Yalnızca açıklama düzenlemeleri {version} sürümünü yerinde günceller.",
+      "namePlaceholder": "örn. \"faithfulness\"",
+      "nameHelp": "Yalnızca küçük harfler, sayılar ve alt çizgiler. Kararlı bir tanımlayıcı olarak kullanılır.",
+      "cannotBeRenamed": "Yeniden adlandırılamaz",
+      "descriptionPlaceholder": "Bu boyut neyi ölçer?",
+      "descriptionHelp": "Yalnızca açıklama düzenlemeleri yeni bir sürüm oluşturmaz.",
+      "dataTypeLocked": "Kilitli",
+      "dataTypeCannotChange": "Oluşturulduktan sonra değiştirilemez",
+      "dataTypeHelp": {
+        "numeric": "Bir aralıktaki sayı olarak puanla",
+        "categorical": "N etiketten biri olarak puanla",
+        "boolean": "true / false olarak puanla"
+      },
+      "minLabel": "Min",
+      "maxLabel": "Maks",
+      "addCategoryPlaceholder": "Bir kategori ekle",
+      "addCategoryButton": "Ekle",
+      "booleanInfo": "Boolean yapılandırmaları {trueLabel} / {falseLabel} değerlerini kabul eder. Ek bir yapılandırma gerekmez.",
+      "healthyThresholdTitle": "Sağlıklı Eşik",
+      "optional": "İsteğe Bağlı",
+      "healthyThresholdIntro": "Bu boyuttaki puanların ne zaman sağlıklı sayılacağını tanımlayın. Bu aralığın dışındaki puanlar; iz listelerinde, oturumlarda ve diğer görünümlerde kalite sorunlarını tetikler.",
+      "healthyWhenValueIs": "Değer şu olduğunda sağlıklı:",
+      "healthyCategories": "Sağlıklı kategoriler:",
+      "healthyCategoriesHint": "Sağlıklı sayılan tüm değerleri işaretleyin.",
+      "healthyValue": "Sağlıklı değer:",
+      "gteLabel": "Şundan büyük veya eşit",
+      "lteLabel": "Şundan küçük veya eşit",
+      "trueIsHealthy": "true sağlıklıdır",
+      "trueIsHealthyHint": "false puanları kalite sorunlarını tetikler.",
+      "falseIsHealthy": "false sağlıklıdır",
+      "falseIsHealthyHint": "true puanları kalite sorunlarını tetikler.",
+      "thresholdEmptyHint": "Bunu boş bırakmak, bu boyutun ürün genelindeki kalite durumu sinyallerine katkıda bulunmayacağı anlamına gelir. Puanlar yine de kaydedilir ancak sorun göstergelerini tetiklemez.",
+      "empty": {
+        "title": "Henüz Puan Yapılandırması Yok",
+        "description": "Puan Yapılandırmaları, puanlayıcılarınızın ürettiği boyutları tanımlar — ad, veri türü, değer aralığı ve sağlıklı eşik. Çevrimiçi değerlendirmeyi bağlamaya başlamak için bir tane oluşturun.",
+        "chipTypes": "Sayısal, Kategorik, Boolean",
+        "chipThreshold": "Sağlıklı Eşik"
+      },
+      "import": {
+        "title": "Puan Yapılandırmasını İçe Aktar",
+        "button": "İçe Aktar",
+        "customLabel": "Özel",
+        "customSubtitle": "JSON dosyasından veya URL'den içe aktar",
+        "libraryLabel": "Kitaplık",
+        "librarySubtitle": "Derlenmiş katalogdan göz atın ve içe aktarın",
+        "libraryDrawerTitle": "Puan Yapılandırması Kitaplığı",
+        "outputMessages": "Çıktı Mesajları",
+        "creation": "Puan Yapılandırması Oluşturma",
+        "errors": {
+          "title": "Doğrulama Hataları"
+        }
+      },
+      "export": {
+        "bulkButton": "Dışa Aktar"
+      }
     },
     "scorer": {
       "backTo": "Skorlar sayfasına geri dön",
@@ -4617,7 +5214,203 @@
         "authHint": "Kaydetmeden önce sağlayıcı kimlik bilgilerini kontrol edin.",
         "schemaHeader": "Şema uyumsuzluğu",
         "schemaHint": "Yanıt yapılandırılmış çıktı şemasıyla eşleşmedi.",
-        "valuePlaceholder": "{variable} için değer"
+        "valuePlaceholder": "{variable} için değer",
+        "disabledHint": "Test çalıştırmak için adı, sağlayıcıyı, şablonu ve her değişken değerini doldurun.",
+        "errorHeader": "Test başarısız oldu",
+        "errorFallback": "Puanlayıcı testi başarısız oldu. Ayrıntılar için sunucu loglarını kontrol edin.",
+        "resultScore": "Puan",
+        "resultLatency": "Gecikme",
+        "resultModel": "Model",
+        "resultTokens": "Token'lar",
+        "resultReasoning": "Gerekçe",
+        "resultRaw": "Ham yanıt"
+      },
+      "detail": {
+        "close": "Kapat",
+        "eyebrow": "Puanlayıcı",
+        "refresh": "Yenile",
+        "descriptionSection": "Açıklama",
+        "configurationSection": "Yapılandırma",
+        "scorerTypeLabel": "Puanlayıcı Türü",
+        "providerLabel": "Sağlayıcı",
+        "providerUnknown": "Bilinmeyen",
+        "modelLabel": "Model",
+        "endpointLabel": "Uç Nokta",
+        "producesSection": "Üretilen Puan Yapılandırması",
+        "producesEmpty": "Bu puanlayıcı herhangi bir Puan Yapılandırmasına yazmıyor.",
+        "promptSection": "Yargıç İstemi",
+        "requestTemplateSection": "İstek Şablonu",
+        "variablesSuffix": "değişken",
+        "outputSchemaSection": "Çıktı Şeması",
+        "usedBySection": "Kullanan",
+        "usedByIntro": "Pipeline'larında bu puanlayıcıya başvuran işler.",
+        "usedByEmpty": "Henüz hiçbir iş bu puanlayıcıya başvurmuyor.",
+        "versionsIntro": "Sürümler, puanlayıcı yapılandırmasının değişmez anlık görüntüleridir. Etkin sürüm, işlerin bugün çalıştırdığı sürümdür.",
+        "activeVersionChip": "Etkin",
+        "lastUpdated": "Son güncelleme",
+        "metadataSection": "Meta Veri",
+        "versionLabel": "Sürüm",
+        "createdLabel": "Oluşturuldu",
+        "updatedLabel": "Güncellendi",
+        "typeLlmJudge": "LLM Yargıcı",
+        "typeRemote": "Uzak",
+        "tabs": {
+          "configuration": "Yapılandırma",
+          "versions": "Sürümler",
+          "runs": "Çalıştırmalar",
+          "usedBy": "Kullanan"
+        },
+        "kpis": {
+          "totalRuns": "Toplam Çalıştırma (24sa)",
+          "totalRunsSub": "Başvuran tüm İşler genelinde",
+          "successRate": "Başarı Oranı",
+          "successRateSub": "Son 24sa",
+          "avgLatency": "Ort. Gecikme",
+          "avgLatencySub": "Çalıştırmalar genelinde p50",
+          "usedBy": "Kullanan",
+          "usedBySubSingular": "iş",
+          "usedBySubPlural": "iş"
+        },
+        "runs": {
+          "showingPrefix": "Gösterilen",
+          "showingOf": "/",
+          "showingSuffix": "çalıştırma",
+          "empty": "Bu pencerede puanlayıcı çalıştırması yok.",
+          "spanLabel": "Span",
+          "traceLabel": "İz",
+          "jobUnknown": "—",
+          "col": {
+            "time": "Zaman",
+            "job": "İş",
+            "target": "Hedef",
+            "score": "Puan",
+            "latency": "Gecikme",
+            "status": "Durum"
+          }
+        }
+      },
+      "listTitle": "Puanlayıcılar",
+      "listSubtitle": "Puanlayıcılar, izlerinize karşı çalışır ve tanımlanmış boyutlarda puanlar üretir.",
+      "searchPlaceholder": "Puanlayıcıları ara",
+      "allTypes": "Tüm türler",
+      "newButton": "Yeni puanlayıcı",
+      "usedByJobs": "{count} iş",
+      "usedByJob": "{count} iş",
+      "columns": {
+        "name": "Ad",
+        "type": "Tür",
+        "produces": "Üretir",
+        "version": "Sürüm",
+        "usedBy": "Kullanan",
+        "lastRun": "Son çalıştırma",
+        "successRate": "Başarı oranı (24sa)",
+        "actions": "İşlemler"
+      },
+      "empty": {
+        "title": "Henüz Puanlayıcı Yok",
+        "description": "Puanlayıcılar, değerlendirmenin yürütme birimleridir. Üretim izlerinizdeki span'leri alır ve önemsediğiniz kalite boyutlarında puanlar üretirler.",
+        "chipLlmJudge": "LLM Yargıcı",
+        "chipRemote": "Uzak",
+        "chipCode": "Kod"
+      },
+      "noProviders": {
+        "title": "Önce Bir Sağlayıcı Ekleyin",
+        "description": "Puanlayıcıların çalışması için bir LLM Sağlayıcısına (OpenAI, Anthropic vb.) ihtiyacı vardır. Puanlayıcı oluşturmadan önce Ayarlar'da bir sağlayıcı ekleyin.",
+        "chipRequired": "LLM Yargıcı için gerekli",
+        "cta": "Sağlayıcı Ekle"
+      },
+      "import": {
+        "title": "Puanlayıcıyı İçe Aktar",
+        "button": "İçe Aktar",
+        "customLabel": "Özel",
+        "customSubtitle": "JSON dosyasından veya URL'den içe aktar",
+        "libraryLabel": "Kitaplık",
+        "librarySubtitle": "Derlenmiş katalogdan göz atın ve içe aktarın",
+        "libraryDrawerTitle": "Puanlayıcı Kitaplığı",
+        "outputMessages": "Çıktı Mesajları",
+        "creation": "Puanlayıcı Oluşturma",
+        "errors": {
+          "title": "Doğrulama Hataları"
+        }
+      },
+      "export": {
+        "bulkButton": "Dışa Aktar"
+      },
+      "descriptionPlaceholder": "Bu puanlayıcının neyi ölçtüğüne dair kısa bir özet.",
+      "producesScoreHelp": "Bu puanlayıcı hangi boyutu ölçer?",
+      "providerHelp": "Bu yargıcın çağırdığı LLM Sağlayıcısını seçin. Sağlayıcıları {settingsLink} bölümünde yönetin.",
+      "providerHelpSettingsLink": "Ayarlar",
+      "refreshProviders": "Sağlayıcıları Yenile",
+      "selectedPrefix": "Seçili:",
+      "endpointLabel": "Uç Nokta:",
+      "defaultModelPreviewLabel": "Varsayılan model:",
+      "authLabel": "Kimlik Doğrulama:",
+      "authConfigured": "yapılandırıldı",
+      "authNotConfigured": "yapılandırılmadı",
+      "rangeLabel": "Aralık:",
+      "healthyLabel": "Sağlıklı:",
+      "typeLabel": "Tür:",
+      "promptVariablesLabel": "Değişkenler:",
+      "promptHelp": "Değerlendirme mantığına odaklanın. Yer tutucu olarak {inputVar} ve {outputVar} kullanın.",
+      "includeReasoningLabel": "Gerekçeyi Dahil Et",
+      "includeReasoningHint": "LLM puanını açıklar. score.metadata.reasoning içinde saklanır.",
+      "extraFieldsLabel": "Ek Meta Veri Alanları",
+      "extraFieldsOptional": "İsteğe Bağlı",
+      "extraFieldsHint": "LLM'nin puanla birlikte çıktı olarak vermesi gereken alanları ekleyin. Daha sonra analiz için score.metadata içinde saklanır.",
+      "extraFields": {
+        "colName": "Alan Adı",
+        "colType": "Tür",
+        "colDescription": "Açıklama",
+        "namePlaceholder": "field_name",
+        "descriptionPlaceholder": "LLM bu alana ne koymalı?",
+        "addButton": "+ Alan Ekle",
+        "previewSchema": "Oluşturulan Şemayı Görüntüle",
+        "schemaTitle": "Oluşturulan JSON Şeması",
+        "schemaLoading": "Şema türetiliyor…",
+        "schemaCopy": "Kopyala",
+        "schemaCopied": "Kopyalandı",
+        "schemaCopyFailed": "Şema panoya kopyalanamadı.",
+        "typeString": "string",
+        "typeNumber": "number",
+        "typeBoolean": "boolean"
+      },
+      "authSection": "Kimlik Doğrulama",
+      "headersSection": "Özel Başlıklar",
+      "requestBodySection": "İstek Gövdesi",
+      "remoteUrlLabel": "URL",
+      "remoteTimeoutLabel": "Zaman Aşımı (ms)",
+      "remoteRetriesLabel": "Maks. Yeniden Deneme",
+      "remoteBackoffLabel": "Geri Çekilme",
+      "remoteBackoff": {
+        "exponential": "Üstel",
+        "linear": "Doğrusal",
+        "fixed": "Sabit"
+      },
+      "remoteAuthLabel": "Kimlik Doğrulama Türü",
+      "remoteAuth": {
+        "placeholder": "Kimlik Doğrulama Türü Seç",
+        "bearer": "Bearer Token",
+        "basic": "Temel Kimlik Doğrulama",
+        "apiKey": "API Anahtarı",
+        "tokenLabel": "Token",
+        "usernameLabel": "Kullanıcı Adı",
+        "passwordLabel": "Parola",
+        "headerNameLabel": "Başlık Adı",
+        "bearerTokenPlaceholder": "Bearer token'ı yapıştırın",
+        "basicUsernamePlaceholder": "kullanıcı",
+        "basicPasswordPlaceholder": "••••••••",
+        "apiKeyHeaderPlaceholder": "X-API-Key",
+        "apiKeyTokenPlaceholder": "API anahtarını yapıştırın",
+        "encryptedHint": "Beklemede şifrelenir. Kaydedildikten sonra görüntülenemez."
+      },
+      "remoteHeaders": {
+        "subtitle": "Her istekle birlikte gönderilir.",
+        "colName": "Ad",
+        "colValue": "Değer",
+        "colKey": "Ad",
+        "keyPlaceholder": "X-Custom-Header",
+        "valuePlaceholder": "değer",
+        "addButton": "+ Başlık Ekle"
       }
     },
     "job": {
@@ -4650,7 +5443,10 @@
       "scorerPicker": {
         "title": "Gol Sahipleri",
         "hint": "Eşleşen her süre için koşmak için bir veya daha fazla oyuncu seçin.",
-        "meta": "{tür} · v {sürüm}"
+        "meta": "{tür} · v {sürüm}",
+        "placeholder": "Puanlayıcıları Seç",
+        "searchPlaceholder": "Puanlayıcıları ara…",
+        "empty": "Kullanılabilir puanlayıcı yok. Önce Puanlayıcılar sekmesinde bir tane oluşturun."
       },
       "filter": {
         "title": "Filtre koşulu",
@@ -4675,7 +5471,117 @@
         "emptyValue": "—"
       },
       "selectAtLeastOne": "En az bir golcü seçin",
-      "saveError": "Eval işi kaydedilemedi"
+      "saveError": "Eval işi kaydedilemedi",
+      "detail": {
+        "close": "Kapat",
+        "eyebrow": "Değerlendirme İşi",
+        "refresh": "Yenile",
+        "descriptionSection": "Açıklama",
+        "targetSection": "Hedef",
+        "streamLabel": "Akış",
+        "streamTypeLabel": "Akış Türü",
+        "filterLabel": "Filtre",
+        "filterEmpty": "Filtre yok — her span değerlendirilir",
+        "scorersSection": "Puanlayıcılar",
+        "scorersEmpty": "Bu işe henüz puanlayıcı eklenmedi.",
+        "scorerUnknown": "(kaldırılmış puanlayıcı)",
+        "scorerTypeLlmJudge": "LLM Yargıcı",
+        "scorerTypeRemote": "Uzak",
+        "producesPrefix": "Üretir",
+        "viewScorerHint": "Görüntüle",
+        "inputMappingSection": "Girdi Eşlemesi",
+        "samplingSection": "Örnekleme",
+        "samplingModeLabel": "Mod",
+        "samplingValueLabel": "Değer",
+        "samplingAll": "Her eşleşmeyi değerlendir",
+        "samplingRate": "Orana göre rastgele örnek",
+        "samplingCount": "İlk N eşleşme",
+        "metadataSection": "Meta Veri",
+        "versionLabel": "Sürüm",
+        "pipelineLabel": "Pipeline ID",
+        "createdLabel": "Oluşturuldu",
+        "updatedLabel": "Güncellendi",
+        "tabs": {
+          "configuration": "Yapılandırma",
+          "runs": "Çalıştırmalar",
+          "failures": "Başarısızlıklar"
+        },
+        "kpis": {
+          "totalRuns": "Toplam Çalıştırma",
+          "totalRunsSub": "Seçili pencere içinde",
+          "successRate": "Başarı Oranı",
+          "successRateSub": "Tüm puanlayıcılar genelinde",
+          "avgLatency": "Ort. Gecikme",
+          "avgLatencySub": "Çalıştırmalar genelinde ort.",
+          "scorers": "Puanlayıcılar",
+          "scorersSubSingular": "puanlayıcı eklendi",
+          "scorersSubPlural": "puanlayıcı eklendi"
+        },
+        "runs": {
+          "showingPrefix": "Gösterilen",
+          "showingOf": "/",
+          "showingSuffix": "eşleşen çalıştırma",
+          "empty": "Seçili pencerede bu iş için kayıtlı çalıştırma yok.",
+          "spanLabel": "SPAN",
+          "traceLabel": "İZ",
+          "scorerUnknown": "(bilinmeyen puanlayıcı)",
+          "col": {
+            "time": "Zaman",
+            "scorer": "Puanlayıcı",
+            "target": "Hedef",
+            "score": "Puan",
+            "latency": "Gecikme",
+            "status": "Durum"
+          }
+        },
+        "failures": {
+          "byScorerTitle": "Puanlayıcıya Göre Başarısızlıklar",
+          "byScorerEmpty": "Seçili pencerede kayıtlı başarısızlık yok.",
+          "recentTitle": "Son Başarısızlıklar",
+          "recentEmpty": "Seçili pencerede başarısız çalıştırma yok.",
+          "col": {
+            "scorer": "Puanlayıcı",
+            "failureRate": "Başarısızlık Oranı",
+            "count": "Başarısızlık / Toplam"
+          }
+        }
+      },
+      "listTitle": "Değerlendirme İşleri",
+      "listSubtitle": "Puanlayıcıları üretim iz akışınıza dağıtın.",
+      "searchPlaceholder": "İşleri ara",
+      "allStatuses": "Tüm durumlar",
+      "newButton": "Yeni iş",
+      "scorersCount": "{count} puanlayıcı",
+      "scorerCount": "{count} puanlayıcı",
+      "columns": {
+        "name": "Ad",
+        "status": "Durum",
+        "stream": "Akış",
+        "scorers": "Puanlayıcılar",
+        "successRate": "Başarı oranı",
+        "lastRun": "Son çalıştırma",
+        "created": "Oluşturuldu",
+        "actions": "İşlemler"
+      },
+      "empty": {
+        "title": "Henüz Değerlendirme İşi Yok",
+        "description": "Değerlendirme İşleri, puanlayıcıları üretim iz akışınıza dağıtır. Eşleşen span'leri örnekler, puanlayıcıları eşzamansız olarak çalıştırır ve elde edilen puanları analiz için saklar.",
+        "chipStreams": "Üretim Akışı",
+        "chipScorers": "Birden Fazla Puanlayıcı",
+        "chipSampling": "Örnekleme Kontrolü"
+      },
+      "descriptionPlaceholder": "Bu iş neyi izler?",
+      "samplingValueHelp": "JSON: rate 0-1 arası bir sayıdır, count pozitif bir tam sayıdır.",
+      "samplingValueAllHelp": "Mod Tümü olduğunda geçerli değildir — eşleşen her olay değerlendirilir.",
+      "samplingHelp": "Filtreden sonra uygulanır. Maliyeti kontrol eder — orana yalnızca eşleşen span'ler dahil edilir.",
+      "presets": {
+        "label": "Hızlı ön ayarlar",
+        "rootSpans": "Yalnızca kök span'ler",
+        "llmCalls": "LLM çağrıları",
+        "toolCalls": "Araç çağrıları"
+      },
+      "createdAndActivated": "Değerlendirme işi oluşturuldu ve etkinleştirildi",
+      "createdButActivateFailed": "Değerlendirme işi oluşturuldu ancak etkinleştirme başarısız oldu"
     },
     "quality": {
       "scopeLabel": "Bu çalışma alanındaki tüm kalite boyutları",
@@ -4752,6 +5658,10 @@
           "unhealthy": "Sağlıksız",
           "healthy": "Sağlıklı",
           "coverage": "Kapsam"
+        },
+        "empty": {
+          "title": "İlk puanlarınız bekleniyor",
+          "description": "Seçili zaman aralığında bu yapılandırma için henüz puan gelmedi. Bunu kullanan bir puanlayıcı çalıştığında otomatik olarak burada görünecekler."
         }
       },
       "sidebar": {
@@ -4808,6 +5718,83 @@
       "description": "LLM Sağlayıcıları, LLM Judge puanlarının aradığı dil modelleri için bağlantı ayrıntılarını (uç nokta + kimlik bilgileri) depolar. Yargıç tabanlı değerlendirmeleri yürütmeye başlamak için bir tane ekleyin."
     }
   },
+  "shortcuts": {
+    "title": "Klavye Kısayolları",
+    "mac": "Mac",
+    "windowsLinux": "Windows/Linux",
+    "toggleHint": "bu paneli değiştirmek için",
+    "pages": {
+      "global": "Küresel",
+      "logs": "Günlükler",
+      "dashboardsList": "Gösterge panoları",
+      "dashboards": "Kontrol Paneli Görünümü",
+      "dashboardsPanel": "Dashboard — Panel (panele gelin)",
+      "metrics": "Metrikler",
+      "traces": "İzleri",
+      "alerts": "Uyarılar",
+      "streams": "Akışlar",
+      "pipelines": "Boru hatları",
+      "functions": "Fonksiyonlar",
+      "reports": "Raporlar"
+    },
+    "actions": {
+      "openCheatsheet": "Klavye kısayolları hile sayfasını aç",
+      "closeDialog": "Herhangi bir iletişim kutusunu, çekmeceyi veya modülü kapatın",
+      "focusSearch": "Odak arama çubuğu",
+      "logsRunQuery": "Arama sorgusunu çalıştır",
+      "logsRefresh": "Aramayı yenile/yeniden çalıştır",
+      "logsToggleHistogram": "Histogramı değiştir",
+      "logsToggleSidebar": "Alanları kenar çubuğunu değiştir",
+      "dashboardsListAdd": "Yeni gösterge tablosu",
+      "dashboardsListImport": "Kontrol panosunu içe aktarma",
+      "dashboardsListRefresh": "Listeyi yenileme",
+      "dashboardRefresh": "Tüm panelleri yenileyin",
+      "dashboardAddPanel": "Yeni panel ekle",
+      "dashboardSave": "Gösterge tablosunu kaydet",
+      "dashboardFullscreen": "Tam ekranı aç/kapat",
+      "panelView": "Paneli tam ekran görüntüle",
+      "panelEdit": "Düzenleme paneli",
+      "panelDuplicate": "Yinelenen panel",
+      "panelDelete": "Paneli sil",
+      "metricsRunQuery": "PromQL sorgusunu çalıştırın",
+      "metricsRefresh": "Yenile",
+      "tracesSearch": "İzleri ara",
+      "tracesRefresh": "Yenile",
+      "alertsCreate": "Yeni uyarı oluştur",
+      "alertsRefresh": "Uyarı listesini yenile",
+      "alertsClose": "Uyarı detay çekmecesini kapat",
+      "streamsAdd": "Yeni akış ekle",
+      "streamsRefresh": "Listeyi yenileme",
+      "pipelinesAdd": "Yeni boru hattı oluştur",
+      "pipelinesImport": "İthalat boru hattı",
+      "pipelinesRefresh": "Listeyi yenileme",
+      "functionsAdd": "Yeni işlev ekle",
+      "functionsRefresh": "Listeyi yenileme",
+      "reportsAdd": "Yeni rapor oluştur",
+      "reportsRefresh": "Listeyi yenileme"
+    },
+    "search": "Kısayolları ara...",
+    "noResults": "Kısayol bulunamadı",
+    "subtitle": "Basın mı? herhangi bir yerde · tetiklemek için herhangi bir satırı tıklayın",
+    "footerClose": "kapat",
+    "footerReopen": "yeniden açmak",
+    "footerRun": "çalıştırmak için satırı tıklayın",
+    "footerMacHint": "⌘ = Mac'te Cmd · Windows'ta Ctrl",
+    "modules": {
+      "global": "Küresel",
+      "logs": "Günlükler",
+      "dashboards": "Gösterge panoları",
+      "metrics": "Metrikler",
+      "traces": "İzleri",
+      "alerts": "Uyarılar",
+      "streams": "Akışlar",
+      "pipelines": "Boru hatları",
+      "functions": "Fonksiyonlar",
+      "reports": "Raporlar",
+      "iam": "IAM",
+      "runningQueries": "Çalışan Sorgular"
+    }
+  },
   "aiObservability": {
     "title": "LLM Gözlemlenebilirlik",
     "sections": {
@@ -4820,7 +5807,61 @@
       "quality": "KALİTE",
       "evalJobs": "Eval İş İlanları",
       "scorers": "Gol Sahipleri",
-      "scoreConfigs": "Puan Yapılandırmaları"
+      "scoreConfigs": "Puan Yapılandırmaları",
+      "llmInsights": "LLM İçgörüleri"
+    },
+    "kpi": {
+      "totalCost": "Toplam Maliyet",
+      "totalTokens": "Toplam Jetonlar",
+      "totalTraces": "Toplam İzler",
+      "p95Latency": "P95 Gecikme",
+      "errorRate": "Hata Oranı"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "Maliyet eğilimi",
+        "subtitle": "Modele göre USD"
+      },
+      "tokenTrend": {
+        "title": "Token trendi",
+        "subtitle": "modele göre belirteçler"
+      },
+      "spanTrend": {
+        "title": "Yayılma eğilimi",
+        "subtitle": "türe göre aralık sayısı"
+      },
+      "latencyPercentiles": {
+        "title": "Gecikme p50/p95/p99",
+        "subtitle": "tüm LLM çağrıları"
+      },
+      "tracesOverTime": {
+        "title": "Zaman içindeki izler",
+        "subtitle": "hizmete göre izleme sayısı"
+      },
+      "errorsOverTime": {
+        "title": "Zaman içindeki hatalar",
+        "subtitle": "hata sayısı"
+      },
+      "spansByModel": {
+        "title": "Modele göre aralıklar",
+        "subtitle": "model başına çağrı sayısı"
+      },
+      "tokensByModel": {
+        "title": "Modele göre belirteçler",
+        "subtitle": "model başına toplam jeton"
+      },
+      "recentErrors": {
+        "title": "Son hatalar",
+        "subtitle": "son 10 başarısız yayılım"
+      }
+    },
+    "subtitle": {
+      "llmInsights": "LLM trafiğiniz genelinde gecikmeyi, hataları, belirteçleri ve maliyeti izleyin",
+      "sessions": "Aracı oturumlarına sırayla göz atın ve denetleyin",
+      "quality": "LLM yanıtlarınızın kalitesini puanlayın ve izleyin",
+      "evalJobs": "Oturumlarınız boyunca değerlendirme işlerini çalıştırın ve izleyin",
+      "scorers": "LLM çıktılarını derecelendiren puanları oluşturun ve yönetin",
+      "scoreConfigs": "Değerlendirmeleriniz tarafından kullanılan puanlama derecelerini yapılandırın"
     }
   },
   "logs": {
@@ -4859,7 +5900,10 @@
       "removeFilterDescSql": "Bu sorguya uygulanan SQL koşullarınız var",
       "openHistory": "Arama geçmişini aç",
       "askAi": "AI'dan sorgumu düzeltmesini isteyin",
-      "selectedRange": "Seçilen aralık"
+      "selectedRange": "Seçilen aralık",
+      "descOutOfRange": "Zaman pencereniz bu akıştan herhangi bir veri içermiyor. Verinin en son görüldüğü zamana geçin.",
+      "jumpToData": "En son verilere geç",
+      "descDataAtBoundary": "Akışta bu pencerede veri var ancak hiçbir olay eşleşmedi. Arama geçmişinizi kontrol etmeyi veya AI'dan yardım istemeyi deneyin."
     },
     "error": {
       "sqlError": "SQL sözdizimi hatası",
@@ -4928,5 +5972,16 @@
     "askAi": "AI'dan sorgumu düzeltmesini isteyin",
     "showDetail": "Ayrıntıları göster",
     "hideDetail": "Ayrıntıları gizle"
+  },
+  "refreshButton": {
+    "justNow": "Hemen şimdi",
+    "secondsAgo": "{sec} s önce",
+    "minutesAgo": "{min} m önce",
+    "hoursAgo": "{h} h önce",
+    "notYetRefreshed": "Henüz yenilenmedi",
+    "dataFresh": "Veriler taze",
+    "dataGettingStale": "Veriler bayatlanıyor",
+    "dataStale": "Veriler bayat",
+    "lastRefreshed": "Son yenilenme: {time}"
   }
 }

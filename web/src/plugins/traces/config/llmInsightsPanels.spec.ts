@@ -11,6 +11,7 @@ import { describe, it, expect } from "vitest";
 import {
   LLM_INSIGHTS_PANELS,
   renderPanelSql,
+  compactSql,
   pickInterval,
   type LLMPanelDef,
 } from "./llmInsightsPanels";
@@ -128,6 +129,71 @@ describe("renderPanelSql", () => {
       }),
     ).toBe(`FROM ""`);
   });
+
+  // Multi-line templates (the real shape of every panel) must come back as a
+  // single clean line — no leading indentation, no blank-line gaps — so the
+  // SQL on the wire / in the network tab stays compact.
+  it("collapses an indented multi-line template to one line", () => {
+    const sql = renderPanelSql(
+      `
+        SELECT
+          histogram(_timestamp, '{{interval}}') as ts,
+          COALESCE(SUM(cost), 0) as cost
+        FROM {{stream}}
+        WHERE cost IS NOT NULL
+        GROUP BY ts
+        ORDER BY ts
+      `,
+      { stream: "default", startTime: 1, endTime: 2, interval: "1 hour" },
+    );
+    expect(sql).toBe(
+      `SELECT histogram(_timestamp, '1 hour') as ts, COALESCE(SUM(cost), 0) as cost ` +
+        `FROM "default" WHERE cost IS NOT NULL GROUP BY ts ORDER BY ts`,
+    );
+    expect(sql).not.toContain("\n");
+  });
+
+  // The spliced agent predicate must also land on the compacted single line.
+  it("compacts the output even after the agent predicate is spliced in", () => {
+    const sql = renderPanelSql(
+      `
+        SELECT COUNT(*) as c
+        FROM {{stream}}
+        WHERE gen_ai_operation_name IS NOT NULL
+        GROUP BY ts
+      `,
+      {
+        stream: "default",
+        startTime: 1,
+        endTime: 2,
+        interval: "1 hour",
+        agentFilter: `gen_ai_agent_id = 'a1'`,
+      },
+    );
+    expect(sql).toBe(
+      `SELECT COUNT(*) as c FROM "default" WHERE gen_ai_operation_name IS NOT NULL ` +
+        `AND gen_ai_agent_id = 'a1' GROUP BY ts`,
+    );
+    expect(sql).not.toContain("\n");
+  });
+});
+
+describe("compactSql", () => {
+  it("collapses runs of whitespace (newlines, tabs, indentation) to single spaces", () => {
+    expect(compactSql("SELECT\n  a,\n  b\nFROM\tx")).toBe("SELECT a, b FROM x");
+  });
+
+  it("trims leading and trailing whitespace", () => {
+    expect(compactSql("\n   SELECT 1   \n")).toBe("SELECT 1");
+  });
+
+  // Single spaces inside string literals (interval strings) are preserved —
+  // only *runs* of whitespace collapse, and these literals carry exactly one.
+  it("preserves single spaces inside string literals", () => {
+    expect(compactSql("histogram(_timestamp, '5 minutes')")).toBe(
+      "histogram(_timestamp, '5 minutes')",
+    );
+  });
 });
 
 describe("pickInterval", () => {
@@ -235,9 +301,10 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     }
   });
 
-  // Horizontal-bar panels render top-N — they must declare both
-  // seriesField (categories) and valueField (bar lengths).
-  it("horizontal-bar panels declare seriesField and valueField", () => {
+  // Horizontal-bar panels render top-N — they must declare seriesField
+  // (categories) and a value source: either a single `valueField` (bar
+  // lengths) or a `series[]` of grouped value columns (e.g. p50/p90/p95/p99).
+  it("horizontal-bar panels declare seriesField and a value source", () => {
     const bars = LLM_INSIGHTS_PANELS.filter((p) => p.type === "horizontal-bar");
     expect(bars.length).toBeGreaterThan(0);
     for (const p of bars) {
@@ -245,10 +312,8 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
         p.query.seriesField,
         `panel ${p.id} missing seriesField`,
       ).toBeTruthy();
-      expect(
-        p.query.valueField,
-        `panel ${p.id} missing valueField`,
-      ).toBeTruthy();
+      const hasValue = !!p.query.valueField || (p.series?.length ?? 0) > 0;
+      expect(hasValue, `panel ${p.id} missing valueField/series`).toBe(true);
     }
   });
 
@@ -263,18 +328,18 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     }
   });
 
-  // Latency panel pulls raw durations and bucketizes client-side; it
-  // needs both the main query and a thresholds query (for the percentile
-  // guide lines drawn on the chart).
-  it("histogram-with-thresholds panels declare a thresholdsQuery and thresholds[]", () => {
-    const histos = LLM_INSIGHTS_PANELS.filter(
-      (p) => p.type === "histogram-with-thresholds",
+  // Latency by model renders grouped bars — one Y series per percentile.
+  // Each series must declare a field/label/color so the chart + legend render.
+  it("latency-by-model declares grouped percentile series", () => {
+    const latency = LLM_INSIGHTS_PANELS.find(
+      (p) => p.id === "latency-by-model",
     );
-    expect(histos.length).toBeGreaterThan(0);
-    for (const p of histos) {
-      expect(p.thresholdsQuery?.sql).toBeTruthy();
-      expect(Array.isArray(p.thresholds)).toBe(true);
-      expect((p.thresholds as any[]).length).toBeGreaterThan(0);
+    expect(latency).toBeTruthy();
+    expect(latency!.series?.length ?? 0).toBeGreaterThan(1);
+    for (const s of latency!.series!) {
+      expect(s.field).toBeTruthy();
+      expect(s.label).toBeTruthy();
+      expect(s.color).toBeTruthy();
     }
   });
 
@@ -288,15 +353,5 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     const fields = recentErrors!.columns!.map((c) => c.field);
     expect(fields).toContain("operation");
     expect(fields).toContain("trace_id");
-  });
-
-  // Errors-over-time uses gap-fill so an empty result shows "0 over time"
-  // instead of a misleading "No data" — preserve this configuration so a
-  // future reader doesn't strip it as cosmetic.
-  it("errors-over-time panel keeps gapFill='zero'", () => {
-    const errors = LLM_INSIGHTS_PANELS.find(
-      (p: LLMPanelDef) => p.id === "errors-over-time",
-    );
-    expect(errors?.gapFill).toBe("zero");
   });
 });

@@ -722,6 +722,14 @@ export const logsUtils = () => {
   };
 
   const updatedLocalLogFilterField = (): void => {
+    // Don't persist a system-picked FTS default column. It is recomputed from
+    // search results each time, so persisting it would leak a stale auto-pick
+    // (e.g. "body") back into later searches and SQL mode as if the user had
+    // chosen it. Only genuine user actions (pin/reorder/remove) clear this flag
+    // and reach persistence.
+    if (searchObj.meta?.isFtsDefaultColumn) {
+      return;
+    }
     const identifier: string = searchObj.organizationIdentifier || "default";
     const selectedFields: any =
       useLocalLogFilterField()?.value != null

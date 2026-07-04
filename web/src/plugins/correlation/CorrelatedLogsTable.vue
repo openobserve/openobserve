@@ -77,7 +77,7 @@ class="tw:mr-1" />
                   </template>
                 </OButton>
               </template>
-              <div class="column-visibility-list tw:min-w-[220px] tw:max-h-[320px] tw:overflow-y-auto">
+              <div class="column-visibility-list tw:min-w-62.5 tw:max-h-100 tw:overflow-y-auto">
                 <!-- Select All / Deselect All -->
                 <ODropdownItem
                   class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
@@ -187,101 +187,103 @@ class="tw:mr-1" />
     <!-- Main Content Area -->
     <div class="tw:flex-1 tw:overflow-hidden tw:relative">
       <!-- Logs Table or Skeleton -->
-      <div class="tw:h-full tw:w-full tw:overflow-auto logs-table-container">
-        <!-- Actual Table (when data is loaded) -->
-        <TenstackTable
-          v-if="hasResults"
-          :key="`page-${currentPage}`"
-          :rows="pagedResults"
-          :columns="tableColumns"
-          :wrap="wrapTableCells"
-          :loading="isLoading"
-          :err-msg="''"
-          :function-error-msg="''"
-          :expanded-rows="expandedRows"
-          :highlight-timestamp="-1"
-          :default-columns="showingDefaultColumns"
-          :jsonpreview-stream-name="jsonPreviewStreamName"
-          :highlight-query="highlightQuery"
-          :selected-stream-fts-keys="ftsFields"
-          :selected-stream-fields="selectedFields"
-          :hide-search-term-actions="hideSearchTermActions"
-          :hide-view-related-button="hideViewRelatedButton"
-          class="tw:overflow-y-auto!"
-          @click:dataRow="handleRowClick"
-          @copy="handleCopy"
-          @sendToAiChat="handleSendToAiChat"
-          @addSearchTerm="handleAddSearchTerm"
-          @addFieldToTable="handleAddFieldToTable"
-          @closeColumn="handleCloseColumn"
-          @update:columnOrder="handleColumnOrderChange"
-          @expandRow="handleExpandRow"
-          @view-trace="handleViewTrace"
-          @show-correlation="handleNestedCorrelation"
-          data-test="logs-tenstack-table"
-        />
+      <div class="tw:flex tw:flex-col tw:h-full">
+        <div class="tw:flex-1 tw:w-full tw:overflow-auto logs-table-container">
+          <!-- Actual Table (when data is loaded) -->
+          <TenstackTable
+            v-if="hasResults"
+            :key="`page-${currentPage}`"
+            :rows="pagedResults"
+            :columns="tableColumns"
+            :wrap="wrapTableCells"
+            :loading="isLoading"
+            :err-msg="''"
+            :function-error-msg="''"
+            :expanded-rows="expandedRows"
+            :highlight-timestamp="-1"
+            :default-columns="showingDefaultColumns"
+            :jsonpreview-stream-name="jsonPreviewStreamName"
+            :highlight-query="highlightQuery"
+            :selected-stream-fts-keys="ftsFields"
+            :selected-stream-fields="selectedFields"
+            :hide-search-term-actions="hideSearchTermActions"
+            :hide-view-related-button="hideViewRelatedButton"
+            class="tw:overflow-y-auto!"
+            @click:dataRow="handleRowClick"
+            @copy="handleCopy"
+            @sendToAiChat="handleSendToAiChat"
+            @addSearchTerm="handleAddSearchTerm"
+            @addFieldToTable="handleAddFieldToTable"
+            @closeColumn="handleCloseColumn"
+            @update:columnOrder="handleColumnOrderChange"
+            @expandRow="handleExpandRow"
+            @view-trace="handleViewTrace"
+            @show-correlation="handleNestedCorrelation"
+            data-test="logs-tenstack-table"
+          />
 
-        <!-- Table Skeleton (initial load) -->
-        <div
-          v-else-if="isLoading && !hasError"
-          class="tw:h-full tw:flex tw:flex-col tw:items-center tw:justify-center"
-          data-test="table-skeleton"
-        >
-          <!-- Loading indicator -->
+          <!-- Table Skeleton (initial load) -->
           <div
-            class="tw:flex tw:items-center tw:justify-center tw:gap-3"
+            v-else-if="isLoading && !hasError"
+            class="tw:h-full tw:flex tw:flex-col tw:items-center tw:justify-center"
+            data-test="table-skeleton"
           >
-            <OSpinner size="sm" />
-            <span class="tw:text-sm tw:opacity-70">
-              {{ t("correlation.logs.loading") }}
-            </span>
+            <!-- Loading indicator -->
+            <div
+              class="tw:flex tw:items-center tw:justify-center tw:gap-3"
+            >
+              <OSpinner size="sm" />
+              <span class="tw:text-sm tw:opacity-70">
+                {{ t("correlation.logs.loading") }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Error State -->
+          <div
+            v-else-if="hasError"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            data-test="error-state"
+          >
+            <p
+              class="tw:text-base tw:opacity-70 tw:max-w-md tw:text-center"
+            >
+              {{ error || t("correlation.logs.errorDetails") }}
+            </p>
+          </div>
+
+          <!-- Empty State -->
+          <div
+            v-else-if="isEmpty"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            data-test="empty-state"
+          >
+            <p class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
+              {{ t("correlation.logs.noData") }}
+            </p>
+            <p class="tw:text-sm tw:opacity-70 tw:mb-4">
+              {{ t("correlation.logs.noDataDetails") }}
+            </p>
           </div>
         </div>
 
-        <!-- Error State -->
+        <!-- Pagination bar -->
         <div
-          v-else-if="hasError"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          data-test="error-state"
+          v-if="hasResults && totalPages > 1"
+          class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:text-xs tw:shrink-0"
+          data-test="correlated-logs-pagination"
         >
-          <p
-            class="tw:text-base tw:opacity-70 tw:max-w-md tw:text-center"
-          >
-            {{ error || t("correlation.logs.errorDetails") }}
-          </p>
+          <span class="tw:opacity-60">
+            {{ (currentPage - 1) * displayPageSize + 1 }}–{{ Math.min(currentPage * displayPageSize, searchResults.length) }} of {{ searchResults.length }}
+          </span>
+          <OPagination
+            :model-value="currentPage"
+            :max="totalPages"
+            :max-pages="5"
+            data-test="correlated-logs-pagination-control"
+            @update:model-value="goToPage"
+          />
         </div>
-
-        <!-- Empty State -->
-        <div
-          v-else-if="isEmpty"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          data-test="empty-state"
-        >
-          <p class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
-            {{ t("correlation.logs.noData") }}
-          </p>
-          <p class="tw:text-sm tw:opacity-70 tw:mb-4">
-            {{ t("correlation.logs.noDataDetails") }}
-          </p>
-        </div>
-      </div>
-
-      <!-- Pagination bar -->
-      <div
-        v-if="hasResults && totalPages > 1"
-        class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:text-xs tw:shrink-0"
-        data-test="correlated-logs-pagination"
-      >
-        <span class="tw:opacity-60">
-          {{ (currentPage - 1) * displayPageSize + 1 }}–{{ Math.min(currentPage * displayPageSize, searchResults.length) }} of {{ searchResults.length }}
-        </span>
-        <OPagination
-          :model-value="currentPage"
-          :max="totalPages"
-          :max-pages="5"
-          data-test="correlated-logs-pagination-control"
-          @update:model-value="goToPage"
-        />
       </div>
     </div>
   </div>
@@ -311,7 +313,7 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import CorrelationEventHeader from "./CorrelationEventHeader.vue";
-import { formatDate } from "@/utils/date";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
@@ -959,7 +961,11 @@ const showingDefaultColumns = computed(() => {
 const formatTimestamp = (timestamp: number): string => {
   // Convert microseconds to milliseconds
   const ms = Math.floor(timestamp / 1000);
-  return formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
+  return timestampToTimezoneDate(
+    ms,
+    store.state.timezone || "UTC",
+    "yyyy-MM-dd HH:mm:ss.SSS",
+  );
 };
 
 /**
@@ -1011,7 +1017,6 @@ const handleResetFilters = () => {
 };
 
 const handleRowClick = (row: any) => {
-  console.log("[CorrelatedLogsTable] Row clicked:", row);
 };
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
@@ -1031,11 +1036,6 @@ const handleAddSearchTerm = (
   fieldValue: string | number | boolean,
   action: string,
 ) => {
-  console.log("[CorrelatedLogsTable] Add search term:", {
-    field,
-    fieldValue,
-    action,
-  });
   emit("addSearchTerm", field, fieldValue, action);
 };
 
@@ -1114,7 +1114,6 @@ const handleColumnOrderChange = (newOrder: string[]) => {
   const newOrderStr = JSON.stringify(newOrder);
 
   if (currentOrder === newOrderStr) {
-    console.log("[CorrelatedLogsTable] Order unchanged, skipping update");
     return;
   }
 
@@ -1207,7 +1206,6 @@ const handleViewTrace = (log: any) => {
 
 const handleNestedCorrelation = (row: any) => {
   // Nested correlation is disabled (as per hideViewRelatedButton prop)
-  console.log("[CorrelatedLogsTable] Nested correlation disabled");
 };
 
 // Lifecycle
@@ -1225,7 +1223,6 @@ onBeforeUnmount(() => {
 watch(
   () => props.timeRange,
   (newRange) => {
-    console.log("[CorrelatedLogsTable] Time range changed:", newRange);
   },
   { deep: true },
 );
@@ -1345,43 +1342,29 @@ const unifiedChips = computed<DimensionChip[]>(() =>
   }
 }
 
-// Smooth transitions
-.tw\:overflow-auto {
-  scroll-behavior: smooth;
+.column-visibility-list .column-item {
+  cursor: grab;
+  transition: background-color 0.2s ease;
 }
 
-
-// Column visibility list styling
-.column-visibility-list {
-  max-height: 400px;
-  overflow-y: auto;
-  min-width: 250px;
-
-  .column-item {
-    cursor: grab;
-    transition: background-color 0.2s ease;
-
-    &:hover {
-      background-color: var(--o2-hover-bg);
-    }
-
-    &.dragging {
-      opacity: 0.5;
-      cursor: grabbing;
-    }
-
-    .drag-handle {
-      opacity: 0.4;
-      transition: opacity 0.2s ease;
-    }
-
-    &:hover .drag-handle {
-      opacity: 0.8;
-    }
-  }
+.column-visibility-list .column-item:hover {
+  background-color: var(--o2-hover-bg);
 }
 
-// Responsive adjustments
+.column-visibility-list .column-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.column-visibility-list .column-item .drag-handle {
+  opacity: 0.4;
+  transition: opacity 0.2s ease;
+}
+
+.column-visibility-list .column-item:hover .drag-handle {
+  opacity: 0.8;
+}
+
 @media (max-width: 768px) {
   .correlation-controls {
     padding: 0.5rem;

@@ -1,12 +1,16 @@
 name: API Integration Test
 
 on:
-  push:
-    branches:
-      - "main"
+  # No `push: main` trigger: the merge_group (merge-queue) run already builds and
+  # tests the exact commit that lands on main, so a post-merge push run would be a
+  # full-suite duplicate. The merge_group run is now the trusted main-ward build and
+  # also warms the shared Rust cache (see save-if on the rust-cache step below).
   pull_request:
     branches:
       - "**"
+    # labeled/unlabeled so adding or removing the 'e2e' label re-fires the run and
+    # re-evaluates the gate in api_tests_summary.
+    types: [opened, reopened, synchronize, labeled, unlabeled]
   merge_group:
 
 concurrency:
@@ -43,10 +47,11 @@ jobs:
 
       - id: check
         run: |
+          # Skip the suite when a PR touches only docs, images, or frontend/UI-test files
+          # (none affect the API). Anything else — source, workflows (incl. this file) — runs it.
+          IGNORE_RE='(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/|\.(png|jpe?g|gif|svg|webp)$)'
           CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          if [ -z "$CHANGED" ]; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          elif echo "$CHANGED" | grep -qvE '(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/)'; then
+          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qvE "$IGNORE_RE"; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
@@ -55,7 +60,10 @@ jobs:
   api_integration_tests:
     name: api_integration_tests
     needs: [check_changes]
-    if: needs.check_changes.outputs.has_changes == 'true'
+    if: >-
+      needs.check_changes.outputs.has_changes == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
     permissions:
       contents: read  # only need to checkout the repo
@@ -82,7 +90,9 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: backend-debug-mimalloc
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          # Save the shared cache on merge_group runs (the main-ward build now that
+          # push:main is gone); keep the main-ref check for any non-PR fallback.
+          save-if: ${{ github.event_name == 'merge_group' || github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: |
@@ -131,9 +141,21 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest --ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex
+          rye run pytest --ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex --junitxml=junit-integration.xml
           kill $SERVER_PID_DEFAULT || true
         working-directory: tests/api-testing/
+
+      # Test-count metrics sidecar: ship the junit so report_to_openobserve can
+      # tally API active/skipped counts (suite=api). always() so counts emit even
+      # when pytest fails (junit is written before pytest's non-zero exit).
+      - name: Upload API junit (integration)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-junit__api_integration_tests__main
+          path: tests/api-testing/junit-integration.xml
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload OpenObserve server logs on failure
         if: failure()
@@ -150,7 +172,10 @@ jobs:
   api_query_agent_tests:
     name: "api_query_agent / ${{ matrix.config.label }}"
     needs: [check_changes]
-    if: needs.check_changes.outputs.has_changes == 'true'
+    if: >-
+      needs.check_changes.outputs.has_changes == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
     # Run the full SQL regression suite with the single-node physical
     # optimizer both enabled (default) and disabled. The non-optimized
@@ -236,9 +261,20 @@ jobs:
             sleep 1
           done
           # SINGLE_NODE_OPT_MODE controls which queries load_all_queries() includes
-          SINGLE_NODE_OPT_MODE=${{ matrix.config.mode }} rye run pytest tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py -v
+          SINGLE_NODE_OPT_MODE=${{ matrix.config.mode }} rye run pytest tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py -v --junitxml=junit-queryagent-${{ matrix.config.label }}.xml
           kill $SERVER_PID || true
         working-directory: tests/api-testing/
+
+      # Test-count metrics sidecar (see integration job). Parser dedups the two
+      # opt-mode legs by test identity so the same suite isn't counted twice.
+      - name: Upload API junit (query_agent)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-junit__query_agent_tests__${{ matrix.config.label }}
+          path: tests/api-testing/junit-queryagent-${{ matrix.config.label }}.xml
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload server log on failure
         if: failure()
@@ -256,7 +292,10 @@ jobs:
   api_regression_tests:
     name: "api_regression / ${{ matrix.config.label }}"
     needs: [check_changes]
-    if: needs.check_changes.outputs.has_changes == 'true'
+    if: >-
+      needs.check_changes.outputs.has_changes == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
     permissions:
       contents: read  # only need to checkout the repo
@@ -339,9 +378,20 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest ${{ matrix.config.target }} -v
+          rye run pytest ${{ matrix.config.target }} -v --junitxml=junit-regression-${{ matrix.config.label }}.xml
           kill $SERVER_PID || true
         working-directory: tests/api-testing/
+
+      # Test-count metrics sidecar (see integration job). Parser dedups the
+      # flag-combo legs that re-run the same target files.
+      - name: Upload API junit (regression)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-junit__api_integration_tests__regression_${{ matrix.config.label }}
+          path: tests/api-testing/junit-regression-${{ matrix.config.label }}.xml
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload server log on failure
         if: failure()
@@ -359,7 +409,10 @@ jobs:
   api_fuzz_tests:
     name: api_fuzz_tests
     needs: [check_changes]
-    if: needs.check_changes.outputs.has_changes == 'true'
+    if: >-
+      needs.check_changes.outputs.has_changes == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
     continue-on-error: true
     permissions:
@@ -478,16 +531,96 @@ jobs:
     steps:
       - name: Check test results
         run: |
+          # 1. check_changes must have succeeded.
           if [ "${{ needs.check_changes.result }}" != "success" ]; then
             echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"
             exit 1
           fi
-          # All three test jobs must pass (or be skipped).
-          ok() { [ "$1" == "success" ] || [ "$1" == "skipped" ]; }
-          if ok "${{ needs.api_integration_tests.result }}" && ok "${{ needs.api_query_agent_tests.result }}" && ok "${{ needs.api_regression_tests.result }}"; then
-            echo "All API test jobs passed or skipped"
+
+          # 2. No API-relevant changes (docs/frontend/meta only) → the suite legitimately did
+          #    not run. Allow the merge; no 'e2e' label required.
+          if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
+            echo "✅ No API-relevant file changes — API suite not required for this PR."
+            exit 0
+          fi
+
+          # 3. The change IS API-relevant. On a pull_request it must carry the 'e2e' label,
+          #    otherwise the suite was intentionally not run and we BLOCK the merge until the
+          #    author opts in. (push to main / merge_group are never label-gated.)
+          if [ "${{ github.event_name }}" == "pull_request" ] && \
+             [ "${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}" != "true" ]; then
+            echo "::error::This PR changes API-relevant files but has no 'e2e' label, so the API suite did not run."
+            echo "::error::Add the 'e2e' label to the PR to run the full test suite before merging."
+            exit 1
+          fi
+
+          # 4. Suite was expected to run — the gating jobs must have succeeded.
+          if [ "${{ needs.api_integration_tests.result }}" == "success" ] && \
+             [ "${{ needs.api_query_agent_tests.result }}" == "success" ] && \
+             [ "${{ needs.api_regression_tests.result }}" == "success" ]; then
+            echo "All API test jobs passed"
             exit 0
           else
             echo "API tests failed: integration=${{ needs.api_integration_tests.result }}, query_agent=${{ needs.api_query_agent_tests.result }}, regression=${{ needs.api_regression_tests.result }}"
             exit 1
           fi
+
+  # Non-fatal metrics sidecar: one retry-aware run-summary doc to OpenObserve (stream ci_test_runs,
+  # suite=api). Re-runs append one doc per attempt; the dashboard keeps the latest attempt per run_id.
+  report_to_openobserve:
+    name: Report run metrics to OpenObserve
+    needs: [check_changes, api_integration_tests, api_query_agent_tests, api_regression_tests]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+      # Pull every per-shard junit. NO merge-multiple: each artifact lands in its
+      # own subdir (api-junit__<category>__<leg>) so the parser can read the test
+      # CATEGORY from the dir name. Missing artifacts are non-fatal.
+      - name: Download API junit reports
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: api-junit__*
+          path: junit-xml
+      - name: Report run metrics
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          O2_REPORTING_INGEST_BASE: ${{ secrets.O2_REPORTING_INGEST_BASE }}
+          O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
+          O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
+          INTEG: ${{ needs.api_integration_tests.result }}
+          AGENT: ${{ needs.api_query_agent_tests.result }}
+          REG: ${{ needs.api_regression_tests.result }}
+        run: |
+          if [ "$INTEG" = "skipped" ] && [ "$AGENT" = "skipped" ] && [ "$REG" = "skipped" ]; then
+            echo "::notice::no API tests ran (no relevant changes) — skipping metrics"; exit 0
+          fi
+          if [ "$INTEG" = "failure" ] || [ "$AGENT" = "failure" ] || [ "$REG" = "failure" ]; then CONCLUSION=failure
+          elif [ "$INTEG" = "cancelled" ] || [ "$AGENT" = "cancelled" ] || [ "$REG" = "cancelled" ]; then CONCLUSION=cancelled
+          else CONCLUSION=success; fi
+          export CONCLUSION STREAM=ci_test_runs SUITE=api
+          # Parse junit into per-category + total counts. The TOTAL folds into the
+          # run doc (EXTRA_JSON) so suite=api shows up in the same KPI/pie panels
+          # as UI; the per-category rows go to ci_test_counts for the per-shard
+          # breakdown (the API analog of UI's ci_test_modules). All best-effort.
+          if [ -d junit-xml ]; then
+            COUNTS=$(python3 .github/scripts/parse-api-junit.py junit-xml 2>/dev/null || echo "")
+            if [ -n "$COUNTS" ] && printf '%s' "$COUNTS" | jq -e . >/dev/null 2>&1; then
+              echo "API counts: $COUNTS"
+              EXTRA_JSON=$(printf '%s' "$COUNTS" | jq -c .total); export EXTRA_JSON
+              printf '%s' "$COUNTS" | jq -c --arg run_id "$GITHUB_RUN_ID" --arg repo "$GITHUB_REPOSITORY" \
+                '[.by_category[] | {run_id:$run_id, repo:$repo, suite:"api", workflow:"test", ingest_source:"live",
+                  module:.module, tests_total, tests_passed, tests_failed, tests_flaky, tests_skipped}]' > api_counts_rows.json
+              if [ "$(jq 'length' api_counts_rows.json 2>/dev/null || echo 0)" -gt 0 ]; then
+                bash .github/scripts/o2-report.sh ci_test_counts api_counts_rows.json
+              fi
+            fi
+          fi
+          bash .github/scripts/o2-run-report.sh

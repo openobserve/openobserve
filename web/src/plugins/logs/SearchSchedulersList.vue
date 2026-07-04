@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:min-h-0">
     <div v-if="!showSearchResults" class="tw:h-full tw:flex tw:flex-col tw:min-h-0">
       <AppPageHeader
@@ -38,20 +38,30 @@
             :show-global-filter="false"
             :default-columns="false"
           >
+            <template #cell-user_id="{ row }">
+              <OUserCell :value="row.user_id" />
+            </template>
+            <template #cell-created_at="{ row }">
+              <OTimeCell
+                :value="row.toBeCreatedAt"
+                unit="us"
+                :timezone="store.state.timezone"
+              />
+            </template>
+            <template #cell-start_time="{ row }">
+              <OTimeCell
+                :value="row.toBeStoredStartTime"
+                unit="us"
+                :timezone="store.state.timezone"
+              />
+            </template>
             <template #cell-status="{ row }">
-              <div class="status-cell">
-                <OIcon
-                  :name="getStatusIcon(row.status)"
-                  size="xs"
-                  class="tw:mr-1"
-                  :class="getStatusColorClass(row.status)"
-                />
-                {{ getStatusText(row.status) }}
-              </div>
+              <OTag type="queryStatus" :value="getStatusText(row.status)" />
             </template>
             <template #cell-actions="{ row }">
               <OButton
                 data-test="search-scheduler-cancel-btn"
+                data-row-action="pause"
                 variant="ghost"
                 size="icon-sm"
                 icon-left="cancel"
@@ -65,6 +75,7 @@
 
               <OButton
                 data-test="search-scheduler-delete-btn"
+                data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
                 icon-left="delete"
@@ -73,6 +84,7 @@
               />
               <OButton
                 data-test="search-scheduler-restart-btn"
+                data-row-action="resume"
                 variant="ghost"
                 size="icon-sm"
                 icon-left="refresh"
@@ -85,6 +97,7 @@
               />
               <OButton
                 data-test="search-scheduler-explore-btn"
+                data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
                 icon-left="search"
@@ -176,7 +189,6 @@
                     :key="row.trace_id"
                     :ref="`QueryEditorRef${row.trace_id}`"
                     :editor-id="`alerts-query-editor${row.trace_id}`"
-                    class="monaco-editor"
                     :debounceTime="300"
                     v-model:query="query"
                     language="json"
@@ -249,6 +261,9 @@ import { useI18n } from "vue-i18n";
 import { formatDate } from "@/utils/date";
 import type { Ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -269,6 +284,9 @@ export default defineComponent({
     DateTime,
     OEmptyState,
     OTable,
+    OTimeCell,
+    OUserCell,
+    OTag,
     TenstackTable,
     ConfirmDialog,
     AppTabs,
@@ -796,6 +814,3 @@ export default defineComponent({
   },
 });
 </script>
-<style lang="scss" scoped>
-@import "@/styles/logs/search-schedulerlist.scss";
-</style>

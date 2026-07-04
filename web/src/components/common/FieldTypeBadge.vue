@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <span
     v-if="info"
-    class="field-type-badge"
+    data-test="common-field-type-badge"
+    class="tw:inline-flex tw:items-center tw:justify-center tw:w-4 tw:h-4 tw:rounded-[0.2rem] tw:text-[0.6rem] tw:font-bold tw:mr-[0.3rem] tw:shrink-0 tw:align-middle"
     :style="{ backgroundColor: info.color, color: info.textColor }"
     :title="dataType"
   >{{ info.label }}</span>
@@ -70,18 +71,3 @@ const info = computed(() => {
 });
 </script>
 
-<style scoped>
-.field-type-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  height: 1rem;
-  border-radius: 0.2rem;
-  font-size: 0.6rem;
-  font-weight: 700;
-  margin-right: 0.3rem;
-  flex-shrink: 0;
-  vertical-align: middle;
-}
-</style>

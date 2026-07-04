@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSeparator class="tw:mr-4 tw:mt-4" />
       <div class="error-report-container" style="height: calc(100vh - 192px) !important; overflow: auto; resize: none;">
         <!-- Alert Errors Section -->
-        <div class="error-section" v-if="alertErrorsToDisplay.length > 0">
+        <div class="tw:p-2.5 tw:mb-2.5" v-if="alertErrorsToDisplay.length > 0">
           <div class="error-list">
             <!-- Iterate through the outer array -->
             <div
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(errorMessage, errorIndex) in errorGroup"
                 :key="errorIndex"
-                class="error-item"
+                class="tw:py-1.25 tw:px-0 tw:text-sm"
                 :data-test="`alert-import-error-${index}-${errorIndex}`"
               >
                 <span
@@ -262,9 +262,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="error-section" v-if="alertCreators.length > 0">
+        <div class="tw:p-2.5 tw:mb-2.5" v-if="alertCreators.length > 0">
           <div
-            class="section-title text-primary"
+            class="tw:text-base tw:mb-2.5 tw:uppercase text-primary"
             data-test="alert-import-creation-title"
           >
             Alert Creation
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div
               :class="{
-                'error-item tw:font-bold': true,
+                'tw:py-1.25 tw:px-0 tw:text-sm tw:font-bold': true,
                 'text-green ': val.success,
                 'text-red': !val.success,
               }"
@@ -1252,27 +1252,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.error-report-container {
-  height: calc(100vh - 192px) !important;
-  overflow: auto;
-  resize: none;
-}
-
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-
-.error-item {
-  padding: 5px 0px;
-  font-size: 14px;
-}
-</style>

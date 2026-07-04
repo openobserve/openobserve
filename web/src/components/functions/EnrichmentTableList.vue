@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AppPageHeader
         :title="t('function.enrichmentTables')"
         icon="dataset"
-        :subtitle="'Lookup tables that enrich ingested data'"
+        :subtitle="t('function.enrichmentTablesSubtitle')"
         tabs-below
         class="tw:shrink-0 tw:px-4"
       >
@@ -118,16 +118,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`${row.name}-type-cell`"
                   class="tw:flex tw:items-center tw:gap-2"
                 >
-                  <span v-if="!row.urlJobs || row.urlJobs.length === 0" :data-test="`${row.name}-type-file`">File</span>
+                  <OTag v-if="!row.urlJobs || row.urlJobs.length === 0" type="enrichmentType" value="file" :data-test="`${row.name}-type-file`" />
                   <template v-else>
                     <span
                       :data-test="`${row.name}-type-url-trigger`"
-                      class="tw:cursor-pointer"
+                      class="tw:cursor-pointer tw:inline-flex tw:items-center tw:gap-1"
                       @click="showUrlJobsDialog(row)"
-                      :class="{'text-primary': row.urlJobs.length > 1}"
                     >
-                      Url
-                      <span v-if="row.urlJobs.length > 1" class="tw:text-gray-400"> ({{ row.urlJobs.length }})</span>
+                      <OTag type="enrichmentType" value="url" />
+                      <span v-if="row.urlJobs.length > 1" class="tw:text-text-primary"> ({{ row.urlJobs.length }})</span>
                     </span>
                     <span v-if="row.aggregateStatus === 'completed'">
                       <OIcon name="check-circle" size="sm" class="tw:text-(--o2-positive)">
@@ -144,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OIcon>
                     </span>
                     <span v-else-if="row.aggregateStatus === 'processing'">
-                      <OIcon name="sync" size="sm" class="rotate-animation">
+                      <OIcon name="sync" size="sm" class="tw:[animation:rotate_1s_linear_infinite]">
                         <OTooltip>
                           <template #content>
                             <div style="max-width: 300px;">
@@ -203,6 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     @click="exploreEnrichmentTable(row)"
                     icon-left="search"
+                    data-row-action="view"
                   />
 
                   <!-- Schema Settings button - show for uploaded tables or completed URL jobs -->
@@ -214,6 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     @click="listSchema(row)"
                     icon-left="format-list-bulleted"
+                    data-row-action="view"
                   />
 
                   <!-- Edit button - show for uploaded tables, completed URL jobs, or failed URL jobs (to add more URLs) -->
@@ -225,6 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     @click="showAddUpdateFn(row)"
                     icon-left="edit"
+                    data-row-action="edit"
                   />
 
                   <!-- Delete button - always visible -->
@@ -235,8 +237,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     @click="showDeleteDialogFn(row)"
                     icon-left="delete"
+                    data-row-action="delete"
                   />
                 </div>
+              </template>
+
+              <template #cell-doc_num="{ row }">
+                <ONumberCell :value="row.doc_num" format="number" />
               </template>
 
               <template #cell-function="{ row }">
@@ -312,14 +319,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="tw:text-sm tw:font-bold">Job {{ index + 1 }}</span>
                 <span class="tw:block tw:text-xs tw:text-muted-foreground">{{ job.url }}</span>
                 <span class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
-                  <OBadge
+                  <OTag
                     :data-test="`enrichment-url-jobs-item-${index}-status-badge`"
                     :data-test-value="job.status"
-                    dot
-                    :variant="job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : job.status === 'processing' ? 'primary' : 'default'"
-                  >
-                    {{ job.status }}
-                  </OBadge>
+                    type="enrichmentJobStatus"
+                    :value="job.status"
+                  />
                 </span>
                 <span v-if="job.status === 'completed'" class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
@@ -372,7 +377,8 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
@@ -394,7 +400,8 @@ export default defineComponent({
     OTooltip,
     OCheckbox,
     OIcon,
-    OBadge,
+    OTag,
+    ONumberCell,
     OTable,
 },
   emits: [
@@ -424,11 +431,11 @@ export default defineComponent({
     const { toast } = useToast();
     const columns: OTableColumnDef[] = [
       { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
-      { id: "name", header: t("function.name"), accessorKey: "name", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
+      { id: "name", header: t("common.name"), accessorKey: "name", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
       { id: "type", header: "Type", accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File", sortable: true, resizable: true, hideable: true, meta: { align: "left" }, size: COL.type },
-      { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, resizable: true, hideable: true, meta: { align: "left" }, size: COL.count },
-      { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, resizable: true, hideable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: COL.sizeBytes },
-      { id: "compressed_size", header: t("logStream.compressedSize"), accessorKey: "original_compressed_size", sortable: true, resizable: true, hideable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size) }, size: COL.sizeBytes },
+      { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, resizable: true, hideable: true, meta: { align: "right" }, size: COL.count },
+      { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, resizable: true, hideable: true, meta: { align: "right", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: COL.sizeBytes },
+      { id: "compressed_size", header: t("logStream.compressedSize"), accessorKey: "original_compressed_size", sortable: true, resizable: true, hideable: true, meta: { align: "right", format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size) }, size: COL.sizeBytes },
       { id: "actions", header: t("function.actions"), accessorKey: "actions", sortable: false, meta: { align: "left", headerClass: "tw:!text-center tw:!justify-center", actionCount: 4 }, isAction: true },
     ];
 
@@ -448,7 +455,7 @@ export default defineComponent({
     onBeforeMount(() => {
       getLookupTables();
     });
-    //here we need to check if the action is there or not 
+    //here we need to check if the action is there or not
     //because if action is there user before refresh the page user was there in add / update page
     //so to maitain consistency we are checking the action and if action is there we are showing the add / update page
     //else we are showing the list of enrichment tables
@@ -970,18 +977,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-
-.search-en-table-input {
-  .q-field__inner {
-    width: 250px;
-  }
-}
-
-.rotate-animation {
-  animation: rotate 1s linear infinite;
-}
-
+<style>
 @keyframes rotate {
   from {
     transform: rotate(0deg);
@@ -990,6 +986,4 @@ export default defineComponent({
     transform: rotate(360deg);
   }
 }
-
-/* No custom styles needed - using Quasar components */
 </style>

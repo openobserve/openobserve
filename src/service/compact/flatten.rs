@@ -149,6 +149,21 @@ pub async fn generate_by_stream(
     Ok(())
 }
 
+/// Generates the storage key of the flattened version of a data file.
+pub fn generate_flatten_file_key(file_key: &str) -> String {
+    let key = file_key.strip_prefix("files/").unwrap_or(file_key);
+    let key = match FileFormat::from_extension(key) {
+        Some(format) => key.strip_suffix(format.extension()).unwrap_or(key),
+        None => key,
+    };
+    format!(
+        "files{}/{}{}",
+        get_config().common.column_all,
+        key,
+        FileFormat::Parquet.extension()
+    )
+}
+
 pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
     log::debug!("[FLATTEN_COMPACTOR] generate flatten file for {}", file.key);
@@ -172,11 +187,7 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
             file.key
         ));
     }
-    let new_file = format!(
-        "files{}/{}",
-        get_config().common.column_all,
-        file.key.strip_prefix("files/").unwrap()
-    );
+    let new_file = generate_flatten_file_key(&file.key);
     let org_id = columns[1];
     let stream_type = StreamType::from(columns[2]);
     let stream_name = columns[3];
@@ -303,6 +314,20 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema};
 
     use super::*;
+
+    #[test]
+    fn test_generate_flatten_file_key_always_uses_parquet_extension() {
+        let column_all = &get_config().common.column_all;
+        assert_eq!(
+            generate_flatten_file_key("files/default/logs/quickstart/2026/07/02/12/abc.parquet"),
+            format!("files{column_all}/default/logs/quickstart/2026/07/02/12/abc.parquet")
+        );
+        // flattened output is written as parquet even when the source is vortex
+        assert_eq!(
+            generate_flatten_file_key("files/default/logs/quickstart/2026/07/02/12/abc.vortex"),
+            format!("files{column_all}/default/logs/quickstart/2026/07/02/12/abc.parquet")
+        );
+    }
 
     // Helper function to create a record batch with the "_all" field
     fn create_test_batch_with_all_field(

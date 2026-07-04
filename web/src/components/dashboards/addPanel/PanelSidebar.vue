@@ -16,34 +16,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="sidebar tw:bg-surface-panel"
-    :class="{ open: isOpen }"
+    class="tw:bg-surface-panel tw:relative tw:h-full tw:min-h-0 tw:flex tw:flex-col"
+    :class="isOpen ? 'tw:w-75' : 'tw:w-12.5'"
     data-test="panel-sidebar-root"
   >
     <div
       v-if="!isOpen"
-      class="sidebar-header-collapsed"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-start tw:w-12.5 tw:h-full tw:overflow-y-auto tw:cursor-pointer"
       data-test="panel-sidebar-header-collapsed"
       @click="toggleSidebar"
     >
-      <!-- <div class="collapsed-icon">+</div> -->
+      <!-- <div class="tw:mt-[10px] tw:text-[20px]">+</div> -->
       <OIcon
         name="expand-all" size="sm"
-        class="collapsed-icon rotate-90"
+        class="tw:mt-[10px] tw:text-[20px] rotate-90"
         data-test="dashboard-sidebar"
       />
       <div
-        class="collapsed-title"
+        class="tw:[writing-mode:vertical-rl] tw:[text-orientation:mixed] tw:font-bold"
         data-test="panel-sidebar-collapsed-title"
       >{{ title }}</div>
     </div>
     <div
       v-else
-      class="sidebar-header-expanded"
+      class="tw:flex tw:items-center tw:justify-between tw:h-[60px] tw:px-[10px] tw:shrink-0"
       data-test="panel-sidebar-header-expanded"
     >
       <div
-        class="expanded-title"
+        class="tw:font-bold"
         data-test="panel-sidebar-expanded-title"
       >{{ title }}</div>
       <OButton
@@ -58,7 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator class="tw:-mt-px tw:shrink-0" data-test="panel-sidebar-separator" />
     <div
-      class="sidebar-content scroll"
+      class="scroll"
+      style="height: calc(100vh - 176px); overflow-y: auto;"
       data-test="panel-sidebar-content"
       v-if="isOpen"
       @scroll.passive="onSidebarScroll"
@@ -119,63 +120,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.sidebar {
-  position: relative;
-  width: 50px;
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar.open {
-  width: 300px;
-}
-
-.sidebar-header-collapsed {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  width: 50px;
-  height: 100%;
-  overflow-y: auto;
-  cursor: pointer;
-}
-
-.sidebar-header-expanded {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 60px;
-  padding: 0 10px;
-  flex-shrink: 0;
-}
-
-.collapsed-icon {
-  margin-top: 10px;
-  font-size: 20px;
-}
-
-.collapsed-title {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-weight: bold;
-}
-
-.expanded-title {
-  font-weight: bold;
-}
-
-.collapse-button {
-  height: 30px;
-  width: 30px;
-  padding: 0px 0px;
-}
-
-.sidebar-content {
-  height: calc(100vh - 176px);
-  overflow-y: auto;
-}
-</style>

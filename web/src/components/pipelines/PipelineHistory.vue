@@ -97,26 +97,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @sort-change="onSortChange"
         >
           <template #cell-timestamp="{ row }">
-            {{ formatDate(row.timestamp) }}
+            <OTimeCell
+              :value="row.timestamp"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+            />
           </template>
 
           <template #cell-start_time="{ row }">
-            {{ formatDate(row.start_time) }}
+            <OTimeCell
+              :value="row.start_time"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+            />
           </template>
 
           <template #cell-end_time="{ row }">
-            {{ formatDate(row.end_time) }}
+            <OTimeCell
+              :value="row.end_time"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+            />
           </template>
 
           <template #cell-status="{ row }">
-            <OBadge
-              :variant="getStatusVariant(row.status)"
-              size="sm"
+            <span
               data-test="pipeline-history-status-badge"
               :data-test-status="(row.status || '').toLowerCase()"
             >
-              {{ row.status }}
-            </OBadge>
+              <OTag type="queryStatus" :value="row.status" />
+            </span>
           </template>
 
           <template #cell-is_realtime="{ row }">
@@ -140,7 +153,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-duration="{ row }">
-            {{ formatDuration(row.end_time - row.start_time) }}
+            <ONumberCell
+              :value="row.end_time - row.start_time"
+              format="durationUs"
+            />
           </template>
 
           <template #cell-is_partial="{ row }">
@@ -224,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="scroll" style="max-height: 70vh" v-if="selectedRow">
         <div class="tw:gap-2">
           <!-- Basic Information -->
-          <div class="detail-section">
+          <div class="tw:py-1">
             <div class="tw:flex tw:gap-3">
               <div class="tw:w-1/2">
                 <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
@@ -236,12 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="tw:w-1/2">
                 <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Status</div>
-                <OBadge
-                  :variant="getStatusVariant(selectedRow.status)"
-                  size="sm"
-                >
-                  {{ selectedRow.status }}
-                </OBadge>
+                <OTag type="queryStatus" :value="selectedRow.status" />
               </div>
             </div>
           </div>
@@ -249,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSeparator class="tw:my-2" />
 
           <!-- Time Information -->
-          <div class="detail-section">
+          <div class="tw:py-1">
             <div class="tw:flex tw:gap-3">
               <div class="tw:w-1/2">
                 <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Timestamp</div>
@@ -273,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSeparator class="tw:my-2" />
 
           <!-- Pipeline Configuration -->
-          <div class="detail-section">
+          <div class="tw:py-1">
             <div class="tw:flex tw:gap-3">
               <div class="tw:w-1/2">
                 <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Type</div>
@@ -314,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <OSeparator class="tw:my-2" />
-            <div class="detail-section">
+            <div class="tw:py-1">
               <div class="tw:flex tw:gap-3">
                 <div v-if="selectedRow.evaluation_took_in_secs" class="tw:w-1/3">
                   <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
@@ -366,9 +377,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Source Node (if available) -->
           <template v-if="selectedRow.source_node">
             <OSeparator class="tw:my-2" />
-            <div class="detail-section">
+            <div class="tw:py-1">
               <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Source Node</div>
-              <div class="tw:text-sm text-mono">
+              <div class="tw:text-sm tw:font-mono tw:text-[13px]">
                 {{ selectedRow.source_node }}
               </div>
             </div>
@@ -377,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Error Details (if available) -->
           <template v-if="selectedRow.error">
             <OSeparator class="tw:my-2" />
-            <div class="detail-section">
+            <div class="tw:py-1">
               <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
                 <OIcon name="error" size="xs" class="tw:mr-1" />
                 Error Details
@@ -403,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Success Response (if available) -->
           <template v-if="selectedRow.success_response">
             <OSeparator class="tw:my-2" />
-            <div class="detail-section">
+            <div class="tw:py-1">
               <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
                 <OIcon name="check-circle" size="xs" class="tw:mr-1" />
                 Response
@@ -445,11 +456,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
-        <OIcon name="error" size="md" class="error-icon" />
+        <OIcon name="error" size="md" class="tw:text-[#ef4444]" />
       </template>
       <div class="tw:mb-4">
-        <div class="section-label tw:mb-2">Error Summary</div>
-        <div class="error-summary-box">
+        <div class="tw:text-[13px] tw:font-semibold tw:tracking-[0.02em] tw:opacity-80 tw:mb-2">Error Summary</div>
+        <div class="tw:p-4 tw:rounded-lg tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:whitespace-pre-wrap tw:wrap-break-word tw:bg-[rgba(239,68,68,0.08)] tw:border tw:border-[rgba(239,68,68,0.2)] tw:text-[#dc2626]">
           {{ errorMessage?.error }}
         </div>
       </div>
@@ -467,9 +478,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
@@ -536,31 +549,32 @@ const columns = ref([
     header: "Pipeline Name",
     accessorKey: "pipeline_name",
     sortable: true,
-    size: COL.name,
-    meta: { align: "left" as const, autoWidth: true },
+    size: 320,
+    minSize: 320,
+    meta: { align: "left" as const },
   },
   {
     id: "is_realtime",
     header: "Type",
     accessorKey: "is_realtime",
     sortable: true,
-    size: 90,
-    meta: { align: "center" as const },
+    size: 70,
+    meta: { align: "left" as const },
   },
   {
     id: "is_silenced",
     header: "Is Silenced",
     accessorKey: "is_silenced",
     sortable: true,
-    size: 130,
-    meta: { align: "center" as const },
+    size: 100,
+    meta: { align: "left" as const },
   },
   {
     id: "timestamp",
     header: "Timestamp",
     accessorKey: "timestamp",
     sortable: true,
-    size: 160,
+    size: COL.dateAbsolute,
     meta: { align: "left" as const },
   },
   {
@@ -568,7 +582,7 @@ const columns = ref([
     header: "Start Time",
     accessorKey: "start_time",
     sortable: true,
-    size: 160,
+    size: COL.dateAbsolute,
     meta: { align: "left" as const },
   },
   {
@@ -576,7 +590,7 @@ const columns = ref([
     header: "End Time",
     accessorKey: "end_time",
     sortable: true,
-    size: 160,
+    size: COL.dateAbsolute,
     meta: { align: "left" as const },
   },
   {
@@ -584,7 +598,7 @@ const columns = ref([
     header: "Duration",
     accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: true,
-    size: 110,
+    size: 90,
     meta: { align: "right" as const },
   },
   {
@@ -593,7 +607,7 @@ const columns = ref([
     accessorKey: "status",
     sortable: true,
     size: 150,
-    meta: { align: "center" as const },
+    meta: { align: "left" as const },
   },
   {
     id: "retries",
@@ -601,7 +615,7 @@ const columns = ref([
     accessorKey: "retries",
     sortable: true,
     size: 50,
-    meta: { align: "center" as const },
+    meta: { align: "right" as const },
   },
   {
     id: "is_partial",
@@ -609,7 +623,7 @@ const columns = ref([
     accessorKey: "is_partial",
     sortable: false,
     size: 60,
-    meta: { align: "center" as const },
+    meta: { align: "left" as const },
   },
   {
     id: "delay_in_secs",
@@ -819,25 +833,6 @@ const formatDuration = (microseconds: number) => {
   return `${seconds}s`;
 };
 
-const getStatusVariant = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "success":
-    case "ok":
-    case "completed":
-      return "success-outline";
-    case "error":
-    case "failed":
-      return "error-outline";
-    case "warning":
-      return "warning-outline";
-    case "pending":
-    case "running":
-      return "primary-outline";
-    default:
-      return "default-outline";
-  }
-};
-
 const showDetailsDialog = (row: any) => {
   selectedRow.value = row;
   detailsDialog.value = true;
@@ -872,111 +867,3 @@ watch(
   },
 );
 </script>
-
-<style scoped lang="scss">
-.pipeline-details-dialog {
-  :deep(.q-dialog__inner) {
-    padding: 24px;
-  }
-
-  .detail-section {
-    padding: 4px 0;
-  }
-
-  .text-mono {
-    font-family: "Courier New", monospace;
-    font-size: 13px;
-  }
-
-  .bg-negative-1 {
-    background-color: rgba(255, 0, 0, 0.05);
-  }
-
-  .bg-positive-1 {
-    background-color: rgba(0, 128, 0, 0.05);
-  }
-
-  pre {
-    max-height: 200px;
-    overflow-y: auto;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: #f1f1f1;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: #888;
-      border-radius: 3px;
-    }
-
-    &::-webkit-scrollbar-thumb:hover {
-      background: #555;
-    }
-  }
-}
-.pipeline-error-header {
-  padding: 20px 24px 16px;
-
-  .error-icon {
-    color: #ef4444;
-  }
-
-  .pipeline-name {
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-
-  .error-timestamp {
-    display: flex;
-    align-items: center;
-    font-size: 13px;
-    opacity: 0.7;
-    margin-left: 36px;
-  }
-
-  .close-btn {
-    opacity: 0.6;
-    transition: opacity 0.2s;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-
-.pipeline-error-content {
-  padding: 20px 24px;
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.section-label {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  opacity: 0.8;
-}
-
-.error-summary-box {
-  padding: 16px;
-  border-radius: 8px;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: #dc2626;
-}
-.pipeline-error-actions {
-  padding: 16px 24px;
-  justify-content: flex-end;
-}
-</style>

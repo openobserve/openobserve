@@ -228,7 +228,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
           ServiceGraphNoDataState: {
             template:
               '<div data-test="service-graph-no-data-state" />',
-            emits: ["widen-range"],
           },
         },
       },
@@ -1203,17 +1202,13 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
-
       wrapper.vm.handleNodeClick({
         dataType: "unknown",
         data: null,
       });
 
-      expect(consoleLog).toHaveBeenCalled();
+      // Invalid clicks are ignored — the side panel must not open.
       expect(wrapper.vm.showSidePanel).toBe(false);
-
-      consoleLog.mockRestore();
     });
 
     it("should silently ignore edge clicks for nonexistent edges", async () => {
@@ -1813,53 +1808,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
   });
 
   describe("widen-range emit and live time range fix", () => {
-    it("should emit 'widen-range' when ServiceGraphNoDataState bubbles the event", async () => {
-      // Return empty nodes so the no-data state is rendered
-      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
-        data: { nodes: [], edges: [], availableStreams: [] },
-      });
-
-      // Mount with ServiceGraphNoDataState stubbed so we can trigger its event
-      const localWrapper = mount(ServiceGraph, {
-        global: {
-          mocks: { $store: createMockStore() },
-          provide: { store: createMockStore() },
-          stubs: {
-            AppTabs: true,
-            ChartRenderer: true,
-            ServiceGraphSidePanel: true,
-            QCard: false,
-            QCardSection: false,
-            QSelect: false,
-            QInput: false,
-            QBtn: false,
-            QIcon: false,
-            QTooltip: false,
-            ODialog: ODialogStub,
-            ServiceGraphNoDataState: {
-              template:
-                '<div @click="$emit(\'widen-range\', \'7d\')" data-test="service-graph-no-data-stub" />',
-              emits: ["widen-range"],
-            },
-          },
-        },
-      });
-
-      await flushPromises();
-
-      const stub = localWrapper.find(
-        '[data-test="service-graph-no-data-stub"]',
-      );
-      expect(stub.exists()).toBe(true);
-
-      await stub.trigger("click");
-
-      expect(localWrapper.emitted("widen-range")).toBeTruthy();
-      expect(localWrapper.emitted("widen-range")![0]).toEqual(["7d"]);
-
-      localWrapper.unmount();
-    });
-
     it("should use fresh timestamps from getEffectiveTimeRange for relative ranges", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1983,30 +1931,4 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     });
   });
 
-  describe("Widen Range Emit", () => {
-    it("should emit widen-range when ServiceGraphNoDataState emits widen-range", async () => {
-      // Load empty graph so the NoDataState is shown
-      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValueOnce({
-        data: { nodes: [], edges: [], availableStreams: [] },
-      });
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // ServiceGraphNoDataState is stubbed in createWrapper — find it by data-test attribute
-      const noDataState = wrapper.find(
-        '[data-test="service-graph-no-data-state"]',
-      );
-      expect(noDataState.exists()).toBe(true);
-
-      // Trigger the widen-range event via the parent component stub element
-      const noDataStateComponent = wrapper.findComponent(
-        '[data-test="service-graph-no-data-state"]',
-      );
-      noDataStateComponent.vm.$emit("widen-range", "7d");
-      await nextTick();
-
-      expect(wrapper.emitted("widen-range")).toBeTruthy();
-      expect(wrapper.emitted("widen-range")![0]).toEqual(["7d"]);
-    });
-  });
 });

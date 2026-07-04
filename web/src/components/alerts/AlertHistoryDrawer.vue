@@ -145,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="history"
           layout="flex-col"
           stretch
+          class="tw:flex-1"
         >
           <div
             class="tw:flex tw:h-full tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:py-2"
@@ -193,111 +194,112 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- History Table -->
             <div
               v-else
-              class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'code-block-dark'
-                  : 'code-block-light'
-              "
+              class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:gap-2"
             >
-              <OTable
-                :data="alertHistory"
-                :columns="historyTableColumns"
-                row-key="timestamp"
-                pagination="server"
-                v-model:current-page="currentPage"
-                v-model:page-size="selectedPerPage"
-                :total-count="resultTotal"
-                :loading="isLoadingHistory"
-                :row-class="getRowClass"
-                :default-columns="false"
-                :show-global-filter="false"
-                class="history-table tw:flex-1 tw:overflow-hidden"
-                data-test="alert-details-history-table"
-                @pagination-change="onPaginationChange"
-              >
-                <template #[`cell-#`]="{ row }">
-                  <span
-                    class="tw:text-[13px] tw:tabular-nums"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'tw:text-gray-500'
-                        : 'tw:text-gray-400'
-                    "
-                  >
-                    {{
-                      (currentPage - 1) * selectedPerPage +
-                      alertHistory.findIndex((r: any) => r.timestamp === row.timestamp) +
-                      1
-                    }}
-                  </span>
-                </template>
-                <template #cell-status="{ row }">
-                  <OBadge
-                    size="sm"
-                    :icon="getStatusChipIcon(row.status)"
-                    :variant="getStatusChipVariant(row.status)"
-                    class="tw:cursor-default"
-                    data-test="alert-history-status-chip"
-                  >
-                    {{ formatStatus(row.status) }}
-                    <OTooltip
-                      v-if="row.error"
-                      :max-width="'300px'"
-                      :content="row.error"
-                    />
-                  </OBadge>
-                </template>
-                <template #cell-timestamp="{ row }">
-                  <span class="tw:text-[13px]">{{
-                    formatTimestamp(row.timestamp)
-                  }}</span>
-                  <OTooltip :content="formatTimestampFull(row.timestamp)" />
-                </template>
-                <template #cell-evaluation_time="{ row }">
-                  <span class="tw:text-[13px] tw:tabular-nums">
-                    {{
-                      row.evaluation_took_in_secs
-                        ? row.evaluation_took_in_secs.toFixed(3) + "s"
-                        : "—"
-                    }}
-                  </span>
-                </template>
-                <template #cell-query_time="{ row }">
-                  <span class="tw:text-[13px] tw:tabular-nums">
-                    {{
-                      row.query_took ? row.query_took + "ms" : "—"
-                    }}
-                  </span>
-                </template>
-                <template #cell-anomaly_count="{ row }">
-                  <span
-                    class="tw:text-[13px] tw:tabular-nums"
-                    :class="
-                      row.anomaly_count > 0
-                        ? 'tw:text-red-500 tw:font-medium'
-                        : ''
-                    "
-                  >
-                    {{
-                      row.anomaly_count != null ? row.anomaly_count : "—"
-                    }}
-                  </span>
-                </template>
-                <template #cell-error="{ row }">
-                  <span class="tw:text-[13px]">{{ row.error || "—" }}</span>
-                </template>
+              <!-- Firing frequency timeline -->
+              <AlertHistoryTimeline
+                v-if="alertHistory.length > 0"
+                :history="alertHistory"
+              />
 
-                <template #bottom="scope">
-                  <div class="tw:flex tw:items-center tw:w-full tw:h-[48px]">
-                    <div
-                      class="o2-table-footer-title tw:flex tw:items-center tw:w-[220px]"
+              <div
+                class="tw:rounded-lg tw:overflow-hidden tw:border tw:flex tw:flex-col tw:flex-1"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:border-[#374151]'
+                    : 'tw:border-[#e5e7eb] tw:bg-[#f9fafb]'
+                "
+              >
+                <OTable
+                  :data="groupedHistory"
+                  :columns="historyTableColumns"
+                  row-key="timestamp"
+                  pagination="server"
+                  v-model:current-page="currentPage"
+                  v-model:page-size="selectedPerPage"
+                  :total-count="resultTotal"
+                  :loading="isLoadingHistory"
+                  :row-class="getRowClass"
+                  :default-columns="false"
+                  :show-global-filter="false"
+                  class="history-table tw:flex-1 tw:overflow-hidden tw:!border-0 tw:!shadow-none"
+                  data-test="alert-details-history-table"
+                  @pagination-change="onPaginationChange"
+                >
+                  <template #[`cell-#`]="{ row }">
+                    <span
+                      class="tw:text-[13px] tw:tabular-nums"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
                     >
-                      {{ resultTotal }} {{ t("alerts.alertDetails.results") }}
+                      {{ row._displayIndex ?? '—' }}
+                    </span>
+                  </template>
+
+                  <template #cell-status="{ row }">
+                    <!-- Flapping group row -->
+                    <div v-if="row._flappingGroup" class="tw:flex tw:items-center tw:gap-1.5">
+                      <OIcon
+                        :name="expandedGroups.has(row.timestamp) ? 'expand-less' : 'expand-more'"
+                        size="sm"
+                        class="tw:cursor-pointer tw:opacity-50 tw:shrink-0"
+                        @click="toggleFlappingGroup(row.timestamp)"
+                      />
+                      <OTag type="alertState" value="flapping" class="tw:cursor-pointer tw:shrink-0" @click="toggleFlappingGroup(row.timestamp)" />
+                      <span class="tw:text-[11px] tw:truncate" style="color: var(--color-text-secondary)">
+                        {{ row._children.length }} rows · {{ row._duration }}
+                      </span>
                     </div>
-                  </div>
-                </template>
-              </OTable>
+                    <!-- Normal row -->
+                    <span v-else class="tw:inline-flex tw:cursor-default">
+                      <OTag
+                        type="alertState"
+                        :value="row.status"
+                        data-test="alert-history-status-chip"
+                      />
+                      <OTooltip v-if="row.error" :max-width="'300px'" :content="row.error" />
+                    </span>
+                  </template>
+
+                  <template #cell-timestamp="{ row }">
+                    <span class="tw:text-[13px] tw:tabular-nums tw:whitespace-nowrap" :class="row._child ? 'tw:pl-5 tw:opacity-70' : ''">
+                      {{ formatTimestampFull(row.timestamp) }}
+                    </span>
+                  </template>
+
+                  <template #cell-evaluation_time="{ row }">
+                    <span class="tw:text-[13px] tw:tabular-nums">
+                      {{ row.evaluation_took_in_secs ? row.evaluation_took_in_secs.toFixed(3) + "s" : "—" }}
+                    </span>
+                  </template>
+
+                  <template #cell-query_time="{ row }">
+                    <span class="tw:text-[13px] tw:tabular-nums">
+                      {{ row.query_took ? row.query_took + "ms" : "—" }}
+                    </span>
+                  </template>
+
+                  <template #cell-anomaly_count="{ row }">
+                    <span
+                      class="tw:text-[13px] tw:tabular-nums"
+                      :class="row.anomaly_count > 0 ? 'tw:text-red-500 tw:font-medium' : ''"
+                    >
+                      {{ row.anomaly_count != null ? row.anomaly_count : "—" }}
+                    </span>
+                  </template>
+
+                  <template #cell-error="{ row }">
+                    <span class="tw:text-[13px]">{{ row.error || "—" }}</span>
+                  </template>
+
+                  <template #bottom>
+                    <div class="tw:flex tw:items-center tw:w-full tw:h-[48px]">
+                      <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[220px]">
+                        {{ resultTotal }} {{ t("alerts.alertDetails.results") }}
+                      </div>
+                    </div>
+                  </template>
+                </OTable>
+              </div>
             </div>
           </div>
         </OTabPanel>
@@ -307,6 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="condition"
           layout="flex-col"
           stretch
+          class="tw:flex-1"
         >
           <div
             class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:py-2"
@@ -314,19 +317,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Anomaly detection condition view — mirrors the alert SQL code block -->
             <template v-if="isAnomaly">
               <div
-                class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden "
+                class="tw:rounded-lg tw:overflow-hidden tw:border tw:flex tw:flex-col tw:flex-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'code-block-dark'
-                    : 'code-block-light'
+                    ? 'tw:border-[#374151]'
+                    : 'tw:border-[#e5e7eb] tw:bg-[#f9fafb]'
                 "
               >
                 <div
-                  class="code-block-header tw:shrink-0"
+                  class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2.5 tw:border-b tw:shrink-0"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'code-block-header-dark'
-                      : 'code-block-header-light'
+                      ? 'tw:border-[#374151]'
+                      : 'tw:bg-[#f3f4f6] tw:border-[#e5e7eb]'
                   "
                 >
                   <div class="tw:flex tw:items-center tw:gap-1.5">
@@ -353,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
                 <pre
-                  class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                  class="tw:p-[10px_14px] tw:font-mono tw:whitespace-pre-wrap tw:overflow-x-auto tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
                   >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre
                 >
               </div>
@@ -362,20 +365,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Regular alert condition view -->
             <template v-else>
               <div
-                class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
+                class="tw:rounded-lg tw:overflow-hidden tw:border tw:flex tw:flex-col tw:flex-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'code-block-dark'
-                    : 'code-block-light'
+                    ? 'tw:border-[#374151]'
+                    : 'tw:border-[#e5e7eb] tw:bg-[#f9fafb]'
                 "
               >
                 <!-- Code block header bar — stays fixed -->
                 <div
-                  class="code-block-header tw:shrink-0"
+                  class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2.5 tw:border-b tw:shrink-0"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'code-block-header-dark'
-                      : 'code-block-header-light'
+                      ? 'tw:border-[#374151]'
+                      : 'tw:bg-[#f3f4f6] tw:border-[#e5e7eb]'
                   "
                 >
                   <div class="tw:flex tw:items-center tw:gap-1.5">
@@ -424,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Code content — scrolls internally -->
                 <pre
-                  class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                  class="tw:p-[10px_14px] tw:font-mono tw:whitespace-pre-wrap tw:overflow-x-auto tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
                   >{{
                     alertDetails.conditions !== "" &&
                     alertDetails.conditions !== "--"
@@ -483,7 +486,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -494,6 +497,7 @@ import type { Ref } from "vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import AlertHistoryTimeline from "./AlertHistoryTimeline.vue";
 
 // Composables
 const { t } = useI18n();
@@ -533,6 +537,157 @@ const activeTab = ref("history");
 // Refs
 const alertHistory: Ref<any[]> = ref([]);
 const isLoadingHistory = ref(false);
+
+// ── Flapping group helpers ──────────────────────────────────────────────────
+const MIN_FLAP_TRANSITIONS = 3; // firing↔ok flips within a run to call it flapping
+const MIN_FLAP_WINDOW = 4;      // minimum consecutive rows needed
+
+function rowIsFiring(s: string) {
+  const v = s?.toLowerCase();
+  return v === "firing" || v === "error" || v === "anomaly" || v === "completed";
+}
+function rowIsOk(s: string) {
+  const v = s?.toLowerCase();
+  return v === "ok" || v === "success" || v === "normal" || v === "condition_not_satisfied";
+}
+
+// Build a boolean mask: true = row is inside a flapping run.
+// Strategy:
+//  1. Scan forward to find the first window of MIN_FLAP_WINDOW rows that
+//     contains >= MIN_FLAP_TRANSITIONS firing↔ok flips — this is a zone start.
+//  2. Once inside a zone, keep extending as long as each new row causes a
+//     flip relative to the previous non-skipped state.
+//  3. Stop extending when we see MAX_STABLE_TAIL consecutive rows with no
+//     flip, then trim those trailing stable rows off the end of the zone.
+function buildFlappingMask(rows: any[]): boolean[] {
+  const n = rows.length;
+  const mask = new Array(n).fill(false);
+  const MAX_STABLE_TAIL = 2; // consecutive non-flipping rows that end a zone
+
+  function stateOf(s: string): "firing" | "ok" | "other" {
+    if (rowIsFiring(s)) return "firing";
+    if (rowIsOk(s))    return "ok";
+    return "other";
+  }
+
+  let i = 0;
+  while (i < n) {
+    // Count transitions in the next MIN_FLAP_WINDOW rows
+    let transitions = 0;
+    let prev = stateOf(rows[i].status);
+    let windowEnd = -1;
+    for (let j = i + 1; j < Math.min(i + MIN_FLAP_WINDOW + 10, n); j++) {
+      const cur = stateOf(rows[j].status);
+      if (cur !== "other" && prev !== "other" && cur !== prev) transitions++;
+      if (cur !== "other") prev = cur;
+      if (transitions >= MIN_FLAP_TRANSITIONS) { windowEnd = j; break; }
+    }
+
+    if (windowEnd === -1) { i++; continue; } // no flapping here
+
+    // Found a flapping zone starting at i — now extend it forward
+    let zoneEnd = windowEnd;
+    let stableTail = 0;
+    let lastState = stateOf(rows[zoneEnd].status);
+
+    for (let j = zoneEnd + 1; j < n; j++) {
+      const cur = stateOf(rows[j].status);
+      if (cur === "other") { zoneEnd = j; stableTail = 0; continue; }
+      if (cur !== lastState) {
+        // flip — still flapping
+        lastState = cur;
+        zoneEnd = j;
+        stableTail = 0;
+      } else {
+        // same state — stable tail growing
+        stableTail++;
+        if (stableTail >= MAX_STABLE_TAIL) break;
+        zoneEnd = j;
+      }
+    }
+
+    // Trim stable tail off the end
+    while (zoneEnd > windowEnd && stateOf(rows[zoneEnd].status) === stateOf(rows[zoneEnd - 1].status)) {
+      zoneEnd--;
+    }
+
+    for (let k = i; k <= zoneEnd; k++) mask[k] = true;
+    i = zoneEnd + 1; // skip past this zone
+  }
+  return mask;
+}
+
+function durationLabel(startTs: number, endTs: number): string {
+  // timestamps are in microseconds — convert to ms
+  const startMs = startTs > 1e12 ? startTs / 1000 : startTs;
+  const endMs   = endTs   > 1e12 ? endTs   / 1000 : endTs;
+  const ms = Math.abs(endMs - startMs);
+  const mins = Math.round(ms / 60000);
+  if (mins < 1) return "< 1 min";
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+// Tracks which flapping group rows are expanded (key = group timestamp)
+const expandedGroups = ref<Set<number>>(new Set());
+
+function toggleFlappingGroup(ts: number) {
+  const s = new Set(expandedGroups.value);
+  s.has(ts) ? s.delete(ts) : s.add(ts);
+  expandedGroups.value = s;
+}
+
+// Produce the display list: normal rows pass through, flapping runs become one
+// header row (+ children shown when expanded)
+const groupedHistory = computed(() => {
+  const rows = [...alertHistory.value].sort((a, b) => b.timestamp - a.timestamp); // newest first for table
+  if (!rows.length) return rows;
+
+  // mask is on sorted-asc; re-sort for mask then flip back
+  const asc = [...rows].sort((a, b) => a.timestamp - b.timestamp);
+  const mask = buildFlappingMask(asc);
+  // map back to desc order by timestamp
+  const maskByTs = new Map(asc.map((r, i) => [r.timestamp, mask[i]]));
+
+  const result: any[] = [];
+  let i = 0;
+  let displayNum = (currentPage.value - 1) * selectedPerPage.value + 1;
+  while (i < rows.length) {
+    const row = rows[i];
+    if (!maskByTs.get(row.timestamp)) {
+      result.push({ ...row, _displayIndex: displayNum++ });
+      i++;
+    } else {
+      // collect all consecutive flapping rows
+      const children: any[] = [];
+      while (i < rows.length && maskByTs.get(rows[i].timestamp)) {
+        children.push(rows[i]);
+        i++;
+      }
+      const timestamps = children.map((r) => r.timestamp);
+      const minTs = Math.min(...timestamps);
+      const maxTs = Math.max(...timestamps);
+      const groupTs = maxTs;
+      result.push({
+        timestamp: groupTs,
+        status: "flapping",
+        _flappingGroup: true,
+        _children: children,
+        _duration: durationLabel(minTs, maxTs),
+        _displayIndex: null,
+      });
+      displayNum += children.length;
+      if (expandedGroups.value.has(groupTs)) {
+        children.forEach((c, ci) =>
+          result.push({ ...c, _child: true, _displayIndex: displayNum - children.length + ci }),
+        );
+      }
+    }
+  }
+  return result;
+});
 
 // Date time - default to last 15 minutes (relative)
 const dateTimeRef = ref<any>(null);
@@ -586,7 +741,7 @@ const alertHistoryColumns = [
     header: t("alerts.historyTable.status"),
     accessorKey: "status",
     sortable: true,
-    size: 200,
+    size: 280,
     meta: { align: "left" as const },
   },
   {
@@ -665,69 +820,18 @@ const historyTableColumns = computed(() =>
 // Helper Functions
 
 const getRowClass = (row: any) => {
-  const status = row?.status;
-  if (store.state.theme === "dark") {
-    switch (status?.toLowerCase()) {
-      case "firing":
-      case "error":
-      case "anomaly":
-        return "row-error-dark";
-      default:
-        return "";
-    }
-  } else {
-    switch (status?.toLowerCase()) {
-      case "firing":
-      case "error":
-      case "anomaly":
-        return "row-error-light";
-      default:
-        return "";
-    }
+  if (row?._flappingGroup) {
+    return store.state.theme === "dark" ? "tw:!bg-[#1e1a2e]" : "tw:!bg-[#f5f3ff]";
   }
-};
-
-const formatStatus = (status: string) => {
-  if (!status) return "Unknown";
-  return status.charAt(0).toUpperCase() + status.slice(1);
-};
-
-const getStatusChipIcon = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "firing":
-    case "error":
-    case "anomaly":
-      return "error-outline";
-    case "ok":
-    case "success":
-    case "normal":
-      return "check-circle-outline";
-    case "skipped":
-      return "block";
-    case "pending":
-      return "schedule";
-    default:
-      return "help-outline";
+  if (row?._child) {
+    return store.state.theme === "dark" ? "tw:!bg-[#1a1a1a]" : "tw:!bg-[#fafafa]";
   }
-};
-
-const getStatusChipVariant = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "firing":
-    case "error":
-    case "anomaly":
-      return "error-soft";
-    case "ok":
-    case "success":
-    case "normal":
-      return "success-soft";
-    case "skipped":
-      return "warning-soft";
-    case "pending":
-      return "primary-soft";
-    default:
-      return "default-soft";
+  const status = row?.status?.toLowerCase();
+  const isFiringStatus = status === "firing" || status === "error" || status === "anomaly" || status === "completed";
+  if (isFiringStatus) {
+    return store.state.theme === "dark" ? "tw:!bg-[#2d1b1b]" : "tw:!bg-[#fff5f5]";
   }
+  return "";
 };
 
 const formatTimestamp = (timestamp: number) => {
@@ -849,69 +953,3 @@ watch(
   { immediate: true },
 );
 </script>
-
-<style lang="scss" scoped>
-/* ── Code Block ── */
-.code-block {
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid;
-}
-.code-block-light {
-  border-color: #e5e7eb;
-  background: #f9fafb;
-}
-.code-block-dark {
-  border-color: #374151;
-  // background: #111827;
-}
-
-.code-block-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  border-bottom: 1px solid;
-}
-.code-block-header-light {
-  background: #f3f4f6;
-  border-color: #e5e7eb;
-}
-.code-block-header-dark {
-  // background: #1f2937;
-  border-color: #374151;
-}
-
-.code-block-content {
-  padding: 10px 14px;
-  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
-  white-space: pre-wrap;
-  overflow-x: auto;
-  font-size: 13px;
-}
-
-/* ── Row tints ── */
-.row-error-light {
-  background: #fff5f5 !important;
-}
-.row-error-dark {
-  background: #2d1b1b !important;
-}
-
-/* ── Table layout ── */
-.history-table {
-  border: none !important;
-  box-shadow: none !important;
-}
-
-/* ── Tab panels fill height ── */
-:deep(.o-tab-panels) {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-:deep(.o-tab-panel) {
-  flex: 1;
-}
-</style>

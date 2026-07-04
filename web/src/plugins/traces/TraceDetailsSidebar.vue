@@ -39,12 +39,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </span>
         <!-- Observation Type Badge (for LLM spans) -->
-        <OBadge
+        <OTag
           v-if="isLLMSpan"
-          :variant="getObservationTypeVariant(span.gen_ai_operation_name)"
-          class="tw:mr-1 observation-type-badge"
+          type="observationType"
+          :value="span.gen_ai_operation_name"
+          class="tw:mr-1 tw:normal-case!"
           data-test="trace-details-sidebar-observation-badge"
-        >{{ span.gen_ai_operation_name?.charAt(0) + span.gen_ai_operation_name?.slice(1).toLowerCase() }}</OBadge>
+        >{{ span.gen_ai_operation_name?.charAt(0) + span.gen_ai_operation_name?.slice(1).toLowerCase() }}</OTag>
 
         <span class="tw:truncate">{{ span.operation_name }}</span>
       </div>
@@ -59,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
     <div
-      class="trace-details-toolbar-container"
+      class="trace-details-toolbar-container tw:bg-[rgba(248,249,250,0.5)] tw:whitespace-nowrap"
       data-test="trace-details-sidebar-header-toolbar"
     >
       <!-- Row 1: Trace Details -->
@@ -69,8 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="tw:flex tw:items-center" style="flex-wrap: nowrap">
           <!-- Service Badge -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             class="toolbar-chip service-chip tw:mr-[0.325rem]"
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
@@ -90,11 +91,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ span.service_name }}
             </span>
-          </OBadge>
+          </OTag>
 
           <!-- Duration Badge -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             class="toolbar-chip duration-chip tw:mr-[0.325rem]"
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
@@ -102,12 +103,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon><OIcon name="schedule" size="xs" /></template>
             <span class="chip-label">Duration</span>
             <span class="chip-value">{{ getDuration }}</span>
-          </OBadge>
+          </OTag>
 
           <!-- TTFT Badge -->
-          <OBadge
+          <OTag
             v-if="getTTFT"
-            size="sm"
+            type="metricChip"
             class="toolbar-chip ttft-chip tw:mr-[0.325rem]"
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
@@ -115,11 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon><OIcon name="speed" size="xs" /></template>
             <span class="chip-label">TTFT</span>
             <span class="chip-value">{{ getTTFT }}</span>
-          </OBadge>
+          </OTag>
 
           <!-- Start Time Badge -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             class="toolbar-chip time-chip tw:mr-[0.325rem]"
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
@@ -127,12 +128,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon><OIcon name="access-time" size="xs" /></template>
             <span class="chip-label">Start</span>
             <span class="chip-value">{{ getStartTime }}</span>
-          </OBadge>
+          </OTag>
 
           <!-- Resend Count Badge -->
-          <OBadge
+          <OTag
             v-if="spanHttpResendCount"
-            size="sm"
+            type="metricChip"
             class="toolbar-chip resend-chip tw:mr-[0.325rem]"
             :title="`Request resent ${spanHttpResendCount} time(s)`"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
@@ -140,13 +141,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon><OIcon name="replay" size="xs" /></template>
             <span class="chip-label">Resends</span>
             <span class="chip-value">{{ spanHttpResendCount }}</span>
-          </OBadge>
+          </OTag>
         </div>
 
         <div class="tw:flex tw:items-center">
           <!-- Span ID Badge -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             clickable
             class="toolbar-chip span-id-chip tw:mr-[0.325rem]"
             :title="`Span ID: ${span.span_id}`"
@@ -161,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:ml-1 copy-icon"
               data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
             />
-          </OBadge>
+          </OTag>
 
           <!-- View Logs Button -->
           <span v-if="parentMode === 'standalone'" class="tw:shrink-0">
@@ -179,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="viewSpanLogs"
                 data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
               >
-                View Logs
+                {{ t('traces.viewLogs') }}
               </OButton>
               <OTooltip :content="viewLogsTooltipContent" />
             </span>
@@ -199,43 +200,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="tw:flex tw:items-center" style="flex-wrap: nowrap">
           <!-- Model Chip -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             icon="psychology"
             class="llm-chip model-chip"
             :title="span.gen_ai_response_model"
           >
             <span class="chip-value tw:font-bold">{{ span.gen_ai_response_model }}</span>
-          </OBadge>
+          </OTag>
 
           <!-- Token Usage Group -->
           <div class="tokens-group">
             <!-- Input Tokens -->
-            <OBadge
-              size="sm"
+            <OTag
+              type="metricChip"
               class="llm-chip token-chip input-token-chip"
               title="Input Tokens"
             >
               <template #icon><OIcon name="arrow-upward" size="xs" /></template>
               <span class="chip-label">In</span>
               <span class="chip-value">{{ llmMetrics.usage.input }}</span>
-            </OBadge>
+            </OTag>
 
             <!-- Output Tokens -->
-            <OBadge
-              size="sm"
+            <OTag
+              type="metricChip"
               class="llm-chip token-chip output-token-chip"
               title="Output Tokens"
             >
               <template #icon><OIcon name="arrow-downward" size="xs" /></template>
               <span class="chip-label">Out</span>
               <span class="chip-value">{{ llmMetrics.usage.output }}</span>
-            </OBadge>
+            </OTag>
           </div>
 
           <!-- Cost Chip -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             icon="attach-money"
             class="llm-chip cost-chip"
             title="Total Cost"
@@ -243,16 +244,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="chip-value tw:font-bold"
               >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
             >
-          </OBadge>
+          </OTag>
         </div>
 
         <div class="tw:flex tw:items-center">
           <!-- Provider Badge -->
-          <OBadge
+          <OTag
             v-if="span.gen_ai_provider_name"
-            variant="primary"
+            type="metricChip"
             class="provider-badge"
-          >{{ span.gen_ai_provider_name }}</OBadge>
+          >{{ span.gen_ai_provider_name }}</OTag>
         </div>
       </div>
     </div>
@@ -289,13 +290,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:font-normal! tw:gap-1!"
         >
           {{ t('common.error') }}
-          <OBadge
+          <OTag
             v-if="hasExceptionEvents.length"
-            variant="error"
-            size="sm"
-            class="tw:font-normal! tw:text-[10px]!  tw:ml-0 tw:text-[var(--o2-error-tag-text)]! tw:bg-[var(--o2-error-tag-bg)]! tw:rounded!"
+            type="countChip"
+            value="error"
+            class="tw:ml-0"
             data-test="trace-details-sidebar-tabs-error-count"
-          >{{ hasExceptionEvents.length }}</OBadge>
+          >{{ hasExceptionEvents.length }}</OTag>
         </OTab>
         <OTab
           v-if="hasDbSpan"
@@ -342,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
     </div>
     <OSeparator class="tw:w-full" />
-    <div class="span_details_tab-panels  tw:p-2">
+    <div class="span_details_tab-panels tw:h-[calc(100%-6rem)] tw:overflow-hidden tw:p-2">
       <OTabPanels v-model="activeTab"
 grow
 class="tw:h-full tw:overflow-y-auto">
@@ -352,7 +353,7 @@ class="tw:h-full tw:overflow-y-auto">
           name="preview"
           class="llm-preview-panel tw:p-3"
         >
-          <div class="llm-preview-container tw:overflow-x-auto tw:w-full tw:h-full!">
+          <div class="llm-preview-container tw:overflow-hidden tw:overflow-x-auto tw:w-full tw:h-full!">
             <!-- Input and Output Side by Side -->
             <div
               class="tw:flex io-container tw:w-full! tw:h-full!"
@@ -532,7 +533,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
                     v-for="action in filterActions"
                     :key="action.operator"
                     :data-test="`trace-details-sidebar-json-filter-action-${action.operator}`"
-                    class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                    class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
                     @click.stop="
                       $emit('apply-filter-immediately', {
                         field,
@@ -565,8 +566,8 @@ class="tw:h-5! tw:text-[0.75rem]!">
             class="tw:flex-1 tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)]"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tab-content-with-llm-metrics'
-                : 'tab-content-without-llm-metrics'
+                ? 'tw:[height:calc(100vh-312px)]'
+                : 'tw:[height:calc(100vh-276px)]'
             "
             data-test="trace-details-sidebar-attributes-tenstack-table"
           >
@@ -589,7 +590,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
                         v-for="action in filterActions"
                         :key="action.operator"
                         :data-test="`trace-details-sidebar-attr-filter-action-${action.operator}`"
-                        class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                        class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
                         @click.stop="
                           $emit('apply-filter-immediately', {
                             field,
@@ -638,8 +639,8 @@ class="tw:h-5! tw:text-[0.75rem]!">
               class="tw:flex-1 traces-events-table-container tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded"
               :class="
                 isLLMSpan && llmMetrics && span.gen_ai_response_model
-                  ? 'tab-content-with-llm-metrics'
-                  : 'tab-content-without-llm-metrics'
+                  ? 'tw:[height:calc(100vh-312px)]'
+                  : 'tw:[height:calc(100vh-276px)]'
               "
               data-test="trace-details-sidebar-events-table"
             >
@@ -675,8 +676,8 @@ class="tw:h-5! tw:text-[0.75rem]!">
             class="tw:w-full tw:text-center tw:flex tw:items-center tw:justify-center tw:pt-4 tw:font-bold tab-content-dynamic-height"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tab-content-with-llm-metrics'
-                : 'tab-content-without-llm-metrics'
+                ? 'tw:[height:calc(100vh-312px)]'
+                : 'tw:[height:calc(100vh-276px)]'
             "
             data-test="trace-details-sidebar-no-events"
           >
@@ -705,7 +706,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
               data-test="trace-details-sidebar-links-table"
             >
               <thead
-                class="thead-sticky tw:text-left tw:bg-[var(--o2-hover-accent)]"
+                class="thead-sticky tw:text-left tw:bg-(--color-surface-accent)"
               >
                 <tr>
                   <th
@@ -723,14 +724,16 @@ class="tw:h-5! tw:text-[0.75rem]!">
                   v-for="(row, index) in spanLinks"
                   :data-test="`trace-event-detail-link-${index}`"
                   :key="'expand_' + index"
+                  tabindex="0"
                   @click="openReferenceTrace('span', row)"
+                  @keydown="onLinkRowKeydown($event, row)"
                   style="cursor: pointer"
-                  class="pointer"
+                  class="pointer tw:focus-visible:outline-none tw:focus-visible:bg-(--color-surface-accent)"
                 >
                   <td
                     v-for="column in linkColumns"
                     :key="index + '-' + column.name"
-                    class="field_list"
+                    class="tw:p-0 tw:mb-0.5 tw:relative tw:overflow-visible tw:cursor-default"
                     style="cursor: pointer"
                   >
                     <div class="tw:flex tw:flex tw:items-center tw:flex-nowrap">
@@ -746,8 +749,8 @@ class="tw:h-5! tw:text-[0.75rem]!">
             class="tw:w-full tw:flex tw:items-center tw:justify-center tw:text-center tw:pt-4 tw:font-bold tab-content-dynamic-height"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tab-content-with-llm-metrics'
-                : 'tab-content-without-llm-metrics'
+                ? 'tw:[height:calc(100vh-312px)]'
+                : 'tw:[height:calc(100vh-276px)]'
             "
             data-test="trace-details-sidebar-no-links"
           >
@@ -785,8 +788,8 @@ class="tw:h-5! tw:text-[0.75rem]!">
             class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tab-content-with-llm-metrics'
-                : 'tab-content-without-llm-metrics'
+                ? 'tw:[height:calc(100vh-312px)]'
+                : 'tw:[height:calc(100vh-276px)]'
             "
           >
             <div class="tw:text-center">
@@ -843,8 +846,8 @@ class="tw:h-5! tw:text-[0.75rem]!">
             class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tab-content-with-llm-metrics'
-                : 'tab-content-without-llm-metrics'
+                ? 'tw:[height:calc(100vh-312px)]'
+                : 'tw:[height:calc(100vh-276px)]'
             "
           >
             <div class="tw:text-center">
@@ -882,7 +885,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { cloneDeep } from "lodash-es";
-import { formatTimestamp, formatTimestampNs } from "@/utils/date";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref, inject } from "vue";
@@ -935,9 +938,8 @@ import TraceErrorTab from "./components/TraceErrorTab.vue";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
 import {
@@ -945,6 +947,9 @@ import {
   useSpanServiceDetection,
 } from "@/utils/traces/useSpanServiceDetection";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
+
+// luxon equivalent of "MMM DD, YYYY HH:mm:ss.SSS Z" → e.g. "Jun 24, 2026 17:39:32.157 +0530"
+const HUMAN_TZ_FORMAT = "MMM dd, yyyy HH:mm:ss.SSS ZZZ";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1014,7 +1019,7 @@ export default defineComponent({
     TraceErrorTab,
     OSpinner,
     OSwitch,
-    OBadge,
+    OTag,
   },
   emits: [
     "close",
@@ -1223,7 +1228,7 @@ export default defineComponent({
     );
 
     watch(
-      () => props.span,
+      [() => props.span, () => store.state.timezone],
       () => {
         tags.value = {};
         spanDetails.value = getFormattedSpanDetails();
@@ -1321,9 +1326,10 @@ export default defineComponent({
         name: "@timestamp",
         field: "@timestamp",
         prop: (row: any) =>
-          formatTimestampNs(
-            row[store.state.zoConfig.timestamp_column],
-            "MMM DD, YYYY HH:mm:ss.SSS Z",
+          timestampToTimezoneDate(
+            row[store.state.zoConfig.timestamp_column] / 1000000,
+            store.state.timezone,
+            HUMAN_TZ_FORMAT,
           ),
         label: "Timestamp",
         align: "left" as const,
@@ -1383,9 +1389,10 @@ export default defineComponent({
           header: "Timestamp",
           size: eventsColSizes.value[tsCol] ?? 220,
           accessorFn: (row: any) =>
-            formatTimestampNs(
-              row[tsCol],
-              "MMM DD, YYYY HH:mm:ss.SSS Z",
+            timestampToTimezoneDate(
+              row[tsCol] / 1000000,
+              store.state.timezone,
+              HUMAN_TZ_FORMAT,
             ),
           meta: {
             headerClass:
@@ -1478,19 +1485,22 @@ export default defineComponent({
 
       spanDetails.attrs.duration = spanDetails.attrs.duration + "us";
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
-        formatTimestamp(
-          spanDetails.attrs[store.state.zoConfig.timestamp_column],
-          "MMM DD, YYYY HH:mm:ss.SSS Z",
+        timestampToTimezoneDate(
+          spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000,
+          store.state.timezone,
+          HUMAN_TZ_FORMAT,
         );
 
-      spanDetails.attrs["start_time"] = formatTimestampNs(
-        spanDetails.attrs["start_time"],
-        "MMM DD, YYYY HH:mm:ss.SSS Z",
+      spanDetails.attrs["start_time"] = timestampToTimezoneDate(
+        spanDetails.attrs["start_time"] / 1000000,
+        store.state.timezone,
+        HUMAN_TZ_FORMAT,
       );
 
-      spanDetails.attrs["end_time"] = formatTimestampNs(
-        spanDetails.attrs["end_time"],
-        "MMM DD, YYYY HH:mm:ss.SSS Z",
+      spanDetails.attrs["end_time"] = timestampToTimezoneDate(
+        spanDetails.attrs["end_time"] / 1000000,
+        store.state.timezone,
+        HUMAN_TZ_FORMAT,
       );
 
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
@@ -1595,6 +1605,24 @@ export default defineComponent({
         });
 
         emit("open-trace");
+      }
+    };
+
+    // Keyboard access for clickable span-link rows: Enter/Space activate, arrows move focus.
+    const onLinkRowKeydown = (event: KeyboardEvent, row: any) => {
+      if (event.target !== event.currentTarget) return;
+      const currentRow = event.currentTarget as HTMLElement;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openReferenceTrace("span", row);
+      } else if (event.key === "ArrowDown") {
+        event.preventDefault();
+        const next = currentRow.nextElementSibling as HTMLElement | null;
+        if (next?.matches("tr[tabindex]")) next.focus();
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        const prev = currentRow.previousElementSibling as HTMLElement | null;
+        if (prev?.matches("tr[tabindex]")) prev.focus();
       }
     };
 
@@ -2077,6 +2105,7 @@ export default defineComponent({
       copySpanId,
       copyAttributesToClipboard,
       openReferenceTrace,
+      onLinkRowKeydown,
       spanLinks,
       linkColumns,
       getTagRows,
@@ -2101,25 +2130,6 @@ export default defineComponent({
       copyContent,
       formatModelParams,
       getObservationTypeColor,
-      getObservationTypeVariant: (type: string | null | undefined): BadgeVariant => {
-        const color = getObservationTypeColor(type);
-        const map: Record<string, BadgeVariant> = {
-          green: "success",
-          blue: "primary",
-          purple: "primary",
-          orange: "warning",
-          indigo: "primary",
-          cyan: "primary",
-          teal: "primary",
-          pink: "primary",
-          "deep-purple": "primary",
-          "light-blue": "primary",
-          red: "error",
-          grey: "default",
-          amber: "warning",
-        };
-        return map[color] || "default";
-      },
       hasContent,
       sysInstrOpen,
       modelParamsOpen,
@@ -2138,174 +2148,156 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.attributes-view-toggle {
-  :deep(.q-btn) {
-    padding: 0.25rem 0.5rem;
-  }
+<style>
+.attributes-view-toggle .q-btn {
+  padding: 0.25rem 0.5rem;
 }
 
-:deep(.span_details_tab-panels .o-tab-panel) {
+.span_details_tab-panels .o-tab-panel {
   height: 100%;
 }
 
-:deep(.traces-correlated-metrics-container) {
-  .q-splitter--vertical .q-splitter__separator {
-    height: 100% !important;
-  }
-
-  .q-card {
-    box-shadow: none !important;
-    border: 1px solid var(--o2-border) !important;
-  }
-
-  .card-container {
-    box-shadow: none !important;
-  }
-
-  .dimension-sidebar {
-    padding-left: 0.25rem;
-  }
-
-  .dimension-sidebar-search-container {
-    padding: 0.375rem 0.2rem !important;
-  }
+.traces-correlated-metrics-container .q-splitter--vertical .q-splitter__separator {
+  height: 100% !important;
 }
 
-:deep(.traces-correlated-logs-container) {
-  .logs-table-container .container {
-    height: 100% !important;
-  }
+.traces-correlated-metrics-container .q-card {
+  box-shadow: none !important;
+  border: 1px solid var(--o2-border) !important;
 }
 
-:deep(.traces-events-table-container) {
-  .table-container {
-    border-radius: 0 !important;
-  }
+.traces-correlated-metrics-container .card-container {
+  box-shadow: none !important;
 }
 
-.trace-detail-tab-table {
-  table {
-    border-collapse: separate;
-    border-spacing: 0;
-    width: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(0.625rem);
-    border-radius: 0.5rem;
-    border: 0.125rem solid rgba(255, 255, 255, 0.3);
-    overflow: hidden;
-  }
-
-  th,
-  td {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    border-right: 1px solid rgba(255, 255, 255, 0.15);
-    text-align: left;
-    padding: 8px !important;
-    font-size: 13px;
-    word-break: break-word;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    min-height: 24px;
-    height: auto;
-    max-width: 600px;
-  }
-
-  /* Add proper column sizing */
-  th:first-child,
-  td:first-child {
-    width: 200px;
-    min-width: 200px;
-  }
-
-  th:nth-child(2),
-  td:nth-child(2) {
-    width: auto;
-    min-width: 100px;
-  }
-  td span {
-    display: inline-block;
-    width: 100%;
-    word-break: break-word;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    white-space: pre-wrap;
-  }
-
-  th:last-child,
-  td:last-child {
-    border-right: none;
-  }
-
-  tr:last-child td {
-    border-bottom: none;
-  }
-
-  tbody tr:first-child td:first-child {
-    border-top-left-radius: 0.5rem;
-  }
-
-  tbody tr:first-child td:last-child {
-    border-top-right-radius: 0.5rem;
-  }
-
-  tbody tr:last-child td:first-child {
-    border-bottom-left-radius: 0.5rem;
-  }
-
-  tbody tr:last-child td:last-child {
-    border-bottom-right-radius: 0.5rem;
-  }
+.traces-correlated-metrics-container .dimension-sidebar {
+  padding-left: 0.25rem;
 }
 
+.traces-correlated-metrics-container .dimension-sidebar-search-container {
+  padding: 0.375rem 0.2rem !important;
+}
+
+.traces-correlated-logs-container .logs-table-container .container {
+  height: 100% !important;
+}
+
+.traces-events-table-container .table-container {
+  border-radius: 0 !important;
+}
+
+.trace-detail-tab-table table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(0.625rem);
+  border-radius: 0.5rem;
+  border: 0.125rem solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+
+.trace-detail-tab-table th,
+.trace-detail-tab-table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid rgba(255, 255, 255, 0.15);
+  text-align: left;
+  padding: 8px !important;
+  font-size: 13px;
+  word-break: break-word;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-height: 24px;
+  height: auto;
+  max-width: 600px;
+}
+
+/* Add proper column sizing */
+.trace-detail-tab-table th:first-child,
+.trace-detail-tab-table td:first-child {
+  width: 200px;
+  min-width: 200px;
+}
+
+.trace-detail-tab-table th:nth-child(2),
+.trace-detail-tab-table td:nth-child(2) {
+  width: auto;
+  min-width: 100px;
+}
+
+.trace-detail-tab-table td span {
+  display: inline-block;
+  width: 100%;
+  word-break: break-word;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.trace-detail-tab-table th:last-child,
+.trace-detail-tab-table td:last-child {
+  border-right: none;
+}
+
+.trace-detail-tab-table tr:last-child td {
+  border-bottom: none;
+}
+
+.trace-detail-tab-table tbody tr:first-child td:first-child {
+  border-top-left-radius: 0.5rem;
+}
+
+.trace-detail-tab-table tbody tr:first-child td:last-child {
+  border-top-right-radius: 0.5rem;
+}
+
+.trace-detail-tab-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 0.5rem;
+}
+
+.trace-detail-tab-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 0.5rem;
+}
 
 .trace-detail-tab-table table.q-table {
   background: rgba(240, 240, 245, 0.8);
   backdrop-filter: blur(0.625rem);
   border: 0.125rem solid rgba(100, 100, 120, 0.5);
 }
-.attr-text {
-  font-size: 12px;
-  font-family: monospace;
+
+.table-header .table-head-chip {
+  padding: 0px;
+}
+
+.table-header .table-head-chip .q-table th.sortable {
+  cursor: pointer;
+  text-transform: capitalize;
+  font-weight: bold;
+}
+
+.table-header.isClosable {
+  padding-right: 26px;
+  position: relative;
+}
+
+.table-header.isClosable .q-table-col-close {
+  transform: translateX(26px);
+  position: absolute;
+  margin-top: 2px;
+  color: grey;
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
+}
+
+.table-header .q-table th.sortable {
+  cursor: pointer;
+  text-transform: capitalize;
+  font-weight: bold;
+}
+
+.table-header .log_json_content {
   white-space: pre-wrap;
-  word-break: break-word;
 }
-.table-header {
-  // text-transform: capitalize;
 
-  .table-head-chip {
-    padding: 0px;
-
-    .q-table th.sortable {
-      cursor: pointer;
-      text-transform: capitalize;
-      font-weight: bold;
-    }
-  }
-
-  &.isClosable {
-    padding-right: 26px;
-    position: relative;
-
-    .q-table-col-close {
-      transform: translateX(26px);
-      position: absolute;
-      margin-top: 2px;
-      color: grey;
-      transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
-    }
-  }
-
-  .q-table th.sortable {
-    cursor: pointer;
-    text-transform: capitalize;
-    font-weight: bold;
-  }
-
-  .log_json_content {
-    white-space: pre-wrap;
-  }
-}
 .q-table__top {
   padding-left: 0;
   padding-top: 0;
@@ -2333,39 +2325,32 @@ export default defineComponent({
 .q-td {
   overflow: hidden;
   min-width: 100px;
-
-  .expanded {
-    margin: 0;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    word-break: break-all;
-  }
 }
 
-// Cell with max-height and scroll
-.cell-with-max-height {
-  vertical-align: top;
-
-  .cell-content {
-    max-height: 200px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    display: block;
-    word-break: break-word;
-    word-wrap: break-word;
-    white-space: pre-wrap;
-  }
+.q-td .expanded {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-all;
 }
 
-// Hide filter action buttons until the row is hovered
-.filter-cell {
-  .filter-actions {
-    visibility: hidden;
-  }
+/* Hide filter action buttons until the row is hovered */
+.filter-cell .filter-actions {
+  visibility: hidden;
+}
 
-  &:hover .filter-actions {
-    visibility: visible;
-  }
+.filter-cell:hover .filter-actions {
+  visibility: visible;
+}
+
+.cell-with-max-height .cell-content {
+  max-height: 200px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: block;
+  word-break: break-word;
+  word-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .thead-sticky tr > *,
@@ -2383,547 +2368,428 @@ export default defineComponent({
   bottom: 0;
 }
 
-.field_list {
-  padding: 0px;
-  margin-bottom: 0.125rem;
-  position: relative;
-  overflow: visible;
-  cursor: default;
-}
-.span_details_tab-panels {
-  height: calc(100% - 6rem);
-  overflow: hidden;
-}
-
-.header_bg {
+/* Trace Details Toolbar - Modern Styling */
+.trace-details-toolbar-container .toolbar-chip {
+  font-size: 11px;
+  height: 22px;
+  padding: 0 6px;
+  background: white;
+  border: 1px solid #dee2e6;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-// LLM-specific styles
-// Observation Type Badge
-.observation-type-badge {
-  text-transform: none !important;
+.trace-details-toolbar-container .toolbar-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-// Trace Details Toolbar - Modern Styling
-.trace-details-toolbar-container {
-  background: rgba(248, 249, 250, 0.5);
-  // border-bottom: 1px solid #e9ecef;
-  white-space: nowrap;
-
-  .toolbar-chip {
-    font-size: 11px;
-    height: 22px;
-    padding: 0 6px;
-    background: white;
-    border: 1px solid #dee2e6;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    .chip-label {
-      color: #6c757d;
-      font-size: 10px;
-      font-weight: 500;
-      margin-right: 3px;
-    }
-
-    .chip-value {
-      color: #212529;
-      font-weight: 600;
-      font-size: 10px;
-    }
-
-    &.service-chip {
-      border-left: 3px solid #0d6efd;
+.trace-details-toolbar-container .toolbar-chip .chip-label {
+  color: #6c757d;
+  font-size: 10px;
+  font-weight: 500;
+  margin-right: 3px;
 }
 
-    &.duration-chip {
-      border-left: 3px solid #6610f2;
+.trace-details-toolbar-container .toolbar-chip .chip-value {
+  color: #212529;
+  font-weight: 600;
+  font-size: 10px;
 }
 
-    &.ttft-chip {
-      border-left: 3px solid #6f42c1;
+.trace-details-toolbar-container .toolbar-chip.service-chip {
+  border-left: 3px solid #0d6efd;
 }
 
-    &.time-chip {
-      border-left: 3px solid #d63384;
+.trace-details-toolbar-container .toolbar-chip.duration-chip {
+  border-left: 3px solid #6610f2;
 }
 
-    &.span-id-chip {
-      border-left: 3px solid #20c997;
-      cursor: pointer;
-.copy-icon {
-        opacity: 0.6;
-        transition: opacity 0.2s;
-      }
-
-      &:hover .copy-icon {
-        opacity: 1;
-      }
-    }
-  }
-
-  .view-logs-btn {
-    height: 24px;
-    font-size: 10px;
-    font-weight: 600;
-    padding: 0 10px;
-    border-radius: 4px;
-    text-transform: none;
-    flex-shrink: 0;
-  }
-
-  // Scrollbar styling for horizontal scroll
-  > div::-webkit-scrollbar {
-    height: 4px;
-  }
-
-  > div::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  > div::-webkit-scrollbar-thumb {
-    background: #cbd5e0;
-    border-radius: 2px;
-  }
-
-  > div::-webkit-scrollbar-thumb:hover {
-    background: #a0aec0;
-  }
+.trace-details-toolbar-container .toolbar-chip.ttft-chip {
+  border-left: 3px solid #6f42c1;
 }
 
-// LLM Chips - Modern Styling (now integrated into toolbar)
-.trace-details-toolbar-container {
-  .llm-chip {
-    font-size: 10px;
-    height: 20px;
-    padding: 0 6px;
-    background: white;
-    border: 1px solid #dee2e6;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-    }
-
-    .chip-value {
-      font-size: 10px;
-      font-weight: 500;
-    }
-
-    &.model-chip {
-      border-left: 3px solid #ab47bc;
-.chip-value {
-        color: #4a148c;
-        font-weight: 600;
-      }
-    }
-
-    &.token-chip {
-      min-width: 60px;
-      justify-content: center;
-
-      .chip-label {
-        font-size: 9px;
-        font-weight: 500;
-        margin-right: 2px;
-      }
-
-      &.input-token-chip {
-        border-left: 3px solid #42a5f5;
-
-        .OIcon,
-        .chip-label,
-        .chip-value {
-          color: #1565c0;
-        }
-      }
-
-      &.output-token-chip {
-        border-left: 3px solid #66bb6a;
-
-        .OIcon,
-        .chip-label,
-        .chip-value {
-          color: #2e7d32;
-        }
-      }
-    }
-
-    &.cost-chip {
-      border-left: 3px solid #ef6c00;
-.chip-value {
-        color: #e65100;
-        font-weight: 600;
-      }
-    }
-  }
-
-  .tokens-group {
-    display: inline-flex;
-    gap: 3px;
-    flex-shrink: 0;
-  }
-
-  .provider-badge {
-    font-size: 10px;
-    font-weight: 600;
-    padding: 3px 8px;
-    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
-    border-radius: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    flex-shrink: 0;
-  }
-
-  .llm-metrics-row {
-    // Scrollbar styling for horizontal scroll
-    &::-webkit-scrollbar {
-      height: 4px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: #cbd5e0;
-      border-radius: 2px;
-    }
-
-    &::-webkit-scrollbar-thumb:hover {
-      background: #a0aec0;
-    }
-  }
+.trace-details-toolbar-container .toolbar-chip.time-chip {
+  border-left: 3px solid #d63384;
 }
 
-// Dark Mode Styles
-body.body--dark {
-  .trace-details-toolbar-container {
-    background: rgba(45, 55, 72, 0.5);
-    border-bottom-color: #4a5568;
-
-    .llm-metrics-row {
-      border-top-color: #4a5568 !important;
-    }
-
-    .toolbar-chip {
-      background: #1a202c;
-      border-color: #4a5568;
-      color: #e2e8f0;
-
-      .chip-label {
-        color: #a0aec0;
-      }
-
-      .chip-value {
-        color: #e2e8f0;
-      }
-
-      &:hover {
-        background: #2d3748;
-      }
-    }
-  }
-
-  .trace-details-toolbar-container {
-    .llm-chip {
-      background: #1a202c;
-      border-color: #4a5568;
-
-      .chip-value {
-        color: #e2e8f0;
-      }
-
-      &.model-chip {
-        border-left: 3px solid #ab47bc;
-.chip-value {
-          color: #e9d8fd;
-        }
-      }
-
-      &.token-chip {
-        &.input-token-chip {
-          border-left: 3px solid #42a5f5;
-
-          .OIcon,
-          .chip-label,
-          .chip-value {
-            color: #90cdf4;
-          }
-        }
-
-        &.output-token-chip {
-          border-left: 3px solid #66bb6a;
-
-          .OIcon,
-          .chip-label,
-          .chip-value {
-            color: #9ae6b4;
-          }
-        }
-      }
-
-      &.cost-chip {
-        border-left: 3px solid #ef6c00;
-.chip-value {
-          color: #fed7aa;
-        }
-      }
-    }
-
-    .provider-badge {
-      background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
-    }
-  }
+.trace-details-toolbar-container .toolbar-chip.span-id-chip {
+  border-left: 3px solid #20c997;
+  cursor: pointer;
 }
 
-.llm-preview-container {
-  overflow: hidden; // Prevent scroll at panel level
+.trace-details-toolbar-container .toolbar-chip.span-id-chip .copy-icon {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
 
-  .section-label {
-    color: var(--o2-text-primary);
-    font-size: 14px;
-    margin-bottom: 0.5rem;
-  }
+.trace-details-toolbar-container .toolbar-chip.span-id-chip:hover .copy-icon {
+  opacity: 1;
+}
 
-  .io-section {
-    flex: 0 0 calc(50% - 0.4rem); // Fixed 50% width minus half the gap
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
+.trace-details-toolbar-container .view-logs-btn {
+  height: 24px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 10px;
+  border-radius: 4px;
+  text-transform: none;
+  flex-shrink: 0;
+}
 
-  .llm-content-box {
-    flex: 1; // Take all available space
-    height: 100%; // Take full height of parent
-    max-height: calc(
-      100% - 1.625rem
-    ); // Container height minus label/button height (with 2-row toolbar)
-    border: 1px solid var(--o2-border-color);
-    border-radius: 4px;
-    padding: 0.75rem;
-    overflow-y: auto; // Enable scroll inside the box
-    overflow-x: hidden;
-    background-color: var(--o2-code-bg);
+/* Scrollbar styling for horizontal scroll */
+.trace-details-toolbar-container > div::-webkit-scrollbar {
+  height: 4px;
+}
 
-    // Enhance hover visibility for code/text content (exclude VueJsonPretty)
-    ::v-deep {
-      .plain-text-content {
-        &:hover {
-          background-color: rgba(0, 0, 0, 0.04) !important;
-        }
-      }
+.trace-details-toolbar-container > div::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-      // Don't apply hover to VueJsonPretty elements
-      .vjs-tree {
-        * {
-          &:hover {
-            background-color: transparent !important;
-          }
-        }
-      }
-    }
-  }
+.trace-details-toolbar-container > div::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 2px;
+}
 
-  // No data message styling
-  .no-data-message {
-    color: var(--o2-text-secondary);
-    font-style: italic;
-    text-align: center;
-    padding: 2rem;
-    font-size: 14px;
-  }
+.trace-details-toolbar-container > div::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}
 
-  // Fullscreen styles for the entire IO container (both Input and Output side by side)
-  .io-container:fullscreen {
-    background-color: #f5f5f5;
-    padding: 0.75rem;
-    height: 100vh; // Full viewport height in fullscreen
-    max-height: 100vh;
-    display: flex;
-    gap: 0.5rem;
-    align-items: stretch;
+/* LLM Chips - Modern Styling (now integrated into toolbar) */
+.trace-details-toolbar-container .llm-chip {
+  font-size: 10px;
+  height: 20px;
+  padding: 0 6px;
+  background: white;
+  border: 1px solid #dee2e6;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
 
-    .io-section {
-      flex: 1; // Equal split in fullscreen
-      display: flex;
-      flex-direction: column;
+.trace-details-toolbar-container .llm-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
 
-      .section-label {
-        background: #f5f5f5;
-        border-radius: 4px;
-      }
+.trace-details-toolbar-container .llm-chip .chip-value {
+  font-size: 10px;
+  font-weight: 500;
+}
 
-      .llm-content-box {
-        height: calc(100vh - 80px); // Full height minus header in fullscreen
-        max-height: unset; // Remove max-height constraint in fullscreen
-        min-height: unset;
-      }
-    }
-  }
+.trace-details-toolbar-container .llm-chip.model-chip {
+  border-left: 3px solid #ab47bc;
+}
 
-  // Dark mode fullscreen
-  .io-container-dark:fullscreen {
-    background: #1e1e1e; // Dark background for dark mode
+.trace-details-toolbar-container .llm-chip.model-chip .chip-value {
+  color: #4a148c;
+  font-weight: 600;
+}
 
-    .io-section .section-label {
-      background: #1e1e1e;
-      color: #e0e0e0; // Ensure text is visible in dark mode
-    }
-  }
+.trace-details-toolbar-container .llm-chip.token-chip {
+  min-width: 60px;
+  justify-content: center;
+}
 
-  // Dark mode hover visibility
-  .io-container-dark .llm-content-box {
-    ::v-deep {
-      .plain-text-content {
-        &:hover {
-          background-color: rgba(255, 255, 255, 0.05) !important;
-        }
-      }
+.trace-details-toolbar-container .llm-chip.token-chip .chip-label {
+  font-size: 9px;
+  font-weight: 500;
+  margin-right: 2px;
+}
 
-      // Don't apply hover to VueJsonPretty elements in dark mode
-      .vjs-tree {
-        * {
-          &:hover {
-            background-color: transparent !important;
-          }
-        }
-      }
-    }
-  }
+.trace-details-toolbar-container .llm-chip.token-chip.input-token-chip {
+  border-left: 3px solid #42a5f5;
+}
 
-  .model-params-json {
-    background-color: var(--o2-code-bg);
-    padding: 1rem;
-    border-radius: 4px;
-    overflow-x: auto;
-    font-family: monospace;
-    font-size: 12px;
-    margin: 0;
-  }
+.trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .OIcon,
+.trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-label,
+.trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-value {
+  color: #1565c0;
+}
+
+.trace-details-toolbar-container .llm-chip.token-chip.output-token-chip {
+  border-left: 3px solid #66bb6a;
+}
+
+.trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .OIcon,
+.trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-label,
+.trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-value {
+  color: #2e7d32;
+}
+
+.trace-details-toolbar-container .llm-chip.cost-chip {
+  border-left: 3px solid #ef6c00;
+}
+
+.trace-details-toolbar-container .llm-chip.cost-chip .chip-value {
+  color: #e65100;
+  font-weight: 600;
+}
+
+.trace-details-toolbar-container .tokens-group {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.trace-details-toolbar-container .provider-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+/* Scrollbar styling for horizontal scroll in llm-metrics-row */
+.trace-details-toolbar-container .llm-metrics-row::-webkit-scrollbar {
+  height: 4px;
+}
+
+.trace-details-toolbar-container .llm-metrics-row::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.trace-details-toolbar-container .llm-metrics-row::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 2px;
+}
+
+.trace-details-toolbar-container .llm-metrics-row::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}
+
+/* Dark Mode Styles */
+body.body--dark .trace-details-toolbar-container {
+  background: rgba(45, 55, 72, 0.5);
+  border-bottom-color: #4a5568;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-metrics-row {
+  border-top-color: #4a5568 !important;
+}
+
+body.body--dark .trace-details-toolbar-container .toolbar-chip {
+  background: #1a202c;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+body.body--dark .trace-details-toolbar-container .toolbar-chip .chip-label {
+  color: #a0aec0;
+}
+
+body.body--dark .trace-details-toolbar-container .toolbar-chip .chip-value {
+  color: #e2e8f0;
+}
+
+body.body--dark .trace-details-toolbar-container .toolbar-chip:hover {
+  background: #2d3748;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip {
+  background: #1a202c;
+  border-color: #4a5568;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip .chip-value {
+  color: #e2e8f0;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.model-chip {
+  border-left: 3px solid #ab47bc;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.model-chip .chip-value {
+  color: #e9d8fd;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip {
+  border-left: 3px solid #42a5f5;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .OIcon,
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-label,
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-value {
+  color: #90cdf4;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip {
+  border-left: 3px solid #66bb6a;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .OIcon,
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-label,
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-value {
+  color: #9ae6b4;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.cost-chip {
+  border-left: 3px solid #ef6c00;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.cost-chip .chip-value {
+  color: #fed7aa;
+}
+
+body.body--dark .trace-details-toolbar-container .provider-badge {
+  background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
+}
+
+.llm-preview-container .section-label {
+  color: var(--o2-text-primary);
+  font-size: 14px;
+  margin-bottom: 0.5rem;
+}
+
+.llm-preview-container .io-section {
+  flex: 0 0 calc(50% - 0.4rem);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.llm-preview-container .llm-content-box {
+  flex: 1;
+  height: 100%;
+  max-height: calc(100% - 1.625rem);
+  border: 1px solid var(--o2-border-color);
+  border-radius: 4px;
+  padding: 0.75rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-color: var(--o2-code-bg);
+}
+
+.llm-preview-container .llm-content-box .plain-text-content:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+.llm-preview-container .llm-content-box .vjs-tree *:hover {
+  background-color: transparent !important;
+}
+
+.llm-preview-container .no-data-message {
+  color: var(--o2-text-secondary);
+  font-style: italic;
+  text-align: center;
+  padding: 2rem;
+  font-size: 14px;
+}
+
+.llm-preview-container .io-container:fullscreen {
+  background-color: #f5f5f5;
+  padding: 0.75rem;
+  height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.llm-preview-container .io-container:fullscreen .io-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.llm-preview-container .io-container:fullscreen .io-section .section-label {
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.llm-preview-container .io-container:fullscreen .io-section .llm-content-box {
+  height: calc(100vh - 80px);
+  max-height: unset;
+  min-height: unset;
+}
+
+.llm-preview-container .io-container-dark:fullscreen {
+  background: #1e1e1e;
+}
+
+.llm-preview-container .io-container-dark:fullscreen .io-section .section-label {
+  background: #1e1e1e;
+  color: var(--o2-border);
+}
+
+.llm-preview-container .io-container-dark .llm-content-box .plain-text-content:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.llm-preview-container .io-container-dark .llm-content-box .vjs-tree *:hover {
+  background-color: transparent !important;
+}
+
+.llm-preview-container .model-params-json {
+  background-color: var(--o2-code-bg);
+  padding: 1rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: monospace;
+  font-size: 12px;
+  margin: 0;
 }
 </style>
 
-<style lang="scss">
-.span_details_tabs {
-  .q-tab__indicator {
-    display: none;
-  }
-  .q-tab--active {
-    border-bottom: 1px solid var(--q-primary);
-  }
+<style>
+.span_details_tabs .q-tab__indicator {
+  display: none;
 }
 
-.span_details_tab-panels {
-  .q-tab-panel {
-    padding: 8px 8px 8px 8px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    height: 100%;
-  }
+.span_details_tabs .q-tab--active {
+  border-bottom: 1px solid var(--q-primary);
 }
 
-.view-span-logs-btn {
-  .q-btn__content {
-    display: flex;
-    align-items: center;
-    font-size: 12px;
+.span_details_tab-panels .q-tab-panel {
+  padding: 8px 8px 8px 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
 }
+
+.view-span-logs-btn .q-btn__content {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
 }
+
 .highlight {
   background-color: yellow; /* Adjust background color as desired */
 }
 </style>
 
-<style lang="scss">
-// Dark theme support for glassmorphic tables
-.body--dark {
-  .trace-detail-tab-table {
-    table {
-      // background: rgba(255, 255, 255, 0.05);
-      // border: 0.125rem solid rgba(255, 255, 255, 0.3);
-    }
-
-    th,
-    td {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      border-right: 1px solid rgba(255, 255, 255, 0.15);
-    }
-  }
+<style>
+/* Dark theme support for glassmorphic tables */
+.body--dark .trace-detail-tab-table table {
+  /* background: rgba(255, 255, 255, 0.05); */
+  /* border: 0.125rem solid rgba(255, 255, 255, 0.3); */
 }
 
-// Light theme support for glassmorphic tables
-.body--light {
-  .trace-detail-tab-table {
-    table {
-      // background: rgba(240, 240, 245, 0.8);
-      // border: 0.125rem solid rgba(100, 100, 120, 0.5);
-    }
-
-    th,
-    td {
-      border-bottom: 1px solid rgba(100, 100, 120, 0.2);
-      border-right: 1px solid rgba(100, 100, 120, 0.3);
-    }
-  }
-}
-.tab-content-with-llm-metrics {
-  height: calc(100vh - 312px);
-}
-.tab-content-without-llm-metrics {
-  height: calc(100vh - 276px);
+.body--dark .trace-detail-tab-table th,
+.body--dark .trace-detail-tab-table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-// Attributes tab with header button
-.attributes-header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-height: 32px;
-}
-.copy-clipboard-button {
-  min-width: 40px !important;
+/* Light theme support for glassmorphic tables */
+.body--light .trace-detail-tab-table table {
+  /* background: rgba(240, 240, 245, 0.8); */
+  /* border: 0.125rem solid rgba(100, 100, 120, 0.5); */
 }
 
-.tab-content-dynamic-height-with-header {
-  &.tab-content-with-llm-metrics {
-    height: calc(100vh - 348px); // 312px + 36px for button header
-  }
-
-  &.tab-content-without-llm-metrics {
-    height: calc(100vh - 312px); // 276px + 36px for button header
-  }
+.body--light .trace-detail-tab-table th,
+.body--light .trace-detail-tab-table td {
+  border-bottom: 1px solid rgba(100, 100, 120, 0.2);
+  border-right: 1px solid rgba(100, 100, 120, 0.3);
 }
 
-.copy-attributes-btn {
-  opacity: 0.7;
-  transition: all 0.2s;
-  background: var(--o2-hover-accent) !important;
-  border: 1px solid var(--o2-border-color);
-
-  &:hover {
-    opacity: 1;
-  }
+.trace-detail-tab-table th {
+  background-color: #f5f5f5 !important;
 }
 
-.trace-detail-tab-table {
-  th {
-    background-color: #f5f5f5 !important;
-  }
-}
-
-.body--dark {
-  .trace-detail-tab-table {
-    th {
-      background-color: #424242 !important;
-    }
-  }
+.body--dark .trace-detail-tab-table th {
+  background-color: #424242 !important;
 }
 </style>

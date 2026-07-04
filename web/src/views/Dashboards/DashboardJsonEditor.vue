@@ -3,7 +3,7 @@
     :open="open"
     :width="70"
     persistent
-    title="Edit Dashboard JSON"
+    :title="t('dashboard.editJson')"
     :secondary-button-label="t('common.cancel')"
     :primary-button-label="t('common.save')"
     :primary-button-loading="saveJsonLoading"
@@ -11,14 +11,14 @@
     @click:secondary="$emit('update:open', false)"
     @click:primary="saveChanges()"
   >
-  <div data-test="dashboard-json-editor-container" class="dashboard-json-editor tw:flex tw:flex-col tw:h-[calc(100vh-116px)]" :class="store.state.theme === 'dark' ? 'dark-mode' : 'tw:bg-white'">
+  <div data-test="dashboard-json-editor-container" class="tw:w-[70vw] tw:flex tw:flex-col tw:h-[calc(100vh-116px)]" :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-primary-background)' : 'tw:bg-white'">
     <!-- Monaco editor fills remaining space; flex-1 + min-h-0 lets it expand without overflow -->
     <div class="tw:flex-1 tw:min-h-0">
       <query-editor
         data-test="dashboard-json-editor"
         ref="queryEditorRef"
         editor-id="dashboard-json-editor"
-        class="monaco-editor"
+        class="tw:h-full"
         :debounceTime="300"
         v-model:query="jsonContent"
         language="json"
@@ -30,7 +30,7 @@
     <div
       v-if="validationErrors.length > 0"
       data-test="dashboard-json-editor-validation-errors"
-      class="tw:p-3 tw:text-red-500 validation-errors"
+      class="tw:p-3 tw:text-red-500 tw:max-h-[200px] tw:overflow-y-auto"
     >
       <div class="tw:font-bold tw:mb-2">Please fix the following issues:</div>
       <ul class="tw:ml-3">
@@ -173,28 +173,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.dashboard-json-editor {
-  width: 70vw;
-  display: flex;
-  flex-direction: column;
-
-  .dark-mode {
-    background-color: $dark-page;
-  }
-
-  :deep(.monaco-editor) {
-    height: 100%;
-  }
-
-  .validation-errors {
-    max-height: 200px;
-    overflow-y: auto;
-  }
-
-  .no-border {
-    border: none !important;
-  }
-}
-</style>

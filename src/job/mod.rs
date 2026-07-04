@@ -423,6 +423,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         });
     }
 
+    // All nodes need org settings watch for consistent cache
+    tokio::task::spawn(db::organization::org_settings_watch());
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
@@ -460,7 +463,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::alerts::destinations::watch());
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
     tokio::task::spawn(db::alerts::alert::watch());
-    tokio::task::spawn(db::organization::org_settings_watch());
+    // org_settings_watch already started above for all nodes including routers
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
     // Watch needed on queriers (UI APIs) and on whichever node role is the configured
@@ -724,8 +727,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     // The scheduler and startup recovery only run on alert_manager nodes.
+    // Skip entirely when anomaly detection is disabled — no training and no detection.
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_alert_manager() {
+    if LOCAL_NODE.is_alert_manager()
+        && !o2_enterprise::enterprise::common::config::get_config()
+            .anomaly_detection
+            .disabled
+    {
         // Ensure every enabled anomaly config has a live detection trigger after restart.
         // Handles: trigger row missing, or stuck in Processing from a previous crash.
         crate::service::anomaly_detection::recover_detection_triggers_on_startup().await;
@@ -743,7 +751,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(alert_grouping::process_expired_batches());
     tokio::task::spawn(file_downloader::run());
     // Note: Service discovery extraction runs automatically during parquet file processing
-    // See src/job/files/parquet.rs:queue_services_from_parquet for implementation
+    // See src/job/files/parquet.rs:queue_services_from_data_file for implementation
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "service_streams_batch_processor",
@@ -752,6 +760,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
             o2_enterprise::enterprise::service_streams::batch_processor::run_once().await;
         },
         pause_if: !get_o2_config().service_streams.enabled
+    );
+    #[cfg(feature = "enterprise")]
+    spawn_pausable_job!(
+        "gen_ai_agent_registry_batch_processor",
+        get_o2_config()
+            .gen_ai_agent_registry
+            .batch_flush_interval_secs,
+        {
+            o2_enterprise::enterprise::llm_evaluations::agent_registry::run_once().await;
+        }
     );
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(

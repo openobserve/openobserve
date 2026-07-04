@@ -51,12 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <!-- Left: count chips -->
-        <OBadge
+        <OTag
           data-test="traces-count-badge"
-          variant="default"
-          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-4)]! tw:mr-[0.6rem]"
-        >{{ `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}` }}</OBadge>
-        <OBadge
+          type="logsResultChip"
+          value="neutral"
+          class="tw:mr-[0.6rem]"
+        >{{ `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}` }}</OTag>
+        <OTag
           v-if="
             searchObj.data.queryResults.errorCount != null &&
             searchObj.data.queryResults.errorCount > 0
@@ -65,7 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="error"
           :clickable="true"
           class="tw:text-xs tw:rounded! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]!"
-          :class="!showErrorOnly ? 'tw:bg-[var(--o2-error-tag-bg)]! tw:text-[var(--o2-error-tag-text)]!' : ''"
+          :class="showErrorOnly
+            ? 'tw:bg-badge-error-solid-bg! tw:text-badge-error-solid-text!'
+            : 'tw:bg-[var(--o2-error-tag-bg)]! tw:text-[var(--o2-error-tag-text)]!'"
           @click="toggleErrorOnly"
         >
           {{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}
@@ -76,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trailing>
             <OIcon name="filter-alt" size="xs" class="tw:shrink-0" />
           </template>
-        </OBadge>
+        </OTag>
 
         <div class="tw:flex-1" />
 
@@ -172,12 +175,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort-by="searchObj.meta.resultGrid.sortBy"
           :sort-order="searchObj.meta.resultGrid.sortOrder"
           :search-mode="searchObj.meta.searchMode"
+          :ai-enabled="aiEnabled"
+          :stream-doc-time-range="streamDocTimeRange"
+          :query-window-us="queryWindowUs"
           @row-click="expandRowDetail"
           @page-change="changePage"
           @rows-per-page-change="changeRowsPerPage"
           @sort-change="changeSortBy"
-          @widen-range="(p) => $emit('widen-range', p)"
           @remove-filter="$emit('remove-filter')"
+          @jump-to-stream-data="(from, to) => $emit('jump-to-stream-data', from, to)"
+          @ask-ai="$emit('ask-ai')"
+          @send-to-ai-chat="(v) => $emit('send-to-ai-chat', v)"
         />
       </div>
     </div>
@@ -207,7 +215,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -217,7 +225,7 @@ export default defineComponent({
     OTooltip,
     OSelect,
     OPagination,
-    OBadge,
+    OTag,
     TracesSearchResultList,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
@@ -229,6 +237,18 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    aiEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    streamDocTimeRange: {
+      type: Object,
+      default: undefined,
+    },
+    queryWindowUs: {
+      type: Object,
+      default: undefined,
+    },
   },
   emits: [
     "update:scroll",
@@ -239,9 +259,11 @@ export default defineComponent({
     "get:traceDetails",
     "metrics:filters-updated",
     "run-query",
-    "widen-range",
     "remove-filter",
+    "jump-to-stream-data",
     "error-only-toggled",
+    "ask-ai",
+    "send-to-ai-chat",
   ],
   methods: {
     toggleErrorOnly() {
@@ -439,34 +461,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-@import "@/styles/pagination.scss";
-/* ── Traces list section ─────────────────────────────────────────────────── */
-.traces-section {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.traces-section-header {
-  flex-shrink: 0;
-  min-height: 40px;
-  border-top: 1px solid rgba(0, 0, 0, 0.07);
-  padding: 4px 8px;
-}
-
-/* Scrollable area that holds the column header + rows */
-.traces-table-scroll-area {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: auto;
-  position: relative;
-}
-
-/* ── Leftover table styles (kept for backward compat) ────────────────────── */
-.max-result {
-  width: 170px;
-}
-</style>

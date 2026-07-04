@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="tableRendererRef"
           :data="tableRendererData"
           :config="panelSchema.config"
+          :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
           @row-click="onChartClick"
         />
         <TableRenderer
@@ -65,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             panelSchema.config?.table_pagination && !store.state.printMode
           "
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
+          :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -115,23 +117,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div
+        v-if="metricItems.length && !noData && !loading"
+        style="position: absolute; inset: 0; pointer-events: none; z-index: 8"
+        data-test="dashboard-metric-copy-overlay"
+      >
+        <div
+          v-for="m in metricItems"
+          :key="m.idx"
+          style="position: absolute; pointer-events: auto"
+          :style="metricZoneStyle(m)"
+          @mouseenter="hoveredMetricIdx = m.idx"
+          @mouseleave="hoveredMetricIdx = null"
+        >
+          <OButton
+            v-show="hoveredMetricIdx === m.idx || metricCopiedIdx === m.idx"
+            variant="ghost"
+            size="icon-xs-sq"
+            style="position: absolute"
+            :style="metricIconStyle(m)"
+            @click="copyMetricItem(m)"
+            data-test="dashboard-metric-copy-btn"
+            :data-copied="metricCopiedIdx === m.idx ? 'true' : undefined"
+          >
+            <OIcon
+              :name="metricCopiedIdx === m.idx ? 'check' : 'content-copy'"
+              size="sm"
+            />
+          </OButton>
+        </div>
+      </div>
+      <OEmptyState
         v-if="
+          noData &&
           !errorDetail?.message &&
           panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
           !loading
         "
-        class="noData"
+        size="inline"
+        icon="bar-chart"
+        :title="noData"
+        :backdrop="false"
         data-test="no-data"
-      >
-        {{ noData }}
-      </div>
+        class="noData tw:absolute! tw:inset-0 tw:w-full tw:h-full tw:!min-h-0 tw:!p-2 tw:[container-type:size]"
+      />
       <div
         v-if="
           errorDetail?.message &&
           !panelSchema?.error_config?.custom_error_handeling
         "
-        class="errorMessage"
+        class="tw:absolute tw:top-[20%] tw:w-full tw:h-[80%] tw:overflow-hidden tw:text-center tw:text-ellipsis"
         data-test="panel-schema-renderer-error-message"
       >
         <OIcon size="md" name="warning" />
@@ -150,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !panelSchema?.error_config?.default_data_on_error &&
           panelSchema?.error_config?.custom_error_message
         "
-        class="customErrorMessage"
+        class="tw:absolute tw:top-[20%] tw:w-full tw:h-[80%] tw:overflow-hidden tw:text-center tw:text-ellipsis"
         data-test="panel-schema-renderer-custom-error-message"
       >
         {{ panelSchema?.error_config?.custom_error_message }}
@@ -164,74 +199,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loadingProgressPercentage="loadingProgressPercentage"
         />
       </div>
+
       <div
-        v-if="isCursorOverPanel"
-        class="tw:flex tw:items-center q-gutter-x-xs"
-        style="
-          position: absolute;
-          top: 0px;
-          right: 0px;
-          z-index: 9;
-          padding-right: 2px;
-          padding-top: 2px;
-        "
-        @click.stop
-      >
-        <OButton
-          v-if="
-            showLegendsButton &&
-            noData !== 'No Data' &&
-            ![
-              'table',
-              'html',
-              'markdown',
-              'custom_chart',
-              'geomap',
-              'maps',
-              'heatmap',
-              'metric',
-              'gauge',
-            ].includes(panelSchema.type)
-          "
-          variant="outline"
-          size="icon-circle"
-          @click="$emit('show-legends')"
-          icon-left="format-list-bulleted"
-          data-test="dashboard-show-legends-btn"
-        >
-          <OTooltip content="Show Legends" side="top" align="end" />
-        </OButton>
-        <OButton
-          v-if="
-            [
-              'area',
-              'area-stacked',
-              'bar',
-              'h-bar',
-              'line',
-              'scatter',
-              'stacked',
-              'h-stacked',
-            ].includes(panelSchema.type) &&
-            checkIfPanelIsTimeSeries === true &&
-            allowAnnotationsAdd &&
-            !viewOnly
-          "
-          data-test="panel-schema-renderer-annotation-button"
-          variant="outline"
-          size="icon-circle"
-          @click="toggleAddAnnotationMode"
-        >
-          <template #icon-left
-            ><OIcon :name="isAddAnnotationMode ? 'cancel' : 'edit'" size="sm"
-          /></template>
-          <OTooltip :content="isAddAnnotationMode ? 'Exit Annotations Mode' : 'Add Annotations'" side="top" align="end" />
-        </OButton>
-      </div>
-      <div
-        class="crosslink-drilldown-menu"
+        class="tw:absolute tw:z-9999999 tw:min-w-50 tw:py-1 tw:px-0 tw:hidden tw:whitespace-nowrap tw:top-0 tw:left-0 tw:rounded tw:border tw:border-(--o2-border) tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
         :class="{
-          'crosslink-drilldown-menu--dark': store.state.theme === 'dark',
+          'tw:group/menu tw:bg-[#2c2c2c] tw:border-[#404040] tw:shadow-[0_2px_8px_rgba(0,0,0,0.4)] crosslink-drilldown-menu--dark': store.state.theme === 'dark',
+          'tw:bg-white': store.state.theme !== 'dark',
         }"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
@@ -249,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
           <div
-            class="crosslink-drilldown-menu-item"
+            class="tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:transition-colors tw:duration-200 tw:text-sm tw:text-[#333] tw:hover:bg-[#f5f5f5] tw:active:bg-(--o2-border) tw:group-[.crosslink-drilldown-menu--dark]/menu:text-[var(--o2-border)] tw:group-[.crosslink-drilldown-menu--dark]/menu:hover:bg-[#383838] tw:group-[.crosslink-drilldown-menu--dark]/menu:active:bg-[#444444]"
             :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >
@@ -258,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:mr-2"
               :name="drilldown._isCrossLink ? 'open-in-new' : 'link'"
             />
-            <span>{{ drilldown.name }}</span>
+            <span class="tw:select-none">{{ drilldown.name }}</span>
           </div>
         </template>
       </div>
@@ -277,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           overflow-wrap: break-word;
           z-index: 9999999;
         "
-        :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+        :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-bg-card-dark,#1a1a1a)' : 'tw:bg-white'"
         ref="annotationPopupRef"
       >
         <div
@@ -382,9 +355,10 @@ const MarkdownRenderer = defineAsyncComponent(() => {
 const AddAnnotation = defineAsyncComponent(() => {
   return import("./addPanel/AddAnnotation.vue");
 });
-const CustomChartRenderer = defineAsyncComponent(() => {
-  return import("./panels/CustomChartRenderer.vue");
-});
+// Statically imported by several route-level components, so it cannot be
+// code-split into its own chunk — import it statically to avoid the mixed
+// dynamic/static import build warning.
+import CustomChartRenderer from "./panels/CustomChartRenderer.vue";
 
 const AlertContextMenu = defineAsyncComponent(() => {
   return import("./AlertContextMenu.vue");
@@ -393,6 +367,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import { copyToClipboard } from "@/utils/clipboard";
+import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
@@ -412,7 +389,8 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
-},
+    OEmptyState,
+  },
   props: {
     selectedTimeObj: {
       required: true,
@@ -457,6 +435,11 @@ export default defineComponent({
     },
     allowAnnotationsAdd: {
       default: false,
+      required: false,
+      type: Boolean,
+    },
+    allowAnnotationsAPI: {
+      default: true,
       required: false,
       type: Boolean,
     },
@@ -598,6 +581,61 @@ export default defineComponent({
       isCursorOverPanel.value = true;
     };
 
+    // Metric chart: one copy icon per rendered value (multi-SQL renders many).
+    // Values are already unit/decimal/timestamp formatted at the metric level;
+    // _metricLayout gives the canvas pixel position so the icon sits beside it.
+    const metricItems = computed(() => {
+      if (props.panelSchema?.type !== "metric") return [];
+      const series = panelData.value?.options?.series ?? [];
+      return series
+        .map((s: any, idx: number) => ({
+          idx,
+          text: s?._metricText,
+          layout: s?._metricLayout,
+        }))
+        .filter((m: any) => {
+          if (!m.layout || m.text == null || String(m.text).trim() === "")
+            return false;
+          const num = parseFloat(
+            String(m.text).replace(/,/g, "").replace(/[^0-9.eE+-]/g, ""),
+          );
+          return Number.isNaN(num) || num !== 0;
+        });
+    });
+    // Hover zone = each value's grid cell.
+    const metricZoneStyle = (m: any) => ({
+      left: `${m.layout.left}px`,
+      top: `${m.layout.top}px`,
+      width: `${m.layout.width}px`,
+      height: `${m.layout.height}px`,
+    });
+    // Fixed copy-button width (icon-xs-sq), matching the table chart.
+    const COPY_BTN_PX = 28;
+    // Sit just past the number's measured right edge, clamped inside the cell.
+    // Measuring (vs estimating) keeps the icon off the digits for any value.
+    const metricIconStyle = (m: any) => {
+      const fs = m.layout?.fontSize || 24;
+      const textWidth = calculateWidthText(String(m.text), `${fs}px`);
+      const left = m.layout.cx - m.layout.left + textWidth / 2 + 2;
+      const maxLeft = m.layout.width - COPY_BTN_PX - 2;
+      return {
+        left: `${Math.min(left, maxLeft)}px`,
+        top: `${m.layout.cy - m.layout.top}px`,
+        transform: "translateY(-50%)",
+      };
+    };
+    const hoveredMetricIdx = ref<number | null>(null);
+    const metricCopiedIdx = ref<number | null>(null);
+    const copyMetricItem = (m: any) => {
+      if (m.text == null) return;
+      copyToClipboard(String(m.text), { silent: true }).then(() => {
+        metricCopiedIdx.value = m.idx;
+        setTimeout(() => {
+          if (metricCopiedIdx.value === m.idx) metricCopiedIdx.value = null;
+        }, 3000);
+      });
+    };
+
     // get refs from props
     const {
       panelSchema,
@@ -609,6 +647,7 @@ export default defineComponent({
       folderId,
       reportId,
       allowAnnotationsAdd,
+      allowAnnotationsAPI,
       allowAlertCreation,
       runId,
       tabId,
@@ -653,6 +692,7 @@ export default defineComponent({
       folderName,
       shouldRefreshWithoutCache,
       regionClusterParams,
+      allowAnnotationsAPI,
     );
 
     const {
@@ -1562,22 +1602,16 @@ export default defineComponent({
       emit("is-partial-data-update", newValue);
     });
 
-    // Computed property for table data with logging
     const tableRendererData = computed(() => {
       if (panelSchema.value.type === "table") {
-        let tableData;
-
         if (panelSchema.value.queryType === "promql") {
           // For PromQL tables, the data is in panelData.options (same as pie/donut)
           // The TableConverter returns {columns, rows, ...} which gets placed in options
-          tableData = panelData.value?.options || { rows: [], columns: [] };
+          return panelData.value?.options || { rows: [], columns: [] };
         } else if (panelData.value?.chartType == "table") {
-          tableData = panelData.value;
-        } else {
-          tableData = { options: { backgroundColor: "transparent" } };
+          return panelData.value;
         }
-
-        return tableData;
+        return { options: { backgroundColor: "transparent" } };
       }
       return { options: { backgroundColor: "transparent" } };
     });
@@ -1616,6 +1650,12 @@ export default defineComponent({
       panelsList,
       isCursorOverPanel,
       showPopupsAndOverlays,
+      metricItems,
+      metricZoneStyle,
+      metricIconStyle,
+      hoveredMetricIdx,
+      metricCopiedIdx,
+      copyMetricItem,
       downloadDataAsCSV,
       downloadDataAsJSON,
       getPanelCsvData: (title: string) => {
@@ -1632,7 +1672,6 @@ export default defineComponent({
             ? filteredData.value
             : data.value;
         console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
-        console.log(chartData);
         console.groupEnd();
       },
       loadingProgressPercentage,
@@ -1649,93 +1688,15 @@ export default defineComponent({
   },
 });
 </script>
-
 <style lang="scss" scoped>
-// Cross-link drilldown popup — matches AlertContextMenu.vue exactly
-.crosslink-drilldown-menu {
-  position: absolute;
-  z-index: 9999999;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
-  padding: 4px 0;
-  display: none;
-  white-space: nowrap;
-  top: 0;
-  left: 0;
-}
-
-.crosslink-drilldown-menu-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 16px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  font-size: 14px;
-  color: #333;
-
-  &:hover {
-    background-color: #f5f5f5;
+// When the panel is too short to comfortably fit the icon, hide it and show
+// just the centered "No Data" message. Kept as scoped CSS because this is a
+// container query targeting a deep descendant rendered by OEmptyState — it
+// cannot be expressed as an inline Tailwind utility. The container itself and
+// its min-height/padding overrides are applied inline on the OEmptyState above.
+@container (max-height: 5rem) {
+  .noData :deep(.o2-empty-state__inline-icon) {
+    display: none;
   }
-
-  &:active {
-    background-color: #e0e0e0;
-  }
-
-  span {
-    user-select: none;
-  }
-}
-
-.crosslink-drilldown-menu--dark {
-  background: #2c2c2c;
-  border-color: #404040;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-
-.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item {
-  color: #e0e0e0;
-}
-
-.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item:hover {
-  background-color: #383838;
-}
-
-.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item:active {
-  background-color: #444444;
-}
-
-.drilldown-item:hover {
-  background-color: rgba(202, 201, 201, 0.908);
-}
-
-.errorMessage {
-  position: absolute;
-  top: 20%;
-  width: 100%;
-  height: 80%;
-  overflow: hidden;
-  text-align: center;
-  // color: rgba(255, 0, 0, 0.8);
-  text-overflow: ellipsis;
-}
-
-.customErrorMessage {
-  position: absolute;
-  top: 20%;
-  width: 100%;
-  height: 80%;
-  overflow: hidden;
-  text-align: center;
-  text-overflow: ellipsis;
-}
-
-.noData {
-  position: absolute;
-  top: 20%;
-  width: 100%;
-  text-align: center;
 }
 </style>

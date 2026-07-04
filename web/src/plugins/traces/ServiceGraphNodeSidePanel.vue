@@ -26,9 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-right>
       <div class="tw:flex tw:items-center tw:gap-2">
-        <span class="health-badge" :class="serviceHealth.status">
-          {{ serviceHealth.text }}
-        </span>
+        <OTag type="serviceStatus" :value="serviceHealth.status" data-test="service-health-badge">{{ serviceHealth.text }}</OTag>
         <ODropdown side="bottom" align="start">
           <template #trigger>
             <OButton
@@ -55,11 +53,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Content Scrollable Area -->
-      <div class="panel-content">
+      <div class="panel-content tw:flex-1 tw:overflow-y-auto tw:overflow-x-hidden tw:bg-[#0f1419] tw:p-2.5">
         <!-- RED Charts Section -->
         <div
           v-if="streamFilter !== 'all' && dashboardData"
-          class="panel-section red-charts-section tw:flex tw:flex-col tw:mb-0!"
+          class="panel-section red-charts-section tw:flex tw:flex-col tw:p-0 tw:mb-0!"
           data-test="service-graph-side-panel-red-charts"
         >
           <!-- DataZoom filter chips + View in Traces button -->
@@ -134,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <RenderDashboardCharts
                 ref="dashboardChartsRef"
                 :viewOnly="true"
+                :frame="false"
                 :dashboardData="dashboardData || {}"
                 :currentTimeObj="currentTimeObj"
                 :allowAlertCreation="false"
@@ -144,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <OSeparator class="tw:my-[1rem]!" />
+        <OSeparator v-if="streamFilter !== 'all' && dashboardData" class="tw:my-[1rem]!" />
         <!-- Tabs: Operations / Nodes / Pods -->
         <template v-if="streamFilter !== 'all'">
           <div
@@ -266,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :enable-text-highlight="false"
                     :enable-status-bar="false"
                     :enable-ai-context-button="false"
-                    :row-height="28"
+                    :row-height="38"
                     @sort-change="handleSortChange"
                     @click:data-row="
                       (row: any) =>
@@ -287,34 +286,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                     </template>
                     <template #cell-p99="{ item }">
-                      <span
-                        :class="
-                          item.p99 > 0
-                            ? 'tw:text-[var(--o2-latency-p99)]'
-                            : ''
-                        "
-                        >{{ formatOperationLatency(item.p99) }}</span
-                      >
+                      <ServiceCatalogBarCell
+                        :value="item.p99"
+                        :max="rowMaxes(sortedOperationsTableRows, ['p99']).p99"
+                        :label="formatOperationLatency(item.p99)"
+                        variant="warning"
+                      />
                     </template>
                     <template #cell-p95="{ item }">
-                      <span
-                        :class="
-                          item.p95 > 0
-                            ? 'tw:text-[var(--o2-latency-p95)]'
-                            : ''
-                        "
-                        >{{ formatOperationLatency(item.p95) }}</span
-                      >
+                      <ServiceCatalogBarCell
+                        :value="item.p95"
+                        :max="rowMaxes(sortedOperationsTableRows, ['p95']).p95"
+                        :label="formatOperationLatency(item.p95)"
+                      />
                     </template>
                     <template #cell-p75="{ item }">
-                      <span
-                        :class="
-                          item.p75 > 0
-                            ? 'tw:text-[var(--o2-latency-p75)]'
-                            : ''
-                        "
-                        >{{ formatOperationLatency(item.p75) }}</span
-                      >
+                      <ServiceCatalogBarCell
+                        :value="item.p75"
+                        :max="rowMaxes(sortedOperationsTableRows, ['p75']).p75"
+                        :label="formatOperationLatency(item.p75)"
+                      />
                     </template>
                     <template #cell-actions="{ row, column, active }">
                       <OButton
@@ -354,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="cfg in activeResourceTabConfigs"
               :key="cfg.id"
               :name="cfg.id"
-              class="tw:p-0! panel-section"
+              class="tw:p-0! panel-section tw:mb-3"
               :data-test="`service-graph-side-panel-${cfg.id}`"
             >
               <div
@@ -381,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :enable-text-highlight="false"
                   :enable-status-bar="false"
                   :enable-ai-context-button="false"
-                  :row-height="28"
+                  :row-height="38"
                   @sort-change="handleSortChange"
                   @click:data-row="
                     (row: any) =>
@@ -424,34 +415,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                   </template>
                   <template #cell-p99="{ item }">
-                    <span
-                      :class="
-                        item.p99 > 0
-                          ? 'tw:text-[var(--o2-latency-p99)]'
-                          : ''
-                      "
-                      >{{ formatOperationLatency(item.p99) }}</span
-                    >
+                    <ServiceCatalogBarCell
+                      :value="item.p99"
+                      :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p99']).p99"
+                      :label="formatOperationLatency(item.p99)"
+                      variant="warning"
+                    />
                   </template>
                   <template #cell-p95="{ item }">
-                    <span
-                      :class="
-                        item.p95 > 0
-                          ? 'tw:text-[var(--o2-latency-p95)]'
-                          : ''
-                      "
-                      >{{ formatOperationLatency(item.p95) }}</span
-                    >
+                    <ServiceCatalogBarCell
+                      :value="item.p95"
+                      :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p95']).p95"
+                      :label="formatOperationLatency(item.p95)"
+                    />
                   </template>
                   <template #cell-p75="{ item }">
-                    <span
-                      :class="
-                        item.p75 > 0
-                          ? 'tw:text-[var(--o2-latency-p75)]'
-                          : ''
-                      "
-                      >{{ formatOperationLatency(item.p75) }}</span
-                    >
+                    <ServiceCatalogBarCell
+                      :value="item.p75"
+                      :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p75']).p75"
+                      :label="formatOperationLatency(item.p75)"
+                    />
                   </template>
                   <template #empty>
                     <div
@@ -565,6 +548,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -611,6 +595,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { toast } from "@/lib/feedback/Toast/useToast";
+import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -841,6 +826,7 @@ const envLabel = (envKey: string): string =>
 export default defineComponent({
   name: "ServiceGraphNodeSidePanel",
   components: {
+    OTag,
     OSeparator,
     OTabs,
     OTab,
@@ -857,6 +843,7 @@ export default defineComponent({
     OTooltip,
     OCheckbox,
     OIcon,
+    ServiceCatalogBarCell,
 },
   props: {
     selectedNode: {
@@ -2342,6 +2329,14 @@ export default defineComponent({
      return ['p99','p95','p75'].includes(column);
     }
 
+    function rowMaxes(rows: any[], fields: string[]): Record<string, number> {
+      const result: Record<string, number> = {};
+      for (const f of fields) {
+        result[f] = rows.reduce((m, r) => Math.max(m, r[f] ?? 0), 0) || 1;
+      }
+      return result;
+    }
+
     return {
       t,
       serviceMetrics,
@@ -2403,690 +2398,102 @@ export default defineComponent({
       handleSortChange,
       sortResourceRows,
       formatOperationLatency,
-      isDurationColumn
+      isDurationColumn,
+      rowMaxes,
     };
   },
 });
 </script>
 
-<style scoped lang="scss">
-.health-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-
-  &::before {
-    content: "●";
-    font-size: 10px;
-  }
-
-  &.healthy {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-  }
-
-  &.degraded {
-    background: rgba(251, 191, 36, 0.15);
-    color: #fbbf24;
-  }
-
-  &.critical {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
-  }
-
-  &.warning {
-    background: rgba(249, 115, 22, 0.15);
-    color: #f97316;
-  }
+<style>
+.health-badge::before {
+  content: "●";
+  font-size: 10px;
 }
 
-.body--light .health-badge {
-  &.healthy {
-    background: rgba(16, 185, 129, 0.08);
-    color: #059669;
-  }
-
-  &.degraded {
-    background: rgba(251, 191, 36, 0.08);
-    color: #d97706;
-  }
-
-  &.critical {
-    background: rgba(239, 68, 68, 0.08);
-    color: #dc2626;
-  }
-
-  &.warning {
-    background: rgba(249, 115, 22, 0.08);
-    color: #ea580c;
-  }
+.health-badge.healthy {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
 }
 
-// Actions Section (moved to content area)
-.actions-section {
-  display: flex;
-  gap: 8px;
-  padding: 0;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-
-  .action-btn {
-    width: 35%;
-    padding: 8px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    border: 1px solid #2d3548;
-    color: #e4e7eb;
-    background: #242938;
-    transition: all 0.2s;
-
-    &:hover {
-      background: #1a1f2e;
-      border-color: #3b82f6;
-      transform: translateY(-1px);
-    }
-  }
+.health-badge.degraded {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
 }
 
-.view-traces-btn {
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 16px;
+.health-badge.critical {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.health-badge.warning {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+}
+
+.body--light .health-badge.healthy {
+  background: rgba(16, 185, 129, 0.08);
+  color: #059669;
+}
+
+.body--light .health-badge.degraded {
+  background: rgba(251, 191, 36, 0.08);
+  color: #d97706;
+}
+
+.body--light .health-badge.critical {
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
+}
+
+.body--light .health-badge.warning {
+  background: rgba(249, 115, 22, 0.08);
+  color: #ea580c;
+}
+
+.panel-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.panel-content::-webkit-scrollbar-track {
+  background: #1a1f2e;
+}
+
+.panel-content::-webkit-scrollbar-thumb {
+  background: #242938;
   border-radius: 4px;
-  padding: 0px 12px;
-  min-width: 90px;
-  transition:
-    box-shadow 0.3s ease,
-    opacity 0.2s ease;
-  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
-
-  &:hover {
-    opacity: 0.8;
-    box-shadow: 0 0 7px
-      color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
-  }
 }
 
-.body--light .actions-section .action-btn {
-  border-color: #e0e0e0;
-  color: #333;
-  background: #f9f9f9;
-
-  &:hover {
-    background: #ffffff;
-    border-color: #3b82f6;
-  }
-}
-
-.panel-content {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  background: #0f1419;
-  padding: 0.625rem;
-
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: #1a1f2e;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #242938;
-    border-radius: 4px;
-
-    &:hover {
-      background: #2d3548;
-    }
-  }
+.panel-content::-webkit-scrollbar-thumb:hover {
+  background: #2d3548;
 }
 
 .body--light .panel-content {
   background: #ffffff;
-
-  &::-webkit-scrollbar-track {
-    background: #f8f9fa;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #e0e0e0;
-
-    &:hover {
-      background: #d0d0d0;
-    }
-  }
 }
 
-.operation-row {
-  transition: background 0.15s ease;
-
-  &:hover {
-    background: rgba(99, 102, 241, 0.1);
-
-    .operation-link-icon {
-      opacity: 1 !important;
-    }
-  }
-
-  .operation-link-icon {
-    opacity: 0;
-    color: var(--o2-text-secondary);
-    transition: opacity 0.15s ease;
-  }
+.body--light .panel-content::-webkit-scrollbar-track {
+  background: #f8f9fa;
 }
 
-.body--light .operation-row:hover {
-  background: rgba(99, 102, 241, 0.07);
+.body--light .panel-content::-webkit-scrollbar-thumb {
+  background: var(--o2-border);
 }
 
-.panel-section {
-  padding: 0;
-  margin-bottom: 12px;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-
-  .section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-  }
-
-  .section-header-actions {
-    display: flex;
-    gap: 6px;
-  }
-
-  .section-title {
-    font-size: 14px;
-    font-weight: 600;
-    text-transform: none;
-    letter-spacing: 0;
-    color: #e4e7eb;
-  }
+.body--light .panel-content::-webkit-scrollbar-thumb:hover {
+  background: #d0d0d0;
 }
 
-.body--light .panel-section .section-title {
-  color: #202124;
+.panel-section:last-child {
+  margin-bottom: 0;
 }
 
-.metrics-section {
-  // Full-width card for total requests (single line)
-  .metric-card-full {
-    padding: 10px 12px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #242938 0%, #1f2937 100%);
-    border: 1px solid #374151;
-    margin-bottom: 12px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow:
-        0 6px 12px rgba(0, 0, 0, 0.2),
-        0 0 0 1px rgba(99, 102, 241, 0.3);
-      border-color: rgba(99, 102, 241, 0.4);
-    }
-
-    .metric-single-line {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-
-      .metric-total {
-        display: flex;
-        align-items: baseline;
-        gap: 6px;
-        padding: 6px 10px;
-        border-radius: 6px;
-        background: linear-gradient(
-          135deg,
-          rgba(99, 102, 241, 0.08),
-          rgba(99, 102, 241, 0.02)
-        );
-        border: 1px solid rgba(99, 102, 241, 0.15);
-
-        .total-label {
-          font-size: 12px;
-          font-weight: 600;
-          color: #a5b4fc;
-        }
-
-        .total-value {
-          font-size: 16px;
-          font-weight: 700;
-          color: #e0e7ff;
-          letter-spacing: -0.02em;
-        }
-
-        .total-unit {
-          font-size: 10px;
-          font-weight: 500;
-          color: #a5b4fc;
-        }
-      }
-
-      .metric-divider {
-        width: 1px;
-        height: 20px;
-        background: #374151;
-      }
-
-      .metric-inline {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        padding: 4px 8px;
-        border-radius: 4px;
-        transition: all 0.2s ease;
-        flex: 1;
-
-        &.incoming {
-          color: #a5b4fc;
-          background: linear-gradient(
-            135deg,
-            rgba(99, 102, 241, 0.1),
-            rgba(99, 102, 241, 0.02)
-          );
-          border: 1px solid rgba(99, 102, 241, 0.15);
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(99, 102, 241, 0.15),
-              rgba(99, 102, 241, 0.05)
-            );
-            box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
-          }
-        }
-
-        &.outgoing {
-          color: #a5b4fc;
-          background: linear-gradient(
-            135deg,
-            rgba(99, 102, 241, 0.1),
-            rgba(99, 102, 241, 0.02)
-          );
-          border: 1px solid rgba(99, 102, 241, 0.15);
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(99, 102, 241, 0.15),
-              rgba(99, 102, 241, 0.05)
-            );
-            box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
-          }
-        }
-
-        .inline-value {
-          font-size: 14px;
-          font-weight: 700;
-          letter-spacing: -0.01em;
-        }
-      }
-    }
-
-    // Horizontal divider between top and bottom rows
-    .metric-horizontal-divider {
-      width: 100%;
-      height: 1px;
-      background: #374151;
-      margin: 10px 0 8px 0;
-    }
-
-    // Bottom row for error rate and p95 latency
-    .metric-bottom-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-
-      .metric-inline-item {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 8px;
-        border-radius: 4px;
-        transition: all 0.2s ease;
-
-        // Status-based styling
-        &.status-healthy {
-          background: linear-gradient(
-            135deg,
-            rgba(16, 185, 129, 0.08),
-            rgba(16, 185, 129, 0.02)
-          );
-          border: 1px solid rgba(16, 185, 129, 0.15);
-.metric-value {
-            color: #10b981;
-          }
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(16, 185, 129, 0.12),
-              rgba(16, 185, 129, 0.04)
-            );
-            box-shadow: 0 0 6px rgba(16, 185, 129, 0.15);
-          }
-        }
-
-        &.status-warning {
-          background: linear-gradient(
-            135deg,
-            rgba(251, 191, 36, 0.08),
-            rgba(251, 191, 36, 0.02)
-          );
-          border: 1px solid rgba(251, 191, 36, 0.15);
-.metric-value {
-            color: #fbbf24;
-          }
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(251, 191, 36, 0.12),
-              rgba(251, 191, 36, 0.04)
-            );
-            box-shadow: 0 0 6px rgba(251, 191, 36, 0.15);
-          }
-        }
-
-        &.status-critical {
-          background: linear-gradient(
-            135deg,
-            rgba(239, 68, 68, 0.08),
-            rgba(239, 68, 68, 0.02)
-          );
-          border: 1px solid rgba(239, 68, 68, 0.15);
-.metric-value {
-            color: #ef4444;
-          }
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(239, 68, 68, 0.12),
-              rgba(239, 68, 68, 0.04)
-            );
-            box-shadow: 0 0 6px rgba(239, 68, 68, 0.15);
-          }
-        }
-
-        &.status-unknown {
-          background: linear-gradient(
-            135deg,
-            rgba(107, 114, 128, 0.08),
-            rgba(107, 114, 128, 0.02)
-          );
-          border: 1px solid rgba(107, 114, 128, 0.15);
-.metric-value {
-            color: #9ca3af;
-          }
-        }
-
-        .metric-label {
-          font-size: 11px;
-          font-weight: 600;
-          color: #9ca3af;
-          white-space: nowrap;
-        }
-
-        .metric-value {
-          font-size: 13px;
-          font-weight: 700;
-          letter-spacing: -0.01em;
-        }
-      }
-
-      .metric-row-divider {
-        width: 1px;
-        height: 20px;
-        background: #374151;
-      }
-    }
-  }
+.red-charts-section .card-container {
+  box-shadow: none;
 }
 
-.body--light .metrics-section {
-  .metric-card-full {
-    background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
-    border-color: #d1d5db;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-
-    &:hover {
-      box-shadow:
-        0 6px 12px rgba(0, 0, 0, 0.08),
-        0 0 0 1px rgba(99, 102, 241, 0.2);
-      border-color: rgba(99, 102, 241, 0.3);
-    }
-
-    .metric-single-line {
-      .metric-total {
-        background: linear-gradient(
-          135deg,
-          rgba(99, 102, 241, 0.08),
-          rgba(99, 102, 241, 0.03)
-        );
-        border-color: rgba(99, 102, 241, 0.2);
-
-        .total-label {
-          color: #6366f1;
-        }
-
-        .total-value {
-          color: #4338ca;
-        }
-
-        .total-unit {
-          color: #6366f1;
-        }
-      }
-
-      .metric-divider {
-        background: #d1d5db;
-      }
-
-      .metric-inline {
-        &.incoming {
-          color: #6366f1;
-          background: linear-gradient(
-            135deg,
-            rgba(99, 102, 241, 0.08),
-            rgba(99, 102, 241, 0.02)
-          );
-          border-color: rgba(99, 102, 241, 0.2);
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(99, 102, 241, 0.12),
-              rgba(99, 102, 241, 0.04)
-            );
-            box-shadow: 0 0 8px rgba(99, 102, 241, 0.15);
-          }
-        }
-
-        &.outgoing {
-          color: #6366f1;
-          background: linear-gradient(
-            135deg,
-            rgba(99, 102, 241, 0.08),
-            rgba(99, 102, 241, 0.02)
-          );
-          border-color: rgba(99, 102, 241, 0.2);
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(99, 102, 241, 0.12),
-              rgba(99, 102, 241, 0.04)
-            );
-            box-shadow: 0 0 8px rgba(99, 102, 241, 0.15);
-          }
-        }
-      }
-    }
-
-    .metric-horizontal-divider {
-      background: #d1d5db;
-    }
-
-    .metric-bottom-row {
-      .metric-inline-item {
-        &.status-healthy {
-          background: linear-gradient(
-            135deg,
-            rgba(16, 185, 129, 0.06),
-            rgba(16, 185, 129, 0.01)
-          );
-          border-color: rgba(16, 185, 129, 0.2);
-.metric-value {
-            color: #059669;
-          }
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(16, 185, 129, 0.1),
-              rgba(16, 185, 129, 0.03)
-            );
-            box-shadow: 0 0 6px rgba(16, 185, 129, 0.12);
-          }
-        }
-
-        &.status-warning {
-          background: linear-gradient(
-            135deg,
-            rgba(217, 119, 6, 0.06),
-            rgba(217, 119, 6, 0.01)
-          );
-          border-color: rgba(217, 119, 6, 0.2);
-.metric-value {
-            color: #d97706;
-          }
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(217, 119, 6, 0.1),
-              rgba(217, 119, 6, 0.03)
-            );
-            box-shadow: 0 0 6px rgba(217, 119, 6, 0.12);
-          }
-        }
-
-        &.status-critical {
-          background: linear-gradient(
-            135deg,
-            rgba(220, 38, 38, 0.06),
-            rgba(220, 38, 38, 0.01)
-          );
-          border-color: rgba(220, 38, 38, 0.2);
-.metric-value {
-            color: #dc2626;
-          }
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(220, 38, 38, 0.1),
-              rgba(220, 38, 38, 0.03)
-            );
-            box-shadow: 0 0 6px rgba(220, 38, 38, 0.12);
-          }
-        }
-
-        &.status-unknown {
-          background: linear-gradient(
-            135deg,
-            rgba(107, 114, 128, 0.06),
-            rgba(107, 114, 128, 0.01)
-          );
-          border-color: rgba(107, 114, 128, 0.2);
-.metric-value {
-            color: #6b7280;
-          }
-        }
-
-        .metric-label {
-          color: rgba(0, 0, 0, 0.6);
-        }
-      }
-
-      .metric-row-divider {
-        background: #d1d5db;
-      }
-    }
-  }
+.red-charts-section .card-container :first-child {
+  padding: 0 0.0625rem !important;
 }
 
-// Empty/Loading/Error States
-.empty-state,
-.loading-state,
-.error-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2.5rem 1.5rem;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.875rem;
-
-  .loading-text,
-  .error-text {
-    margin-top: 0.75rem;
-    font-weight: 400;
-  }
-}
-
-.body--light {
-  .empty-state,
-  .loading-state,
-  .error-state {
-    color: rgba(0, 0, 0, 0.5);
-  }
-}
-
-.error-state {
-  color: #f44336;
-  font-weight: 500;
-}
-
-.body--light .error-state {
-  color: #c62828;
-}
-
-.error-state {
-  color: var(--q-negative);
-}
-
-.red-charts-section {
-  :deep(.card-container) {
-    box-shadow: none;
-
-    :first-child {
-      padding: 0 0.0625rem !important;
-    }
-  }
-}
-
-:deep(
-  .metrics-correlation-dashboard .q-splitter--vertical > .q-splitter__separator
-) {
-  height: 100% !important;
-}
 </style>

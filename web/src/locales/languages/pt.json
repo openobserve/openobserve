@@ -132,7 +132,11 @@
     "error": "Erro",
     "db": "Banco de dados",
     "discardChanges": "Descartar alterações",
-    "unsavedChanges": "Alterações não salvas"
+    "unsavedChanges": "Alterações não salvas",
+    "clearFilter": "Filtro claro",
+    "noMatches": "Sem jogos",
+    "remove": "Remover",
+    "export": "Exportar"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -425,7 +429,18 @@
     "menuGroupExplain": "Explique",
     "fieldValuesEmpty": "Nenhum valor encontrado.",
     "fieldValuesEmptyHint": "Experimente um intervalo de tempo mais amplo para ver os valores.",
-    "selectLogsStreamFirst": "Selecione o fluxo de registros primeiro"
+    "selectLogsStreamFirst": "Selecione o fluxo de registros primeiro",
+    "menuMore": "Mais",
+    "searchInspect": "Pesquisar e Inspecionar",
+    "vrlOnlyForTableWarning": "A função VRL só é suportada para gráfico de tabela.",
+    "customDownloadTitle": "Download personalizado",
+    "selectFunctionNamePlaceholder": "Selecione o nome da função",
+    "confirmFunctionUpdateTitle": "Confirme a atualização",
+    "confirmFunctionUpdateMsg": "Tem certeza de que deseja atualizar a função {name}?",
+    "traceIdLabel": "ID de rastreamento:",
+    "enterTraceIdPlaceholder": "Insira o ID de rastreamento",
+    "changeQueryModeTitle": "Alterar modo de consulta",
+    "changeQueryModeConfirm": "Tem certeza de que deseja alterar o modo de consulta? Os dados salvos para o eixo X, eixo Y e filtros serão apagados."
   },
   "menu": {
     "home": "Início",
@@ -460,7 +475,9 @@
     "actions": "Ações",
     "incidents": "Incidentes",
     "evals": "Evals",
-    "aiObservability": "Observabilidade da IA"
+    "keyboardShortcuts": "Atalhos de teclado",
+    "aiObservability": "Observabilidade da IA",
+    "aiAssistant": "Assistente de IA"
   },
   "rum": {
     "title": "Monitoramento de usuários reais",
@@ -539,7 +556,14 @@
       "learnMore": "Saiba mais:",
       "quickImpl": "Guia de implementação rápida",
       "blogPost": "Noções básicas sobre monitoramento de front-end"
-    }
+    },
+    "sourceMaps": "Mapas de origem",
+    "service": "Serviço",
+    "environment": "Meio ambiente",
+    "applyFilters": "Aplicar filtros",
+    "uploadSourceMaps": "Carregar mapas de origem",
+    "files": "Arquivos",
+    "uploadedAt": "Carregado em"
   },
   "about": {
     "name": "Abra o Observe",
@@ -791,6 +815,10 @@
         "service_maps": {
           "name": "Mapas de serviço",
           "note": "Visualize as dependências do serviço"
+        },
+        "byob": {
+          "name": "Use Seu Próprio Bucket",
+          "note": "Encaminhe os dados da organização para o seu próprio bucket na nuvem"
         }
       },
       "buttons": {
@@ -922,7 +950,12 @@
     "authTypeSSO": "SSO",
     "authTypeLocal": "Nativo",
     "noCustomRolesHint": "Nenhuma função personalizada definida — crie uma no IAM → Funções",
-    "externalUserCustomRoleHint": "Usuários externos só podem ser modificados por meio do sistema de origem"
+    "externalUserCustomRoleHint": "Usuários externos só podem ser modificados por meio do sistema de origem",
+    "subtitle": "Pessoas com acesso a essa organização",
+    "revokeInvitationTitle": "Revogar convite",
+    "revokeInvitationMsg": "Tem certeza de que deseja revogar o convite para {email}?",
+    "deleteUsersTitle": "Excluir usuários",
+    "deleteUsersMsg": "Tem certeza de que deseja excluir {count} usuário (s)?"
   },
   "ticket": {
     "header": "Tickets de suporte",
@@ -984,7 +1017,8 @@
     "proceed_subscription": "Prosseguir com a assinatura",
     "subscription_plan": "Plano de assinatura",
     "makeBilledMember": "Torne esta organização um membro de cobrança de {org}",
-    "manage": "Gerenciar"
+    "manage": "Gerenciar",
+    "nameHelpText": "Use somente caracteres alfanuméricos, espaço e sublinhado."
   },
   "template": {
     "header": "Modelos",
@@ -1054,7 +1088,10 @@
     "fieldRequired": "O campo é obrigatório!",
     "dataType": "Tipo de dados",
     "dataTypeRequired": "O tipo de dados é obrigatório!",
-    "udsFieldAlreadyInSchema": "Um ou mais campos selecionados já fazem parte do esquema definido"
+    "udsFieldAlreadyInSchema": "Um ou mais campos selecionados já fazem parte do esquema definido",
+    "subtitle": "Gerenciamento de índices e configuração de streams",
+    "streamNameHelpText": "Use somente caracteres alfanuméricos, sublinhado e dois pontos.",
+    "deleteAssociatedAlertsPipelines": "Exclua todos os pipelines e alertas associados ao stream"
   },
   "function": {
     "header": "Funções",
@@ -1114,7 +1151,11 @@
     "vrlFunctionHint": "Use o `.` para representar o evento atual. Exemplo: .new_field = .existing_field + 'processado'",
     "askAIFunctionPlaceholder": "Peça ajuda à IA com sua função...",
     "enterFunctionPrompt": "Insira um prompt para gerar a função",
-    "jsErrorDetails": "Detalhes do erro de JavaScript"
+    "jsErrorDetails": "Detalhes do erro de JavaScript",
+    "subtitle": "Funções VRL reutilizáveis aplicadas em pipelines",
+    "clickTestFunctionHint": "Clique em Função de teste para ver os eventos",
+    "pleaseEnterQuery": "Por favor, insira uma consulta",
+    "enrichmentTablesSubtitle": "Tabelas de pesquisa que enriquecem os dados ingeridos"
   },
   "confirmDialog": {
     "cancel": "Cancelar",
@@ -1386,6 +1427,7 @@
     "selectDashboardLabel": "Selecione o painel",
     "selectTabLabel": "Selecione a guia",
     "numbers": "Números",
+    "localeFormat": "Formato Regional",
     "nanoseconds": "Nanossegundos (ns)",
     "currency": "Moeda",
     "p99": "P99",
@@ -1692,7 +1734,89 @@
     "multiSqlQueryLabelHint": "Nome personalizado para essa consulta em legendas (por exemplo, 'Produção')",
     "multiQueryWarning": "Somente a consulta 1 é renderizada para {chartType}",
     "trellisNotSupportedWithMultiQuery": "O layout do Trellis está desativado com várias consultas. Remova consultas extras para usar a treliça.",
-    "xAliasInconsistencyWarning": "Os aliases do eixo X são inconsistentes nas consultas: alguns usam histograma e outros não. Use o mesmo tipo de alias em todas as consultas para obter resultados previsíveis."
+    "xAliasInconsistencyWarning": "Os aliases do eixo X são inconsistentes nas consultas: alguns usam histograma e outros não. Use o mesmo tipo de alias em todas as consultas para obter resultados previsíveis.",
+    "tableFiltering": "Filtragem de colunas",
+    "columnFormattingTitle": "Formatação de coluna",
+    "sectionValueFormatting": "Formatação de valor",
+    "configSectionFieldOverridesAliases": [
+      "Field Overrides",
+      "Override Config",
+      "Override",
+      "Column Formatting"
+    ],
+    "sectionAlignment": "Alinhamento",
+    "alignLeft": "Left",
+    "alignCenter": "Center",
+    "alignRight": "Right",
+    "sectionStyling": "Estilo",
+    "sectionConditionalStyling": "Estilo condicional",
+    "conditionThreshold": "Valor",
+    "conditionAddRule": "+ Adicionar regra",
+    "textColor": "Texto",
+    "bgColor": "Plano de fundo",
+    "colorNone": "nenhum",
+    "conditionNoRules": "Ainda não há regras.",
+    "customColor": "Cor personalizada",
+    "inlinePreview": "prévia",
+    "columnFormattingSubtitle": "Controles à esquerda, uma amostra ao vivo da coluna à direita para vê-la em contexto.",
+    "columnFormattingPick": "Escolher uma coluna",
+    "columnFormattingSampleNote": "Linhas de amostra desta coluna.",
+    "typeNumeric": "Núm",
+    "typeText": "Texto",
+    "sectionFieldType": "Tipo de campo",
+    "conditionIfValue": "Se o valor for",
+    "conditionThenText": "em seguida, cor do texto",
+    "conditionAndBg": "e plano de fundo",
+    "opLessThan": "menos de",
+    "opGreaterThan": "maior que",
+    "opLessThanEqual": "menor ou igual a",
+    "opGreaterThanEqual": "maior ou igual a",
+    "opEqual": "igual a",
+    "opNotEqual": "não é igual a",
+    "columnFormattingAddField": "Adicionar campo",
+    "columnFormattingAllAdded": "Todos os campos adicionados",
+    "columnFormattingNoFields": "Nenhum campo adicionado",
+    "columnFormattingNoFieldsHint": "Use “Adicionar campo” acima para começar a formatar uma coluna.",
+    "columnFormattingEmptyTitle": "Formatar uma coluna",
+    "columnFormattingEmptyHint": "Escolha um campo para aplicar unidades, alinhamento, cores e regras condicionais.",
+    "columnFormattingNoFieldsToFormat": "Ainda não há campos formatados",
+    "columnFormattingOneFieldToFormat": "1 campo formatado",
+    "columnFormattingFieldsToFormat": "campos formatados",
+    "subtitle": "Crie, organize e compartilhe painéis em todas as pastas",
+    "deleteDashboardConfirmTitle": "Excluir painel",
+    "deleteDashboardConfirmMsg": "Tem certeza de que deseja excluir o painel?",
+    "deleteDashboardsConfirmTitle": "Excluir painéis",
+    "deleteDashboardsConfirmMsg": "Tem certeza de que deseja excluir {count} painel (s)?",
+    "importCustom": "Personalizado",
+    "importCustomDesc": "Importar do arquivo JSON ou URL",
+    "importTemplates": "Modelos",
+    "importTemplatesDesc": "Navegue e importe da galeria",
+    "searchThisFolder": "Esta pasta",
+    "searchThisFolderTitle": "Pesquisar somente nesta pasta",
+    "searchAllFolders": "Todas as pastas",
+    "searchAllFoldersTitle": "Pesquise em todas as pastas",
+    "reloadDashboards": "Recarregar painéis",
+    "editVariable": "Editar variável",
+    "addOption": "Adicionar opção",
+    "addFilter": "Adicionar filtro",
+    "noDataFound": "Nenhum dado encontrado",
+    "streamSelectTooltip": "Selecione um fluxo ou use uma variável como $streamVariable para escolher dinamicamente o fluxo com base em outro valor.",
+    "fieldSelectTooltip": "Selecione um campo ou use uma variável como $fieldVariable. Se o stream usar uma variável, a lista de campos ficará vazia - digite o nome do campo manualmente.",
+    "filterInfoTooltip": "Em filtros, você pode usar o valor de outra variável para filtrar o valor da variável atual. Isso pode ser feito usando o nome da outra variável. Por exemplo:",
+    "defaultSelectAll": "Padrão - Selecionar tudo",
+    "escapeSingleQuotesTooltip": "Se ativada, as aspas simples serão ignoradas na consulta. Por exemplo, um valor como `O'Reilly` será substituído por `O\"Reilly`.",
+    "byDefaultSelect": "Por padrão, selecione:",
+    "firstValue": "Primeiro valor",
+    "allValues": "Todos os valores",
+    "customValue": "Personalizado",
+    "showDependencies": "Mostrar dependências",
+    "deleteVariable": "Excluir variável",
+    "deleteVariableMsg": "Tem certeza de que deseja excluir a variável?",
+    "appliedToTabs": "Aplicado às guias:",
+    "appliedToPanels": "Aplicado aos painéis:",
+    "selectVariableScope": "Selecione o escopo da variável",
+    "variableScopeHelp": "As variáveis serão aplicadas a todas as guias e painéis se a opção global for selecionada.",
+    "showDynamicFilters": "Mostrar filtros dinâmicos"
   },
   "panel": {
     "header": "Painel",
@@ -1981,7 +2105,14 @@
       "viewOrgGroup": "Exibir grupo organizacional",
       "usageMemberLabel": "Organização membro",
       "usageAllMembers": "Organização atual",
-      "currentOrgTitle": "Organização Atual"
+      "currentOrgTitle": "Organização Atual",
+      "childOrgIdColumn": "Identificador da Organização Filha",
+      "childOrgNameColumn": "Nome da Organização Filha",
+      "notEnabledTitle": "Grupo de Faturamento Indisponível",
+      "notEnabledDesc": "Esta organização não está habilitada para iniciar um grupo de faturamento. Entre em contato com o administrador caso precise deste recurso.",
+      "memberOrgsTitle": "Organizações Membros",
+      "searchMemberOrg": "Pesquisar Organização",
+      "noMemberMatch": "Nenhuma Organização Correspondente"
     }
   },
   "message": {
@@ -2182,7 +2313,43 @@
       "rcaCompleted": "Análise da causa raiz concluída",
       "noRcaYet": "Nenhuma análise de causa raiz disponível. Clique em “Analisar” para começar.",
       "search": "Pesquisar incidentes...",
-      "sreChat": "Perguntar ao Assistente SRE"
+      "sreChat": "Perguntar ao Assistente SRE",
+      "subtitle": "Gerenciamento e acompanhamento de incidentes",
+      "correlationPrimaryMatch": "Correspondência Primária",
+      "correlationSecondaryMatch": "Correspondência Secundária",
+      "correlationServiceDiscoveryTooltip": "Correlacionado usando a identidade de serviço pré-computada da descoberta de serviços",
+      "correlationPrimaryMatchTooltip": "Correlacionado por critérios de correspondência primária",
+      "correlationSecondaryMatchTooltip": "Correlacionado por critérios de correspondência secundária",
+      "correlationAlertId": "ID do Alerta",
+      "correlationAlertIdTooltip": "Nenhuma dimensão correspondente encontrada — isolado pelo ID do alerta",
+      "correlatedByServiceDiscovery": "Dimensões",
+      "correlatedBySemanticGroups": "Dimensões",
+      "correlatedByAlertId": "ID do Alerta",
+      "goBack": "Voltar",
+      "incident": "Incidente",
+      "uniqueAlerts": "Alertas Únicos",
+      "relatedAlerts": "Alertas Relacionados",
+      "alertTriggers": "Disparos de Alerta",
+      "incidentTimeline": "Linha do Tempo do Incidente",
+      "incidentDetails": "Detalhes do Incidente",
+      "incidentId": "ID do Incidente",
+      "incidentName": "Nome do Incidente",
+      "initialTrigger": "Disparo inicial",
+      "noDimensionsAvailable": "Nenhuma dimensão disponível",
+      "noAlertDetailsAvailable": "Nenhum detalhe de alerta disponível",
+      "clickOnTriggerToViewDetails": "Clique em um disparo na tabela para ver os detalhes",
+      "refreshCorrelatedData": "Atualizar dados correlacionados",
+      "showingCorrelatedLogs": "Exibindo logs correlacionados do período do incidente",
+      "showingCorrelatedMetrics": "Exibindo métricas correlacionadas do período do incidente",
+      "showingCorrelatedTraces": "Exibindo traces correlacionados do período do incidente",
+      "incidentTitleUpdatedSuccess": "Título do incidente atualizado com sucesso",
+      "markAsAcknowledgedTooltip": "Marcar o incidente como reconhecido e em andamento",
+      "markAsResolvedTooltip": "Marcar o incidente como resolvido e fechá-lo",
+      "reopenIncidentTooltip": "Reabrir este incidente resolvido",
+      "editIncidentTitleTooltip": "Editar título do incidente",
+      "firedTimes": "Disparado {count} vez(es)",
+      "incidentAnalysis": "Análise do Incidente",
+      "noAlertActivityData": "Nenhum dado de atividade de alerta"
     },
     "events": "Eventos",
     "multiWindow": "Compare com o passado",
@@ -2230,7 +2397,9 @@
       "alertName": "Nome do alerta",
       "streamInfo": "Fonte de dados",
       "alertType": "Tipo de alerta",
-      "queryCondition": "Condição de consulta"
+      "queryCondition": "Condição de consulta",
+      "configuringRealTime": "Configurando um alerta em tempo real para",
+      "configuringScheduled": "Configurando um alerta agendado para"
     },
     "correlation": {
       "title": "Correlação de alertas",
@@ -2387,7 +2556,8 @@
       "comparingText": "Comparando o resultado da consulta da janela atual com o resultado da consulta do {offset} anterior.",
       "addComparisonWindow": "Adicionar janela de comparação",
       "goToConditions": "Vá para Condições",
-      "goToConditionsTooltip": "Clique em “Ir para as condições” para verificar os eventos nas janelas de comparação selecionadas"
+      "goToConditionsTooltip": "Clique em “Ir para as condições” para verificar os eventos nas janelas de comparação selecionadas",
+      "comparisonDisabledTooltip": "Janelas de comparação só são suportadas no modo SQL. Mude para SQL na aba Regras de Alerta."
     },
     "alertSettings": {
       "cronSchedule": "Programação Cron",
@@ -2399,13 +2569,22 @@
       "frequencyTooltipCron": "Formato cron padrão do UNIX com 5 campos separados por espaço: [Minuto 0-59] [Hora 0-23] [Dia do mês 1-31] [Mês 1-12 ou JAN-DEZ] [Dia da semana 0-7 ou '1L-7L', 0 e 7 para domingo].",
       "timezoneWarning": "Aviso: O fuso horário exibido é aproximado. Verifique e selecione o fuso horário correto manualmente.",
       "destinationsTooltip": "Selecione um ou mais destinos para enviar notificações de alerta.",
-      "templateTooltip": "Opcional: selecione um modelo para usar em todos os destinos neste alerta. Os modelos permitem que você personalize o formato das mensagens de alerta. Se não for selecionado, cada destino usará seu próprio modelo configurado."
+      "templateTooltip": "Opcional: selecione um modelo para usar em todos os destinos neste alerta. Os modelos permitem que você personalize o formato das mensagens de alerta. Se não for selecionado, cada destino usará seu próprio modelo configurado.",
+      "sectionTitle": "Configurações",
+      "fieldRequired": "O campo é obrigatório!",
+      "noDestinationsAvailable": "Nenhum destino disponível",
+      "refreshDestinations": "Atualizar Destinos mais recentes",
+      "createsIncident": "Cria Incidente",
+      "createsIncidentTooltip": "Se um alerta pode criar um incidente, ele não envia uma notificação dedicada. Em vez disso, uma notificação do incidente é enviada quando um novo incidente é criado ou quando um novo tipo de alerta se junta a um incidente existente."
     },
     "advanced": {
       "addVariable": "Adicionar variável",
       "variablesTooltip": "As variáveis são usadas para passar dados do alerta para o destino.",
       "rowTemplateTooltip": "O modelo de linha é usado para formatar a mensagem de alerta.",
-      "templateType": "Tipo de modelo:"
+      "templateType": "Tipo de modelo:",
+      "noTemplatesAvailable": "Nenhum modelo disponível",
+      "refreshTemplates": "Atualizar Modelos mais recentes",
+      "selectTemplate": "Selecionar Modelo"
     },
     "addConditions": "Adicionar condições",
     "sqlEditor": "Editor SQL",
@@ -2509,7 +2688,28 @@
       "destinationRequired": "É necessário pelo menos um destino!",
       "disabledNotificationsInfo": "A detecção de anomalias ainda será executada e gravará os resultados no fluxo _anomalies. Ative as notificações para receber alertas quando forem detectadas anomalias."
     },
-    "anomalyName": "Nome da anomalia"
+    "anomalyName": "Nome da anomalia",
+    "subtitle": "Regras de alerta e canais de notificação",
+    "searchThisFolder": "Esta pasta",
+    "searchAllFolders": "Todas as pastas",
+    "streamConfig": "Configuração de transmissão",
+    "alertRules": "Regras de alerta",
+    "addCondition": "Adicionar condição",
+    "conditionOf": "do",
+    "conditionIs": "é",
+    "matchingTypeFound": "{type} correspondente encontrado",
+    "matchingMetricsFound": "métricas correspondentes encontradas",
+    "metricsValueFieldTooltip": "Por padrão, os fluxos de métricas armazenam suas medidas no campo “valor”",
+    "howOftenCheckTooltip": "Com que frequência verificar essa condição de alerta",
+    "alertIfNoOfEvents": "Alerta em caso de número de eventos",
+    "alertIfValueIs": "Alerta se o valor for",
+    "havingSeries": "Ter séries",
+    "clearMultiWindowsTitle": "Limpar várias janelas?",
+    "lastTrainedAt": "Treinado pela última vez em",
+    "noTemplatesMsg": "Parece que você ainda não criou nenhum modelo. Para criar um alerta, você precisará ter pelo menos um destino e um modelo em vigor",
+    "createTemplateBtn": "Criar modelo",
+    "noDestinationsMsg": "Parece que você ainda não criou nenhum destino. Para criar um alerta, você precisará ter pelo menos um destino e um modelo em vigor",
+    "createDestinationBtn": "Criar destino"
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2781,7 +2981,93 @@
       "noMatchingDimensions": "Nenhuma dimensão correspondente",
       "otherGroup": "Outro",
       "fallbackGroup": "Fallback",
-      "fallbackNote": "Dimensões de fallback (como 'service') se aplicam a todos os ambientes quando nenhuma carga de trabalho específica do ambiente corresponde."
+      "fallbackNote": "Dimensões de fallback (como 'service') se aplicam a todos os ambientes quando nenhuma carga de trabalho específica do ambiente corresponde.",
+      "serviceDiscoveryTab": "Regras de Detecção",
+      "fieldAliasesTab": "Mapeamentos de Campos",
+      "fieldAliasesSaved": "Aliases de campos salvos com sucesso",
+      "serviceNameFieldAliasNote": "Os nomes de campos reais mapeados para este grupo são configurados em",
+      "viewFieldAliases": "Editar aliases de campos →",
+      "fieldAliasesSaveError": "Falha ao salvar os aliases de campos",
+      "fieldAliasesUnsavedConfirm": "Você tem alterações de mapeamento de campos não salvas. Descartá-las e sair?",
+      "duplicateIdsError": "IDs de grupo duplicados encontrados: {ids}. Certifique-se de que cada grupo tenha um ID único.",
+      "duplicateNamesInCategoryError": "Nome duplicado \"{name}\" encontrado na categoria \"{category}\". Cada grupo dentro de uma categoria deve ter um nome único.",
+      "emptyIdError": " a categoria tem nomes de grupos vazios. Certifique-se de que todos os grupos tenham nomes válidos.",
+      "emptyFieldsError": "É necessário pelo menos um nome de campo",
+      "lastSeen": "Visto pela Última Vez",
+      "serviceIdentitySetupTitle": "Configuração de Identidade de Serviço",
+      "serviceIdentitySetupDescription": "Configure como os serviços são identificados em seus dados de telemetria",
+      "serviceNameFieldLabel": "Campo de Nome do Serviço",
+      "serviceNameFieldHelp": "Qual campo identifica o nome do serviço em seus dados de telemetria",
+      "serviceNameFrom": "Nome do serviço de",
+      "serviceNameDerivedPrefix": "O nome do serviço é derivado usando os campos de nome de serviço definidos em",
+      "serviceNameFields": "aliases de campos",
+      "serviceNameDetectedFrom": "Nome do serviço detectado de:",
+      "serviceNameNotDetected": "Nenhum campo de nome de serviço detectado em seus dados ainda",
+      "serviceNameNotDetectedHelp": "Certifique-se de que sua telemetria inclua um campo como service.name ou similar",
+      "serviceNameExpandedHelp": "Estes nomes de campos em seus dados são todos mapeados para o nome do serviço:",
+      "serviceNameConfiguredNotSeen": "configurado, mas ainda não visto em seus dados",
+      "customizeFieldMappings": "Personalizar mapeamentos de campos",
+      "fieldMappingDialogHelp": "Adicione ou remova nomes de campos que devem ser reconhecidos como o nome do serviço em seus dados de telemetria.",
+      "fieldMappingPlaceholder": "Digite um nome de campo e pressione Enter",
+      "foundInLogs": "Encontrado em Logs",
+      "foundInTraces": "Encontrado em Traces",
+      "foundInMetrics": "Encontrado em Métricas",
+      "distinguishByLabel": "Distinguir Serviços Por",
+      "distinguishByHelp": "Escolha campos que definam onde seus serviços são executados. Por exemplo, cluster + namespace + deployment juntos criam uma identidade única para cada serviço. Até 5 campos.",
+      "serviceOptionalLabel": "Correlacionar sem o atributo de serviço",
+      "serviceOptionalHelp": "Corresponder streams usando apenas os atributos abaixo, ignorando os atributos de serviço",
+      "noFieldsConfiguredYet": "Nenhum campo de desambiguação configurado ainda.",
+      "addField": "Adicionar campo",
+      "addFieldTooltip": "Adicione outro campo para ajudar a identificar serviços de forma única (máx. 5). Exemplos: região, namespace ou ambiente.",
+      "addGroup": "Adicionar grupo",
+      "addGroupTooltip": "Crie um conjunto separado de campos de desambiguação para um ambiente diferente (por exemplo, campos diferentes para Kubernetes vs AWS)",
+      "autoSuggestedBanner": "Estes campos foram sugeridos automaticamente porque possuem poucos valores únicos (baixa cardinalidade) e aparecem na maioria dos seus serviços — ideais para distinguir serviços com o mesmo nome. Você pode personalizá-los antes de salvar.",
+      "addDisambiguationField": "Adicionar outro",
+      "removeDisambiguationField": "Remover campo",
+      "nameFieldLockedNote": "O campo de nome do serviço não pode ser alterado após a primeira configuração",
+      "noGroupsAvailable": "Nenhum grupo de campos disponível",
+      "selectField": "Selecione um campo",
+      "detectedLabel": "Detectamos carga de trabalho {type} com base em seus dados.",
+      "suggestionPrompt": "Devemos aplicar a sugestão?",
+      "applySuggestion": "Aplicar sugestão",
+      "logStreams": "Streams de logs",
+      "traceStreams": "Streams de traces",
+      "metricStreams": "Streams de métricas",
+      "saveIdentityConfig": "Salvar Configuração",
+      "identityConfigSaved": "Configuração de identidade de serviço salva com sucesso",
+      "identityConfigSaveFailed": "Falha ao salvar a configuração de identidade de serviço",
+      "loadRecommendationsFailed": "Falha ao carregar recomendações",
+      "resetServices": "Redefinir Serviços",
+      "resetServicesTooltip": "Excluir todos os serviços descobertos. Eles serão redescobertos automaticamente à medida que novos dados chegarem.",
+      "resetServicesConfirmTitle": "Redefinir Todos os Serviços Descobertos?",
+      "resetServicesConfirmMessage": "Isso excluirá todos os serviços descobertos para esta organização. Os serviços serão redescobertos automaticamente à medida que novos dados de telemetria forem ingeridos. Esta ação não pode ser desfeita.",
+      "resetServicesConfirmWarning": "Os serviços serão redescobertos automaticamente à medida que novos dados de telemetria forem ingeridos. Esta ação não pode ser desfeita.",
+      "resetServicesSuccess": "{count} serviço(s) descoberto(s) excluído(s) com sucesso.",
+      "resetServicesFailed": "Falha ao redefinir os serviços",
+      "workload": "Carga de Trabalho",
+      "goToConfiguration": "Ir para a Configuração",
+      "configureServicesHint": "para configurar como os serviços são identificados e agrupados.",
+      "filterBy": "Filtrar por:",
+      "selectFieldPlaceholder": "Selecionar campo",
+      "selectValuePlaceholder": "Selecionar valor",
+      "selectFieldFirst": "Selecione um campo primeiro",
+      "instanceSingular": "instância",
+      "instancePlural": "instâncias",
+      "serviceSingular": "Serviço",
+      "serviceCountSingular": "{count} Serviço",
+      "serviceCountPlural": "{count} Serviços",
+      "instancesCount": "({count} instâncias)",
+      "noDimensions": "sem dimensões",
+      "defaultSetWarningTitle": "A correlação pode ser não confiável.",
+      "defaultSetWarningBody": "Esta instância não tem desambiguação — foi descoberta sem nenhuma correspondência de carga de trabalho (sem contexto de cluster, namespace ou ambiente). Logs e traces podem vir de diferentes implantações do mesmo nome de serviço.",
+      "instanceIdentity": "Identidade da Instância",
+      "noDimensionsCatchAll": "Sem dimensões — instância genérica",
+      "streamSources": "Fontes de Stream",
+      "openInLogsTooltip": "Abrir em Logs com filtro de serviço",
+      "fieldNameMapping": "Mapeamento de Nome de Campo",
+      "logsWithCount": "Logs ({count})",
+      "tracesWithCount": "Traces ({count})",
+      "metricsWithCount": "Métricas ({count})"
     },
     "pageSubtitle": "Ajuste as configurações do seu aplicativo",
     "platformSettings": "Configurações da plataforma",
@@ -2824,7 +3110,48 @@
     "usageStreamEnabledLabel": "Ativar fluxo de uso",
     "aiToolsets": "Conjuntos de ferramentas de IA",
     "llmModelPricing": "Preços do modelo LLM",
-    "ingestionTokens": "Tokens de ingestão"
+    "ingestionTokens": "Tokens de ingestão",
+    "genAiAgentMapping": {
+      "tabLabel": "Mapeamento de agentes GenAI",
+      "title": "Mapeamento de agentes GenAI",
+      "description": "Configure os atributos de telemetria alternativa usados para normalizar a identidade do agente para rastreamentos e avaliações do LLM.",
+      "howItWorksTitle": "Como funciona o mapeamento",
+      "howItWorksDescription": "O OpenObserve primeiro preserva os atributos gen_ai.agent.name e gen_ai.agent.id padrão. Essas listas são verificadas somente quando os atributos padrão estão ausentes ou vazios. Adicione um atributo de telemetria de entrada por linha.",
+      "agentNameFields": "Campos alternativos do nome do agente",
+      "agentNameHelp": "Atributos de entrada a serem usados como substitutos para gen_ai.agent.name.",
+      "agentIdFields": "Campos alternativos de ID do agente",
+      "agentIdHelp": "Atributos de entrada a serem usados como substitutos para gen_ai.agent.id.",
+      "fieldsPlaceholder": "agente.nome\nllm.agent.name",
+      "applyDefaults": "Aplicar padrões",
+      "resetToEmpty": "Redefinir como vazio",
+      "defaultsSource": "Os padrões são carregados de openobserve/sdr_patterns e podem ser modificados antes de serem salvos para esta organização.",
+      "saved": "O mapeamento do agente GenAI foi salvo com sucesso",
+      "loadFailed": "Falha ao carregar o mapeamento do agente GenAI",
+      "saveFailed": "Falha ao salvar o mapeamento do agente GenAI",
+      "defaultsLoadFailed": "Falha ao carregar os padrões de mapeamento do agente GenAI"
+    },
+    "groupGeneral": "Geral",
+    "groupAccessSecurity": "Acesso e Segurança",
+    "groupDestinationsTemplates": "Destinos e Modelos",
+    "groupDataAI": "Dados e IA",
+    "groupOperations": "Operações",
+    "groupAccount": "Conta",
+    "generalDesc": "Tema, padrões de consulta e preferências essenciais",
+    "orgDesc": "Parâmetros e identificadores da organização",
+    "cipherKeysDesc": "Chaves de criptografia para campos sensíveis",
+    "regexPatternsDesc": "Padrões regex reutilizáveis para redação",
+    "domainManagementDesc": "Restringir o login a domínios SSO permitidos",
+    "alertDestinationsDesc": "Onde os alertas disparados são entregues",
+    "pipelineDestinationsDesc": "Destinos externos para a saída do pipeline",
+    "templatesDesc": "Modelos reutilizáveis de mensagens de alerta",
+    "storageSettingsDesc": "Configuração de armazenamento por organização",
+    "modelPricingDesc": "Configuração de custo do modelo de LLM",
+    "correlationSettingsDesc": "Configuração de correlação de telemetria",
+    "llmProvidersDesc": "Provedores de LLM para avaliações online",
+    "queryManagementDesc": "Inspecionar e cancelar consultas em execução",
+    "nodesDesc": "Nós do cluster e sua integridade",
+    "licenseDesc": "Detalhes da licença Enterprise",
+    "organizationManagementDesc": "Criar e gerenciar organizações"
   },
   "iam": {
     "users": "Usuários",
@@ -2857,7 +3184,19 @@
     "externalUserWarningTitle": "Aviso de usuário externo",
     "externalUserWarningMessage": "Adicionar usuários externos diretamente às funções não concederá permissões. Em vez disso, adicione-os aos grupos de usuários.",
     "invitations": "Convites",
-    "ingestionTokens": "Tokens de ingestão"
+    "ingestionTokens": "Tokens de ingestão",
+    "sectionAccess": "Acesso",
+    "sectionPermissions": "Permissões",
+    "sectionOrganization": "Organização",
+    "usersDesc": "Pessoas com acesso a essa organização",
+    "serviceAccountsDesc": "Tokens de acesso programático para APIs",
+    "ingestionTokensDesc": "Tokens para ingestão de dados nessa organização",
+    "invitationsDesc": "Convites de membros pendentes e enviados",
+    "groupsDesc": "Agrupe usuários para atribuir funções",
+    "rolesDesc": "Defina permissões e políticas de acesso",
+    "quotaDesc": "Limites de uso aplicados por função",
+    "organizationsDesc": "Organizações que você pode acessar",
+    "nameHelpText": "Use somente caracteres alfanuméricos e '_', sem espaços."
   },
   "pipeline": {
     "header": "Oleodutos",
@@ -3018,7 +3357,14 @@
     "dimensionWidth": "Largura (px)",
     "dimensionHeight": "Altura (px)",
     "imagePreview": "Incluir imagem de visualização do painel em linha",
-    "customDimensions": "Dimensões personalizadas (avançadas)"
+    "customDimensions": "Dimensões personalizadas (avançadas)",
+    "subtitle": "Relatórios e exportações programados",
+    "searchThisFolder": "Esta pasta",
+    "searchAllFolders": "Todas as pastas",
+    "reloadReports": "Recarregar relatórios",
+    "moveToFolder": "Mover para a pasta",
+    "deleteReportsTitle": "Excluir relatórios",
+    "deleteReportsMsg": "Tem certeza de que deseja excluir {count} relatório (s)?"
   },
   "queries": {
     "runningQueries": "Executando consultas",
@@ -3146,19 +3492,27 @@
         "p99Latency": "P99",
         "avgLatency": "Latência média",
         "lastSeen": "Visto pela última vez",
-        "operations": "Operações"
+        "operations": "Operações",
+        "avgDuration": "Duração Média",
+        "maxDuration": "Duração Máxima"
       },
       "status": {
         "healthy": "Saudável",
         "warning": "Aviso",
-        "degraded": "Degradado"
+        "degraded": "Degradado",
+        "critical": "Crítico"
       },
       "viewTraces": "Exibir traços",
       "exportCsv": "Exportar CSV",
       "justNow": "Agora mesmo",
       "minutesAgo": "{n} m atrás",
       "hoursAgo": "{n} h atrás",
-      "daysAgo": "{n} d atrás"
+      "daysAgo": "{n} d atrás",
+      "serviceLabel": "serviço",
+      "servicesLabel": "serviços",
+      "legend": {
+        "title": "Taxa de Erros"
+      }
     },
     "noErrorPresent": "Nenhum erro presente neste período",
     "httpStatusCode": "Código de status HTTP",
@@ -3196,8 +3550,12 @@
         "duration": "Duração",
         "tokens": "Tokens",
         "cost": "Custo",
-        "status": "Status"
-      }
+        "status": "Status",
+        "user": "Usuário",
+        "firstMessage": "Primeira mensagem"
+      },
+      "streamLabel": "Stream",
+      "unknownUser": "Usuário desconhecido"
     },
     "sessionDetail": {
       "backToSessions": "Voltar às sessões",
@@ -3239,7 +3597,15 @@
         "output": "Saída",
         "total": "Total",
         "cost": "Custo",
-        "spans": "Vãos"
+        "spans": "Vãos",
+        "llmCalls": "Chamadas de LLM",
+        "toolCalls": "Chamadas de ferramentas",
+        "otherCalls": "Outras",
+        "otherCallsTooltip": "spans gen_ai com nomes de operação não reconhecidos:"
+      },
+      "fullscreen": {
+        "expandTurn": "Ver turno em tela cheia",
+        "close": "Fechar"
       }
     },
     "openInFullView": "Abrir à vista completa",
@@ -3276,11 +3642,28 @@
       "expandRange": "Expandir o intervalo de tempo",
       "expandRangeDescAbsolute": "Mudar para um intervalo de tempo relativo mais amplo",
       "removeFilter": "Remover um filtro",
-      "selectedRange": "o intervalo selecionado"
+      "selectedRange": "o intervalo selecionado",
+      "descOutOfRange": "Sua janela de tempo não contém nenhum dado deste stream. Vá para quando os dados foram vistos pela última vez.",
+      "descDataAtBoundary": "O stream tem dados nesta janela, mas nenhum trace correspondeu. Tente ampliar o intervalo de tempo.",
+      "jumpToData": "Ir para os dados mais recentes"
     },
     "showAll": "Mostrar tudo",
     "filterByErrors": "Filtrar por erros",
-    "clearErrorFilter": "Limpar filtro de erro"
+    "clearErrorFilter": "Limpar filtro de erro",
+    "spansTab": "Vãos",
+    "tracesTab": "Traços",
+    "serviceGraphTab": "Gráfico de serviços",
+    "treeView": "Visualização em árvore",
+    "graphView": "Visualização gráfica",
+    "layoutHorizontal": "Horizontal",
+    "layoutVertical": "Vertical",
+    "layoutForce": "Layout de força",
+    "exportTraces": "Exportar traços",
+    "waterfall": "Cachoeira",
+    "flameGraph": "Gráfico de chamas",
+    "traceGraph": "Gráfico de traço",
+    "dag": "DIA",
+    "thread": "Tópico"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -3450,7 +3833,38 @@
     "failed_to_load": "Falha ao carregar padrões",
     "no_patterns_selected": "Selecione pelo menos um padrão",
     "name_required": "* O nome é obrigatório",
-    "pattern_required": "* O padrão é obrigatório"
+    "pattern_required": "* O padrão é obrigatório",
+    "associated_breadcrumb": "Detalhes do Stream",
+    "associated_search_placeholder": "Pesquisar",
+    "applied_patterns_count": "Padrões Aplicados ({count})",
+    "all_patterns_count": "Todos os Padrões ({count})",
+    "no_data_available": "Nenhum dado disponível",
+    "no_patterns_applied_title": "Nenhum Padrão Aplicado Ainda",
+    "no_patterns_applied_subtitle": "Navegue pela biblioteca de padrões para começar a aplicar expressões regulares aos seus campos.",
+    "pattern_name": "Nome do Padrão",
+    "when_value_matches": "Quando o valor corresponder",
+    "redact": "Redigir",
+    "redact_hint": "Substituir por [REDACTED]",
+    "drop": "Descartar",
+    "drop_hint": "Descartar o campo completamente",
+    "hash": "Hash",
+    "hash_hint": "Substituir por hash pesquisável",
+    "detect_at": "Detectar em",
+    "ingestion": "Ingestão",
+    "query": "Consulta",
+    "test_pattern": "Testar Padrão",
+    "test_input": "Testar Entrada",
+    "regex_pattern_label": "Padrão Regex",
+    "input_string": "String de entrada",
+    "input_string_placeholder": "Ex. 1234567890",
+    "output": "Saída",
+    "output_string_placeholder": "String de Saída",
+    "click_test_input_hint": "Clique em Testar Entrada para ver os resultados",
+    "remove_pattern": "Remover Padrão",
+    "add_pattern": "Adicionar Padrão",
+    "remove_pattern_confirm_msg": "Tem certeza de que deseja remover este padrão do campo?",
+    "failed_to_test_string": "Falha ao testar a string",
+    "select_detect_at_option": "Selecione a opção de detectar em"
   },
   "search_history": {
     "title": "Histórico de pesquisa",
@@ -3678,7 +4092,10 @@
         "duration": "Duração",
         "startBeforeEnd": "A hora de início deve ser antes da hora de término",
         "endAfterStart": "A hora de término deve ser após a hora de início"
-      }
+      },
+      "filtersLabel": "Filtros",
+      "errorDetails": "Ocorreu um erro ao buscar os dados de log. Tente novamente.",
+      "viewLogs": "Ver Logs"
     },
     "viewInTraces": "Exibir em traços",
     "viewInTracesTooltip": "Abra a página de rastreamentos com o painel de métricas RED e todos os rastreamentos correlacionados",
@@ -4051,7 +4468,12 @@
     "emptyActionLogs": "Explorar registros",
     "emptyActionLogsDesc": "Pesquise e filtre seus fluxos de log",
     "emptyActionTraces": "Explore os traços",
-    "emptyActionTracesDesc": "Inspecione rastreamentos distribuídos e latência de serviço"
+    "emptyActionTracesDesc": "Inspecione rastreamentos distribuídos e latência de serviço",
+    "viewAll": "Exibir tudo",
+    "showingOf": "Mostrando {mostrado} de {total}",
+    "colErrorRate": "Taxa de erro",
+    "colLatency": "Latência",
+    "colReqs": "Requestões"
   },
   "chatHistory": {
     "title": "Conversa",
@@ -4164,7 +4586,13 @@
       "one": "Mostre-me os erros da última hora...",
       "two": "Escreva VRL para analisar o JSON dos logs do nginx...",
       "three": "Crie um painel para a integridade do nó K8s..."
-    }
+    },
+    "autoNavigation": {
+      "label": "Navegação automática",
+      "enabledTooltip": "Navegação automática ativada - O O2 Assistant navegará automaticamente sem confirmação",
+      "disabledTooltip": "Navegação automática desativada - o O2 Assistant perguntará antes de navegar"
+    },
+    "attachImageTooltip": "Anexe imagens (PNG, JPEG, máximo de 2 MB)"
   },
   "emptyState": {
     "noSearchResults": {
@@ -4284,7 +4712,29 @@
       "reports": "notícias",
       "queries": "consultas",
       "serviceAccounts": "contas de serviço",
-      "invitations": "convites"
+      "invitations": "convites",
+      "searchJobs": "trabalhos de pesquisa",
+      "groups": "grupos",
+      "roles": "funções",
+      "anomalyConfigs": "configurações de detecção de anomalias",
+      "apiLimits": "limites de API",
+      "roleLimits": "limites de função",
+      "ingestionTokens": "tokens de ingestão",
+      "organizations": "organizações",
+      "alertDestinations": "destinos",
+      "pipelineDestinations": "destinos",
+      "alertTemplates": "modelos",
+      "evalTemplates": "modelos de avaliação",
+      "enrichmentTables": "tabelas de enriquecimento",
+      "cipherKeys": "chaves de cifra",
+      "aiToolsets": "conjuntos de ferramentas de IA",
+      "llmProviders": "provedores de LLM",
+      "sourceMaps": "mapas de origem",
+      "backfillJobs": "trabalhos de preenchimento",
+      "scorers": "avaliadores",
+      "evalJobs": "trabalhos de avaliação",
+      "scoreConfigs": "configurações de pontuação",
+      "pipelineHistory": "histórico de pipeline"
     },
     "noDashboardsInFolder": {
       "title": "Não há painéis nesta pasta",
@@ -4475,13 +4925,21 @@
     },
     "actions": {
       "edit": "Editar",
-      "delete": "Excluir"
+      "delete": "Excluir",
+      "export": "Exportar",
+      "activate": "Ativar",
+      "pause": "Pausar",
+      "activated": "Trabalho ativado",
+      "paused": "Trabalho pausado",
+      "activateError": "Falha ao ativar o trabalho",
+      "pauseError": "Falha ao pausar o trabalho"
     },
     "tabs": {
       "jobs": "Empregos de avaliação",
       "scorers": "Marcadores",
       "scoreConfigs": "Configurações de pontuação",
-      "providers": "Provedores"
+      "providers": "Provedores",
+      "quality": "Qualidade"
     },
     "singular": {
       "jobs": "Trabalho de avaliação",
@@ -4505,7 +4963,11 @@
     "buttons": {
       "cancel": "Cancelar",
       "create": "Criar",
-      "save": "Salvar"
+      "save": "Salvar",
+      "close": "Fechar",
+      "remove": "Remover",
+      "saveAsDraft": "Salvar como Rascunho",
+      "createAndActivate": "Criar e Ativar"
     },
     "scorerTypeDialog": {
       "title": "Crie um novo marcador",
@@ -4515,7 +4977,11 @@
       "remoteTitle": "Remoto",
       "remoteDescription": "Ligue para seu próprio endpoint HTTP para pontuar.",
       "codeTitle": "Código",
-      "codeDescription": "Em breve."
+      "codeDescription": "Em breve.",
+      "llmJudgeCta": "Configurar Avaliador",
+      "remoteCta": "Configurar Endpoint",
+      "codeCta": "Disponível em uma versão futura",
+      "comingSoonBadge": "Em Breve"
     },
     "provider": {
       "backTo": "Voltar para Provedores",
@@ -4535,7 +5001,15 @@
       "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
       "useAsDefault": "Use como provedor padrão",
       "authConfigLabel": "Configuração de autenticação JSON",
-      "saveError": "Falha ao salvar o provedor"
+      "saveError": "Falha ao salvar o provedor",
+      "authConfigHelp": "As credenciais são criptografadas em repouso e não podem ser lidas novamente após salvas.",
+      "apiKeyLabel": "Chave de API",
+      "apiKeyPlaceholder": "Insira a chave de API",
+      "apiKeyHelp": "Armazenada criptografada em repouso e nunca lida novamente. Deixe em branco ao editar para manter a chave existente.",
+      "authSection": "Autenticação",
+      "authEditNote": "As credenciais não podem ser lidas novamente. Insira a chave de API novamente apenas se quiser rotacioná-la.",
+      "cannotRename": "Não pode ser renomeado após a criação.",
+      "availableModelsHelp": "Opcional. Lista separada por vírgulas de modelos disponíveis neste Provedor."
     },
     "scoreConfig": {
       "createTitle": "Nova configuração de pontuação",
@@ -4552,7 +5026,129 @@
         "categorical": "Categórico",
         "boolean": "boleano"
       },
-      "saveError": "Falha ao salvar a configuração da pontuação"
+      "saveError": "Falha ao salvar a configuração da pontuação",
+      "booleanValues": "true / false",
+      "detail": {
+        "eyebrow": "Configuração de Pontuação",
+        "close": "Fechar",
+        "statusActive": "Ativo",
+        "statusInactive": "Inativo",
+        "createdShort": "Criado",
+        "tabs": {
+          "overview": "Visão Geral",
+          "versions": "Versões",
+          "usedBy": "Usado por"
+        },
+        "descriptionSection": "Descrição",
+        "configurationSection": "Configuração",
+        "dataTypeLabel": "Tipo de dados",
+        "rangeLabel": "Intervalo",
+        "categoriesLabel": "Categorias",
+        "valuesLabel": "Valores",
+        "thresholdSection": "Limite saudável",
+        "thresholdHint": "Considera uma pontuação como saudável",
+        "noThreshold": "Não declarado",
+        "noThresholdHint": "Nenhum limite declarado — as pontuações nesta dimensão não contribuirão para os sinais de status de qualidade.",
+        "usedByIntro": "Qualquer avaliador que emita um valor com este nome de dimensão.",
+        "usedByEmpty": "Nenhum avaliador faz referência a esta configuração ainda.",
+        "scorerTypeLlmJudge": "Avaliador de LLM",
+        "scorerTypeRemote": "Remoto",
+        "versionsIntro": "Cada alteração no intervalo, categorias ou limite saudável cria uma nova versão. As pontuações históricas permanecem vinculadas à versão que as produziu.",
+        "activeVersionChip": "Ativo",
+        "lastUpdated": "Última atualização",
+        "metadataSection": "Metadados",
+        "statusLabel": "Status",
+        "versionLabel": "Versão",
+        "createdLabel": "Criado",
+        "updatedLabel": "Atualizado"
+      },
+      "editTitlePrefix": "Editar",
+      "eyebrow": "Configurações de Pontuação",
+      "sectionTitle": "Configurações de Pontuação",
+      "listTitle": "Configurações de Pontuação",
+      "listSubtitle": "Dimensões de esquema flexível que os avaliadores produzem.",
+      "searchPlaceholder": "Pesquisar configurações",
+      "allTypes": "Todos os tipos",
+      "newButton": "Nova configuração de pontuação",
+      "saveButton": "Salvar alterações",
+      "createButton": "Criar",
+      "columns": {
+        "index": "#",
+        "name": "Nome",
+        "type": "Tipo",
+        "rangeValues": "Intervalo / valores",
+        "healthy": "Saudável",
+        "activeVersion": "Versão ativa",
+        "usedBy": "Usado por",
+        "created": "Criado",
+        "actions": "Ações"
+      },
+      "active": "ativo",
+      "usedByScorers": "{count} avaliadores",
+      "usedByScorer": "{count} avaliador",
+      "noHealthy": "—",
+      "createInfoNumeric": "Defina quando as pontuações nesta dimensão são consideradas saudáveis. Pontuações fora deste intervalo acionarão problemas de qualidade nas listas de traces, sessões e outras visualizações.",
+      "editInfoBannerEmphasis": {
+        "numeric": "Modificar o intervalo ou o limite saudável cria a {nextVersion}.",
+        "categorical": "Modificar as categorias ou o limite saudável cria a {nextVersion}.",
+        "boolean": "Modificar o valor saudável cria a {nextVersion}."
+      },
+      "editInfoBannerDetail": "As pontuações históricas permanecem associadas à versão que as produziu. Edições apenas na descrição são atualizadas no local.",
+      "createInfoSubtitle": "Edições apenas na descrição atualizam a {version} no local.",
+      "namePlaceholder": "ex. \"faithfulness\"",
+      "nameHelp": "Apenas letras minúsculas, números e sublinhados. Usado como identificador estável.",
+      "cannotBeRenamed": "Não pode ser renomeado",
+      "descriptionPlaceholder": "O que esta dimensão mede?",
+      "descriptionHelp": "Edições apenas na descrição não criam uma nova versão.",
+      "dataTypeLocked": "Bloqueado",
+      "dataTypeCannotChange": "Não pode ser alterado após a criação",
+      "dataTypeHelp": {
+        "numeric": "Pontuar como um número em um intervalo",
+        "categorical": "Pontuar como um de N rótulos",
+        "boolean": "Pontuar como true / false"
+      },
+      "minLabel": "Mín",
+      "maxLabel": "Máx",
+      "addCategoryPlaceholder": "Adicionar uma categoria",
+      "addCategoryButton": "Adicionar",
+      "booleanInfo": "Configurações booleanas aceitam valores {trueLabel} / {falseLabel}. Nenhuma configuração adicional é necessária.",
+      "healthyThresholdTitle": "Limite Saudável",
+      "optional": "Opcional",
+      "healthyThresholdIntro": "Defina quando as pontuações nesta dimensão são consideradas saudáveis. Pontuações fora deste intervalo acionarão problemas de qualidade nas listas de traces, sessões e outras visualizações.",
+      "healthyWhenValueIs": "Saudável quando o valor for:",
+      "healthyCategories": "Categorias saudáveis:",
+      "healthyCategoriesHint": "Marque todos os valores que contam como saudáveis.",
+      "healthyValue": "Valor saudável:",
+      "gteLabel": "Maior ou igual a",
+      "lteLabel": "Menor ou igual a",
+      "trueIsHealthy": "true é saudável",
+      "trueIsHealthyHint": "Pontuações de false acionam problemas de qualidade.",
+      "falseIsHealthy": "false é saudável",
+      "falseIsHealthyHint": "Pontuações de true acionam problemas de qualidade.",
+      "thresholdEmptyHint": "Deixar isto vazio significa que esta dimensão não contribuirá para os sinais de status de qualidade em todo o produto. As pontuações ainda serão registradas, mas não acionarão indicadores de problemas.",
+      "empty": {
+        "title": "Nenhuma Configuração de Pontuação Ainda",
+        "description": "As Configurações de Pontuação definem as dimensões que seus avaliadores produzem — nome, tipo de dados, intervalo de valores e limite saudável. Crie uma para começar a configurar a avaliação online.",
+        "chipTypes": "Numérico, Categórico, Booleano",
+        "chipThreshold": "Limite Saudável"
+      },
+      "import": {
+        "title": "Importar Configuração de Pontuação",
+        "button": "Importar",
+        "customLabel": "Personalizado",
+        "customSubtitle": "Importar de arquivo JSON ou URL",
+        "libraryLabel": "Biblioteca",
+        "librarySubtitle": "Navegue e importe do catálogo selecionado",
+        "libraryDrawerTitle": "Biblioteca de Configurações de Pontuação",
+        "outputMessages": "Mensagens de Saída",
+        "creation": "Criação de Configuração de Pontuação",
+        "errors": {
+          "title": "Erros de Validação"
+        }
+      },
+      "export": {
+        "bulkButton": "Exportar"
+      }
     },
     "scorer": {
       "backTo": "Voltar para Scorers",
@@ -4604,7 +5200,203 @@
         "authHint": "Verifique as credenciais do provedor antes de salvar.",
         "schemaHeader": "Incompatibilidade de esquema",
         "schemaHint": "A resposta não correspondeu ao esquema de saída configurado.",
-        "valuePlaceholder": "Valor para {variable}"
+        "valuePlaceholder": "Valor para {variable}",
+        "disabledHint": "Preencha o nome, o provedor, o modelo e o valor de cada variável para executar um teste.",
+        "errorHeader": "Falha no teste",
+        "errorFallback": "Falha no teste do avaliador. Verifique os logs do servidor para mais detalhes.",
+        "resultScore": "Pontuação",
+        "resultLatency": "Latência",
+        "resultModel": "Modelo",
+        "resultTokens": "Tokens",
+        "resultReasoning": "Raciocínio",
+        "resultRaw": "Resposta bruta"
+      },
+      "detail": {
+        "close": "Fechar",
+        "eyebrow": "Avaliador",
+        "refresh": "Atualizar",
+        "descriptionSection": "Descrição",
+        "configurationSection": "Configuração",
+        "scorerTypeLabel": "Tipo de Avaliador",
+        "providerLabel": "Provedor",
+        "providerUnknown": "Desconhecido",
+        "modelLabel": "Modelo",
+        "endpointLabel": "Endpoint",
+        "producesSection": "Produz Configuração de Pontuação",
+        "producesEmpty": "Este avaliador não grava em nenhuma Configuração de Pontuação.",
+        "promptSection": "Prompt do Avaliador",
+        "requestTemplateSection": "Modelo de Requisição",
+        "variablesSuffix": "variáveis",
+        "outputSchemaSection": "Esquema de Saída",
+        "usedBySection": "Usado Por",
+        "usedByIntro": "Trabalhos que fazem referência a este avaliador em seu pipeline.",
+        "usedByEmpty": "Nenhum trabalho faz referência a este avaliador ainda.",
+        "versionsIntro": "As versões são snapshots imutáveis da configuração do avaliador. A versão ativa é a que os trabalhos executam hoje.",
+        "activeVersionChip": "Ativo",
+        "lastUpdated": "Última atualização",
+        "metadataSection": "Metadados",
+        "versionLabel": "Versão",
+        "createdLabel": "Criado",
+        "updatedLabel": "Atualizado",
+        "typeLlmJudge": "Avaliador de LLM",
+        "typeRemote": "Remoto",
+        "tabs": {
+          "configuration": "Configuração",
+          "versions": "Versões",
+          "runs": "Execuções",
+          "usedBy": "Usado Por"
+        },
+        "kpis": {
+          "totalRuns": "Total de Execuções (24h)",
+          "totalRunsSub": "Em todos os Trabalhos que fazem referência",
+          "successRate": "Taxa de Sucesso",
+          "successRateSub": "Últimas 24h",
+          "avgLatency": "Latência Média",
+          "avgLatencySub": "p50 entre as execuções",
+          "usedBy": "Usado Por",
+          "usedBySubSingular": "trabalho",
+          "usedBySubPlural": "trabalhos"
+        },
+        "runs": {
+          "showingPrefix": "Exibindo",
+          "showingOf": "de",
+          "showingSuffix": "execuções",
+          "empty": "Nenhuma execução do avaliador nesta janela.",
+          "spanLabel": "Span",
+          "traceLabel": "Trace",
+          "jobUnknown": "—",
+          "col": {
+            "time": "Hora",
+            "job": "Trabalho",
+            "target": "Alvo",
+            "score": "Pontuação",
+            "latency": "Latência",
+            "status": "Status"
+          }
+        }
+      },
+      "listTitle": "Avaliadores",
+      "listSubtitle": "Os avaliadores são executados contra seus traces e produzem pontuações em dimensões definidas.",
+      "searchPlaceholder": "Pesquisar avaliadores",
+      "allTypes": "Todos os tipos",
+      "newButton": "Novo avaliador",
+      "usedByJobs": "{count} trabalhos",
+      "usedByJob": "{count} trabalho",
+      "columns": {
+        "name": "Nome",
+        "type": "Tipo",
+        "produces": "Produz",
+        "version": "Versão",
+        "usedBy": "Usado por",
+        "lastRun": "Última execução",
+        "successRate": "Taxa de sucesso (24h)",
+        "actions": "Ações"
+      },
+      "empty": {
+        "title": "Nenhum Avaliador Ainda",
+        "description": "Os avaliadores são as unidades de execução da avaliação. Eles pegam spans dos seus traces de produção e produzem pontuações nas dimensões de qualidade que importam para você.",
+        "chipLlmJudge": "Avaliador de LLM",
+        "chipRemote": "Remoto",
+        "chipCode": "Código"
+      },
+      "noProviders": {
+        "title": "Adicione um Provedor Primeiro",
+        "description": "Os avaliadores precisam de um Provedor de LLM (OpenAI, Anthropic, etc.) para serem executados. Adicione um provedor em Configurações antes de criar avaliadores.",
+        "chipRequired": "Necessário para o Avaliador de LLM",
+        "cta": "Adicionar Provedor"
+      },
+      "import": {
+        "title": "Importar Avaliador",
+        "button": "Importar",
+        "customLabel": "Personalizado",
+        "customSubtitle": "Importar de arquivo JSON ou URL",
+        "libraryLabel": "Biblioteca",
+        "librarySubtitle": "Navegue e importe do catálogo selecionado",
+        "libraryDrawerTitle": "Biblioteca de Avaliadores",
+        "outputMessages": "Mensagens de Saída",
+        "creation": "Criação de Avaliador",
+        "errors": {
+          "title": "Erros de Validação"
+        }
+      },
+      "export": {
+        "bulkButton": "Exportar"
+      },
+      "descriptionPlaceholder": "Um breve resumo do que este avaliador mede.",
+      "producesScoreHelp": "Qual dimensão este avaliador mede?",
+      "providerHelp": "Escolha o Provedor de LLM que este avaliador chama. Gerencie os provedores em {settingsLink}.",
+      "providerHelpSettingsLink": "Configurações",
+      "refreshProviders": "Atualizar Provedores",
+      "selectedPrefix": "Selecionado:",
+      "endpointLabel": "Endpoint:",
+      "defaultModelPreviewLabel": "Modelo padrão:",
+      "authLabel": "Autenticação:",
+      "authConfigured": "configurado",
+      "authNotConfigured": "não configurado",
+      "rangeLabel": "Intervalo:",
+      "healthyLabel": "Saudável:",
+      "typeLabel": "Tipo:",
+      "promptVariablesLabel": "Variáveis:",
+      "promptHelp": "Concentre-se na lógica de avaliação. Use {inputVar} e {outputVar} como placeholders.",
+      "includeReasoningLabel": "Incluir Raciocínio",
+      "includeReasoningHint": "O LLM explica sua pontuação. Armazenado em score.metadata.reasoning.",
+      "extraFieldsLabel": "Campos de Metadados Extras",
+      "extraFieldsOptional": "Opcional",
+      "extraFieldsHint": "Adicione campos que o LLM deve gerar junto com a pontuação. Armazenados em score.metadata para análise posterior.",
+      "extraFields": {
+        "colName": "Nome do Campo",
+        "colType": "Tipo",
+        "colDescription": "Descrição",
+        "namePlaceholder": "field_name",
+        "descriptionPlaceholder": "O que o LLM deve colocar neste campo?",
+        "addButton": "+ Adicionar Campo",
+        "previewSchema": "Ver Esquema Gerado",
+        "schemaTitle": "Esquema JSON Gerado",
+        "schemaLoading": "Derivando esquema…",
+        "schemaCopy": "Copiar",
+        "schemaCopied": "Copiado",
+        "schemaCopyFailed": "Falha ao copiar o esquema para a área de transferência.",
+        "typeString": "string",
+        "typeNumber": "number",
+        "typeBoolean": "boolean"
+      },
+      "authSection": "Autenticação",
+      "headersSection": "Cabeçalhos Personalizados",
+      "requestBodySection": "Corpo da Requisição",
+      "remoteUrlLabel": "URL",
+      "remoteTimeoutLabel": "Timeout (ms)",
+      "remoteRetriesLabel": "Máx. de Tentativas",
+      "remoteBackoffLabel": "Backoff",
+      "remoteBackoff": {
+        "exponential": "Exponencial",
+        "linear": "Linear",
+        "fixed": "Fixo"
+      },
+      "remoteAuthLabel": "Tipo de Autenticação",
+      "remoteAuth": {
+        "placeholder": "Selecione o Tipo de Autenticação",
+        "bearer": "Bearer Token",
+        "basic": "Basic Auth",
+        "apiKey": "Chave de API",
+        "tokenLabel": "Token",
+        "usernameLabel": "Nome de Usuário",
+        "passwordLabel": "Senha",
+        "headerNameLabel": "Nome do Cabeçalho",
+        "bearerTokenPlaceholder": "Cole o bearer token",
+        "basicUsernamePlaceholder": "usuário",
+        "basicPasswordPlaceholder": "••••••••",
+        "apiKeyHeaderPlaceholder": "X-API-Key",
+        "apiKeyTokenPlaceholder": "Cole a chave de API",
+        "encryptedHint": "Criptografado em repouso. Não pode ser visualizado após salvar."
+      },
+      "remoteHeaders": {
+        "subtitle": "Enviado com cada requisição.",
+        "colName": "Nome",
+        "colValue": "Valor",
+        "colKey": "Nome",
+        "keyPlaceholder": "X-Custom-Header",
+        "valuePlaceholder": "valor",
+        "addButton": "+ Adicionar Cabeçalho"
       }
     },
     "job": {
@@ -4637,7 +5429,10 @@
       "scorerPicker": {
         "title": "Marcadores",
         "hint": "Selecione um ou mais marcadores para disputar cada período combinado.",
-        "meta": "{tipo} · v {versão}"
+        "meta": "{tipo} · v {versão}",
+        "placeholder": "Selecionar Avaliadores",
+        "searchPlaceholder": "Pesquisar avaliadores…",
+        "empty": "Nenhum avaliador disponível. Crie um primeiro na aba Avaliadores."
       },
       "filter": {
         "title": "Condição do filtro",
@@ -4662,7 +5457,117 @@
         "emptyValue": "—"
       },
       "selectAtLeastOne": "Selecione pelo menos um marcador",
-      "saveError": "Falha ao salvar o trabalho de avaliação"
+      "saveError": "Falha ao salvar o trabalho de avaliação",
+      "detail": {
+        "close": "Fechar",
+        "eyebrow": "Trabalho de Avaliação",
+        "refresh": "Atualizar",
+        "descriptionSection": "Descrição",
+        "targetSection": "Alvo",
+        "streamLabel": "Stream",
+        "streamTypeLabel": "Tipo de Stream",
+        "filterLabel": "Filtro",
+        "filterEmpty": "Sem filtro — cada span é avaliado",
+        "scorersSection": "Avaliadores",
+        "scorersEmpty": "Nenhum avaliador anexado a este trabalho ainda.",
+        "scorerUnknown": "(avaliador removido)",
+        "scorerTypeLlmJudge": "Avaliador de LLM",
+        "scorerTypeRemote": "Remoto",
+        "producesPrefix": "Produz",
+        "viewScorerHint": "Ver",
+        "inputMappingSection": "Mapeamento de Entrada",
+        "samplingSection": "Amostragem",
+        "samplingModeLabel": "Modo",
+        "samplingValueLabel": "Valor",
+        "samplingAll": "Avaliar cada correspondência",
+        "samplingRate": "Amostra aleatória por taxa",
+        "samplingCount": "Primeiras N correspondências",
+        "metadataSection": "Metadados",
+        "versionLabel": "Versão",
+        "pipelineLabel": "ID do Pipeline",
+        "createdLabel": "Criado",
+        "updatedLabel": "Atualizado",
+        "tabs": {
+          "configuration": "Configuração",
+          "runs": "Execuções",
+          "failures": "Falhas"
+        },
+        "kpis": {
+          "totalRuns": "Total de Execuções",
+          "totalRunsSub": "Dentro da janela selecionada",
+          "successRate": "Taxa de Sucesso",
+          "successRateSub": "Em todos os avaliadores",
+          "avgLatency": "Latência Média",
+          "avgLatencySub": "Média entre as execuções",
+          "scorers": "Avaliadores",
+          "scorersSubSingular": "avaliador anexado",
+          "scorersSubPlural": "avaliadores anexados"
+        },
+        "runs": {
+          "showingPrefix": "Exibindo",
+          "showingOf": "de",
+          "showingSuffix": "execuções correspondentes",
+          "empty": "Nenhuma execução registrada para este trabalho na janela selecionada.",
+          "spanLabel": "SPAN",
+          "traceLabel": "TRACE",
+          "scorerUnknown": "(avaliador desconhecido)",
+          "col": {
+            "time": "Hora",
+            "scorer": "Avaliador",
+            "target": "Alvo",
+            "score": "Pontuação",
+            "latency": "Latência",
+            "status": "Status"
+          }
+        },
+        "failures": {
+          "byScorerTitle": "Falhas por Avaliador",
+          "byScorerEmpty": "Nenhuma falha registrada na janela selecionada.",
+          "recentTitle": "Falhas Recentes",
+          "recentEmpty": "Nenhuma execução com falha na janela selecionada.",
+          "col": {
+            "scorer": "Avaliador",
+            "failureRate": "Taxa de Falhas",
+            "count": "Falhas / Total"
+          }
+        }
+      },
+      "listTitle": "Trabalhos de Avaliação",
+      "listSubtitle": "Implante avaliadores no seu stream de traces de produção.",
+      "searchPlaceholder": "Pesquisar trabalhos",
+      "allStatuses": "Todos os status",
+      "newButton": "Novo trabalho",
+      "scorersCount": "{count} avaliadores",
+      "scorerCount": "{count} avaliador",
+      "columns": {
+        "name": "Nome",
+        "status": "Status",
+        "stream": "Stream",
+        "scorers": "Avaliadores",
+        "successRate": "Taxa de sucesso",
+        "lastRun": "Última execução",
+        "created": "Criado",
+        "actions": "Ações"
+      },
+      "empty": {
+        "title": "Nenhum Trabalho de Avaliação Ainda",
+        "description": "Os Trabalhos de Avaliação implantam avaliadores contra seu stream de traces de produção. Eles amostram spans correspondentes, executam os avaliadores de forma assíncrona e armazenam as pontuações resultantes para análise.",
+        "chipStreams": "Stream de Produção",
+        "chipScorers": "Múltiplos Avaliadores",
+        "chipSampling": "Controle de Amostragem"
+      },
+      "descriptionPlaceholder": "O que este trabalho monitora?",
+      "samplingValueHelp": "JSON: rate é um número de 0 a 1, count é um inteiro positivo.",
+      "samplingValueAllHelp": "Não aplicável quando o modo é Todos — cada evento correspondente será avaliado.",
+      "samplingHelp": "Aplicado após o Filtro. Controla o custo — apenas os spans correspondentes contam para a taxa.",
+      "presets": {
+        "label": "Predefinições rápidas",
+        "rootSpans": "Apenas spans raiz",
+        "llmCalls": "Chamadas de LLM",
+        "toolCalls": "Chamadas de ferramentas"
+      },
+      "createdAndActivated": "Trabalho de avaliação criado e ativado",
+      "createdButActivateFailed": "Trabalho de avaliação criado, mas a ativação falhou"
     },
     "quality": {
       "scopeLabel": "Todas as dimensões de qualidade neste espaço de trabalho",
@@ -4739,6 +5644,10 @@
           "unhealthy": "Insalubre",
           "healthy": "Saudável",
           "coverage": "Cobertura"
+        },
+        "empty": {
+          "title": "Aguardando suas primeiras pontuações",
+          "description": "Nenhuma pontuação foi registrada para esta configuração no intervalo de tempo selecionado. Elas aparecerão aqui automaticamente assim que um avaliador que a utilize for executado."
         }
       },
       "sidebar": {
@@ -4795,6 +5704,83 @@
       "description": "Os provedores de LLM armazenam os detalhes da conexão (endpoint + credenciais) dos modelos de linguagem que seus avaliadores do LLM Judge chamam. Adicione um para começar a fazer avaliações baseadas em juízes."
     }
   },
+  "shortcuts": {
+    "title": "Atalhos de teclado",
+    "mac": "Mac",
+    "windowsLinux": "Windows/ Linux",
+    "toggleHint": "para alternar este painel",
+    "pages": {
+      "global": "Global",
+      "logs": "Registros",
+      "dashboardsList": "Painéis",
+      "dashboards": "Visualização do painel",
+      "dashboardsPanel": "Painel — Painel (passe o mouse sobre um painel)",
+      "metrics": "Métricas",
+      "traces": "Traços",
+      "alerts": "Alertas",
+      "streams": "Fluxos",
+      "pipelines": "Oleodutos",
+      "functions": "Funções",
+      "reports": "Relatórios"
+    },
+    "actions": {
+      "openCheatsheet": "Abra a folha de dicas de atalhos de teclado",
+      "closeDialog": "Feche qualquer caixa de diálogo, gaveta ou modal",
+      "focusSearch": "Barra de pesquisa de foco",
+      "logsRunQuery": "Executar consulta de pesquisa",
+      "logsRefresh": "Atualizar/executar novamente a pesquisa",
+      "logsToggleHistogram": "Alternar histograma",
+      "logsToggleSidebar": "Alternar barra lateral de campos",
+      "dashboardsListAdd": "Novo painel",
+      "dashboardsListImport": "Painel de importação",
+      "dashboardsListRefresh": "Atualizar lista",
+      "dashboardRefresh": "Atualizar todos os painéis",
+      "dashboardAddPanel": "Adicionar novo painel",
+      "dashboardSave": "Salvar painel",
+      "dashboardFullscreen": "Alternar para tela cheia",
+      "panelView": "Exibir painel em tela cheia",
+      "panelEdit": "Painel de edição",
+      "panelDuplicate": "Painel duplicado",
+      "panelDelete": "Excluir painel",
+      "metricsRunQuery": "Executar consulta ProMQL",
+      "metricsRefresh": "Atualizar",
+      "tracesSearch": "Traços de pesquisa",
+      "tracesRefresh": "Atualizar",
+      "alertsCreate": "Criar novo alerta",
+      "alertsRefresh": "Atualizar lista de alertas",
+      "alertsClose": "Fechar gaveta de detalhes de alertas",
+      "streamsAdd": "Adicionar novo stream",
+      "streamsRefresh": "Atualizar lista",
+      "pipelinesAdd": "Crie um novo funil",
+      "pipelinesImport": "Pipeline de importação",
+      "pipelinesRefresh": "Atualizar lista",
+      "functionsAdd": "Adicionar nova função",
+      "functionsRefresh": "Atualizar lista",
+      "reportsAdd": "Criar novo relatório",
+      "reportsRefresh": "Atualizar lista"
+    },
+    "search": "Atalhos de pesquisa...",
+    "noResults": "Nenhum atalho encontrado",
+    "subtitle": "Imprensa? em qualquer lugar · clique em qualquer linha para acionar",
+    "footerClose": "fechar",
+    "footerReopen": "reabrir",
+    "footerRun": "clique na linha para executar",
+    "footerMacHint": "⌘ = Cmd no Mac · Ctrl no Windows",
+    "modules": {
+      "global": "Global",
+      "logs": "Registros",
+      "dashboards": "Painéis",
+      "metrics": "Métricas",
+      "traces": "Traços",
+      "alerts": "Alertas",
+      "streams": "Fluxos",
+      "pipelines": "Oleodutos",
+      "functions": "Funções",
+      "reports": "Relatórios",
+      "iam": "IAM",
+      "runningQueries": "Executando consultas"
+    }
+  },
   "aiObservability": {
     "title": "Observabilidade do LLM",
     "sections": {
@@ -4807,7 +5793,61 @@
       "quality": "Qualidade",
       "evalJobs": "Empregos de avaliação",
       "scorers": "Marcadores",
-      "scoreConfigs": "Configurações de pontuação"
+      "scoreConfigs": "Configurações de pontuação",
+      "llmInsights": "Insights de LLM"
+    },
+    "kpi": {
+      "totalCost": "Custo total",
+      "totalTokens": "Total de tokens",
+      "totalTraces": "Total de traços",
+      "p95Latency": "Latência P95",
+      "errorRate": "Taxa de erro"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "Tendência de custo",
+        "subtitle": "USD por modelo"
+      },
+      "tokenTrend": {
+        "title": "Tendência do token",
+        "subtitle": "tokens por modelo"
+      },
+      "spanTrend": {
+        "title": "Tendência da Espanha",
+        "subtitle": "contagem de extensão por tipo"
+      },
+      "latencyPercentiles": {
+        "title": "Latência p50/p95/p99",
+        "subtitle": "todas as chamadas LLM"
+      },
+      "tracesOverTime": {
+        "title": "Traços ao longo do tempo",
+        "subtitle": "contagem de rastreios por serviço"
+      },
+      "errorsOverTime": {
+        "title": "Erros ao longo do tempo",
+        "subtitle": "contagem de erros"
+      },
+      "spansByModel": {
+        "title": "Expansões por modelo",
+        "subtitle": "contagem de chamadas por modelo"
+      },
+      "tokensByModel": {
+        "title": "Tokens por modelo",
+        "subtitle": "total de tokens por modelo"
+      },
+      "recentErrors": {
+        "title": "Erros recentes",
+        "subtitle": "últimos 10 períodos falhados"
+      }
+    },
+    "subtitle": {
+      "llmInsights": "Acompanhe latência, erros, tokens e custos em todo o seu tráfego de LLM",
+      "sessions": "Navegue e inspecione as sessões dos agentes, passo a passo",
+      "quality": "Classifique e acompanhe a qualidade de suas respostas de LLM",
+      "evalJobs": "Execute e monitore trabalhos de avaliação em suas sessões",
+      "scorers": "Crie e gerencie os marcadores que classificam os resultados do LLM",
+      "scoreConfigs": "Configure as rubricas de pontuação usadas por suas avaliações"
     }
   },
   "logs": {
@@ -4846,7 +5886,10 @@
       "removeFilterDescSql": "Você tem condições SQL aplicadas a essa consulta",
       "openHistory": "Abrir histórico de pesquisa",
       "askAi": "Peça à IA que corrija minha consulta",
-      "selectedRange": "o intervalo selecionado"
+      "selectedRange": "o intervalo selecionado",
+      "descOutOfRange": "Sua janela de tempo não contém nenhum dado deste stream. Vá para quando os dados foram vistos pela última vez.",
+      "jumpToData": "Ir para os dados mais recentes",
+      "descDataAtBoundary": "O stream tem dados nesta janela, mas nenhum evento correspondeu. Tente verificar seu histórico de pesquisa ou pedir ajuda a AI."
     },
     "error": {
       "sqlError": "Erro de sintaxe SQL",
@@ -4915,5 +5958,16 @@
     "askAi": "Peça à IA que corrija minha consulta",
     "showDetail": "Mostrar detalhes",
     "hideDetail": "Ocultar detalhes"
+  },
+  "refreshButton": {
+    "justNow": "agora mesmo",
+    "secondsAgo": "{sec} s atrás",
+    "minutesAgo": "{min} m atrás",
+    "hoursAgo": "{h} h atrás",
+    "notYetRefreshed": "Ainda não foi atualizado",
+    "dataFresh": "Os dados estão atualizados",
+    "dataGettingStale": "Os dados estão ficando obsoletos",
+    "dataStale": "Os dados estão obsoletos",
+    "lastRefreshed": "Última atualização: {time}"
   }
 }

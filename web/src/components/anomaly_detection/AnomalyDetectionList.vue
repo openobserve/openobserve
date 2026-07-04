@@ -47,14 +47,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Status column -->
       <template #cell-status="{ row }">
         <div class="tw:flex tw:items-center tw:gap-2">
-          <OBadge :variant="statusColor(row)" dot data-test="anomaly-detection-status-badge">
+          <OTag
+            type="anomalyStatus"
+            :value="row.enabled ? row.status : 'disabled'"
+            data-test="anomaly-detection-status-badge"
+          >
             {{ statusLabel(row) }}
             <OSpinner
               v-if="row.status === 'training'"
               size="xs"
               class="tw:ml-1"
             />
-          </OBadge>
+          </OTag>
           <OTooltip v-if="row.status === 'failed'" :content="row.last_error || t('alerts.anomalyStatus.failed')" />
         </div>
       </template>
@@ -64,31 +68,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="row.detection_window_seconds">
           {{ formatSeconds(row.detection_window_seconds) }}
         </span>
-        <span v-else class="tw:text-gray-400">—</span>
+        <span v-else class="tw:text-text-primary">—</span>
       </template>
 
       <!-- Last Triggered At column -->
       <template #cell-last_triggered_at="{ row }">
-        <span v-if="row.last_detection_run && row.last_detection_run > 0">
-          {{ formatTimestamp(row.last_detection_run) }}
-        </span>
-        <span v-else class="tw:text-gray-400">—</span>
+        <OTimeCell :value="row.last_detection_run" unit="us" empty-label="—" />
       </template>
 
       <!-- Last Anomaly Detected At column -->
       <template #cell-last_anomaly_detected_at="{ row }">
-        <span v-if="row.last_anomaly_detected_at">
-          {{ formatTimestamp(row.last_anomaly_detected_at) }}
-        </span>
-        <span v-else class="tw:text-gray-400">—</span>
+        <OTimeCell :value="row.last_anomaly_detected_at" unit="us" empty-label="—" />
       </template>
 
       <!-- Last Trained At column -->
       <template #cell-last_trained_at="{ row }">
-        <span v-if="row.training_completed_at">
-          {{ formatTimestamp(row.training_completed_at) }}
-        </span>
-        <span v-else class="tw:text-gray-400">—</span>
+        <OTimeCell :value="row.training_completed_at" unit="us" empty-label="—" />
       </template>
 
       <!-- Actions column -->
@@ -100,15 +95,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-sm"
           :title="t('alerts.edit')"
+          data-row-action="edit"
           @click="editConfig(row)"
           />
           <!-- Pause / Resume — tw:hidden while training or failed -->
           <OButton
             v-if="row.status !== 'training' && row.status !== 'failed'"
           :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-          variant="ghost"
+          :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
           size="icon-sm"
           :title="row.enabled ? 'Pause' : 'Resume'"
+          :data-row-action="row.enabled ? 'pause' : 'resume'"
           @click="toggleEnabled(row)"
           />
           <!-- Stop Training — only shown while training -->
@@ -119,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           title="Stop Training"
           :loading="cancellingId === row.anomaly_id"
+          data-row-action="pause"
           @click="confirmCancelTraining(row)"
           />
           <!-- Retrain / Retry -->
@@ -128,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-sm"
             :title="row.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining')"
             :loading="retrainingId === row.anomaly_id"
+            data-row-action="resume"
             @click="confirmRetrain(row)"
           >
             <OIcon name="brain-circuit" size="sm" />
@@ -138,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-destructive"
           size="icon-sm"
           :title="t('alerts.delete')"
+          data-row-action="delete"
           @click="confirmDelete(row)"
           />
         </div>
@@ -240,17 +240,17 @@ import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OBadge, OButton, ODialog, OEmptyState, OIcon, OSpinner, OTable, OTooltip },
+  components: { OTag, OButton, ODialog, OEmptyState, OIcon, OSpinner, OTable, OTimeCell, OTooltip },
 
   props: {
     org_identifier: {
@@ -294,17 +294,6 @@ export default defineComponent({
     const displayConfigs = computed(() =>
       configs.value.map((c, i) => ({ ...c, "#": i + 1 }))
     );
-
-    const statusColor = (row: any): BadgeVariant => {
-      if (!row.enabled) return "default";
-      switch (row.status) {
-        case "ready":     return "success";
-        case "training":  return "primary";
-        case "failed":    return "error";
-        case "waiting":   return "default";
-        default:          return "default";
-      }
-    };
 
     const statusLabel = (row: any) => {
       if (!row.enabled) return t("alerts.anomalyStatus.disabled");
@@ -452,7 +441,6 @@ export default defineComponent({
       cancellingId,
       confirmCancelTraining,
       cancelTraining,
-      statusColor,
       statusLabel,
       formatTimestamp,
       formatSeconds,

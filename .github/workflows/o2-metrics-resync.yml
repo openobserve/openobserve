@@ -1,0 +1,43 @@
+name: OpenObserve Metrics Re-sync (fallback)
+
+# Fallback for the LIVE per-run metrics (report_to_openobserve jobs in playwright.yml,
+# api-testing.yml, playwright_regression.yml). Those are the happy path (ingest_source="live").
+# This cron re-posts the last LOOKBACK_DAYS of runs tagged ingest_source="backfill" so any run
+# whose live emit was missed still lands. Dashboards dedup by run_id (latest attempt) and PREFER
+# the live doc, so a backfill row only surfaces when live genuinely missed — making the
+# live-vs-fallback split visible. No-ops until the O2_REPORTING_* secrets are set.
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # daily, 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      lookback_days:
+        description: "How many days back to re-sync"
+        required: false
+        default: "2"
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: o2-metrics-resync
+  cancel-in-progress: false
+
+jobs:
+  resync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+      - name: Re-sync recent runs to OpenObserve
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          O2_REPORTING_INGEST_BASE: ${{ secrets.O2_REPORTING_INGEST_BASE }}
+          O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
+          O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
+          LOOKBACK_DAYS: ${{ github.event.inputs.lookback_days || '2' }}
+        run: python3 .github/scripts/o2_metrics_resync.py

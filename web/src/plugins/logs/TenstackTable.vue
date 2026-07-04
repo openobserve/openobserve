@@ -228,7 +228,7 @@ class="tw:mr-1" />
         <tr
           v-for="r in SKEL_ROW_COUNT"
           :key="`skel-${r}`"
-          class="logs-skel-row tw:flex tw:items-center tw:w-full"
+          class="logs-skel-row tw:flex tw:items-center tw:w-full tw:opacity-0 tw:h-[29px] tw:bg-(--o2-log-table-row-bg) tw:border-b tw:border-(--o2-log-table-row-border)"
           :style="{ animationDelay: `${(r - 1) * 40}ms` }"
         >
           <!-- No columns loaded yet (first page load) — full-width shimmer bar -->
@@ -280,6 +280,11 @@ class="tw:mr-1" />
             :data-expanded="
               formattedRows?.[virtualRow.index]?.original?.isExpandedRow
             "
+            :tabindex="
+              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                ? 0
+                : undefined
+            "
             :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
             :class="[
               'tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b-[1px]',
@@ -299,16 +304,21 @@ class="tw:mr-1" />
                   ? 'tw:bg-zinc-700'
                   : 'tw:bg-zinc-300'
                 : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                  ? 'log-row-base'
+                  ? 'log-row-base tw:bg-(--o2-log-table-row-bg)'
                   : '',
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'table-row-hover'
+                ? 'table-row-hover table-row-focus tw:focus-visible:outline-none tw:transition-[background-color,box-shadow] tw:duration-[120ms] tw:[transition-timing-function:ease-in-out] tw:border-b-(--o2-log-table-row-border)!'
                 : '',
             ]"
             @click="
               !(formattedRows[virtualRow.index]?.original as any)
                 ?.isExpandedRow &&
               handleDataRowClick(tableRows[virtualRow.index], virtualRow.index)
+            "
+            @keydown="
+              !(formattedRows[virtualRow.index]?.original as any)
+                ?.isExpandedRow &&
+              handleRowKeydown($event, tableRows[virtualRow.index], virtualRow.index)
             "
           >
             <!-- Status color line for entire row -->
@@ -318,6 +328,8 @@ class="tw:mr-1" />
                   ?.isExpandedRow
               "
               class="tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
+              data-test="log-table-row-status-color"
+              :data-test-status-level="getRowStatusLevel(tableRows[virtualRow.index])"
               :style="{
                 backgroundColor: getRowStatusColor(tableRows[virtualRow.index]),
               }"
@@ -644,6 +656,13 @@ const highlightQuery = computed(() => {
 const getRowStatusColor = (rowData: any) => {
   const statusInfo = extractStatusFromLog(rowData);
   return statusInfo.color;
+};
+
+// Detected severity/level for the row, exposed as a data attribute on the status
+// color bar. This keeps the severity machine-readable regardless of which column
+// is displayed (e.g. the FTS "body" column instead of the raw "source" JSON).
+const getRowStatusLevel = (rowData: any) => {
+  return extractStatusFromLog(rowData).level;
 };
 
 watch(
@@ -1116,6 +1135,29 @@ const handleDataRowClick = (row: any, index: number) => {
   }
 };
 
+const handleRowKeydown = (event: KeyboardEvent, row: any, index: number) => {
+  // Only handle keys originating from the row itself, not focusable inner elements.
+  if (event.target !== event.currentTarget) return;
+
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    handleDataRowClick(row, index);
+  } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    let sibling =
+      event.key === "ArrowDown"
+        ? (event.currentTarget as HTMLElement).nextElementSibling
+        : (event.currentTarget as HTMLElement).previousElementSibling;
+    while (sibling && !sibling.matches("tr[tabindex]")) {
+      sibling =
+        event.key === "ArrowDown"
+          ? sibling.nextElementSibling
+          : sibling.previousElementSibling;
+    }
+    if (sibling instanceof HTMLElement) sibling.focus();
+  }
+};
+
 const expandFunctionError = () => {
   isFunctionErrorOpen.value = !isFunctionErrorOpen.value;
 };
@@ -1205,10 +1247,9 @@ defineExpose({
 <style>
 @import "@/assets/styles/log-highlighting.css";
 </style>
-<style scoped lang="scss">
-@import "@/styles/logs/tenstack-table.scss";
+<style>
 
-// Compact expand/collapse button for log rows — matches original q-btn dense size="xs" flat
+/* Compact expand/collapse button for log rows — matches original q-btn dense size="xs" flat */
 .log-row-expand-btn {
   height: 1.25rem !important;
   width: 1.25rem !important;
@@ -1218,32 +1259,23 @@ defineExpose({
   vertical-align: middle !important;
 }
 
-:deep(.log-row-expand-btn svg) {
+.log-row-expand-btn svg {
   width: 0.75rem !important;
   height: 0.75rem !important;
 }
 
-// Log table row surface colour — uniform background, separator via border-bottom only
-.log-row-base {
-  background-color: var(--o2-log-table-row-bg);
+.table-row-hover:hover,
+.table-row-focus:focus-visible {
+  background-color: var(--o2-log-table-row-hover) !important;
+  box-shadow: inset 3px 0 0 var(--o2-primary-color) !important;
 }
 
-.table-row-hover {
-  transition: background-color 0.12s ease-in-out, box-shadow 0.12s ease-in-out;
-  border-bottom-color: var(--o2-log-table-row-border) !important;
-
-  &:hover {
-    background-color: var(--o2-log-table-row-hover) !important;
-    box-shadow: inset 3px 0 0 var(--o2-primary-color) !important;
-  }
-}
-
-// Fix: OButton base class (tw:relative) overrides tw:absolute passed via props.
-// Use top:0 + translate:-50% 0 to anchor the button flush with the row top,
-// and height:100% to fill the td height (= row height minus 1px border).
-// Overriding the CSS `translate` property (not `transform`) is required because
-// Tailwind v4 sets tw:-translate-y-1/2 via the CSS `translate` shorthand property.
-:deep(.ai-btn) {
+/* Fix: OButton base class (tw:relative) overrides tw:absolute passed via props.
+   Use top:0 + translate:-50% 0 to anchor the button flush with the row top,
+   and height:100% to fill the td height (= row height minus 1px border).
+   Overriding the CSS `translate` property (not `transform`) is required because
+   Tailwind v4 sets tw:-translate-y-1/2 via the CSS `translate` shorthand property. */
+.ai-btn {
   position: absolute !important;
   top: 50% !important;
   right: 0.875rem !important;
@@ -1255,27 +1287,23 @@ defineExpose({
   border-radius: 0.25rem !important;
 }
 
-:deep(.ai-btn img.ai-icon) {
+.ai-btn img.ai-icon {
   width: 0.75rem !important;
   height: 0.75rem !important;
 }
 
-// Suppress the hover box-shadow — it visually bleeds outside the row boundary
-:deep(.ai-btn:hover) {
+/* Suppress the hover box-shadow — it visually bleeds outside the row boundary */
+.ai-btn:hover {
   box-shadow: none !important;
 }
 
-// ── Loading skeleton ─────────────────────────────────────────────
+/* ── Loading skeleton ───────────────────────────────────────────── */
 .logs-skel-row {
-  opacity: 0;
   animation: logs-skel-row-in 320ms ease-out forwards;
-  border-bottom: 1px solid var(--o2-log-table-row-border);
-  height: 29px;
-  background-color: var(--o2-log-table-row-bg);
 }
 
+/* Light mode — matches histogram-skeleton --hsk-bar (grey-100 #f5f5f5) */
 .logs-skel-pill {
-  // Light mode — matches histogram-skeleton --hsk-bar (grey-100 #f5f5f5)
   background: linear-gradient(
     90deg,
     var(--color-grey-100)       0%,
@@ -1284,16 +1312,16 @@ defineExpose({
   );
   background-size: 200% 100%;
   animation: logs-skel-shimmer 1.5s ease-in-out infinite;
+}
 
-  // Dark mode — matches histogram-skeleton dark --hsk-bar (grey-600 #525252)
-  .body--dark & {
-    background: linear-gradient(
-      90deg,
-      var(--color-grey-600)       0%,
-      rgba(255, 255, 255, 0.03)   50%,
-      var(--color-grey-600)       100%
-    );
-  }
+/* Dark mode — matches histogram-skeleton dark --hsk-bar (grey-600 #525252) */
+.body--dark .logs-skel-pill {
+  background: linear-gradient(
+    90deg,
+    var(--color-grey-600)       0%,
+    rgba(255, 255, 255, 0.03)   50%,
+    var(--color-grey-600)       100%
+  );
 }
 
 @keyframes logs-skel-shimmer {

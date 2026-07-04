@@ -79,6 +79,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
 
+          <template #cell-identifier="{ row }">
+            <OCodeCell :value="row.identifier" />
+          </template>
+
+          <template #cell-type="{ row }">
+            <OTag v-if="row.type" :value="row.type" />
+            <span v-else class="tw:text-text-primary">—</span>
+          </template>
+
+          <template #cell-plan="{ row }">
+            <OTag v-if="row.plan && row.plan !== '-'" type="subscriptionPlan" :value="row.plan" />
+            <span v-else class="tw:text-text-primary">—</span>
+          </template>
+
           <template #cell-actions="{ row }">
             <OButton
               data-test="organization-name-edit"
@@ -116,6 +130,8 @@ import JoinOrganization from "./JoinOrganization.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -130,9 +146,11 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "PageOrganization",
   components: {
+    OCodeCell,
     AddUpdateOrganization,
     OEmptyState,
     OButton,
+    OTag,
     AppPageHeader,
     OIcon,
     OTable,
@@ -474,6 +492,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-</style>

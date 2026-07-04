@@ -4,6 +4,7 @@ import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
 import { openNavFlyoutChild } from '../commonActions.js';
+import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -303,7 +304,10 @@ export class LogsPage {
         // ===== QUERY EDITOR EXPAND/COLLAPSE SELECTORS =====
         this.queryEditorFullScreenBtn = '[data-test="logs-query-editor-full_screen-btn"]';
         this.queryEditorContainer = '.query-editor-container';
-        this.expandOnFocusClass = '.editor-fullscreen';
+        // Fullscreen state is exposed via a stable data attribute on the container
+        // (the old `.editor-fullscreen` scoped class was removed in PR #12764 in
+        // favour of inline utility classes bound to `isFocused`).
+        this.expandOnFocusClass = '[data-fullscreen="true"]';
 
         // ===== LOG DETAIL SIDEBAR SELECTORS (Bug #9724) =====
         this.logDetailDialogBox = '[data-test="log-detail-dialog"]';
@@ -404,8 +408,10 @@ export class LogsPage {
         this.patternCardIncludeBtn = (index) => `[data-test="pattern-card-${index}-include-btn"]`;
         this.patternCardExcludeBtn = (index) => `[data-test="pattern-card-${index}-exclude-btn"]`;
         this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}"]`;
-        this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] .wildcard-chip`;
-        this.wildcardChip = '.wildcard-chip';
+        // The pattern-template wildcard chip carries a data-test hook (the `.wildcard-chip`
+        // scoped class was dropped when the chip moved from a class to the OTag component).
+        this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] [data-test="pattern-card-wildcard-chip"]`;
+        this.wildcardChip = '[data-test="pattern-card-wildcard-chip"]';
         // Pattern details dialog (ODrawer — PatternDetailsDialog.vue)
         this.closePatternDialog = '[data-test="pattern-details-dialog"] [data-test="o-drawer-close-btn"]';
         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
@@ -936,6 +942,11 @@ export class LogsPage {
                     await popoverSearch.press('Backspace').catch(() => {});
                     await popoverSearch.fill(stream).catch(() => {});
                 }
+
+                // Wait for the virtualized list to filter and re-render the option row.
+                // Without this, isVisible often fails because the Vue virtualizer
+                // has not yet rendered the matching option into the DOM.
+                await option.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
 
                 testLogger.debug(`selectStream: Looking for option [data-test="log-search-index-list-select-stream-option"][data-test-value="${stream}"]`);
                 const visible = await option
@@ -2706,15 +2717,23 @@ export class LogsPage {
             ? process.env.INGESTION_URL.slice(0, -1)
             : process.env.INGESTION_URL;
 
+        // Unique per-batch marker. Verification queries the search API by this exact
+        // value (WHERE sdr_test_id = '<marker>'), so it inspects ONLY the records this
+        // call ingested — never stale data from an earlier batch on the same stream.
+        // This is what makes SDR verification deterministic instead of relying on the
+        // virtualized results table rendering the right rows at the right time.
+        const marker = `sdr-${require('crypto').randomUUID()}`;
+
         const baseTimestamp = Date.now() * 1000;
         const logData = dataObjects.map(({ fieldName, fieldValue }, index) => ({
             level: "info",
             [fieldName]: fieldValue,
             log: `Test log with ${fieldName} field - entry ${index}`,
+            sdr_test_id: marker,
             _timestamp: baseTimestamp + (index * 1000000)
         }));
 
-        testLogger.info(`Preparing to ingest ${logData.length} separate log entries`);
+        testLogger.info(`Preparing to ingest ${logData.length} separate log entries (marker: ${marker})`);
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
@@ -2732,9 +2751,10 @@ export class LogsPage {
                     testLogger.info('Ingestion successful, waiting for stream to be indexed...');
                     // NOTE: This is a backend async indexing wait, not a UI wait.
                     // waitForLoadState won't help as no page navigation occurs.
-                    // Consider using waitForStreamData() polling for production tests.
+                    // Verification polls the search API for this marker, so this is just
+                    // a small head start to reduce poll iterations — not the readiness gate.
                     await this.page.waitForTimeout(5000);
-                    return;
+                    return marker;
                 }
 
                 const errorMessage = responseBody?.message || JSON.stringify(responseBody);
@@ -3184,7 +3204,18 @@ export class LogsPage {
     }
 
     async clickLogTableColumnSource() {
-        return await this.page.locator(this.logTableColumnSource).click();
+        // Open the first result row's detail/search-around. With the FTS
+        // default-column feature the first cell may be the generic "source"
+        // column OR the FTS "body" column (e.g. log/message/body), so click
+        // whichever first-row cell is rendered rather than "source" only.
+        // The cell can also detach mid-click while the table re-renders, so
+        // Playwright's auto-retrying click is allowed to settle via a short
+        // post-condition wait on the detail dialog by callers.
+        const firstRowCell = this.page
+            .locator('[data-test^="log-table-column-0-"]')
+            .first();
+        await firstRowCell.waitFor({ state: 'visible', timeout: 30000 });
+        return await firstRowCell.click();
     }
 
     async clickIncludeExcludeFieldButton() {
@@ -3201,11 +3232,31 @@ export class LogsPage {
 
     // ===== LOG DETAIL SIDEBAR METHODS (Bug #9724) =====
     /**
-     * Opens the log detail sidebar by clicking on a log row
+     * Opens the log detail sidebar by clicking the first result row.
+     * Clicks whichever first-row cell is rendered (matched by the
+     * `log-table-column-0-` prefix) — the default column may be the generic
+     * "source" column OR the FTS "body"/message column — then waits for the
+     * detail dialog. Includes a force-click fallback for transient instability.
      * @returns {Promise<void>}
      */
     async openLogDetailSidebar() {
-        await this.page.locator(this.logTableColumnSource).click();
+        // The first result cell can render as the generic "source" column OR the FTS
+        // "body"/message column (e.g. streams whose default column is a body field, like
+        // the highlighting test stream). Waiting on the exact "...-source" cell timed out
+        // whenever the body column was rendered instead, so target any first-row cell by
+        // prefix — mirroring clickLogTableColumnSource / waitForSearchResults.
+        const sourceCell = this.page.locator('[data-test^="log-table-column-0-"]').first();
+        // Under CI load the row can resolve in the DOM while the results table is still
+        // streaming/re-rendering, so a plain click waits out its timeout on "element is not
+        // stable". Wait for the cell to be visible, bring it into view, then click with a
+        // force fallback to push past any transient instability or overlay.
+        await sourceCell.waitFor({ state: 'visible', timeout: 30000 });
+        await sourceCell.scrollIntoViewIfNeeded().catch(() => {});
+        try {
+            await sourceCell.click({ timeout: 15000 });
+        } catch {
+            await sourceCell.click({ force: true });
+        }
         await this.page.locator(this.logDetailDialog).waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Log detail sidebar opened');
     }
@@ -3704,7 +3755,10 @@ export class LogsPage {
     async waitForSearchResults(timeout = 30000) {
         const table = this.page.locator(this.logsTable);
         await table.waitFor({ state: 'visible', timeout });
-        const firstRow = this.page.locator(this.logTableColumnSource);
+        // The default view may render the generic "source" column OR the FTS
+        // "body" column, so wait for any first-row cell rather than "source"
+        // specifically — both mean "results rendered".
+        const firstRow = this.page.locator('[data-test^="log-table-column-0-"]').first();
         await firstRow.waitFor({ state: 'visible', timeout });
         return true;
     }
@@ -4344,9 +4398,9 @@ export class LogsPage {
     }
 
     async isQueryEditorExpanded() {
-        // editor-fullscreen is added to the container itself, not a child element.
-        // Use a combined selector (.query-editor-container.editor-fullscreen) instead of
-        // container.locator('.editor-fullscreen') which would search descendants only.
+        // Fullscreen state is reflected by data-fullscreen="true" on the container itself.
+        // Use a combined selector (.query-editor-container[data-fullscreen="true"]) so we
+        // match the container node, not a descendant.
         return await this.page.locator(`${this.queryEditorContainer}${this.expandOnFocusClass}`).count() > 0;
     }
 
@@ -4570,11 +4624,29 @@ export class LogsPage {
         return await this.page.locator(this.logsDetailTableSearchAroundBtn).click();
     }
 
+    /**
+     * Assert that the results table rendered at least one data row.
+     *
+     * Historically the default logs view always showed a single generic "source"
+     * column (full row as JSON). With the FTS default-column feature, a plain
+     * (non-SQL, no-pin) view instead promotes the best-fill full-text "body"
+     * field (e.g. "log"/"message"/"body") to its own column, so "source" is no
+     * longer guaranteed. Custom SQL queries and aggregates still render "source".
+     *
+     * This helper therefore passes when EITHER the "source" column OR any other
+     * first-row column cell is visible — i.e. "results rendered", independent of
+     * which default column the view chose. Use expectLogTableColumnVisible(name)
+     * when a specific column must be asserted.
+     */
     async expectLogTableColumnSourceVisible() {
-        const element = this.page.locator(this.logTableColumnSource);
-        // Wait for the element to be visible with a timeout
-        await element.waitFor({ state: 'visible', timeout: 30000 });
-        return await expect(element).toBeVisible();
+        const sourceCol = this.page.locator(this.logTableColumnSource);
+        const anyFirstRowCol = this.page.locator('[data-test^="log-table-column-0-"]').first();
+        // Whichever appears first satisfies "results rendered".
+        await Promise.race([
+            sourceCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
+            anyFirstRowCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
+        ]);
+        return await expect(anyFirstRowCol).toBeVisible();
     }
 
     /**
@@ -4866,12 +4938,22 @@ export class LogsPage {
     }
 
     async clickCustomDownloadRangeSelect() {
-        return await this.page.locator(this.customDownloadRangeSelect).click();
+        // OSelect (reka-ui popover): clicking the root wrapper can open-then-close the
+        // listbox on a single click, which continuously re-mounts the options and makes
+        // the subsequent option click flake with "element was detached from the DOM".
+        // openOSelectDropdown clicks the inner -trigger until aria-expanded="true" so the
+        // listbox is stably open before we pick an option.
+        await openOSelectDropdown(this.page, this.page.locator(this.customDownloadRangeSelect));
     }
 
     async selectCustomDownloadRange(range) {
         // OSelect option data-test contract: `${parent}-option` shared + `data-test-value="<value>"`.
-        return await this.page.locator(this.customDownloadRangeOption(range)).click();
+        // The reka listbox virtualises/re-renders its items, so the option node can detach
+        // between resolve and click. Poll the click until it lands (option gone / selected).
+        const option = this.page.locator(this.customDownloadRangeOption(range));
+        await expect(async () => {
+            await option.click({ timeout: 3000 });
+        }).toPass({ timeout: 15000, intervals: [500] });
     }
 
     async clickCustomDownloadFileTypeJson() {
@@ -5081,6 +5163,20 @@ export class LogsPage {
         return await btn.click({ force: true });
     }
 
+    /**
+     * Click the field-list reset icon (FieldListPagination "Clear" button).
+     * Clears selectedFields and sets isFtsDefaultColumn to false, used by
+     * FTS default-column tests to verify re-resolution after a reset.
+     * @returns {Promise<void>}
+     */
+    async clickFieldListResetIcon() {
+        const btn = this.page.locator(this.fieldListResetIcon).first();
+        await expect(btn).toBeVisible({ timeout: 5000 });
+        await btn.click();
+        // Wait for the field sidebar to settle after reset trims selectedFields.
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
+
     async expectTimestampFieldVisible() {
         // Post-OFieldList migration: data-test="logs-field-list-item-_timestamp"
         // Clear any active field-search filter and switch back to All Fields view —
@@ -5135,7 +5231,15 @@ export class LogsPage {
 
     async clickAddFieldToTableButton(fieldName) {
         const addBtn = this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`);
-        await addBtn.waitFor({ state: 'visible', timeout: 5000 });
+        try {
+            await addBtn.waitFor({ state: 'visible', timeout: 5000 });
+        } catch {
+            // The add button is only revealed while the field row is hovered. Under CI load
+            // the hover state can be lost (or never settled) before the click — re-hover the
+            // field row and wait again before giving up.
+            await this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`).hover().catch(() => {});
+            await addBtn.waitFor({ state: 'visible', timeout: 10000 });
+        }
         await addBtn.click();
         // The add operation commits when both (a) the toggle inverts to a remove
         // button in the sidebar, and (b) the field column header appears in the
@@ -5163,8 +5267,57 @@ export class LogsPage {
     }
 
     async expectFieldNotInTableHeader(fieldName) {
-        // When field is removed, the source column should be visible again
-        return await expect(this.page.locator('[data-test="log-search-result-table-th-source"]').getByText('source')).toBeVisible();
+        // After removing a field, its column header must no longer be present.
+        // (Asserting on the removed field is mode-agnostic: the default view may
+        // fall back to the generic "source" column or the FTS "body" column.)
+        return await expect(
+            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`),
+        ).toHaveCount(0);
+    }
+
+    /**
+     * Resolve which FTS default column is currently rendered in the results table.
+     * Both `message` and `log` are valid FTS candidates (`message` has the higher
+     * FTS priority). Waits for *either* header to appear and returns whichever is
+     * present — this replaces the "wait the full timeout on `message`, then fall
+     * back to `log`" try/catch pattern, which cost ~10-15s on every call whenever
+     * `log` was the active field.
+     * @param {number} timeout - Max ms to wait for an FTS header to appear.
+     * @returns {Promise<'message'|'log'>} The FTS field currently in the header.
+     */
+    async resolveFtsDefaultField(timeout = 15000) {
+        const message = this.page.locator('[data-test="log-search-result-table-th-message"]');
+        const log = this.page.locator('[data-test="log-search-result-table-th-log"]');
+        await expect(message.or(log).first()).toBeVisible({ timeout });
+        return (await message.isVisible().catch(() => false)) ? 'message' : 'log';
+    }
+
+    /**
+     * Close a column by clicking the X (close) button on its header.
+     * Used by FTS default-column tests to verify that closing the auto-picked
+     * column triggers re-resolution on the next search.
+     *
+     * The close button has a CSS `invisible` class and only appears on
+     * column-header hover, so we hover the header to reveal it, then click it
+     * normally — keeping Playwright's actionability checks (a `force` click would
+     * skip them and mask a regression that makes the button non-interactable).
+     * @param {string} fieldName - The field/column name to close (e.g. 'message')
+     * @returns {Promise<void>}
+     */
+    async clickCloseColumnButton(fieldName) {
+        const header = this.page.locator(
+            `[data-test="log-search-result-table-th-${fieldName}"]`,
+        );
+        const closeBtn = this.page.locator(
+            `[data-test="logs-search-result-table-th-remove-${fieldName}-btn"]`,
+        );
+        // Hover the column header to reveal its hover-gated X, then click normally
+        // so the actionability check still runs (no force).
+        await header.hover();
+        await expect(closeBtn).toBeVisible({ timeout: 5000 });
+        await closeBtn.click();
+        // Wait for the column to disappear from the DOM header row
+        await expect(header).toHaveCount(0, { timeout: 10000 });
     }
 
     // New POM methods for PR tests
@@ -6262,10 +6415,25 @@ export class LogsPage {
      */
     async ingestData(streamName, data) {
         const fetch = (await import('node-fetch')).default;
+        const http = require('http');
+        const https = require('https');
         const orgId = getOrgIdentifier();
         const authHeaders = getAuthHeaders();
 
         testLogger.info('Ingesting data', { streamName, recordCount: data.length });
+
+        // node-fetch 2.x reuses keep-alive sockets by default. With records sent
+        // one-by-one (spaced 500ms apart), CI servers close the idle keep-alive
+        // connection between requests, surfacing as a "Premature close" error
+        // while reading the response body — even though the server returns HTTP
+        // 200 and ingests the record. Forcing a fresh connection per request
+        // (keepAlive: false) eliminates that socket-reuse race.
+        const httpAgent = new http.Agent({ keepAlive: false });
+        const httpsAgent = new https.Agent({ keepAlive: false });
+        const agent = (parsedURL) => (parsedURL.protocol === 'https:' ? httpsAgent : httpAgent);
+
+        const ingestUrl = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+        const maxAttempts = 3;
 
         let successCount = 0;
         let failCount = 0;
@@ -6273,31 +6441,49 @@ export class LogsPage {
         // Send records one by one to ensure each is treated as unique
         for (let i = 0; i < data.length; i++) {
             const record = data[i];
+            let ingested = false;
+            let lastError = null;
 
-            try {
-                const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`, {
-                    method: 'POST',
-                    headers: authHeaders,
-                    body: JSON.stringify([record])  // Send as single-element array
-                });
+            // Retry transient connection failures (e.g. "Premature close") so a
+            // single dropped socket does not fail the whole test.
+            for (let attempt = 1; attempt <= maxAttempts && !ingested; attempt++) {
+                try {
+                    const response = await fetch(ingestUrl, {
+                        method: 'POST',
+                        headers: authHeaders,
+                        body: JSON.stringify([record]),  // Send as single-element array
+                        agent
+                    });
 
-                const responseData = await response.json();
+                    const responseData = await response.json();
 
-                if (response.status === 200 && responseData.code === 200) {
-                    successCount++;
-                    testLogger.debug(`Ingested record ${i+1}/${data.length}`, { name: record.name, test_id: record.test_id || 'no_id', unique_id: record.unique_id });
-                } else {
-                    failCount++;
-                    testLogger.error(`Failed to ingest record ${i+1}/${data.length}`, { response: responseData, test_id: record.test_id || record.name });
+                    if (response.status === 200 && responseData.code === 200) {
+                        ingested = true;
+                        testLogger.debug(`Ingested record ${i+1}/${data.length}`, { name: record.name, test_id: record.test_id || 'no_id', unique_id: record.unique_id });
+                    } else {
+                        lastError = `status=${response.status} code=${responseData.code}`;
+                        testLogger.error(`Failed to ingest record ${i+1}/${data.length} (attempt ${attempt}/${maxAttempts})`, { response: responseData, test_id: record.test_id || record.name });
+                    }
+                } catch (error) {
+                    lastError = error.message;
+                    testLogger.error(`Error ingesting record ${i+1}/${data.length} (attempt ${attempt}/${maxAttempts})`, { error: error.message });
                 }
 
-                // Small delay between records
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-            } catch (error) {
-                failCount++;
-                testLogger.error(`Error ingesting record ${i+1}/${data.length}`, { error: error.message });
+                // Back off briefly before retrying the same record
+                if (!ingested && attempt < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
             }
+
+            if (ingested) {
+                successCount++;
+            } else {
+                failCount++;
+                testLogger.error(`Giving up on record ${i+1}/${data.length} after ${maxAttempts} attempts`, { lastError, test_id: record.test_id || record.name });
+            }
+
+            // Small delay between records
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         testLogger.info('Ingestion complete', { streamName, total: data.length, success: successCount, failed: failCount });
@@ -6320,17 +6506,15 @@ export class LogsPage {
 
             for (const row of rows) {
                 const text = row.textContent;
-                // Find the color indicator div - it's a div with inline backgroundColor style
-                // The div has classes like "tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
-                // Use multiple selector approaches for robustness
-                let colorDiv = row.querySelector('div[style*="background"]');
+                // The status color bar carries data-test="log-table-row-status-color"
+                // and data-test-status-level="<level>". This makes the detected
+                // severity/level machine-readable regardless of which column is
+                // shown (the FTS "body" column hides the raw "source" JSON).
+                let colorDiv = row.querySelector('[data-test="log-table-row-status-color"]');
 
-                // Fallback: try class-based selector with escaped colon
-                if (!colorDiv) {
-                    colorDiv = row.querySelector('div[class*="tw\\:absolute"]');
-                }
-
-                // Fallback: try finding the first absolute positioned child div
+                // Fallbacks for older renders: inline-style / absolute-positioned div.
+                if (!colorDiv) colorDiv = row.querySelector('div[style*="background"]');
+                if (!colorDiv) colorDiv = row.querySelector('div[class*="tw\\:absolute"]');
                 if (!colorDiv) {
                     const divs = row.querySelectorAll('div');
                     for (const div of divs) {
@@ -6345,29 +6529,29 @@ export class LogsPage {
                 if (!colorDiv) continue;
 
                 const bgColor = window.getComputedStyle(colorDiv).backgroundColor;
-
-                // Skip if no valid background color
                 if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
 
-                // Check for severity value in the row text - look for various patterns
+                const level = colorDiv.getAttribute('data-test-status-level') || null;
+
+                // Best-effort: also recover the raw severity number when the JSON
+                // source column is visible (kept for backward compatibility).
+                let severity = null;
                 for (let sev = 0; sev <= 7; sev++) {
-                    // Match "severity":"X", "severity":X, "severity": X, or severity: X patterns
                     const patterns = [
                         `"severity":"${sev}"`,
                         `"severity":${sev},`,
                         `"severity":${sev}}`,
                         `"severity": ${sev}`,
-                        `severity: ${sev}`
+                        `severity: ${sev}`,
                     ];
-
                     if (patterns.some(pattern => text.includes(pattern))) {
-                        findings.push({
-                            severity: sev,
-                            color: bgColor
-                        });
+                        severity = sev;
                         break;
                     }
                 }
+
+                if (level === null && severity === null) continue;
+                findings.push({ severity, level, color: bgColor });
             }
 
             return findings;

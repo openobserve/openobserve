@@ -269,6 +269,16 @@ describe("CodeQueryEditor", () => {
       expect(wrapper.props("readOnly")).toBe(false);
     });
 
+    it("should default releaseWheelToPage to true (page scrolls once editor has nothing left)", () => {
+      const wrapper = createWrapper({ releaseWheelToPage: undefined });
+      expect(wrapper.props("releaseWheelToPage")).toBe(true);
+    });
+
+    it("should allow opting out via releaseWheelToPage=false (editor keeps the wheel)", () => {
+      const wrapper = createWrapper({ releaseWheelToPage: false });
+      expect(wrapper.props("releaseWheelToPage")).toBe(false);
+    });
+
     it("should accept language prop", () => {
       const wrapper = createWrapper({ language: "json" });
       expect(wrapper.props("language")).toBe("json");
@@ -554,6 +564,117 @@ describe("CodeQueryEditor", () => {
       expect(mockEditorObj.addCommand).toHaveBeenCalled();
       const firstCall = mockEditorObj.addCommand.mock.calls[0];
       expect(firstCall[2]).toBe("ctrlenter");
+    });
+  });
+
+  // Tests for the bug fix: setValue must coerce null/undefined to "" so Monaco's
+  // "Illegal argument" error can't surface when switching query modes (PromQL → SQL).
+  describe("when query becomes null/undefined (PromQL -> SQL switch)", () => {
+    let getElementByIdSpy: ReturnType<typeof vi.spyOn>;
+    let shortcutWrapper: ReturnType<typeof mount> | null = null;
+
+    // Mount the component and wait for the async setupEditor to complete so that
+    // editorObj is fully initialised and the exposed setValue is wired to mockEditorObj.
+    const mountAndSetup = async (props: any = {}) => {
+      const fakeEditorEl = document.createElement("div");
+      getElementByIdSpy = vi
+        .spyOn(document, "getElementById")
+        .mockReturnValue(fakeEditorEl);
+
+      shortcutWrapper = mount(CodeQueryEditor, {
+        props: {
+          editorId: "test-editor",
+          query: "SELECT * FROM logs",
+          ...props,
+        },
+        global: { plugins: [store] },
+      });
+
+      await vi.waitFor(
+        () => {
+          expect(mockEditorObj.addCommand).toHaveBeenCalled();
+        },
+        { timeout: 10000 },
+      );
+      return shortcutWrapper;
+    };
+
+    afterEach(() => {
+      getElementByIdSpy?.mockRestore();
+      shortcutWrapper?.unmount();
+      shortcutWrapper = null;
+    });
+
+    it("calls the underlying editor setValue with empty string when exposed setValue receives null", async () => {
+      // Arrange
+      const wrapper = await mountAndSetup();
+      mockEditorObj.setValue.mockClear();
+
+      // Act — call the exposed public method with null (simulates PromQL → SQL switch)
+      wrapper.vm.setValue(null as any);
+
+      // Assert — Monaco must receive "" not null
+      expect(mockEditorObj.setValue).toHaveBeenCalledOnce();
+      expect(mockEditorObj.setValue).toHaveBeenCalledWith("");
+    });
+
+    it("calls the underlying editor setValue with empty string when exposed setValue receives undefined", async () => {
+      // Arrange
+      const wrapper = await mountAndSetup();
+      mockEditorObj.setValue.mockClear();
+
+      // Act
+      wrapper.vm.setValue(undefined as any);
+
+      // Assert
+      expect(mockEditorObj.setValue).toHaveBeenCalledOnce();
+      expect(mockEditorObj.setValue).toHaveBeenCalledWith("");
+    });
+
+    it("does not throw when exposed setValue is called with null", async () => {
+      // Arrange
+      const wrapper = await mountAndSetup();
+      mockEditorObj.setValue.mockClear();
+
+      // Act & Assert — must not throw at all
+      expect(() => wrapper.vm.setValue(null as any)).not.toThrow();
+    });
+
+    it("does not throw when exposed setValue is called with undefined", async () => {
+      // Arrange
+      const wrapper = await mountAndSetup();
+      mockEditorObj.setValue.mockClear();
+
+      // Act & Assert
+      expect(() => wrapper.vm.setValue(undefined as any)).not.toThrow();
+    });
+
+    it("passes a real string value through unchanged to the underlying editor", async () => {
+      // Arrange
+      const wrapper = await mountAndSetup();
+      mockEditorObj.setValue.mockClear();
+
+      // Act — normal usage: a valid SQL query after mode switch
+      wrapper.vm.setValue("SELECT count(*) FROM logs");
+
+      // Assert — value is forwarded as-is
+      expect(mockEditorObj.setValue).toHaveBeenCalledOnce();
+      expect(mockEditorObj.setValue).toHaveBeenCalledWith(
+        "SELECT count(*) FROM logs",
+      );
+    });
+
+    it("also calls layout after setValue so the editor repaints", async () => {
+      // Arrange
+      const wrapper = await mountAndSetup();
+      mockEditorObj.setValue.mockClear();
+      mockEditorObj.layout.mockClear();
+
+      // Act
+      wrapper.vm.setValue("SELECT 1");
+
+      // Assert — layout must be called to repaint after content change
+      expect(mockEditorObj.layout).toHaveBeenCalled();
     });
   });
 

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="search-bar-component" id="searchBarComponent">
+  <div class="search-bar-component tw:border-b tw:border-(--o2-border) tw:pb-px" id="searchBarComponent">
     <div class="tw:flex tw:my-1">
       <div class="float-right tw:flex tw:flex-col">
         <syntax-guide
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="float-right col-auto">
         <OButton
           v-if="searchObj.data.queryResults.hits"
-          class="tw:mr-2 float-left download-logs-btn"
+          class="tw:mr-2 float-left tw:h-7.5"
           variant="ghost"
           size="icon-sm"
           icon-left="download"
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
         </div>
-        <div class="search-time tw:pl-2 float-left">
+        <div class="tw:pl-2 tw:mr-2.5 float-left">
           <OButton
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <query-editor
           ref="queryEditorRef"
           editor-id="rum-searchbar-query-editor"
-          class="monaco-editor"
+          class="tw:w-full! tw:h-17.5!"
           v-model:query="searchObj.data.editorValue"
           :keywords="effectiveKeywords"
           v-model:functions="searchObj.data.stream.functions"
@@ -357,125 +357,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.search-bar-component {
-  border-bottom: 1px solid #e0e0e0;
-  padding-bottom: 1px;
-
-  .q-toggle__inner {
-    font-size: 1.875rem;
-  }
-
-  .q-toggle__label {
-    font-size: 0.75rem;
-  }
-
-  .casesensitive-btn {
-    padding: 0.5rem;
-    margin-left: -0.375rem;
-    background-color: #d5d5d5;
-    border-radius: 0 0.1875rem 0.1875rem 0;
-  }
-  .search-field .q-field {
-    &__control {
-      border-radius: 0.1875rem 0 0 0.1875rem !important;
-    }
-    &__native {
-      font-weight: 600;
-    }
-  }
-  .search-time {
-    // width: 120px;
-    margin-right: 0.625rem;
-    .q-btn-group {
-      border-radius: 0.1875rem;
-
-      .q-btn {
-        min-height: auto;
-      }
-    }
-  }
-  .search-dropdown {
-    padding: 0;
-    .block {
-      color: $dark-page;
-      font-weight: 600;
-      font-size: 0.75rem;
-    }
-    .q-btn-dropdown__arrow-container {
-      color: $light-text2;
-    }
-  }
-  .refresh-rate-dropdown-container {
-    width: 13.75rem;
-    * .q-btn {
-      font-size: 0.75rem !important;
-      padding-left: 0.5rem;
-      padding-right: 0.5rem;
-    }
-  }
-
-  .flex-start {
-    justify-content: flex-start;
-    align-items: flex-start;
-    display: flex;
-  }
-
-  .resultsOverChart {
-    margin-bottom: 0.75rem;
-    font-size: 0.875rem;
-    color: $dark-page;
-    font-weight: 700;
-  }
-
-  .ddlWrapper {
-    position: relative;
-    z-index: 10;
-
-    .listWrapper {
-      box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-      transition: height 0.25s ease;
-      height: calc(100vh - 9.125rem);
-      background-color: white;
-      position: absolute;
-      top: 2.75rem;
-      width: 100%;
-      left: 0;
-
-      &:empty {
-        height: 0;
-      }
-
-      & {
-        border-radius: 0.1875rem;
-      }
-    }
-  }
-  .fields_autocomplete {
-    max-height: 15.625rem;
-  }
-  .monaco-editor {
-    width: 100% !important;
-    height: 4.375rem !important;
-  }
-
-  .search-button {
-    width: 6rem;
-    line-height: 1.8125rem;
-    font-weight: bold;
-    text-transform: initial;
-    font-size: 0.6875rem;
-    color: white;
-
-    .q-btn__content {
-      background: $secondary;
-      border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
-}
-  }
-
-  .download-logs-btn {
-    height: 1.875rem;
-  }
-}
-</style>

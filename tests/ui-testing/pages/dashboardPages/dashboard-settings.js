@@ -51,6 +51,19 @@ export default class DashboardSetting {
     this.EditSave = page.locator(
       '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
     );
+    // Tab name cells inside the OTable (one per tab row).
+    this.tabNameCells = page.locator(
+      '[data-test="dashboard-tab-settings-tab-name"]'
+    );
+    // Resolve a tab's OTable row from its name cell. The tabs table migrated
+    // to OTable, so rows are `o2-table-row-{index}` — walk up to that row from
+    // the name cell to reach its edit/delete actions.
+    this.getTabRowByName = (tabName) =>
+      page
+        .locator(
+          `[data-test="dashboard-tab-settings-tab-name"][data-test-tab-name="${tabName}"]`
+        )
+        .locator(`xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]`);
   }
 
   //Dashboard Settings//
@@ -143,10 +156,9 @@ export default class DashboardSetting {
     await this.tab.waitFor({ state: "visible" });
     await this.tab.click();
     // TabsSettings loads dashboard data async on mount; wait for the first
-    // draggable row (the default tab) to appear before clicking "Add Tab",
+    // tab row (the default tab) to appear before clicking "Add Tab",
     // otherwise dashboardId is still undefined and the API call fails.
-    await this.page
-      .locator('[data-test="dashboard-tab-settings-draggable-row"]')
+    await this.tabNameCells
       .first()
       .waitFor({ state: "visible", timeout: 10000 });
     await this.addtab.click();
@@ -496,9 +508,7 @@ export default class DashboardSetting {
       .waitFor({ state: "visible" });
 
     // Locate the tab to be edited based on oldTabName
-    const tabLocator = page.locator(
-      `[data-test="dashboard-tab-settings-draggable-row"][data-test-tab-name="${oldTabName}"]`
-    );
+    const tabLocator = this.getTabRowByName(oldTabName);
 
     // Click Edit button for the tab
     await tabLocator
@@ -533,9 +543,7 @@ export default class DashboardSetting {
       .waitFor({ state: "visible" });
 
     // Locate the tab to be deleted based on oldTabName
-    const tabLocator = page.locator(
-      `[data-test="dashboard-tab-settings-draggable-row"][data-test-tab-name="${oldTabName}"]`
-    );
+    const tabLocator = this.getTabRowByName(oldTabName);
 
     // Click delete button for the tab
     await tabLocator

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container tw:mb-[0.625rem]">
         <!-- Header -->
         <div
-          class="insights-header tw:flex tw:justify-between tw:items-center"
+          class="tw:flex tw:justify-between tw:items-center tw:px-2 tw:py-2"
         >
           <div class="tw:flex tw:items-center">
             <OButton
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-relative-time="relativeTime"
               @on:date-change="updateDateTime"
               @on:timezone-change="updateTimezone"
-              class="datetime-picker"
+              class="tw:mr-2"
               data-test="alert-insights-datetime"
             />
 
@@ -92,9 +92,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Filters Section -->
         <div
           v-if="show"
-          class="filters-section tw:flex tw:items-center tw:gap-2 tw:flex-wrap"
+          class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:px-4 tw:py-3 tw:border-b tw:border-(--q-border-color)"
         >
-          <span class="filter-label">{{ t("common.filters") }}:</span>
+          <span class="tw:text-sm tw:font-semibold tw:relative tw:top-1">{{ t("common.filters") }}:</span>
 
           <!-- Failed Only Toggle -->
           <OSwitch
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="[panelId, filter] in rangeFilters"
             :key="panelId"
-            class="filter-chip tw:rounded tw:flex tw:items-center"
+            class="tw:inline-flex tw:items-center tw:rounded tw:py-1 tw:px-3 tw:text-sm tw:cursor-default"
             :class="
               store.state.theme === 'dark'
                 ? 'tw:bg-indigo-900 tw:text-indigo-100'
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OIcon
               name="close" size="sm"
-              class="chip-close-icon tw:cursor-pointer"
+              class="tw:cursor-pointer tw:text-sm tw:ml-2 tw:opacity-70 tw:transition-opacity tw:duration-200 tw:hover:opacity-100"
               @click="removeRangeFilter(panelId)"
             />
           </div>
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="hasActiveFilters"
             variant="ghost"
             size="sm"
-            class="clear-filters-btn"
+            class="tw:ml-2"
             @click="clearAllFilters"
             data-test="clear-all-filters-btn"
             icon-left="close"
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Action Buttons Row -->
     <div
       v-if="selectedAlertForAction"
-      class="action-buttons-row tw:bg-primary tw:bg-opacity-10 tw:flex tw:items-center"
+      class="tw:bg-primary tw:bg-opacity-10 tw:flex tw:items-center tw:px-4 tw:py-3 tw:gap-3 tw:border-b tw:border-(--q-border-color)"
       data-test="action-buttons-row"
     >
       <OIcon name="campaign" size="sm" />
@@ -233,16 +233,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           @contextmenu="handleNativeContextMenu"
         >
-          <div v-show="isLoading" class="loading-container tw:flex tw:items-center tw:justify-center">
+          <div v-show="isLoading" class="tw:flex tw:items-center tw:justify-center tw:h-100">
             <OSpinner size="md" />
             <div class="tw:ml-3">Loading insights...</div>
           </div>
 
           <div :style="{ visibility: isLoading ? 'hidden' : 'visible' }">
-            <div v-if="!dashboardData" class="loading-message">
+            <div v-if="!dashboardData" class="tw:p-5 tw:text-center tw:text-[#666]">
               {{ t("alerts.insights.loading.dashboardConfig") }}
             </div>
-            <div v-else-if="!show" class="loading-message">
+            <div v-else-if="!show" class="tw:p-5 tw:text-center tw:text-[#666]">
               {{ t("alerts.insights.loading.refreshing") }}
             </div>
             <RenderDashboardCharts
@@ -750,92 +750,8 @@ onMounted(async () => {
 });
 </script>
 
-<style scoped lang="scss">
-.alert-insights-container {
-  height: calc(100vh - 65px);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.insights-header {
-  padding: 0.5rem 1rem;
-}
-
-.back-btn {
-  margin-right: 0.5rem;
-}
-
-.insights-title {
-  font-size: 1.25rem;
-  font-weight: 500;
-}
-
-.datetime-picker {
-  margin-right: 0.5rem;
-}
-
-.alert-insights-tabs {
-  :deep(.o-tab__label) {
-    text-transform: none !important;
-  }
-}
-
-.filters-section {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--q-border-color);
-}
-
-.filter-label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  position: relative;
-  top: 4px;
-}
-
-.filter-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.75rem;
-  font-size: 0.875rem;
-  cursor: default;
-
-  .chip-close-icon {
-    font-size: 0.875rem;
-    margin-left: 0.5rem;
-    cursor: pointer;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-
-.clear-filters-btn {
-  margin-left: 0.5rem;
-}
-
-.action-buttons-row {
-  padding: 0.75rem 1rem;
-  gap: 0.75rem;
-  border-bottom: 1px solid var(--q-border-color);
-}
-
-.dashboard-content {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-.loading-container {
-  height: 25rem;
-}
-
-.loading-message {
-  padding: 1.25rem;
-  text-align: center;
-  color: #666;
+<style>
+.alert-insights-tabs :deep(.o-tab__label) {
+  text-transform: none !important;
 }
 </style>

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="build-query-page  tw:border-t tw:border-border-default" data-test="logs-build-query-page">
+  <div class="tw:h-full tw:w-full tw:relative tw:border-t tw:border-border-default" data-test="logs-build-query-page">
     <!-- PanelEditor with BUILD_PRESET -->
     <PanelEditor
       ref="panelEditorRef"
@@ -563,10 +563,3 @@ defineExpose({
 });
 </script>
 
-<style lang="scss" scoped>
-.build-query-page {
-  height: 100%;
-  width: 100%;
-  position: relative;
-}
-</style>

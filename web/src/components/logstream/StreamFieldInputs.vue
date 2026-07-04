@@ -34,7 +34,7 @@
             :data-test="`add-stream-field-name-input-${index}`"
             :name="`${formFieldName}[${index}].name`"
             :placeholder="t('logStream.fieldName') + ' *'"
-            :help-text="streamFieldNameHelpText"
+            :help-text="t('logStream.streamNameHelpText')"
             required
             tabindex="0"
           />
@@ -101,7 +101,6 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import {
   makeStreamFieldRow,
-  streamFieldNameHelpText,
 } from "./StreamFieldInputs.schema";
 
 // FORM-ONLY (migrated 2026-07-01). The rows are now owned by the parent's

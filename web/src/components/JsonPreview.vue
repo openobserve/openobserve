@@ -155,6 +155,3 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
-@import "@/styles/logs/json-preview.scss";
-</style>

@@ -55,12 +55,16 @@
     <div v-show="activeTab === 'unflattened'" class="tw:pl-3">
       <OSpinner size="md" />
       <div v-if="!loading">
+        <!-- Editor sizing is inlined here because it was originally scoped to this
+             component via <style scoped>; keeping it inline prevents it from
+             leaking onto every .monaco-editor app-wide. (The focus-border is left
+             off so this editor stays borderless like the others.) -->
         <code-query-editor
           v-model:query="unflattendData"
           ref="queryEditorRef"
           :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
-          class="monaco-editor"
-          :class="mode"
+          class="tw:w-[calc(100%-16px)]!"
+          :class="[mode, mode === 'expanded' ? 'tw:h-[300px]! tw:max-w-[1024px]!' : 'tw:h-[calc(100vh-250px)]!']"
           language="json"
         />
       </div>
@@ -176,7 +180,7 @@
               :query-string="highlightQuery"
               :simple-mode="false" /><LogsHighLighting
               v-else
-              :data="value[key]"
+              :data="getDisplayValue(key, value[key])"
               :show-braces="false"
               :query-string="highlightQuery" /></span
           ><span v-if="index < Object.keys(value).length - 1">,</span>
@@ -270,6 +274,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default {
@@ -886,6 +891,27 @@ export default {
       return String(data).length;
     };
 
+    // Display-only: render the timestamp column in a human-readable format in
+    // the user-selected timezone (same representation as the traces detail
+    // sidebar). The raw value is kept intact for include/exclude search terms
+    // and all other field actions.
+    const getDisplayValue = (key: string, val: any): any => {
+      if (
+        key === store.state.zoConfig.timestamp_column &&
+        val !== null &&
+        val !== undefined &&
+        val !== "" &&
+        !isNaN(Number(val))
+      ) {
+        return timestampToTimezoneDate(
+          Number(val) / 1000,
+          store.state.timezone,
+          "MMM dd, yyyy HH:mm:ss.SSS ZZZ",
+        );
+      }
+      return val;
+    };
+
     return {
       t,
       copyLogToClipboard,
@@ -933,6 +959,7 @@ export default {
       regexPatternType,
       confirmRegexPatternType,
       getContentSize,
+      getDisplayValue,
       getCrossLinksForField,
       openCrossLink,
     };
@@ -940,8 +967,3 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
-@import "@/styles/logs/json-preview.scss";
-
-// No custom cross-link CSS needed — cross-links render as q-items inside existing q-btn-dropdown
-</style>

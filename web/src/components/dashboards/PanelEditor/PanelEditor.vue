@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="panel-editor tw:flex-1 tw:flex tw:min-h-0" data-test="panel-editor-container">
+  <div class="tw:flex-1 tw:flex tw:min-h-0 tw:h-full tw:w-full" data-test="panel-editor-container">
     <div class="tw:flex" :style="rowStyle">
       <!-- Chart Type Selection Sidebar -->
       <div>
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel!"
+          class="tw:cursor-pointer tw:overflow-y-auto tw:flex tw:flex-col tw:items-center tw:justify-start card-container tw:bg-surface-panel!"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
@@ -58,10 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="expand-all"
             size="sm"
-            class="field-list-collapsed-icon rotate-90"
+            class="tw:mt-2.5 tw:text-xl rotate-90"
             data-test="panel-editor-field-list-collapsed-icon"
           />
-          <div class="field-list-collapsed-title">
+          <div class="tw:[writing-mode:vertical-rl] tw:[text-orientation:mixed] tw:font-bold tw:text-base">
             {{ t("panel.fields") }}
           </div>
         </div>
@@ -190,6 +190,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="tw:flex tw:justify-end tw:mr-2 tw:mt-1 tw:items-center tw:gap-2"
                   >
+                    <!-- Show Legends button -->
+                    <OButton
+                      v-if="
+                        ![
+                          'table', 'heatmap', 'metric', 'gauge',
+                          'geomap', 'maps',
+                        ].includes(dashboardPanelData.data.type)
+                      "
+                      variant="ghost"
+                      size="icon"
+                      @click="showLegendsDialog = true"
+                      icon-left="format-list-bulleted"
+                      data-test="panel-editor-show-legends-btn"
+                    >
+                      <OTooltip content="Show Legends" side="bottom" align="end" />
+                    </OButton>
+
+                    <!-- Add Annotations button -->
+                    <OButton
+                      v-if="
+                        editMode &&
+                        pageType === 'dashboard' &&
+                        [
+                          'area', 'area-stacked', 'bar', 'h-bar',
+                          'line', 'scatter', 'stacked', 'h-stacked',
+                        ].includes(dashboardPanelData.data.type) &&
+                        panelSchemaRendererRef?.checkIfPanelIsTimeSeries === true
+                      "
+                      variant="ghost"
+                      size="icon"
+                      @click="panelSchemaRendererRef?.toggleAddAnnotationMode()"
+                      data-test="panel-editor-annotation-btn"
+                    >
+                      <OIcon
+                        :name="
+                          panelSchemaRendererRef?.isAddAnnotationMode
+                            ? 'cancel'
+                            : 'edit'
+                        "
+                        size="sm"
+                      />
+                      <OTooltip
+                        :content="
+                          panelSchemaRendererRef?.isAddAnnotationMode
+                            ? 'Exit Annotations Mode'
+                            : 'Add Annotations'
+                        "
+                        side="bottom"
+                        align="end"
+                      />
+                    </OButton>
+
                     <PanelErrorButtons
                       :error="errorMessage"
                       :maxQueryRangeWarning="maxQueryRangeWarning"
@@ -233,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :width="6"
                         :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                         :regionClusterParams="props.regionClusterParams"
-                        :showLegendsButton="true"
+                        :showLegendsButton="false"
                         :searchType="searchType"
                         :searchResponse="props.searchResponse"
                         :is_ui_histogram="props.isUiHistogram"
@@ -324,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
             :initialVariableValues="initialVariableValues"
-            class="tw:flex-shrink-0 tw:mb-2"
+            class="tw:shrink-0 tw:mb-2"
             :showAddVariableButton="true"
             :showAllVisible="true"
             :tabId="tabId"
@@ -339,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <DashboardErrorsComponent
             :errors="errorData"
-            class="tw:flex-shrink-0"
+            class="tw:shrink-0"
           />
         </div>
       </div>
@@ -359,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
             :initialVariableValues="initialVariableValues"
-            class="tw:flex-shrink-0 tw:mb-2"
+            class="tw:shrink-0 tw:mb-2"
             :showAddVariableButton="true"
             :showAllVisible="true"
             :tabId="tabId"
@@ -374,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <DashboardErrorsComponent
             :errors="errorData"
-            class="tw:flex-shrink-0"
+            class="tw:shrink-0"
           />
         </div>
       </div>
@@ -388,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar for custom chart -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel!"
+          class="tw:cursor-pointer tw:overflow-y-auto tw:flex tw:flex-col tw:items-center tw:justify-start card-container tw:bg-surface-panel!"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
@@ -396,10 +448,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="expand-all"
             size="sm"
-            class="field-list-collapsed-icon rotate-90"
+            class="tw:mt-2.5 tw:text-xl rotate-90"
             data-test="panel-editor-field-list-collapsed-icon"
           />
-          <div class="field-list-collapsed-title">
+          <div class="tw:[writing-mode:vertical-rl] tw:[text-orientation:mixed] tw:font-bold tw:text-base">
             {{ t("panel.fields") }}
           </div>
         </div>
@@ -501,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Splitter separator -->
                     <template #separator>
-                      <div class="splitter-vertical splitter-enabled"></div>
+                      <div class="tw:w-1 tw:h-full tw:bg-transparent tw:transition-colors tw:duration-300 tw:hover:bg-orange-500"></div>
                     </template>
 
                     <!-- Chart Preview -->
@@ -649,6 +701,7 @@ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -1236,37 +1289,8 @@ defineExpose({
 });
 </script>
 
-<style lang="scss" scoped>
-.panel-editor {
-  height: 100%;
-  width: 100%;
-}
-
-.layout-panel-container {
-  display: flex;
-  flex-direction: column;
-}
-
-.splitter {
-  height: 4px;
-  width: 100%;
-}
-
-.splitter-vertical {
-  width: 4px;
-  height: 100%;
-}
-
-.splitter-enabled {
-  background-color: transparent;
-  transition: background-color 0.3s;
-}
-
-.splitter-enabled:hover {
-  background-color: orange;
-}
-
-:deep(.field-list-separator::after) {
+<style>
+.field-list-separator::after {
   content: '';
   position: absolute;
   top: 0;
@@ -1278,57 +1302,11 @@ defineExpose({
   transition: background-color 0.3s;
 }
 
-:deep(.field-list-separator:hover::after) {
+.field-list-separator:hover::after {
   background-color: orange;
 }
 
-:deep(.query-editor-splitter .o-splitter__separator) {
+.query-editor-splitter .o-splitter__separator {
   background-color: transparent !important;
-}
-
-.field-list-sidebar-header-collapsed {
-  cursor: pointer;
-  width: 50px;
-  height: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.field-list-collapsed-icon {
-  margin-top: 10px;
-  font-size: 20px;
-}
-
-.field-list-collapsed-title {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-weight: bold;
-  font-size: 1rem;
-}
-
-.warning {
-  color: var(--q-warning);
-}
-
-.lastRefreshedAt {
-  font-size: 12px;
-  color: var(--q-secondary);
-}
-
-.lastRefreshedAtIcon {
-  margin-right: 4px;
-}
-
-.splitter-icon-expand {
-  position: absolute;
-  left: -12px;
-}
-
-.splitter-icon-collapse {
-  position: absolute;
-  left: -12px;
 }
 </style>

@@ -119,6 +119,7 @@ export default defineComponent({
       orgnizationManagement: "organization_management",
       regexPatterns:         "regex_patterns",
       correlationSettings:   "correlation_settings",
+      genAiAgentMapping:     "gen_ai_agent_mapping",
     };
 
     const settingsTab = ref(
@@ -213,7 +214,7 @@ export default defineComponent({
         {
           key: "general",
           label: t("settings.generalLabel"),
-          description: "Theme, query defaults, and core preferences",
+          description: t("settings.generalDesc"),
           icon: "settings",
           to: `/settings/general?org_identifier=${org}`,
           dataTest: "general-settings-tab",
@@ -222,7 +223,7 @@ export default defineComponent({
         {
           key: "organization",
           label: t("settings.orgLabel"),
-          description: "Organization parameters and identifiers",
+          description: t("settings.orgDesc"),
           icon: "business",
           to: `/settings/organization?org_identifier=${org}`,
           dataTest: "organization-settings-tab",
@@ -231,7 +232,7 @@ export default defineComponent({
         {
           key: "cipher-keys",
           label: t("settings.cipherKeys"),
-          description: "Encryption keys for sensitive fields",
+          description: t("settings.cipherKeysDesc"),
           icon: "key",
           to: { name: "cipherKeys", query: { org_identifier: org } },
           visible: isEnt,
@@ -241,7 +242,7 @@ export default defineComponent({
         {
           key: "regex_patterns",
           label: t("regex_patterns.title"),
-          description: "Reusable regex patterns for redaction",
+          description: t("settings.regexPatternsDesc"),
           icon: `img:${regexIcon.value}`,
           to: { name: "regexPatterns", query: { org_identifier: org } },
           visible: isEnt,
@@ -251,7 +252,7 @@ export default defineComponent({
         {
           key: "domain_management",
           label: t("settings.ssoDomainRestrictions"),
-          description: "Restrict sign-in to allowed SSO domains",
+          description: t("settings.domainManagementDesc"),
           icon: "dns",
           to: { name: "domainManagement", query: { org_identifier: org } },
           visible: isEnt && meta,
@@ -261,7 +262,7 @@ export default defineComponent({
         {
           key: "alert_destinations",
           label: t("alert_destinations.header"),
-          description: "Where triggered alerts are delivered",
+          description: t("settings.alertDestinationsDesc"),
           icon: "location-on",
           to: { name: "alertDestinations", query: { org_identifier: org } },
           dataTest: "alert-destinations-tab",
@@ -270,7 +271,7 @@ export default defineComponent({
         {
           key: "pipeline_destinations",
           label: t("pipeline_destinations.header"),
-          description: "External targets for pipeline output",
+          description: t("settings.pipelineDestinationsDesc"),
           icon: "person-pin-circle",
           to: { name: "pipelineDestinations", query: { org_identifier: org } },
           visible: isEnt,
@@ -280,7 +281,7 @@ export default defineComponent({
         {
           key: "templates",
           label: t("alert_templates.header"),
-          description: "Reusable alert message templates",
+          description: t("settings.templatesDesc"),
           icon: "description",
           to: { name: "alertTemplates", query: { org_identifier: org } },
           dataTest: "alert-templates-tab",
@@ -289,7 +290,7 @@ export default defineComponent({
         {
           key: "storageSettings",
           label: t("storage_settings.tabLabel"),
-          description: "Per-organization storage configuration",
+          description: t("settings.storageSettingsDesc"),
           icon: "cloud",
           to: { name: "storageSettings", query: { org_identifier: org } },
           visible:
@@ -303,7 +304,7 @@ export default defineComponent({
         {
           key: "model_pricing",
           label: t("settings.llmModelPricing"),
-          description: "LLM model cost configuration",
+          description: t("settings.modelPricingDesc"),
           icon: "paid",
           to: { name: "modelPricing", query: { org_identifier: org } },
           visible: !!z.model_pricing_enabled,
@@ -313,7 +314,7 @@ export default defineComponent({
         {
           key: "correlation_settings",
           label: t("settings.correlationSettings"),
-          description: "Telemetry correlation configuration",
+          description: t("settings.correlationSettingsDesc"),
           icon: "group-work",
           to: { name: "correlationSettings", query: { org_identifier: org } },
           visible: isEnt && z.service_streams_enabled !== false,
@@ -323,7 +324,7 @@ export default defineComponent({
         {
           key: "llm_providers",
           label: t("llmProviders.tabLabel"),
-          description: "LLM providers for online evaluations",
+          description: t("settings.llmProvidersDesc"),
           icon: "smart-toy",
           to: { name: "llmProviders", query: { org_identifier: org } },
           visible: (isEnt || isCloud) && !!z.online_evals_enabled,
@@ -331,9 +332,18 @@ export default defineComponent({
           group: "Data & AI",
         },
         {
+          key: "gen_ai_agent_mapping",
+          label: t("settings.genAiAgentMapping.tabLabel"),
+          description: "Map GenAI spans to agent identifiers",
+          icon: "smart-toy",
+          to: { name: "genAiAgentMapping", query: { org_identifier: org } },
+          dataTest: "gen-ai-agent-mapping-tab",
+          group: "Data & AI",
+        },
+        {
           key: "queryManagement",
           label: t("settings.queryManagement"),
-          description: "Inspect and cancel running queries",
+          description: t("settings.queryManagementDesc"),
           icon: "query-stats",
           to: `/settings/query_management?org_identifier=${org}`,
           visible: isEnt && meta,
@@ -343,7 +353,7 @@ export default defineComponent({
         {
           key: "nodes",
           label: t("settings.nodes"),
-          description: "Cluster nodes and their health",
+          description: t("settings.nodesDesc"),
           icon: "hub",
           to: { name: "nodes", query: { org_identifier: org } },
           visible: isEnt && meta,
@@ -353,7 +363,7 @@ export default defineComponent({
         {
           key: "license",
           label: t("settings.license"),
-          description: "Enterprise license details",
+          description: t("settings.licenseDesc"),
           icon: "card-membership",
           to: { name: "license", query: { org_identifier: org } },
           visible: isEnt && meta,
@@ -363,7 +373,7 @@ export default defineComponent({
         {
           key: "organization_management",
           label: t("settings.organizationManagement"),
-          description: "Create and manage organizations",
+          description: t("settings.organizationManagementDesc"),
           icon: "lan",
           to: { name: "orgnizationManagement", query: { org_identifier: org } },
           visible: isCloud && meta,
@@ -392,9 +402,19 @@ export default defineComponent({
         const i = settingsGroupOrder.indexOf(label);
         return i === -1 ? Number.MAX_SAFE_INTEGER : i;
       };
+      // Internal group keys stay English (used for bucketing + rank); only the
+      // displayed label is translated so sorting/ranking is unaffected.
+      const groupLabels: Record<string, string> = {
+        "General": t("settings.groupGeneral"),
+        "Access & Security": t("settings.groupAccessSecurity"),
+        "Destinations & Templates": t("settings.groupDestinationsTemplates"),
+        "Data & AI": t("settings.groupDataAI"),
+        "Operations": t("settings.groupOperations"),
+        "Account": t("settings.groupAccount"),
+      };
       return [...buckets.keys()]
         .sort((a, b) => rank(a) - rank(b))
-        .map((label) => ({ label, items: buckets.get(label)! }));
+        .map((label) => ({ label: groupLabels[label] ?? label, items: buckets.get(label)! }));
     });
 
     return {

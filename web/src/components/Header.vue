@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-nowrap tw:items-center tw:h-10 tw:w-full tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0">
+  <div class="tw:flex tw:flex-nowrap tw:items-center tw:h-10 tw:w-full tw:bg-surface-chrome-deeper tw:shrink-0">
     <!-- LEFT SIDE: Logo -->
     <div class="tw:flex tw:items-center tw:justify-start tw:shrink-0 tw:pl-3">
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
@@ -35,18 +35,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <!-- Custom logo text -->
-      <span
+      <a
         v-if="
           store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
           store.state.zoConfig?.custom_logo_text != ''
         "
-        class="tw:text-xl tw:font-semibold tw:font-bold tw:p-0 tw:cursor-pointer tw:mr-2 tw:flex tw:items-center"
-        @click="goToHome"
-        >{{ store.state.zoConfig.custom_logo_text }}</span
+        :href="homeUrl"
+        @click.prevent="goToHome"
+        class="tw:text-xl tw:font-semibold tw:font-bold tw:p-0 tw:cursor-pointer tw:mr-2 tw:flex tw:items-center tw:no-underline tw:text-inherit"
+        >{{ store.state.zoConfig.custom_logo_text }}</a
       >
 
       <!-- Custom logo image - shows appropriate logo based on current theme -->
-      <div class="tw:flex tw:items-center">
+      <a :href="homeUrl" @click.prevent="goToHome" class="tw:inline-flex tw:items-center">
         <!-- Dark mode: Show dark logo, fallback to light logo -->
         <img
           v-if="
@@ -88,16 +89,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
           style="max-width: 150px; max-height: 32px"
         />
-      </div>
+      </a>
 
       <!-- OpenObserve logo (shown alongside custom logo if configured) -->
       <div
         v-if="store.state.zoConfig.custom_hide_self_logo == false"
-        class="logo-container tw:relative tw:inline-flex tw:items-center tw:min-h-10"
+        class="tw:relative tw:inline-flex tw:items-center tw:min-h-10"
       >
+        <a :href="homeUrl" @click.prevent="goToHome" class="tw:inline-flex tw:items-center">
+          <img
+            data-test="header-openobserve-logo"
+            class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 tw:hover:opacity-80"
+            :src="
+              getImageURL(
+                store.state.theme === 'dark'
+                  ? 'images/common/openobserve_latest_dark_2.svg'
+                  : 'images/common/openobserve_latest_light_2.svg',
+              )
+            "
+            alt="OpenObserve"
+          />
+        </a>
+      </div>
+    </div>
+
+    <!-- Default OpenObserve logo (when no custom logo) -->
+    <div v-else class="relative-position tw:relative tw:inline-flex tw:items-center tw:min-h-10">
+      <a :href="homeUrl" @click.prevent="goToHome" class="tw:inline-flex tw:items-center">
         <img
           data-test="header-openobserve-logo"
-          class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
+          class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 tw:hover:opacity-80"
           :src="
             getImageURL(
               store.state.theme === 'dark'
@@ -105,27 +126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'images/common/openobserve_latest_light_2.svg',
             )
           "
-          @click="goToHome"
           alt="OpenObserve"
         />
-      </div>
-    </div>
-
-    <!-- Default OpenObserve logo (when no custom logo) -->
-    <div v-else class="tw:flex relative-position logo-container">
-      <img
-        data-test="header-openobserve-logo"
-        class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
-        :src="
-          getImageURL(
-            store.state.theme === 'dark'
-              ? 'images/common/openobserve_latest_dark_2.svg'
-              : 'images/common/openobserve_latest_light_2.svg',
-          )
-        "
-        @click="goToHome"
-        alt="OpenObserve"
-      />
+      </a>
     </div>
     </div><!-- end left side -->
 
@@ -136,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex tw:items-center tw:justify-end tw:shrink-0 tw:pr-3 tw:gap-1">
     <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
     <div
-      class="headerMenu tw:flex tw:items-center tw:gap-1"
+      class="tw:mr-4 tw:flex tw:items-center tw:gap-1"
       v-if="store.state.organizationData.quotaThresholdMsg"
     >
       <div
@@ -219,6 +222,12 @@ size="xs" class="warning" />{{
           @mouseleave="handleMouseLeave"
         >
           <img :src="getBtnLogo" class="ai-icon tw:w-5 tw:h-5 tw:shrink-0" />
+          <OTooltip
+            side="bottom"
+            align="center"
+            :content="t('menu.aiAssistant')"
+            shortcut-id="aiChatToggle"
+          />
         </OButton>
       </template>
 
@@ -272,6 +281,16 @@ size="xs" class="warning" />{{
           </ODropdownItem>
           <ODropdownSeparator />
 
+          <!-- Keyboard shortcuts -->
+          <ODropdownItem
+            data-test="menu-link-shortcuts-item"
+            shortcut-id="openCheatsheet"
+            @select="openShortcuts"
+          >
+            {{ t("menu.keyboardShortcuts") }}
+          </ODropdownItem>
+          <ODropdownSeparator />
+
           <!-- About page link -->
           <ODropdownItem
             data-test="menu-link-about-item"
@@ -320,17 +339,17 @@ size="xs" class="warning" />{{
           <!-- Language selector — nested sub-dropdown (click to open) -->
           <div
             data-test="header-language-submenu-trigger"
-            class="header-language-item"
+            class="tw:relative tw:flex tw:items-center tw:gap-3 tw:py-1.5 tw:px-3 tw:text-sm tw:leading-[1.2] tw:cursor-pointer tw:select-none tw:hover:bg-[rgba(0,0,0,0.05)] tw:dark:hover:bg-[rgba(255,255,255,0.08)]"
             @click.stop="showLanguageSubmenu = !showLanguageSubmenu"
           >
             <OIcon size="xs" name="language" class="padding-none" />
-            <span class="header-language-label">{{ t("menu.language") }}</span>
-            <span class="header-language-current">
+            <span class="tw:flex-1 tw:whitespace-nowrap">{{ t("menu.language") }}</span>
+            <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:opacity-75 tw:whitespace-nowrap">
               <img
                 v-if="selectedLanguage.icon && selectedLanguage.icon.startsWith('img:')"
                 :src="selectedLanguage.icon.slice(4)"
                 :alt="selectedLanguage.label"
-                class="header-language-flag"
+                class="tw:w-4 tw:h-3 tw:object-cover tw:rounded-xs tw:inline-block tw:shrink-0"
               />
               <OIcon
                 v-else-if="selectedLanguage.icon"
@@ -345,7 +364,10 @@ size="xs" class="warning" />{{
             <!-- Submenu — absolutely positioned to the left of parent dropdown -->
             <div
               v-if="showLanguageSubmenu"
-              class="language-submenu"
+              class="tw:absolute tw:right-full tw:top-0 tw:mr-1 tw:min-w-50 tw:border tw:rounded-md tw:py-1 tw:z-9999"
+              :class="store.state.theme === 'dark'
+                ? 'tw:bg-[#1f2937] tw:border-[rgba(255,255,255,0.12)] tw:shadow-[0_8px_24px_rgba(0,0,0,0.5)]'
+                : 'tw:bg-white tw:border-black/12 tw:shadow-[0_8px_24px_rgba(0,0,0,0.15)]'"
               data-test="language-dropdown-item"
               @click.stop
             >
@@ -354,17 +376,20 @@ size="xs" class="warning" />{{
                 :key="lang.code"
                 type="button"
                 :data-test="`language-dropdown-item-${lang.code}`"
-                class="language-submenu-item"
-                :class="{
-                  'is-selected': selectedLanguage.code === lang.code,
-                }"
+                class="tw:flex tw:items-center tw:gap-2.5 tw:w-full tw:py-1.5 tw:px-3 tw:text-sm tw:leading-[1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-inherit"
+                :class="[
+                  store.state.theme === 'dark'
+                    ? 'tw:hover:bg-[rgba(255,255,255,0.08)]'
+                    : 'tw:hover:bg-[rgba(0,0,0,0.05)]',
+                  { 'tw:font-semibold': selectedLanguage.code === lang.code },
+                ]"
                 @click="changeLanguage(lang); showLanguageSubmenu = false"
               >
                 <img
                   v-if="lang.icon && lang.icon.startsWith('img:')"
                   :src="lang.icon.slice(4)"
                   :alt="lang.label"
-                  class="header-language-flag"
+                  class="tw:w-4 tw:h-3 tw:object-cover tw:rounded-xs tw:inline-block tw:shrink-0"
                 />
                 <OIcon v-else-if="lang.icon" size="xs" :name="lang.icon" />
                 <span class="tw:flex-1">{{ lang.label }}</span>
@@ -415,6 +440,7 @@ size="xs" class="warning" />{{
 <script lang="ts">
 
 import { defineComponent, PropType, computed, ref, watch, nextTick } from "vue";
+import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
@@ -522,10 +548,22 @@ export default defineComponent({
     "navigateToDocs",
     "changeLanguage",
     "openPredefinedThemes",
+    "openShortcuts",
     "signout",
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
+    const router = useRouter();
+
+    const homeUrl = computed(() => {
+      if (!router) return "/";
+      return router.resolve({
+        path: "/",
+        query: {
+          org_identifier: props.store.state.selectedOrganization?.identifier,
+        },
+      }).href;
+    });
 
     // Enterprise upgrade dialog state
     const showEnterpriseDialog = ref(false);
@@ -599,6 +637,10 @@ export default defineComponent({
       emit("openPredefinedThemes");
     };
 
+    const openShortcuts = () => {
+      emit("openShortcuts");
+    };
+
     const signout = () => {
       emit("signout");
     };
@@ -633,6 +675,7 @@ export default defineComponent({
       showLanguageSubmenu,
       updateOrganization,
       goToHome,
+      homeUrl,
       goToAbout,
       toggleAIChat,
       openSlack,
@@ -640,6 +683,7 @@ export default defineComponent({
       navigateToDocs,
       changeLanguage,
       openPredefinedThemes,
+      openShortcuts,
       signout,
       handleMouseEnter,
       handleMouseLeave,
@@ -650,138 +694,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-:deep(.header-user-tooltip) {
-  width: auto;
-  max-width: none;
-  white-space: nowrap;
-}
-
-/* Language sub-menu trigger row inside the user-profile dropdown */
-.header-language-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 12px;
-  font-size: 14px;
-  line-height: 1.2;
-  cursor: pointer;
-  user-select: none;
-
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.05);
-  }
-
-  body.body--dark & {
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.08);
-    }
-  }
-}
-
-.header-language-label {
-  flex: 1;
-  white-space: nowrap;
-}
-
-.header-language-current {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  opacity: 0.75;
-  white-space: nowrap;
-}
-
-.header-language-flag {
-  width: 16px;
-  height: 12px;
-  object-fit: cover;
-  border-radius: 2px;
-  display: inline-block;
-  flex-shrink: 0;
-}
-
-/* The nested popover */
-.language-submenu {
-  position: absolute;
-  right: 100%;
-  top: 0;
-  margin-right: 4px;
-  min-width: 200px;
-  background-color: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  padding: 4px 0;
-  z-index: 9999;
-
-  body.body--dark & {
-    background-color: #1f2937;
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  }
-}
-
-.language-submenu-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 6px 12px;
-  font-size: 14px;
-  line-height: 1.2;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  color: inherit;
-
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.05);
-  }
-
-  &.is-selected {
-    font-weight: 600;
-  }
-
-  body.body--dark & {
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.08);
-    }
-  }
-}
-
-.logo-container {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.5rem;
-  /* No min-width: the wordmark is ~120px, so reserving 150px left an empty gap
-     before the breadcrumb. The enterprise custom-logo branch keeps its own
-     Tailwind min-w-[150px] where it's still wanted. */
-}
-
-.openobserve-logo {
-  height: 2rem;
-  width: auto;
-  max-width: 9.375rem;
-  display: block;
-  transition: opacity 0.2s ease;
-
-  &:hover {
-    opacity: 0.8;
-  }
-}
-
-.headerMenu {
-  margin-right: 1rem;
-
-  .block {
-    font-weight: 700;
-    color: var(--o2-text-primary);
-  }
-}
-
-
-</style>

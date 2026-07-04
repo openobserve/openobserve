@@ -17,7 +17,7 @@
  * Shared tooltip overflow CSS style for chart tooltips
  */
 export const TOOLTIP_SCROLL_STYLE =
-  "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;";
+  "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;";
 
 /**
  * PromQL result item structure

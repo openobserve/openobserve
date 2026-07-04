@@ -381,7 +381,7 @@ describe("FileItem.vue", () => {
       expect(listItem.classes()).toContain("tw:cursor-pointer");
       expect(listItem.classes()).toContain("tw:py-[1px]");
       expect(listItem.classes()).toContain("tw:px-2");
-      expect(listItem.classes()).toContain("hover:tw:bg-gray-200");
+      expect(listItem.classes()).toContain("tw:hover:bg-gray-200");
       expect(listItem.classes()).toContain("file-item");
     });
 

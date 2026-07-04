@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="addApiHeader"
         icon-left="add"
       >
-        Add Condition
+        {{ t('alerts.addCondition') }}
       </OButton>
     </template>
     <template v-else>
@@ -167,10 +167,3 @@ const addApiHeader = () => {
 
 </script>
 
-<style lang="scss">
-.add-field {
-}
-
-.alerts-condition-action {
-}
-</style>

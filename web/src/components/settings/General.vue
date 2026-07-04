@@ -19,15 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <!-- Section header (title + description) is provided full-width by the
          Settings shell; this component renders only the form content. -->
-    <!-- platform settings section. The page gutter is owned by the Settings
-         shell's ConstrainedPage; this block adds none of its own. -->
-    <div>
+    <!-- platform settings section -->
+    <div class="">
       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
       <div class="tw:w-full tw:flex tw:flex-col">
         <OForm @submit.stop="onSubmit.execute">
           <!-- scape interval section -->
-          <div class="settings-grid-item">
-            <span class="individual-setting-title">
+          <div class="settings-grid-item tw:grid tw:grid-cols-3 tw:gap-4 tw:items-center tw:py-4 tw:border-b tw:border-(--o2-border-color)">
+            <span class="individual-setting-title tw:text-sm tw:font-medium tw:leading-5">
               {{ t("settings.scrapintervalLabel") }}
             </span>
             <OInput
@@ -41,14 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="general-settings-scrape-interval"
               style="width: 120px"
             />
-            <span class="individual-setting-description">
+            <span class="individual-setting-description tw:text-[13px] tw:opacity-70">
               {{ t("settings.scrapeIntervalDescription") }}
             </span>
           </div>
 
           <!-- Max Series Per Query section -->
-          <div class="settings-grid-item">
-            <span class="individual-setting-title">
+          <div class="settings-grid-item tw:grid tw:grid-cols-3 tw:gap-4 tw:items-center tw:py-4 tw:border-b tw:border-(--o2-border-color)">
+            <span class="individual-setting-title tw:text-sm tw:font-medium tw:leading-5">
               {{ t("settings.maxSeriesPerQueryLabel") }}
             </span>
             <OInput
@@ -70,14 +69,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OIcon>
               </template>
             </OInput>
-            <span class="individual-setting-description">
+            <span class="individual-setting-description tw:text-[13px] tw:opacity-70">
               {{ t("settings.maxSeriesPerQueryDescription") }}
             </span>
           </div>
 
           <!-- Manage Theme section -->
-          <div class="settings-grid-item tw:items-start">
-            <span class="individual-setting-title">
+          <div class="settings-grid-item tw:grid tw:grid-cols-3 tw:gap-4 tw:items-center tw:py-4 tw:border-b tw:border-(--o2-border-color)">
+            <span class="individual-setting-title tw:text-sm tw:font-medium tw:leading-5">
               {{ t("settings.manageTheme") }}
             </span>
             <div
@@ -86,55 +85,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Light Mode Theme -->
               <div
-                class="theme-color-chip"
+                class="tw:group/chip tw:inline-flex tw:items-center tw:gap-2 tw:py-[6px] tw:pr-3 tw:pl-[6px] tw:rounded-[20px] tw:cursor-pointer tw:transition-all tw:duration-200 tw:bg-[rgba(0,0,0,0.04)] tw:border tw:border-[rgba(0,0,0,0.1)] tw:hover:bg-[rgba(0,0,0,0.06)] tw:hover:border-(--o2-primary-color) tw:hover:-translate-y-px tw:hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] tw:dark:bg-[rgba(255,255,255,0.05)] tw:dark:border-[rgba(255,255,255,0.15)] tw:dark:hover:bg-[rgba(255,255,255,0.08)] tw:dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
                 @click="handleThemeChipClick('light')"
                 data-test="theme-light-chip"
               >
                 <div
-                  class="color-circle"
+                  class="color-circle tw:w-6 tw:h-6 tw:rounded-full tw:shrink-0 tw:flex tw:items-center tw:justify-center tw:shadow-[0_1px_3px_rgba(0,0,0,0.2)] tw:relative tw:overflow-hidden"
                   :style="{ backgroundColor: customLightColor }"
                 >
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="palette-icon"
+                    class="tw:opacity-0 tw:transition-opacity tw:duration-200 tw:[filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))] tw:group-hover/chip:opacity-90"
                   />
                 </div>
-                <span class="chip-label">{{ t("settings.light") }}</span>
-                <span class="chip-value">{{ customLightColor }}</span>
+                <span class="chip-label tw:text-[11px] tw:font-semibold tw:opacity-50 tw:tracking-[0.5px]">{{ t("settings.light") }}</span>
+                <span class="chip-value tw:font-['SF_Mono','Monaco','Menlo',monospace] tw:text-[11px] tw:font-medium tw:opacity-70 tw:tracking-[-0.2px]">{{ customLightColor }}</span>
               </div>
 
               <!-- Dark Mode Theme -->
               <div
-                class="theme-color-chip"
+                class="tw:group/chip tw:inline-flex tw:items-center tw:gap-2 tw:py-[6px] tw:pr-3 tw:pl-[6px] tw:rounded-[20px] tw:cursor-pointer tw:transition-all tw:duration-200 tw:bg-[rgba(0,0,0,0.04)] tw:border tw:border-[rgba(0,0,0,0.1)] tw:hover:bg-[rgba(0,0,0,0.06)] tw:hover:border-(--o2-primary-color) tw:hover:-translate-y-px tw:hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] tw:dark:bg-[rgba(255,255,255,0.05)] tw:dark:border-[rgba(255,255,255,0.15)] tw:dark:hover:bg-[rgba(255,255,255,0.08)] tw:dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
                 @click="handleThemeChipClick('dark')"
                 data-test="theme-dark-chip"
               >
                 <div
-                  class="color-circle"
+                  class="color-circle tw:w-6 tw:h-6 tw:rounded-full tw:shrink-0 tw:flex tw:items-center tw:justify-center tw:shadow-[0_1px_3px_rgba(0,0,0,0.2)] tw:relative tw:overflow-hidden"
                   :style="{ backgroundColor: customDarkColor }"
                 >
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="palette-icon"
+                    class="tw:opacity-0 tw:transition-opacity tw:duration-200 tw:[filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))] tw:group-hover/chip:opacity-90"
                   />
                 </div>
-                <span class="chip-label">{{ t("settings.dark") }}</span>
-                <span class="chip-value">{{ customDarkColor }}</span>
+                <span class="chip-label tw:text-[11px] tw:font-semibold tw:opacity-50 tw:tracking-[0.5px]">{{ t("settings.dark") }}</span>
+                <span class="chip-value tw:font-['SF_Mono','Monaco','Menlo',monospace] tw:text-[11px] tw:font-medium tw:opacity-70 tw:tracking-[-0.2px]">{{ customDarkColor }}</span>
               </div>
 
               <!-- Reset Button -->
               <div
-                class="theme-reset-chip"
+                class="tw:group/resetChip tw:inline-flex tw:items-center tw:justify-center tw:w-8 tw:h-8 tw:rounded-full tw:cursor-pointer tw:transition-all tw:duration-200 tw:bg-transparent tw:border tw:border-dashed tw:border-[rgba(0,0,0,0.2)] tw:opacity-60 tw:hover:bg-[rgba(239,68,68,0.08)] tw:hover:border-[rgba(239,68,68,0.4)] tw:hover:border-solid tw:hover:opacity-100 tw:hover:-translate-y-px tw:hover:rotate-180 tw:dark:border-[rgba(255,255,255,0.25)] tw:dark:hover:bg-[rgba(239,68,68,0.15)] tw:dark:hover:border-[rgba(239,68,68,0.5)]"
                 @click="resetThemeColors"
                 data-test="reset-theme-colors-btn"
               >
-                <OIcon name="refresh" size="sm" />
+                <OIcon name="refresh" size="sm" class="tw:group-hover/resetChip:text-[rgb(239,68,68)] tw:dark:group-hover/resetChip:text-[rgb(248,113,113)]" />
                 <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
               </div>
             </div>
-            <span class="individual-setting-description tw:self-start">
+            <span class="individual-setting-description tw:self-start tw:text-[13px] tw:opacity-70">
               {{ t("settings.themeManagementDescription") }}
             </span>
           </div>
@@ -169,9 +168,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :showIcon="false"
         />
       </div>
-      <div>
-        <div class="settings-grid-item no-border-bottom">
-          <span class="individual-setting-title">
+      <div class="">
+        <div class="settings-grid-item no-border-bottom tw:grid tw:grid-cols-3 tw:gap-4 tw:items-center tw:py-4 tw:border-b tw:border-(--o2-border-color)">
+          <span class="individual-setting-title tw:text-sm tw:font-medium tw:leading-5">
             {{ t("settings.customLogoText") }}
           </span>
           <div
@@ -227,13 +226,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="edit"
             />
           </div>
-          <span class="individual-setting-description">
+          <span class="individual-setting-description tw:text-[13px] tw:opacity-70">
             {{ t("settings.customLogoTextDescription") }}
           </span>
         </div>
         <!-- Light Mode Logo -->
-        <div class="settings-grid-item">
-          <div class="tw:pt-2 individual-setting-title tw:w-full tw:mb-5">
+        <div class="settings-grid-item tw:grid tw:grid-cols-3 tw:gap-4 tw:items-center tw:py-4 tw:border-b tw:border-(--o2-border-color)">
+          <div class="tw:pt-2 individual-setting-title tw:text-sm tw:font-medium tw:leading-5 tw:w-full tw:mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
           </div>
           <div
@@ -296,14 +295,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <span class="individual-setting-description tw:-translate-y-[5px]">
+          <span class="individual-setting-description tw:-translate-y-[5px] tw:text-[13px] tw:opacity-70">
               {{ t("settings.customLogoLightDescription") }}
             </span>
           </div>
 
         <!-- Dark Mode Logo -->
-        <div class="settings-grid-item">
-          <div class="tw:pt-2 individual-setting-title tw:w-full tw:mb-5">
+        <div class="settings-grid-item tw:grid tw:grid-cols-3 tw:gap-4 tw:items-center tw:py-4 tw:border-b tw:border-(--o2-border-color)">
+          <div class="tw:pt-2 individual-setting-title tw:text-sm tw:font-medium tw:leading-5 tw:w-full tw:mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
           </div>
           <div
@@ -367,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <span class="individual-setting-description tw:-translate-y-[5px]">
+          <span class="individual-setting-description tw:-translate-y-[5px] tw:text-[13px] tw:opacity-70">
               {{ t("settings.customLogoDarkDescription") }}
             </span>
           </div>
@@ -875,11 +874,13 @@ export default defineComponent({
         color: DEFAULT_DARK_COLOR,
       });
 
-      // Apply the theme immediately for current mode
+      // Apply the theme immediately for current mode.
+      // isDefault=false so the default theme's (O2 Signature) actual colors are
+      // applied rather than reverting to the base stylesheet palette.
       const currentMode = store.state.theme === "dark" ? "dark" : "light";
       const color =
         currentMode === "light" ? DEFAULT_LIGHT_COLOR : DEFAULT_DARK_COLOR;
-      applyThemeColors(color, currentMode, true);
+      applyThemeColors(color, currentMode, false);
 
       // Show notification
       toast({
@@ -907,13 +908,9 @@ export default defineComponent({
       const color =
         mode === "light" ? customLightColor.value : customDarkColor.value;
 
-      // Check if the color is a default color
-      const isDefault =
-        (mode === "light" && color === DEFAULT_LIGHT_COLOR) ||
-        (mode === "dark" && color === DEFAULT_DARK_COLOR);
-
-      // Apply the theme color for the new mode
-      applyThemeColors(color, mode, isDefault);
+      // Apply the theme color for the new mode. isDefault=false so the resolved
+      // color (including the O2 Signature default) is always applied directly.
+      applyThemeColors(color, mode, false);
     };
 
     const cancelLogoText = () => {
@@ -1077,142 +1074,18 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-/* .general-page-title / .general-page-subtitle removed — the section title now
-   renders via the standard AppPageHeader (title + subtitle props). */
-.individual-setting-title {
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-}
-.individual-setting-description {
-  font-size: 13px;
-  opacity: 0.7;
-}
-
-.settings-grid-item {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 1rem;
-  align-items: center;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--o2-border-color);
-}
-
-.dark-settings-theme .settings-grid-item {
-  border-bottom: 1px solid var(--o2-border-color) !important;
-}
-.text-btn-border-light {
-  border: 1px solid #d3d5db;
-}
-.text-btn-border-dark {
-  border: 1px solid #6f737a;
-}
-
-// Theme management styles - Compact chip design
-.theme-color-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px 6px 6px;
-  border-radius: 20px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background: rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.theme-color-chip:hover {
-  background: rgba(0, 0, 0, 0.06);
-  border-color: var(--q-primary);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-body.body--dark .theme-color-chip {
+<style>
+/* The theme chips' dark background/border are set via `tw:dark:*` utilities,
+   which don't apply in this app (dark mode is toggled by `body.body--dark`,
+   not the OS media query Tailwind's `dark:` variant targets). Restore them
+   with class-based rules so the chips keep their fill + border in dark mode. */
+.body--dark [data-test="theme-light-chip"],
+.body--dark [data-test="theme-dark-chip"] {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.15);
 }
-
-body.body--dark .theme-color-chip:hover {
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.color-circle {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  position: relative;
-  overflow: hidden;
-}
-
-.palette-icon {
-  opacity: 0;
-  transition: opacity 0.2s;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
-}
-
-.theme-color-chip:hover .palette-icon {
-  opacity: 0.9;
-}
-
-.chip-label {
-  font-size: 11px;
-  font-weight: 600;
-  opacity: 0.5;
-  letter-spacing: 0.5px;
-}
-
-.chip-value {
-  font-family: "SF Mono", "Monaco", "Menlo", monospace;
-  font-size: 11px;
-  font-weight: 500;
-  opacity: 0.7;
-  letter-spacing: -0.2px;
-}
-
-.theme-reset-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background: transparent;
-  border: 1px dashed rgba(0, 0, 0, 0.2);
-  opacity: 0.6;
-}
-
-.theme-reset-chip:hover {
-  background: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.4);
-  border-style: solid;
-  opacity: 1;
-  transform: translateY(-1px) rotate(180deg);
-}
-
-.theme-reset-chip:hover .OIcon {
-  color: rgb(239, 68, 68);
-}
-
-body.body--dark .theme-reset-chip {
+.body--dark [data-test="reset-theme-colors-btn"] {
   border-color: rgba(255, 255, 255, 0.25);
 }
-
-body.body--dark .theme-reset-chip:hover {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.5);
-}
-
-body.body--dark .theme-reset-chip:hover .OIcon {
-  color: rgb(248, 113, 113);
-}
 </style>
+

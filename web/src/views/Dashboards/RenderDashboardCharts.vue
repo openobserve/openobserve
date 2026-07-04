@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <slot name="before_panels" />
-      <div class="displayDiv">
+      <div class="displayDiv tw:clear-both tw:min-h-0 tw:h-auto">
         <div
           v-if="
             store.state.printMode &&
@@ -140,7 +140,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: 100%; width: 100%"
           />
         </div>
-        <div v-else-if="panels.length > 0" ref="gridStackContainer" class="grid-stack">
+        <div
+          v-else-if="panels.length > 0"
+          ref="gridStackContainer"
+          class="grid-stack tw:bg-transparent tw:m-0.5"
+        >
           <div
             v-for="item in panels"
             :key="item.id + selectedTabId"
@@ -151,12 +155,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :gs-h="getPanelLayout(item, 'h')"
             :gs-min-w="getMinimumWidth(item.type)"
             :gs-min-h="getMinimumHeight(item.type)"
-            class="grid-stack-item gridBackground"
-            :class="store.state.theme == 'dark' ? 'dark' : ''"
+            class="grid-stack-item gridBackground tw:bg-transparent! tw:rounded-lg tw:border-border-default!"
+            :class="store.state.theme == 'dark' ? 'dark tw:border-border-default!' : ''"
           >
             <div class="grid-stack-item-content">
               <!-- Panel with Panel-Level Variables -->
-              <div class="panel-with-variables">
+              <div class="panel-with-variables tw:h-full tw:flex tw:flex-col">
                 <!-- Original Panel Container -->
 
                 <PanelContainer
@@ -247,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {}
                         "
                         :initialVariableValues="initialVariableValues"
-                        :style="{ marginBottom: '8px' }"
+                        class="panel-variables-margin tw:mb-2"
                         data-test="panel-variables-selector"
                       />
                     </div>
@@ -269,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Explicit height wrapper: fills the dialog body's available space
              (90vh − body padding) so ViewPanel can use height:100% and
              flex:1 works all the way down without causing a body scrollbar. -->
-        <div class="view-panel-height-wrapper">
+        <div class="view-panel-height-wrapper tw:h-[calc(90vh-var(--spacing-dialog-content-py)*2)] tw:-my-(--spacing-dialog-content-py) tw:-mx-(--spacing-dialog-content-px) tw:flex tw:flex-col tw:overflow-hidden">
           <ViewPanel
             :folderId="folderId"
             :dashboardId="dashboardData.dashboardId"
@@ -1688,114 +1692,68 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-// Fills the ODialog body's available space (dialog max-h:90vh minus body padding)
-// so ViewPanel can use height:100% and flex:1 chains work without a scrollbar.
-.view-panel-height-wrapper {
-  height: calc(90vh - var(--spacing-dialog-content-py) * 2);
-  margin: calc(-1 * var(--spacing-dialog-content-py)) calc(-1 * var(--spacing-dialog-content-px));
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+<!--
+  Plain GLOBAL (unscoped) style block.
+  Only rules that target third-party / dynamically-created DOM that this
+  template does NOT render directly are kept here (GridStack-injected classes,
+  Quasar internals, print/page setup). All component-own element styles are
+  expressed as inline tw: utilities in the template above.
+-->
+<style>
+/* Quasar table top toolbar (dynamic Quasar DOM — cannot be inlined) */
+.q-table__top {
+  border-bottom: 1px solid var(--color-border-default);
+  justify-content: flex-end;
 }
 
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
+/* When grid is static (disabled), hide resize handles */
+.grid-stack.grid-stack-static .ui-resizable-handle {
+  display: none !important;
 }
 
-.displayDiv {
-  clear: both;
-  min-height: 0;
-  height: auto;
+/* Dark-mode outline lives on the content child; pull it onto the design
+   token for a clean solid edge against the dark canvas. */
+.grid-stack-item.dark .grid-stack-item-content {
+  border-color: var(--color-border-default);
 }
 
-.gridBackground {
-  background: transparent !important;
-  border-radius: 4px;
-  border-color: #c2c2c27a !important;
-}
-
-.gridBackground.dark {
-  border-color: rgba(204, 204, 220, 0.12) !important;
-}
-
-/* Optimized GridStack layout styles for better performance and visual feedback */
-.grid-stack {
-  background: transparent;
-  margin: 2px;
-
-  /* When grid is static (disabled), hide resize handles */
-  &.grid-stack-static {
-    .ui-resizable-handle {
-      display: none !important;
-    }
-  }
-}
-
-.grid-stack-item {
-  background: transparent;
-
-  &.dark {
-    border-color: rgba(204, 204, 220, 0.12) !important;
-
-    /* The visible panel outline lives on the content child; in dark mode pull
-       it onto the design token (clean solid edge) instead of the bright
-       #c2c2c27a gray, which reads too light against the dark canvas. */
-    .grid-stack-item-content {
-      border-color: var(--color-border-default);
-    }
-  }
-  .grid-stack-item-content {
-    border: 1px solid #c2c2c27a;
-    border-radius: 4px;
-    overflow: visible;
-    border-radius: inherit;
-    // height: 100%;
-  }
-}
-
-.panel-with-variables {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+.grid-stack-item .grid-stack-item-content {
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.375rem;
+  overflow: visible;
+  box-shadow: var(--shadow-sm);
 }
 
 /* GridStack theme overrides */
-:deep(.grid-stack) {
-  .grid-stack-item {
-    .drag-allow {
-      cursor: move;
-    }
+.grid-stack .grid-stack-item .drag-allow {
+  cursor: move;
+}
 
-    &.ui-draggable-dragging {
-      opacity: 0.8;
-      z-index: 1000;
-      transition: transform 0.15s ease;
-    }
+.grid-stack .grid-stack-item.ui-draggable-dragging {
+  opacity: 0.8;
+  z-index: 1000;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+}
 
-    &.ui-resizable-resizing {
-      opacity: 0.9;
-    }
+.grid-stack .grid-stack-item.ui-resizable-resizing {
+  opacity: 0.9;
+}
 
-    > .ui-resizable-handle {
-      background: none;
+.grid-stack .grid-stack-item > .ui-resizable-handle {
+  background: none;
+}
 
-      &.ui-resizable-se {
-        background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='%23999999' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
-          no-repeat center;
-        background-size: 8px 8px;
-        width: 16px;
-        height: 16px;
-        bottom: 2px;
-        right: 2px;
-        cursor: se-resize;
-        transform: rotate(0deg) !important;
-      }
-    }
-  }
+.grid-stack .grid-stack-item > .ui-resizable-handle.ui-resizable-se {
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='%23999999' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
+    no-repeat center;
+  background-size: 0.5rem 0.5rem;
+  width: 1rem;
+  height: 1rem;
+  bottom: 0.125rem;
+  right: 0.125rem;
+  cursor: se-resize;
+  transform: rotate(0deg) !important;
 }
 
 /* Ensure proper box-sizing */
@@ -1837,7 +1795,7 @@ export default defineComponent({
   /* Quasar virtual-scroll inserts padding divs above/below the rendered
    * rows to simulate the full scroll height. In print mode these become
    * empty white space. Hide them so no blank gaps appear in table panels. */
-  :deep(.q-virtual-scroll__padding) {
+  .q-virtual-scroll__padding {
     display: none !important;
   }
 }

@@ -121,7 +121,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-/* RCA styles are imported from parent */
-</style>

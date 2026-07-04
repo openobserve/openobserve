@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="table-wrapper" data-test="dashboard-table-renderer-wrapper">
+  <div class="table-wrapper tw:h-full tw:w-full tw:relative" data-test="dashboard-table-renderer-wrapper">
     <TenstackTable
       ref="tableRef"
       :rows="sortedRows"
-      :columns="data.columns || []"
+      :columns="tableColumns"
       :sort-by="localSortBy"
       :sort-order="localSortOrder"
       @sort-change="handleSortChange"
@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :enable-row-expand="false"
       :enable-status-bar="false"
       :enable-ai-context-button="false"
+      :enable-column-filter="enableFiltering"
       data-test="dashboard-panel-table"
       @click:dataRow="(row: any, _idx: number, evt?: MouseEvent) => $emit('row-click', evt ?? null, row, _idx)"
     >
@@ -74,11 +75,19 @@ import TenstackTable from "@/components/TenstackTable.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
-import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
+import { isColorDark } from "@/utils/dashboard/chartColorUtils";
+import {
+  buildValueMappingCache,
+  lookupValueMappingFull,
+} from "@/utils/dashboard/tableConfigUtils";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "TableRenderer",
-  components: { TenstackTable, TablePaginationControls },
+  components: {
+    TenstackTable,
+    TablePaginationControls,
+  },
   props: {
     data: {
       required: true,
@@ -105,20 +114,20 @@ export default defineComponent({
       type: Number,
       default: TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
     },
+    enableFiltering: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["row-click"],
   setup(props) {
+    const store = useStore();
     const tableRef = ref<any>(null);
 
-    /** Returns true when the hex colour is dark (needs white text). */
-    const isDashboardColor = (hex: string): boolean => {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      if (!result) return false;
-      const r = parseInt(result[1], 16);
-      const g = parseInt(result[2], 16);
-      const b = parseInt(result[3], 16);
-      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
-    };
+    const tableColumns = computed(
+      () => (props.data?.columns as any[]) || [],
+    );
 
     /**
      * Computes the inline style for a given TanStack cell.
@@ -128,28 +137,76 @@ export default defineComponent({
     // Component-level cache: colKey → (value → hex). Avoids mutating prop-derived col objects.
     const autoColorCache = new Map<string, Map<string, string>>();
 
+    // Value-mapping lookup cache, rebuilt only when the mappings change.
+    const valueMappingCache = computed(() =>
+      buildValueMappingCache(props.valueMapping),
+    );
+
+    const evalCondition = (val: number, op: string, threshold: number): boolean => {
+      switch (op) {
+        case "<":  return val < threshold;
+        case ">":  return val > threshold;
+        case "<=": return val <= threshold;
+        case ">=": return val >= threshold;
+        case "=":
+        case "==": return val === threshold;
+        case "!=": return val !== threshold;
+        default:   return false;
+      }
+    };
+
     const cellStyleFn = computed(() => (cell: any): string => {
       const col = (cell.column.columnDef.meta as any)?._col;
       const value = cell.getValue();
 
       // 1) Auto color mode — stable palette per distinct string value.
       if (col?.colorMode === "auto") {
-        const palette = getColorForTable;
+        const palette = getColorForTable(store.state.theme);
         const key = String(value);
         const colKey = col.field ?? col.name;
         if (!autoColorCache.has(colKey)) autoColorCache.set(colKey, new Map<string, string>());
         const map = autoColorCache.get(colKey)!;
-        if (!map.has(key)) map.set(key, palette[map.size % palette.length]);
+        if (!map.has(key))
+          map.set(key, palette[map.size % palette.length]);
         const hex = map.get(key) as string;
-        return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
+        return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
       }
 
-      // 2) Value-mapping color.
-      const found = findFirstValidMappedValue(value, props.valueMapping, "color");
-      if (found?.color) {
+      // 2) Value-mapping color (valid hex only; else fall through).
+      const found = lookupValueMappingFull(value, valueMappingCache.value, "color");
+      if (
+        found?.color &&
+        /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(found.color)
+      ) {
         const hex = found.color;
-        if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(hex)) return "";
-        return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
+        return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
+      }
+
+      // 3) Conditional styling rules — last matching rule wins, so later rules
+      // override earlier ones (e.g. >1000 takes precedence over >400 for 2301).
+      const conditionalRules = col?.conditionalRules as any[] | undefined;
+      if (conditionalRules?.length) {
+        const numVal = parseFloat(String(value));
+        if (!isNaN(numVal)) {
+          let matched: any = null;
+          for (const rule of conditionalRules) {
+            if (evalCondition(numVal, rule.operator, rule.threshold)) matched = rule;
+          }
+          if (matched) {
+            const parts: string[] = [];
+            if (matched.bgColor) parts.push(`background-color: ${matched.bgColor}`);
+            if (matched.textColor) parts.push(`color: ${matched.textColor}`);
+            if (parts.length) return parts.join("; ");
+          }
+        }
+      }
+
+      // 4) Column-level text / background color override.
+      if (col?.bgColor || col?.textColor) {
+        const parts: string[] = [];
+        if (col.bgColor) parts.push(`background-color: ${col.bgColor}`);
+        if (col.textColor) parts.push(`color: ${col.textColor}`);
+        return parts.join("; ");
       }
 
       return "";
@@ -246,6 +303,7 @@ export default defineComponent({
 
     return {
       tableRef,
+      tableColumns,
       cellStyleFn,
       sortedRows,
       localSortBy,
@@ -259,93 +317,82 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.table-wrapper {
-  height: 100%;
-  width: 100%;
-  position: relative;
-}
-
-// Remove border-radius from the shared .container class (logs uses rounded corners)
-:deep(.container) {
+<style>
+/* Remove border-radius from the shared .container class (logs uses rounded corners) */
+.table-wrapper .container {
   border-radius: 0;
 }
 
-// Dashboard table cells should not use the monospace font from tenstack-table.scss
-// (that scss is shared with logs, which intentionally uses monospace for log data)
-:deep(td) {
+/* Dashboard table cells should not use the monospace font from tenstack-table.scss */
+.table-wrapper td {
   font-family: var(--font-sans);
 }
 
-// Pivot table styles
-:deep(.pivot-total-row) {
+/* Pivot table styles */
+.table-wrapper .pivot-total-row {
   font-weight: bold;
   background-color: rgba(0, 0, 0, 0.03);
 }
 
-.body--dark :deep(.pivot-total-row) {
+.body--dark .table-wrapper .pivot-total-row {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
-:deep(.pivot-group-header) {
+.table-wrapper .pivot-group-header {
   font-weight: 600;
   border-bottom: 2px solid rgba(0, 0, 0, 0.12);
 }
 
-.body--dark :deep(.pivot-group-header) {
+.body--dark .table-wrapper .pivot-group-header {
   border-bottom-color: rgba(255, 255, 255, 0.12);
 }
 
-:deep(.pivot-section-border) {
+.table-wrapper .pivot-section-border {
   border-left: 2px solid rgba(0, 0, 0, 0.12) !important;
 }
 
-.body--dark :deep(.pivot-section-border) {
+.body--dark .table-wrapper .pivot-section-border {
   border-left-color: rgba(255, 255, 255, 0.12) !important;
 }
 
-:deep(.pivot-value-header) {
+.table-wrapper .pivot-value-header {
   font-weight: 500;
   font-size: 0.85em;
 }
 
-// Sticky total row (bottom-row slot)
-:deep(.pivot-sticky-total-row) {
+/* Sticky total row */
+.table-wrapper .pivot-sticky-total-row {
   font-weight: bold;
-
-  td {
-    border-top: 2px solid rgba(0, 0, 0, 0.12);
-  }
 }
 
-// Pivot header sort icons
-:deep(.pivot-sort-icon) {
+.table-wrapper .pivot-sticky-total-row td {
+  border-top: 2px solid rgba(0, 0, 0, 0.12);
+}
+
+/* Pivot header sort icons */
+.table-wrapper .pivot-sort-icon {
   opacity: 0;
   transition: opacity 0.2s;
 }
 
-:deep(th:hover .pivot-sort-icon) {
+.table-wrapper th:hover .pivot-sort-icon {
   opacity: 0.4;
 }
 
-:deep(.pivot-sort-active) {
+.table-wrapper .pivot-sort-active {
   opacity: 1 !important;
 }
 
-// Sticky total column visual separator — inset shadow on left edge
-:deep(.pivot-total-col) {
+/* Sticky total column visual separator */
+.table-wrapper .pivot-total-col {
   box-shadow: inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
 }
 
-// Middle sticky: both left-sticky and right-sticky — outward right + inset left
-:deep(.sticky-column.pivot-total-col) {
+.table-wrapper .sticky-column.pivot-total-col {
   box-shadow: 4px 0 8px rgba(0, 0, 0, 0.15), inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
 }
 
 @media print {
-  // .table-wrapper is the containing block (position:relative).
-  // It clips the expanded table at the panel height; the footer is
-  // pinned to its bottom edge via absolute positioning (see below).
   .table-wrapper {
     position: relative !important;
     height: 100% !important;
@@ -354,39 +401,31 @@ export default defineComponent({
   }
 
   .my-sticky-virtscroll-table {
-    // Expand to natural content height so all rows are rendered from the top.
     height: auto !important;
     overflow: visible !important;
-
-    // Remove sticky — no scroll container in print, sticky causes quirks.
-    :deep(thead tr th) {
-      position: static !important;
-      top: auto !important;
-    }
-
-    // Let the scroll container expand to show all rows.
-    :deep(.table-container) {
-      overflow: visible !important;
-      height: auto !important;
-    }
-
-    // Pin the footer to the bottom of .table-wrapper (the nearest
-    // position:relative ancestor) so it is always visible at the
-    // bottom of the panel, regardless of how many rows the table has.
-    :deep([data-test="dashboard-table-pagination"]) {
-      position: absolute !important;
-      bottom: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      background-color: #fff !important;
-      z-index: 1 !important;
-    }
   }
 
-  .body--dark .my-sticky-virtscroll-table {
-    :deep([data-test="dashboard-table-pagination"]) {
-      background-color: #1a1a2e !important;
-    }
+  .my-sticky-virtscroll-table thead tr th {
+    position: static !important;
+    top: auto !important;
+  }
+
+  .my-sticky-virtscroll-table .table-container {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  .my-sticky-virtscroll-table [data-test="dashboard-table-pagination"] {
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background-color: #fff !important;
+    z-index: 1 !important;
+  }
+
+  .body--dark .my-sticky-virtscroll-table [data-test="dashboard-table-pagination"] {
+    background-color: #1a1a2e !important;
   }
 }
 </style>

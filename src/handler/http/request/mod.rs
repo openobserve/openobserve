@@ -37,6 +37,7 @@ pub mod eval_jobs;
 #[allow(deprecated)]
 pub mod folders;
 pub mod functions;
+pub mod gen_ai;
 pub mod keys;
 pub mod kv;
 #[cfg(feature = "enterprise")]

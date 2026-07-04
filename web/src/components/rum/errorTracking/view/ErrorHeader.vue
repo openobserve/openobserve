@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:pt-2 tw:pb-1 tw:flex tw:justify-start">
         <div
           data-test="back-button"
-          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)]"
+          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer tw:hover:text-[var(--o2-primary-btn-bg)]"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -41,20 +41,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             size="xs"
             name="content-copy"
-            class="hover:tw:text-[var(--o2-primary-btn-bg)]"
+            class="tw:hover:text-[var(--o2-primary-btn-bg)]"
             @click="copyErrorId(error.error_id)"
         /></span>
         <span class="tw:ml-4">{{ error.timestamp }}</span>
       </div>
       <div class="tw:flex tw:items-center tw:flex-nowrap tw:my-1">
-        <div class="error_type tw:font-bold">{{ error.type }}</div>
+        <div
+          data-test="error-header-error-type"
+          class="tw:text-[22px] tw:font-bold"
+        >{{ error.type }}</div>
       </div>
-      <div class="error_message tw:pt-1 tw:flex tw:items-center">
+      <div class="tw:text-base tw:pt-1 tw:flex tw:items-center">
         <div
           v-if="error.error_handling === 'unhandled'"
+          data-test="error-header-unhandled-badge"
           :class="
             error.error_handling === 'unhandled'
-              ? 'unhandled_error text-red-6 tw:px-1 tw:mr-2'
+              ? 'text-red-6 tw:border tw:border-[rgb(246,68,68)] tw:rounded tw:text-sm tw:px-1 tw:mr-2'
               : ''
           "
         >
@@ -89,32 +93,3 @@ const copyErrorId = (id: string) => {
   });
 };
 </script>
-
-<style lang="scss">
-.error_type {
-  font-size: 22px;
-}
-
-.error_description {
-  font-size: 18px;
-}
-
-.error_message {
-  font-size: 16px;
-}
-.error_symbol {
-  width: 12px;
-  height: 12px;
-  background-color: rgb(251, 119, 119);
-  border-radius: 50%;
-}
-.error_time {
-  font-size: 16px;
-}
-
-.unhandled_error {
-  border: 1px solid rgb(246, 68, 68);
-  border-radius: 4px;
-  font-size: 14px;
-}
-</style>

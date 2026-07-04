@@ -63,11 +63,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="confirmDeleteAction(row)"
         />
       </template>
+      <template #cell-user_id="{ row }">
+        <OUserCell :value="row.user_id" />
+      </template>
       <template #cell-duration="{ row }">
         {{ durationFormatter(row.duration) }}
       </template>
       <template #cell-queryRange="{ row }">
         {{ durationFormatter(row.queryRange) }}
+      </template>
+      <template #cell-status="{ row }">
+        <OTag type="queryStatus" :value="row.status" />
       </template>
 
       <template #bottom>
@@ -104,12 +110,14 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { getDuration, durationFormatter } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, OEmptyState, OButton, ODrawer, OSpinner, OTable },
+  components: { QueryList, OEmptyState, OButton, ODrawer, OSpinner, OTable, OUserCell, OTag },
   props: {
     rows: {
       type: Array,
@@ -289,36 +297,9 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.query-management-tabs {
-  :deep(.q-btn:before) {
-    border: none !important;
-  }
-}
-
+<style>
+/* Deep override for empty-state image spacing — must stay in CSS */
 :deep(.no-data-image) {
   margin-bottom: 0.5rem;
-}
-
-.label-container {
-  display: flex;
-  width: 100%;
-  justify-content: flex-end;
-}
-</style>
-
-<style lang="scss">
-.running-queries-page {
-  .search-input {
-    width: 250px;
-  }
-}
-
-.search-field-select {
-  .q-field__control {
-    padding-left: 12px;
-    top: -1px;
-    position: relative;
-  }
 }
 </style>

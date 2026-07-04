@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="semantic-group-item tw:p-3 tw:mb-2">
-    <div class="group-layout">
+  <div class="semantic-group-item tw:p-3 tw:mb-2 tw:rounded-lg tw:transition-all tw:duration-200 tw:w-full tw:max-w-full tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.12))">
+    <div class="tw:grid tw:grid-cols-[200px_1fr_auto] tw:gap-4 tw:items-start tw:w-full tw:overflow-hidden">
       <!-- Left Column: Display Name only (ID is internal/read-only) -->
-      <div class="left-column">
+      <div class="tw:flex tw:flex-col tw:gap-1 tw:min-w-0 tw:justify-center">
         <div class="input-wrapper">
           <OInput
             data-test="semantic-group-display-input"
@@ -46,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Right Column: Field Names spanning both rows -->
-      <div class="right-column">
-        <div class="field-names-input">
+      <div class="tw:flex tw:flex-col tw:h-full tw:min-w-0 tw:overflow-hidden">
+        <div class="tw:flex-1 tw:flex tw:flex-col tw:min-w-0 tw:overflow-hidden">
           <TagInput
             v-model="localGroup.fields"
             :placeholder="t('correlation.fieldNamePlaceholder') + ' *'"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
       <!-- Actions Column: Delete -->
-      <div class="actions-column">
+      <div class="tw:flex tw:flex-col tw:justify-between tw:min-h-full">
         <div class="tw:flex tw:justify-end">
           <OButton
             data-test="semantic-group-remove-group-btn"
@@ -161,79 +161,3 @@ const emitUpdate = () => {
   emit("update", { ...localGroup.value });
 };
 </script>
-
-<style lang="scss" scoped>
-.semantic-group-item {
-  border-radius: 8px;
-  transition: all 0.2s ease;
-  width: 100%;
-  max-width: 100%;
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.12));
-}
-
-.group-layout {
-  display: grid;
-  grid-template-columns: 200px 1fr auto;
-  gap: 16px;
-  align-items: start;
-  width: 100%;
-  overflow: hidden;
-}
-
-.left-column {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  justify-content: center;
-}
-
-.right-column {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.field-names-input {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  overflow: hidden;
-
-  :deep(.tag-input-container) {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  :deep(.tag-input-wrapper) {
-    flex: 1;
-    min-height: 100px;
-    min-width: 0;
-  }
-}
-
-.actions-column {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 100%;
-}
-
-.text-subtitle2 {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--q-color-text-secondary);
-}
-
-@media (max-width: 768px) {
-  .group-layout {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

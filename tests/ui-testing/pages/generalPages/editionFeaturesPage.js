@@ -58,17 +58,17 @@ export class EditionFeaturesPage {
 
     // Dialog
     this.dialog = page.locator('[data-test="enterprise-upgrade-dialog"]');
-    this.heroTitle = this.dialog.locator('.hero-title');
-    this.offerBadge = this.dialog.locator('.offer-badge');
-    this.primaryButton = this.dialog.locator('.download-btn');
-    this.learnMoreButton = this.dialog.locator('.learn-more-btn');
-    this.featuresTitle = this.dialog.locator('.features-header h4');
-    this.featureItems = this.dialog.locator('.feature-list-item');
+    this.heroTitle = this.dialog.locator('[data-test="enterprise-upgrade-hero-title"]');
+    this.offerBadge = this.dialog.locator('[data-test="enterprise-upgrade-offer-badge"]');
+    this.primaryButton = this.dialog.locator('[data-test="enterprise-upgrade-download-btn"]');
+    this.learnMoreButton = this.dialog.locator('[data-test="enterprise-upgrade-learn-more-btn"]');
+    this.featuresTitle = this.dialog.locator('[data-test="enterprise-upgrade-features-title"]');
+    this.featureItems = this.dialog.locator('[data-test="enterprise-upgrade-feature-item"]');
   }
 
   getFeatureItem(name) {
     return this.featureItems.filter({
-      has: this.page.locator('.feature-name', { hasText: name }),
+      has: this.page.locator('[data-test="enterprise-upgrade-feature-name"]', { hasText: name }),
     });
   }
 
@@ -109,12 +109,12 @@ export class EditionFeaturesPage {
   async expectFeatureCard({ name, beta, ha }) {
     const item = this.getFeatureItem(name);
     await expect(item, `Feature card "${name}" should be visible`).toBeVisible();
-    await expect(item.locator('.external-link-icon'), `"${name}" should show external link icon`).toBeVisible();
+    await expect(item.locator('[data-test="enterprise-upgrade-feature-external-link"]'), `"${name}" should show external link icon`).toBeVisible();
     if (beta) {
-      await expect(item.locator('.beta-badge'), `"${name}" should show BETA badge`).toBeVisible();
+      await expect(item.locator('[data-test="enterprise-upgrade-feature-beta-badge"]'), `"${name}" should show BETA badge`).toBeVisible();
     }
     if (ha) {
-      await expect(item.locator('.ha-badge'), `"${name}" should show HA badge`).toBeVisible();
+      await expect(item.locator('[data-test="enterprise-upgrade-feature-ha-badge"]'), `"${name}" should show HA badge`).toBeVisible();
     }
   }
 
@@ -132,9 +132,23 @@ export class EditionFeaturesPage {
       locator.click(),
     ]);
     try {
-      await popup.waitForURL(/openobserve\.ai/, { timeout: 30000 });
-      // Wait for any in-page JS redirects to settle before sampling the URL
-      await popup.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      // Resolve as soon as the o2.ws short link commits to an openobserve.ai URL.
+      // Use waitUntil:'commit' (not the default 'load') — the marketing/docs pages
+      // are heavy and frequently never fire the 'load' event within the timeout in
+      // CI, which previously burned the full 30s on every link and blew past the
+      // test timeout (24 links × ~45s).
+      await popup.waitForURL(/openobserve\.ai/, { timeout: 20000, waitUntil: 'commit' });
+      // A couple of pages (sre_agent, ent_install_guide) issue an in-page JS
+      // redirect. Let the URL settle so we sample the final destination, but cap it
+      // tightly — do NOT wait for networkidle (a live marketing site with chat /
+      // analytics widgets never goes idle, so that always burned its full timeout).
+      let lastUrl = popup.url();
+      for (let i = 0; i < 6; i++) {
+        await popup.waitForTimeout(500);
+        const currentUrl = popup.url();
+        if (currentUrl === lastUrl) break;
+        lastUrl = currentUrl;
+      }
       return popup.url();
     } catch (e) {
       testLogger.error('Popup never reached openobserve.ai — returning current URL', {

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc. -->
+﻿<!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
 import type { HeaderGroup, Table } from "@tanstack/vue-table";
@@ -330,8 +330,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           <!-- Sortable header -->
           <div
             v-if="(header.column.columnDef.meta as any)?.sortable"
-            class="tw:gap-1 tw:cursor-pointer tw:flex-1 tw:min-w-0"
-            :style="{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center' }"
+            :class="['tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:flex-1 tw:min-w-0', headerAlignClass(header)]"
             data-test="o2-table-th-sort-trigger"
             @click="(e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)"
           >
@@ -342,11 +341,11 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 :props="header.getContext()"
               />
             </span>
-            <!-- Sort icons — in the grid's `auto` track, so never clipped even
-                 when the header title truncates. -->
+            <!-- Sort icons — `shrink-0` so they're never clipped even when the
+                 header title truncates. -->
             <span
               v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable"
-              class="tw:flex tw:items-center"
+              class="tw:flex tw:items-center tw:shrink-0"
             >
               <OIcon
                 v-if="getSortIcon(header.id) === 'asc'"
@@ -399,7 +398,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               'tw:rounded-full tw:transition-all tw:duration-150',
               header.column.getIsResizing()
                 ? 'tw:w-0.5 tw:h-full tw:bg-[var(--color-table-resize-handle)]'
-                : 'tw:w-px tw:h-4 tw:bg-[var(--color-border-default)] group-hover/resizer:tw:w-0.5 group-hover/resizer:tw:h-full group-hover/resizer:tw:bg-[var(--color-table-resize-handle)]',
+                : 'tw:w-px tw:h-4 tw:bg-[var(--color-border-default)] tw:group-hover/resizer:w-0.5 tw:group-hover/resizer:h-full tw:group-hover/resizer:bg-[var(--color-table-resize-handle)]',
             ]"
           />
         </div>
@@ -471,35 +470,37 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         <div :class="['tw:flex tw:items-center tw:gap-1 tw:h-full tw:overflow-hidden tw:min-w-0', headerAlignClass(header)]">
           <div
             v-if="(header.column.columnDef.meta as any)?.sortable"
-            class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:flex-1 tw:overflow-hidden tw:whitespace-nowrap"
+            :class="['tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:flex-1 tw:overflow-hidden tw:whitespace-nowrap', headerAlignClass(header)]"
             data-test="o2-table-th-sort-trigger"
             @click="(e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)"
           >
-            <FlexRender
-              v-if="!header.isPlaceholder"
-              :render="header.column.columnDef.header"
-              :props="header.getContext()"
-            />
+            <span class="tw:truncate tw:min-w-0">
+              <FlexRender
+                v-if="!header.isPlaceholder"
+                :render="header.column.columnDef.header"
+                :props="header.getContext()"
+              />
+            </span>
             <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
               <OIcon
                 v-if="getSortIcon(header.id) === 'asc'"
                 name="arrow-upward"
                 size="sm"
-                class="tw:text-[var(--color-table-sort-icon-active)]"
+                class="tw:shrink-0 tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
               <OIcon
                 v-else-if="getSortIcon(header.id) === 'desc'"
                 name="arrow-downward"
                 size="sm"
-                class="tw:text-[var(--color-table-sort-icon-active)]"
+                class="tw:shrink-0 tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
               <OIcon
                 v-else
                 name="unfold-more"
                 size="sm"
-                class="tw:opacity-40"
+                class="tw:shrink-0 tw:opacity-40"
                 data-test="o2-table-sort-icon-inactive"
               />
             </template>
@@ -527,7 +528,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               'tw:rounded-full tw:transition-all tw:duration-150',
               header.column.getIsResizing()
                 ? 'tw:w-0.5 tw:h-full tw:bg-[var(--color-table-resize-handle)]'
-                : 'tw:w-px tw:h-4 tw:bg-[var(--color-border-default)] group-hover/resizer:tw:w-0.5 group-hover/resizer:tw:h-full group-hover/resizer:tw:bg-[var(--color-table-resize-handle)]',
+                : 'tw:w-px tw:h-4 tw:bg-[var(--color-border-default)] tw:group-hover/resizer:w-0.5 tw:group-hover/resizer:h-full tw:group-hover/resizer:bg-[var(--color-table-resize-handle)]',
             ]"
           />
         </div>

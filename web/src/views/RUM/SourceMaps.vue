@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -19,14 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="source-maps-container card-container tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
   >
     <!-- Filters Section -->
-    <div class="filters-section tw:p-3">
+    <div class="tw:p-3 tw:bg-(--q-background)">
       <div class="tw:flex tw:justify-between tw:items-end">
       <div class="tw:flex tw:gap-4 tw:items-end">
           <!-- Version Filter -->
           <OSelect
             v-model="filters.version"
             :options="versionOptions"
-            label="Version"
+            :label="t('common.version')"
             clearable
             searchable
             creatable
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             v-model="filters.service"
             :options="serviceOptions"
-            label="Service"
+            :label="t('rum.service')"
             clearable
             searchable
             creatable
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             v-model="filters.environment"
             :options="environmentOptions"
-            label="Environment"
+            :label="t('rum.environment')"
             clearable
             searchable
             creatable
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             @click="applyFilters"
             :loading="isLoading"
-          >Apply Filters</OButton>
+          >{{ t('rum.applyFilters') }}</OButton>
 
       </div>
 
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm-action"
             @click="navigateToUpload"
-          >Upload Source Maps</OButton>
+          >{{ t('rum.uploadSourceMaps') }}</OButton>
       </div>
     </div>
 
@@ -92,19 +92,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size="selectedPerPage"
           :page-size-options="perPageOptionsList"
           :show-global-filter="false"
-          footer-title="Source Maps"
+          :footer-title="t('rum.sourceMaps')"
           expansion="single"
           expand-on-row-click
           v-model:expanded-ids="expandedIds"
           class="tw:w-full"
         >
           <template #expansion="{ row }">
-            <div class="expanded-details tw:p-3">
+            <div class="tw:p-3 tw:bg-(--q-background) tw:border-t tw:border-(--q-border-color,var(--o2-border))">
               <div class="tw:text-sm tw:font-medium tw:mb-2">
                 Source Map Files ({{ row.files.length }})
               </div>
               <ul
-                class="tw:rounded tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md"
+                class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md"
                 style="max-height: 400px; overflow-y: auto;"
               >
                 <li
@@ -115,11 +115,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                     <span class="tw:block tw:text-xs tw:text-muted-foreground">Source File</span>
-                    <span class="text-code tw:text-sm">{{ file.source_file_name }}</span>
+                    <span class="tw:font-[SF_Mono,Monaco,Inconsolata,'Fira_Code','Droid_Sans_Mono',monospace] tw:break-all tw:text-sm">{{ file.source_file_name }}</span>
                   </div>
                   <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                     <span class="tw:block tw:text-xs tw:text-muted-foreground">Source Map File</span>
-                    <span class="text-code tw:text-sm">{{ file.source_map_file_name }}</span>
+                    <span class="tw:font-[SF_Mono,Monaco,Inconsolata,'Fira_Code','Droid_Sans_Mono',monospace] tw:break-all tw:text-sm">{{ file.source_map_file_name }}</span>
                   </div>
                 </li>
               </ul>
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-uploaded_at="{ row }">
-            <div class="tw:cursor-pointer">{{ formatTimestamp(row.uploaded_at) }}</div>
+            <div class="tw:cursor-pointer tw:hover:bg-black/3 tw:dark:hover:bg-white/5">{{ formatTimestamp(row.uploaded_at) }}</div>
           </template>
 
           <template #cell-actions="{ row }">
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`source-maps-${row.service}-delete`"
               variant="ghost-destructive"
               size="icon-sm"
-              title="Delete"
+              :title="t('common.delete')"
               @click="confirmDeleteSourceMap(row)"
             >
               <OIcon name="delete" size="sm" />
@@ -160,8 +160,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="xs"
       :title="deleteDialog.title"
       data-test="delete-source-maps-dialog"
-      secondary-button-label="Cancel"
-      primary-button-label="OK"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="t('common.ok')"
       @click:secondary="deleteDialog.show = false"
       @click:primary="deleteSourceMap(); deleteDialog.show = false"
     >
@@ -173,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 
 import { ref, onMounted, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
@@ -186,6 +187,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
+const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 
@@ -308,38 +310,38 @@ const groupedSourceMaps = ref<any[]>([]);
 const expandedIds = ref<string[]>([]);
 
 // Table columns
-const columns: OTableColumnDef[] = [
+const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "service",
-    header: "Service",
+    header: t("rum.service"),
     accessorKey: "service",
     sortable: true,
     meta: { align: "left" },
   },
   {
     id: "version",
-    header: "Version",
+    header: t("common.version"),
     accessorKey: "version",
     sortable: true,
     meta: { align: "left" },
   },
   {
     id: "environment",
-    header: "Environment",
+    header: t("rum.environment"),
     accessorKey: "env",
     sortable: true,
     meta: { align: "left" },
   },
   {
     id: "file_count",
-    header: "Files",
+    header: t("rum.files"),
     accessorKey: "fileCount",
     sortable: true,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "uploaded_at",
-    header: "Uploaded At",
+    header: t("rum.uploadedAt"),
     accessorKey: "uploaded_at",
     sortable: true,
     meta: {
@@ -349,13 +351,13 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "actions",
-    header: "Actions",
+    header: t("common.actions"),
     accessorKey: "actions",
     meta: { align: "center", actionCount: 1 },
     isAction: true,
     size: 80,
   },
-];
+]);
 
 // Pagination
 const selectedPerPage = ref<number>(20);
@@ -499,39 +501,3 @@ onMounted(async () => {
   fetchSourceMaps();
 });
 </script>
-
-<style lang="scss" scoped>
-.source-maps-container {
-  height: 100%;
-  overflow-y: auto;
-}
-
-.filters-section {
-  background-color: var(--q-background);
-}
-
-.text-code {
-  font-family: "SF Mono", "Monaco", "Inconsolata", "Fira Code", "Droid Sans Mono", monospace;
-  font-size: 12px;
-  word-break: break-all;
-}
-
-.cursor-pointer {
-  cursor: pointer;
-
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-  }
-}
-
-:deep(.q-dark) {
-  .cursor-pointer:hover {
-    background-color: rgba(255, 255, 255, 0.05);
-  }
-}
-
-.expanded-details {
-  background-color: var(--q-background);
-  border-top: 1px solid var(--q-border-color, #e0e0e0);
-}
-</style>

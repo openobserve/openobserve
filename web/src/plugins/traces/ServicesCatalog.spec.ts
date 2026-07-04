@@ -1481,29 +1481,6 @@ describe("ServicesCatalog", () => {
   // Status badge classes per row
   // -----------------------------------------------------------------------
   describe("status badges", () => {
-    it("should apply correct badge class for healthy status", () => {
-      expect(wrapper?.vm?.statusBadgeClass("healthy")).toBe(
-        "o2-status-badge--success",
-      );
-    });
-
-    it("should apply correct badge class for degraded status", () => {
-      expect(wrapper?.vm?.statusBadgeClass("degraded")).toBe(
-        "o2-status-badge--degraded",
-      );
-    });
-
-    it("should apply correct badge class for warning status", () => {
-      expect(wrapper?.vm?.statusBadgeClass("warning")).toBe(
-        "o2-status-badge--warning",
-      );
-    });
-
-    it("should apply correct badge class for critical status", () => {
-      expect(wrapper?.vm?.statusBadgeClass("critical")).toBe(
-        "o2-status-badge--error",
-      );
-    });
 
     it("should derive correct status from error rate", async () => {
       // Load services with known error rates and verify the derived status
@@ -1974,97 +1951,6 @@ describe("ServicesCatalog", () => {
         await flushPromises();
 
         expect(wrapper.vm.streamFilter).toBe("selected-stream");
-      });
-    });
-
-    // -----------------------------------------------------------------------
-    // widen-range emit
-    // -----------------------------------------------------------------------
-    describe("widen-range emit", () => {
-      it("should emit 'widen-range' when ServicesCatalogNoDataState bubbles the event", async () => {
-        // Keep fetch as a no-op so isLoading stays false after complete fires,
-        // and services remains empty so the no-data state is rendered.
-        mockFetchQueryDataWithHttpStream.mockImplementation(
-          (_req: any, callbacks: any) => {
-            if (callbacks?.complete) {
-              callbacks.complete(null, {});
-            }
-          },
-        );
-
-        // Mount with ServicesCatalogNoDataState stubbed so we can trigger its event
-        const localWrapper = mount(ServicesCatalog, {
-          global: {
-            plugins: [i18n, createMockStore()],
-            provide: { store: createMockStore() },
-            stubs: {
-              TenstackTable: {
-                template:
-                  '<div data-test="services-catalog-table" :data-loading="loading"><slot /></div>',
-                props: ["rows", "columns", "loading"],
-                emits: ["click:dataRow", "sort-change"],
-              },
-              CellActions: {
-                template: '<div data-test="services-catalog-cell-actions" />',
-                props: ["column", "row"],
-                emits: ["copy", "add-search-term"],
-              },
-              TraceServiceCell: {
-                template: '<div />',
-                props: ["item"],
-                emits: ["click"],
-              },
-              ServiceGraphNodeSidePanel: {
-                template: '<div data-test="services-catalog-node-side-panel" />',
-                props: ["selectedNode", "graphData", "timeRange", "visible", "streamFilter"],
-                emits: ["close", "view-traces"],
-              },
-              ServicesCatalogNoDataState: {
-                template:
-                  '<div @click="$emit(\'widen-range\', \'7d\')" data-test="services-catalog-no-data-stub" />',
-                emits: ["widen-range"],
-              },
-              "q-input": false,
-              "q-btn": false,
-              OIcon: false,
-              "q-tooltip": false,
-            },
-          },
-        });
-
-        await flushPromises();
-
-        const stub = localWrapper.find(
-          '[data-test="services-catalog-no-data-stub"]',
-        );
-        expect(stub.exists()).toBe(true);
-
-        await stub.trigger("click");
-
-        expect(localWrapper.emitted("widen-range")).toBeTruthy();
-        expect(localWrapper.emitted("widen-range")![0]).toEqual(["7d"]);
-
-        localWrapper.unmount();
-      });
-
-      it("should accept 'widen-range' emissions without errors", async () => {
-        mockFetchQueryDataWithHttpStream.mockImplementation(
-          (_req: any, callbacks: any) => {
-            if (callbacks?.complete) {
-              callbacks.complete(null, {});
-            }
-          },
-        );
-
-        wrapper = mountServicesCatalog();
-        await flushPromises();
-
-        // Programmatically emit to confirm the event channel exists and propagates
-        wrapper.vm.$emit("widen-range", "7d");
-        await flushPromises();
-
-        expect(wrapper.emitted("widen-range")).toBeTruthy();
-        expect(wrapper.emitted("widen-range")![0]).toEqual(["7d"]);
       });
     });
 

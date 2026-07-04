@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -81,10 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <CorrelationEventHeader
         :source-event="sourceEvent"
         :context-chips="contextChips"
-        :subject-chips="subjectChips"
+        :subject-chips="isNestedGroupMode ? [] : subjectChips"
         v-model:active-subject="activeSubject"
         overflow-mode="responsive"
-        badge-size="md"
         :get-subject-button-label="getSubjectButtonLabel"
       />
 
@@ -173,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- -- Left sidebar -- -->
             <template #before>
               <div
-                class="dimension-sidebar card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col"
+                class="tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-surface-overlay"
               >
                 <!-- Search -->
                   <div
@@ -204,10 +203,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template v-if="group.streams.length > 0">
                         <div
-                          class="metric-group-header tw:cursor-pointer"
+                          class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--o2-section-header-bg) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer"
                           @click="toggleGroupCollapse(group.id)"
                         >
-                          <div class="metric-group-label">
+                          <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
                             <OIcon
                               :name="
                                 collapsedGroups.has(group.id)
@@ -220,12 +219,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
                             <component v-else :is="group.icon" />
                             <span>{{ group.label }}</span>
-                            <OBadge
-                              variant="default"
+                            <OTag
+                              type="fieldTag"
                               class="tw:ml-1"
-                            >{{ group.streams.length }}</OBadge>
+                            >{{ group.streams.length }}</OTag>
                           </div>
-                          <div class="metric-group-actions">
+                          <div class="tw:flex tw:gap-1">
                             <OButton
                               variant="ghost"
                               size="chip"
@@ -249,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-show="!collapsedGroups.has(group.id)"
                           :key="stream.stream_name"
                           data-test="telemetry-correlation-metric-stream-item"
-                          class="dimension-list-item tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                          class="tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-[rgba(0,0,0,0.04)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
                           @click="toggleMetricStream(stream)"
                         >
                           <div class="tw:flex tw:items-center tw:shrink-0">
@@ -265,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                           <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                             <span
-                              class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
+                              class="tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
                               >{{ stream.stream_name }}</span
                             >
                           </div>
@@ -275,8 +274,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <div
                     v-else
-                    class="tw:p-3 tw:text-center tw:text-xs tw:opacity-60"
+                    class="tw:text-center tw:px-2 tw:pt-3"
                   >
+                    <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
                     {{ t("search.noResult") }}
                   </div>
                 </div>
@@ -293,19 +293,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- -- Separator -- -->
             <template #separator>
-              <div class="metric-splitter-separator" />
+              <div class="tw:w-px tw:h-full tw:bg-(--o2-border) tw:cursor-col-resize tw:dark:bg-[rgba(255,255,255,0.12)]" />
             </template>
 
             <!-- -- Right area: group tabs + dashboard -- -->
             <template #after>
               <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+                <!-- Outer Pod/Node tabs — only shown in nested K8s mode -->
+                <OTabs
+                  v-if="isNestedGroupMode"
+                  v-model="activeOuterTab"
+                  dense
+                  align="left"
+                  class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                >
+                  <OTab
+                    v-for="outerGroup in groupDefs"
+                    :key="outerGroup.id"
+                    :name="outerGroup.id"
+                    class="tw:flex-none!"
+                  >
+                    <div class="tw:flex tw:flex-col tw:items-start tw:px-1 tw:py-0.5 tw:min-w-0">
+                      <div class="tw:flex tw:items-center tw:gap-1">
+                        <OIcon v-if="typeof outerGroup.icon === 'string'" :name="outerGroup.icon" size="xs" />
+                        <component v-else :is="outerGroup.icon" />
+                        <span class="tw:whitespace-nowrap">{{ outerGroup.label }}</span>
+                      </div>
+                      <span
+                        v-if="outerTabResourceName[outerGroup.id]"
+                        class="tw:text-xs tw:leading-tight tw:opacity-75 tw:whitespace-nowrap"
+                        :title="outerTabResourceName[outerGroup.id]"
+                      >{{ outerTabResourceName[outerGroup.id] }}</span>
+                    </div>
+                  </OTab>
+                </OTabs>
+
                 <!-- Group tabs -->
                 <OTabs
                   v-if="nonEmptyGroupTabs.length > 0"
                   v-model="activeMetricGroupTab"
                   dense
                   align="left"
-                  class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                  class="metric-group-tabs tw:shrink-0 tw:bg-surface-panel tw:border-b tw:border-solid tw:border-(--o2-border-color)"
                 >
                   <OTab
                     v-for="group in groupedUniqueMetricStreams.groups.filter(
@@ -319,11 +348,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" />
                       <component v-else :is="group.icon" />
                       <span>{{ group.label }}</span>
-                      <OBadge
-                        :variant="activeMetricGroupTab === group.id ? 'primary' : 'default'"
+                      <OTag
+                        type="tabChip"
+                        :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
                         class="tw:ml-0.5"
-                        size="sm"
-                      >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OBadge>
+                      >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OTag>
                     </div>
                   </OTab>
                 </OTabs>
@@ -473,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Header -->
             <div
-              class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
+              class="tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-surface-panel"
             >
               <div class="tw:flex tw:items-center tw:gap-3">
                 <OIcon name="hub" size="md" />
@@ -497,15 +526,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t('correlation.viewInTraces') }}
                     <OTooltip :content="t('correlation.viewInTraces')" side="top" />
                   </OButton>
-                  <OBadge variant="primary">
+                  <OTag type="fieldTag" value="primary">
                     {{ tracesForDimensions.length }} {{ t("menu.traces") }}
-                  </OBadge>
+                  </OTag>
                 </div>
               </div>
             </div>
 
             <!-- Traces List -->
-            <div style="height: calc(100% - 4rem)">
+            <div class="tw:h-full">
               <TracesSearchResultList
                 :hits="tracesForDimensions"
                 :loading="false"
@@ -549,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODrawer>
 
   <!-- Embedded Tabs Mode -->
-  <div v-else class="correlation-dashboard-embedded">
+  <div v-else class="tw:flex tw:flex-col tw:h-full tw:w-full tw:bg-surface-panel">
     <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
     <DimensionFiltersBar
       v-if="!props.hideDimensionFilters"
@@ -567,7 +596,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CorrelationEventHeader
       :source-event="sourceEvent"
       :context-chips="contextChips"
-      :subject-chips="subjectChips"
+      :subject-chips="isNestedGroupMode ? [] : subjectChips"
       v-model:active-subject="activeSubject"
       overflow-mode="responsive"
       :get-subject-button-label="getSubjectButtonLabel"
@@ -575,8 +604,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
     <OCard
-      class="correlation-content tw:flex-1"
-      style="display: flex; flex-direction: column; overflow: auto"
+      class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-auto"
     >
       <div
         v-if="activeTab == 'logs'"
@@ -647,7 +675,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- -- Left sidebar -- -->
           <template #before>
             <div
-              class="dimension-sidebar card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col"
+              class="tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-surface-overlay"
             >
             <div
               class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
@@ -677,10 +705,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template v-if="group.streams.length > 0">
                       <div
-                        class="metric-group-header tw:cursor-pointer"
+                        class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--o2-section-header-bg) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer"
                         @click="toggleGroupCollapse(group.id)"
                       >
-                        <div class="metric-group-label">
+                        <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
                           <OIcon
                             :name="
                               collapsedGroups.has(group.id)
@@ -693,12 +721,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
                           <component v-else :is="group.icon" />
                           <span>{{ group.label }}</span>
-                          <OBadge
-                            variant="default"
+                          <OTag
+                            type="fieldTag"
                             class="tw:ml-1"
-                          >{{ group.streams.length }}</OBadge>
+                          >{{ group.streams.length }}</OTag>
                         </div>
-                        <div class="metric-group-actions">
+                        <div class="tw:flex tw:gap-1">
                           <OButton
                             variant="ghost"
                             size="chip"
@@ -722,7 +750,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-show="!collapsedGroups.has(group.id)"
                         :key="stream.stream_name"
                         data-test="telemetry-correlation-metric-stream-item"
-                        class="dimension-list-item tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                        class="tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-[rgba(0,0,0,0.04)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
                         @click="toggleMetricStream(stream)"
                       >
                         <div class="tw:flex tw:items-center tw:shrink-0">
@@ -738,7 +766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                           <span
-                            class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
+                            class="tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
                             >{{ stream.stream_name }}</span
                           >
                         </div>
@@ -748,8 +776,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div
                   v-else
-                  class="tw:p-3 tw:text-center tw:text-xs tw:opacity-60"
+                  class="tw:text-center tw:px-2 tw:pt-3"
                 >
+                  <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
                   {{ t("search.noResult") }}
                 </div>
               </div>
@@ -766,19 +795,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- -- Separator -- -->
           <template #separator>
-            <div class="metric-splitter-separator" />
+            <div class="tw:w-px tw:h-full tw:bg-(--o2-border) tw:cursor-col-resize tw:dark:bg-[rgba(255,255,255,0.12)]" />
           </template>
 
           <!-- -- Right area: group tabs + dashboard -- -->
           <template #after>
             <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+              <!-- Outer Pod/Node tabs — only shown in nested K8s mode -->
+              <OTabs
+                v-if="isNestedGroupMode"
+                v-model="activeOuterTab"
+                dense
+                align="left"
+                class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+              >
+                <OTab
+                  v-for="outerGroup in groupDefs"
+                  :key="outerGroup.id"
+                  :name="outerGroup.id"
+                  class="tw:flex-none!"
+                >
+                  <div class="tw:flex tw:flex-col tw:items-start tw:px-1 tw:py-0.5 tw:min-w-0">
+                    <div class="tw:flex tw:items-center tw:gap-1">
+                      <OIcon v-if="typeof outerGroup.icon === 'string'" :name="outerGroup.icon" size="xs" />
+                      <component v-else :is="outerGroup.icon" />
+                      <span class="tw:whitespace-nowrap">{{ outerGroup.label }}</span>
+                    </div>
+                    <span
+                      v-if="outerTabResourceName[outerGroup.id]"
+                      class="tw:text-xs tw:leading-tight tw:opacity-75 tw:whitespace-nowrap"
+                      :title="outerTabResourceName[outerGroup.id]"
+                    >{{ outerTabResourceName[outerGroup.id] }}</span>
+                  </div>
+                </OTab>
+              </OTabs>
+
               <!-- Group tabs -->
               <OTabs
                 v-if="nonEmptyGroupTabs.length > 0"
                 v-model="activeMetricGroupTab"
                 dense
                 align="left"
-                class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                class="metric-group-tabs tw:shrink-0 tw:bg-surface-panel tw:border-b tw:border-solid tw:border-(--o2-border-color)"
               >
                 <OTab
                   v-for="group in groupedUniqueMetricStreams.groups.filter(
@@ -799,11 +857,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="xs"
                     />
                     <span>{{ group.label }}</span>
-                    <OBadge
-                      :variant="activeMetricGroupTab === group.id ? 'primary' : 'default'"
+                    <OTag
+                      type="tabChip"
+                      :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
                       class="tw:ml-0.5"
-                      size="sm"
-                    >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OBadge>
+                    >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OTag>
                   </div>
                 </OTab>
               </OTabs>
@@ -852,6 +910,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :viewOnly="true"
                   :allowAlertCreation="false"
                   searchType="dashboards"
+                  class="tw:border-none"
                 />
                 <div
                   v-else
@@ -910,7 +969,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="
             traceCorrelationMode === 'direct' && traceSpanList.length > 0
           "
-          class="tw:h-full tw:overflow-hidden telemetry-correlation-traces"
+          class="tw:h-full tw:overflow-auto telemetry-correlation-traces"
         >
           <TraceDetails
             mode="embedded"
@@ -941,11 +1000,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             traceCorrelationMode === 'dimension-based' &&
             tracesForDimensions.length > 0
           "
-          class="tw:h-full"
+          class="tw:h-full tw:flex tw:flex-col"
         >
           <!-- Header -->
           <div
-            class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
+            class="tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-surface-panel"
           >
             <div class="tw:flex tw:items-center tw:gap-3">
               <OIcon name="hub" size="md" />
@@ -957,9 +1016,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("correlation.tracesFromService", { service: serviceName })
                 }}</span>
               </div>
-              <OBadge variant="primary">
+              <OTag type="fieldTag" value="primary">
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
-              </OBadge>
+              </OTag>
               <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
                 <OButton
                   variant="ghost"
@@ -977,7 +1036,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Traces List -->
-          <div style="height: calc(100vh - 11rem)">
+          <div class="tw:flex-1">
             <TracesSearchResultList
               :hits="tracesForDimensions"
               :loading="false"
@@ -1031,7 +1090,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:w-full tw:mb-3"
     />
 
-    <div class="metric-list-container">
+    <div class="metric-list-container tw:max-h-100 tw:overflow-y-auto">
       <template
         v-if="
           groupedFilteredMetricStreams.groups.some(
@@ -1046,17 +1105,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Group section — tw:hidden when no streams match -->
           <template v-if="group.streams.length > 0">
             <!-- Group header -->
-            <div class="metric-group-header">
-              <div class="metric-group-label">
+            <div class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--o2-section-header-bg) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10">
+              <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
                 <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
                 <component v-else :is="group.icon" />
                 <span>{{ group.label }}</span>
-                <OBadge
-                  variant="default"
+                <OTag
+                  type="fieldTag"
                   class="tw:ml-1"
-                >{{ group.streams.length }}</OBadge>
+                >{{ group.streams.length }}</OTag>
               </div>
-              <div class="metric-group-actions">
+              <div class="tw:flex tw:gap-1">
                 <OButton
                   variant="ghost"
                   size="chip"
@@ -1080,7 +1139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="stream in group.streams"
               :key="stream.stream_name"
-              class="metric-list-item tw:flex tw:items-center tw:gap-2"
+              class="tw:flex tw:items-center tw:gap-2 tw:py-2 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border)] tw:hover:bg-[rgba(0,0,0,0.04)] tw:dark:border-[rgba(255,255,255,0.1)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
             >
               <div class="tw:flex tw:items-center tw:shrink-0">
                 <OCheckbox
@@ -1094,7 +1153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="metric-label">{{ stream.stream_name }}</span>
+                <span class="tw:text-sm tw:font-[monospace]">{{ stream.stream_name }}</span>
               </div>
             </div>
           </template>
@@ -1102,7 +1161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- No results message -->
-      <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
+      <div v-else class="tw:text-center tw:px-2 tw:pt-3">
+        <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
         {{ t("search.noResult") }}
       </div>
     </div>
@@ -1140,6 +1200,9 @@ import {
   getDefaultMetricSelections,
   type MetricGroupDefinition,
   DEFAULT_METRIC_GROUP_DEFINITIONS,
+  K8S_METRIC_GROUP_DEFINITIONS,
+  NODE_PATTERNS,
+  POD_PATTERNS,
 } from "@/utils/metrics/metricGrouping";
 import type { StreamInfo } from "@/services/service_streams";
 import {
@@ -1177,7 +1240,7 @@ import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -1233,7 +1296,6 @@ export interface TelemetryCorrelationDashboardProps {
 const props = withDefaults(defineProps<TelemetryCorrelationDashboardProps>(), {
   mode: "dialog",
   externalActiveTab: "logs",
-  metricGroupDefinitions: () => DEFAULT_METRIC_GROUP_DEFINITIONS,
 });
 
 const emit = defineEmits<{
@@ -1255,10 +1317,68 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
 let currentTracesStreamTraceId: string | null = null;
 
 // Resolved group definitions and their ids (reactive to prop changes)
-const groupDefs = computed(
-  () => props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS,
+const groupDefs = computed(() => {
+  if (props.metricGroupDefinitions) return props.metricGroupDefinitions;
+  // Auto-select K8s nested definitions when the correlation matched a kubernetes identity set
+  const setId = props.matchedSetId?.toLowerCase() ?? "";
+  if (setId === "kubernetes" || setId.startsWith("k8s")) return K8S_METRIC_GROUP_DEFINITIONS;
+  return DEFAULT_METRIC_GROUP_DEFINITIONS;
+});
+
+// Nested mode: when top-level groups have children (e.g. K8s Pod/Node outer tabs)
+const isNestedGroupMode = computed(() =>
+  groupDefs.value.some((g) => g.children && g.children.length > 0),
 );
-const groupIds = computed(() => groupDefs.value.map((g) => g.id));
+
+const activeOuterTab = ref<string>(
+  groupDefs.value.find((g) => g.children)?.id ?? groupDefs.value[0]?.id ?? "",
+);
+
+// When matchedSetId arrives (async) groupDefs switches from flat → nested.
+// Re-initialize activeOuterTab to the first outer group so the Pods tab is selected.
+watch(isNestedGroupMode, (nested) => {
+  if (nested) {
+    activeOuterTab.value =
+      groupDefs.value.find((g) => g.children)?.id ?? groupDefs.value[0]?.id ?? "";
+  }
+});
+
+// Resolve a value for a semantic ID by checking chipDimensions directly (semantic-id key)
+// and also by looking up raw field names from semanticGroups (raw-field key).
+const resolveChipValue = (semanticId: string): string | undefined => {
+  // Try semantic-id key directly (from buildWorkloadChipDimensions)
+  const direct = props.chipDimensions?.[semanticId];
+  if (direct && direct !== SELECT_ALL_VALUE) return direct;
+  // Try raw field names (from buildChipDimensionsFromFilters)
+  const group = semanticGroups.value.find((g) => g.id === semanticId);
+  if (!group) return undefined;
+  for (const field of group.fields) {
+    const v = props.chipDimensions?.[field];
+    if (v && v !== SELECT_ALL_VALUE) return v;
+  }
+  return undefined;
+};
+
+// Map outer tab id → actual resource name (pod/node name)
+const outerTabResourceName = computed<Record<string, string | undefined>>(() => ({
+  pods: resolveChipValue("k8s-pod-name"),
+  nodes: resolveChipValue("k8s-node-name"),
+}));
+
+// Map outer tab id → subject semantic id (drives the same filtering as the "View by" chip)
+const outerTabToSubjectSemanticId: Record<string, string> = {
+  pods: "k8s-pod-name",
+  nodes: "k8s-node-name",
+};
+
+// Effective sub-groups: children of the active outer tab, or flat groupDefs
+const effectiveGroupDefs = computed(() => {
+  if (!isNestedGroupMode.value) return groupDefs.value;
+  const outer = groupDefs.value.find((g) => g.id === activeOuterTab.value);
+  return outer?.children ?? groupDefs.value;
+});
+
+const groupIds = computed(() => effectiveGroupDefs.value.map((g) => g.id));
 
 // Sort related streams so those with confirmed data overlap in props.timeRange
 // come first; streams without overlap (or missing stats) sink to the bottom.
@@ -1550,7 +1670,25 @@ const applyUnstableDimensionDefaults = (
 };
 
 const uniqueMetricStreams = computed(() => {
-  return getUniqueStreams(sortedMetricStreams.value);
+  const base = getUniqueStreams(sortedMetricStreams.value);
+  if (!isNestedGroupMode.value) return base;
+
+  // In nested mode (K8s), supplement correlation-returned streams with all
+  // node/pod streams from the org catalog. The _correlate API only returns
+  // streams associated with the matched service record (pod-level), so
+  // node-level metrics (k8s_node_*, system_*) are missing from the response.
+  const catalogMetrics = store.state.streams?.metrics as Record<string, any> | undefined;
+  if (!catalogMetrics) return base;
+
+  const existingNames = new Set(base.map((s) => s.stream_name));
+  const extra: StreamInfo[] = Object.keys(catalogMetrics)
+    .filter((name) =>
+      !existingNames.has(name) &&
+      (streamMatchesPatterns(name, NODE_PATTERNS) || streamMatchesPatterns(name, POD_PATTERNS)),
+    )
+    .map((name) => ({ stream_name: name, stream_type: "metrics" }));
+
+  return [...base, ...extra];
 });
 
 // Selected metric streams — declared before chip/intent block because applyActivePill references it.
@@ -1558,7 +1696,7 @@ const selectedMetricStreams = ref<StreamInfo[]>(
   applyUnstableDimensionDefaults(
     (() => {
       const unique = getUniqueStreams(sortedMetricStreams.value);
-      const defs = props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS;
+      const defs = groupDefs.value;
       const defaults = getDefaultMetricSelections(defs, unique);
       return defaults.length > 0 ? defaults : unique.slice(0, 6);
     })(),
@@ -1797,11 +1935,22 @@ const activeSubjectButtonId = computed<string | null>(() => {
 });
 
 const applyScopeFilter = (streams: StreamInfo[]): StreamInfo[] => {
-  const sid = activeSubject.value;
-  if (!sid || subjectButtons.value.length === 0) return streams;
-  const button = subjectButtons.value.find((b) => Array.isArray(b.semanticIds) && b.semanticIds.includes(sid));
-  if (!button || button.poolPatterns.length === 0) return streams;
-  return streams.filter((s) => streamMatchesPatterns(s.stream_name, button.poolPatterns));
+  if (!isNestedGroupMode.value) {
+    // Non-nested: use the subject button's dimension-derived pool patterns (original behaviour)
+    const sid = activeSubject.value;
+    if (!sid || subjectButtons.value.length === 0) return streams;
+    const button = subjectButtons.value.find((b) => Array.isArray(b.semanticIds) && b.semanticIds.includes(sid));
+    if (!button || button.poolPatterns.length === 0) return streams;
+    return streams.filter((s) => streamMatchesPatterns(s.stream_name, button.poolPatterns));
+  }
+  // Nested mode: filter by stream-name patterns so node/pod tabs show the right streams
+  if (activeOuterTab.value === "nodes") {
+    return streams.filter((s) => streamMatchesPatterns(s.stream_name, NODE_PATTERNS));
+  }
+  if (activeOuterTab.value === "pods") {
+    return streams.filter((s) => streamMatchesPatterns(s.stream_name, POD_PATTERNS));
+  }
+  return streams;
 };
 
 const streamsForActivePill = computed<StreamInfo[]>(() => {
@@ -1863,24 +2012,41 @@ const filteredMetricStreams = computed(() => {
 });
 
 // Group the filtered metric streams into configured categories
+// In nested mode, also apply scope filter so the sidebar shows only pod/node streams
 const groupedFilteredMetricStreams = computed(() =>
-  groupMetricsByCategory(filteredMetricStreams.value, groupDefs.value),
+  groupMetricsByCategory(
+    applyScopeFilter(filteredMetricStreams.value),
+    effectiveGroupDefs.value,
+  ),
 );
 
-// Group ALL available unique metric streams � drives which tabs are visible
+// Group ALL available unique metric streams — drives which tabs are visible
+// In nested mode, scope-filter so counts reflect the active outer tab
 const groupedUniqueMetricStreams = computed(() =>
-  groupMetricsByCategory(uniqueMetricStreams.value, groupDefs.value),
+  groupMetricsByCategory(
+    applyScopeFilter(uniqueMetricStreams.value),
+    effectiveGroupDefs.value,
+  ),
 );
 
 // Group the currently *selected* metric streams (used by the selector dialog)
 const groupedSelectedMetricStreams = computed(() =>
-  groupMetricsByCategory(selectedMetricStreams.value, groupDefs.value),
+  groupMetricsByCategory(selectedMetricStreams.value, effectiveGroupDefs.value),
 );
 
 // Active group tab within the metrics section
 const activeMetricGroupTab = ref<string>(
-  props.metricGroupDefinitions?.[0]?.id ?? "infra",
+  effectiveGroupDefs.value[0]?.id ?? "compute",
 );
+
+// When outer tab changes: reset inner tab + sync activeSubject for filtering
+watch(activeOuterTab, (tabId) => {
+  const first = effectiveGroupDefs.value[0]?.id;
+  if (first) activeMetricGroupTab.value = first;
+  // Apply the same scope filter that the "View by Pod/Node" chip would apply
+  const semanticId = outerTabToSubjectSemanticId[tabId];
+  if (semanticId) activeSubject.value = semanticId;
+}, { immediate: true });
 
 // Per-group dashboard data and render key
 const groupedDashboardData = ref<Partial<Record<string, any>>>({});
@@ -1907,7 +2073,7 @@ const nonEmptyGroupTabs = computed(() =>
 const regenerateGroupDashboards = (config: MetricsCorrelationConfig) => {
   const grouped = groupMetricsByCategory(
     selectedMetricStreams.value,
-    groupDefs.value,
+    effectiveGroupDefs.value,
   );
   const next: Partial<Record<string, any>> = {};
 
@@ -2334,7 +2500,7 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
         x:
           (index % Math.floor(grid / (props.panelWidth ?? 64))) *
           (props.panelWidth ?? 64),
-        y: maxY + Math.floor(index / 3) * (props.panelHeight ?? 16),
+        y: maxY + Math.floor(index / Math.floor(grid / (props.panelWidth ?? 64))) * (props.panelHeight ?? 16),
         i: uniqueId,
       };
       panel.id = `${panel.id}_${timestamp}`;
@@ -2389,9 +2555,6 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
 
     // Log cache usage for debugging
     if (cachedPanels.length > 0) {
-      console.log(
-        `[TelemetryCorrelationDashboard] Reused ${cachedPanels.length} cached panel(s), generated ${newPanels.length} new panel(s)`,
-      );
     }
   } catch (err: any) {
     console.error(
@@ -2414,22 +2577,17 @@ const onClose = () => {
 // Helper function to format time range
 const formatTimeRange = (range: TimeRange) => {
   // range.startTime and range.endTime are in microseconds (16 digits)
-  // Convert to milliseconds by dividing by 1000
-  const startDate = new Date(range.startTime / 1000);
-  const endDate = new Date(range.endTime / 1000);
-
-  const formatTime = (date: Date) => {
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    const seconds = String(date.getSeconds()).padStart(2, "0");
-    return `${hours}:${minutes}:${seconds}`;
-  };
+  // Convert to milliseconds by dividing by 1000, then render in the
+  // user-selected timezone (falls back to UTC).
+  const timezone = store.state.timezone || "UTC";
+  const formatTime = (micros: number) =>
+    timestampToTimezoneDate(Math.floor(micros / 1000), timezone, "HH:mm:ss");
 
   // Calculate duration in microseconds, then convert to minutes
   const durationMicros = range.endTime - range.startTime;
   const durationMinutes = Math.round(durationMicros / 1000 / 60000);
 
-  return `${formatTime(startDate)} - ${formatTime(endDate)} (${durationMinutes} min)`;
+  return `${formatTime(range.startTime)} - ${formatTime(range.endTime)} (${durationMinutes} min)`;
 };
 
 // ============= TRACE CORRELATION FUNCTIONS =============
@@ -3258,237 +3416,26 @@ watch(
       pendingDimensions.value = { ...newDimensions };
       activeDimensions.value = { ...newDimensions };
 
-      console.log(
-        "[TelemetryCorrelationDashboard] Updated dimensions from props:",
-        newDimensions,
-      );
     }
   },
   { immediate: true, deep: true },
 );
 </script>
 
-<style lang="scss" scoped>
-.correlation-dashboard-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 90vw;
-  max-width: 87.5rem;
-  background: #ffffff !important;
-
-  .correlation-header {
-    flex-shrink: 0;
-    background: #ffffff !important;
-    z-index: 1;
-  }
-
-  .correlation-content {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-  }
+<style>
+.telemetry-correlation-traces .trace-details-content {
+  padding: 0 !important;
 }
-
-.telemetry-correlation-traces {
-  :deep(.trace-details-content) {
-    padding: 0 !important;
-  }
-
-  :deep(.trace-combined-header-wrapper) {
-    margin-bottom: 0 !important;
-  }
+.telemetry-correlation-traces .trace-combined-header-wrapper {
+  margin-bottom: 0 !important;
 }
-
-// Splitter separator visual divider
-.metric-splitter-separator {
-  width: 1px;
-  height: 100%;
-  background: var(--o2-border-color, #e0e0e0);
-  cursor: col-resize;
+.metric-group-tabs .o-tab {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  font-size: 0.8125rem;
 }
-
-body.body--dark .metric-splitter-separator {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-// Dimension sidebar (matching TracesAnalysisDashboard style)
-.dimension-sidebar {
-  background: #ffffff;
-}
-
-.dimension-list-item {
-  border-bottom: none;
-
-  &:hover {
-    background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
-  }
-
-  .dimension-label {
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-  }
-}
-
-// Metric group headers (used in both sidebar and selector dialog)
-.metric-group-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.375rem 0.5rem;
-  background: var(--q-color-grey-2, #f5f5f5);
-  border-bottom: 0.0625rem solid var(--q-border-color, #e0e0e0);
-  position: sticky;
-  top: 0;
-  z-index: 1;
-
-  .metric-group-label {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    opacity: 0.75;
-  }
-
-  .metric-group-actions {
-    display: flex;
-    gap: 0.25rem;
-  }
-}
-
-// Metric group tabs (Infra / Network / Others sub-tabs within the metrics section)
-.metric-group-tabs {
-  flex-shrink: 0;
-  background: var(--color-surface-panel);
-
-  :deep(.o-tab) {
-    min-height: 2rem;
-    padding: 0 0.75rem;
-    font-size: 0.8125rem;
-  }
-
-  :deep(.o-tab__indicator) {
-    height: 0.125rem;
-  }
-}
-
-// Metric selector dialog
-.metric-selector-dialog {
-  min-width: 25rem;
-  max-width: 31.25rem;
-}
-
-.metric-list-container {
-  max-height: 25rem;
-  overflow-y: auto;
-
-  .metric-list-item {
-    padding: 0.5rem 1rem;
-    border-bottom: 0.0625rem solid var(--q-border-color, #e0e0e0);
-
-    &:hover {
-      background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
-    }
-
-    .metric-label {
-      font-size: 0.875rem;
-      line-height: 1.25rem;
-      font-family: monospace;
-    }
-  }
-}
-
-// Embedded mode styling
-.correlation-dashboard-embedded {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  background: #ffffff !important;
-
-  .correlation-header {
-    flex-shrink: 0;
-    background: #ffffff !important;
-    z-index: 1;
-  }
-
-  .correlation-content {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-  }
-}
-
-// Dimension dropdown styling
-.dimension-dropdown {
-  :deep(.q-field__control) {
-    min-height: 2rem;
-    padding: 0 0.5rem;
-  }
-
-  :deep(.q-field__native) {
-    font-size: 0.875rem;
-    padding: 0.25rem 0;
-  }
-
-  :deep(.q-field__append) {
-    padding-left: 0.25rem;
-  }
-}
-
-// Trace header background - light mode
-.trace-header-bg {
-  background: #ffffff;
-}
-
-// Dark mode support
-body.body--dark {
-  .trace-header-bg {
-    background: #1e1e1e;
-  }
-  .correlation-dashboard-embedded {
-    background: #1e1e1e !important;
-
-    .correlation-header {
-      background: #1e1e1e !important;
-    }
-  }
-
-  .correlation-dashboard-card {
-    background: #1e1e1e !important;
-
-    .correlation-header {
-      background: #1e1e1e !important;
-    }
-  }
-
-  .dimension-sidebar {
-    background: #202223 !important;
-  }
-
-  .dimension-list-item {
-    border-bottom-color: rgba(255, 255, 255, 0.06);
-
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-  }
-
-  .metric-group-header {
-    background: #202223 !important;
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .metric-list-item {
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-  }
+.metric-group-tabs .o-tab__indicator {
+  height: 0.125rem;
 }
 
 </style>

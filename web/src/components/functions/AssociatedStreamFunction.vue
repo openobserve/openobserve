@@ -262,7 +262,7 @@ export default defineComponent({
         header: t("logStream.docNum"),
         sortable: true,
         size: COL.count,
-        meta: { align: "left" },
+        meta: { align: "right" },
       },
       {
         id: "storage_size",
@@ -270,7 +270,7 @@ export default defineComponent({
         header: t("logStream.storageSize"),
         sortable: true,
         size: COL.sizeBytes,
-        meta: { align: "left" },
+        meta: { align: "right" },
       },
       {
         id: "compressed_size",
@@ -278,7 +278,7 @@ export default defineComponent({
         header: t("logStream.compressedSize"),
         sortable: true,
         size: COL.sizeBytes,
-        meta: { align: "left" },
+        meta: { align: "right" },
       },
     ];
     const addFunctionInProgress = ref(false);
@@ -362,7 +362,7 @@ export default defineComponent({
           cell: " ",
           sortable: true,
           size: COL.count,
-          meta: { align: "left" },
+          meta: { align: "right" },
         },
         {
           id: "applyBeforeFlattening",
@@ -711,35 +711,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-/* q-table__title replaced with inline Tailwind — font-size and weight now set directly on elements */
-
-.confirmBody {
-  padding: 11px 1.375rem 0;
-  font-size: 0.875rem;
-  text-align: center;
-  font-weight: 700;
-
-  .head {
-    line-height: 2.125rem;
-    margin-bottom: 0.5rem;
-    color: $dark-page;
-  }
-
-  .para {
-    color: $light-text;
-  }
-}
-
-.confirmActions {
-  justify-content: center;
-  padding: 1.25rem 1.375rem 1.625rem;
-  display: flex;
-
-  .q-btn {
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
-}
-</style>

@@ -164,7 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 import { formatDate } from "@/utils/date";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -187,6 +189,7 @@ const emit = defineEmits<{
 
 // Composables
 const { t } = useI18n();
+const store = useStore();
 
 // State
 const selectedWindow = ref<string>("5min");
@@ -219,7 +222,11 @@ const isValid = computed(() => {
  */
 const formatTimestamp = (timestamp: number): string => {
   const ms = Math.floor(timestamp / 1000);
-  return formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
+  return timestampToTimezoneDate(
+    ms,
+    store.state.timezone || "UTC",
+    "yyyy-MM-dd HH:mm:ss.SSS",
+  );
 };
 
 /**
@@ -464,27 +471,3 @@ watch(customEndTime, (newVal) => {
 detectCurrentWindow();
 </script>
 
-<style lang="scss" scoped>
-.tw\\:bg-gray-50 {
-  background-color: rgba(0, 0, 0, 0.02);
-}
-
-.tw\\:bg-blue-50 {
-  background-color: rgba(33, 150, 243, 0.05);
-}
-
-// Dark theme adjustments
-:deep(.q-dark) {
-  .tw\\:bg-gray-50 {
-    background-color: rgba(255, 255, 255, 0.03);
-  }
-
-  .tw\\:bg-blue-50 {
-    background-color: rgba(33, 150, 243, 0.1);
-  }
-
-  .tw\\:text-gray-600 {
-    color: rgba(255, 255, 255, 0.7);
-  }
-}
-</style>

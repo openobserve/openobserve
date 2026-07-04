@@ -18,22 +18,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <transition name="slide">
     <div
       v-if="visible"
-      class="service-graph-edge-side-panel"
+      class="service-graph-edge-side-panel tw:absolute tw:right-0 tw:top-0 tw:w-[420px] tw:h-full tw:z-[100] tw:flex tw:flex-col tw:bg-[#1a1f2e] tw:border-l tw:border-[#2d3548] tw:shadow-[0_10px_15px_-3px_rgba(0,0,0,0.5)] tw:overflow-hidden tw:animate-[slideIn_0.3s_ease-out]"
       data-test="service-graph-edge-side-panel"
     >
       <!-- Header -->
-      <div class="panel-header" data-test="service-graph-edge-side-panel-header">
-        <div class="panel-title">
-          <h2 class="edge-name" data-test="service-graph-edge-side-panel-route">
-            <span class="from-service">{{ selectedEdge?.from }}</span>
-            <OIcon name="arrow-forward" size="xs" class="edge-arrow" />
-            <span class="to-service">{{ selectedEdge?.to }}</span>
-            <span class="health-badge" :class="edgeHealth.status">
-              {{ edgeHealth.text }}
-            </span>
+      <div
+        class="panel-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:border-b tw:border-[#2d3548] tw:bg-[#1a1f2e] tw:shrink-0"
+        data-test="service-graph-edge-side-panel-header"
+      >
+        <div class="panel-title tw:flex-1 tw:min-w-0">
+          <h2
+            class="edge-name tw:text-[15px] tw:font-semibold tw:m-0 tw:leading-[1.2] tw:text-[#e4e7eb] tw:tracking-normal tw:flex tw:items-center tw:gap-2 tw:flex-wrap"
+            data-test="service-graph-edge-side-panel-route"
+          >
+            <span class="from-service tw:text-[#60a5fa] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">{{ selectedEdge?.from }}</span>
+            <OIcon name="arrow-forward" size="xs" class="edge-arrow tw:text-[rgba(255,255,255,0.35)] tw:shrink-0" />
+            <span class="to-service tw:text-[#a78bfa] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">{{ selectedEdge?.to }}</span>
+            <OTag type="serviceStatus" :value="edgeHealth.status">{{ edgeHealth.text }}</OTag>
           </h2>
         </div>
-        <div class="panel-header-actions">
+        <div class="panel-header-actions tw:flex tw:items-center tw:shrink-0">
           <OButton
             variant="ghost"
             size="icon"
@@ -46,10 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Content -->
-      <div class="panel-content">
+      <div
+        class="panel-content tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:overflow-x-hidden tw:bg-[#0f1419] tw:px-3 tw:pb-3"
+      >
 
         <!-- Metrics Section -->
-        <div class="panel-section metrics-section" data-test="service-graph-edge-side-panel-metrics">
+        <div class="panel-section metrics-section tw:p-0 tw:mt-3" data-test="service-graph-edge-side-panel-metrics">
           <div class="metric-card metric-card-full" data-test="service-graph-edge-side-panel-request-rate">
 
             <!-- Traffic Summary: Total | Failed | Error Rate -->
@@ -95,17 +101,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="getLatencyClass(p50Latency)"
                 data-test="service-graph-edge-side-panel-p50"
               >
-                <span class="col-metric"><span class="percentile-badge">P50</span></span>
+                <span class="col-metric"><OTag type="percentileTag" value="p50" /></span>
                 <span class="col-current latency-current">{{ p50Latency }}</span>
                 <span class="col-baseline latency-baseline">{{ baselineP50 }}</span>
                 <span class="col-delta">
-                  <span class="delta-badge" :class="getDeltaClass(p50DeltaPct)">
-                    <OIcon
-                      :name="p50DeltaPct > 2 ? 'arrow-upward' : p50DeltaPct < -2 ? 'arrow-downward' : 'remove'"
-                      size="xs"
-                    />
+                  <OTag type="deltaTrend" :value="getDeltaTrend(p50DeltaPct)">
+                    <template #icon>
+                      <OIcon
+                        :name="p50DeltaPct > 2 ? 'arrow-upward' : p50DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                        size="xs"
+                      />
+                    </template>
                     {{ p50DeltaFormatted }}
-                  </span>
+                  </OTag>
                 </span>
               </div>
 
@@ -115,17 +123,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="getLatencyClass(p95Latency)"
                 data-test="service-graph-edge-side-panel-p95"
               >
-                <span class="col-metric"><span class="percentile-badge">P95</span></span>
+                <span class="col-metric"><OTag type="percentileTag" value="p95" /></span>
                 <span class="col-current latency-current">{{ p95Latency }}</span>
                 <span class="col-baseline latency-baseline">{{ baselineP95 }}</span>
                 <span class="col-delta">
-                  <span class="delta-badge" :class="getDeltaClass(p95DeltaPct)">
-                    <OIcon
-                      :name="p95DeltaPct > 2 ? 'arrow-upward' : p95DeltaPct < -2 ? 'arrow-downward' : 'remove'"
-                      size="xs"
-                    />
+                  <OTag type="deltaTrend" :value="getDeltaTrend(p95DeltaPct)">
+                    <template #icon>
+                      <OIcon
+                        :name="p95DeltaPct > 2 ? 'arrow-upward' : p95DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                        size="xs"
+                      />
+                    </template>
                     {{ p95DeltaFormatted }}
-                  </span>
+                  </OTag>
                 </span>
               </div>
 
@@ -135,17 +145,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="getLatencyClass(p99Latency)"
                 data-test="service-graph-edge-side-panel-p99"
               >
-                <span class="col-metric"><span class="percentile-badge">P99</span></span>
+                <span class="col-metric"><OTag type="percentileTag" value="p99" /></span>
                 <span class="col-current latency-current">{{ p99Latency }}</span>
                 <span class="col-baseline latency-baseline">{{ baselineP99 }}</span>
                 <span class="col-delta">
-                  <span class="delta-badge" :class="getDeltaClass(p99DeltaPct)">
-                    <OIcon
-                      :name="p99DeltaPct > 2 ? 'arrow-upward' : p99DeltaPct < -2 ? 'arrow-downward' : 'remove'"
-                      size="xs"
-                    />
+                  <OTag type="deltaTrend" :value="getDeltaTrend(p99DeltaPct)">
+                    <template #icon>
+                      <OIcon
+                        :name="p99DeltaPct > 2 ? 'arrow-upward' : p99DeltaPct < -2 ? 'arrow-downward' : 'remove'"
+                        size="xs"
+                      />
+                    </template>
                     {{ p99DeltaFormatted }}
-                  </span>
+                  </OTag>
                 </span>
               </div>
             </div>
@@ -154,8 +166,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- RED Chart Section -->
-        <div class="panel-section trend-section" data-test="service-graph-edge-side-panel-trend">
-          <div class="section-header">
+        <div class="panel-section trend-section tw:p-0 tw:mt-3 tw:flex-1 tw:min-h-0 tw:flex tw:flex-col" data-test="service-graph-edge-side-panel-trend">
+          <div class="section-header tw:flex tw:items-center tw:justify-between tw:mb-2 tw:shrink-0">
             <!-- R·E·D Tab switcher -->
             <OToggleGroup
               :model-value="activeTab"
@@ -238,13 +250,14 @@ import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 type ChartTab = 'rate' | 'errors' | 'duration';
 
 export default defineComponent({
   name: 'ServiceGraphEdgeSidePanel',
   components: { OButton, OToggleGroup, OToggleGroupItem, OSpinner, OTooltip,
-    OIcon,
+    OIcon, OTag,
 },
   props: {
     selectedEdge: {
@@ -369,12 +382,12 @@ export default defineComponent({
     const p95DeltaFormatted = computed(() => formatDelta(p95DeltaPct.value));
     const p99DeltaFormatted = computed(() => formatDelta(p99DeltaPct.value));
 
-    const getDeltaClass = (pct: number): string => {
-      if (Math.abs(pct) < 2) return 'delta-neutral';
-      if (pct <= -5) return 'delta-improved';
-      if (pct < 0) return 'delta-improved-slight';
-      if (pct < 20) return 'delta-warning';
-      return 'delta-critical';
+    const getDeltaTrend = (pct: number): string => {
+      if (Math.abs(pct) < 2) return 'neutral';
+      if (pct <= -5) return 'improved';
+      if (pct < 0) return 'slight';
+      if (pct < 20) return 'warning';
+      return 'critical';
     };
 
     const trendDataPoints = computed<any[]>(
@@ -777,7 +790,7 @@ export default defineComponent({
       p50DeltaFormatted,
       p95DeltaFormatted,
       p99DeltaFormatted,
-      getDeltaClass,
+      getDeltaTrend,
       getErrorRateClass,
       getLatencyClass,
       formatNumber,
@@ -789,29 +802,13 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.service-graph-edge-side-panel {
-  position: absolute;
-  right: 0;
-  top: 0;
-  width: 420px;
-  height: 100%;
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-  background: #1a1f2e;
-  border-left: 1px solid #2d3548;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-  overflow: hidden;
-  animation: slideIn 0.3s ease-out;
-}
-
+<style>
 @keyframes slideIn {
   from { transform: translateX(100%); }
   to   { transform: translateX(0); }
 }
 
-// ── Slide transition ─────────────────────────────────────────────────────
+/* Slide transition */
 .slide-enter-active,
 .slide-leave-active {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -821,475 +818,376 @@ export default defineComponent({
 .slide-enter-to,
 .slide-leave-from { transform: translateX(0); }
 
-// ── Header ────────────────────────────────────────────────────────────────
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid #2d3548;
-  background: #1a1f2e;
-  flex-shrink: 0;
-
-  .panel-title {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .edge-name {
-    font-size: 15px;
-    font-weight: 600;
-    margin: 0;
-    line-height: 1.2;
-    color: #e4e7eb;
-    letter-spacing: normal;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-
-    .from-service {
-      color: #60a5fa;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .edge-arrow {
-      color: rgba(255,255,255,0.35);
-      flex-shrink: 0;
-    }
-
-    .to-service {
-      color: #a78bfa;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .health-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: 600;
-      line-height: 1;
-      flex-shrink: 0;
-
-      &::before {
-        content: '●';
-        font-size: 10px;
-      }
-
-      &.healthy  { background: rgba(16,185,129,0.15); color: #10b981; }
-      &.degraded { background: rgba(251,191,36,0.15);  color: #fbbf24; }
-      &.critical { background: rgba(239,68,68,0.15);   color: #ef4444; }
-    }
-  }
-
-  .panel-header-actions {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-  }
+/* Header descendant selectors */
+.panel-header .panel-title {
+  flex: 1;
+  min-width: 0;
 }
+
+.panel-header .edge-name .health-badge::before {
+  content: '●';
+  font-size: 10px;
+}
+
+.panel-header .edge-name .health-badge.healthy  { background: rgba(16,185,129,0.15); color: #10b981; }
+.panel-header .edge-name .health-badge.degraded { background: rgba(251,191,36,0.15);  color: #fbbf24; }
+.panel-header .edge-name .health-badge.critical { background: rgba(239,68,68,0.15);   color: #ef4444; }
 
 .body--light .panel-header {
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--o2-border);
   background: #f5f5f5;
-
-  .edge-name {
-    color: #202124;
-
-    .from-service { color: #1d4ed8; }
-    .to-service   { color: #6d28d9; }
-    .edge-arrow   { color: rgba(0,0,0,0.3); }
-
-    .health-badge {
-      &.healthy  { background: rgba(16,185,129,0.08); color: #059669; }
-      &.degraded { background: rgba(251,191,36,0.08); color: #d97706; }
-      &.critical { background: rgba(239,68,68,0.08);  color: #dc2626; }
-    }
-  }
 }
 
-// ── Scrollable content ────────────────────────────────────────────────────
-.panel-content {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow-x: hidden;
-  background: #0f1419;
-  padding: 0 12px 12px;
-
-  &::-webkit-scrollbar { width: 6px; }
-  &::-webkit-scrollbar-track { background: #1a1f2e; }
-  &::-webkit-scrollbar-thumb {
-    background: #242938;
-    border-radius: 3px;
-    &:hover { background: #2d3548; }
-  }
+.body--light .panel-header .edge-name {
+  color: #202124;
 }
+
+.body--light .panel-header .edge-name .from-service { color: #1d4ed8; }
+.body--light .panel-header .edge-name .to-service   { color: #6d28d9; }
+.body--light .panel-header .edge-name .edge-arrow   { color: rgba(0,0,0,0.3); }
+
+.body--light .panel-header .edge-name .health-badge.healthy  { background: rgba(16,185,129,0.08); color: #059669; }
+.body--light .panel-header .edge-name .health-badge.degraded { background: rgba(251,191,36,0.08); color: #d97706; }
+.body--light .panel-header .edge-name .health-badge.critical { background: rgba(239,68,68,0.08);  color: #dc2626; }
+
+/* Scrollbar pseudo-elements */
+.panel-content::-webkit-scrollbar { width: 6px; }
+.panel-content::-webkit-scrollbar-track { background: #1a1f2e; }
+.panel-content::-webkit-scrollbar-thumb {
+  background: #242938;
+  border-radius: 3px;
+}
+.panel-content::-webkit-scrollbar-thumb:hover { background: #2d3548; }
 
 .body--light .panel-content {
   background: #ffffff;
-  &::-webkit-scrollbar-track { background: #f8f9fa; }
-  &::-webkit-scrollbar-thumb {
-    background: #e0e0e0;
-    &:hover { background: #d0d0d0; }
-  }
+}
+.body--light .panel-content::-webkit-scrollbar-track { background: #f8f9fa; }
+.body--light .panel-content::-webkit-scrollbar-thumb { background: var(--o2-border); }
+.body--light .panel-content::-webkit-scrollbar-thumb:hover { background: #d0d0d0; }
+
+/* Metric card — descendant selectors */
+.metrics-section .metric-card-full {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #242938 0%, #1f2937 100%);
+  border: 1px solid #374151;
+  margin-bottom: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-// ── Sections ──────────────────────────────────────────────────────────────
-.panel-section {
-  padding: 0;
-  margin-top: 12px;
+.metrics-section .metric-card-full:hover {
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(99, 102, 241, 0.3);
+  border-color: rgba(99, 102, 241, 0.4);
 }
 
-.section-header {
+.metrics-section .metric-card-full .metric-horizontal-divider {
+  width: 100%;
+  height: 1px;
+  background: #374151;
+  margin: 10px 0 8px 0;
+}
+
+/* Traffic Summary row */
+.metrics-section .metric-card-full .traffic-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+  gap: 6px;
 }
 
-// ── Metric card ───────────────────────────────────────────────────────────
-.metrics-section {
-  .metric-card-full {
-    padding: 10px 12px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #242938 0%, #1f2937 100%);
-    border: 1px solid #374151;
-    margin-bottom: 12px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-
-    &:hover {
-      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(99, 102, 241, 0.3);
-      border-color: rgba(99, 102, 241, 0.4);
-    }
-
-    .metric-horizontal-divider {
-      width: 100%;
-      height: 1px;
-      background: #374151;
-      margin: 10px 0 8px 0;
-    }
-
-    // ── Traffic Summary row ──────────────────────────────────────────────
-    .traffic-row {
-      display: flex;
-      gap: 6px;
-
-      .traffic-pill {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 3px;
-        padding: 7px 6px 6px;
-        border-radius: 6px;
-        border: 1px solid transparent;
-        transition: all 0.2s ease;
-        cursor: default;
-.traffic-label {
-          font-size: 9px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          line-height: 1;
-          opacity: 0.65;
-        }
-
-        .traffic-value {
-          font-size: 16px;
-          font-weight: 700;
-          letter-spacing: -0.02em;
-          line-height: 1;
-        }
-
-        &.total {
-          background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.02));
-          border-color: rgba(99, 102, 241, 0.2);
-          color: #a5b4fc;
-          .traffic-value { color: #c7d2fe; }
-          &:hover { box-shadow: 0 0 8px rgba(99, 102, 241, 0.2); }
-        }
-
-        &.failed {
-          background: linear-gradient(135deg, rgba(107, 114, 128, 0.1), rgba(107, 114, 128, 0.02));
-          border-color: rgba(107, 114, 128, 0.2);
-          color: #9ca3af;
-          .traffic-value { color: #d1d5db; }
-        }
-
-        &.error-rate {
-          &.status-healthy {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.02));
-            border-color: rgba(16, 185, 129, 0.2);
-            color: #6ee7b7;
-            .traffic-value { color: #10b981; }
-            &:hover { box-shadow: 0 0 8px rgba(16, 185, 129, 0.2); }
-          }
-          &.status-warning {
-            background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(251, 191, 36, 0.02));
-            border-color: rgba(251, 191, 36, 0.2);
-            color: #fde68a;
-            .traffic-value { color: #fbbf24; }
-            &:hover { box-shadow: 0 0 8px rgba(251, 191, 36, 0.2); }
-          }
-          &.status-critical {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.02));
-            border-color: rgba(239, 68, 68, 0.2);
-            color: #fca5a5;
-            .traffic-value { color: #ef4444; }
-            &:hover { box-shadow: 0 0 8px rgba(239, 68, 68, 0.2); }
-          }
-        }
-      }
-    }
-
-    // ── Latency baseline comparison table ───────────────────────────────
-    .latency-table {
-      .latency-header-row {
-        display: grid;
-        grid-template-columns: 44px 1fr 1fr 1fr;
-        gap: 4px;
-        padding: 2px 6px 4px;
-        span {
-          font-size: 10px;
-          font-weight: 600;
-          color: #9ca3af;
-          letter-spacing: 0.04em;
-        }
-        .col-current, .col-baseline, .col-delta { text-align: right; }
-      }
-
-      .latency-data-row {
-        display: grid;
-        grid-template-columns: 44px 1fr 1fr 1fr;
-        gap: 4px;
-        padding: 6px 6px;
-        border-radius: 5px;
-        margin-bottom: 3px;
-        align-items: center;
-        border: 1px solid transparent;
-        transition: all 0.2s ease;
-
-        &:last-child { margin-bottom: 0; }
-
-        &.status-healthy {
-          background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.01));
-          border-color: rgba(16, 185, 129, 0.12);
-          .latency-current { color: #10b981; }
-          &:hover { background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.02)); }
-        }
-        &.status-warning {
-          background: linear-gradient(135deg, rgba(251, 191, 36, 0.06), rgba(251, 191, 36, 0.01));
-          border-color: rgba(251, 191, 36, 0.12);
-          .latency-current { color: #fbbf24; }
-          &:hover { background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(251, 191, 36, 0.02)); }
-        }
-        &.status-critical {
-          background: linear-gradient(135deg, rgba(239, 68, 68, 0.06), rgba(239, 68, 68, 0.01));
-          border-color: rgba(239, 68, 68, 0.12);
-          .latency-current { color: #ef4444; }
-          &:hover { background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.02)); }
-        }
-        &.status-unknown {
-          background: rgba(107, 114, 128, 0.04);
-          border-color: rgba(107, 114, 128, 0.1);
-          .latency-current { color: #9ca3af; }
-        }
-
-        .col-current, .col-baseline, .col-delta { text-align: right; }
-
-        .percentile-badge {
-          font-size: 11px;
-          font-weight: 700;
-          color: #9ca3af;
-          background: rgba(107, 114, 128, 0.14);
-          padding: 2px 6px;
-          border-radius: 3px;
-          letter-spacing: 0.03em;
-        }
-
-        .latency-current {
-          font-size: 13px;
-          font-weight: 700;
-          letter-spacing: -0.01em;
-        }
-
-        .latency-baseline {
-          font-size: 11px;
-          font-weight: 500;
-          color: #9ca3af;
-        }
-
-        .delta-badge {
-          display: inline-flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 2px;
-          padding: 2px 5px;
-          border-radius: 3px;
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: -0.01em;
-
-          &.delta-improved       { background: rgba(16, 185, 129, 0.14); color: #10b981; }
-          &.delta-improved-slight { background: rgba(16, 185, 129, 0.08); color: #34d399; }
-          &.delta-neutral        { background: rgba(107, 114, 128, 0.12); color: #6b7280; }
-          &.delta-warning        { background: rgba(251, 191, 36, 0.14);  color: #fbbf24; }
-          &.delta-critical       { background: rgba(239, 68, 68, 0.14);   color: #ef4444; }
-        }
-      }
-    }
-  }
-}
-
-.body--light .metrics-section {
-  .metric-card-full {
-    background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
-    border-color: #d1d5db;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-
-    &:hover {
-      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(99, 102, 241, 0.2);
-      border-color: rgba(99, 102, 241, 0.3);
-    }
-
-    .metric-horizontal-divider { background: #e5e7eb; }
-
-    .traffic-row {
-      .traffic-pill {
-        &.total {
-          background: linear-gradient(135deg, rgba(99, 102, 241, 0.06), rgba(99, 102, 241, 0.01));
-          border-color: rgba(99, 102, 241, 0.2);
-          color: #6366f1;
-          .traffic-value { color: #4338ca; }
-        }
-        &.failed {
-          background: linear-gradient(135deg, rgba(107, 114, 128, 0.06), rgba(107, 114, 128, 0.01));
-          border-color: rgba(107, 114, 128, 0.15);
-          color: #6b7280;
-          .traffic-value { color: #374151; }
-        }
-        &.error-rate {
-          &.status-healthy {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.01));
-            border-color: rgba(16, 185, 129, 0.2);
-            color: #059669;
-            .traffic-value { color: #047857; }
-          }
-          &.status-warning {
-            background: linear-gradient(135deg, rgba(217, 119, 6, 0.06), rgba(217, 119, 6, 0.01));
-            border-color: rgba(217, 119, 6, 0.2);
-            color: #d97706;
-            .traffic-value { color: #b45309; }
-          }
-          &.status-critical {
-            background: linear-gradient(135deg, rgba(220, 38, 38, 0.06), rgba(220, 38, 38, 0.01));
-            border-color: rgba(220, 38, 38, 0.2);
-            color: #dc2626;
-            .traffic-value { color: #b91c1c; }
-          }
-        }
-      }
-    }
-
-    .latency-table {
-      .latency-header-row span { color: #9ca3af; }
-
-      .latency-data-row {
-        &.status-healthy {
-          background: linear-gradient(135deg, rgba(16, 185, 129, 0.04), rgba(16, 185, 129, 0.01));
-          border-color: rgba(16, 185, 129, 0.15);
-          .latency-current { color: #059669; }
-        }
-        &.status-warning {
-          background: linear-gradient(135deg, rgba(217, 119, 6, 0.04), rgba(217, 119, 6, 0.01));
-          border-color: rgba(217, 119, 6, 0.15);
-          .latency-current { color: #d97706; }
-        }
-        &.status-critical {
-          background: linear-gradient(135deg, rgba(220, 38, 38, 0.04), rgba(220, 38, 38, 0.01));
-          border-color: rgba(220, 38, 38, 0.15);
-          .latency-current { color: #dc2626; }
-        }
-
-        .percentile-badge { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
-        .latency-baseline { color: #6b7280; }
-
-        .delta-badge {
-          &.delta-improved       { background: rgba(16, 185, 129, 0.1);  color: #059669; }
-          &.delta-improved-slight { background: rgba(16, 185, 129, 0.06); color: #10b981; }
-          &.delta-neutral        { background: rgba(107, 114, 128, 0.08); color: #6b7280; }
-          &.delta-warning        { background: rgba(217, 119, 6, 0.1);    color: #d97706; }
-          &.delta-critical       { background: rgba(220, 38, 38, 0.1);    color: #dc2626; }
-        }
-      }
-    }
-  }
-}
-
-// ── Trend chart ───────────────────────────────────────────────────────────
-.trend-section {
+.metrics-section .metric-card-full .traffic-row .traffic-pill {
   flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-
-  .section-header { flex-shrink: 0; }
-
-  .trend-state {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 8px;
-    padding: 24px;
-    font-size: 13px;
-    color: rgba(255,255,255,0.4);
-    border-radius: 8px;
-    border: 1px dashed rgba(255,255,255,0.1);
-
-    .trend-empty-icon { opacity: 0.3; margin-bottom: 4px; }
-  }
-
-  .trend-error { color: #f87171; border-color: rgba(239,68,68,0.2); }
-
-  .trend-chart {
-    flex: 1;
-    min-height: 180px;
-    width: 100%;
-    border-radius: 8px;
-    overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.06);
-    background: rgba(255,255,255,0.02);
-
-    &.trend-chart--hidden { display: none; }
-  }
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 7px 6px 6px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  cursor: default;
 }
 
-.body--light .trend-section {
-  .trend-state {
-    color: rgba(0,0,0,0.4);
-    border-color: rgba(0,0,0,0.1);
-  }
-  .trend-chart {
-    border-color: rgba(0,0,0,0.08);
-    background: rgba(0,0,0,0.02);
-  }
+.metrics-section .metric-card-full .traffic-row .traffic-pill .traffic-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  opacity: 0.65;
 }
-</style>
 
-<style lang="scss">
+.metrics-section .metric-card-full .traffic-row .traffic-pill .traffic-value {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.metrics-section .metric-card-full .traffic-row .traffic-pill.total {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.02));
+  border-color: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+}
+.metrics-section .metric-card-full .traffic-row .traffic-pill.total .traffic-value { color: #c7d2fe; }
+.metrics-section .metric-card-full .traffic-row .traffic-pill.total:hover { box-shadow: 0 0 8px rgba(99, 102, 241, 0.2); }
+
+.metrics-section .metric-card-full .traffic-row .traffic-pill.failed {
+  background: linear-gradient(135deg, rgba(107, 114, 128, 0.1), rgba(107, 114, 128, 0.02));
+  border-color: rgba(107, 114, 128, 0.2);
+  color: #9ca3af;
+}
+.metrics-section .metric-card-full .traffic-row .traffic-pill.failed .traffic-value { color: #d1d5db; }
+
+.metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-healthy {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.02));
+  border-color: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+}
+.metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-healthy .traffic-value { color: #10b981; }
+.metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-healthy:hover { box-shadow: 0 0 8px rgba(16, 185, 129, 0.2); }
+
+.metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-warning {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(251, 191, 36, 0.02));
+  border-color: rgba(251, 191, 36, 0.2);
+  color: #fde68a;
+}
+.metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-warning .traffic-value { color: #fbbf24; }
+.metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-warning:hover { box-shadow: 0 0 8px rgba(251, 191, 36, 0.2); }
+
+.metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-critical {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.02));
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+}
+.metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-critical .traffic-value { color: #ef4444; }
+.metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-critical:hover { box-shadow: 0 0 8px rgba(239, 68, 68, 0.2); }
+
+/* Latency baseline comparison table */
+.metrics-section .metric-card-full .latency-table .latency-header-row {
+  display: grid;
+  grid-template-columns: 44px 1fr 1fr 1fr;
+  gap: 4px;
+  padding: 2px 6px 4px;
+}
+
+.metrics-section .metric-card-full .latency-table .latency-header-row span {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9ca3af;
+  letter-spacing: 0.04em;
+}
+
+.metrics-section .metric-card-full .latency-table .latency-header-row .col-current,
+.metrics-section .metric-card-full .latency-table .latency-header-row .col-baseline,
+.metrics-section .metric-card-full .latency-table .latency-header-row .col-delta { text-align: right; }
+
+.metrics-section .metric-card-full .latency-table .latency-data-row {
+  display: grid;
+  grid-template-columns: 44px 1fr 1fr 1fr;
+  gap: 4px;
+  padding: 6px 6px;
+  border-radius: 5px;
+  margin-bottom: 3px;
+  align-items: center;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.metrics-section .metric-card-full .latency-table .latency-data-row:last-child { margin-bottom: 0; }
+
+.metrics-section .metric-card-full .latency-table .latency-data-row.status-healthy {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.01));
+  border-color: rgba(16, 185, 129, 0.12);
+}
+.metrics-section .metric-card-full .latency-table .latency-data-row.status-healthy .latency-current { color: #10b981; }
+.metrics-section .metric-card-full .latency-table .latency-data-row.status-healthy:hover { background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.02)); }
+
+.metrics-section .metric-card-full .latency-table .latency-data-row.status-warning {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.06), rgba(251, 191, 36, 0.01));
+  border-color: rgba(251, 191, 36, 0.12);
+}
+.metrics-section .metric-card-full .latency-table .latency-data-row.status-warning .latency-current { color: #fbbf24; }
+.metrics-section .metric-card-full .latency-table .latency-data-row.status-warning:hover { background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(251, 191, 36, 0.02)); }
+
+.metrics-section .metric-card-full .latency-table .latency-data-row.status-critical {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.06), rgba(239, 68, 68, 0.01));
+  border-color: rgba(239, 68, 68, 0.12);
+}
+.metrics-section .metric-card-full .latency-table .latency-data-row.status-critical .latency-current { color: #ef4444; }
+.metrics-section .metric-card-full .latency-table .latency-data-row.status-critical:hover { background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.02)); }
+
+.metrics-section .metric-card-full .latency-table .latency-data-row.status-unknown {
+  background: rgba(107, 114, 128, 0.04);
+  border-color: rgba(107, 114, 128, 0.1);
+}
+.metrics-section .metric-card-full .latency-table .latency-data-row.status-unknown .latency-current { color: #9ca3af; }
+
+.metrics-section .metric-card-full .latency-table .latency-data-row .col-current,
+.metrics-section .metric-card-full .latency-table .latency-data-row .col-baseline,
+.metrics-section .metric-card-full .latency-table .latency-data-row .col-delta { text-align: right; }
+
+.metrics-section .metric-card-full .latency-table .latency-data-row .percentile-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9ca3af;
+  background: rgba(107, 114, 128, 0.14);
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.03em;
+}
+
+.metrics-section .metric-card-full .latency-table .latency-data-row .latency-current {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.metrics-section .metric-card-full .latency-table .latency-data-row .latency-baseline {
+  font-size: 11px;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+.metrics-section .metric-card-full .latency-table .latency-data-row .delta-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.metrics-section .metric-card-full .latency-table .latency-data-row .delta-badge.delta-improved       { background: rgba(16, 185, 129, 0.14); color: #10b981; }
+.metrics-section .metric-card-full .latency-table .latency-data-row .delta-badge.delta-improved-slight { background: rgba(16, 185, 129, 0.08); color: #34d399; }
+.metrics-section .metric-card-full .latency-table .latency-data-row .delta-badge.delta-neutral        { background: rgba(107, 114, 128, 0.12); color: #6b7280; }
+.metrics-section .metric-card-full .latency-table .latency-data-row .delta-badge.delta-warning        { background: rgba(251, 191, 36, 0.14);  color: #fbbf24; }
+.metrics-section .metric-card-full .latency-table .latency-data-row .delta-badge.delta-critical       { background: rgba(239, 68, 68, 0.14);   color: #ef4444; }
+
+/* Light mode metric card */
+.body--light .metrics-section .metric-card-full {
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  border-color: #d1d5db;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.body--light .metrics-section .metric-card-full:hover {
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.body--light .metrics-section .metric-card-full .metric-horizontal-divider { background: #e5e7eb; }
+
+.body--light .metrics-section .metric-card-full .traffic-row .traffic-pill.total {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06), rgba(99, 102, 241, 0.01));
+  border-color: rgba(99, 102, 241, 0.2);
+  color: #6366f1;
+}
+.body--light .metrics-section .metric-card-full .traffic-row .traffic-pill.total .traffic-value { color: #4338ca; }
+
+.body--light .metrics-section .metric-card-full .traffic-row .traffic-pill.failed {
+  background: linear-gradient(135deg, rgba(107, 114, 128, 0.06), rgba(107, 114, 128, 0.01));
+  border-color: rgba(107, 114, 128, 0.15);
+  color: #6b7280;
+}
+.body--light .metrics-section .metric-card-full .traffic-row .traffic-pill.failed .traffic-value { color: #374151; }
+
+.body--light .metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-healthy {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.01));
+  border-color: rgba(16, 185, 129, 0.2);
+  color: #059669;
+}
+.body--light .metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-healthy .traffic-value { color: #047857; }
+
+.body--light .metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-warning {
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.06), rgba(217, 119, 6, 0.01));
+  border-color: rgba(217, 119, 6, 0.2);
+  color: #d97706;
+}
+.body--light .metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-warning .traffic-value { color: #b45309; }
+
+.body--light .metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-critical {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.06), rgba(220, 38, 38, 0.01));
+  border-color: rgba(220, 38, 38, 0.2);
+  color: #dc2626;
+}
+.body--light .metrics-section .metric-card-full .traffic-row .traffic-pill.error-rate.status-critical .traffic-value { color: #b91c1c; }
+
+.body--light .metrics-section .metric-card-full .latency-table .latency-header-row span { color: #9ca3af; }
+
+.body--light .metrics-section .metric-card-full .latency-table .latency-data-row.status-healthy {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.04), rgba(16, 185, 129, 0.01));
+  border-color: rgba(16, 185, 129, 0.15);
+}
+.body--light .metrics-section .metric-card-full .latency-table .latency-data-row.status-healthy .latency-current { color: #059669; }
+
+.body--light .metrics-section .metric-card-full .latency-table .latency-data-row.status-warning {
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.04), rgba(217, 119, 6, 0.01));
+  border-color: rgba(217, 119, 6, 0.15);
+}
+.body--light .metrics-section .metric-card-full .latency-table .latency-data-row.status-warning .latency-current { color: #d97706; }
+
+.body--light .metrics-section .metric-card-full .latency-table .latency-data-row.status-critical {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.04), rgba(220, 38, 38, 0.01));
+  border-color: rgba(220, 38, 38, 0.15);
+}
+.body--light .metrics-section .metric-card-full .latency-table .latency-data-row.status-critical .latency-current { color: #dc2626; }
+
+.body--light .metrics-section .metric-card-full .latency-table .latency-data-row .percentile-badge { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
+.body--light .metrics-section .metric-card-full .latency-table .latency-data-row .latency-baseline { color: #6b7280; }
+
+.body--light .metrics-section .metric-card-full .latency-table .latency-data-row .delta-badge.delta-improved       { background: rgba(16, 185, 129, 0.1);  color: #059669; }
+.body--light .metrics-section .metric-card-full .latency-table .latency-data-row .delta-badge.delta-improved-slight { background: rgba(16, 185, 129, 0.06); color: #10b981; }
+.body--light .metrics-section .metric-card-full .latency-table .latency-data-row .delta-badge.delta-neutral        { background: rgba(107, 114, 128, 0.08); color: #6b7280; }
+.body--light .metrics-section .metric-card-full .latency-table .latency-data-row .delta-badge.delta-warning        { background: rgba(217, 119, 6, 0.1);    color: #d97706; }
+.body--light .metrics-section .metric-card-full .latency-table .latency-data-row .delta-badge.delta-critical       { background: rgba(220, 38, 38, 0.1);    color: #dc2626; }
+
+/* Trend chart — descendant selectors */
+.trend-section .section-header { flex-shrink: 0; }
+
+.trend-section .trend-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+  border-radius: 8px;
+  border: 1px dashed rgba(255,255,255,0.1);
+}
+
+.trend-section .trend-state .trend-empty-icon { opacity: 0.3; margin-bottom: 4px; }
+
+.trend-section .trend-error { color: #f87171; border-color: rgba(239,68,68,0.2); }
+
+.trend-section .trend-chart {
+  flex: 1;
+  min-height: 180px;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+}
+
+.trend-section .trend-chart.trend-chart--hidden { display: none; }
+
+.body--light .trend-section .trend-state {
+  color: rgba(0,0,0,0.4);
+  border-color: rgba(0,0,0,0.1);
+}
+.body--light .trend-section .trend-chart {
+  border-color: rgba(0,0,0,0.08);
+  background: rgba(0,0,0,0.02);
+}
+
 .body--dark .service-graph-edge-side-panel {
   background: #1a1f2e;
   color: #e4e7eb;
@@ -1299,6 +1197,6 @@ export default defineComponent({
 .body--light .service-graph-edge-side-panel {
   background: #ffffff;
   color: #333333;
-  border-left: 1px solid #e0e0e0;
+  border-left: 1px solid var(--o2-border);
 }
 </style>

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -40,14 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-current_state="{ row }">
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <OIcon
-            :name="getStateIcon(row.current_state)"
-            :class="getStateColorClass(row.current_state)"
-            size="sm"
-          />
-          <span>{{ row.current_state }}</span>
-        </div>
+        <OTag type="alertState" :value="row.current_state" />
       </template>
 
       <template #cell-frequency="{ row }">
@@ -55,13 +48,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-last_evaluation="{ row }">
-        {{ formatTimestamp(row.last_evaluation) }}
+        <OTimeCell
+          :value="row.last_evaluation"
+          unit="us"
+          mode="absolute"
+          :timezone="store.state.timezone"
+          empty-label="—"
+        />
       </template>
 
       <template #empty>
         <div class="tw:w-full tw:text-center tw:py-8">
-          <OIcon name="history" size="xl" class="tw:text-gray-400" />
-          <div class="tw:mt-2 tw:text-gray-600 dark:tw:text-gray-400">
+          <OIcon name="history" size="xl" class="tw:text-text-primary" />
+          <div class="tw:mt-2 tw:text-text-primary">
             {{ t("alerts.noHistoryData") }}
           </div>
         </div>
@@ -75,7 +74,9 @@ import { ref, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
@@ -115,7 +116,7 @@ const columns: OTableColumnDef[] = [
     accessorKey: "total_evaluations",
     sortable: true,
     size: COL.count,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "firing_count",
@@ -123,7 +124,7 @@ const columns: OTableColumnDef[] = [
     accessorKey: "firing_count",
     sortable: true,
     size: COL.count,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "current_state",
@@ -131,7 +132,7 @@ const columns: OTableColumnDef[] = [
     accessorKey: "current_state",
     sortable: true,
     size: COL.status,
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "frequency",
@@ -139,15 +140,15 @@ const columns: OTableColumnDef[] = [
     accessorKey: "frequency",
     sortable: true,
     size: COL.frequency,
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "last_evaluation",
     header: t("alerts.lastEvaluation"),
     accessorKey: "last_evaluation",
     sortable: true,
-    size: COL.date,
-    meta: { align: "center" },
+    size: COL.dateAbsolute,
+    meta: { align: "left" },
   },
 ];
 
@@ -277,5 +278,3 @@ defineExpose({
 });
 </script>
 
-<style scoped lang="scss">
-</style>

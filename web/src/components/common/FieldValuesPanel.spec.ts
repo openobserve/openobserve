@@ -92,7 +92,9 @@ describe("FieldValuesPanel.vue", () => {
 
     it("renders the filter-values-container", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".filter-values-container").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="field-values-panel-container"]').exists(),
+      ).toBe(true);
     });
   });
 
@@ -193,7 +195,9 @@ describe("FieldValuesPanel.vue", () => {
   describe("Values list rendering", () => {
     it("renders one list item per value", () => {
       wrapper = createWrapper({ fieldValues: buildFieldValues(3) });
-      const items = wrapper.findAll(".filter-values-container [data-test]");
+      const items = wrapper.findAll(
+        '[data-test="field-values-panel-container"] [data-test]',
+      );
       // 3 items — each has a data-test attribute for log-search-subfield-add
       const subfields = items.filter((el) =>
         el.attributes("data-test")?.startsWith("logs-search-subfield-add-")

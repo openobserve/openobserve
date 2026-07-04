@@ -35,7 +35,6 @@ if (config.enableAnalytics == "true") {
 
     // Register the ready callback after load
     rudderanalytics.ready(() => {
-      console.log("RudderStack analytics initialized successfully");
     });
   } catch (error) {
     // Silently handle initialization errors - analytics is not critical

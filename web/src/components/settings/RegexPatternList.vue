@@ -81,10 +81,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @action="(id) => id === 'clear-filters' && (filterQuery = '')"
         />
       </template>
+      <template #cell-pattern="{ row }">
+        <OCodeCell :value="row.pattern" />
+      </template>
+      <template #cell-created_at="{ row }">
+        <OTimeCell :value="row.created_at" unit="iso" :timezone="store.state.timezone" />
+      </template>
+      <template #cell-updated_at="{ row }">
+        <OTimeCell :value="row.updated_at" unit="iso" :timezone="store.state.timezone" />
+      </template>
       <template #cell-actions="{ row }">
         <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
           <OButton
             :data-test="`regex-pattern-list-${row.id}-export-regex-pattern`"
+            data-row-action="export"
             variant="ghost"
             size="icon-sm"
             title="Export Regex Pattern"
@@ -93,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OButton
             :data-test="`regex-pattern-list-${row.id}-update-regex-pattern`"
+            data-row-action="edit"
             variant="ghost"
             size="icon-sm"
             :title="t('regex_patterns.edit')"
@@ -101,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OButton
             :data-test="`regex-pattern-list-${row.id}-delete-regex-pattern`"
+            data-row-action="delete"
             variant="ghost-destructive"
             size="icon-sm"
             :title="t('regex_patterns.delete')"
@@ -178,6 +190,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -195,6 +209,8 @@ export default defineComponent({
     OButton,
     OSearchInput,
     OTable,
+    OCodeCell,
+    OTimeCell,
   },
   setup() {
     const filterQuery = ref("");
@@ -218,7 +234,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.name,
-        minSize: 160,
+        minSize: 270,
         meta: { align: "left", flex: true },
       },
       {
@@ -228,6 +244,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 400,
+        minSize: 200,
         meta: { align: "left" },
       },
       {
@@ -535,13 +552,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss">
-.o2-table-cell-content {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  width: 100%;
-  display: block;
-}
-</style>

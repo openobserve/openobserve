@@ -16,18 +16,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="panelcontainer"
+    class="tw:h-full tw:flex tw:flex-col tw:rounded-lg tw:overflow-hidden"
     @mouseover="() => (isCurrentlyHoveredPanel = true)"
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
     :data-test="`dashboard-panel-container`"
     :data-test-panel-id="props.data.id"
     :data-test-panel-title="props.data.title"
   >
-    <div :class="{ 'drag-allow': !viewOnly && !simplifiedPanelView }">
+    <div
+      :class="{
+        'tw:shrink-0': !viewOnly && !simplifiedPanelView,
+        'drag-allow': !viewOnly && !simplifiedPanelView,
+      }"
+    >
       <div
-        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:px-1"
-        :class="{ 'dark-mode': store.state.theme === 'dark' }"
-        style="border-top-left-radius: 3px; border-top-right-radius: 3px"
+        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:py-1 tw:px-2 tw:border-b tw:border-border-subtle tw:rounded-t-lg"
+        :class="{ 'tw:border-b-transparent': isPanelLoading }"
         data-test="dashboard-panel-bar"
       >
         <OIcon
@@ -37,12 +41,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           :title="props.data.title"
-          class="panelHeader"
+          class="tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis tw:text-[0.8125rem] tw:font-medium tw:text-(--color-text-primary) tw:tracking-[0.02em]"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
         </div>
         <div class="tw:flex-1" />
+
+        <!-- Show Legends button -->
+        <OButton
+          v-if="
+            isCurrentlyHoveredPanel &&
+            props.showLegendsButton &&
+            ![
+              'table', 'html', 'markdown', 'custom_chart',
+              'geomap', 'maps', 'heatmap', 'metric', 'gauge',
+            ].includes(props.data.type)
+          "
+          variant="ghost"
+          size="icon"
+          @click="showLegendsDialog = true"
+          icon-left="format-list-bulleted"
+          data-test="dashboard-show-legends-btn"
+        >
+          <OTooltip content="Show Legends" side="bottom" align="end" />
+        </OButton>
+
+        <!-- Add Annotations button -->
+        <OButton
+          v-if="
+            !viewOnly &&
+            !simplifiedPanelView &&
+            isCurrentlyHoveredPanel &&
+            [
+              'area', 'area-stacked', 'bar', 'h-bar',
+              'line', 'scatter', 'stacked', 'h-stacked',
+            ].includes(props.data.type) &&
+            PanleSchemaRendererRef?.checkIfPanelIsTimeSeries === true
+          "
+          variant="ghost"
+          size="icon"
+          @click="PanleSchemaRendererRef?.toggleAddAnnotationMode()"
+          data-test="panel-schema-renderer-annotation-button"
+        >
+          <OIcon :name="PanleSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'edit'" size="sm" />
+          <OTooltip :content="PanleSchemaRendererRef?.isAddAnnotationMode ? 'Exit Annotations Mode' : 'Add Annotations'" side="bottom" align="end" />
+        </OButton>
+
         <OIcon
           v-if="
             !viewOnly &&
@@ -52,11 +97,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           name="info-outline"
           size="sm"
-          style="cursor: pointer"
+          class="tw:cursor-pointer"
           data-test="dashboard-panel-description-info"
         >
-          <OTooltip side="bottom" align="end" max-width="220px">
-            <template #content><div style="white-space: pre-wrap">{{ props.data.description }}</div></template>
+          <OTooltip side="bottom" align="end" max-width="13.75rem">
+            <template #content><div class="tw:whitespace-pre-wrap">{{ props.data.description }}</div></template>
           </OTooltip>
         </OIcon>
         <OButton
@@ -64,10 +109,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon"
           @click="onPanelModifyClick('ViewPanel')"
-          :title="t('panel.fullScreen')"
           data-test="dashboard-panel-fullscreen-btn"
           icon-left="fullscreen"
         >
+          <OTooltip side="bottom" :content="t('panel.fullScreen')" shortcut-id="panelView" />
         </OButton>
         <OButton
           v-if="dependentAdHocVariable"
@@ -77,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
           icon-left="warning"
         >
-          <OTooltip side="bottom" align="end" max-width="220px" content="Some dynamic variables are not applied because the field is not present in the query's stream. Open Query Inspector to see all the details of the variables and queries executed to render this panel" />
+          <OTooltip side="bottom" align="end" max-width="13.75rem" content="Some dynamic variables are not applied because the field is not present in the query's stream. Open Query Inspector to see all the details of the variables and queries executed to render this panel" />
         </OButton>
         <!-- show error here -->
         <PanelErrorButtons
@@ -135,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!simplifiedPanelView"
             data-test="dashboard-edit-panel"
             @select="onPanelModifyClick('EditPanel')"
+            shortcut-id="panelEdit"
           >
             <template #icon-left
               ><OIcon name="edit" size="sm"
@@ -155,6 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!simplifiedPanelView"
             data-test="dashboard-duplicate-panel"
             @select="onPanelModifyClick('DuplicatePanel')"
+            shortcut-id="panelDuplicate"
           >
             <template #icon-left
               ><OIcon name="content-copy" size="sm"
@@ -164,6 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownItem
             data-test="dashboard-delete-panel"
             @select="onPanelModifyClick('DeletePanel')"
+            shortcut-id="panelDelete"
           >
             <template #icon-left
               ><OIcon name="delete-outline" size="sm" class="tw:text-current!"
@@ -176,6 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             data-test="dashboard-query-inspector-panel"
             @select="showViewPanel = true"
+            shortcut-id="panelQueryInspector"
           >
             <template #icon-left
               ><OIcon name="manage-search" size="sm"
@@ -256,11 +305,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Panel-Level Variables (shown below drag-allow section) -->
-    <div class="panel-variables-wrapper">
+    <div class="tw:shrink-0">
       <slot name="panel-variables"></slot>
     </div>
 
-    <div class="panel-chart-wrapper">
+    <div class="tw:flex-1 tw:min-h-0">
       <PanelSchemaRenderer
         :panelSchema="props.data"
         :selectedTimeObj="props.selectedTimeDate"
@@ -368,6 +417,7 @@ import shortURL from "@/services/short_url";
 import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -864,6 +914,40 @@ export default defineComponent({
       };
     });
 
+    // ── Panel hover keyboard shortcuts ────────────────────────────────────
+    // Direct keydown listener — avoids ShortcutManager conflicts when many
+    // panels are mounted at the same time. Only fires when this panel is hovered.
+    const handlePanelKeydown = (e: KeyboardEvent) => {
+      if (!isCurrentlyHoveredPanel.value) return;
+      if (isInputFocused()) return;
+      // These are single-letter shortcuts — never fire while a modifier is held.
+      // Otherwise combos like Alt+Left (panel-editor "Discard & go back") leaking
+      // a still-held Alt into the next keystroke would wrongly trigger edit/view.
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (e.key === "v" || e.key === "V") {
+        e.preventDefault();
+        emit("onViewPanel", props.data.id);
+      } else if (e.key === "i" || e.key === "I") {
+        e.preventDefault();
+        showViewPanel.value = true;
+      } else if (e.key === "e" || e.key === "E") {
+        e.preventDefault();
+        onEditPanel(props.data);
+      } else if (e.key === "d" || e.key === "D") {
+        e.preventDefault();
+        onDuplicatePanel(props.data);
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        // Mac: physical Delete key fires Backspace; Fn+Delete fires Delete
+        e.preventDefault();
+        confirmDeletePanelDialog.value = true;
+      }
+    };
+
+    onMounted(() => window.addEventListener("keydown", handlePanelKeydown));
+    onBeforeUnmount(() =>
+      window.removeEventListener("keydown", handlePanelKeydown),
+    );
+
     return {
       props,
       onEditPanel,
@@ -979,35 +1063,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.panelcontainer {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.drag-allow {
-  flex-shrink: 0;
-}
-
-.panel-variables-wrapper {
-  flex-shrink: 0;
-}
-
-.panel-chart-wrapper {
-  flex: 1;
-  min-height: 0;
-}
-
-.panelHeader {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.warning {
-  color: var(--q-warning);
-}
-
-</style>

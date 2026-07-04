@@ -2,7 +2,9 @@ name: Playwright Regression Tests
 
 on:
   schedule:
-    - cron: '30 3,7,11,15,19,23 * * *'  # Every 4 hrs from 9 AM IST (3:30, 7:30, 11:30, 15:30, 19:30, 23:30 UTC)
+    # Daytime IST only (9 AM, 1 PM, 5 PM, 9 PM IST) — the 1 AM and 5 AM IST slots were
+    # dropped: main rarely moves overnight, so those runs mostly re-tested unchanged code.
+    - cron: '30 3,7,11,15 * * *'  # 9 AM, 1 PM, 5 PM, 9 PM IST (3:30, 7:30, 11:30, 15:30 UTC)
   workflow_dispatch:
 
 concurrency:
@@ -45,9 +47,59 @@ env:
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
+  # Skip the whole suite when main has not moved since the last regression run.
+  # Scheduled runs fire every 4h; if nothing merged in between, rebuilding and
+  # re-running the full matrix on identical code is pure waste. Manual dispatch
+  # always runs.
+  check_main_changed:
+    timeout-minutes: 5
+    name: check_main_changed
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read  # for `gh run list` (last run's head_sha)
+    outputs:
+      should_run: ${{ steps.decide.outputs.should_run }}
+    steps:
+      - id: decide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Manual dispatch always runs.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Manual dispatch — running regardless of main changes."
+            exit 0
+          fi
+          # On a scheduled run github.sha is main's tip, so no checkout is needed.
+          CURRENT_SHA="${{ github.sha }}"
+          # head_sha of the most recent completed previous run of THIS workflow on
+          # main, excluding the current run. Limit 50 so the current run is always in
+          # the window even under bursty history. On any failure LAST_SHA stays empty
+          # and we fall through to should_run=true (fail-safe: run rather than skip).
+          LAST_SHA=$(gh run list \
+            --workflow "${{ github.workflow }}" \
+            --branch main \
+            --limit 50 \
+            --json databaseId,headSha,status \
+            --jq "[.[] | select(.databaseId != ${{ github.run_id }} and .status == \"completed\")] | .[0].headSha" \
+            2>/dev/null || echo "")
+          if [ -z "$LAST_SHA" ]; then
+            echo "::warning::Could not determine last run SHA (no prior completed run, or gh query failed) — defaulting to run."
+          fi
+          echo "Current main SHA: ${CURRENT_SHA:-<none>}"
+          echo "Last run SHA:     ${LAST_SHA:-<none>}"
+          if [ -n "$LAST_SHA" ] && [ "$CURRENT_SHA" = "$LAST_SHA" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::main unchanged since last regression run ($CURRENT_SHA) — skipping."
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build_binary:
     timeout-minutes: 45
     name: build_binary
+    needs: [check_main_changed]
+    if: ${{ needs.check_main_changed.outputs.should_run == 'true' }}
     runs-on:
       labels: ubicloud-standard-16
     permissions:
@@ -83,7 +135,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Lint frontend code
         run: cd web && npm ci && npm run lint:ci
@@ -118,7 +170,7 @@ jobs:
     name: e2e / ${{ matrix.testfolder }}
     needs: [build_binary]
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
     strategy:
@@ -229,11 +281,11 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Cache Playwright browser
         id: playwright-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
@@ -538,15 +590,25 @@ jobs:
         if: always()
         run: cat o2.log
 
-  merge_and_upload_reports:
+  merge_reports:
     timeout-minutes: 15
-    name: Merge Reports and Upload to TestDino
+    name: Merge Reports
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
+    # eks runner: `playwright merge-reports` silently stops mid-merge (exits 0, ~3 of N blobs, no
+    # output) on the ubicloud and github-hosted runners — but works on the eks runners (same as ENT).
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
+      actions: read  # the no-blobs investigation reads run/job state from the Actions API
+    outputs:
+      # Compact Playwright stats (expected/unexpected/flaky/skipped/duration) from the merged
+      # report.json — consumed by the report_openobserve job to record reliability metrics.
+      stats: ${{ steps.report_stats.outputs.stats }}
+      # One JSON array of flaky+failed tests (per-test rows) for the ci_test_results stream,
+      # so the unified UI+Regression dashboard's Latest-failures / Flakiest panels cover regression.
+      flaky: ${{ steps.report_flaky.outputs.flaky }}
 
     steps:
       - name: Clone the current repo
@@ -555,7 +617,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version: 24
 
       - name: Install project dependencies
         run: cd tests/ui-testing && npm ci
@@ -607,18 +669,100 @@ jobs:
             fi
           fi
 
-          unset CI
-          npx playwright merge-reports --config playwright.config.js ./all-blob-reports
+          # Force the html + json reporters explicitly with their output paths instead of
+          # relying on `unset CI` to flip playwright.config.js's `process.env.CI ? blob : html/json`
+          # ternary. The runner exports CI=true and `unset CI` does not reliably reach the
+          # merge subprocess, so the config would intermittently re-select the `blob` reporter —
+          # which writes a merged blob-report/ and NOTHING to playwright-results/, making the
+          # downstream `ls playwright-results/html-report/` fail with a cryptic exit 2.
+          mkdir -p playwright-results
+          # These env vars override playwright.config.js's reporter settings:
+          #   PLAYWRIGHT_HTML_OUTPUT_DIR  - html reporter output directory
+          #   PLAYWRIGHT_HTML_OPEN=never  - never auto-open the report (required for CI)
+          #   PLAYWRIGHT_JSON_OUTPUT_NAME - json reporter output file path
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-results/html-report \
+          PLAYWRIGHT_HTML_OPEN=never \
+          PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results/report.json \
+            npx playwright merge-reports --reporter html,json ./all-blob-reports
 
           echo "Contents of playwright-results:"
-          ls -la playwright-results/
+          ls -la playwright-results/ || true
+          if [ ! -f playwright-results/html-report/index.html ] || [ ! -f playwright-results/report.json ]; then
+            echo "::error::merge-reports did not produce the expected html-report/index.html and report.json"
+            echo "::error::all-blob-reports contents:"
+            ls -la all-blob-reports/ || true
+            exit 1
+          fi
+          # Diagnostics only — never fail the step on these (the guard above already
+          # confirmed the outputs exist).
           echo "Contents of html-report:"
-          ls -la playwright-results/html-report/
+          ls -la playwright-results/html-report/ || true
           echo "Checking report.json:"
-          ls -lh playwright-results/report.json
+          ls -lh playwright-results/report.json || true
+
+      - name: Extract report stats for OpenObserve
+        id: report_stats
+        if: always()
+        run: |
+          cd tests/ui-testing
+          if [ -f playwright-results/report.json ]; then
+            STATS=$(jq -c '.stats // {}' playwright-results/report.json 2>/dev/null || echo '{}')
+          else
+            STATS='{}'
+          fi
+          echo "stats=$STATS" >> "$GITHUB_OUTPUT"
+          echo "report stats: $STATS"
+
+      - name: Extract flaky/failed tests for OpenObserve
+        id: report_flaky
+        if: always()
+        run: |
+          # One JSON array of flaky+failed tests for the ci_test_results stream (per-test rows).
+          # Logic + schema live in extract-flaky.js; prints "[]" if the report is missing/clean.
+          FLAKY=$(node .github/scripts/extract-flaky.js tests/ui-testing/playwright-results/report.json)
+          printf 'flaky=%s\n' "$FLAKY" >> "$GITHUB_OUTPUT"
+          echo "report flaky count: $(printf '%s' "$FLAKY" | jq 'length' 2>/dev/null || echo '?')"
+
+      - name: Upload merged report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merged-report-${{ github.run_attempt }}
+          path: tests/ui-testing/playwright-results
+          retention-days: 1
+          if-no-files-found: warn
+
+  # TestDino upload — its own job so it never gates playwright_summary. Only runs when tests
+  # failed (and uploads are enabled); consumes the merged report via artifact.
+  upload_testdino:
+    timeout-minutes: 15
+    name: Upload to TestDino
+    needs: [ui_integration_tests, merge_reports]
+    if: ${{ !cancelled() && needs.ui_integration_tests.result == 'failure' && needs.merge_reports.result == 'success' }}
+    runs-on:
+      labels: eks-openobserve-standard-4
+    permissions:
+      contents: read
+      actions: read  # download-artifact fetches the merged-report artifact
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Install project dependencies
+        run: cd tests/ui-testing && npm ci
+
+      - name: Download merged report
+        uses: actions/download-artifact@v4
+        with:
+          name: merged-report-${{ github.run_attempt }}
+          path: tests/ui-testing/playwright-results
 
       - name: Cache test failures to TestDino
-        if: ${{ needs.ui_integration_tests.result == 'failure' }}
         env:
           TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
         run: |
@@ -654,7 +798,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload to TestDino
-        if: ${{ needs.ui_integration_tests.result == 'failure' && env.UPLOAD_TO_TESTDINO == 'true' }}
+        if: ${{ env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
           cd tests/ui-testing
 
@@ -697,12 +841,200 @@ jobs:
             --verbose \
             --token="${{ secrets.TESTDINO_API_TOKEN }}"
 
+  # OpenObserve metrics — its own job so playwright_summary never depends on it. Emits one
+  # run-summary doc (stream: ci_regression) + per-shard rows (ci_regression_shards). The step
+  # is continue-on-error and the poster script never fails, so this can never break the run.
+  report_openobserve:
+    timeout-minutes: 10
+    name: Report to OpenObserve
+    needs: [build_binary, ui_integration_tests, merge_reports]
+    if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
+    runs-on:
+      labels: eks-openobserve-standard-4
+    permissions:
+      contents: read
+      actions: read  # reads run/job timings from the Actions API
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Report run metrics to OpenObserve
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          O2_REPORTING_INGEST_BASE: ${{ secrets.O2_REPORTING_INGEST_BASE }}
+          O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
+          O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+          BUILD_RESULT: ${{ needs.build_binary.result }}
+          UI_RESULT: ${{ needs.ui_integration_tests.result }}
+          MERGE_RESULT: ${{ needs.merge_reports.result }}
+          MERGE_STATS: ${{ needs.merge_reports.outputs.stats }}
+          MERGE_FLAKY: ${{ needs.merge_reports.outputs.flaky }}
+          # Branch + PR for per-test rows (ci_test_results), matching the UI workflow.
+          REPORT_BRANCH: ${{ github.head_ref || github.ref_name }}
+          REPORT_PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          # Forks / unconfigured repos: skip entirely (no API call, no rate-limit spend).
+          if [ -z "${O2_REPORTING_INGEST_BASE:-}" ] || [ -z "${O2_REPORTING_AUTH:-}" ]; then
+            echo "::notice::O2_REPORTING_* secrets not set — skipping metrics ingest"; exit 0
+          fi
+          # Per-job metadata (durations + conclusions) for THIS run attempt.
+          curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            > jobs.json || echo '{"jobs":[]}' > jobs.json
+
+          # This attempt's start time — the floor for awall (below). On a RE-RUN, GitHub keeps
+          # the jobs that did NOT re-run at their ORIGINAL (earlier-attempt) timestamps, so a
+          # naive min(started) spans the idle gap to a much-later manual re-run and inflates the
+          # duration by hours. Flooring the start at run_started_at counts only this attempt's work.
+          RUN_STARTED=$(curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            | jq 'if .run_started_at then (.run_started_at|fromdateiso8601) else 0 end' 2>/dev/null || echo 0)
+          [ -n "$RUN_STARTED" ] || RUN_STARTED=0
+
+          STATS="${MERGE_STATS:-}"; [ -z "$STATS" ] && STATS=null
+
+          # Retry-aware: this attempt's wall-clock + total summed across all attempts (so the
+          # latest-attempt doc carries the cumulative compute; dashboards keep latest per run_id).
+          ATT="${GITHUB_RUN_ATTEMPT:-1}"
+          # $1 = floor epoch (run_started_at); start = max(min job started, floor) so re-run
+          # carry-over jobs with old timestamps don't inflate the wall-clock.
+          awall(){ jq --argjson floor "${1:-0}" '[.jobs[]|select(.completed_at!=null and .started_at!=null)] as $j | (if ($j|length)>0 then (($j|map(.completed_at|fromdateiso8601)|max)-([($j|map(.started_at|fromdateiso8601)|min), $floor]|max)) else 0 end) | if . < 0 then 0 else . end'; }
+          FINAL_DUR=$(awall "$RUN_STARTED" < jobs.json 2>/dev/null || echo 0)
+          TOTAL_DUR="$FINAL_DUR"
+          if [ "$ATT" -gt 1 ] 2>/dev/null; then
+            SUM="$FINAL_DUR"
+            for n in $(seq 1 $((ATT-1))); do
+              NFLOOR=$(curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${n}" \
+                | jq 'if .run_started_at then (.run_started_at|fromdateiso8601) else 0 end' 2>/dev/null || echo 0)
+              W=$(curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${n}/jobs?per_page=100" | awall "${NFLOOR:-0}" 2>/dev/null || echo 0)
+              SUM=$(awk -v a="$SUM" -v b="$W" 'BEGIN{print a+b}')
+            done
+            TOTAL_DUR="$SUM"
+          fi
+          COMMIT="${GITHUB_SHA:0:12}"
+
+          dur='if (.completed_at and .started_at) then ((.completed_at|fromdateiso8601)-(.started_at|fromdateiso8601)) else null end'
+          jq -n \
+            --slurpfile jb jobs.json \
+            --arg workflow "regression" \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg run_url "$RUN_URL" \
+            --arg trigger "$GITHUB_EVENT_NAME" \
+            --arg actor "$GITHUB_ACTOR" \
+            --arg branch "$GITHUB_REF_NAME" \
+            --arg build_result "$BUILD_RESULT" \
+            --arg ui_result "$UI_RESULT" \
+            --arg merge_result "$MERGE_RESULT" \
+            --argjson stats "$STATS" \
+            --argjson final "${FINAL_DUR:-0}" \
+            --argjson total "${TOTAL_DUR:-0}" \
+            --arg commit "$COMMIT" \
+            "
+            (\$jb[0].jobs // []) as \$j
+            | [ \$j[] | select(.conclusion != null) ] as \$done
+            | {
+                workflow: \$workflow,
+                repo: \$repo,
+                run_id: \$run_id,
+                run_attempt: (\$run_attempt|tonumber),
+                run_url: \$run_url,
+                trigger: \$trigger,
+                actor: \$actor,
+                author: \$actor,
+                branch: \$branch,
+                suite: \"regression\",
+                ingest_source: \"live\",
+                commit_sha: \$commit,
+                retries: ((\$run_attempt|tonumber)-1),
+                was_retried: ((\$run_attempt|tonumber)>1),
+                final_duration_sec: \$final,
+                total_duration_sec: \$total,
+                retry_wasted_sec: (\$total-\$final),
+                conclusion: (
+                  if (\$build_result==\"cancelled\" or \$ui_result==\"cancelled\" or \$merge_result==\"cancelled\") then \"cancelled\"
+                  elif (\$build_result==\"success\" and \$ui_result==\"success\") then \"success\"
+                  elif (\$ui_result==\"skipped\" and \$build_result!=\"failure\") then \"skipped\"
+                  else \"failure\" end
+                ),
+                build_result: \$build_result,
+                ui_result: \$ui_result,
+                merge_result: \$merge_result,
+                started_at: (\$done | map(.started_at) | min),
+                finished_at: (\$done | map(.completed_at) | max),
+                duration_sec: ((\$done | map(.completed_at|fromdateiso8601) | max) - (\$done | map(.started_at|fromdateiso8601) | min)),
+                runner_seconds: ([ \$done[] | ($dur) ] | add),
+                build_duration_sec: ( [ \$j[] | select(.name==\"build_binary\") ] | .[0] | if . then ($dur) else null end ),
+                shards_total: ([ \$j[] | select(.name|startswith(\"e2e /\")) ] | length),
+                shards_passed: ([ \$j[] | select((.name|startswith(\"e2e /\")) and .conclusion==\"success\") ] | length),
+                shards_failed: ([ \$j[] | select((.name|startswith(\"e2e /\")) and .conclusion==\"failure\") ] | length),
+                shards_skipped: ([ \$j[] | select((.name|startswith(\"e2e /\")) and (.conclusion==\"skipped\" or .conclusion==\"cancelled\")) ] | length),
+                shards: [ \$j[] | select(.name|startswith(\"e2e /\")) | {name: .name, conclusion: .conclusion, duration_sec: ($dur)} ],
+                tests_total: (if \$stats then ((\$stats.expected//0)+(\$stats.unexpected//0)+(\$stats.flaky//0)+(\$stats.skipped//0)) else null end),
+                tests_passed: (if \$stats then (\$stats.expected//0) else null end),
+                tests_failed: (if \$stats then (\$stats.unexpected//0) else null end),
+                tests_flaky: (if \$stats then (\$stats.flaky//0) else null end),
+                tests_skipped: (if \$stats then (\$stats.skipped//0) else null end)
+              }
+            " > payload.json || { echo "::warning::payload build failed"; echo '{}' > payload.json; }
+
+          bash .github/scripts/o2-report.sh ci_regression payload.json
+          # Also write the same run-level doc to ci_test_runs (already tagged suite=regression) so
+          # the unified UI+Regression dashboard drives one panel set off a `suite` variable. Additive:
+          # ci_regression keeps receiving the doc, so existing dashboards/crons are untouched.
+          bash .github/scripts/o2-report.sh ci_test_runs payload.json
+
+          # Also emit one row per shard to the ci_regression_shards stream, flattened from
+          # payload.shards (each = {name, conclusion, duration_sec}). Powers per-shard duration /
+          # slowest-shard / per-module panels. Row schema:
+          #   run_id, repo, workflow="regression", ingest_source="live",
+          #   shard_name (raw job name), module (shard_name minus "e2e / " prefix and "-Regression"
+          #   suffix; "unknown" if empty), conclusion, duration_sec.
+          # _timestamp is intentionally NOT set, so OpenObserve stamps ingest time — same as the run
+          # doc above (which also leaves it unset), keeping the two streams time-aligned.
+          shards_json=$(jq -c --arg repo "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" \
+            '[.shards[]? | {
+              run_id: $run_id, repo: $repo, suite: "regression", workflow: "regression", ingest_source: "live",
+              shard_name: .name,
+              module: (.name | sub("^e2e / ";"") | sub("-Regression$";"") | if . == "" then "unknown" else . end),
+              conclusion: .conclusion, duration_sec: .duration_sec
+            }]' payload.json 2>/dev/null) && printf '%s' "$shards_json" > shards.json || echo '[]' > shards.json
+          if [ "$(jq 'length' shards.json 2>/dev/null || echo 0)" -gt 0 ]; then
+            bash .github/scripts/o2-report.sh ci_regression_shards shards.json
+            # Dual-write per-shard rows to the unified stream (now tagged suite=regression).
+            bash .github/scripts/o2-report.sh ci_test_runs_shards shards.json
+          else
+            echo "::notice::no shard rows to emit"
+          fi
+
+          # Per-test flaky/failed rows -> ci_test_results (suite=regression), so the unified
+          # dashboard's Latest-failures / Flakiest panels cover regression too. Non-fatal; mirrors
+          # the UI workflow's block. branch + pr_number stamped so no cross-stream JOIN is needed.
+          FLAKY="${MERGE_FLAKY:-[]}"
+          if printf '%s' "$FLAKY" | jq -e 'type=="array" and length>0' >/dev/null 2>&1; then
+            FLAKY_FILE=$(mktemp "${TMPDIR:-/tmp}/flaky.XXXXXX")
+            trap 'rm -f "$FLAKY_FILE"' EXIT
+            printf '%s' "$FLAKY" | jq -c --arg run_id "$GITHUB_RUN_ID" --arg repo "$GITHUB_REPOSITORY" \
+              --arg branch "${REPORT_BRANCH:-}" --arg pr "${REPORT_PR:-}" \
+              '[.[] | {run_id:$run_id, repo:$repo, suite:"regression", workflow:"regression", ingest_source:"live", status:.status, module:.module, test_title:.title, test_file:.file, branch:(if $branch=="" then null else $branch end), pr_number:(if $pr=="" then null else ($pr|tonumber) end)}]' \
+              > "$FLAKY_FILE" 2>/dev/null || echo '[]' > "$FLAKY_FILE"
+            if [ "$(jq 'length' "$FLAKY_FILE" 2>/dev/null || echo 0)" -gt 0 ]; then
+              bash .github/scripts/o2-report.sh ci_test_results "$FLAKY_FILE"
+            fi
+          fi
+
   playwright_summary:
     timeout-minutes: 5
     runs-on:
-      labels: ubicloud-standard-4
+      labels: eks-openobserve-standard-4
     permissions: {}
-    needs: [build_binary, ui_integration_tests, merge_and_upload_reports]
+    needs: [build_binary, ui_integration_tests, merge_reports]
     if: always()
     steps:
       - name: Check test results
@@ -719,7 +1051,9 @@ jobs:
             UI_OK=true
           fi
 
-          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "failure" ]; then
+          # A merge/report failure is a non-blocker: the tests already ran and passed, so only
+          # a cancelled merge should fail the summary.
+          if [ "${{ needs.merge_reports.result }}" == "success" ] || [ "${{ needs.merge_reports.result }}" == "skipped" ] || [ "${{ needs.merge_reports.result }}" == "failure" ]; then
             MERGE_OK=true
           fi
 
@@ -730,6 +1064,6 @@ jobs:
             echo "Regression tests failed:"
             echo "  build_binary: ${{ needs.build_binary.result }}"
             echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
-            echo "  merge_and_upload_reports: ${{ needs.merge_and_upload_reports.result }}"
+            echo "  merge_reports: ${{ needs.merge_reports.result }}"
             exit 1
           fi

@@ -74,16 +74,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-destination_type="{ row }">
-          {{ row.destination_type_name || "N/A" }}
+          <OTag
+            v-if="row.destination_type_name"
+            type="fieldTag"
+            value="soft"
+          >{{ row.destination_type_name }}</OTag>
+          <span v-else class="tw:text-text-primary">—</span>
         </template>
 
         <template #cell-output_format="{ row }">
-          {{ formatOutputFormat(row.output_format) }}
+          <OTag
+            v-if="row.output_format"
+            type="fieldTag"
+            value="soft"
+          >{{ formatOutputFormat(row.output_format) }}</OTag>
+          <span v-else class="tw:text-text-primary">—</span>
         </template>
 
         <template #cell-actions="{ row }">
           <OButton
             :data-test="`alert-destination-list-${row.name}-update-destination`"
+            data-row-action="edit"
             variant="ghost"
             size="icon-sm"
             :title="t('alert_destinations.edit')"
@@ -93,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             :data-test="`alert-destination-list-${row.name}-delete-destination`"
+            data-row-action="delete"
             variant="ghost"
             size="icon-sm"
             :title="t('alert_destinations.delete')"
@@ -173,6 +185,7 @@ import type { Template } from "@/ts/interfaces/index";
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -202,6 +215,7 @@ export default defineComponent({
     ConfirmDialog,
     OButton,
     OIcon,
+    OTag,
     OSearchInput,
     OTable,
   },

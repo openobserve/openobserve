@@ -26,7 +26,7 @@ use config::{
 };
 use datafusion::{
     common::{DataFusionError, Result},
-    physical_plan::execute_stream,
+    physical_plan::execute_stream_partitioned,
 };
 use flight::common::{MetricsInfo, PreCustomMessage};
 use futures::{StreamExt, stream::BoxStream};
@@ -59,6 +59,7 @@ use crate::{
     },
 };
 
+mod partition_encoder;
 mod stream;
 pub mod visitor;
 
@@ -151,7 +152,7 @@ impl FlightService for FlightServiceImpl {
         );
 
         // prepare dataufion context
-        let (ctx, physical_plan, lock, scan_stats) = match result {
+        let (ctx, plan, lock, scan_stats) = match result {
             Ok(v) => v,
             Err(e) => {
                 clear_session_data(&trace_id);
@@ -176,7 +177,7 @@ impl FlightService for FlightServiceImpl {
             );
             log::info!(
                 "{}",
-                config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+                config::meta::plan::generate_plan_string(&trace_id, plan.as_ref())
             );
         }
 
@@ -194,7 +195,7 @@ impl FlightService for FlightServiceImpl {
 
         // used for EXPLAIN ANALYZE to collect metrics after stream is done
         let metrics = req.search_info.is_analyze.then_some(MetricsInfo {
-            plan: physical_plan.clone(),
+            plan: plan.clone(),
             is_super_cluster,
             func: Box::new(super_cluster_enabled),
         });
@@ -204,22 +205,24 @@ impl FlightService for FlightServiceImpl {
         let peak_memory = get_peak_memory_from_ctx(&ctx);
 
         // used for super cluster follower leader to get information from follower node
-        let scan_stats_ref = get_scan_stats(&physical_plan);
-        let metrics_ref = get_cluster_metrics(&physical_plan);
-        let peak_memory_ref = get_peak_memory(&physical_plan);
-        let partial_err_ref = get_partial_err(&physical_plan);
+        let scan_stats_ref = get_scan_stats(&plan);
+        let metrics_ref = get_cluster_metrics(&plan);
+        let peak_memory_ref = get_peak_memory(&plan);
+        let partial_err_ref = get_partial_err(&plan);
 
-        let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
-            clear_session_data(&trace_id);
-            #[cfg(feature = "enterprise")]
-            if get_o2_config().work_group.max_nodes_per_query > 0 {
-                o2_enterprise::enterprise::search::admission::ledger::release(&trace_id);
-                log::error!(
-                    "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
-                );
-            }
-            Status::internal(e.to_string())
-        })?;
+        // One stream per output partition so they encode in parallel
+        let streams =
+            execute_stream_partitioned(plan, ctx.task_ctx()).map_err(|e| {
+                clear_session_data(&trace_id);
+                #[cfg(feature = "enterprise")]
+                if get_o2_config().work_group.max_nodes_per_query > 0 {
+                    o2_enterprise::enterprise::search::admission::ledger::release(&trace_id);
+                    log::error!(
+                        "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
+                    );
+                }
+                Status::internal(e.to_string())
+            })?;
 
         let mut stream = FlightEncoderStreamBuilder::new(write_options, 33554432)
             .with_trace_id(trace_id.to_string())
@@ -236,7 +239,7 @@ impl FlightService for FlightServiceImpl {
                 partial_err_ref.clone(),
             ))
             .with_custom_message(PreCustomMessage::PartialErrRef(partial_err_ref))
-            .build(stream, span);
+            .build(streams, span);
 
         let stream = async_stream::stream! {
             let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));

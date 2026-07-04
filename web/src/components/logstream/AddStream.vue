@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('common.name')"
             required
             class="showLabelOnTop"
-            :help-text="streamNameHelpText"
+            :help-text="t('logStream.streamNameHelpText')"
             tabindex="0"
           />
         </div>
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('common.name')"
             required
             class="showLabelOnTop"
-            :help-text="streamNameHelpText"
+            :help-text="t('logStream.streamNameHelpText')"
             tabindex="0"
           />
         </div>
@@ -162,7 +162,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   makeAddStreamSchema,
   addStreamDefaults,
-  streamNameHelpText,
   type AddStreamForm,
 } from "./AddStream.schema";
 

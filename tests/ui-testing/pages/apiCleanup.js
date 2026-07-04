@@ -1,6 +1,11 @@
+const http = require('http');
 const fetch = require('node-fetch');
 const testLogger = require('../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../playwright-tests/utils/cloud-auth.js');
+
+// node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
+// "Premature close" / ECONNRESET flakiness in CI.
+const noKeepAliveAgent = new http.Agent({ keepAlive: false });
 
 class APICleanup {
     constructor(page = null) {
@@ -53,7 +58,7 @@ class APICleanup {
                 testLogger.warn('page.evaluate fetch failed, falling back to node-fetch', { url: url.substring(0, 80), error: e.message });
             }
         }
-        return fetch(url, options);
+        return fetch(url, { ...options, compress: false, agent: noKeepAliveAgent });
     }
 
     /**
@@ -263,6 +268,37 @@ class APICleanup {
             testLogger.error('Failed to fetch dashboards', { folder: folderName, error: error.message });
             return [];
         }
+    }
+
+    /**
+     * Create a minimal dashboard for use as a report dependency.
+     * Returns { dashboardId, folderId } or throws on failure.
+     */
+    async createMinimalDashboard(title = 'E2E Setup Dashboard', folderId = 'default') {
+        const payload = {
+            title,
+            description: '',
+            role: '',
+            owner: this.email,
+            tabs: [{ tabId: 'default', name: 'Default', panels: [] }],
+            variables: {}
+        };
+        const response = await this._fetch(
+            `${this.baseUrl}/api/${this.org}/dashboards?folder=${encodeURIComponent(folderId)}`,
+            {
+                method: 'POST',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }
+        );
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createMinimalDashboard: HTTP ${response.status} — ${body}`);
+        }
+        const result = await response.json();
+        const dashboardId = result.dashboard_id || result.dashboardId || result.id;
+        testLogger.info('Created minimal dashboard', { dashboardId, folderId });
+        return { dashboardId, folderId };
     }
 
     /**
