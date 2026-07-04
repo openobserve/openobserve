@@ -50,7 +50,7 @@ describe("DatabaseDeprecationBanner", () => {
 
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find(".deprecation-message").exists()).toBe(true);
+    expect(wrapper.find('[data-test="database-deprecation-banner-message"]').exists()).toBe(true);
   });
 
   it("should not render when MySQL deprecation warning is disabled", () => {
@@ -69,7 +69,7 @@ describe("DatabaseDeprecationBanner", () => {
       },
     });
 
-    expect(wrapper.find(".deprecation-message").exists()).toBe(false);
+    expect(wrapper.find('[data-test="database-deprecation-banner-message"]').exists()).toBe(false);
   });
 
   it("should display deprecation message text", async () => {
@@ -90,7 +90,7 @@ describe("DatabaseDeprecationBanner", () => {
 
     await wrapper.vm.$nextTick();
 
-    const message = wrapper.find(".deprecation-message");
+    const message = wrapper.find('[data-test="database-deprecation-banner-message"]');
     expect(message.text()).toContain("MySQL support is DEPRECATED");
   });
 
@@ -112,7 +112,7 @@ describe("DatabaseDeprecationBanner", () => {
 
     await wrapper.vm.$nextTick();
 
-    const subtitle = wrapper.find(".deprecation-subtitle");
+    const subtitle = wrapper.find('[data-test="database-deprecation-banner-subtitle"]');
     expect(subtitle.text()).toContain("Please migrate to PostgreSQL");
   });
 
@@ -156,7 +156,7 @@ describe("DatabaseDeprecationBanner", () => {
 
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find(".deprecation-message").exists()).toBe(true);
+    expect(wrapper.find('[data-test="database-deprecation-banner-message"]').exists()).toBe(true);
 
     const closeButton = wrapper.findComponent({ name: "OButton" });
     await closeButton.trigger("click");
@@ -352,6 +352,6 @@ describe("DatabaseDeprecationBanner", () => {
       },
     });
 
-    expect(wrapper.find(".deprecation-message").exists()).toBe(false);
+    expect(wrapper.find('[data-test="database-deprecation-banner-message"]').exists()).toBe(false);
   });
 });

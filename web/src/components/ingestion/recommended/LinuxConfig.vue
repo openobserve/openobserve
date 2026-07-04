@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="tw:p-3">
     <!-- Environment selection cards -->
     <div class="tw:grid tw:grid-cols-2 tw:gap-3 tw:mb-5">
@@ -106,9 +106,7 @@ const selectedCardClass = computed(() =>
 
 const unselectedCardClass = computed(() =>
   store.state.theme === "dark"
-    ? "tw:border-gray-700 tw:bg-gray-800/40 hover:tw:border-gray-500"
-    : "tw:border-gray-200 tw:bg-white hover:tw:border-gray-300"
+    ? "tw:border-gray-700 tw:bg-gray-800/40 tw:hover:border-gray-500"
+    : "tw:border-gray-200 tw:bg-white tw:hover:border-gray-300"
 );
 </script>
-
-<style scoped></style>

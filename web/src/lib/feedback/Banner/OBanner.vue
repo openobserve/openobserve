@@ -3,7 +3,7 @@ import { computed, useSlots } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 interface Props {
-  variant?: "default" | "info" | "success" | "warning" | "error";
+  variant?: "default" | "info" | "success" | "warning" | "error" | "error-soft";
   content?: string;
   icon?: string;
   dense?: boolean;
@@ -28,6 +28,24 @@ const hasIconSlot = computed(() => !!slots.icon);
 const hasActionsSlot = computed(() => !!slots.actions);
 const showContentProp = computed(() => !hasDefaultSlot.value && !!props.content);
 const showIconArea = computed(() => !!props.icon || hasIconSlot.value);
+
+const variantClass = computed(() => {
+  switch (props.variant) {
+    case "info":
+      return "tw:bg-(--color-banner-info-bg) tw:border tw:border-(--color-banner-info-border) tw:text-(--color-banner-info-text)";
+    case "success":
+      return "tw:bg-(--color-banner-success-bg) tw:border tw:border-(--color-banner-success-border) tw:text-(--color-banner-success-text)";
+    case "warning":
+      return "tw:bg-(--color-banner-warning-bg) tw:border tw:border-(--color-banner-warning-border) tw:border-l-4 tw:border-l-(--color-banner-warning-border) tw:text-(--color-banner-warning-text)";
+    case "error":
+      return "tw:bg-(--color-banner-error-bg) tw:text-(--color-banner-error-text)";
+    // Tinted error for hints/insights — solid `error` stays for hard failures.
+    case "error-soft":
+      return "tw:bg-(--color-banner-error-soft-bg) tw:border tw:border-(--color-banner-error-soft-border) tw:border-l-4 tw:border-l-(--color-banner-error-soft-border) tw:text-(--color-banner-error-soft-text)";
+    default:
+      return "tw:bg-(--color-banner-default-bg) tw:text-(--color-banner-default-text)";
+  }
+});
 </script>
 
 <template>
@@ -35,106 +53,32 @@ const showIconArea = computed(() => !!props.icon || hasIconSlot.value);
     :role="ariaRole"
     :data-test="dataTest"
     :class="[
-      'obanner',
-      `obanner--${variant}`,
-      dense && 'obanner--dense',
-      inlineActions && 'obanner--inline-actions',
+      'tw:flex tw:rounded-md',
+      inlineActions ? 'tw:flex-row tw:items-center tw:gap-3' : 'tw:flex-col tw:gap-2',
+      dense ? 'tw:p-2' : 'tw:p-4',
+      variantClass,
     ]"
   >
-    <div class="obanner__body">
-      <div v-if="showIconArea" class="obanner__icon">
+    <div
+      :class="[
+        'tw:flex tw:flex-row tw:items-start tw:gap-3',
+        inlineActions ? 'tw:flex-1' : '',
+      ]"
+    >
+      <div v-if="showIconArea" class="tw:shrink-0 tw:flex tw:items-start">
         <slot name="icon">
           <OIcon :name="icon" size="sm" />
         </slot>
       </div>
 
-      <div class="obanner__content">
+      <div class="tw:flex-1 tw:text-sm">
         <slot />
         <template v-if="showContentProp">{{ content }}</template>
       </div>
     </div>
 
-    <div v-if="hasActionsSlot" class="obanner__actions">
+    <div v-if="hasActionsSlot">
       <slot name="actions" />
     </div>
   </div>
 </template>
-
-<style scoped>
-.obanner {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  border-radius: 0.375rem;
-}
-
-.obanner__body {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 0.75rem;
-}
-
-.obanner--inline-actions {
-  flex-direction: row;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.obanner--inline-actions .obanner__body {
-  flex: 1;
-}
-
-.obanner:not(.obanner--dense) {
-  padding: 1rem;
-}
-
-.obanner--dense {
-  padding: 0.5rem;
-}
-
-/* variant: default */
-.obanner--default {
-  background-color: var(--color-banner-default-bg);
-  color: var(--color-banner-default-text);
-}
-
-/* variant: info */
-.obanner--info {
-  background-color: var(--color-banner-info-bg);
-  border: 1px solid var(--color-banner-info-border);
-  color: var(--color-banner-info-text);
-}
-
-/* variant: success */
-.obanner--success {
-  background-color: var(--color-banner-success-bg);
-  border: 1px solid var(--color-banner-success-border);
-  color: var(--color-banner-success-text);
-}
-
-/* variant: warning */
-.obanner--warning {
-  background-color: var(--color-banner-warning-bg);
-  border: 1px solid var(--color-banner-warning-border);
-  border-left-width: 4px;
-  color: var(--color-banner-warning-text);
-}
-
-/* variant: error */
-.obanner--error {
-  background-color: var(--color-banner-error-bg);
-  color: var(--color-banner-error-text);
-}
-
-.obanner__icon {
-  flex-shrink: 0;
-  display: flex;
-  align-items: flex-start;
-}
-
-.obanner__content {
-  flex: 1;
-  font-size: 0.875rem;
-}
-</style>

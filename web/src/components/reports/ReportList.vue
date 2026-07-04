@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -129,10 +129,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     icon-left="refresh"
                     :loading="isLoadingReports"
-                    :title="t('reports.reloadReports')"
                     data-test="report-list-refresh-btn"
                     @click="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
-                  />
+                  >
+                    <OTooltip side="bottom" :content="t('reports.reloadReports')" shortcut-id="reportsRefresh" />
+                  </OButton>
                 </template>
                 <template #empty>
                   <OEmptyState
@@ -151,20 +152,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Name column: badges for type/preview -->
                 <template #cell-name="{ row }">
                   <span :data-test="`report-list-name-cell-${row.name}`">{{ row.name }}</span>
-                  <OBadge
+                  <OTag
                     v-if="row.dashboards?.[0]?.report_type === 'png'"
-                    variant="primary-outline"
+                    type="reportTag"
+                    value="png"
                     class="tw:ml-1"
-                  >
-                    PNG
-                  </OBadge>
-                  <OBadge
+                  />
+                  <OTag
                     v-if="row.imagePreview"
-                    variant="default-outline"
+                    type="reportTag"
+                    value="preview"
                     class="tw:ml-1"
-                  >
-                    Preview
-                  </OBadge>
+                  />
                 </template>
 
                 <!-- Owner column -->
@@ -202,6 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     v-else
                     :data-test="`report-list-${row.name}-pause-start-report`"
+                    :data-row-action="row.enabled ? 'pause' : 'resume'"
                     :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                     size="icon-sm"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -212,6 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Edit -->
                   <OButton
                     :data-test="`report-list-${row.name}-edit-report`"
+                    data-row-action="edit"
                     icon-left="edit"
                     variant="ghost"
                     size="icon-sm"
@@ -232,6 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Delete -->
                   <OButton
                     :data-test="`report-list-${row.name}-delete-report`"
+                    data-row-action="delete"
                     icon-left="delete"
                     variant="ghost-destructive"
                     size="icon-sm"
@@ -330,15 +332,18 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OIcon from '@/lib/core/Icon/OIcon.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
@@ -788,6 +793,30 @@ const onMoveUpdated = async (fromFolder: string, toFolder: string) => {
   invalidateFolderCache(toFolder);
   await loadReports(activeFolderId.value);
 };
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcuts([
+  {
+    id: "reportsAdd",
+    handler: () => { if (!isInputFocused()) createNewReport(); },
+  },
+  {
+    id: "reportsRefresh",
+    handler: () => {
+      if (!isInputFocused()) {
+        // Match the refresh button: drop the cache first so it actually reloads.
+        invalidateFolderCache(activeFolderId.value);
+        loadReports(activeFolderId.value);
+      }
+    },
+  },
+  {
+    id: "reportsFocusSearch",
+    handler: () => {
+      focusSearchInput("report-list-search-input");
+    },
+  },
+]);
 </script>
 
 

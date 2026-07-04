@@ -128,4 +128,56 @@ describe("AppTabs", () => {
     // Hidden tab is not in DOM
     expect(wrapper.find('[data-test="tab-tab4"]').exists()).toBe(false);
   });
+
+  describe("dirty dot", () => {
+    it("renders a dirty dot when tab.dirty is true", () => {
+      const dirtyWrapper = mount(AppTabs, {
+        props: {
+          tabs: [
+            { label: "Clean", value: "clean" },
+            { label: "Dirty", value: "dirty", dirty: true },
+          ],
+          activeTab: "clean",
+        },
+      });
+
+      expect(
+        dirtyWrapper.find('[data-test="tab-dirty-dirty-dot"]').exists(),
+      ).toBe(true);
+      expect(
+        dirtyWrapper.find('[data-test="tab-clean-dirty-dot"]').exists(),
+      ).toBe(false);
+      dirtyWrapper.unmount();
+    });
+
+    it("renders no dot when dirty is false or undefined (existing callers unaffected)", () => {
+      // mockTabs has no `dirty` prop on any tab — none should render a dot.
+      const dots = wrapper.findAll('[data-test$="-dirty-dot"]');
+      expect(dots).toHaveLength(0);
+
+      const falseWrapper = mount(AppTabs, {
+        props: {
+          tabs: [{ label: "Tab", value: "tab", dirty: false }],
+          activeTab: "tab",
+        },
+      });
+      expect(falseWrapper.find('[data-test="tab-tab-dirty-dot"]').exists()).toBe(
+        false,
+      );
+      falseWrapper.unmount();
+    });
+
+    it("applies dirtyTitle to the dot when provided", () => {
+      const titledWrapper = mount(AppTabs, {
+        props: {
+          tabs: [{ label: "Dirty", value: "dirty", dirty: true }],
+          activeTab: "dirty",
+          dirtyTitle: "Unsaved changes",
+        },
+      });
+      const dot = titledWrapper.find('[data-test="tab-dirty-dirty-dot"]');
+      expect(dot.attributes("title")).toBe("Unsaved changes");
+      titledWrapper.unmount();
+    });
+  });
 });

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="dashboard-custom-chart-editor-container"
-    class="markdown-editor card-container"
+    class="card-container"
     style="
       width: 100%;
       height: 100%;
@@ -117,36 +117,8 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.markdown-editor {
-  display: flex;
-  height: 100%;
-}
-
-.splitter {
-  height: 4px;
-  width: 100%;
-}
-
-.splitter-vertical {
-  width: 4px;
-  height: 100%;
-}
-
-.splitter-enabled {
-  background-color: #ffffff00;
-  transition: 0.3s;
-  transition-delay: 0.2s;
-}
-
-.splitter-enabled:hover {
-  background-color: orange;
-}
-
+<style>
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
-}
-
-.javascript-query-editor {
 }
 </style>

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -30,33 +30,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
       <div v-if="!sqlmode">
-        <div class="syntax-guide-title">
-          <div class="label">{{ t("search.syntaxGuideLabel") }}</div>
+        <div class="syntax-guide-title tw:w-[420px]">
+          <div class="label tw:text-[15px] tw:font-bold">{{ t("search.syntaxGuideLabel") }}</div>
         </div>
         <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
         <div class="answers">
-          <div class="syntax-section">
-            <div class="syntax-guide-text">
-              <ul class="guide-list">
+          <div class="tw:mb-[5px]">
+            <div class="tw:text-xs tw:ml-[5px]">
+              <ul class="tw:px-[10px] tw:mt-[10px] tw:mb-0 tw:text-[14px] tw:leading-[23px]">
                 <li>
                   For instant vector selectors, use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"
                     >metric_name{label1="value1", label2="value2"}</span
                   >
                 </li>
                 <li>
                   For range vector selectors, use
-                  <span class="bg-highlight">metric_name[5m]</span>
+                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'">metric_name[5m]</span>
                 </li>
                 <li>
                   To aggregate data, use
-                  <span class="bg-highlight">sum by (label)(metric_name)</span>
+                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'">sum by (label)(metric_name)</span>
                   or
-                  <span class="bg-highlight"> avg by (label)(metric_name)</span>
+                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"> avg by (label)(metric_name)</span>
                 </li>
                 <li>
                   For rate calculations over a range vector, use
-                  <span class="bg-highlight">rate(metric_name[5m])</span>
+                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'">rate(metric_name[5m])</span>
                 </li>
               </ul>
             </div>
@@ -64,43 +64,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div v-else>
-        <div class="syntax-guide-title">
-          <div class="label">Syntax Guide: SQL Mode</div>
+        <div class="syntax-guide-title tw:w-[420px]">
+          <div class="label tw:text-[15px] tw:font-bold">Syntax Guide: SQL Mode</div>
         </div>
         <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
         <div class="answers">
-          <div class="syntax-section">
-            <div class="syntax-guide-text">
-              <ul class="guide-list">
+          <div class="tw:mb-[5px]">
+            <div class="tw:text-xs tw:ml-[5px]">
+              <ul class="tw:px-[10px] tw:mt-[10px] tw:mb-0 tw:text-[14px] tw:leading-[23px]">
                 <li>
                   For full text search of value 'error' use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                 </li>
                 <li>
                   For column search of value 'error' use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"
                     >SELECT * FROM <b>stream</b> WHERE
                     str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
                   To search value 200 for code column use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"
                     >SELECT * FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
                   To search value 'stderr' for stream column use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
                   >
                 </li>
                 <li>
                   To search and use query function <i>extract_ip</i> on column
                   log use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE
                     code=200</span
                   >
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="hover:tw:underline text-primary"
+                    class="tw:hover:underline text-primary"
                     >click here</a
                   >.
                 </li>
@@ -154,52 +154,8 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.guide-list {
-  padding: 0 10px;
-  margin: 10px 0 0 0;
-}
-.guide-list li {
-  font-size: 14px;
-  line-height: 23px;
-}
+<style>
 .q-btn:before {
-  border: 0px solid #d5d5d5;
-}
-
-.syntax-guide-title {
-  width: 420px;
-
-  .label {
-    font-size: 15px;
-    font-weight: bold;
-  }
-}
-
-.syntax-guide-sub-title {
-  color: $primary;
-  font-size: 15px;
-  margin-left: 5px;
-}
-
-.syntax-guide-text {
-  font-size: 12px;
-  margin-left: 5px;
-}
-
-.syntax-section {
-  margin-bottom: 5px;
-}
-.bg-highlight {
-  padding-left: 5px;
-  padding-right: 5px;
-}
-
-.theme-dark .bg-highlight {
-  background-color: #747474;
-}
-
-.theme-light .bg-highlight {
-  background-color: #e7e6e6;
+  border: 0px solid var(--o2-border-input);
 }
 </style>

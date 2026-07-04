@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div
     style="width: 60vw; height: calc(100vh - 59px)"
     :class="
@@ -16,10 +16,10 @@
           class="tw:flex tw:items-center"
           data-test="associated-regex-patterns-title-text"
         >
-          <span class="breadcrumb-text tw:cursor-pointer" @click="closeDialog"
+          <span class="breadcrumb-text tw:text-lg tw:font-normal tw:leading-6 tw:cursor-pointer tw:text-[#5960b2]" @click="closeDialog"
             >{{ t('regex_patterns.associated_breadcrumb') }} &gt; &nbsp;
           </span>
-          <span class="associated-field-name">
+          <span class="associated-field-name tw:text-lg tw:font-normal tw:leading-6" :class="store.state.theme === 'dark' ? 'tw:text-[#fff]' : 'tw:text-[#000]'">
             {{ fieldName }}
           </span>
         </div>
@@ -71,10 +71,10 @@
                     :key="row.pattern_id"
                     :data-test="`associated-regex-patterns-applied-patterns-table-row-${row.pattern_id}`"
                     class="tw:cursor-pointer tw:flex tw:justify-between tw:items-center tw:px-2 tw:py-2.5 tw:border-b tw:text-[13px] tw:font-[600]"
-                    :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'selected-pattern-row' : ''"
+                    :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'tw:text-[var(--o2-tab-text-color)] tw:bg-[var(--o2-tab-bg)]' : ''"
                     @click="handlePatternClick(row)"
                   >
-                    <span class="regex-pattern-name">{{ row.pattern_name }}</span>
+                    <span class="regex-pattern-name tw:whitespace-nowrap tw:overflow-hidden tw:max-w-[10vw] tw:truncate tw:normal-case!">{{ row.pattern_name }}</span>
                     <OIcon name="check" size="xs" />
                   </li>
                 </ul>
@@ -94,10 +94,10 @@
                     :key="row.pattern_id"
                     :data-test="`associated-regex-patterns-all-patterns-table-row-${row.pattern_id}`"
                     class="tw:cursor-pointer tw:flex tw:justify-between tw:items-center tw:px-2 tw:py-2.5 tw:border-b tw:text-[13px] tw:font-[600]"
-                    :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'selected-pattern-row' : ''"
+                    :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'tw:text-[var(--o2-tab-text-color)] tw:bg-[var(--o2-tab-bg)]' : ''"
                     @click="handlePatternClick(row)"
                   >
-                    <span class="regex-pattern-name">{{ row.pattern_name }}</span>
+                    <span class="regex-pattern-name tw:whitespace-nowrap tw:overflow-hidden tw:max-w-[10vw] tw:truncate tw:normal-case!">{{ row.pattern_name }}</span>
                     <OIcon v-if="checkIfPatternIsApplied(row.pattern_id)" name="check" size="xs" />
                   </li>
                 </ul>
@@ -121,12 +121,12 @@
               alt=""
             />
             <span
-              class="no-pattern-applied-title"
+              class="tw:text-base tw:font-semibold tw:leading-8"
               data-test="associated-regex-patterns-no-pattern-applied-title"
               >{{ t('regex_patterns.no_patterns_applied_title') }}</span
             >
             <span
-              class="no-pattern-applied-subtitle tw:text-center"
+              class="tw:text-sm tw:font-normal tw:leading-3 tw:text-center"
               data-test="associated-regex-patterns-no-pattern-applied-subtitle"
               >{{ t('regex_patterns.no_patterns_applied_subtitle') }}</span
             >
@@ -146,11 +146,11 @@
             >
               <div class="tw:flex tw:flex-col tw:gap-2">
                 <div class="tw:flex tw:flex-col tw:gap-1">
-                  <span class="individual-section-title tw:text-[12px] tw:font-[500]">
+                  <span class="individual-section-title tw:text-[12px] tw:font-[500] tw:text-(--o2-text-secondary)">
                     {{ t('regex_patterns.pattern_name') }}
                   </span>
                   <span
-                    class="individual-section-value tw:text-[15px] tw:font-[700]"
+                    class="individual-section-value tw:text-[15px] tw:font-[700]" :class="store.state.theme === 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#000000]'"
                     data-test="associated-regex-patterns-pattern-name"
                   >
                     {{ userClickedPattern.pattern_name }}
@@ -160,11 +160,11 @@
                 <OSeparator />
 
                 <div class="tw:flex tw:flex-col tw:gap-1">
-                  <span class="individual-section-title tw:text-[12px] tw:font-[500]">
+                  <span class="individual-section-title tw:text-[12px] tw:font-[500] tw:text-(--o2-text-secondary)">
                     {{ t('regex_patterns.description') }}
                   </span>
                   <span
-                    class="individual-section-value tw:text-[15px] tw:font-[700]"
+                    class="individual-section-value tw:text-[15px] tw:font-[700]" :class="store.state.theme === 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#000000]'"
                     data-test="associated-regex-patterns-pattern-description"
                   >
                     {{
@@ -189,7 +189,7 @@
               <div class="tw:flex tw:gap-4">
                 <!-- when value matches -->
                 <div class="tw:flex tw:flex-col tw:gap-1.5 tw:flex-1">
-                  <span class="individual-section-title tw:text-[12px] tw:font-[500]">
+                  <span class="individual-section-title tw:text-[12px] tw:font-[500] tw:text-(--o2-text-secondary)">
                     {{ t('regex_patterns.when_value_matches') }}
                   </span>
                   <ORadioGroup v-model="policy">
@@ -229,7 +229,7 @@
 
                 <!-- detect at section -->
                 <div class="tw:flex tw:flex-col tw:gap-1.5 tw:min-w-[120px]">
-                  <span class="individual-section-title tw:text-[12px] tw:font-[500]">
+                  <span class="individual-section-title tw:text-[12px] tw:font-[500] tw:text-(--o2-text-secondary)">
                     {{ t('regex_patterns.detect_at') }}
                   </span>
                   <div class="tw:flex tw:flex-col tw:gap-1.5">
@@ -266,7 +266,7 @@
               <div class="tw:flex tw:flex-col tw:gap-2.5">
                 <div class="tw:flex tw:items-center tw:justify-between">
                   <span
-                    class="individual-section-title-main tw:text-[13px] tw:font-[700]"
+                    class="tw:text-[13px] tw:font-bold tw:leading-6"
                   >
                     {{ t('regex_patterns.test_pattern') }}
                   </span>
@@ -282,7 +282,7 @@
 
                 <div class="tw:flex tw:flex-col tw:gap-1">
                   <span
-                    class="individual-section-sub-title2 tw:text-[12px] tw:font-[500]"
+                    class="tw:text-[12px] tw:font-medium tw:leading-6 tw:text-(--o2-text-secondary)"
                   >
                     {{ t('regex_patterns.regex_pattern_label') }}
                   </span>
@@ -295,7 +295,7 @@
                     "
                   >
                     <span
-                      class="regex-pattern-text"
+                      class="regex-pattern-text tw:text-[12px] tw:font-normal tw:leading-6 tw:break-all tw:whitespace-pre-wrap tw:overflow-wrap-anywhere" :class="store.state.theme === 'dark' ? '' : 'tw:text-[#5a5a5a]'"
                       data-test="associated-regex-patterns-regex-pattern"
                     >
                       {{ userClickedPattern.pattern }}
@@ -326,11 +326,6 @@
                         data-test="add-regex-test-string-input"
                         v-model="testString"
                         class="regex-test-string-input"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'dark-mode-regex-test-string-input'
-                            : 'light-mode-regex-test-string-input'
-                        "
                         type="textarea"
                         :placeholder="t('regex_patterns.input_string_placeholder')"
                         :rows="5"
@@ -360,11 +355,6 @@
                         data-test="add-regex-test-string-input"
                         v-model="outputString"
                         class="regex-test-string-input"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'dark-mode-regex-test-string-input'
-                            : 'light-mode-regex-test-string-input'
-                        "
                         type="textarea"
                         :placeholder="t('regex_patterns.output_string_placeholder')"
                         :rows="5"
@@ -375,8 +365,8 @@
                         class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[111px]"
                         :class="
                           store.state.theme === 'dark'
-                            ? 'dark-mode-regex-no-output'
-                            : 'light-mode-regex-no-output'
+                            ? 'tw:bg-[var(--o2-primary-background)] tw:[border-left:2px_solid_var(--o2-primary-background)] tw:[border-right:2px_solid_var(--o2-primary-background)] tw:[border-bottom:2px_solid_var(--o2-primary-background)]'
+                            : 'tw:bg-[#ffffff] tw:[border-left:1px_solid_#e6e6e6] tw:[border-right:1px_solid_#e6e6e6] tw:[border-bottom:1px_solid_#e6e6e6]'
                         "
                       >
                         <div v-if="!testLoading && outputString.length === 0">
@@ -943,174 +933,8 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.breadcrumb-text {
-  font-size: 18px;
-  font-weight: 400;
-  line-height: 24px;
-}
-.associated-field-name {
-  font-size: 18px;
-  font-weight: 400;
-  line-height: 24px;
-}
-.light-regex-patterns {
-  .breadcrumb-text {
-    color: #5960b2;
-  }
-  .associated-field-name {
-    color: #000;
-  }
-}
-.dark-regex-patterns {
-  .breadcrumb-text {
-    color: #5960b2;
-  }
-  .associated-field-name {
-    color: #fff;
-  }
-}
-
-.individual-section-title {
-  font-size: 14px;
-  font-weight: 600;
-}
-.individual-section-title-main {
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 24px;
-}
-.individual-section-sub-title {
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 24px;
-}
-.individual-section-sub-title2 {
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 24px;
-}
-.individual-section-sub-information {
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 24px;
-}
-.regex-pattern-text {
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 24px;
-  word-wrap: break-word;
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-}
-
-.individual-section-title,
-.individual-section-sub-title2 {
-  color: var(--o2-text-secondary);
-}
-.light-regex-patterns {
-  .individual-section-sub-title {
-    color: #000000;
-  }
-  .individual-section-sub-information {
-    color: #000000;
-  }
-  .individual-section-value {
-    color: #000000;
-  }
-  .regex-pattern-text {
-    color: #5a5a5a;
-  }
-}
-.dark-regex-patterns {
-  .individual-section-value {
-    color: #ffffff;
-  }
-}
-.add-remove-pattern-button-light {
-  color: #5960b2;
-  border: 1px solid #5960b2;
-  width: fit-content;
-}
-.add-remove-pattern-button-dark {
-  color: #5960b2;
-  border: 1px solid #5960b2;
-  width: fit-content;
-}
-
+<style>
 .regex-test-string-input > div > div > div > textarea {
   resize: none !important;
-}
-.is-pattern-valid > div > div {
-  .q-field__native {
-    color: green !important;
-  }
-}
-
-.selected-pattern-row {
-  color: var(--o2-tab-text-color);
-  background-color: var(--o2-tab-bg);
-}
-.dark-associated-regex-patterns-table {
-  background-color: #1f1f1f !important;
-}
-.associated-regex-patterns-table {
-  .q-table__card {
-    border-radius: 0px !important;
-  }
-}
-.regex-pattern-name {
-  white-space: nowrap;
-  overflow: hidden;
-  max-width: 10vw;
-  text-overflow: ellipsis;
-  text-transform: none !important;
-}
-.no-pattern-applied-title {
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 32px;
-}
-.no-pattern-applied-subtitle {
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 12px;
-}
-.regex-pattern-associated-test-string-editor {
-  .lines-content {
-    padding-left: 12px !important;
-  }
-}
-.dark-mode-regex-test-string-input .q-field__control {
-  background-color: #181a1b !important;
-  border-top: 1px solid #666666 !important;
-  border-left: 1px solid #666666 !important;
-  border-right: 1px solid #666666 !important;
-  border-bottom: 1px solid #666666 !important;
-}
-.light-mode-regex-test-string-input .q-field__control {
-  background-color: #ffffff !important;
-  border-top: 1px solid #e6e6e6 !important;
-  border-left: 1px solid #e6e6e6 !important;
-  border-right: 1px solid #e6e6e6 !important;
-  border-bottom: 1px solid #e6e6e6 !important;
-}
-.light-mode-regex-associated-test-string-input .monaco-editor-background {
-  background-color: #ffffff !important;
-}
-.dark-mode-regex-associated-test-string-input .monaco-editor-background {
-  background-color: #1f1f1f !important;
-}
-.dark-mode-regex-no-output {
-  background-color: #181a1b !important;
-  border-left: 2px solid #212121 !important;
-  border-right: 2px solid #212121 !important;
-  border-bottom: 2px solid #212121 !important;
-}
-.light-mode-regex-no-output {
-  background-color: #ffffff !important;
-  border-left: 1px solid #e6e6e6 !important;
-  border-right: 1px solid #e6e6e6 !important;
-  border-bottom: 1px solid #e6e6e6 !important;
 }
 </style>

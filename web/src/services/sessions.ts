@@ -30,8 +30,17 @@ export interface SessionApiHit {
   gen_ai_usage_output_tokens: number;
   gen_ai_usage_total_tokens: number;
   gen_ai_usage_cost: number;
+  gen_ai_usage_cache_read_input_tokens?: number;
+  gen_ai_usage_cache_creation_input_tokens?: number;
+  gen_ai_usage_cost_cache_read_input?: number;
+  gen_ai_usage_cost_cache_creation_input?: number;
+  gen_ai_usage_cost_estimated_without_cache?: number;
+  gen_ai_usage_cost_cache_read_savings?: number;
+  gen_ai_usage_cost_net_cache_impact?: number;
   /** Number of error spans across all traces in this session. */
   error_count: number;
+  user_ids?: string[];
+  first_user_message?: string | null;
 }
 
 export interface SessionApiResponse {
@@ -40,6 +49,16 @@ export interface SessionApiResponse {
   from: number;
   size: number;
   hits: SessionApiHit[];
+  trace_id?: string;
+  function_error?: string;
+}
+
+export interface SessionDetailsApiResponse {
+  took: number;
+  total: number;
+  from: number;
+  size: number;
+  hits: any[];
   trace_id?: string;
   function_error?: string;
 }
@@ -95,6 +114,44 @@ const sessions = {
       streamName,
     )}/traces/session?${params.toString()}`;
     return http().get<SessionApiResponse>(url);
+  },
+
+  /**
+   * Fetch per-turn trace summaries for a single session. The backend returns
+   * the same hit shape used by traces/latest_stream, but computes each turn's
+   * status from all spans in the trace.
+   */
+  details: ({
+    orgId,
+    streamName,
+    sessionId,
+    startTime,
+    endTime,
+    from = 0,
+    size = 1000,
+    timeout,
+  }: {
+    orgId: string;
+    streamName: string;
+    sessionId: string;
+    startTime: number;
+    endTime: number;
+    from?: number;
+    size?: number;
+    timeout?: number;
+  }) => {
+    const params = new URLSearchParams({
+      session_id: sessionId,
+      from: String(from),
+      size: String(size),
+      start_time: String(startTime),
+      end_time: String(endTime),
+    });
+    if (timeout) params.set("timeout", String(timeout));
+    const url = `/api/${orgId}/${encodeURIComponent(
+      streamName,
+    )}/traces/session/details?${params.toString()}`;
+    return http().get<SessionDetailsApiResponse>(url);
   },
 };
 

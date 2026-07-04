@@ -71,7 +71,7 @@ describe("AwsMarketplaceSetup", () => {
       },
     });
 
-    const logo = wrapper.find(".appLogo");
+    const logo = wrapper.find('[data-test="aws-marketplace-setup-logo"]');
     expect(logo.exists()).toBe(true);
   });
 
@@ -314,7 +314,7 @@ describe("AwsMarketplaceSetup", () => {
       },
     });
 
-    const logo = wrapper.find(".appLogo");
+    const logo = wrapper.find('[data-test="aws-marketplace-setup-logo"]');
     expect(logo.attributes("src")).toContain("light");
   });
 
@@ -337,7 +337,7 @@ describe("AwsMarketplaceSetup", () => {
       },
     });
 
-    const logo = wrapper.find(".appLogo");
+    const logo = wrapper.find('[data-test="aws-marketplace-setup-logo"]');
     expect(logo.attributes("src")).toContain("dark");
   });
 });

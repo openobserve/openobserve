@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flexWrap: 'nowrap',
             height: '100%',
           }"
-          class="tw:flex span-row"
+          class="tw:flex tw:relative tw:min-h-7.5 span-row"
           :class="{
             'span-row-selected':
               (spans as any[])[virtualRow.index].spanId === highlightedSpanId,
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="(spans as any[])[virtualRow.index].operationName"
             >
               <div
-                class="tw:flex tw:flex-nowrap tw:w-full relative-position operation-name-container tw:cursor-pointer tw:items-center"
+                class="tw:flex tw:flex-nowrap tw:w-full tw:h-7.5 tw:overflow-visible relative-position operation-name-container tw:cursor-pointer tw:items-center"
                 :class="[
                   store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
                 ]"
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <div
-                  class="tw:absolute view-logs-container"
+                  class="tw:absolute tw:top-1 tw:right-0 tw:invisible view-logs-container"
                   :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
                 >
                   <div class="tw:mx-1 view-span-logs">
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
-                  class="span-count-box tw:cursor-pointer tw:border-[var(--o2-border-color)]! tw:relative"
+                  class="span-count-box tw:min-w-5 tw:h-5 tw:py-0 tw:px-1 tw:rounded-full tw:border tw:flex tw:items-center tw:justify-center tw:text-[0.7rem] tw:font-semibold tw:mr-1 tw:transition-colors tw:duration-200 tw:cursor-pointer tw:border-(--o2-border-color)! tw:relative"
                   :style="{
                     color: (spans as any[])[virtualRow.index].style.color,
                   }"
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <div
                   v-else
-                  class="span-leaf-dot"
+                  class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:mr-1 tw:shrink-0 tw:self-center"
                   :style="{
                     backgroundColor: (spans as any[])[virtualRow.index].style
                       .color,
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <div
-                    class="tw:truncate tw:pl-1 tw:cursor-pointer span-name-section tw:w-[calc(100%-2rem)]!"
+                    class="tw:truncate tw:pl-1 tw:cursor-pointer tw:w-[calc(100%-2rem)]!"
                     :class="
                       isLLMTrace((spans as any[])[virtualRow.index])
                         ? 'tw:flex-col tw:items-start'
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         class="tw:text-sm tw:font-medium tw:font-bold tw:mr-2"
                         :class="{
-                          highlighted: isHighlighted(
+                          'tw:bg-yellow-300 tw:font-bold': isHighlighted(
                             (spans as any[])[virtualRow.index].spanId,
                           ),
                           'tw:text-gray-900':
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             isHighlighted(
                               (spans as any[])[virtualRow.index].spanId,
                             ),
-                          'current-match':
+                          'tw:bg-yellow-300 tw:text-red-600 tw:font-bold':
                             currentSelectedValue ===
                             (spans as any[])[virtualRow.index].spanId,
                         }"
@@ -240,6 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <SpanKindBadge
                         v-if="(spans as any[])[virtualRow.index]?.spanKind"
                         :kind="(spans as any[])[virtualRow.index]?.spanKind"
+                        class="tw:mr-1"
                       />
 
                       <img
@@ -348,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="span-background-wrapper"
+                class="tw:grow tw:relative span-background-wrapper"
                 :style="{
                   backgroundColor: (spans as any[])[virtualRow.index].style
                     .backgroundColor,
@@ -840,138 +841,54 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.view-logs-container {
-  top: 0.25rem;
-  right: 0;
-  visibility: hidden;
-}
-
-.span-count-box {
-  min-width: 1.25rem;
-  height: 1.25rem;
-  padding: 0 0.25rem;
-  border-radius: 50%;
-  border: 0.0625rem solid;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.7rem;
-  font-weight: 600;
-  margin-right: 0.25rem;
-  transition: background-color 0.2s ease;
-
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.05);
-  }
+<style>
+.span-count-box:hover {
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 .bg-dark .span-count-box:hover {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-.span-leaf-dot {
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 50%;
-  margin-right: 0.25rem;
-  flex-shrink: 0;
-  align-self: center;
+/* Hover highlight via CSS — no JS required */
+.span-row:hover::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background-color: rgba(0, 123, 255, 0.2);
+  pointer-events: none;
+  z-index: 999;
 }
 
-.span-name-section {
-  padding-left: 0.25rem;
+.span-row:hover .operation-name-container {
+  background-color: transparent !important;
 }
 
-.span-name-section-content {
-  display: block;
-}
-
-.span-background-wrapper {
-  flex-grow: 1;
-  position: relative;
-}
-
-.operation-name-container {
-  height: 1.875rem;
-  overflow: visible;
-}
-
-.span-row {
-  position: relative;
-  min-height: 1.875rem;
-
-  // Hover highlight via CSS — no JS required
-  &:hover::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    background-color: rgba(0, 123, 255, 0.2);
-    pointer-events: none;
-    z-index: 999;
-  }
-
-  &:hover .operation-name-container {
-    background-color: transparent !important;
-  }
-
-  &:hover .view-logs-container {
-    visibility: visible;
-  }
-
-  &.span-row-selected {
-    &::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 0;
-      bottom: 0;
-      background-color: rgba(0, 123, 255, 0.35);
-      pointer-events: none;
-      z-index: 999;
-    }
-
-    .operation-name-container {
-      background-color: transparent !important;
-    }
-  }
-
-  > * {
-    position: relative;
-    z-index: 2;
-  }
-}
-</style>
-<style lang="scss">
-.view-logs-btn-text {
+.span-row:hover .view-logs-container {
   visibility: visible;
 }
-.view-span-logs {
-  background-color: inherit;
-  .view-logs-btn-text {
-    visibility: hidden;
-    width: 0;
-    transition: width 0.3s ease-in;
-  }
-  &:hover .view-logs-btn-text {
-    visibility: visible;
-    width: auto;
-  }
+
+.span-row.span-row-selected::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background-color: rgba(0, 123, 255, 0.35);
+  pointer-events: none;
+  z-index: 999;
 }
-.border-right {
-  border-right: 0.0625rem solid rgb(236, 236, 236);
+
+.span-row.span-row-selected .operation-name-container {
+  background-color: transparent !important;
 }
-.highlighted {
-  background-color: yellow;
-  font-weight: bold;
-}
-.current-match {
-  background-color: yellow;
-  color: red;
-  font-weight: bold;
+
+.span-row > * {
+  position: relative;
+  z-index: 2;
 }
 </style>

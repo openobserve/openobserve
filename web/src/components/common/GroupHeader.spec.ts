@@ -53,7 +53,7 @@ describe("GroupHeader.vue", () => {
   describe("Props", () => {
     it("accepts and renders title prop", () => {
       const wrapper = createWrapper({ title: "My Section" });
-      expect(wrapper.find(".title-text").text()).toBe("My Section");
+      expect(wrapper.find('[data-test="common-group-header-title"]').text()).toBe("My Section");
     });
 
     it("defaults title to empty string", () => {
@@ -83,24 +83,24 @@ describe("GroupHeader.vue", () => {
   describe("Title rendering", () => {
     it("renders the provided title text", () => {
       const wrapper = createWrapper({ title: "Cipher Keys" });
-      expect(wrapper.find(".title-text").text()).toContain("Cipher Keys");
+      expect(wrapper.find('[data-test="common-group-header-title"]').text()).toContain("Cipher Keys");
     });
 
     it("renders empty title text when title is empty string", () => {
       const wrapper = createWrapper({ title: "" });
-      expect(wrapper.find(".title-text").text()).toBe("");
+      expect(wrapper.find('[data-test="common-group-header-title"]').text()).toBe("");
     });
 
     it("renders long titles correctly", () => {
       const longTitle = "A".repeat(100);
       const wrapper = createWrapper({ title: longTitle });
-      expect(wrapper.find(".title-text").text()).toBe(longTitle);
+      expect(wrapper.find('[data-test="common-group-header-title"]').text()).toBe(longTitle);
     });
 
     it("renders titles with special characters", () => {
       const special = "Config & Settings <API>";
       const wrapper = createWrapper({ title: special });
-      expect(wrapper.find(".title-text").text()).toBe(special);
+      expect(wrapper.find('[data-test="common-group-header-title"]').text()).toBe(special);
     });
   });
 

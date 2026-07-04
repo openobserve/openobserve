@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="iam-roles-selection-section" class="tw:flex tw:flex-col tw:h-full tw:p-0" >
     <div
-      class="tw:flex tw:justify-start tw:px-3 tw:py-2 card-container tw:flex-shrink-0"
-      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+      class="tw:flex tw:justify-start tw:px-3 tw:py-2 card-container tw:shrink-0"
+      :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-bg-card-dark,#1a1a1a)' : 'tw:bg-white'"
     >
       <div class="tw:mr-3">
         <div
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSearchInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          class="tw:h-[36px] tw:w-[200px]"
+          class="tw:h-9 tw:w-50"
           placeholder="Search Roles"
         />
       </div>
@@ -271,5 +271,3 @@ const toggleUserSelection = (user: any) => {
 };
 
 </script>
-
-<style scoped></style>

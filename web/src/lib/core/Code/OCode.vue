@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import type { CodeProps, CodeSlots } from "./OCode.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { ref } from "vue";
@@ -48,7 +48,7 @@ async function copy() {
       v-if="copyable"
       type="button"
       :aria-label="copied ? 'Copied!' : 'Copy to clipboard'"
-      class="tw:absolute tw:top-2 tw:right-2 tw:rounded tw:p-1 tw:transition-colors tw:duration-150 tw:text-code-copy-icon hover:tw:text-code-copy-hover-icon hover:tw:bg-code-copy-hover-bg focus-visible:tw:outline-none focus-visible:tw:ring-2 focus-visible:tw:ring-primary-400"
+      class="tw:absolute tw:top-2 tw:right-2 tw:rounded tw:p-1 tw:transition-colors tw:duration-150 tw:text-code-copy-icon tw:hover:text-code-copy-hover-icon tw:hover:bg-code-copy-hover-bg tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-400"
       @click.prevent="copy"
     ><OIcon
         :name="copied ? 'check' : 'content-copy'"
@@ -73,7 +73,7 @@ async function copy() {
       v-if="copyable"
       type="button"
       :aria-label="copied ? 'Copied!' : 'Copy'"
-      class="tw:shrink-0 tw:rounded tw:p-px tw:transition-colors tw:duration-150 tw:text-code-copy-icon hover:tw:text-code-copy-hover-icon hover:tw:bg-code-copy-hover-bg focus-visible:tw:outline-none focus-visible:tw:ring-1 focus-visible:tw:ring-primary-400"
+      class="tw:shrink-0 tw:rounded tw:p-px tw:transition-colors tw:duration-150 tw:text-code-copy-icon tw:hover:text-code-copy-hover-icon tw:hover:bg-code-copy-hover-bg tw:focus-visible:outline-none tw:focus-visible:ring-1 tw:focus-visible:ring-primary-400"
       @click.prevent="copy"
     >
       <OIcon

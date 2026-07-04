@@ -214,6 +214,54 @@ test.describe("Service Account for API access", () => {
         testLogger.info('Test completed successfully');
     });
 
+    test("Token wizard Grant permissions step shows role/group actions", async ({ page }, testInfo) => {
+        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
+        testLogger.testStart(testInfo.title, testInfo.file);
+
+        await navigateToBase(page);
+        pageManager = new PageManager(page);
+
+        await pageManager.iamPage.gotoIamPage();
+        await pageManager.iamPage.iamPageServiceAccountsTab();
+        await waitForServiceAccountsPage(page);
+        await pageManager.iamPage.iamPageAddServiceAccount();
+        await pageManager.iamPage.enterEmailServiceAccount(uniqueEmail);
+        await pageManager.iamPage.clickSaveServiceAccount();
+        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+
+        // Advance the token wizard to step 2 (Grant permissions).
+        const nextBtn = page.locator('[data-test="service-accounts-token-next-btn"]');
+        await expect(nextBtn).toBeVisible({ timeout: 10000 });
+        await nextBtn.click();
+
+        // The two grant actions only render on Enterprise/Cloud (showGroupLink =
+        // isEnterprise || isCloud). On an OSS build step 2 shows a plain hint with
+        // no links, so gate-skip the label assertions there instead of failing.
+        const roleLink = page.locator('[data-test="service-accounts-list-token-add-to-role"]');
+        const groupLink = page.locator('[data-test="service-accounts-list-token-add-to-group"]');
+        const grantLinksRendered = await roleLink
+            .waitFor({ state: 'visible', timeout: 5000 })
+            .then(() => true)
+            .catch(() => false);
+
+        if (!grantLinksRendered) {
+            testLogger.info('Grant links absent (OSS build) — skipping label assertions');
+            await page.locator('[data-test="service-accounts-token-done-btn"]').click();
+            test.skip(true, 'Token wizard grant links are Enterprise/Cloud-only (showGroupLink=false on OSS)');
+            return;
+        }
+
+        // Step 2 offers the two grant actions with the reworded labels.
+        await expect(groupLink).toBeVisible();
+        await expect(roleLink).toContainText('Assign a role');
+        await expect(groupLink).toContainText('Add to a user group');
+
+        // Close the wizard.
+        await page.locator('[data-test="service-accounts-token-done-btn"]').click();
+
+        testLogger.info('Grant permissions step verified');
+    });
+
     test("SRE Agent System Account Protection", async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
 

@@ -16,14 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-advanced"
+    class="step-advanced tw:w-full"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div class="step-content card-container">
+    <div
+      class="step-content tw:rounded-lg tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]"
+    >
       <!-- Section header -->
-      <div class="section-header">
-        <div class="section-header-accent" />
-        <span class="section-header-title">{{
+      <div
+        class="section-header tw:flex tw:items-center tw:py-[10px] tw:px-3"
+        :class="store.state.theme === 'dark' ? 'tw:border-b tw:border-[#343434]' : 'tw:border-b tw:border-[#eeeeee]'"
+      >
+        <div class="section-header-accent tw:w-[3px] tw:h-4 tw:rounded-[2px] tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
+        <span
+          class="section-header-title tw:text-[13px] tw:font-semibold tw:text-[var(--color-text-primary)]"
+        >{{
           t("alerts.additional_settings") || "Additional Settings"
         }}</span>
       </div>
@@ -31,13 +38,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:px-3 tw:py-3 tw:flex tw:flex-col tw:gap-4">
         <!-- Template Override -->
         <div>
-          <div class="subsection-label tw:mb-2">
+          <div
+            class="subsection-label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:mb-2"
+            :class="store.state.theme === 'dark' ? 'tw:text-[#9ca3af]' : 'tw:text-[#6b7280]'"
+          >
             <span>{{ t("alerts.template") }}</span>
             <OButton
               data-test="advanced-template-info-btn"
               variant="ghost-primary"
               size="xs"
-              class="help-learn-more"
+              class="tw:gap-1 tw:font-medium"
               @click="openHelp('template')"
             >
               <OIcon name="help" size="xs" />
@@ -69,13 +79,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Context Variables -->
         <div>
-          <div class="subsection-label tw:mb-2">
+          <div
+            class="subsection-label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:mb-2"
+            :class="store.state.theme === 'dark' ? 'tw:text-[#9ca3af]' : 'tw:text-[#6b7280]'"
+          >
             <span>{{ t("alerts.additionalVariables") }}</span>
             <OButton
               data-test="advanced-variables-info-btn"
               variant="ghost-primary"
               size="xs"
-              class="help-learn-more"
+              class="tw:gap-1 tw:font-medium"
               @click="openHelp('variables')"
             >
               <OIcon name="help" size="xs" />
@@ -136,7 +149,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Description -->
         <div>
-          <div class="subsection-label tw:mb-2">
+          <div
+            class="subsection-label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:mb-2"
+            :class="store.state.theme === 'dark' ? 'tw:text-[#9ca3af]' : 'tw:text-[#6b7280]'"
+          >
             <span>{{ t("alerts.description") }}</span>
           </div>
           <OTextarea
@@ -150,13 +166,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Row Template -->
         <div>
           <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
-            <div class="subsection-label">
+            <div
+              class="subsection-label tw:flex tw:items-center tw:text-xs tw:font-semibold"
+              :class="store.state.theme === 'dark' ? 'tw:text-[#9ca3af]' : 'tw:text-[#6b7280]'"
+            >
               <span>{{ t("alerts.row") }}</span>
               <OButton
                 data-test="add-alert-row-input-info-btn"
                 variant="ghost-primary"
                 size="xs"
-                class="help-learn-more"
+                class="tw:gap-1 tw:font-medium"
                 @click="openHelp('rowTemplate')"
               >
                 <OIcon name="help" size="xs" />
@@ -460,85 +479,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.step-advanced {
-  width: 100%;
-
-  .step-content {
-    border-radius: 8px;
-  }
-
-  &.dark-mode {
-    .step-content {
-      background-color: #212121;
-      border: 1px solid #343434;
-    }
-    .section-header {
-      border-bottom: 1px solid #343434;
-    }
-    .section-header-title {
-      color: #e0e0e0;
-    }
-    .section-header-accent {
-      background: var(--q-primary);
-    }
-    .subsection-label {
-      color: #9ca3af;
-    }
-  }
-
-  &.light-mode {
-    .step-content {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
-    }
-    .section-header {
-      border-bottom: 1px solid #eeeeee;
-    }
-    .section-header-title {
-      color: #374151;
-    }
-    .section-header-accent {
-      background: var(--q-primary);
-    }
-    .subsection-label {
-      color: #6b7280;
-    }
-  }
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
-}
-.section-header-accent {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-.section-header-title {
-  font-size: 13px;
-  font-weight: 600;
-}
-.subsection-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-// "Learn more" help trigger — a clear, labeled, clickable affordance that
-// opens the help drawer. Distinct from passive info tooltips elsewhere, so
-// the click action is never ambiguous. Tighten the icon/label gap.
-.help-learn-more {
-  gap: 0.25rem;
-  font-weight: 500;
-}
-
-
-</style>

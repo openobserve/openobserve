@@ -70,6 +70,27 @@ export class ReportsPage {
     this.saveButton = page.locator('[data-test="add-report-save-btn"]');
     this.cancelButton = page.locator('[data-test="add-report-cancel-btn"]');
 
+    // ── Report Format section ──────────────────────────────────────────────
+    this.reportFormatSection = page.locator('[data-test="add-report-format-section"]');
+
+    // Report Type OSelect (trigger + popover + per-option)
+    this.reportTypeSelect = page.locator('[data-test="add-report-type-select"]');
+    this.reportTypeTrigger = page.locator('[data-test="add-report-type-select"] [data-test-selected-value]');
+    this.reportTypePopover = page.locator('[data-test="add-report-type-select-popover"]');
+    // OSelect always stamps data-test-value on options (unconditional), but
+    // data-test-concatenated attrs are only emitted when OSelect receives a
+    // direct data-test prop. This instance lacks it — match by value only.
+    this.reportTypeOption = (value) => page.locator(`[data-test-value="${value}"]`).first();
+
+    // Attachment Type OSelect (hidden when CSV is selected)
+    this.attachmentTypeSelect = page.locator('[data-test="add-report-attachment-type-select"]');
+
+    // Custom Dimensions expandable section (hidden when CSV is selected)
+    this.customDimensionsSection = page.locator('[data-test="add-report-custom-dimensions-section"]');
+
+    // PNG warning banner (visible only when PNG is selected)
+    this.pngNoteBanner = page.locator('[data-test="add-report-png-note"]');
+
     // Toasts (OToast variants)
     this.toastSuccess = page.locator('[data-test-variant="success"]');
     this.toastError = page.locator('[data-test-variant="error"]');
@@ -484,6 +505,82 @@ export class ReportsPage {
     await this.reportSearchInputField.fill(reportName);
     await this.reportListTable.waitFor({ state: 'visible', timeout: 10000 });
     await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
+  }
+
+  // ── Report Format section helpers ───────────────────────────────────────
+
+  async selectReportType(value) {
+    // Open the report type dropdown by clicking the trigger.
+    // NOTE: This OSelect lacks a direct `data-test` prop (the attribute is on
+    // the parent <div> instead), so the popover and option children do NOT have
+    // data-test-concatenated attributes. We locate options by data-test-value
+    // instead, which OSelect always renders unconditionally.
+    await this.reportTypeTrigger.waitFor({ state: 'visible', timeout: 10000 });
+    await this.reportTypeTrigger.click();
+    // Click the desired option — gating on its visibility confirms the popover opened
+    const opt = this.reportTypeOption(value);
+    await opt.waitFor({ state: 'visible', timeout: 10000 });
+    await opt.click();
+    // Wait for popover to close after selection (gate on option disappearing)
+    await opt.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    // Allow Vue reactivity to settle
+    await this.page.waitForTimeout(300);
+  }
+
+  async selectDashboardDefaults(dashboardName) {
+    await this.createReportFolderInput();
+    await this.createReportDashboardInput(dashboardName);
+    await this.createReportDashboardTabInput();
+  }
+
+  // ── Visibility assertion helpers (no raw selectors leak into specs) ─────
+
+  async expectReportFormatSectionVisible() {
+    await expect(this.reportFormatSection).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectAttachmentTypeVisible() {
+    await expect(this.attachmentTypeSelect).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectAttachmentTypeHidden() {
+    await expect(this.attachmentTypeSelect).not.toBeVisible({ timeout: 5000 });
+  }
+
+  async expectCustomDimensionsVisible() {
+    await expect(this.customDimensionsSection).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectCustomDimensionsHidden() {
+    await expect(this.customDimensionsSection).not.toBeVisible({ timeout: 5000 });
+  }
+
+  async expectPngNoteVisible() {
+    await expect(this.pngNoteBanner).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectPngNoteHidden() {
+    await expect(this.pngNoteBanner).not.toBeVisible({ timeout: 5000 });
+  }
+
+  async expectReportTypeOptionVisible(value) {
+    // Open the popover, assert the option is visible, then close it.
+    // Same note as selectReportType: popover/option data-test attrs are missing
+    // because OSelect lacks a direct data-test prop. Use data-test-value instead.
+    await this.reportTypeTrigger.waitFor({ state: 'visible', timeout: 10000 });
+    await this.reportTypeTrigger.click();
+    const opt = this.reportTypeOption(value);
+    await expect(opt).toBeVisible({ timeout: 5000 });
+    // Close popover by pressing Escape
+    await this.page.keyboard.press('Escape');
+    await opt.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+  }
+
+  async expectReportTypeOptionSelected(value) {
+    // Verify the selected value display shows the expected label
+    const labelMap = { csv: 'CSV (Data)', pdf: 'PDF (default)', png: 'PNG (Image)' };
+    const expectedLabel = labelMap[value] || value;
+    await expect(this.reportTypeTrigger).toContainText(expectedLabel, { timeout: 10000 });
   }
 
 }

@@ -47,16 +47,6 @@ const mockKpi = ref({
   errorCount: 0,
   totalTokens: 0,
   totalCost: 0,
-  avgDurationMicros: 0,
-  p95DurationMicros: 0,
-});
-const mockKpiPrev = ref({
-  requestCount: 0,
-  traceCount: 0,
-  errorCount: 0,
-  totalTokens: 0,
-  totalCost: 0,
-  avgDurationMicros: 0,
   p95DurationMicros: 0,
 });
 const mockSparklines = ref({
@@ -67,6 +57,7 @@ const mockSparklines = ref({
   errorRate: [],
 });
 const mockLoading = ref(false);
+const mockP95Loading = ref(false);
 const mockError = ref<string | null>(null);
 const mockHasLoadedOnce = ref(false);
 const mockAvailableStreams = ref<string[]>([]);
@@ -75,9 +66,9 @@ const mockStreamsLoaded = ref(false);
 vi.mock("./composables/useLLMInsights", () => ({
   useLLMInsights: () => ({
     kpi: mockKpi,
-    kpiPrev: mockKpiPrev,
     sparklines: mockSparklines,
     loading: mockLoading,
+    p95Loading: mockP95Loading,
     error: mockError,
     hasLoadedOnce: mockHasLoadedOnce,
     availableStreams: mockAvailableStreams,
@@ -101,7 +92,8 @@ vi.mock("vue-i18n", () => ({
 }));
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: mockRouterPush }),
+  useRouter: () => ({ push: mockRouterPush, replace: vi.fn(() => Promise.resolve()) }),
+  useRoute: () => ({ query: {} }),
 }));
 
 // Partial-mock vuex so `createStore` (used by `src/stores/index.ts`)
@@ -123,6 +115,10 @@ vi.mock("vuex", async (importOriginal) => {
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import LLMInsightsDashboard from "./LLMInsightsDashboard.vue";
+// The KPI cache is a module singleton (survives remounts in the app); clear it
+// between tests so a warmed entry from one mount doesn't suppress the fetch in
+// the next.
+import { kpiCache } from "./llmInsightsCache";
 
 const STREAM_LS_KEY = "llmInsights_streamFilter";
 
@@ -141,7 +137,8 @@ function mountDashboard(
       stubs: {
         // Children — all stubbed so we don't try to render echarts /
         // sparkline math during dashboard-level tests.
-        LLMTrendPanel: { template: "<div data-test=\"llm-trend-panel\" />" },
+        LLMSchemaPanel: { template: "<div data-test=\"llm-schema-panel\" />" },
+        LLMErrorTable: { template: "<div data-test=\"llm-error-table\" />" },
         KpiSparkline: { template: "<div data-test=\"kpi-sparkline\" />" },
         LLMInsightsSkeleton: { template: "<div data-test=\"llm-insights-skeleton\" />" },
         OButton: {
@@ -164,16 +161,15 @@ function mountDashboard(
 beforeEach(() => {
   // Fresh mock state for every test.
   vi.clearAllMocks();
+  kpiCache.clear();
   mockKpi.value = {
     requestCount: 0,
     traceCount: 0,
     errorCount: 0,
     totalTokens: 0,
     totalCost: 0,
-    avgDurationMicros: 0,
     p95DurationMicros: 0,
   };
-  mockKpiPrev.value = { ...mockKpi.value };
   mockSparklines.value = {
     cost: [],
     tokens: [],
@@ -182,6 +178,7 @@ beforeEach(() => {
     errorRate: [],
   };
   mockLoading.value = false;
+  mockP95Loading.value = false;
   mockError.value = null;
   mockHasLoadedOnce.value = false;
   mockAvailableStreams.value = [];
@@ -246,33 +243,61 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
     await flushPromises();
     mockFetchAll.mockClear();
     await (wrapper.vm as any).loadInsights(123, 456);
-    expect(mockFetchAll).toHaveBeenCalledWith("default", 123, 456);
+    // 4th arg is the selected agent (null = All Agents).
+    expect(mockFetchAll).toHaveBeenCalledWith("default", 123, 456, null);
   });
 
-  // Default path — no args means use props.
+  // Default path — no args means use props. `force` bypasses the in-memory KPI
+  // cache that onMounted already warmed for this window (a same-window reload is
+  // otherwise served from the snapshot — see the caching tests).
   it("falls back to props when no args passed", async () => {
     const wrapper = mountDashboard();
     await flushPromises();
     mockFetchAll.mockClear();
-    await (wrapper.vm as any).loadInsights();
+    await (wrapper.vm as any).loadInsights(undefined, undefined, { force: true });
     expect(mockFetchAll).toHaveBeenCalledWith(
       "default",
       1_700_000_000_000_000,
       1_700_001_000_000_000,
+      null,
     );
   });
 
   // Persists the user's stream choice so reopening the dashboard later
   // restores it. The localStorage write happens BEFORE fetchAll —
-  // verify both ordering and content.
+  // verify both ordering and content. (`force` to bypass the warm KPI cache.)
   it("writes the active stream to localStorage before fetching", async () => {
     const wrapper = mountDashboard();
     await flushPromises();
     localStorage.clear();
     mockFetchAll.mockClear();
-    await (wrapper.vm as any).loadInsights();
+    await (wrapper.vm as any).loadInsights(undefined, undefined, { force: true });
     expect(localStorage.getItem(STREAM_LS_KEY)).toBe("default");
     expect(mockFetchAll).toHaveBeenCalled();
+  });
+
+  // The KPI cache: a same-window reload of the same selection is served from the
+  // snapshot (no refetch); `force` and a new window both bypass it.
+  it("restores KPI from cache on a same-window reload (no refetch)", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    // The insights fetch is parent-driven — trigger the first fetch via the
+    // exposed refresh(), which populates the KPI cache for this window.
+    await (wrapper.vm as any).refresh();
+    await flushPromises();
+    expect(mockFetchAll).toHaveBeenCalledTimes(1);
+    mockFetchAll.mockClear();
+    // Same window + selection, non-forced → served from the cache snapshot.
+    await (wrapper.vm as any).loadInsights();
+    expect(mockFetchAll).not.toHaveBeenCalled();
+  });
+
+  it("refetches KPI after the time window changes", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    mockFetchAll.mockClear();
+    await (wrapper.vm as any).loadInsights(2_000_000_000_000_000, 2_000_001_000_000_000);
+    expect(mockFetchAll).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -289,7 +314,7 @@ describe("LLMInsightsDashboard — refresh (parent entry point)", () => {
     await flushPromises();
     mockFetchAll.mockClear();
     await (wrapper.vm as any).refresh(999, 1999);
-    expect(mockFetchAll).toHaveBeenCalledWith("default", 999, 1999);
+    expect(mockFetchAll).toHaveBeenCalledWith("default", 999, 1999, null);
   });
 
   // No args → behaves like a normal loadInsights (falls back to props).
@@ -302,6 +327,7 @@ describe("LLMInsightsDashboard — refresh (parent entry point)", () => {
       "default",
       1_700_000_000_000_000,
       1_700_001_000_000_000,
+      null,
     );
   });
 });
@@ -324,6 +350,7 @@ describe("LLMInsightsDashboard — onStreamChange", () => {
       "other",
       1_700_000_000_000_000,
       1_700_001_000_000_000,
+      null,
     );
     expect(localStorage.getItem(STREAM_LS_KEY)).toBe("other");
   });
@@ -334,13 +361,19 @@ describe("LLMInsightsDashboard — onStreamChange", () => {
 // ===========================================================================
 
 describe("LLMInsightsDashboard — onMounted", () => {
-  // First-time visit: loadTraceStreams runs, then loadInsights fires
-  // once with the resolved stream. We assert getStreams was called
-  // (so the dashboard discovered LLM streams) and fetchAll fired.
-  it("fetches streams then loads insights on first mount", async () => {
-    mountDashboard();
+  // First-time visit: onMounted loads the stream list ONLY — the insights
+  // fetch is owned by the parent (via the exposed refresh()), so we don't
+  // double-fetch on load. Mount discovers streams; the parent's refresh()
+  // is what fires fetchAll.
+  it("loads streams on mount but leaves the insights fetch to the parent", async () => {
+    const wrapper = mountDashboard();
     await flushPromises();
     expect(mockGetStreams).toHaveBeenCalled();
+    // Mount alone must NOT fetch — that's the parent's job.
+    expect(mockFetchAll).not.toHaveBeenCalled();
+    // Parent-driven fetch.
+    await (wrapper.vm as any).refresh();
+    await flushPromises();
     expect(mockFetchAll).toHaveBeenCalled();
   });
 

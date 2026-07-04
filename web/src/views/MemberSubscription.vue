@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <SanitizedHtmlRenderer
       v-else-if="status == 'error' && error !== ''"
       :htmlContent="error"
-      class="subscription_message"
+      class="tw:text-base tw:leading-7.5 tw:w-[70%] tw:mx-auto tw:text-left"
     />
 
     <div v-else>Thank you for your subscription.</div>
@@ -121,12 +121,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.subscription_message {
-  font-size: 16px;
-  line-height: 30px;
-  width: 70%;
-  margin: auto;
-  text-align: left;
-}
-</style>

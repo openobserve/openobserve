@@ -3,8 +3,13 @@
 // for Tier 1 KPI values. Each refresh runs current-window and prev-window
 // aggregates in parallel; one stream's failure doesn't break the page.
 
-import { computed, ref } from "vue";
+import { computed, ref, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
+import {
+  buildEvaluatorAgentFilterWhere,
+  buildScoresAgentFilterWhere,
+  type AgentFilterSelection,
+} from "../utils/agentFilterSql";
 
 export type TimeRangeKey = "last1h" | "last24h" | "last7d" | "last30d";
 
@@ -43,7 +48,6 @@ export interface KpiCard {
   format: "percent" | "currency" | "count" | "seconds";
 }
 
-
 interface ScoresAggRow {
   evaluated_count?: number | string;
 }
@@ -70,7 +74,6 @@ interface EvaluatorBucketRow {
   cost_usd?: number | string | null;
 }
 
-
 function toNumber(v: unknown): number | null {
   if (v == null) return null;
   const n = typeof v === "number" ? v : Number(v);
@@ -79,11 +82,46 @@ function toNumber(v: unknown): number | null {
 
 function emptyKpis(): KpiCard[] {
   return [
-    { id: "evaluated", value: null, prevValue: null, sparkline: [], healthyDirection: "up", format: "percent" },
-    { id: "evaluationCost", value: null, prevValue: null, sparkline: [], healthyDirection: "neutral", format: "currency" },
-    { id: "jobSuccess", value: null, prevValue: null, sparkline: [], healthyDirection: "up", format: "percent" },
-    { id: "scorerFailures", value: null, prevValue: null, sparkline: [], healthyDirection: "down", format: "count" },
-    { id: "latencyP95", value: null, prevValue: null, sparkline: [], healthyDirection: "down", format: "seconds" },
+    {
+      id: "evaluated",
+      value: null,
+      prevValue: null,
+      sparkline: [],
+      healthyDirection: "up",
+      format: "percent",
+    },
+    {
+      id: "evaluationCost",
+      value: null,
+      prevValue: null,
+      sparkline: [],
+      healthyDirection: "neutral",
+      format: "currency",
+    },
+    {
+      id: "jobSuccess",
+      value: null,
+      prevValue: null,
+      sparkline: [],
+      healthyDirection: "up",
+      format: "percent",
+    },
+    {
+      id: "scorerFailures",
+      value: null,
+      prevValue: null,
+      sparkline: [],
+      healthyDirection: "down",
+      format: "count",
+    },
+    {
+      id: "latencyP95",
+      value: null,
+      prevValue: null,
+      sparkline: [],
+      healthyDirection: "down",
+      format: "seconds",
+    },
   ];
 }
 
@@ -92,11 +130,16 @@ function emptyKpis(): KpiCard[] {
 // in `useQualityScoreConfigs`. Scores are written per-span (each evaluated
 // span produces one row per scorer), so distinct span_id is the right unit
 // for "evaluated"; a single trace can have many evaluated spans.
-function scoresSql(): string {
+function whereLines(whereClause: string | null): string[] {
+  return whereClause ? [`WHERE ${whereClause}`] : [];
+}
+
+function scoresSql(whereClause: string | null): string {
   return [
     "SELECT",
     "  COUNT(DISTINCT span_id) AS evaluated_count",
     'FROM "_llm_scores"',
+    ...whereLines(whereClause),
   ].join("\n");
 }
 
@@ -110,7 +153,7 @@ function scoresSql(): string {
 // Cost lives at the top level as `gen_ai_usage_cost` (OTel GenAI semantic
 // convention) — not under `attributes_`. Already a Float64 in the schema,
 // so no cast needed; SUM() naturally skips NULLs if any sneak in.
-function evaluatorSql(): string {
+function evaluatorSql(whereClause: string | null): string {
   return [
     "SELECT",
     "  COUNT(*) AS total_runs,",
@@ -119,22 +162,30 @@ function evaluatorSql(): string {
     "  approx_percentile_cont(TRY_CAST(attributes_latency_ms AS DOUBLE), 0.95) AS latency_p95_ms,",
     "  SUM(gen_ai_usage_cost) AS total_cost_usd",
     'FROM "_evaluator"',
+    ...whereLines(whereClause),
   ].join("\n");
 }
 
-function scoresSparklineSql(interval: string): string {
+function scoresSparklineSql(
+  interval: string,
+  whereClause: string | null,
+): string {
   // Same span-level rollup as scoresSql() — distinct span_id per bucket.
   return [
     "SELECT",
     `  histogram(_timestamp, '${interval}') AS bucket,`,
     "  COUNT(DISTINCT span_id) AS evaluated_c",
     'FROM "_llm_scores"',
+    ...whereLines(whereClause),
     "GROUP BY bucket",
     "ORDER BY bucket",
   ].join("\n");
 }
 
-function evaluatorSparklineSql(interval: string): string {
+function evaluatorSparklineSql(
+  interval: string,
+  whereClause: string | null,
+): string {
   return [
     "SELECT",
     `  histogram(_timestamp, '${interval}') AS bucket,`,
@@ -144,12 +195,16 @@ function evaluatorSparklineSql(interval: string): string {
     "  approx_percentile_cont(TRY_CAST(attributes_latency_ms AS DOUBLE), 0.95) AS latency_p95_ms,",
     "  SUM(gen_ai_usage_cost) AS cost_usd",
     'FROM "_evaluator"',
+    ...whereLines(whereClause),
     "GROUP BY bucket",
     "ORDER BY bucket",
   ].join("\n");
 }
 
-export function useQualityData(dateWindow: import("vue").Ref<DateWindow>) {
+export function useQualityData(
+  dateWindow: Ref<DateWindow>,
+  agentFilter?: Ref<AgentFilterSelection | null | undefined>,
+) {
   const { executeQuery } = useLLMStreamQuery();
   const sourceStream = ref<string>("__all__");
   const isLoading = ref(false);
@@ -197,17 +252,64 @@ export function useQualityData(dateWindow: import("vue").Ref<DateWindow>) {
       const prevStartUs = startUs - windowUs;
       const windowMs = windowUs / 1000;
       const interval = chooseBucketInterval(windowMs);
-      const [scoresNow, scoresPrev, evalNow, evalPrev, scoresSeries, evalSeries] =
-        await Promise.all([
-          fetchAgg<ScoresAggRow>("logs", scoresSql(), startUs, endUs, "scores.now"),
-          fetchAgg<ScoresAggRow>("logs", scoresSql(), prevStartUs, prevEndUs, "scores.prev"),
-          fetchAgg<EvaluatorAggRow>("traces", evaluatorSql(), startUs, endUs, "eval.now"),
-          fetchAgg<EvaluatorAggRow>("traces", evaluatorSql(), prevStartUs, prevEndUs, "eval.prev"),
-          fetchHits<ScoresBucketRow>("logs", scoresSparklineSql(interval), startUs, endUs, "scores.spark"),
-          fetchHits<EvaluatorBucketRow>("traces", evaluatorSparklineSql(interval), startUs, endUs, "eval.spark"),
-        ]);
+      const selectedAgent = agentFilter?.value ?? null;
+      const scoresWhere = buildScoresAgentFilterWhere(selectedAgent);
+      const evaluatorWhere = buildEvaluatorAgentFilterWhere(selectedAgent);
+      const [
+        scoresNow,
+        scoresPrev,
+        evalNow,
+        evalPrev,
+        scoresSeries,
+        evalSeries,
+      ] = await Promise.all([
+        fetchAgg<ScoresAggRow>(
+          "logs",
+          scoresSql(scoresWhere),
+          startUs,
+          endUs,
+          "scores.now",
+        ),
+        fetchAgg<ScoresAggRow>(
+          "logs",
+          scoresSql(scoresWhere),
+          prevStartUs,
+          prevEndUs,
+          "scores.prev",
+        ),
+        fetchAgg<EvaluatorAggRow>(
+          "traces",
+          evaluatorSql(evaluatorWhere),
+          startUs,
+          endUs,
+          "eval.now",
+        ),
+        fetchAgg<EvaluatorAggRow>(
+          "traces",
+          evaluatorSql(evaluatorWhere),
+          prevStartUs,
+          prevEndUs,
+          "eval.prev",
+        ),
+        fetchHits<ScoresBucketRow>(
+          "logs",
+          scoresSparklineSql(interval, scoresWhere),
+          startUs,
+          endUs,
+          "scores.spark",
+        ),
+        fetchHits<EvaluatorBucketRow>(
+          "traces",
+          evaluatorSparklineSql(interval, evaluatorWhere),
+          startUs,
+          endUs,
+          "eval.spark",
+        ),
+      ]);
 
-      const evaluatedSpark = scoresSeries.map((r) => toNumber(r.evaluated_c) ?? 0);
+      const evaluatedSpark = scoresSeries.map(
+        (r) => toNumber(r.evaluated_c) ?? 0,
+      );
       const jobSuccessSpark = evalSeries.map((r) => {
         const tot = toNumber(r.total) ?? 0;
         const ok = toNumber(r.success) ?? 0;
@@ -229,9 +331,13 @@ export function useQualityData(dateWindow: import("vue").Ref<DateWindow>) {
       const successPrev = toNumber(evalPrev?.success_runs);
 
       const jobSuccessNow =
-        totalNow && totalNow > 0 && successNow != null ? (successNow / totalNow) * 100 : null;
+        totalNow && totalNow > 0 && successNow != null
+          ? (successNow / totalNow) * 100
+          : null;
       const jobSuccessPrev =
-        totalPrev && totalPrev > 0 && successPrev != null ? (successPrev / totalPrev) * 100 : null;
+        totalPrev && totalPrev > 0 && successPrev != null
+          ? (successPrev / totalPrev) * 100
+          : null;
 
       const latencyP95SecNow = toNumber(evalNow?.latency_p95_ms);
       const latencyP95SecPrev = toNumber(evalPrev?.latency_p95_ms);
@@ -280,7 +386,8 @@ export function useQualityData(dateWindow: import("vue").Ref<DateWindow>) {
         {
           id: "latencyP95",
           value: latencyP95SecNow != null ? latencyP95SecNow / 1000 : null,
-          prevValue: latencyP95SecPrev != null ? latencyP95SecPrev / 1000 : null,
+          prevValue:
+            latencyP95SecPrev != null ? latencyP95SecPrev / 1000 : null,
           sparkline: latencySpark,
           healthyDirection: "down",
           format: "seconds",
@@ -293,7 +400,8 @@ export function useQualityData(dateWindow: import("vue").Ref<DateWindow>) {
 
   const deltaByKpi = computed(() =>
     kpis.value.reduce<Record<string, number | null>>((acc, k) => {
-      acc[k.id] = k.value != null && k.prevValue != null ? k.value - k.prevValue : null;
+      acc[k.id] =
+        k.value != null && k.prevValue != null ? k.value - k.prevValue : null;
       return acc;
     }, {}),
   );

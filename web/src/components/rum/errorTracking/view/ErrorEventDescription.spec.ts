@@ -69,7 +69,7 @@ describe("ErrorEventDescription Component", () => {
     await wrapper.setProps({ column: { type: "error", error_message: "" } });
 
     // Assert
-    expect(wrapper.find(".description").text()).toBe("");
+    expect(wrapper.find('[data-test="error-event-description-default"]').text()).toBe("");
   });
 
   it("shows resource URL for resource type without xhr subtype", async () => {
@@ -139,7 +139,7 @@ describe("ErrorEventDescription Component", () => {
     });
 
     // Assert
-    const nav = wrapper.find(".navigation");
+    const nav = wrapper.find('[data-test="error-event-description-navigation"]');
     expect(nav.exists()).toBe(true);
     expect(nav.text()).toContain("from");
     expect(nav.text()).toContain("/home");
@@ -159,7 +159,7 @@ describe("ErrorEventDescription Component", () => {
     });
 
     // Assert
-    const nav = wrapper.find(".navigation");
+    const nav = wrapper.find('[data-test="error-event-description-navigation"]');
     expect(nav.element.tagName).toBe("PRE");
   });
 
@@ -206,7 +206,7 @@ describe("ErrorEventDescription Component", () => {
     });
 
     // Assert
-    expect(wrapper.find(".description").text()).toBe("undefined : undefined");
+    expect(wrapper.find('[data-test="error-event-description-default"]').text()).toBe("undefined : undefined");
   });
 
   it("shows empty text for unknown type", async () => {
@@ -214,7 +214,7 @@ describe("ErrorEventDescription Component", () => {
     await wrapper.setProps({ column: { type: "unknown", some_field: "value" } });
 
     // Assert
-    expect(wrapper.find(".description").text()).toBe("");
+    expect(wrapper.find('[data-test="error-event-description-default"]').text()).toBe("");
   });
 
   it("shows empty text when type is missing", async () => {
@@ -222,7 +222,7 @@ describe("ErrorEventDescription Component", () => {
     await wrapper.setProps({ column: { error_message: "Some error" } });
 
     // Assert
-    expect(wrapper.find(".description").text()).toBe("");
+    expect(wrapper.find('[data-test="error-event-description-default"]').text()).toBe("");
   });
 
   it("shows empty text when error_message is null", async () => {
@@ -230,7 +230,7 @@ describe("ErrorEventDescription Component", () => {
     await wrapper.setProps({ column: { type: "error", error_message: null } });
 
     // Assert
-    expect(wrapper.find(".description").text()).toBe("");
+    expect(wrapper.find('[data-test="error-event-description-default"]').text()).toBe("");
   });
 
   it("has getDescription computed property that returns the error message", () => {
@@ -273,7 +273,7 @@ describe("ErrorEventDescription Component", () => {
         view_url: "/b",
       },
     });
-    expect(wrapper.find(".navigation").exists()).toBe(true);
+    expect(wrapper.find('[data-test="error-event-description-navigation"]').exists()).toBe(true);
 
     // Act: switch to xhr template
     await wrapper.setProps({
@@ -291,7 +291,11 @@ describe("ErrorEventDescription Component", () => {
     await wrapper.setProps({
       column: { type: "error", error_message: "Default" },
     });
-    expect(wrapper.find(".description span").exists()).toBe(true);
+    const defaultSpan = wrapper.find(
+      '[data-test="error-event-description-default"]',
+    );
+    expect(defaultSpan.exists()).toBe(true);
+    expect(defaultSpan.text()).toBe("Default");
   });
 
   it("handles rapid prop changes without errors", async () => {

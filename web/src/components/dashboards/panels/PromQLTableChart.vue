@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="promql-table-chart"
     data-test="promql-table-chart"
     style="
       height: 100%;
@@ -260,89 +259,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.promql-table-chart {
-  position: relative;
-}
-
-.my-sticky-virtscroll-table {
-  /* height or max-height is important */
-  height: calc(100% - 1px);
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  overflow: auto;
-
-  :deep(.q-table__top),
-  :deep(.q-table__bottom),
-  :deep(thead tr:first-child th) {
-    /* bg color is important for th; just specify one */
-    background-color: #fff;
-  }
-
-  :deep(thead tr th) {
-    will-change: auto !important;
-    position: sticky;
-    z-index: 1;
-  }
-
-  /* this will be the loading indicator */
-  :deep(thead tr:last-child th) {
-    /* height of all previous header rows */
-    top: 48px;
-  }
-
-  :deep(thead tr:first-child th) {
-    top: 0;
-  }
-
-  :deep(.q-virtual-scroll) {
-    will-change: auto !important;
-  }
-
-  // Sticky columns (horizontal scroll)
-  :deep(thead tr th.sticky-column),
-  :deep(tbody tr td.sticky-column) {
-    position: sticky !important;
-    left: 0 !important;
-    z-index: 2;
-    background-color: #fff !important;
-    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
-  }
-
-  :deep(thead tr th.sticky-column) {
-    z-index: 3 !important; // Headers need higher z-index
-  }
-
-  // Support for multiple sticky columns - each subsequent column should be offset
-  :deep(thead tr th.sticky-column:nth-child(2)),
-  :deep(tbody tr td.sticky-column:nth-child(2)) {
-    left: var(--sticky-col-1-width, 150px) !important;
-  }
-
-  :deep(thead tr th.sticky-column:nth-child(3)),
-  :deep(tbody tr td.sticky-column:nth-child(3)) {
-    left: calc(
-      var(--sticky-col-1-width, 150px) + var(--sticky-col-2-width, 150px)
-    ) !important;
-  }
-}
-
-.my-sticky-virtscroll-table.q-dark {
-  :deep(.q-table__top),
-  :deep(.q-table__bottom),
-  :deep(thead tr:first-child th) {
-    /* bg color is important for th; just specify one */
-    background-color: $dark-page !important;
-  }
-
-  // Sticky columns in dark mode
-  :deep(thead tr th.sticky-column),
-  :deep(tbody tr td.sticky-column) {
-    background-color: $dark-page !important;
-  }
-}
-</style>

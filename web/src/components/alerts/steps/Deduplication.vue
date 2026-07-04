@@ -16,13 +16,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-deduplication"
+    class="step-deduplication tw:w-full tw:h-full tw:overflow-auto tw:mx-auto"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div class="step-content card-container">
-      <div class="section-header">
-        <div class="section-header-accent" />
-        <span class="section-header-title">{{
+    <div
+      class="step-content tw:rounded-lg tw:min-h-full tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]"
+    >
+      <div
+        class="section-header tw:flex tw:items-center tw:gap-0 tw:py-2.5 tw:px-3"
+        :class="
+          store.state.theme === 'dark'
+            ? 'tw:border-b tw:border-[#343434]'
+            : 'tw:border-b tw:border-[#eeeeee]'
+        "
+      >
+        <div class="section-header-accent tw:w-0.75 tw:h-4 tw:rounded-sm tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
+        <span
+          class="section-header-title tw:text-[13px] tw:font-semibold tw:text-[var(--color-text-primary)]"
+        >{{
           t("alerts.steps.deduplication")
         }}</span>
       </div>
@@ -212,119 +223,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.step-deduplication {
-  width: 100%;
-  height: 100%;
-  margin: 0 auto;
-  overflow: auto;
-
-  .step-content {
-    border-radius: 8px;
-    min-height: 100%;
-  }
-
-  &.dark-mode {
-    .step-content {
-      background-color: #212121;
-      border: 1px solid #343434;
-    }
-    .section-header {
-      border-bottom: 1px solid #343434;
-    }
-    .section-header-title {
-      color: #e0e0e0;
-    }
-    .section-header-accent {
-      background: var(--q-primary);
-    }
-  }
-
-  &.light-mode {
-    .step-content {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
-    }
-    .section-header {
-      border-bottom: 1px solid #eeeeee;
-    }
-    .section-header-title {
-      color: #374151;
-    }
-    .section-header-accent {
-      background: var(--q-primary);
-    }
-  }
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 10px 12px;
-}
-.section-header-accent {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-.section-header-title {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-:deep(.fingerprint-select) {
-  .q-field__control {
-    min-height: 40px;
-    display: flex;
-    align-items: center;
-  }
-
-  .q-field__control-container {
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    padding-right: 36px; // Reserve space for dropdown arrow
-    display: flex;
-    align-items: center;
-  }
-
-  .q-field__native {
-    min-height: 32px;
-    gap: 4px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important; // Center align chips vertically
-    padding-top: 6px !important;
-    padding-bottom: 6px !important;
-
-    // Hide scrollbar but keep scrolling functionality
-    scrollbar-width: none; // Firefox
-    -ms-overflow-style: none; // IE/Edge
-
-    &::-webkit-scrollbar {
-      display: none; // Chrome/Safari/Opera
-    }
-  }
-
-  // Ensure the input field stays visible and accessible
-  input {
-    min-width: 100px !important;
-    flex-shrink: 0 !important;
-  }
-
-  // Ensure dropdown icon is always visible
-  .q-field__append {
-    padding-left: 8px;
-  }
-}
-
-// NOTE: Dark/light fingerprint chip styling moved to OBadge variants since the
-// `q-chip` element no longer renders post-Quasar removal. If chip-specific
-// visual tweaks are needed, use `<OBadge variant="default">` and rely on its
-// built-in light/dark token-driven background.
-</style>

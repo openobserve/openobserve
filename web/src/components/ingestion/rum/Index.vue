@@ -157,34 +157,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.ingestionPage {
-  padding: 1.5rem 0 0;
-  .head {
-    padding-bottom: 1rem;
-  }
-  .o-tabs {
-    &--vertical {
-      margin: 1.5rem 1rem 0 1rem;
-      .o-tab {
-        justify-content: flex-start;
-        padding: 0 0.6rem 0 0.6rem;
-        text-transform: capitalize;
-
-        &__content.tab_content {
-          .o-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          color: black;
-          background-color: $accent;
-        }
-      }
-    }
-  }
-}
-</style>

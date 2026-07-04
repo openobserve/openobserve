@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:justify-start tw:items-center header-bg tw:bg-surface-panel trace-header-container"
+    class="tw:flex tw:justify-start tw:items-center tw:bg-[color-mix(in_srgb,currentColor_5%,transparent)] tw:h-7.5 tw:top-0 tw:z-1999 tw:sticky tw:rounded-t-lg"
     data-test="trace-header"
     :style="
       isSidebarOpen && {
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <div
-      class="tw:relative tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:px-2 trace-header-left"
+      class="tw:relative tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:px-2"
       :style="{
         width: splitterWidth + 'px',
       }"
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       Operation Name
       <div
-        class="resize-btn tw:bg-[var(--o2-primary)] tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
+        class="tw:bg-(--o2-primary) tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full tw:absolute tw:-right-2.5 tw:-top-0.5 tw:z-10 tw:cursor-col-resize"
         @mousedown="handleMouseDown"
         data-test="trace-header-resize-btn"
       >
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:relative trace-header-right"
+      class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:relative"
       :style="{
         width: `calc(100% - ${splitterWidth}px)`,
       }"
@@ -77,10 +77,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-for="(tick, index) in baseTracePosition['tics']"
-        class="trace-tic"
+        class="trace-tic tw:absolute tw:-top-0.75 tw:w-px tw:bg-[#cacaca] tw:z-1 tw:h-6.5"
         :class="{
-          'trace-tic-first': index === 0,
-          'bg-dark-tic': store.state.theme === 'dark',
+          'tw:z-5 tw:hidden': index === 0,
+          'tw:bg-[#3c3c3c]': store.state.theme === 'dark',
         }"
         :key="tick.value + index"
         :style="{
@@ -132,60 +132,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-$toolbarHeight: 50px;
-$traceHeaderHeight: 30px;
-$traceChartHeight: 250px;
-
-.trace-header-container {
-  height: 1.875rem;
-  top: 0;
-  z-index: 1999;
-  position: sticky;
-  border-radius: 0.5rem 0.5rem 0 0;
-}
-
-.trace-header-container.bg-grey-9 {
-  border-color: #3c3c3c;
-}
-
-.spans-container {
-  position: relative;
-}
-
-.collapse-btn {
-  width: 0.625rem;
-  height: 0.625rem;
-}
-
-.trace-tic {
-  position: absolute;
-  top: -0.1875rem;
-  width: 0.0625rem;
-  background-color: #cacaca;
-  z-index: 1;
-  height: 1.625rem;
-}
-
-.trace-tic.bg-dark-tic {
-  background-color: #3c3c3c;
-}
-
-.trace-tic-first {
-  z-index: 5;
-  display: none;
-}
-
-.header-bg {
-  background-color: color-mix(in srgb, currentColor 5%, transparent);
-}
-
-.resize-btn {
-  position: absolute;
-  right: -0.625rem;
-  top: -0.125rem;
-  z-index: 10;
-  cursor: col-resize;
-}
-</style>

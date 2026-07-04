@@ -124,39 +124,39 @@ describe("SpanKindBadge", () => {
   // -------------------------------------------------------------------------
 
   describe("CSS modifier class", () => {
-    it('should apply "span-kind-badge--client" class when kind is "Client"', () => {
+    it('should apply "tw:bg-badge-blue-soft-bg" class when kind is "Client"', () => {
       wrapper = mountBadge("Client");
       const badge = wrapper.find('[data-test="trace-tree-span-kind-badge-client"]');
 
-      expect(badge.classes()).toContain("span-kind-badge--client");
+      expect(badge.classes()).toContain("tw:bg-badge-blue-soft-bg");
     });
 
-    it('should apply "span-kind-badge--server" class when kind is "Server"', () => {
+    it('should apply "tw:bg-badge-purple-soft-bg" class when kind is "Server"', () => {
       wrapper = mountBadge("Server");
       const badge = wrapper.find('[data-test="trace-tree-span-kind-badge-server"]');
 
-      expect(badge.classes()).toContain("span-kind-badge--server");
+      expect(badge.classes()).toContain("tw:bg-badge-purple-soft-bg");
     });
 
-    it('should apply "span-kind-badge--producer" class when kind is "Producer"', () => {
+    it('should apply "tw:bg-badge-teal-soft-bg" class when kind is "Producer"', () => {
       wrapper = mountBadge("Producer");
       const badge = wrapper.find('[data-test="trace-tree-span-kind-badge-producer"]');
 
-      expect(badge.classes()).toContain("span-kind-badge--producer");
+      expect(badge.classes()).toContain("tw:bg-badge-teal-soft-bg");
     });
 
-    it('should apply "span-kind-badge--consumer" class when kind is "Consumer"', () => {
+    it('should apply "tw:bg-badge-amber-soft-bg" class when kind is "Consumer"', () => {
       wrapper = mountBadge("Consumer");
       const badge = wrapper.find('[data-test="trace-tree-span-kind-badge-consumer"]');
 
-      expect(badge.classes()).toContain("span-kind-badge--consumer");
+      expect(badge.classes()).toContain("tw:bg-badge-amber-soft-bg");
     });
 
-    it('should apply "span-kind-badge--internal" class when kind is "Internal"', () => {
+    it('should apply "tw:bg-badge-default-soft-bg" class when kind is "Internal"', () => {
       wrapper = mountBadge("Internal");
       const badge = wrapper.find('[data-test="trace-tree-span-kind-badge-internal"]');
 
-      expect(badge.classes()).toContain("span-kind-badge--internal");
+      expect(badge.classes()).toContain("tw:bg-badge-default-soft-bg");
     });
   });
 
