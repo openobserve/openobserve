@@ -2292,7 +2292,8 @@ export default defineComponent({
 </script>
 
 <style>
-/* placeholder overlay — child selector must stay */
+/* placeholder overlay positioning — typewriter text styling is global
+   (styles/tailwind.css), shared with logs/traces/RUM pages. */
 .query-editor-placeholder-overlay {
   position: absolute;
   top: 0;
@@ -2305,19 +2306,6 @@ export default defineComponent({
   pointer-events: none;
   z-index: 1;
   user-select: none;
-
-  .query-editor-placeholder-typewriter {
-    font-family: monospace;
-    font-size: var(--text-base);
-    line-height: 1.3125rem;
-    color: #a0aec0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-:global(.body--dark) .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
-  color: #718096;
 }
 
 /* status bar child/compound selectors — cannot be inlined */

@@ -126,9 +126,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('search.resetFilters')" />
         </OButton>
 
-        <!-- Histogram toggle — moves into More menu below 328px available width -->
+        <!-- ── Pinned toolbar controls ──────────────────────────────────
+             Items pinned out of the More menu render here in fixed order.
+             They collapse back into the menu on narrow widths (see
+             showPinned*/pin* computeds). -->
+
+        <!-- Histogram (pinned by default — see useToolbarPins) -->
         <OButton
-          v-if="!shouldMoveButtonsToMenu"
+          v-if="showPinnedHistogram"
           data-test="logs-search-bar-histogram-btn"
           size="xs"
           variant="outline"
@@ -143,11 +148,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="bar-chart" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="tw:shrink-0" />
           <OTooltip :content="searchObj.meta.showHistogram ? t('search.hideHistogram') : t('search.showHistogramLabel')" shortcut-id="logsToggleHistogram" />
         </OButton>
-
-        <!-- ── Pinned toolbar controls ──────────────────────────────────
-             Items pinned out of the More menu render here in fixed order.
-             They collapse back into the menu on narrow widths (see
-             showPinned*/pin* computeds). -->
 
         <!-- SQL Mode (pinned) -->
         <OButton
@@ -291,9 +291,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.resetFilters") }}
             </ODropdownItem>
 
-            <!-- Histogram (shown here only when toolbar is too narrow for inline button) -->
+            <!-- Histogram — pinned copy renders on the toolbar -->
             <ODropdownItem
-              v-if="shouldMoveButtonsToMenu"
               data-test="logs-search-bar-menu-histogram-btn"
               @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
             >
@@ -304,13 +303,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               {{ t("search.showHistogramLabel") }}
               <template #icon-right>
-                <OSwitch
-                  v-model="searchObj.meta.showHistogram"
-                  size="md"
-                  data-test="logs-search-bar-show-histogram-toggle-btn"
-                  class="tw:ml-auto"
-                  @click.stop
-                />
+                <span class="tw:ml-auto tw:flex tw:items-center tw:gap-1">
+                  <OSwitch
+                    v-model="searchObj.meta.showHistogram"
+                    size="md"
+                    data-test="logs-search-bar-show-histogram-toggle-btn"
+                    @click.stop
+                  />
+                  <OButton
+                    data-test="logs-search-bar-menu-pin-histogram-btn"
+                    variant="ghost-neutral"
+                    size="icon-sm"
+                    :title="isPinned('histogram') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                    @click.stop="togglePin('histogram')"
+                  >
+                    <OIcon :name="isPinned('histogram') ? 'keep' : 'keep-outline'" size="sm" />
+                  </OButton>
+                </span>
               </template>
             </ODropdownItem>
 
@@ -2404,35 +2413,33 @@ export default defineComponent({
     // Each threshold has a small buffer (+16px) so collapse fires before clipping.
     const shouldHideToolbarButtonText = computed(() => availableLeftWidth.value < 720);
     const toolbarToggleIconOnly       = computed(() => availableLeftWidth.value < 568);
-    const shouldMoveButtonsToMenu     = computed(() => availableLeftWidth.value < 328);
     const toolbarMoveResetToMenu      = computed(() => availableLeftWidth.value < 248);
     const toolbarToggleAsDropdown     = computed(() => availableLeftWidth.value < 176);
 
     // ── Pinned toolbar items ──────────────────────────────────────────────
     // Items pinned out of the "More" menu render as fixed-position toolbar
-    // controls. They share the left section with the toggle group / reset /
-    // histogram, so we allocate the leftover width to pinned items with a running
-    // budget: the More button is always reserved, then pinned items are kept in
-    // priority order (sql mode kept longest, syntax guide dropped first).
+    // controls. They share the left section with the toggle group / reset, so we
+    // allocate the leftover width to pinned items with a running budget: the More
+    // button is always reserved, then pinned items are kept in priority order
+    // (histogram kept longest, syntax guide dropped first).
     const { isPinned, togglePin } = useToolbarPins();
 
     // Approximate rendered widths (px) of each pinned control and of the fixed
     // left-section content, used only to decide how many pinned items fit before
     // they would clip. Hidden pinned items stay reachable inside the More menu.
-    const PIN_ITEM_WIDTH = { sqlMode: 46, quickMode: 46, savedViews: 62 };
+    const PIN_ITEM_WIDTH = { histogram: 46, sqlMode: 46, quickMode: 46, savedViews: 62 };
     const SYNTAX_GUIDE_LABEL_WIDTH = 108;
     const SYNTAX_GUIDE_ICON_WIDTH = 40;
     const PIN_ITEM_GAP = 4;
 
     // Width consumed by the always-present left content (toggle group in its
-    // current collapse state, reset, histogram) plus the reserved More button.
+    // current collapse state, reset) plus the reserved More button.
     const baseReservedWidth = computed(() => {
       let w = 0;
       if (toolbarToggleAsDropdown.value) w += 120;
       else if (toolbarToggleIconOnly.value) w += 190;
       else w += 350;
       if (!toolbarMoveResetToMenu.value) w += shouldHideToolbarButtonText.value ? 40 : 88;
-      if (!shouldMoveButtonsToMenu.value) w += 64; // histogram button
       w += 92; // More button (always visible)
       w += 24; // inter-item gaps / padding buffer
       return w;
@@ -2448,6 +2455,7 @@ export default defineComponent({
       const budget = pinBudget.value;
       let used = 0;
       const res = {
+        histogram: false,
         sqlMode: false,
         quickMode: false,
         savedViews: false,
@@ -2462,6 +2470,7 @@ export default defineComponent({
         }
         return false;
       };
+      if (isPinned("histogram")) res.histogram = tryFit(PIN_ITEM_WIDTH.histogram);
       if (isPinned("sqlMode")) res.sqlMode = tryFit(PIN_ITEM_WIDTH.sqlMode);
       if (isPinned("quickMode")) res.quickMode = tryFit(PIN_ITEM_WIDTH.quickMode);
       if (isPinned("savedViews")) res.savedViews = tryFit(PIN_ITEM_WIDTH.savedViews);
@@ -2478,6 +2487,7 @@ export default defineComponent({
 
     // Function editor lives on the right toolbar (next to the date picker), so it
     // is not part of the left-section budget.
+    const showPinnedHistogram      = computed(() => pinnedVisibility.value.histogram);
     const showPinnedSqlMode        = computed(() => pinnedVisibility.value.sqlMode);
     const showPinnedQuickMode      = computed(() => pinnedVisibility.value.quickMode);
     const showPinnedFunctionEditor = computed(() => isPinned("functionEditor"));
@@ -5217,12 +5227,12 @@ export default defineComponent({
       toolbarRightRef,
       shouldHideToolbarButtonText,
       toolbarToggleIconOnly,
-      shouldMoveButtonsToMenu,
       toolbarMoveResetToMenu,
       toolbarToggleAsDropdown,
       isPinned,
       togglePin,
       pinSyntaxGuideIconOnly,
+      showPinnedHistogram,
       showPinnedSqlMode,
       showPinnedQuickMode,
       showPinnedFunctionEditor,
@@ -5587,21 +5597,6 @@ export default defineComponent({
 }
 
 
-/* Query editor placeholder — descendant text styling */
-.query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
-  /* Mirror Monaco's rendered text so the placeholder reads as the future
-     typed query, not a different (proportional) font on a different baseline:
-     same monospace family and same ~21px (1.5 × 14px) line height. */
-  font-family: monospace;
-  font-size: var(--text-base);
-  line-height: 1.3125rem;
-  color: #a0aec0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.body--dark .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
-  color: #718096;
-}
+/* Query editor placeholder text styling is global (styles/tailwind.css) —
+   shared with traces, RUM sessions, RUM error tracking, and alerts. */
 </style>

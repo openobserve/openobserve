@@ -20,22 +20,30 @@ export function isMacOS(): boolean {
   return /mac|iphone|ipad|ipod/i.test(source);
 }
 
+/** ARIA roles that represent a text-entry widget even when not backed by a native input. */
+const INPUT_ROLES = ["textbox", "combobox", "searchbox", "spinbutton"];
+
 /**
- * Returns true when no text-input element has focus.
+ * Returns true when the focused element is a text-input.
  * Single-letter shortcuts should guard with this to avoid firing while typing.
+ *
+ * Catches native inputs, any contentEditable element (CodeMirror, ProseMirror,
+ * RichTextInput, inline-editable table cells, etc.), and custom widgets that
+ * expose an input-like ARIA role — regardless of which component built them.
+ *
+ * @param target Element to test instead of `document.activeElement`. Event
+ * handlers should pass the keydown's real target (`e.composedPath()[0]`) so
+ * inputs inside shadow DOM are detected; with no argument the current
+ * `document.activeElement` is used.
  */
-export function isInputFocused(): boolean {
-  const el = document.activeElement;
-  if (!el || el === document.body) return false;
+export function isInputFocused(target?: EventTarget | null): boolean {
+  const el = (target ?? document.activeElement) as HTMLElement | null;
+  if (!el || el === document.body || !(el instanceof Element)) return false;
   const tag = el.tagName.toLowerCase();
-  // Only treat contentEditable as an input when it has role="textbox"
-  // (CodeMirror, ProseMirror, etc.). Generic contentEditable containers
-  // (e.g. panel drag handles) should not block shortcuts.
-  const isContentEditableInput =
-    (el as HTMLElement).isContentEditable &&
-    (el.getAttribute("role") === "textbox" ||
-      el.closest('[role="textbox"]') !== null);
-  return ["input", "textarea", "select"].includes(tag) || isContentEditableInput;
+  if (["input", "textarea", "select"].includes(tag)) return true;
+  if ((el as HTMLElement).isContentEditable) return true;
+  const role = el.getAttribute("role");
+  return !!role && INPUT_ROLES.includes(role);
 }
 
 /**

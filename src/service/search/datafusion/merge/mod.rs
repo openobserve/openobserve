@@ -42,11 +42,16 @@ use {
 };
 
 pub enum MergeParquetResult {
-    Single(Vec<u8>, FileMeta),
+    Single {
+        buf: Vec<u8>,
+        file_meta: FileMeta,
+        file_format: FileFormat,
+    },
     #[allow(unused)]
     Multiple {
         bufs: Vec<Vec<u8>>,
         file_metas: Vec<FileMeta>,
+        file_format: FileFormat,
     },
 }
 
@@ -62,6 +67,8 @@ pub async fn merge_parquet_files(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
+    let file_format = merge_output_file_format(stream_type, is_ingester, cfg.common.file_format);
+
     #[cfg(feature = "enterprise")]
     if stream_type == StreamType::Metrics && !is_ingester {
         let rule = get_largest_downsampling_rule(stream_name, metadata.max_ts);
@@ -75,6 +82,7 @@ pub async fn merge_parquet_files(
                 bloom_filter_fields,
                 rule,
                 &metadata,
+                file_format,
             )
             .await;
         }
@@ -150,8 +158,7 @@ pub async fn merge_parquet_files(
         Ok(())
     });
 
-    // write batches to the appropriate format
-    let buf = match cfg.common.file_format {
+    let buf = match file_format {
         FileFormat::Parquet => {
             write_parquet(
                 &schema,
@@ -172,7 +179,23 @@ pub async fn merge_parquet_files(
     );
 
     metadata.compressed_size = buf.len() as i64;
-    Ok(MergeParquetResult::Single(buf, metadata))
+    Ok(MergeParquetResult::Single {
+        buf,
+        file_meta: metadata,
+        file_format,
+    })
+}
+
+fn merge_output_file_format(
+    stream_type: StreamType,
+    is_ingester: bool,
+    configured: FileFormat,
+) -> FileFormat {
+    if is_ingester {
+        FileFormat::for_ingester_stream(stream_type, configured)
+    } else {
+        configured
+    }
 }
 
 async fn write_parquet(
@@ -272,6 +295,26 @@ mod tests {
             Field::new("field1", DataType::Utf8, true),
             Field::new("field2", DataType::Int64, true),
         ]))
+    }
+
+    #[test]
+    fn test_merge_output_file_format_uses_parquet_for_ingester_metrics() {
+        assert_eq!(
+            merge_output_file_format(StreamType::Metrics, true, FileFormat::Vortex),
+            FileFormat::Parquet
+        );
+        assert_eq!(
+            merge_output_file_format(StreamType::Logs, true, FileFormat::Vortex),
+            FileFormat::Vortex
+        );
+        assert_eq!(
+            merge_output_file_format(StreamType::Metrics, false, FileFormat::Vortex),
+            FileFormat::Vortex
+        );
+        assert_eq!(
+            merge_output_file_format(StreamType::Logs, false, FileFormat::Parquet),
+            FileFormat::Parquet
+        );
     }
 
     #[tokio::test]

@@ -349,22 +349,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div
-            class="histogram-empty"
-            data-test="logs-search-no-data-histogram"
+          <!-- Same no-data treatment as dashboard panels (PanelSchemaRenderer);
+               inline min-height/padding overridden to fit the 6.25rem strip. -->
+          <OEmptyState
             v-else-if="
               searchObj.meta.showHistogram &&
               !searchObj.loadingHistogram &&
               !searchObj.loading
             "
-          >
-            <h6 class="tw:text-center">
-              <span class="histogram-empty__message">
-                <OIcon name="warning" size="xs"></OIcon> No
-                data found for histogram.</span
-              >
-            </h6>
-          </div>
+            size="inline"
+            icon="bar-chart"
+            title="No Data"
+            :backdrop="false"
+            data-test="logs-search-no-data-histogram"
+            class="histogram-empty tw:!min-h-0 tw:!p-2"
+          />
 
           <div
             class="histogram-empty"
@@ -710,6 +709,7 @@ import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -723,6 +723,7 @@ export default defineComponent({
     OTooltip,
     OSelect,
     OPagination,
+    OEmptyState,
     LoadingProgress,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
