@@ -17,15 +17,16 @@ use axum::{extract::Path, response::Response};
 use config::meta::folder::Folder;
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::models::folders::{
-        CreateFolderRequestBody, CreateFolderResponseBody, FolderType, GetFolderResponseBody,
-        ListFoldersResponseBody, UpdateFolderRequestBody,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::{
+        extractors::Headers,
+        models::folders::{
+            CreateFolderRequestBody, CreateFolderResponseBody, FolderType, GetFolderResponseBody,
+            ListFoldersResponseBody, UpdateFolderRequestBody,
+        },
     },
     service::folders::{self, FolderError},
 };
-#[cfg(feature = "enterprise")]
-use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
 impl From<FolderError> for Response {
     fn from(value: FolderError) -> Self {
@@ -93,8 +94,21 @@ impl From<FolderError> for Response {
 )]
 pub async fn create_folder(
     Path((org_id, folder_type)): Path<(String, FolderType)>,
+    Headers(user_email): Headers<UserEmail>,
     axum::Json(body): axum::Json<CreateFolderRequestBody>,
 ) -> Response {
+    // Non-enterprise: no RBAC middleware, so enforce Admin/Root role explicitly here.
+    #[cfg(not(feature = "enterprise"))]
+    if let Err(resp) = crate::handler::http::auth::oss_role_gate::assert_admin_role(
+        &org_id,
+        &user_email.user_id,
+    )
+    .await
+    {
+        return resp;
+    }
+    let _ = &user_email; // silence unused warning on enterprise builds
+
     let folder = body.into();
     match folders::save_folder(&org_id, folder, folder_type.into(), false).await {
         Ok(folder) => {
@@ -141,8 +155,21 @@ pub async fn create_folder(
 )]
 pub async fn update_folder(
     Path((org_id, folder_type, folder_id)): Path<(String, FolderType, String)>,
+    Headers(user_email): Headers<UserEmail>,
     axum::Json(body): axum::Json<UpdateFolderRequestBody>,
 ) -> Response {
+    // Non-enterprise: no RBAC middleware, so enforce Admin/Root role explicitly here.
+    #[cfg(not(feature = "enterprise"))]
+    if let Err(resp) = crate::handler::http::auth::oss_role_gate::assert_admin_role(
+        &org_id,
+        &user_email.user_id,
+    )
+    .await
+    {
+        return resp;
+    }
+    let _ = &user_email; // silence unused warning on enterprise builds
+
     let folder = body.into();
     match folders::update_folder(&org_id, &folder_id, folder_type.into(), folder).await {
         Ok(_) => MetaHttpResponse::ok("Folder updated"),
@@ -181,8 +208,19 @@ pub async fn update_folder(
 #[allow(unused_variables)]
 pub async fn list_folders(
     Path((org_id, folder_type)): Path<(String, FolderType)>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    // Non-enterprise: no RBAC middleware, so enforce Admin/Root role explicitly here.
+    #[cfg(not(feature = "enterprise"))]
+    if let Err(resp) = crate::handler::http::auth::oss_role_gate::assert_admin_role(
+        &org_id,
+        &user_email.user_id,
+    )
+    .await
+    {
+        return resp;
+    }
+
     #[cfg(not(feature = "enterprise"))]
     let user_id = None;
 
@@ -303,7 +341,20 @@ pub async fn get_folder_by_name(
 )]
 pub async fn delete_folder(
     Path((org_id, folder_type, folder_id)): Path<(String, FolderType, String)>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    // Non-enterprise: no RBAC middleware, so enforce Admin/Root role explicitly here.
+    #[cfg(not(feature = "enterprise"))]
+    if let Err(resp) = crate::handler::http::auth::oss_role_gate::assert_admin_role(
+        &org_id,
+        &user_email.user_id,
+    )
+    .await
+    {
+        return resp;
+    }
+    let _ = &user_email; // silence unused warning on enterprise builds
+
     match folders::delete_folder(&org_id, &folder_id, folder_type.into()).await {
         Ok(()) => MetaHttpResponse::ok("Folder deleted"),
         Err(err) => err.into(),
@@ -568,6 +619,62 @@ pub mod deprecated {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Regression: OSS `POST /api/v2/{org}/folders/{type}` must reject a
+    /// `service_account`-role caller with HTTP 403 before writing to the
+    /// folders table. Fails on the unfixed handler (which returned 200 and
+    /// created the folder), passes once the handler calls
+    /// `oss_role_gate::assert_admin_role`. Update/delete/list share the same
+    /// invariant (asserted at the helper level, see
+    /// `handler/http/auth/oss_role_gate.rs`).
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn service_account_cannot_create_folder_regression() {
+        use axum::extract::Path;
+        use config::meta::user::UserRole;
+        use infra::table::org_users::OrgUserRecord;
+
+        use crate::{
+            common::infra::config::ORG_USERS,
+            handler::http::extractors::Headers as HeadersExtractor,
+        };
+
+        let org = "org-folders-create-regression";
+        let sa_email = "folders-create-sa-regression@example.test";
+        let key = format!("{org}/{sa_email}");
+        ORG_USERS.insert(
+            key,
+            OrgUserRecord {
+                email: sa_email.to_string(),
+                org_id: org.to_string(),
+                role: UserRole::ServiceAccount,
+                token: "test-token".to_string(),
+                rum_token: None,
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+
+        let body = CreateFolderRequestBody {
+            name: "sa-attempt-folder".to_string(),
+            description: "created by SA — must be blocked".to_string(),
+        };
+
+        let resp = create_folder(
+            Path((org.to_string(), FolderType::Dashboards)),
+            HeadersExtractor(UserEmail {
+                user_id: sa_email.to_string(),
+            }),
+            axum::Json(body),
+        )
+        .await;
+
+        assert_eq!(
+            resp.status().as_u16(),
+            403,
+            "OSS service_account must be blocked from creating folders"
+        );
+    }
 
     #[test]
     fn test_folder_error_conversion() {

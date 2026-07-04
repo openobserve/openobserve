@@ -96,6 +96,17 @@ pub async fn list(
     Headers(user_email): Headers<UserEmail>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
+    // Non-enterprise: no RBAC middleware, so enforce Admin/Root role explicitly here.
+    #[cfg(not(feature = "enterprise"))]
+    if let Err(resp) = crate::handler::http::auth::oss_role_gate::assert_admin_role(
+        &org_id,
+        &user_email.user_id,
+    )
+    .await
+    {
+        return resp;
+    }
+
     let list_all = match query.get("list_all") {
         Some(v) => v.parse::<bool>().unwrap_or(false),
         None => false,
@@ -1210,5 +1221,53 @@ mod tests {
         assert!(result.is_some());
         let role_response = result.unwrap();
         assert_eq!(role_response.value, "admin");
+    }
+
+    /// Regression: OSS `GET /api/{org}/users` must reject a
+    /// `service_account`-role caller with HTTP 403 before enumerating
+    /// organization members. Fails on the unfixed handler (which returned
+    /// 200 with the full member roster) and passes once the handler calls
+    /// the shared `oss_role_gate::assert_admin_role`.
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn service_account_cannot_list_users_regression() {
+        use axum::extract::{Path, Query};
+        use infra::table::org_users::OrgUserRecord;
+
+        use crate::{
+            common::infra::config::ORG_USERS,
+            handler::http::extractors::Headers as HeadersExtractor,
+        };
+
+        let org = "org-users-list-regression";
+        let sa_email = "users-list-sa-regression@example.test";
+        let key = format!("{org}/{sa_email}");
+        ORG_USERS.insert(
+            key,
+            OrgUserRecord {
+                email: sa_email.to_string(),
+                org_id: org.to_string(),
+                role: UserRole::ServiceAccount,
+                token: "test-token".to_string(),
+                rum_token: None,
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+
+        let resp = list(
+            Path(org.to_string()),
+            HeadersExtractor(UserEmail {
+                user_id: sa_email.to_string(),
+            }),
+            Query(HashMap::new()),
+        )
+        .await;
+
+        assert_eq!(
+            resp.status().as_u16(),
+            403,
+            "OSS service_account must be blocked from listing org members"
+        );
     }
 }

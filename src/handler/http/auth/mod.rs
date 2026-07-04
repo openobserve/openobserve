@@ -15,5 +15,6 @@
 
 pub mod action_server;
 pub mod jwt;
+pub mod oss_role_gate;
 pub mod token;
 pub mod validator;

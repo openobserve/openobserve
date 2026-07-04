@@ -117,6 +117,17 @@ pub async fn create_report(
     Headers(user_email): Headers<UserEmail>,
     axum::Json(report): axum::Json<Report>,
 ) -> Response {
+    // Non-enterprise: no RBAC middleware, so enforce Admin/Root role explicitly here.
+    #[cfg(not(feature = "enterprise"))]
+    if let Err(resp) = crate::handler::http::auth::oss_role_gate::assert_admin_role(
+        &org_id,
+        &user_email.user_id,
+    )
+    .await
+    {
+        return resp;
+    }
+
     let mut report = report;
     if report.owner.is_empty() {
         report.owner = user_email.user_id;
@@ -208,8 +219,19 @@ pub async fn update_report(
 pub async fn list_reports(
     Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    // Non-enterprise: no RBAC middleware, so enforce Admin/Root role explicitly here.
+    #[cfg(not(feature = "enterprise"))]
+    if let Err(resp) = crate::handler::http::auth::oss_role_gate::assert_admin_role(
+        &org_id,
+        &user_email.user_id,
+    )
+    .await
+    {
+        return resp;
+    }
+
     let folder = query.get("folder_id").map(|field| field.to_owned());
     let dashboard = query.get("dashboard_id").map(|field| field.to_owned());
     let destination_less = query
@@ -550,6 +572,17 @@ pub async fn create_report_v2(
     Headers(user_email): Headers<UserEmail>,
     axum::Json(mut report): axum::Json<Report>,
 ) -> Response {
+    // Non-enterprise: no RBAC middleware, so enforce Admin/Root role explicitly here.
+    #[cfg(not(feature = "enterprise"))]
+    if let Err(resp) = crate::handler::http::auth::oss_role_gate::assert_admin_role(
+        &org_id,
+        &user_email.user_id,
+    )
+    .await
+    {
+        return resp;
+    }
+
     let folder_id = get_folder(uri.query().unwrap_or(""));
     if report.owner.is_empty() {
         report.owner = user_email.user_id;
@@ -586,8 +619,19 @@ pub async fn create_report_v2(
 pub async fn list_reports_v2(
     Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    // Non-enterprise: no RBAC middleware, so enforce Admin/Root role explicitly here.
+    #[cfg(not(feature = "enterprise"))]
+    if let Err(resp) = crate::handler::http::auth::oss_role_gate::assert_admin_role(
+        &org_id,
+        &user_email.user_id,
+    )
+    .await
+    {
+        return resp;
+    }
+
     // Reuse the v1 list handler logic — it already reads ?folder as a filter.
     // Re-map the query key from "folder" to "folder_id" if needed by the service.
     let folder = query.get("folder").map(|s| s.to_owned());
@@ -960,6 +1004,64 @@ mod tests {
     use axum::{http::StatusCode, response::Response};
 
     use crate::service::dashboards::reports::ReportError;
+
+    /// Regression: OSS `POST /api/{org}/reports` must reject a
+    /// `service_account`-role caller with HTTP 403 before saving a
+    /// scheduled report. Fails on the unfixed handler (which returned 200
+    /// and persisted the report), passes once the handler calls
+    /// `oss_role_gate::assert_admin_role`. List/v2 twins share the same
+    /// invariant (asserted at the helper level in
+    /// `handler/http/auth/oss_role_gate.rs`).
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn service_account_cannot_create_report_regression() {
+        use axum::extract::Path;
+        use config::meta::{dashboards::reports::Report, user::UserRole};
+        use infra::table::org_users::OrgUserRecord;
+
+        use super::create_report;
+        use crate::{
+            common::{infra::config::ORG_USERS, utils::auth::UserEmail},
+            handler::http::extractors::Headers as HeadersExtractor,
+        };
+
+        let org = "org-reports-create-regression";
+        let sa_email = "reports-create-sa-regression@example.test";
+        let key = format!("{org}/{sa_email}");
+        ORG_USERS.insert(
+            key,
+            OrgUserRecord {
+                email: sa_email.to_string(),
+                org_id: org.to_string(),
+                role: UserRole::ServiceAccount,
+                token: "test-token".to_string(),
+                rum_token: None,
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+
+        let report = Report {
+            name: "sa-attempt-report".to_string(),
+            org_id: org.to_string(),
+            ..Default::default()
+        };
+
+        let resp = create_report(
+            Path(org.to_string()),
+            HeadersExtractor(UserEmail {
+                user_id: sa_email.to_string(),
+            }),
+            axum::Json(report),
+        )
+        .await;
+
+        assert_eq!(
+            resp.status().as_u16(),
+            403,
+            "OSS service_account must be blocked from creating scheduled reports"
+        );
+    }
 
     fn status(err: ReportError) -> StatusCode {
         Response::from(err).status()
