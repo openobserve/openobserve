@@ -1,8 +1,0 @@
-[
-  { "title": "Preview popup is fully contained within the viewport", "action": "new", "verifies": "Preview popup bounding box is entirely inside viewport bounds (no overflow off any edge)" },
-  { "title": "Preview popup renders pipeline flow diagram with nodes", "action": "new", "verifies": "VueFlow canvas and custom nodes render inside the preview popup with overflow:auto CSS" },
-  { "title": "Preview popup dismisses when mouse leaves the trigger", "action": "new", "verifies": "Preview tooltip hides when mouse moves away from the view/eye button" },
-  { "title": "Action buttons are hidden in the preview popup (read-only mode)", "action": "new", "verifies": "Node action buttons (.node-action-buttons) are not visible inside the preview popup" },
-  { "title": "Empty pipeline preview shows blank canvas", "action": "new", "verifies": "Empty pipeline (zero nodes) shows VueFlow canvas with no custom nodes and no crash" },
-  { "title": "Preview popup scrolls when pipeline content overflows 500x300 container", "action": "new", "verifies": "Scrollbars appear when nodes exceed 500x300; popup stays within viewport after scrolling" }
-]

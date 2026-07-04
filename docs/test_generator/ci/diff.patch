@@ -1,8 +1,0 @@
-=== E2E-COUNCIL: ISSUE-MODE (no PR diff — regression coverage for a closed bug) ===
-Issue: #12647
-Title: Pipelines page: preview popup on View hover overflows off the right edge of the viewport
-Area labels: <none>
-
-The bug report body has been written to feature_hint.txt. Use it as the full
-feature description. No code change / no PR exists — you're generating a
-regression test that PROTECTS the fixed behavior going forward.

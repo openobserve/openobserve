@@ -336,8 +336,12 @@ export class PipelinesPage {
 
         // ========== Preview Popup Locators (Bug: preview popup overflow) ==========
         this.previewTooltip = page.locator('.pipeline-view-tooltip');
-        this.previewVueFlow = page.locator('.pipeline-view-tooltip [data-test="vue-flow"]');
-        this.previewCustomNodes = page.locator('.pipeline-view-tooltip [data-test="custom-node"]');
+        // VueFlow component renders a div.vue-flow inside the tooltip (no data-test on it)
+        this.previewVueFlow = page.locator('.pipeline-view-tooltip .vue-flow');
+        // Custom nodes use data-test^="pipeline-node-" (e.g. pipeline-node-input-stream-node)
+        this.previewCustomNodes = page.locator('.pipeline-view-tooltip [data-test^="pipeline-node-"]');
+        // The VueFlow pane (inner scrollable area with transforms) — used for overflow checks
+        this.previewVueFlowPane = page.locator('.pipeline-view-tooltip .vue-flow__pane');
         this.previewNodeActionButtons = page.locator('.pipeline-view-tooltip .node-action-buttons');
         this.pipelineListPage = page.locator('[data-test="pipeline-list-page"]');
         this.pipelineListTable = page.locator('[data-test="pipeline-list-table"]');
@@ -1778,8 +1782,27 @@ export class PipelinesPage {
             "Content-Type": "application/json",
         };
 
-        // Clean conditions to remove UI-only fields
-        const cleanedConditions = this.cleanConditionsForAPI(conditions);
+        // Clean conditions to remove UI-only fields, then wrap in v2 group format
+        // The v2 condition API requires: { filterType: "group", logicalOperator: "AND",
+        //   conditions: [{ filterType: "condition", column, operator, value, logicalOperator }] }
+        const cleaned = this.cleanConditionsForAPI(conditions);
+        let cleanedConditions = cleaned;
+        if (cleaned.filterType === 'condition') {
+            // Single flat condition → wrap in v2 group
+            cleanedConditions = {
+                filterType: 'group',
+                logicalOperator: 'AND',
+                conditions: [
+                    {
+                        filterType: 'condition',
+                        column: cleaned.column,
+                        operator: cleaned.operator,
+                        value: cleaned.value,
+                        logicalOperator: 'AND',
+                    },
+                ],
+            };
+        }
         testLogger.info('Cleaned conditions', { cleaned: JSON.stringify(cleanedConditions, null, 2) });
 
         // Generate unique node IDs
@@ -4070,11 +4093,11 @@ export class PipelinesPage {
      * (read-only mode: CSS `display: none !important` hides them).
      */
     async expectActionButtonsHiddenInPreview() {
-        // Check that the action-buttons container is either not present or not visible
-        const count = await this.previewNodeActionButtons.count();
-        if (count > 0) {
-            await expect(this.previewNodeActionButtons.first()).not.toBeVisible({ timeout: 3000 });
-        }
+        // Assert action buttons are NOT visible inside the preview popup.
+        // Playwright's not.toBeVisible() passes when the locator resolves to 0
+        // elements, so this correctly handles both "absent from DOM" and
+        // "present but hidden via display:none !important".
+        await expect(this.previewNodeActionButtons).not.toBeVisible({ timeout: 3000 });
         testLogger.info('Action buttons are hidden in preview popup (read-only mode confirmed)');
     }
 
@@ -4217,12 +4240,19 @@ export class PipelinesPage {
 
         // Create intermediate condition nodes spread across and beyond the 500x300 container
         const intermediateIds = [];
+        // v2 condition API requires group-wrapped format with logicalOperator
         const conditionTemplate = {
-            filterType: "condition",
-            column: "kubernetes_container_name",
-            operator: "Contains",
-            value: "test",
-            values: ["test"]
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: [
+                {
+                    filterType: "condition",
+                    column: "kubernetes_container_name",
+                    operator: "Contains",
+                    value: "test",
+                    logicalOperator: "AND",
+                },
+            ],
         };
         for (let i = 0; i < intermediateNodeCount; i++) {
             const nodeId = `cond-${Date.now()}-${i}`;
