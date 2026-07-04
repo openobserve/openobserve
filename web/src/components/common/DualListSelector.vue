@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(item, index) in filteredSelected"
             :key="item.value"
             data-test="dual-list-selector-left-item"
-            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
             :class="{ 'tw:bg-muted/30': leftSelected.includes(item.value) }"
             @click="toggleLeftSelection(item.value)"
           >
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="item in filteredAvailable"
             :key="item.value"
             data-test="dual-list-selector-right-item"
-            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
             :class="{ 'tw:bg-muted/30': rightSelected.includes(item.value) }"
             @click="toggleRightSelection(item.value)"
           >

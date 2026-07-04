@@ -79,6 +79,8 @@ import Schema from "~icons/material-symbols/schema-outline";
 import Wifi from "~icons/material-symbols/wifi";
 import Window from "~icons/material-symbols/window-outline";
 import Javascript from "~icons/material-symbols/javascript";
+import Keep from "~icons/material-symbols/keep";
+import KeepOutline from "~icons/material-symbols/keep-outline";
 import KeyboardArrowDown from "~icons/material-symbols/keyboard-arrow-down";
 import KeyboardDoubleArrowLeft from "~icons/material-symbols/keyboard-double-arrow-left";
 import KeyboardDoubleArrowRight from "~icons/material-symbols/keyboard-double-arrow-right";
@@ -316,7 +318,6 @@ import CallReceived from "~icons/material-symbols/call-received";
 import Inbox from "~icons/material-symbols/inbox-outline";
 import StarRate from "~icons/material-symbols/star-rate-outline";
 import CardMembership from "~icons/material-symbols/card-membership-outline";
-import PersonPinCircle from "~icons/material-symbols/person-pin-circle-outline";
 import Domain from "~icons/material-symbols/domain";
 import DataArray from "~icons/material-symbols/data-array";
 import Mouse from "~icons/material-symbols/mouse-outline";
@@ -393,6 +394,8 @@ export const iconRegistry = {
   "wifi": Wifi,
   "window": Window,
   "javascript": Javascript,
+  "keep": Keep,
+  "keep-outline": KeepOutline,
   "keyboard-arrow-down": KeyboardArrowDown,
   "keyboard-double-arrow-left": KeyboardDoubleArrowLeft,
   "keyboard-double-arrow-right": KeyboardDoubleArrowRight,
@@ -636,7 +639,6 @@ export const iconRegistry = {
   "inbox": Inbox,
   "star-rate": StarRate,
   "card-membership": CardMembership,
-  "person-pin-circle": PersonPinCircle,
   "domain": Domain,
   "data-array": DataArray,
   "mouse": Mouse,

@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="organizationToDisplay"
                 searchable
                 placeholder="Select Organization"
-                class="tw:py-2 no-case tw:mr-3 input-width org-select"
+                class="tw:py-2 no-case tw:mr-3 tw:w-[300px] input-width org-select"
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="handleOrgSelect"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 clearable
                 placeholder="Select API Category"
                 style="padding: 0px"
-                class="no-case tw:mr-3 input-width tw:ml-3 category-select"
+                class="no-case tw:mr-3 tw:w-[300px] input-width tw:ml-3 category-select"
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="handleApiCategorySelect"
@@ -167,7 +167,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               debounce="500"
               :class="{
                 'editable-cell': editTable,
+                'tw:px-[10px] tw:py-0': editTable && store.state.theme !== 'dark',
+                'tw:bg-[#f1f1ee]': editTable && store.state.theme !== 'dark',
+                'tw:px-[10px]': editTable && store.state.theme === 'dark',
                 'edited-input': isEdited(row.module_name, col),
+                'tw:bg-[#bfc3f4] tw:text-black tw:font-medium': isEdited(row.module_name, col) && store.state.theme !== 'dark',
+                'tw:bg-[#f6f6f6] tw:text-black tw:font-medium tw:[padding:0px!important]': isEdited(row.module_name, col) && store.state.theme === 'dark',
               }"
               @input="(event: any) => handleInputChange('', row.module_name, value, col, event.target.innerText)"
               @keypress="restrictToNumbers"
@@ -192,7 +197,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="json-view-roles-editor"
           ref="queryEditorRef"
           editor-id="json-view-roles-editor"
-          class="monaco-editor"
           :debounceTime="300"
           v-model:query="jsonStrToDisplay"
           language="json"
@@ -251,7 +255,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     debounce="500"
                     :class="{
                       'editable-cell': true,
+                      'tw:px-[10px] tw:py-0': store.state.theme !== 'dark',
+                      'tw:bg-[#f1f1ee]': store.state.theme !== 'dark',
+                      'tw:px-[10px]': store.state.theme === 'dark',
                       'edited-input': isEdited(moduleRow.module_name, col),
+                      'tw:bg-[#bfc3f4] tw:text-black tw:font-medium': isEdited(moduleRow.module_name, col) && store.state.theme !== 'dark',
+                      'tw:bg-[#f6f6f6] tw:text-black tw:font-medium tw:[padding:0px!important]': isEdited(moduleRow.module_name, col) && store.state.theme === 'dark',
                     }"
                     @input="(event: any) => handleInputChange(row.role_name, moduleRow.module_name, moduleRow[col], col, event.target.innerText)"
                     @keypress="restrictToNumbers"
@@ -277,7 +286,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="json-view-roles-editor"
           ref="queryEditorRef"
           editor-id="json-view-roles-editor"
-          class="monaco-editor"
           :debounceTime="300"
           v-model:query="jsonStrToDisplay"
           language="json"
@@ -311,7 +319,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:pr-3 tw:py-2 tw:gap-2 tw:border-t tw:border-border-default"
+        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:sticky tw:bottom-0 tw:top-0 tw:z-[100] tw:pr-3 tw:py-2 tw:gap-2 tw:border-t tw:border-border-default"
+        :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-primary-background)]' : 'tw:bg-white'"
         v-if="editTable && activeType == 'table'"
       >
         <OButton
@@ -331,7 +340,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:pr-3 tw:mt-3 tw:gap-2 tw:border-t tw:border-border-default"
+        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:sticky tw:bottom-0 tw:top-0 tw:z-[100] tw:pr-3 tw:mt-3 tw:gap-2 tw:border-t tw:border-border-default"
+        :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-primary-background)]' : 'tw:bg-white'"
         v-if="editTable && activeType == 'json'"
       >
         <OButton
@@ -814,7 +824,6 @@ export default defineComponent({
           isOrgLoading.value = false;
         } catch (error) {
           isOrgLoading.value = false;
-          console.log(error);
         } finally {
           isOrgLoading.value = false;
         }
@@ -917,7 +926,6 @@ export default defineComponent({
         resultTotal.value = rolesLimitRows.value.length;
         isRolesLoading.value = false;
       } catch (error) {
-        console.log(error);
         isRolesLoading.value = false;
       }
     };
@@ -1631,121 +1639,13 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
+<style>
 .quota-page {
   input[type="number"]::-webkit-outer-spin-button,
   input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
   }
-  .title-height {
-    height: 40px;
-    min-height: 40px;
-  }
-  .input-width {
-    width: 300px;
-  }
-}
-.floating-buttons {
-  position: sticky;
-  bottom: 0;
-  top: 0;
-  z-index: 100; /* Ensure it stays on top of table content */
-  width: 100%;
-}
-.dark-theme-page {
-  .floating-buttons {
-    background-color: $dark;
-  }
-}
-.light-theme-page {
-  .floating-buttons {
-    background-color: $white;
-  }
-}
-.light-theme-page {
-  .editable-cell {
-    padding: 0px 10px;
-    background-color: #f1f1ee;
-  }
-  .edited-cell {
-    padding-left: 8px !important; // light blue color
-  }
-  .edited-input {
-    background-color: #bfc3f4;
-    color: black; // blue text color for edited values
-    font-weight: 500;
-  }
-  .edited-input-role-level {
-    color: #2196f3; // blue text color for edited values
-    font-weight: 500;
-  }
-}
-
-.dark-theme-page {
-  .editable-cell {
-    padding: 0px 10px;
-  }
-  .edited-cell {
-    padding-left: 8px !important;
-  }
-  .edited-input {
-    background-color: #f6f6f6;
-    color: black;
-    font-weight: 500;
-    padding: 0px !important;
-  }
-  .edited-input-role-level {
-    color: #64b5f6; // lighter blue text color for dark theme
-    font-weight: 500;
-    width: 100% !important;
-  }
-}
-.file-upload-input {
-  height: 100% !important;
-}
-
-.focused-input {
-  border: 1px solid #007bff; /* Customize the border color */
-  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5); /* Optional: Add shadow for better focus effect */
-  width: 100% !important;
-}
-
-.expanded-content {
-  padding: 0 3rem;
-  max-height: 100vh; /* Set a fixed height for the container */
-  overflow: hidden; /* Hide overflow by default */
-}
-
-.scrollable-content {
-  width: 100%; /* Use the full width of the parent */
-  overflow-y: auto; /* Enable vertical scrolling for long content */
-  padding: 10px; /* Optional: padding for aesthetics */
-  border: 1px solid #ddd; /* Optional: border for visibility */
-  height: 100%;
-  max-height: 200px;
-  /* Use the full height of the parent */
-  text-wrap: normal;
-  background-color: #e8e8e8;
-  color: black;
-}
-.expanded-sql {
-  border-left: #7a54a2 3px solid;
-}
-
-.app-table-container {
-  .thead-sticky,
-  .tfoot-sticky {
-    position: sticky;
-    top: 0;
-    opacity: 1;
-    z-index: 1;
-    background: #f5f5f5;
-  }
-}
-
-.editable-input {
-  height: 10px !important;
 }
 
 /* Center sortable column headers for all non-first columns in the quota table */

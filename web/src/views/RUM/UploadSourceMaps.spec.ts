@@ -81,7 +81,7 @@ describe("UploadSourceMaps", () => {
 
   it("renders the page with the dropzone + native file input", async () => {
     const wrapper = await mountPage();
-    expect(wrapper.find(".upload-source-maps-page").exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "OForm" }).exists()).toBe(true);
     expect(
       wrapper.find('[data-test="rum-upload-source-maps-file-dropzone"]').exists(),
     ).toBe(true);

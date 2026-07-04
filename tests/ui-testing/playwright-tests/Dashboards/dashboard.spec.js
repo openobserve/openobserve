@@ -857,14 +857,18 @@ test.describe("dashboard UI testcases", () => {
 
     // Set custom SQL — fields are populated client-side by the SQL parser.
     // Use `level` and `method` (guaranteed fields in e2e_automate) with
-    // impossible conditions so all counts are zero. This validates that the
-    // line chart renders zero-valued camelCase-aliased series without errors.
+    // impossible conditions so the camelCase-aliased error counts are zero.
+    // `pageViewCount` counts every row so at least one series carries data:
+    // a line chart whose series are ALL zero renders "No Data" (series with no
+    // non-null/non-zero points are dropped from the chart), which would make
+    // this test flaky. Keeping one non-zero series makes the chart render
+    // deterministically while still exercising zero-valued camelCase aliases.
     await pm.chartTypeSelector.setCustomSQL(
       `SELECT histogram(_timestamp, '5 minute') AS "_time",
        COUNT(CASE WHEN level = 'nonexistentLevel_abc' THEN 1 END) AS "4xxErrorCount",
        COUNT(CASE WHEN level = 'nonexistentLevel_def' THEN 1 END) AS "5xxErrorCount",
        COUNT(CASE WHEN method = 'NONEXISTENT_METHOD_xyz' THEN 1 END) AS "NullErrorCount",
-       COUNT(CASE WHEN stream = 'nonexistentStream_xyz' THEN 1 END) AS "pageViewCount"
+       COUNT(CASE WHEN _timestamp IS NOT NULL THEN 1 END) AS "pageViewCount"
 FROM e2e_automate
 GROUP BY _time
 ORDER BY _time ASC`
@@ -896,6 +900,22 @@ ORDER BY _time ASC`
     const chartContainer = pm.dashboardPanelActions.getChartRendererCanvas();
     await expect(chartContainer).toBeVisible({ timeout: 15000 });
 
+    // A freshly-added panel auto-runs a DEFAULT-stream query (against _o2_service_graph,
+    // which is empty) when it first opens, BEFORE the custom-SQL query fires on Apply.
+    // If that empty default query resolves AFTER the custom query it overwrites the
+    // result and the panel gets stuck on the no-data overlay — a last-writer race that
+    // no timeout can recover (verified: the overlay never clears in a lost-race run).
+    // Re-apply the now-stable custom query (the default query only fires on panel open,
+    // so re-Apply fires the custom query alone) until the chart actually paints.
+    const noDataOverlay = pm.dashboardPanelActions.getNoDataLocator();
+    await expect(async () => {
+      if (await noDataOverlay.isVisible()) {
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender();
+      }
+      await expect(noDataOverlay).not.toBeVisible({ timeout: 8000 });
+    }).toPass({ timeout: 90000, intervals: [1000] });
+
     // Wait for canvas inside the chart-renderer (ECharts renders asynchronously).
     // The CASE WHEN query returns zero-valued counts which still produce chart lines.
     const canvas = chartContainer.locator('canvas').first();
@@ -905,7 +925,7 @@ ORDER BY _time ASC`
     const boundingBox = await chartContainer.boundingBox();
     expect(boundingBox.width).toBeGreaterThan(100);
     expect(boundingBox.height).toBeGreaterThan(50);
-    await expect(pm.dashboardPanelActions.getNoDataLocator()).not.toBeVisible();
+    await expect(noDataOverlay).not.toBeVisible();
 
     // Save panel and cleanup
     await pm.dashboardPanelActions.savePanel();

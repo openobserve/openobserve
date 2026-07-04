@@ -136,7 +136,11 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      expect(wrapper.find(".field-list-pagination").exists()).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="logs-page-fields-list-pagination-firstpage-button"]')
+          .exists(),
+      ).toBe(false);
     });
 
     it("should show pagination when multiple pages", () => {
@@ -153,7 +157,11 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      expect(wrapper.find(".field-list-pagination").exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="logs-page-fields-list-pagination-firstpage-button"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should disable first page button when on first page", () => {
@@ -356,9 +364,17 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      // Pagination wrapper is shown
-      const pagination = wrapper.find(".field-list-pagination");
-      expect(pagination.exists()).toBe(true);
+      // Pagination wrapper is shown with first/last page controls
+      expect(
+        wrapper
+          .find('[data-test="logs-page-fields-list-pagination-firstpage-button"]')
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="logs-page-fields-list-pagination-lastpage-button"]')
+          .exists(),
+      ).toBe(true);
     });
   });
 });

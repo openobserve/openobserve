@@ -26,7 +26,7 @@ use config::{
     meta::promql::value::{RangeValue, Value},
     utils::{
         hash::{Sum64, gxhash},
-        time::{get_ymdh_from_micros, now_micros, second_micros},
+        time::{HourFormat, get_ymdh_from_micros, now_micros, second_micros},
     },
 };
 use hashbrown::HashMap;
@@ -404,7 +404,7 @@ fn get_cache_item_key(prefix: &str, org: &str, start: i64, end: i64) -> String {
     format!(
         "metrics_results/{}/{}/{}_{}_{}_{}.pb",
         org,
-        get_ymdh_from_micros(start),
+        get_ymdh_from_micros(start, HourFormat::Real),
         prefix,
         start,
         end,

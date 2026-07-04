@@ -42,11 +42,10 @@
               {{ t("crossLinks.fieldsHint") }}
             </div>
             <div v-if="formFields.length > 0" class="tw:flex tw:flex-wrap tw:gap-1 tw:mb-2">
-              <OBadge
+              <OTag
                 v-for="(field, idx) in formFields"
                 :key="idx"
-                variant="default"
-                size="sm"
+                type="selectionChip"
                 class="tw:max-w-[250px]"
                 :data-test="`cross-link-field-chip-${idx}`"
               >
@@ -62,7 +61,7 @@
                     <OIcon name="close" size="xs" />
                   </button>
                 </template>
-              </OBadge>
+              </OTag>
             </div>
             <div
               class="tw:flex tw:gap-2 tw:items-center"
@@ -113,7 +112,7 @@ import { useI18n } from "vue-i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -132,7 +131,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
-  components: { CrossLinkUserGuide, OBadge, OButton, OFormCombobox, ODialog, OForm, OFormInput, OIcon },
+  components: { CrossLinkUserGuide, OTag, OButton, OFormCombobox, ODialog, OForm, OFormInput, OIcon },
   props: {
     modelValue: {
       type: Boolean,

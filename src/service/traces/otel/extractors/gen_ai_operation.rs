@@ -191,6 +191,8 @@ pub fn is_llm_trace(attributes: &HashMap<String, json::Value>, scope_name: Optio
     if attributes.contains_key(GenAiAttributes::OPERATION_NAME)
         || attributes.contains_key(GenAiAttributes::REQUEST_MODEL)
         || attributes.contains_key(GenAiAttributes::INPUT_MESSAGES)
+        || attributes.contains_key(GenAiAttributes::AGENT_NAME)
+        || attributes.contains_key(GenAiAttributes::AGENT_ID)
     {
         return true;
     }

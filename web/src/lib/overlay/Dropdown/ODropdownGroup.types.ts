@@ -9,4 +9,6 @@ export interface DropdownGroupProps {
 
 export interface DropdownGroupSlots {
   default?: () => unknown;
+  /** Optional right-aligned action rendered next to the group label */
+  "label-action"?: () => unknown;
 }

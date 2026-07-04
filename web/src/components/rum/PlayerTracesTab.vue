@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <button
             v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
-            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap tw:cursor-pointer hover:tw:bg-[var(--o2-border-color)]"
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-(--color-surface-accent) tw:text-[var(--o2-text-body)] tw:whitespace-nowrap tw:cursor-pointer tw:hover:bg-[var(--o2-border-color)]"
             :title="t('rum.seekToMoment')"
             data-test="rum-player-traces-tab-seek-btn"
             @click="seekToTrace(selectedTrace)"
@@ -93,14 +93,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
           <span
             v-if="selectedTrace.metadata?.e2eDuration"
-            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap"
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-(--color-surface-accent) tw:text-[var(--o2-text-body)] tw:whitespace-nowrap"
           >
             <OIcon name="timer" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
             {{ formatTimeWithSuffix(selectedTrace.metadata.e2eDuration * 1000) }}
           </span>
           <span
             v-if="selectedTrace.metadata?.spanCount"
-            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap"
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-(--color-surface-accent) tw:text-[var(--o2-text-body)] tw:whitespace-nowrap"
           >
             <OIcon name="lan" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
             {{ selectedTrace.metadata.spanCount }} {{ selectedTrace.metadata.spanCount === 1 ? t("rum.span") : t("rum.spans") }}
@@ -145,17 +145,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full tw:px-2">
       <!-- Filter bar -->
       <div class="tw:flex tw:items-center tw:pr-2 tw:py-1  tw:shrink-0 tw:min-h-[2rem]">
-        <OBadge
-          variant="default"
+        <OTag
+          type="logsResultChip"
+          value="neutral"
           data-test="rum-player-traces-tab-count-badge"
-          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-4)]! tw:mr-[0.6rem]"
-        >{{ `${formatLargeNumber(correlatedViews.length)} ${t("menu.traces").toLowerCase()}` }}</OBadge>
-        <OBadge
+          class="tw:mr-[0.6rem]"
+        >{{ `${formatLargeNumber(correlatedViews.length)} ${t("menu.traces").toLowerCase()}` }}</OTag>
+        <OTag
           v-if="totalErrorCount > 0"
-          variant="error"
+          type="logsResultChip"
+          value="error"
           data-test="rum-player-traces-tab-error-count-badge"
-          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]!"
-        >{{ `${formatLargeNumber(totalErrorCount)} ${t("rum.errorTraces")}` }}</OBadge>
+        >{{ `${formatLargeNumber(totalErrorCount)} ${t("rum.errorTraces")}` }}</OTag>
       </div>
 
       <!-- Traces table -->
@@ -231,7 +232,7 @@ import useHttpStreaming from "@/composables/useStreamingSearch";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import TraceStatusCell from "@/plugins/traces/components/TraceStatusCell.vue";
 import TenstackTable from "@/components/TenstackTable.vue";
@@ -563,14 +564,9 @@ watch(
 );
 </script>
 
-<style scoped lang="scss">
-.player-traces-tab {
-  height: 100%;
-  overflow: hidden;
-}
-
-:deep(.trace-details-content .card-container){
-  box-shadow: none
+<style>
+:deep(.trace-details-content .card-container) {
+  box-shadow: none;
 }
 
 :deep(.trace-row--error td:first-child) {

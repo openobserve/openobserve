@@ -319,6 +319,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-@import "@/styles/logs/visualizelogs-query.scss";
-</style>

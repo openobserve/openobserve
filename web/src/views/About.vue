@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- ── Info Cards Grid ─────────────────────────────────────── -->
-        <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 tw:gap-4">
+        <div class="tw:grid tw:grid-cols-1 tw:gap-4">
 
           <!-- Open Source Libraries -->
           <div class="tw:bg-(--o2-card-bg) tw:rounded-[0.625rem] tw:p-4 tw:flex tw:flex-col tw:gap-y-2">
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] tw:text-(--o2-primary-color)">
                 <OIcon name="code" size="md" />
               </div>
-                <OText variant="panel-title" as="h2">{{ t("about.os_libraries") }}</OText>
+                <OText variant="page-title" as="h2" class="tw:text-xl tw:font-medium">{{ t("about.os_libraries") }}</OText>
             </div>
             <div class="tw:text-sm" style="color: var(--o2-text-secondary)">{{ t("about.os_libraries_msg") }}</div>
             <div class="tw:grid tw:grid-cols-4 tw:gap-2.5">
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-info)_12%,var(--o2-card-bg))] tw:text-(--o2-info)">
                 <OIcon name="shield" size="md" />
               </div>
-              <OText variant="page-title" as="h2" class="tw:m-0">{{ t("about.license_info") }}</OText>
+              <OText variant="page-title" as="h2" class="tw:m-0 tw:text-xl tw:font-medium">{{ t("about.license_info") }}</OText>
             </div>
             <OText v-if="store.state.zoConfig.build_type == 'opensource'" variant="body" as="div" class="tw:leading-relaxed tw:m-0 tw:mb-4">
               {{ t("about.license_info_os_msg") }}
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] tw:text-(--o2-primary-color)">
                 <OIcon name="groups" size="md" />
               </div>
-              <OText variant="page-title" as="h3" class="tw:m-0">{{ t("about.community_lbl") }}</OText>
+              <OText variant="page-title" as="h3" class="tw:m-0 tw:text-lg tw:font-medium tw:leading-6">{{ t("about.community_lbl") }}</OText>
             </div>
             <OText variant="body" class="tw:leading-relaxed tw:m-0 tw:mb-4">{{ t("about.community_msg") }}</OText>
             <div class="tw:flex tw:flex-wrap tw:gap-2">
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t('about.manage_license') }}
             </OButton>
           </div>
-          <OText variant="body" class="tw:leading-relaxed tw:m-0 tw:mb-5 tw:ml-15">{{ t("about.license_info_msg") }}</OText>
+          <OText variant="body" class="tw:leading-relaxed tw:m-0 tw:mb-5">{{ t("about.license_info_msg") }}</OText>
 
           <div v-if="loadingLicense" class="tw:text-center tw:py-8">
             <OSpinner size="md" />
@@ -332,7 +332,6 @@ import licenseServer from "@/services/license_server";
 import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -344,7 +343,6 @@ export default defineComponent({
     FeatureComparisonTable,
     OButton,
     OIcon,
-    OBadge,
     OSpinner,
     OBanner,
     OText,
@@ -447,6 +445,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-/* intentionally empty */
-</style>

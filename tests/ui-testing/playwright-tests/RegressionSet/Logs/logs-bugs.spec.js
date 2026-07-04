@@ -34,7 +34,7 @@ const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtu
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
 const logData = require("../../../fixtures/log.json");
-const { ingestTestData, sendRequest, getHeaders, getIngestionUrl } = require('../../utils/data-ingestion.js');
+const { ingestTestData, sendRequest, getHeaders, getIngestionUrl, waitForFieldValueSearchable } = require('../../utils/data-ingestion.js');
 const { getOrgIdentifier, isCloudEnvironment } = require('../../utils/cloud-auth.js');
 
 test.describe("Logs Regression Bug Fixes", () => {
@@ -578,6 +578,14 @@ test.describe("Logs Regression Bug Fixes", () => {
     ], headers);
     testLogger.info(`Stream1 ingestion response: ${JSON.stringify(stream1Response)}`);
 
+    // Readiness gate: e2e_automate is a SHARED stream and freshly-ingested data is not
+    // queryable immediately (WAL -> index lag). Without waiting on the actual value, the
+    // field-values panel returns svc-automate-* values from earlier runs/retries but misses
+    // the one we just ingested, making the stream1 assertion flaky. Wait until it's searchable.
+    const stream1Searchable = await waitForFieldValueSearchable(page, stream1Name, testFieldName, stream1Value, streamWaitMs, 3000);
+    expect(stream1Searchable, `Value ${stream1Value} should be searchable in ${stream1Name} via API`).toBeTruthy();
+    testLogger.info(`Value ${stream1Value} confirmed searchable in ${stream1Name}`);
+
     // Step 2: Create new stream by ingesting standard test data first (ensures proper stream registration),
     // then ingest custom records with distinct service_name for the field values cache test.
     testLogger.info(`Creating stream ${stream2Name} with standard test data`);
@@ -596,6 +604,12 @@ test.describe("Logs Regression Bug Fixes", () => {
     const stream2Available = await pm.logsPage.waitForStreamAvailable(stream2Name, streamWaitMs, 3000);
     expect(stream2Available, `Stream ${stream2Name} should be available via API`).toBeTruthy();
     testLogger.info(`Stream ${stream2Name} confirmed available via API`);
+
+    // Readiness gate for the custom value too: waitForStreamAvailable only confirms the
+    // stream's metadata exists, not that our distinct svc-newstream value is searchable yet.
+    const stream2Searchable = await waitForFieldValueSearchable(page, stream2Name, testFieldName, stream2Value, streamWaitMs, 3000);
+    expect(stream2Searchable, `Value ${stream2Value} should be searchable in ${stream2Name} via API`).toBeTruthy();
+    testLogger.info(`Value ${stream2Value} confirmed searchable in ${stream2Name}`);
 
     // Step 3: Navigate to logs and select stream1 (e2e_automate — always available)
     await pm.logsPage.clickMenuLinkLogsItem();
@@ -1832,7 +1846,12 @@ test.describe("Logs Regression Bug Fixes", () => {
       await logRow.click();
       await page.waitForTimeout(1000);
 
+      // The log detail sidebar opens on the JSON tab by default (Bug #9724); the wrap
+      // toggle only renders in the Table tab. Switch tabs before asserting its
+      // visibility — otherwise the check always waits out its full timeout on the
+      // hidden toggle and logs a misleading "Wrap toggle not found" warning.
       try {
+        await pm.logsPage.clickLogDetailTableTab();
         await pm.logsPage.verifyWrapToggleVisibleInTableTab();
         testLogger.info('Wrap toggle is visible in log detail table tab');
       } catch (err) {

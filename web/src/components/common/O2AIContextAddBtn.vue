@@ -6,11 +6,11 @@
         size="icon-toolbar"
         @click.stop="sendToAiChat"
         data-test="o2-ai-context-add-btn"
-        :class="['o2-ai-context-btn', props.class]"
+        :class="['tw:group o2-ai-context-btn', props.class]"
         :style="props.style"
         >
         <div class="tw:flex tw:items-center tw:flex-nowrap">
-            <img :height="props.imageHeight" :width="props.imageWidth" :src="getBtnLogo" class="header-icon ai-icon" />
+            <img :height="props.imageHeight" :width="props.imageWidth" :src="getBtnLogo" class="header-icon ai-icon tw:[transition:transform_0.6s_ease,filter_0.6s_ease] tw:group-hover:brightness-0 tw:group-hover:invert tw:group-hover:rotate-180" />
         </div>
     </OButton>
 </template>
@@ -41,7 +41,7 @@ const props = defineProps({
         default: '',
         required: false
     },
-    //this is for image height and width sometimes we need to change the size of the image 
+    //this is for image height and width sometimes we need to change the size of the image
     imageHeight:{
         type: String,
         default: '20px',
@@ -67,29 +67,3 @@ const sendToAiChat = () => {
 }
 </script>
 
-<style scoped lang="scss">
-.o2-ai-context-btn {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
-  color: white !important;
-  transition: background 0.3s ease, box-shadow 0.3s ease !important;
-  width: 30px !important;
-  height: 30px !important;
-  min-width: 30px !important;
-  min-height: 30px !important;
-  border-radius: 6px !important;
-
-  .ai-icon {
-    transition: transform 0.6s ease;
-  }
-
-  &:hover {
-    background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
-    box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35) !important;
-
-    .ai-icon {
-      filter: brightness(0) invert(1);
-      transform: rotate(180deg);
-    }
-  }
-}
-</style>

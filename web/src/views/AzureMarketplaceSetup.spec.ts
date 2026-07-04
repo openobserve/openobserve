@@ -88,7 +88,7 @@ describe("AzureMarketplaceSetup", () => {
   it("should display logo", () => {
     const wrapper = mountSetup();
 
-    const logo = wrapper.find(".appLogo");
+    const logo = wrapper.find('[data-test="azure-marketplace-setup-logo"]');
     expect(logo.exists()).toBe(true);
   });
 
@@ -223,7 +223,7 @@ describe("AzureMarketplaceSetup", () => {
   it("should use correct theme logo", async () => {
     const wrapper = mountSetup();
 
-    const logo = wrapper.find(".appLogo");
+    const logo = wrapper.find('[data-test="azure-marketplace-setup-logo"]');
     expect(logo.attributes("src")).toContain("light");
   });
 
@@ -244,7 +244,7 @@ describe("AzureMarketplaceSetup", () => {
       },
     });
 
-    const logo = wrapper.find(".appLogo");
+    const logo = wrapper.find('[data-test="azure-marketplace-setup-logo"]');
     expect(logo.attributes("src")).toContain("dark");
   });
 

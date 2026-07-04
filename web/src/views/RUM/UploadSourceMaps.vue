@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="upload-source-maps-page tw:w-full tw:h-full tw:px-[0.625rem]">
+  <div class="tw:flex tw:flex-col tw:w-full tw:h-full tw:px-2.5 tw:bg-(--q-background)">
     <!-- Top Header Bar -->
-    <div class="header-bar card-container tw:flex tw:items-center tw:justify-between tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]">
+    <div class="header-bar tw:shrink-0 card-container tw:flex tw:items-center tw:justify-between tw:py-[0.675rem] tw:h-16 tw:px-[0.675rem] tw:mb-[0.675rem] tw:border-b tw:border-[var(--o2-border-color)]">
       <div class="tw:flex tw:items-center tw:gap-3">
         <div
           data-test="add-alert-back-btn"
@@ -47,8 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-slot="{ isSubmitting }"
     >
       <!-- Form Content Area -->
-      <div class="form-content-area card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 172px); overflow: auto">
-        <div class="upload-form">
+      <div class="tw:flex-1 tw:overflow-y-auto card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 172px); overflow: auto">
+        <div class="tw:max-w-300 tw:mx-auto">
           <!-- Input Fields -->
           <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-3 tw:gap-4 tw:mb-6">
             <!-- Service Input -->
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Bottom Action Bar -->
-      <div class="action-bar card-container tw:flex tw:items-center tw:justify-end tw:gap-3 tw:py-3 tw:pr-3"
+      <div class="action-bar tw:shrink-0 card-container tw:flex tw:items-center tw:justify-end tw:gap-3 tw:py-3 tw:pr-3 tw:border-t tw:border-[var(--o2-border-color)]"
         style="position: sticky; z-index: 2">
         <OButton
           data-test="rum-upload-source-maps-cancel-btn"
@@ -185,34 +185,3 @@ const uploadSourceMaps = async (value: UploadSourceMapsForm) => {
   }
 };
 </script>
-
-<style lang="scss" scoped>
-.upload-source-maps-page {
-  display: flex;
-  flex-direction: column;
-  background-color: var(--q-background);
-}
-
-.header-bar {
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--q-border-color, #e0e0e0);
-}
-
-.form-content-area {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.upload-form {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.action-bar {
-  flex-shrink: 0;
-  border-top: 1px solid var(--q-border-color, #e0e0e0);
-}
-
-/* The dropzone styles (.upload-area / .upload-content / dark-mode) moved to
-   SourceMapDropzone.vue along with the dropzone markup. */
-</style>

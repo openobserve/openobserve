@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <component
     :is="href ? 'a' : 'button'"
-    class="es-ing-chip"
+    class="es-ing-chip tw:inline-flex tw:items-center tw:gap-1.25 tw:py-1 tw:px-3 tw:text-[length:var(--text-sm)] tw:font-medium tw:rounded-full tw:border tw:border-border-default tw:bg-surface-panel tw:no-underline tw:cursor-pointer tw:outline-none tw:transition-[border-color,color,background-color] tw:duration-150 tw:hover:border-primary-400 tw:hover:bg-[color-mix(in_srgb,var(--color-primary-500)_6%,transparent)] tw:focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
     v-bind="href ? { href, target: '_blank', rel: 'noopener noreferrer' } : { type: 'button' }"
     @click="!href && emit('click')"
   >
@@ -42,29 +42,10 @@ defineProps<{
 const emit = defineEmits<{ click: [] }>();
 </script>
 
-<style scoped>
-.es-ing-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3125rem;
-  padding: 0.25rem 0.75rem;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  border-radius: 999px;
-  border: 1px solid var(--color-border-default);
-  background: var(--color-surface-panel);
-  color: var(--color-text-secondary);
-  text-decoration: none;
-  cursor: pointer;
-  transition: border-color 150ms, color 150ms, background-color 150ms;
-  outline: none;
-}
-.es-ing-chip:hover {
-  border-color: var(--color-primary-400);
-  color: var(--color-primary-600);
-  background: color-mix(in srgb, var(--color-primary-500) 6%, transparent);
-}
-.es-ing-chip:focus-visible {
-  box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--color-primary-500) 40%, transparent);
-}
+<style>
+/* Color can't be inlined: as an <a> the chip inherits the global unlayered
+   `a { color: var(--o2-text-link) }`, which beats any layered tw: utility.
+   A class selector outranks the bare `a` selector without needing `!`. */
+.es-ing-chip { color: var(--color-text-secondary); }
+.es-ing-chip:hover { color: var(--color-primary-600); text-decoration: none; }
 </style>

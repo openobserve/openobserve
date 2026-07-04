@@ -751,7 +751,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(alert_grouping::process_expired_batches());
     tokio::task::spawn(file_downloader::run());
     // Note: Service discovery extraction runs automatically during parquet file processing
-    // See src/job/files/parquet.rs:queue_services_from_parquet for implementation
+    // See src/job/files/parquet.rs:queue_services_from_data_file for implementation
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "service_streams_batch_processor",
@@ -760,6 +760,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
             o2_enterprise::enterprise::service_streams::batch_processor::run_once().await;
         },
         pause_if: !get_o2_config().service_streams.enabled
+    );
+    #[cfg(feature = "enterprise")]
+    spawn_pausable_job!(
+        "gen_ai_agent_registry_batch_processor",
+        get_o2_config()
+            .gen_ai_agent_registry
+            .batch_flush_interval_secs,
+        {
+            o2_enterprise::enterprise::llm_evaluations::agent_registry::run_once().await;
+        }
     );
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(

@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]">
     <!-- Current org section (if super org, not a member) -->
     <div v-if="currentOrgToShow" class="tw:mb-3">
-      <div class="member-header">
+      <div class="tw:rounded-[0.625rem] tw:bg-(--o2-card-bg) tw:dark:bg-[var(--o2-card-background)]">
         <div class="tw:font-semibold tw:px-2 tw:py-2">
           {{ t("billing.billingGroup.currentOrgTitle") }}
         </div>
@@ -30,13 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="usage-member-tab-current"
         >
           <OTab name="" :data-test="`usage-member-tab-current-item`">
-            <div class="member-item">
-              <div class="member-name" :title="currentOrgToShow.title">
+            <div class="member-item tw:flex tw:flex-col tw:items-start tw:w-full tw:min-w-0">
+              <div class="member-name tw:font-semibold tw:truncate tw:max-w-full tw:normal-case" :title="currentOrgToShow.title">
                 {{ currentOrgToShow.primary }}
               </div>
               <div
                 v-if="currentOrgToShow.secondary"
-                class="member-id"
+                class="member-id tw:text-[0.72rem] tw:opacity-60 tw:truncate tw:max-w-full tw:normal-case"
                 :title="currentOrgToShow.secondary"
               >
                 {{ currentOrgToShow.secondary }}
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Member organizations section -->
     <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0">
-      <div class="member-header">
+      <div class="tw:rounded-[0.625rem] tw:bg-(--o2-card-bg) tw:dark:bg-[var(--o2-card-background)]">
         <div class="tw:font-semibold tw:px-2 tw:py-2">
           {{ t("billing.billingGroup.memberOrgsTitle") }}
         </div>
@@ -81,11 +81,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :name="opt.value"
             :data-test="`usage-member-tab-${opt.value}`"
           >
-            <div class="member-item">
-              <div class="member-name" :title="opt.title">
+            <div class="member-item tw:flex tw:flex-col tw:items-start tw:w-full tw:min-w-0">
+              <div class="member-name tw:font-semibold tw:truncate tw:max-w-full tw:normal-case" :title="opt.title">
                 {{ opt.primary }}
               </div>
-              <div v-if="opt.secondary" class="member-id" :title="opt.secondary">
+              <div v-if="opt.secondary" class="member-id tw:text-[0.72rem] tw:opacity-60 tw:truncate tw:max-w-full tw:normal-case" :title="opt.secondary">
                 {{ opt.secondary }}
               </div>
             </div>
@@ -195,68 +195,25 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.member-header {
-  border-radius: 0.625rem;
-  background-color: var(--o2-card-bg);
+<style>
+.card-container .o-tabs--vertical {
+  margin: 5px;
 }
 
-.body--dark .member-header {
-  background-color: var(--o2-card-background);
+.card-container .o-tabs--vertical .o-tab {
+  justify-content: flex-start;
+  padding: 0.375rem 1rem 0.375rem 1.25rem;
+  border-radius: 0.5rem;
+  min-height: 1.5rem;
+  text-transform: none;
 }
 
-// Shared tab styles applied to both the current-org and member OTabs instances
-.card-container {
-  :deep(.o-tabs--vertical) {
-    margin: 5px;
-
-    .o-tab {
-      justify-content: flex-start;
-      padding: 0.375rem 1rem 0.375rem 1.25rem;
-      border-radius: 0.5rem;
-      min-height: 1.5rem;
-      text-transform: none;
-
-      &[data-state="active"] {
-        .member-id {
-          opacity: 0.85;
-        }
-      }
-    }
-  }
-
-  .member-item {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .member-name {
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-    text-transform: none;
-  }
-
-  .member-id {
-    font-size: 0.72rem;
-    opacity: 0.6;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-    text-transform: none;
-  }
+.card-container .o-tabs--vertical .o-tab[data-state="active"] .member-id {
+  opacity: 0.85;
 }
 
-.members-tabs {
-  :deep(.o-tabs) {
-    height: auto !important;
-    max-height: none !important;
-  }
+.members-tabs .o-tabs {
+  height: auto !important;
+  max-height: none !important;
 }
 </style>

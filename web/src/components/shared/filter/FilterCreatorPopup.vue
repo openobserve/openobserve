@@ -11,7 +11,7 @@
       :default-values="filterCreatorDefaults"
       @submit="applyFilter"
     >
-      <div class="tw:p-3 filter-container">
+      <div class="tw:p-3 tw:w-50 tw:overflow-hidden">
         <OCardSection class="tw:p-0">
           <OFormSelect
             name="selectedOperator"
@@ -24,14 +24,14 @@
         </OCardSection>
         <OCardSection class="tw:p-0">
           <div class="tw:font-bold tw:pb-1 tw:pt-2">Values</div>
-          <div class="filter-values-container">
+          <div class="tw:max-h-37.5 tw:overflow-auto">
             <div v-show="!fieldValues?.length">No values present</div>
             <OFormCheckboxGroup name="selectedValues">
               <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
                 <li v-for="value in fieldValues" :key="value">
                   <label
                     :data-test="`filter-creator-popup-value-${value}`"
-                    class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                    class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
                   >
                     <OCheckbox
                       :value="value"
@@ -122,14 +122,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.filter-container {
-  width: 200px;
-  overflow: hidden;
-}
-.filter-values-container {
-  max-height: 150px;
-  overflow: auto;
-}
-</style>

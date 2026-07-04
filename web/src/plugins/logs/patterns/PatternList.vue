@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Header skeleton -->
       <div
-        class="pattern-skel-header tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border-color)]"
+        class="tw:min-h-8 tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border-color)]"
         style="background: var(--o2-table-header-bg); min-width: 100%"
       >
         <div class="tw:flex-1 tw:min-w-0 tw:px-2">
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(skeletonWidth, n) in SKELETON_WIDTHS"
         :key="n"
-        class="pattern-skel-row tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border-color)] tw:relative"
+        class="pattern-skel-row tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border-color)] tw:relative tw:opacity-0 tw:h-8 tw:bg-[var(--o2-log-table-row-bg,transparent)]"
         :style="{ animationDelay: `${n * 40}ms` }"
       >
         <!-- Left accent bar -->
@@ -243,20 +243,13 @@ const {
 } = useWildcardHover();
 </script>
 
-<style scoped lang="scss">
-// ── Pattern list loading skeleton ────────────────────────────────────────
-// Matches the shimmer style used by the logs table (TenstackTable.vue)
-// but at the slightly lighter grey-100 / grey-600 palette for visual parity.
-
-.pattern-skel-header {
-  min-height: 2rem;
-}
+<style>
+/* ── Pattern list loading skeleton ────────────────────────────────────────
+   Matches the shimmer style used by the logs table (TenstackTable.vue)
+   but at the slightly lighter grey-100 / grey-600 palette for visual parity. */
 
 .pattern-skel-row {
-  opacity: 0;
-  height: 2rem;
   animation: pattern-skel-row-in 320ms ease-out forwards;
-  background-color: var(--o2-log-table-row-bg, transparent);
 }
 
 .pattern-skel-pill {
@@ -268,15 +261,15 @@ const {
   );
   background-size: 200% 100%;
   animation: pattern-skel-shimmer 1.5s ease-in-out infinite;
+}
 
-  .body--dark & {
-    background: linear-gradient(
-      90deg,
-      var(--color-grey-600) 0%,
-      rgba(255, 255, 255, 0.03) 50%,
-      var(--color-grey-600) 100%
-    );
-  }
+.body--dark .pattern-skel-pill {
+  background: linear-gradient(
+    90deg,
+    var(--color-grey-600) 0%,
+    rgba(255, 255, 255, 0.03) 50%,
+    var(--color-grey-600) 100%
+  );
 }
 
 @keyframes pattern-skel-shimmer {

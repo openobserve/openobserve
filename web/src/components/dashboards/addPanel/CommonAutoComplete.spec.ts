@@ -425,8 +425,10 @@ describe("CommonAutoComplete", () => {
       await wrapper.vm.$nextTick();
       
       const options = wrapper.findAll('[data-test="common-auto-complete-option"]');
+      expect(options.length).toBeGreaterThan(0);
       options.forEach(option => {
-        expect(option.classes()).toContain("option");
+        expect(option.classes()).toContain("tw:p-2");
+        expect(option.classes()).toContain("tw:cursor-pointer");
       });
     });
   });

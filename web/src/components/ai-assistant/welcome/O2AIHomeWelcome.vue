@@ -11,55 +11,15 @@ function onSelect(prompt: string) {
 </script>
 
 <template>
-  <div class="o2-ai-home-welcome">
-    <div class="o2-ai-home-welcome__ambient" aria-hidden="true"></div>
-    <div class="o2-ai-home-welcome__inner">
+  <div class="o2-ai-home-welcome tw:relative tw:w-full tw:h-full tw:flex tw:justify-center tw:items-center tw:overflow-hidden">
+    <div
+      aria-hidden="true"
+      class="tw:absolute tw:top-[8%] tw:left-1/2 tw:-translate-x-1/2 tw:w-[min(820px,70%)] tw:h-80 tw:bg-[radial-gradient(closest-side,rgba(123,97,255,0.22),rgba(236,72,153,0.1)_45%,rgba(245,158,11,0.06)_65%,transparent_75%)] tw:blur-[56px] tw:pointer-events-none tw:z-0"
+    ></div>
+    <div class="o2-ai-home-welcome__inner tw:relative tw:z-1 tw:w-full tw:max-w-[960px] tw:flex tw:flex-col tw:items-center tw:gap-6 tw:px-6 tw:pt-6 tw:pb-4">
       <WelcomeGreeting />
       <CapabilityCards @select="onSelect" />
       <PromptSuggestions @select="onSelect" />
     </div>
   </div>
 </template>
-
-<style scoped lang="scss">
-.o2-ai-home-welcome {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-}
-
-.o2-ai-home-welcome__ambient {
-  position: absolute;
-  top: 8%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(820px, 70%);
-  height: 320px;
-  background: radial-gradient(
-    closest-side,
-    rgba(123, 97, 255, 0.22),
-    rgba(236, 72, 153, 0.1) 45%,
-    rgba(245, 158, 11, 0.06) 65%,
-    transparent 75%
-  );
-  filter: blur(56px);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.o2-ai-home-welcome__inner {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 960px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
-  padding: 1.5rem 1.5rem 1rem;
-}
-</style>

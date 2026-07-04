@@ -44,14 +44,24 @@ export type BadgeVariant =
   | "purple" | "purple-outline" | "purple-soft"
   | "indigo" | "indigo-outline" | "indigo-soft";
 
-/** Size controls padding and font-size only — shape is always pill (rounded-full). */
-export type BadgeSize = "sm" | "md";
+/** Size controls padding and font-size only. */
+export type BadgeSize = "xs" | "sm" | "md";
+
+/**
+ * Corner shape:
+ *   pill    — fully rounded (rounded-full). The default; classic status pill.
+ *   rounded — small radius (rounded-md). For code/identifier-style chips.
+ *   square  — no radius (rounded-none).
+ */
+export type BadgeShape = "pill" | "rounded" | "square";
 
 export interface BadgeProps {
   /** Semantic colour variant. Default: `"default"` */
   variant?: BadgeVariant;
   /** Size. Default: `"md"` */
   size?: BadgeSize;
+  /** Corner shape. Default: `"pill"` (rounded-full). */
+  shape?: BadgeShape;
   /**
    * Material icon name rendered on the left side of the label.
    * Overridden by the `#icon` slot when provided.

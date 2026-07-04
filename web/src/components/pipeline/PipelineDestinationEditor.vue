@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label: t('pipeline_destinations.header'),
         onClick: () => emit('cancel'),
       }"
-      class="card-container tw:px-3 tw:border-b tw:border-border-default"
+      class="tw:rounded-lg tw:px-3 tw:border-b tw:border-border-default"
     >
       <template #title>
         <span data-test="pipeline-destination-editor-title">
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </AppPageHeader>
 
-    <div class="card-container tw:py-2 tw:px-3 tw:overflow-auto">
+    <div class="tw:rounded-lg tw:py-2 tw:px-3 tw:overflow-auto">
       <div class="tw:w-full">
         <CreateDestinationForm
           :destination="destination"
@@ -80,8 +80,3 @@ const handleCancel = () => {
 };
 </script>
 
-<style lang="scss" scoped>
-.card-container {
-  border-radius: 8px;
-}
-</style>

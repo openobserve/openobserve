@@ -622,37 +622,7 @@ pub async fn merge_by_stream(
         orphan_blooms.extend(task.await??);
     }
 
-    // Build bloom for the current hour (enterprise-only).
-    #[cfg(feature = "enterprise")]
-    {
-        let build_start = std::time::Instant::now();
-        match o2_enterprise::enterprise::bloom::compact::build_for_stream(
-            org_id,
-            stream_type,
-            stream_name,
-            &date_start,
-            is_incremental,
-            orphan_blooms,
-        )
-        .await
-        {
-            Ok(false) => {}
-            Ok(true) => {
-                let build_time = build_start.elapsed().as_millis();
-                log::info!(
-                    "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} took: {build_time} ms"
-                );
-            }
-            Err(e) => {
-                log::warn!(
-                    "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} failed: {e}"
-                );
-            }
-        }
-    }
-    // `orphan_blooms` is only consumed by the enterprise bloom builder above.
-    #[cfg(not(feature = "enterprise"))]
-    let _ = orphan_blooms;
+    let _ = (is_incremental, orphan_blooms);
 
     // update job status
     if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
@@ -909,7 +879,11 @@ pub async fn merge_files(
 
     let mut new_files = Vec::new();
     match buf {
-        MergeParquetResult::Single(buf, mut new_file_meta) => {
+        MergeParquetResult::Single {
+            buf,
+            file_meta: mut new_file_meta,
+            file_format,
+        } => {
             if new_file_meta.compressed_size == 0 {
                 return Err(anyhow::anyhow!(
                     "merge_parquet_files error: compressed_size is 0"
@@ -917,8 +891,7 @@ pub async fn merge_files(
             }
 
             let id = ider::generate_file_name();
-            let file_format = get_config().common.file_format.extension();
-            let new_file_key = format!("{prefix}/{id}{file_format}");
+            let new_file_key = format!("{prefix}/{id}{}", file_format.extension());
             log::info!(
                 "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
@@ -960,7 +933,11 @@ pub async fn merge_files(
             }
             new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
         }
-        MergeParquetResult::Multiple { bufs, file_metas } => {
+        MergeParquetResult::Multiple {
+            bufs,
+            file_metas,
+            file_format,
+        } => {
             for (buf, file_meta) in bufs.into_iter().zip(file_metas) {
                 let mut new_file_meta = file_meta;
                 new_file_meta.compressed_size = buf.len() as i64;
@@ -971,8 +948,7 @@ pub async fn merge_files(
                 }
 
                 let id = ider::generate_file_name();
-                let file_format = get_config().common.file_format.extension();
-                let new_file_key = format!("{prefix}/{id}{file_format}");
+                let new_file_key = format!("{prefix}/{id}{}", file_format.extension());
 
                 // upload file to storage
                 let buf = Bytes::from(buf);

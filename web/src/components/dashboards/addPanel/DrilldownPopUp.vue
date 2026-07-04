@@ -10,7 +10,7 @@
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
- limitations under the License. 
+ limitations under the License.
 -->
 
 <!-- eslint-disable vue/no-unused-components -->
@@ -91,7 +91,6 @@
           data-test="scheduled-alert-sql-editor"
           ref="queryEditorRef"
           editor-id="alerts-query-editor"
-          class="monaco-editor"
           style="height: 80px"
           :debounceTime="300"
           v-model:query="drilldownData.data.logsQuery"
@@ -118,7 +117,7 @@
 
     <div v-if="drilldownData.type == 'byDashboard'">
       <div style="margin-top: 10px">
-        <div class="dropdownDiv">
+        <div class="tw:flex tw:items-center tw:my-[10px] tw:w-full">
           <OSelect
             v-model="drilldownData.data.folder"
             :options="folderList"
@@ -128,7 +127,7 @@
             data-test="dashboard-drilldown-folder-select"
           />
         </div>
-        <div class="dropdownDiv" v-if="drilldownData.data.folder">
+        <div class="tw:flex tw:items-center tw:my-[10px] tw:w-full" v-if="drilldownData.data.folder">
           <OSelect
             v-model="drilldownData.data.dashboard"
             :options="dashboardList"
@@ -138,7 +137,7 @@
             data-test="dashboard-drilldown-dashboard-select"
           />
         </div>
-        <div class="dropdownDiv" v-if="drilldownData.data.dashboard">
+        <div class="tw:flex tw:items-center tw:my-[10px] tw:w-full" v-if="drilldownData.data.dashboard">
           <OSelect
             v-model="drilldownData.data.tab"
             :options="tabList"
@@ -766,30 +765,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.selected {
-  background-color: var(--q-primary) !important;
-  font-weight: bold;
-  color: white;
-}
-
-.dropdownDiv {
-  display: flex;
-  align-items: center;
-  margin: 10px 0px;
-  width: 100%;
-}
-
-.dropdownLabel {
-  width: 150px;
-}
-
-.dropdown {
-  min-width: 100%;
-}
-
-:deep(.no-case .q-field__native > :first-child) {
-  text-transform: none !important;
-}
-</style>
