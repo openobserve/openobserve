@@ -24,6 +24,13 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
+// Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
+const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
+const wrapperAttrs = computed(() => {
+  const { tabindex, ...rest } = $attrs;
+  return rest;
+});
+
 const props = withDefaults(defineProps<ColorProps>(), {
   size: "md",
   disabled: false,
@@ -128,7 +135,7 @@ const wrapperClasses = computed(() => [
 </script>
 
 <template>
-  <div v-bind="$attrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div v-bind="wrapperAttrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
@@ -228,6 +235,7 @@ const wrapperClasses = computed(() => [
         :readonly="readonly"
         :disabled="disabled"
         :aria-invalid="hasError || undefined"
+        :tabindex="inputTabindex"
         maxlength="7"
         :class="[
           'tw:flex-1 tw:min-w-0 tw:bg-transparent tw:outline-none tw:font-mono',

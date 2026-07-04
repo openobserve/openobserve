@@ -298,7 +298,7 @@ export class ShortcutManager {
       if (!el || document.activeElement !== el) return;
     }
 
-    if (this.options.preventDefault) e.preventDefault();
+    if (this.options.preventDefault && e.key !== "Escape") e.preventDefault();
     if (this.options.stopPropagation) e.stopPropagation();
     shortcut.handler();
   }

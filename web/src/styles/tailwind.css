@@ -23,6 +23,23 @@
   pointer-events: auto !important;
 }
 
+/*
+ * Query editor placeholder — the ONE definition for every page that overlays
+ * a placeholder on the Monaco query editor (logs, traces, RUM sessions,
+ * RUM error tracking, alerts). Mirrors Monaco's rendered text (monospace,
+ * same line height) so the placeholder reads as the future typed query.
+ * --o2-text-placeholder is theme-paired, so no dark override is needed.
+ */
+.query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
+  font-family: monospace;
+  font-size: var(--text-base);
+  line-height: 1.3125rem;
+  color: var(--o2-text-placeholder);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 @layer base {
   *, :before, :after {
     border-color: #e5e7eb;

@@ -572,7 +572,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="dashboard-data-row tw:cursor-pointer tw:hover:bg-[var(--o2-hover-gray)]"
               :class="{ 'tw:border-b': !usesSeparateBorders }"
               data-test="dashboard-data-row"
+              tabindex="0"
               @click="handleDataRowClick(row.original, idx as number, $event)"
+              @keydown="handleDataRowKeydown($event, row.original, idx as number)"
             >
               <td
                 v-for="(cell, cellIndex) in row.getVisibleCells()"
@@ -2465,6 +2467,24 @@ const handleDataRowClick = (row: any, index: number, event?: MouseEvent) => {
 
   if (actualIndex !== -1) {
     emits("click:dataRow", row, actualIndex, event);
+  }
+};
+
+// Keyboard access for clickable data rows: Enter/Space activate, arrows move focus.
+const handleDataRowKeydown = (event: KeyboardEvent, row: any, index: number) => {
+  if (event.target !== event.currentTarget) return;
+  const current = event.currentTarget as HTMLElement;
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    handleDataRowClick(row, index);
+  } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const next = event.key === "ArrowDown" ? "nextElementSibling" : "previousElementSibling";
+    let sibling = current[next] as HTMLElement | null;
+    while (sibling && !sibling.matches("tr[tabindex]")) {
+      sibling = sibling[next] as HTMLElement | null;
+    }
+    sibling?.focus();
   }
 };
 

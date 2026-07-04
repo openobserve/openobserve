@@ -17,6 +17,11 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
+// Strip tabindex from the wrapper so it isn't an extra tab-stop before the options.
+const wrapperAttrs = computed(() => {
+  const { tabindex, ...rest } = $attrs;
+  return rest;
+});
 
 const props = withDefaults(defineProps<OptionGroupProps>(), {
   type: "radio",
@@ -59,7 +64,7 @@ function handleCheckbox(val: (string | number)[]) {
 </script>
 
 <template>
-  <div v-bind="$attrs" class="tw:flex tw:flex-col tw:gap-2 tw:w-full">
+  <div v-bind="wrapperAttrs" class="tw:flex tw:flex-col tw:gap-2 tw:w-full">
     <div
       v-if="$slots.label || label || $slots.tooltip"
       :class="[

@@ -724,9 +724,11 @@ class="tw:h-5! tw:text-[0.75rem]!">
                   v-for="(row, index) in spanLinks"
                   :data-test="`trace-event-detail-link-${index}`"
                   :key="'expand_' + index"
+                  tabindex="0"
                   @click="openReferenceTrace('span', row)"
+                  @keydown="onLinkRowKeydown($event, row)"
                   style="cursor: pointer"
-                  class="pointer"
+                  class="pointer tw:focus-visible:outline-none tw:focus-visible:bg-(--color-surface-accent)"
                 >
                   <td
                     v-for="column in linkColumns"
@@ -1606,6 +1608,24 @@ export default defineComponent({
       }
     };
 
+    // Keyboard access for clickable span-link rows: Enter/Space activate, arrows move focus.
+    const onLinkRowKeydown = (event: KeyboardEvent, row: any) => {
+      if (event.target !== event.currentTarget) return;
+      const currentRow = event.currentTarget as HTMLElement;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openReferenceTrace("span", row);
+      } else if (event.key === "ArrowDown") {
+        event.preventDefault();
+        const next = currentRow.nextElementSibling as HTMLElement | null;
+        if (next?.matches("tr[tabindex]")) next.focus();
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        const prev = currentRow.previousElementSibling as HTMLElement | null;
+        if (prev?.matches("tr[tabindex]")) prev.focus();
+      }
+    };
+
     const spanLinks = computed(() => {
       try {
         const parsedLinks =
@@ -2085,6 +2105,7 @@ export default defineComponent({
       copySpanId,
       copyAttributesToClipboard,
       openReferenceTrace,
+      onLinkRowKeydown,
       spanLinks,
       linkColumns,
       getTagRows,
