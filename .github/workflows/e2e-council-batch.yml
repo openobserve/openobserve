@@ -1,0 +1,459 @@
+name: E2E Council Batch — Automate Regression from Needs-Automation
+
+# Scheduled/manual BATCH orchestrator that fires the E2E Council engine across every CLOSED issue
+# labelled `Needs-Automation`, aggregates the generated regression tests under
+# tests/ui-testing/playwright-tests/RegressionSet/, and opens ONE PR per run for QA to review.
+#
+# WHY A SEPARATE FILE (not adding to e2e-council-caller.yml):
+#   The `/e2e` caller is a THIN per-PR gate + dispatch — different trigger, different lifecycle,
+#   different failure semantics. Mixing batch orchestration into it would bloat the hot path,
+#   which every open PR reads on every comment. Cheap file separation now saves debugging later.
+#
+# THE FLOW (mode=full):
+#   plan:      kill-switch → resolve closed `Needs-Automation` issues → find each issue's fix PR
+#              → cap to `max_issues` → emit JSON queue.
+#   run:       per queued issue, dispatch the engine (workflow `e2e-council.yml` on o2-enterprise)
+#              with batch_key=regression-YYYY-MM-DD, pr_back_enabled=false,
+#              target_dir=<area folder derived from labels>. Wait per-run with a 45-min hard cap
+#              (`timeout 2700 gh run watch`). Failures don't abort the batch — the label stays,
+#              tomorrow retries. Engine writes ALL runs to autoe2e/batch-<key> (shared branch,
+#              reuse-forced) so no cherry-pick step exists.
+#   finalize:  grep `Issue: #<n>` commit trailers on autoe2e/batch-<key> — that IS the success set.
+#              Empty set → skip PR (empty-day guard). Non-empty → open ONE PR against main.
+#              mode=full only: for each SUCCESSFULLY-COVERED issue, remove `Needs-Automation`,
+#              add `Automated`. Failures keep the label → auto-retry on the next run.
+#
+# MODES (input `mode`, 3-way choice):
+#   dry_run    — resolve issues + fix PRs, report what WOULD run. NO engine dispatch, NO writes.
+#   test       — engine runs, a real PR opens, but NO label mutation on real issues. Safe pre-merge
+#                testing and safe against fixture / hand-picked issues.
+#   full       — everything, including label writes. What the cron will use.
+#
+# TEST-RUN BEFORE MERGE (invariant we promised):
+#   `workflow_dispatch` runs a workflow at ANY ref — you don't need this file on `main` yet. To
+#   test the full stack from the feature branches before opening PRs:
+#     gh workflow run e2e-council-batch.yml \
+#        --repo openobserve/openobserve \
+#        --ref feat/automate-regression-council \
+#        -f mode=test \
+#        -f engine_ref=feat/engine-batch-inputs \
+#        -f issue_numbers=<one-known-good-closed-Needs-Automation-issue>
+#   Watch the resulting PR + engine logs. When green: open o2-enterprise PR first, merge, then
+#   open openobserve PR. `engine_ref` defaults to `main` so post-merge nothing has to change.
+#
+# EXISTING /e2e IS UNTOUCHED:
+#   This workflow never fires on issue_comment or PR events. The engine changes it depends on
+#   (batch_key/target_dir/pr_back_enabled inputs) are additive with backward-compat defaults, so
+#   `/e2e` reads the same code paths it always did.
+#
+# KILL SWITCHES:
+#   vars.E2E_COUNCIL_DISABLED       — global engine kill (shared with /e2e).
+#   vars.E2E_AUTO_REGRESSION_DISABLED — batch-only kill (pause nightly without killing /e2e).
+#
+# REQUIRED SECRET: secrets.ORG_ADMIN_TOKEN — SAME PAT the /e2e caller uses. Needs:
+#   o2-enterprise: Actions R/W (dispatch the engine).
+#   openobserve:   Contents R/W (create branches/PR), Issues R/W (labels + comments), Pull-requests R/W.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry_run: report only, no engine, no writes. test: engine runs + PR opens, NO label mutation. full: everything (what cron uses)."
+        required: true
+        default: "dry_run"
+        type: choice
+        options: [dry_run, test, full]
+      issue_numbers:
+        description: "Optional comma-separated closed-issue numbers to force-include (e.g. 12345,12401). Empty = query GitHub by label:Needs-Automation + state:closed."
+        required: false
+        default: ""
+      max_issues:
+        description: "Cap issues per batch. Extras roll to tomorrow (they still have the label). Default 10."
+        required: false
+        default: "10"
+      engine_ref:
+        description: "Ref of o2-enterprise to dispatch the engine on. Set to a feat branch for test-before-merge of engine changes. Default: main."
+        required: false
+        default: "main"
+  # NOTE: schedule: is intentionally commented out until we've had 3 successful manual runs.
+  # Enable via a one-line follow-up PR. Recommended: `0 13 * * 1-5` (6:30 PM IST, weekdays only).
+  # schedule:
+  #   - cron: "0 13 * * 1-5"
+
+permissions:
+  contents: read       # step-level checkout only (no PR-code checkout)
+  pull-requests: write # open the aggregated PR
+  issues: write        # label + comment writes on source issues
+
+# Batch runs must NEVER race — the engine writes all runs of one batch to the same shared branch.
+# Group is fixed (one queue for the whole workflow), cancel-in-progress=false so a mid-batch
+# cancellation doesn't leave partial commits on autoe2e/batch-<key>.
+concurrency:
+  group: e2e-council-batch-oss
+  cancel-in-progress: false
+
+jobs:
+  batch:
+    if: vars.E2E_COUNCIL_DISABLED != 'true' && vars.E2E_AUTO_REGRESSION_DISABLED != 'true'
+    runs-on: ubuntu-latest
+    # Hard cap: max 10 issues × ~30-min engine run + PR-open + label writes. 6h is defense-in-depth.
+    timeout-minutes: 360
+    env:
+      # ORG_ADMIN_TOKEN is required for cross-repo dispatch (o2-enterprise Actions R/W) and for
+      # openobserve writes (PR branches on main, label + comment writes). Scoped job-wide is
+      # acceptable here because THIS workflow never checks out or executes PR code — no
+      # untrusted-code surface can steal the token.
+      GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+      MODE: ${{ inputs.mode }}
+      MAX_ISSUES: ${{ inputs.max_issues }}
+      ENGINE_REF: ${{ inputs.engine_ref }}
+      IN_ISSUE_NUMBERS: ${{ inputs.issue_numbers }}
+      OSS_REPO: openobserve/openobserve
+      ENT_REPO: openobserve/o2-enterprise
+    outputs:
+      batch_key: ${{ steps.plan.outputs.batch_key }}
+      work_branch: ${{ steps.plan.outputs.work_branch }}
+      queue_count: ${{ steps.plan.outputs.queue_count }}
+      success_count: ${{ steps.finalize.outputs.success_count }}
+    steps:
+      - name: Plan — resolve issue list, fix PRs, and cap
+        id: plan
+        # Untrusted event data → env vars, never spliced into commands. This step reads GitHub API
+        # (issues + timeline) but never checks out or runs PR code.
+        run: |
+          set -euo pipefail
+
+          # ---- 1. Compose the queue ----
+          # Explicit issue_numbers (workflow_dispatch override) win over the label query. This lets
+          # QA force-include specific issues without waiting for the cron, or replay a bad run.
+          if [ -n "${IN_ISSUE_NUMBERS:-}" ]; then
+            # Split on commas, trim whitespace, keep only digits.
+            RAW=$(printf '%s' "$IN_ISSUE_NUMBERS" | tr ',' '\n' | sed 's/[^0-9]//g' | grep -v '^$' || true)
+            echo "Explicit issue_numbers input received: $(echo "$RAW" | tr '\n' ' ')"
+          else
+            # Label query: closed, has Needs-Automation, NOT already Automated (defensive: catches
+            # a stale re-label). Highest N by number = FIFO drain of oldest backlog first.
+            RAW=$(gh issue list \
+              --repo "$OSS_REPO" \
+              --state closed \
+              --label "Needs-Automation" \
+              --limit 100 \
+              --json number,labels \
+              --jq '[.[] | select([.labels[].name] | index("Automated") | not)] | sort_by(.number) | .[].number' || true)
+            echo "Label-query result: $(echo "$RAW" | tr '\n' ' ')"
+          fi
+
+          if [ -z "${RAW:-}" ]; then
+            echo "queue_count=0" >> "$GITHUB_OUTPUT"
+            echo "batch_key=" >> "$GITHUB_OUTPUT"
+            echo "work_branch=" >> "$GITHUB_OUTPUT"
+            echo "queue_json=[]" >> "$GITHUB_OUTPUT"
+            {
+              echo "## E2E Council Batch — Nothing to do"
+              echo ""
+              echo "No closed issues matched \`Needs-Automation\` (or the explicit input was empty). Exiting cleanly."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Cap and preserve FIFO (oldest first).
+          CAPPED=$(printf '%s\n' "$RAW" | head -n "${MAX_ISSUES:-10}")
+          COUNT=$(printf '%s\n' "$CAPPED" | grep -c '^' || true)
+
+          # ---- 2. Resolve fix PR for each issue ----
+          # Preferred: gh issue view --json closedByPullRequestsReferences (GitHub's own "Closed by"
+          # timeline link, most reliable). Fallback for older issues without that: scan the timeline
+          # events for `closed_event` with a linked PR. Empty result → skip issue with a comment.
+          QUEUE_JSON="["
+          FIRST=1
+          SKIPPED_NO_PR=""
+          while IFS= read -r ISSUE; do
+            [ -z "$ISSUE" ] && continue
+            # Primary: the "closed by" back-link. Multiple linked PRs possible → take the merged one.
+            FIX_PR=$(gh issue view "$ISSUE" --repo "$OSS_REPO" \
+              --json closedByPullRequestsReferences \
+              --jq '[.closedByPullRequestsReferences[] | select(.state == "MERGED")] | sort_by(.number) | last | .number // empty' \
+              2>/dev/null || true)
+            # Fallback: scan issue timeline events.
+            if [ -z "$FIX_PR" ]; then
+              FIX_PR=$(gh api "/repos/${OSS_REPO}/issues/${ISSUE}/timeline" \
+                --jq '[.[] | select(.event=="closed" and .commit_id == null) | .source.issue.pull_request.merged_at // empty]' \
+                2>/dev/null | head -n1 || true)
+              # This fallback is best-effort; if it doesn't yield a PR number, we skip below.
+            fi
+            if [ -z "$FIX_PR" ] || ! printf '%s' "$FIX_PR" | grep -qE '^[0-9]+$'; then
+              SKIPPED_NO_PR="$SKIPPED_NO_PR $ISSUE"
+              continue
+            fi
+
+            # Derive an advisory target_dir from the issue's `area/*` label, fallback to Bugs/.
+            # awk here Title-cases "alerts" → "Alerts" (matches the RegressionSet/ folder convention).
+            AREA=$(gh issue view "$ISSUE" --repo "$OSS_REPO" --json labels \
+              --jq '[.labels[].name | select(startswith("area/"))] | first // ""' 2>/dev/null || true)
+            AREA=$(printf '%s' "$AREA" | sed 's|^area/||' \
+              | awk '{ if (length($0) > 0) printf "%s%s", toupper(substr($0,1,1)), substr($0,2) }')
+            [ -z "$AREA" ] && AREA="Bugs"
+            TARGET_DIR="tests/ui-testing/playwright-tests/RegressionSet/${AREA}"
+
+            [ $FIRST -eq 0 ] && QUEUE_JSON="${QUEUE_JSON},"
+            QUEUE_JSON="${QUEUE_JSON}{\"issue\":${ISSUE},\"fix_pr\":${FIX_PR},\"target_dir\":\"${TARGET_DIR}\"}"
+            FIRST=0
+          done <<< "$CAPPED"
+          QUEUE_JSON="${QUEUE_JSON}]"
+
+          QUEUE_COUNT=$(printf '%s' "$QUEUE_JSON" | jq 'length')
+
+          # ---- 3. Compute batch_key + work_branch (deterministic per calendar day) ----
+          BATCH_KEY="regression-$(date -u +%Y-%m-%d)"
+          WORK_BRANCH="autoe2e/batch-${BATCH_KEY}"
+
+          # Emit for later steps.
+          {
+            echo "batch_key=${BATCH_KEY}"
+            echo "work_branch=${WORK_BRANCH}"
+            echo "queue_count=${QUEUE_COUNT}"
+          } >> "$GITHUB_OUTPUT"
+          # Multi-line JSON via heredoc-delimited $GITHUB_OUTPUT write.
+          DELIM="qEOF_$(openssl rand -hex 16 2>/dev/null || echo "${RANDOM}${RANDOM}${RANDOM}")"
+          printf 'queue_json<<%s\n%s\n%s\n' "$DELIM" "$QUEUE_JSON" "$DELIM" >> "$GITHUB_OUTPUT"
+
+          # ---- 4. Human-facing plan summary ----
+          {
+            echo "## E2E Council Batch — Plan (mode=${MODE})"
+            echo ""
+            echo "- Batch key: \`${BATCH_KEY}\`"
+            echo "- Work branch (engine will write here): \`${WORK_BRANCH}\`"
+            echo "- Engine ref: \`${ENGINE_REF}\`"
+            echo "- Queued: **${QUEUE_COUNT}** issue(s) (cap: ${MAX_ISSUES:-10})"
+            echo ""
+            if [ -n "$SKIPPED_NO_PR" ]; then
+              echo "### Skipped (no fix PR found)"
+              for I in $SKIPPED_NO_PR; do echo "- #${I} — no MERGED closing PR (label stays; add the PR link and it'll retry)"; done
+              echo ""
+            fi
+            echo "### Queue"
+            echo "| Issue | Fix PR | Target dir |"
+            echo "|-------|--------|------------|"
+            printf '%s' "$QUEUE_JSON" | jq -r '.[] | "| #\(.issue) | #\(.fix_pr) | \(.target_dir) |"'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dry-run stop (mode=dry_run reports the plan, does not dispatch)
+        if: inputs.mode == 'dry_run' || steps.plan.outputs.queue_count == '0'
+        run: |
+          echo "mode=${MODE}, queue_count=${{ steps.plan.outputs.queue_count }} — plan reported, exiting without dispatching."
+
+      - name: Dispatch engine per issue (sequential, per-run 45-min cap)
+        if: inputs.mode != 'dry_run' && steps.plan.outputs.queue_count != '0'
+        env:
+          QUEUE_JSON: ${{ steps.plan.outputs.queue_json }}
+          BATCH_KEY: ${{ steps.plan.outputs.batch_key }}
+        run: |
+          set -uo pipefail
+          # Sequential loop. GitHub's concurrency group on the engine (e2e-council-batch-<key>) will
+          # ALSO serialize us defensively even if two batch runs raced, but we drive one-at-a-time
+          # here so we can poll each run's exit status and give the batch summary rich per-issue data.
+          RESULTS_FILE="$RUNNER_TEMP/batch-results.jsonl"
+          : > "$RESULTS_FILE"
+
+          # Iterate the queue as JSON to preserve exact issue/PR pairing.
+          echo "$QUEUE_JSON" | jq -c '.[]' | while IFS= read -r ITEM; do
+            ISSUE=$(printf '%s' "$ITEM" | jq -r '.issue')
+            FIX_PR=$(printf '%s' "$ITEM" | jq -r '.fix_pr')
+            TARGET_DIR=$(printf '%s' "$ITEM" | jq -r '.target_dir')
+
+            echo "::group::Issue #${ISSUE} — dispatch engine for fix PR #${FIX_PR} (target_dir=${TARGET_DIR})"
+            START=$(date -u +%s)
+
+            # Dispatch the engine on the chosen ref. This mirrors the /e2e caller's dispatch shape
+            # (source_repo, pr_number, dry_run, force_overwrite, feature_hint, actor) + our three
+            # batch-mode inputs. `--ref` targets a specific branch of o2-enterprise so test-runs
+            # can hit engine feat branches pre-merge.
+            if ! gh workflow run e2e-council.yml \
+              --repo "$ENT_REPO" \
+              --ref "$ENGINE_REF" \
+              -f source_repo=openobserve \
+              -f pr_number="$FIX_PR" \
+              -f dry_run=false \
+              -f force_overwrite=false \
+              -f feature_hint="regression coverage for issue #${ISSUE}" \
+              -f actor=e2e-council-batch \
+              -f batch_key="$BATCH_KEY" \
+              -f target_dir="$TARGET_DIR" \
+              -f pr_back_enabled=false; then
+              printf '{"issue":%s,"fix_pr":%s,"status":"dispatch_failed","duration":0}\n' \
+                "$ISSUE" "$FIX_PR" >> "$RESULTS_FILE"
+              echo "::error::dispatch failed for issue #${ISSUE}"
+              echo "::endgroup::"
+              continue
+            fi
+
+            # Find the run we just triggered. `gh run list` on the ENT repo, filtered to the engine
+            # workflow, newest first. Retry a few times: workflow_dispatch takes 2-10s to appear.
+            RUN_ID=""
+            for _ in 1 2 3 4 5 6 7 8 9 10; do
+              sleep 3
+              RUN_ID=$(gh run list \
+                --repo "$ENT_REPO" \
+                --workflow e2e-council.yml \
+                --limit 5 \
+                --json databaseId,createdAt,event,status \
+                --jq "[.[] | select(.event==\"workflow_dispatch\" and .status != \"completed\")] | first | .databaseId // \"\"" \
+                2>/dev/null || true)
+              [ -n "$RUN_ID" ] && break
+            done
+            if [ -z "$RUN_ID" ]; then
+              printf '{"issue":%s,"fix_pr":%s,"status":"run_not_found","duration":0}\n' \
+                "$ISSUE" "$FIX_PR" >> "$RESULTS_FILE"
+              echo "::warning::couldn't locate dispatched engine run for #${ISSUE} — continuing"
+              echo "::endgroup::"
+              continue
+            fi
+            echo "Engine run id: $RUN_ID  → https://github.com/${ENT_REPO}/actions/runs/${RUN_ID}"
+
+            # Wait up to 45 min. `gh run watch --exit-status` returns non-zero on any non-success
+            # completion. `timeout` returns 124 on the wall-clock cap.
+            STATUS="unknown"
+            if timeout 2700 gh run watch "$RUN_ID" --repo "$ENT_REPO" --exit-status >/dev/null 2>&1; then
+              STATUS="success"
+            else
+              RC=$?
+              if [ "$RC" = "124" ]; then STATUS="timeout"; else STATUS="engine_failed"; fi
+            fi
+            END=$(date -u +%s)
+            DURATION=$((END - START))
+
+            printf '{"issue":%s,"fix_pr":%s,"status":"%s","duration":%s,"run_id":%s}\n' \
+              "$ISSUE" "$FIX_PR" "$STATUS" "$DURATION" "$RUN_ID" >> "$RESULTS_FILE"
+            echo "Issue #${ISSUE} → status=${STATUS} duration=${DURATION}s"
+            echo "::endgroup::"
+          done
+
+          # Persist for the finalize step.
+          echo "results_file=$RESULTS_FILE" >> "$GITHUB_OUTPUT"
+        id: dispatch
+
+      - name: Finalize — grep trailers, open PR, label lifecycle
+        id: finalize
+        if: inputs.mode != 'dry_run' && steps.plan.outputs.queue_count != '0'
+        env:
+          BATCH_KEY: ${{ steps.plan.outputs.batch_key }}
+          WORK_BRANCH: ${{ steps.plan.outputs.work_branch }}
+          RESULTS_FILE: ${{ steps.dispatch.outputs.results_file }}
+        run: |
+          set -uo pipefail
+
+          # ---- 1. Does the batch branch even exist? ----
+          # If no engine run committed anything (all timed-out / dispatch-failed / triage said skip),
+          # the branch was never created. Empty-day guard: skip PR creation.
+          if ! gh api "/repos/${OSS_REPO}/branches/${WORK_BRANCH}" >/dev/null 2>&1; then
+            echo "success_count=0" >> "$GITHUB_OUTPUT"
+            {
+              echo "## E2E Council Batch — No PR opened"
+              echo ""
+              echo "The batch branch \`${WORK_BRANCH}\` was never created — no engine run produced a commit."
+              echo "This is normal on days when every queued issue's triage returned action=none."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # ---- 2. Grep Issue: trailers on the branch → success set ----
+          # Each successful engine commit under batch mode ends with `Issue: #<n>`. The set of
+          # such n's is the source-of-truth for which issues actually got regression coverage.
+          COMMITS=$(gh api "/repos/${OSS_REPO}/commits?sha=${WORK_BRANCH}&per_page=100" \
+            --jq '.[].commit.message' 2>/dev/null || true)
+          SUCCESS_ISSUES=$(printf '%s' "$COMMITS" | grep -oE 'Issue: #[0-9]+' | grep -oE '[0-9]+' | sort -u || true)
+          SUCCESS_COUNT=$(printf '%s\n' "$SUCCESS_ISSUES" | grep -c '^' || true)
+          [ -z "$SUCCESS_ISSUES" ] && SUCCESS_COUNT=0
+          echo "success_count=$SUCCESS_COUNT" >> "$GITHUB_OUTPUT"
+
+          if [ "$SUCCESS_COUNT" -eq 0 ]; then
+            {
+              echo "## E2E Council Batch — No PR opened"
+              echo ""
+              echo "The branch \`${WORK_BRANCH}\` exists but contains no \`Issue: #<n>\` trailers."
+              echo "That means every engine run reached the branch but none of them landed generated tests"
+              echo "(healing failed or Sentinel rejected all attempts). Labels unchanged; retry tomorrow."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # ---- 3. Build the PR body table ----
+          BODY_FILE="$RUNNER_TEMP/pr-body.md"
+          {
+            echo "## Automated Regression Batch — ${BATCH_KEY}"
+            echo ""
+            echo "Generated by \`e2e-council-batch.yml\` — scheduled council-of-agents run over closed issues labelled \`Needs-Automation\`."
+            echo ""
+            echo "### Covered in this batch (${SUCCESS_COUNT} issues)"
+            echo "| Issue | Fix PR | Engine run |"
+            echo "|-------|--------|------------|"
+            for N in $SUCCESS_ISSUES; do
+              LINE=$(grep -E "\"issue\":${N}," "$RESULTS_FILE" | head -n1 || true)
+              FIX_PR=$(printf '%s' "$LINE" | jq -r '.fix_pr // "?"' 2>/dev/null || echo "?")
+              RUN_ID=$(printf '%s' "$LINE" | jq -r '.run_id // ""' 2>/dev/null || echo "")
+              RUN_LINK="—"
+              [ -n "$RUN_ID" ] && RUN_LINK="[run](https://github.com/${ENT_REPO}/actions/runs/${RUN_ID})"
+              echo "| #${N} | #${FIX_PR} | ${RUN_LINK} |"
+            done
+            echo ""
+            # Failures worth surfacing (non-success statuses from the dispatch loop).
+            FAILURES=$(jq -c 'select(.status != "success")' "$RESULTS_FILE" 2>/dev/null || true)
+            if [ -n "$FAILURES" ]; then
+              echo "### Not covered (label stays \`Needs-Automation\`, will retry)"
+              echo "| Issue | Fix PR | Reason |"
+              echo "|-------|--------|--------|"
+              printf '%s\n' "$FAILURES" | jq -r '"| #\(.issue) | #\(.fix_pr) | \(.status) |"'
+              echo ""
+            fi
+            echo "### Review guidance"
+            echo "- Each spec targets \`tests/ui-testing/playwright-tests/RegressionSet/<Area>/\`."
+            echo "- The spec was verify-healed against the enterprise binary before landing on this branch."
+            echo "- The existing Playwright CI on this PR re-validates the specs against the OSS binary."
+          } > "$BODY_FILE"
+
+          # ---- 4. Open ONE aggregated PR (idempotent — reuse if today's PR already exists) ----
+          PR_TITLE="regression(auto): batch ${BATCH_KEY} — ${SUCCESS_COUNT} issue(s)"
+          EXISTING_PR=$(gh pr list --repo "$OSS_REPO" --head "$WORK_BRANCH" --state open \
+            --json number --jq '.[0].number // empty' 2>/dev/null || true)
+          if [ -n "$EXISTING_PR" ]; then
+            gh pr edit "$EXISTING_PR" --repo "$OSS_REPO" \
+              --title "$PR_TITLE" --body-file "$BODY_FILE"
+            PR_URL="https://github.com/${OSS_REPO}/pull/${EXISTING_PR}"
+            echo "Refreshed existing PR: $PR_URL"
+          else
+            PR_URL=$(gh pr create --repo "$OSS_REPO" \
+              --base main --head "$WORK_BRANCH" \
+              --title "$PR_TITLE" --body-file "$BODY_FILE" 2>&1 | grep -oE 'https://github.com/[^ ]+' | head -n1 || true)
+            echo "Opened PR: $PR_URL"
+          fi
+
+          # ---- 5. Label lifecycle (mode=full only) ----
+          # `test` mode never touches real-issue labels — that's the whole point of the mode split.
+          if [ "$MODE" = "full" ]; then
+            # Ensure the `Automated` label exists on the repo. Idempotent: no-op if already present.
+            gh label create "Automated" --repo "$OSS_REPO" \
+              --color "0e8a16" --description "Regression test coverage added by the E2E Council batch" \
+              2>/dev/null || true
+            for N in $SUCCESS_ISSUES; do
+              gh issue edit "$N" --repo "$OSS_REPO" \
+                --remove-label "Needs-Automation" \
+                --add-label "Automated" 2>/dev/null || echo "::warning::label update failed for #${N}"
+              gh issue comment "$N" --repo "$OSS_REPO" --body \
+                "Regression coverage added by the E2E Council batch. See ${PR_URL:-the batch PR} for the generated spec." \
+                2>/dev/null || true
+            done
+          else
+            echo "mode=${MODE} — skipping label writes (test mode)."
+          fi
+
+          # ---- 6. Job summary ----
+          {
+            echo "## E2E Council Batch — Done (mode=${MODE})"
+            echo ""
+            echo "- Batch: \`${BATCH_KEY}\`"
+            echo "- Success: **${SUCCESS_COUNT}** issue(s)"
+            echo "- PR: ${PR_URL:-<none>}"
+            if [ "$MODE" != "full" ]; then
+              echo "- Labels unchanged (mode=${MODE})."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
