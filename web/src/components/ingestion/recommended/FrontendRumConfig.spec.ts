@@ -482,25 +482,25 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent());
     });
 
-    it("CDN install code contains preconnect link for cdn.jsdelivr.net", () => {
+    it("CDN install code contains preconnect link for browsersdk.openobserve.ai", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
       const installStep = card
         .props("content")
         .steps.find((s: any) => s.id === "install");
       const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
       expect(cdnVariant.code.raw).toContain(
-        'rel="preconnect" href="https://cdn.jsdelivr.net"',
+        'rel="preconnect" href="https://browsersdk.openobserve.ai"',
       );
     });
 
-    it("CDN install code contains dns-prefetch for cdn.jsdelivr.net", () => {
+    it("CDN install code contains dns-prefetch for browsersdk.openobserve.ai", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
       const installStep = card
         .props("content")
         .steps.find((s: any) => s.id === "install");
       const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
       expect(cdnVariant.code.raw).toContain(
-        'rel="dns-prefetch" href="https://cdn.jsdelivr.net"',
+        'rel="dns-prefetch" href="https://browsersdk.openobserve.ai"',
       );
     });
 

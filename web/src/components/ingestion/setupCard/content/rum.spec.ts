@@ -227,21 +227,21 @@ describe("rumCard builder", () => {
       expect(cdn.code.lang).toBe("html");
     });
 
-    it("cdn install code contains preconnect for cdn.jsdelivr.net", () => {
+    it("cdn install code contains preconnect for browsersdk.openobserve.ai", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
       const cdn = install.variants!.find((v) => v.id === "cdn")!;
       expect(cdn.code.raw).toContain(
-        'rel="preconnect" href="https://cdn.jsdelivr.net"',
+        'rel="preconnect" href="https://browsersdk.openobserve.ai"',
       );
     });
 
-    it("cdn install code contains dns-prefetch for cdn.jsdelivr.net", () => {
+    it("cdn install code contains dns-prefetch for browsersdk.openobserve.ai", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
       const cdn = install.variants!.find((v) => v.id === "cdn")!;
       expect(cdn.code.raw).toContain(
-        'rel="dns-prefetch" href="https://cdn.jsdelivr.net"',
+        'rel="dns-prefetch" href="https://browsersdk.openobserve.ai"',
       );
     });
 
@@ -268,7 +268,7 @@ describe("rumCard builder", () => {
       const install = card.steps.find((s) => s.id === "install")!;
       const cdn = install.variants!.find((v) => v.id === "cdn")!;
       expect(cdn.code.raw).toContain(
-        `https://cdn.jsdelivr.net/npm/@openobserve/browser-rum@${RUM_SDK_VERSION}/bundle/openobserve-rum.js`,
+        `https://browsersdk.openobserve.ai/${RUM_SDK_VERSION}/openobserve-rum.js`,
       );
     });
 
@@ -277,7 +277,7 @@ describe("rumCard builder", () => {
       const install = card.steps.find((s) => s.id === "install")!;
       const cdn = install.variants!.find((v) => v.id === "cdn")!;
       expect(cdn.code.raw).toContain(
-        `https://cdn.jsdelivr.net/npm/@openobserve/browser-logs@${RUM_SDK_VERSION}/bundle/openobserve-logs.js`,
+        `https://browsersdk.openobserve.ai/${RUM_SDK_VERSION}/openobserve-logs.js`,
       );
     });
 
