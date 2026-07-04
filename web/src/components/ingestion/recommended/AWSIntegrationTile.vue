@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCard
-    class="aws-integration-tile tw:border tw:border-border tw:h-full"
+    class="tw:border tw:border-border tw:h-full tw:flex tw:flex-col tw:transition-all tw:duration-200 tw:ease-in-out tw:rounded-lg tw:hover:-translate-y-0.5 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] tw:dark:hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)]"
   >
     <OCardSection class="tw:p-4 tw:pb-2 tw:flex-1">
       <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
-        <div class="tile-name tw:font-semibold tw:text-base">
+        <div class="tw:font-semibold tw:text-base tw:leading-[1.4]" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
           {{ integration.displayName }}
         </div>
         <OButton
@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-circle-sm"
           @click="handleDocumentation()"
-          class="docs-btn"
+          class="docs-btn tw:opacity-70 tw:hover:opacity-100 tw:transition-opacity tw:duration-200 tw:ease-in-out"
           :data-test="`aws-${integration.id}-docs-btn`"
         >
           <OIcon name="description" size="sm" />
           <OTooltip content="View Documentation" />
         </OButton>
       </div>
-      <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3">
+      <div class="tw:text-sm tw:mb-3 tw:leading-normal tw:min-h-[3em]" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
         {{ integration.description }}
       </div>
     </OCardSection>
@@ -81,13 +81,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:text-sm tw:font-medium tw:mb-3">
         Select how you want to integrate {{ integration.displayName }}:
       </div>
-      <ul class="aws-integration-options-list tw:flex tw:flex-col">
+      <ul class="aws-integration-options-list tw:flex tw:flex-col tw:list-none tw:p-0 tw:m-0">
         <!-- CloudFormation Templates -->
         <li
           v-for="(template, index) in integration.cloudFormationTemplates"
           :key="`cf-${index}`"
           @click="handleTemplateSelection(template)"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-2 tw:cursor-pointer tw:rounded tw:border tw:border-border hover:tw:bg-muted/50"
+          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-2 tw:cursor-pointer tw:rounded tw:border tw:border-border tw:hover:bg-muted/50"
           :data-test="`aws-${integration.id}-template-option-${index}`"
         >
           <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(option, index) in integration.componentOptions"
           :key="`comp-${index}`"
           @click="handleComponentSelection(option)"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-2 tw:cursor-pointer tw:rounded tw:border tw:border-border hover:tw:bg-muted/50"
+          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-2 tw:cursor-pointer tw:rounded tw:border tw:border-border tw:hover:bg-muted/50"
           :data-test="`aws-${integration.id}-component-option-${index}`"
         >
           <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
@@ -386,17 +386,11 @@ export default defineComponent({
       // If replacing existing dashboard, delete it first
       if (existingDashboardId) {
         try {
-          console.log("Attempting to delete dashboard:", {
-            orgId,
-            dashboardId: existingDashboardId,
-            folderId,
-          });
           const deleteResponse = await dashboardsService.delete(
             orgId,
             existingDashboardId,
             folderId,
           );
-          console.log("Delete response:", deleteResponse);
           // Wait a moment to ensure deletion completes
           await new Promise((resolve) => setTimeout(resolve, 500));
         } catch (deleteError) {
@@ -408,11 +402,6 @@ export default defineComponent({
       }
 
       // Import dashboard
-      console.log("Creating dashboard:", {
-        orgId,
-        folderId,
-        title: dashboardJson.title,
-      });
       await dashboardsService.create(orgId, dashboardJson, folderId);
     };
 
@@ -461,12 +450,6 @@ export default defineComponent({
           existingDashboard?.dashboard_id ||
           existingDashboard?.id;
 
-        console.log("Dashboard check:", {
-          dashboardTitle,
-          allDashboards: dashboardsResponse.data?.dashboards,
-          existingDashboard,
-          existingDashboardId,
-        });
 
         if (existingDashboard) {
           // Ask user if they want to replace the existing dashboard
@@ -580,6 +563,7 @@ export default defineComponent({
     };
 
     return {
+      store,
       handleAddSource,
       handleAddDashboard,
       handleDocumentation,
@@ -596,69 +580,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.aws-integration-options-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.aws-integration-tile {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  transition: all 0.2s ease;
-  border-radius: 8px;
-
-  &:hover {
-    transform: translateY(-2px);
-  }
-
-  .body--light & {
-    &:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    .tile-name {
-      color: #1a1a1a;
-    }
-
-    .tile-description {
-      color: #666;
-    }
-  }
-
-  .body--dark & {
-    &:hover {
-      box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
-    }
-
-    .tile-name {
-      color: #e0e0e0;
-    }
-
-    .tile-description {
-      color: #b0b0b0;
-    }
-  }
-
-  .tile-name {
-    line-height: 1.4;
-  }
-
-  .tile-description {
-    line-height: 1.5;
-    min-height: 3em;
-  }
-
-  .docs-btn {
-    opacity: 0.7;
-    transition: opacity 0.2s ease;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-</style>

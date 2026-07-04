@@ -1038,22 +1038,24 @@ const setInitialReportData = async () => {
 
   const cached = queryParams.type === "cached";
 
-  // Support both ?folder= (from ReportList) and ?folderId= (legacy links)
-  const reportFolderId = (queryParams.folder || queryParams.folderId) as
-    | string
-    | undefined;
+  // ?folderId= is the DASHBOARD folder (passed from a dashboard context, e.g.
+  // ScheduledDashboards). ?folder= is the REPORTS folder (from ReportList) and is
+  // handled separately via selectedReportFolderId — it must NOT be used to
+  // pre-select the dashboard folder, otherwise the dashboard folder dropdown shows
+  // the raw reports-folder id instead of a dashboard folder name.
+  const dashboardFolderId = queryParams.folderId as string | undefined;
   const dashboardId = queryParams.dashboardId as string | undefined;
   const tabId = queryParams.tabId as string | undefined;
 
   // Load the options the query-seeded selections need (no cascade @update fires
   // for programmatic seeding, so load them here).
-  if (reportFolderId) await setDashboardOptions(reportFolderId);
-  if (reportFolderId && dashboardId) setDashboardTabOptions(dashboardId);
+  if (dashboardFolderId) await setDashboardOptions(dashboardFolderId);
+  if (dashboardFolderId && dashboardId) setDashboardTabOptions(dashboardId);
 
   const row = {
     ...createReportDefaults().dashboards[0],
-    folder: reportFolderId ?? "",
-    dashboard: reportFolderId && dashboardId ? dashboardId : "",
+    folder: dashboardFolderId ?? "",
+    dashboard: dashboardFolderId && dashboardId ? dashboardId : "",
     tabs: dashboardId && tabId ? tabId : "",
   };
 

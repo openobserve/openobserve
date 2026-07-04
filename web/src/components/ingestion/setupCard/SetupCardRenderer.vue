@@ -35,7 +35,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
@@ -429,29 +429,28 @@ function fireConfetti() {
         </div>
         <p class="c-sub">{{ content.provider.tagline }}</p>
         <div class="pv-meta">
-          <OBadge
+          <OTag
             v-if="content.provider.runtime"
-            variant="default-outline"
-            icon="code"
-            >{{ content.provider.runtime }}</OBadge
+            type="setupCardMeta"
+            value="runtime"
+            >{{ content.provider.runtime }}</OTag
           >
-          <OBadge
+          <OTag
             v-if="content.provider.setupTime"
-            variant="primary-soft"
-            icon="schedule"
-            >{{ content.provider.setupTime }} setup</OBadge
+            type="setupCardMeta"
+            value="setuptime"
+            >{{ content.provider.setupTime }} setup</OTag
           >
           <template v-if="content.provider.metaBadges">
-            <OBadge
+            <OTag
               v-for="b in content.provider.metaBadges"
               :key="b"
-              variant="default-outline"
-              >{{ b }}</OBadge
+              type="setupCardMeta"
+              value="meta"
+              >{{ b }}</OTag
             >
           </template>
-          <OBadge v-else variant="default-outline" icon="attach-money"
-            >Cost &amp; Tokens Captured</OBadge
-          >
+          <OTag v-else type="setupCardMeta" value="cost" />
         </div>
       </div>
 
@@ -488,16 +487,16 @@ function fireConfetti() {
           :data-test="`ai-step-${step.id}`"
         >
           <template v-if="step.chip" #title-suffix>
-            <OBadge
-              size="sm"
-              :variant="step.required ? 'primary-soft' : 'default-outline'"
+            <OTag
+              type="stepChip"
+              :value="step.required ? 'required' : 'optional'"
               :icon="step.chip.kind === 'terminal' ? undefined : chipIcon(step.chip.kind)"
             >
               <template v-if="step.chip.kind === 'terminal'" #icon>
                 <span class="step-tag-glyph">$_</span>
               </template>
               {{ step.chip.label }}
-            </OBadge>
+            </OTag>
           </template>
 
           <div class="step-content-pad" :ref="(el) => setStepRef(el, i)">
@@ -588,12 +587,12 @@ function fireConfetti() {
             </p>
 
             <div v-if="step.pills?.length" class="pill-list tw:mt-2">
-              <OBadge
+              <OTag
                 v-for="p in step.pills"
                 :key="p"
-                variant="default-soft"
-                size="sm"
-                >{{ p }}</OBadge
+                type="fieldTag"
+                value="softsm"
+                >{{ p }}</OTag
               >
             </div>
 
@@ -729,12 +728,12 @@ function fireConfetti() {
             <template v-if="extras.installs?.length">
               Installs via pip and verifies imports:
               <div class="pill-list tw:mt-2">
-                <OBadge
+                <OTag
                   v-for="p in extras.installs"
                   :key="p"
-                  variant="default-soft"
-                  size="sm"
-                  >{{ p }}</OBadge
+                  type="fieldTag"
+                  value="softsm"
+                  >{{ p }}</OTag
                 >
               </div>
             </template>
@@ -743,12 +742,12 @@ function fireConfetti() {
                 Writes these keys to <code>./.env</code> (idempotent):
               </div>
               <div class="pill-list tw:mt-2">
-                <OBadge
+                <OTag
                   v-for="p in extras.envVars"
                   :key="p"
-                  variant="default-soft"
-                  size="sm"
-                  >{{ p }}</OBadge
+                  type="fieldTag"
+                  value="softsm"
+                  >{{ p }}</OTag
                 >
               </div>
             </template>
@@ -917,7 +916,7 @@ function fireConfetti() {
   font-size: 14px;
   margin: 10px 0 0;
 }
-/* Hero meta chips are now <OBadge> (lib) — just lay them out. */
+/* Hero meta chips are now <OTag> (lib) — just lay them out. */
 .pv-meta {
   display: flex;
   align-items: center;
@@ -957,7 +956,7 @@ function fireConfetti() {
 .steps {
   margin-top: 0;
 }
-/* Step context chip is now <OBadge> (lib). Only the terminal "$_" glyph (used
+/* Step context chip is now <OTag> (lib). Only the terminal "$_" glyph (used
    in the badge's #icon slot) keeps a monospace style. */
 .step-tag-glyph {
   font-weight: 800;
@@ -1133,7 +1132,7 @@ function fireConfetti() {
   border-radius: 4px;
 }
 
-/* ---- pills (now <OBadge>) — just lay them out ---- */
+/* ---- pills (now <OTag>) — just lay them out ---- */
 .pill-list {
   display: flex;
   flex-wrap: wrap;

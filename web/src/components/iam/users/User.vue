@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -106,8 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="(roleName, idx) in (row.roles || [])"
                 :key="`${roleName}-${idx}`"
                 :type="isBuiltinRole(roleName) ? 'userRole' : undefined"
-                :value="isBuiltinRole(roleName) ? roleName : roleName"
-                :label="isBuiltinRole(roleName) ? undefined : roleName"
+                :value="roleName"
               />
             </div>
           </template>
@@ -122,8 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OTag
                 v-if="row.status === 'pending'"
-                value="Invited"
-                variant="warning-soft"
+                type="userStatus"
+                value="invited"
               />
             </span>
           </template>
@@ -135,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`delete-basic-user-${row.email}`"
+              data-row-action="delete"
               @click="confirmDeleteAction(row)"
             >
               <OIcon name="delete" size="sm" />
@@ -145,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`revoke-invite-${row.email}`"
+              data-row-action="delete"
               @click="confirmRevokeAction(row)"
             >
               <OIcon name="cancel" size="sm" />
@@ -155,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`edit-basic-user-${row.email}`"
+              data-row-action="edit"
               @click="addRoutePush(row)"
             >
               <OIcon name="edit" size="sm" />
@@ -176,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
         </div>
     </div>
-    
+
     <update-user-role
       v-if="config.isCloud == 'false'"
       v-model:open="showUpdateUserDialog"
@@ -237,7 +239,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -267,6 +268,8 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
 import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
@@ -278,7 +281,6 @@ export default defineComponent({
     AddUser,
     MemberInvitation,
     OButton,
-    OBadge,
     OTag,
     OIcon,
     ODialog,
@@ -619,7 +621,7 @@ export default defineComponent({
               const invitedMembers: any = await getInvitedMembers();
               users = [...res.data.data, ...invitedMembers];
             }
-            
+
             let counter = 1;
             currentUserRole.value = "";
             usersState.users = users.map((data: any) => {
@@ -1214,10 +1216,29 @@ export default defineComponent({
     watch(selectedUsers, (newSelectedUsers) => {
       const onlyEnabledSelected = newSelectedUsers.filter((user: any) => user.enableDelete);
       if (onlyEnabledSelected.length !== newSelectedUsers.length) {
+
         selectedUsers.value = onlyEnabledSelected;
       }
     });
 
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "iamUsersAdd",
+        handler: () => { if (!isInputFocused()) addRoutePush({}); },
+      },
+      {
+        id: "iamUsersRefresh",
+        handler: () => { if (!isInputFocused()) getOrgMembers(); },
+      },
+      {
+        id: "iamUsersFocusSearch",
+        handler: () => {
+          focusSearchInput("user-list-search-input");
+        },
+      },
+    ]);
     return {
       t,
       router,
@@ -1285,99 +1306,12 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-
-/* Role chip — matches the incident "dimension-badge" sizing so role pills
-   read consistently across the app (2px 8px padding, 11px font, weight 600). */
+<style>
 :deep(.o2-role-chip) {
   padding: 2px 8px;
   font-size: 11px;
   font-weight: 600;
   border-radius: 6px;
   line-height: 1.4;
-}
-
-.iconHoverBtn {
-  cursor: pointer !important;
-}
-
-.confirmBody {
-  padding: 11px 1.375rem 0;
-  font-size: 0.875rem;
-  text-align: center;
-  font-weight: 700;
-
-  .head {
-    line-height: 2.125rem;
-    margin-bottom: 0.5rem;
-    color: $dark-page;
-  }
-
-  .para {
-    color: $light-text;
-  }
-}
-
-.confirmActions {
-  justify-content: center;
-  padding: 1.25rem 1.375rem 1.625rem;
-  display: flex;
-}
-
-.non-selectable {
-  cursor: default !important;
-}
-
-.invite-user {
-  background: $input-bg;
-  border-radius: 4px;
-
-  .separator {
-    width: 1px;
-  }
-}
-
-.inputHint {
-  font-size: 11px;
-  color: $light-text;
-}
-
-.role-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
-  padding: 4px 10px;
-  border-radius: 6px;
-  background-color: transparent;
-  white-space: nowrap;
-}
-
-.role-badge-system {
-  color: #8a6a1f;
-  border: 1px solid #8a6a1f;
-}
-
-.role-badge-custom {
-  color: #a04545;
-  border: 1px solid #a04545;
-  font-weight: 700;
-}
-
-.role-badge-more {
-  color: #a04545;
-  border: 1px solid #a04545;
-  cursor: pointer;
-}
-
-.role-badge-sso {
-  color: #1f6f8b;
-  border: 1px solid #1f6f8b;
-}
-
-.role-badge-local {
-  color: #4a4a4a;
-  border: 1px solid #4a4a4a;
 }
 </style>

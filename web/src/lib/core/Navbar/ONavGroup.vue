@@ -49,6 +49,7 @@ import MenuLink from "@/components/MenuLink.vue";
 import config from "@/aws-exports";
 import { GATE_PREDICATES } from "./navGroups";
 import type { SubnavChild, NavGateContext } from "./ONavbar.types";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const props = defineProps<{
   groupKey: string;
@@ -265,14 +266,18 @@ function onLinkClick() {
 }
 
 function onTileKeydown(event: KeyboardEvent) {
-  if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+  // ArrowRight opens the flyout; Up/Down are left to the rail's own navigation.
+  if (event.key === "ArrowRight") {
     event.preventDefault();
+    event.stopPropagation();
     if (!isOpen.value) open();
     nextTick(() => {
       flyoutRef.value
         ?.querySelector<HTMLElement>("a[data-test^='nav-group-item-']")
         ?.focus();
     });
+  } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+    if (isOpen.value) close();
   } else if (event.key === "Escape") {
     close();
   }
@@ -315,7 +320,7 @@ onBeforeUnmount(() => {
 });
 
 function onFlyoutKeydown(event: KeyboardEvent) {
-  if (event.key === "Escape") {
+  if (event.key === "Escape" || event.key === "ArrowLeft") {
     event.preventDefault();
     close();
     focusTile();
@@ -343,6 +348,13 @@ function onFlyoutKeydown(event: KeyboardEvent) {
 
 function onChildClick() {
   close();
+}
+
+// Focus the hovered item so Enter activates it natively — but never yank
+// focus away from an input the user is typing in.
+function onChildMouseenter(event: MouseEvent) {
+  if (isInputFocused()) return;
+  (event.currentTarget as HTMLElement)?.focus();
 }
 </script>
 
@@ -423,6 +435,7 @@ function onChildClick() {
             ]"
             :aria-current="isChildActive(row.child) ? 'page' : undefined"
             @click="onChildClick"
+            @mouseenter="onChildMouseenter"
           >
             <!-- Icon color is locked to the text color so it never picks up a
                  primary tint via currentColor inheritance. -->

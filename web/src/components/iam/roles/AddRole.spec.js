@@ -688,6 +688,61 @@ describe("AddRole Component", () => {
     });
   });
 
+  describe("Start from preset", () => {
+    it("renders Custom (default) and Read-only radio options", () => {
+      expect(
+        wrapper.find('[data-test="add-role-start-from-custom-radio"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="add-role-start-from-readonly-radio"]')
+          .exists(),
+      ).toBe(true);
+      // Default selection is "custom".
+      expect(wrapper.vm.startFrom).toBe("custom");
+    });
+
+    it("emits added:role with role_name and the selected preset", async () => {
+      vi.mocked(createRole).mockResolvedValue({});
+      wrapper.vm.name = "readonly_role";
+      wrapper.vm.startFrom = "readonly";
+      await wrapper.vm.$nextTick();
+
+      await wrapper.vm.saveRole();
+      await flushPromises();
+
+      const added = wrapper.emitted("added:role");
+      expect(added).toBeTruthy();
+      expect(added[added.length - 1]).toEqual([
+        { role_name: "readonly_role", startFrom: "readonly" },
+      ]);
+    });
+
+    it("defaults the preset back to custom each time the dialog opens", async () => {
+      wrapper.vm.startFrom = "readonly";
+      await wrapper.setProps({ open: false });
+      await wrapper.setProps({ open: true });
+      expect(wrapper.vm.startFrom).toBe("custom");
+    });
+  });
+
+  describe("Name error messages", () => {
+    // NOTE: this spec mocks useI18n so t(key) returns the key verbatim;
+    // we therefore assert on the distinct keys (required vs invalidChars).
+    it("shows the required message when the name is empty", async () => {
+      wrapper.vm.name = "";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.nameErrorMessage).toBe("iam.role.name.required");
+    });
+
+    it("shows the invalid-chars message when the name has a space", async () => {
+      wrapper.vm.name = "bad name";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.isValidRoleName).toBe(false);
+      expect(wrapper.vm.nameErrorMessage).toBe("iam.role.name.invalidChars");
+    });
+  });
+
   describe("Analytics", () => {
     it.skip("tracks the save role click on successful save", async () => {
       vi.mocked(createRole).mockResolvedValue({});

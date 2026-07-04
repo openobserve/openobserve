@@ -15,32 +15,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="incident-service-graph" style="height: calc(100vh - 202px); position: relative;">
+  <div
+    class="incident-service-graph tw:min-h-[400px] tw:flex tw:flex-col tw:m-3 tw:p-5 tw:rounded-xl tw:overflow-hidden tw:transition-all tw:duration-200 tw:bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] tw:border tw:border-[#e5e7eb] tw:shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] tw:hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)]"
+    style="height: calc(100vh - 202px); position: relative;"
+  >
     <!-- Info Icon → Graph Legend popover (hover to show, like the previous behavior) -->
     <span
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      class="info-icon-btn"
+      class="info-icon-btn tw:absolute tw:top-4 tw:right-4 tw:z-10"
     >
       <OButton variant="ghost" size="icon-circle-sm">
         <OIcon name="info-outline" size="sm" />
       </OButton>
-      <div class="graph-legend" role="tooltip">
-        <div class="graph-legend__title">Graph Legend</div>
-        <div class="graph-legend__row">
-          <span class="graph-legend__dot" style="color: #ef4444;">●</span>
+      <div
+        class="graph-legend tw:absolute tw:top-[calc(100%+8px)] tw:right-0 tw:min-w-[240px] tw:py-[14px] tw:px-4 tw:text-[13px] tw:leading-normal tw:text-[#1f2937] tw:bg-white tw:border tw:border-(--o2-border) tw:rounded-lg tw:shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] tw:opacity-0 tw:invisible tw:-translate-y-1 tw:transition-all tw:duration-150 tw:pointer-events-none tw:whitespace-nowrap"
+        role="tooltip"
+      >
+        <div class="tw:font-semibold tw:text-sm tw:mb-2.5">Graph Legend</div>
+        <div class="graph-legend__row tw:flex tw:items-center tw:gap-2 tw:py-1">
+          <span class="graph-legend__dot tw:text-[14px] tw:leading-none tw:w-[14px] tw:text-center tw:shrink-0" style="color: #ef4444;">●</span>
           Red = Potential Root Cause
         </div>
-        <div class="graph-legend__row">
-          <span class="graph-legend__dot" style="color: #f97316;">●</span>
+        <div class="graph-legend__row tw:flex tw:items-center tw:gap-2 tw:py-1">
+          <span class="graph-legend__dot tw:text-[14px] tw:leading-none tw:w-[14px] tw:text-center tw:shrink-0" style="color: #f97316;">●</span>
           Orange = High Frequency
         </div>
-        <div class="graph-legend__row">
-          <span class="graph-legend__dot" style="color: #3b82f6;">●</span>
+        <div class="graph-legend__row tw:flex tw:items-center tw:gap-2 tw:py-1">
+          <span class="graph-legend__dot tw:text-[14px] tw:leading-none tw:w-[14px] tw:text-center tw:shrink-0" style="color: #3b82f6;">●</span>
           Blue = Normal
         </div>
-        <div class="graph-legend__divider" />
-        <div class="graph-legend__row">
-          <span class="graph-legend__dot" style="color: #a78bfa;">→</span>
+        <div class="graph-legend__divider tw:h-px tw:bg-(--o2-border) tw:my-2" />
+        <div class="graph-legend__row tw:flex tw:items-center tw:gap-2 tw:py-1">
+          <span class="graph-legend__dot tw:text-[14px] tw:leading-none tw:w-[14px] tw:text-center tw:shrink-0" style="color: #a78bfa;">→</span>
           Purple arrows show temporal flow
         </div>
       </div>
@@ -644,54 +650,11 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.incident-service-graph {
-  min-height: 400px;
-  display: flex;
-  flex-direction: column;
-  margin: 12px;
-  padding: 20px;
-  border-radius: 12px;
-  overflow: hidden;
-  transition: all 0.2s ease;
-}
-
-.info-icon-btn {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 10;
-}
-
+<style>
 /* Graph Legend popover — appears on hover of the info-icon-btn wrapper.
    Background/text use explicit colors per theme because `--o2-popover-background`
    and `--o2-text-primary` both resolve to `#F0F1F2` in dark mode, which gave
    us a white card with invisible (same-color) text. */
-.graph-legend {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  min-width: 240px;
-  padding: 14px 16px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: #1f2937;
-  background-color: #ffffff;
-  border: 1px solid var(--o2-border);
-  border-radius: 8px;
-  box-shadow:
-    0 10px 20px rgba(0, 0, 0, 0.12),
-    0 3px 6px rgba(0, 0, 0, 0.06);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-4px);
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease,
-    visibility 0.15s ease;
-  pointer-events: none;
-  white-space: nowrap;
-}
 
 /* Dark-mode overrides — using both signals so it works regardless of which
    class is currently toggled (theme.ts toggles both `body.body--dark` and
@@ -719,51 +682,7 @@ body.body--dark .graph-legend__divider {
   pointer-events: auto;
 }
 
-.graph-legend__title {
-  font-weight: 600;
-  font-size: 14px;
-  margin-bottom: 10px;
-}
-
-.graph-legend__row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-}
-
-.graph-legend__dot {
-  font-size: 14px;
-  line-height: 1;
-  width: 14px;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.graph-legend__divider {
-  height: 1px;
-  background-color: var(--o2-border);
-  margin: 8px 0;
-}
-
-/* Light mode */
-.incident-service-graph {
-  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
-  border: 1px solid #e5e7eb;
-  box-shadow:
-    0 1px 3px 0 rgba(0, 0, 0, 0.08),
-    0 1px 2px 0 rgba(0, 0, 0, 0.04),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-}
-
-.incident-service-graph:hover {
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-}
-
-/* Dark mode */
+/* Dark mode for incident-service-graph container */
 .body--dark .incident-service-graph {
   background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
   border: 1px solid #374151;

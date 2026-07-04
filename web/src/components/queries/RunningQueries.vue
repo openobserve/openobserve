@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="isMetaOrg"
-    class="running-queries-page tw:rounded-md tw:p-0 tw:flex tw:flex-col tw:h-full"
+    class="tw:rounded-md tw:p-0 tw:flex tw:flex-col tw:h-full"
   >
     <div class="tw:flex-none">
       <div class="card-container">
@@ -80,14 +80,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('queries.search')"
               data-test="running-queries-search-input"
             />
-            <div v-else class="o2-select-input o2-input">
+            <div v-else class="o2-select-input o2-input tw:w-[250px]">
               <OSelect
                 v-model="filterQuery"
                 placeholder="Select option"
                 :options="otherFieldOptions"
                 labelKey="label"
                 valueKey="value"
-                class="no-border search-input"
+                class="no-border search-input tw:w-[250px]"
                 data-test="running-queries-search-input"
               />
             </div>
@@ -199,6 +199,8 @@ import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
 import { getDuration } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
@@ -793,6 +795,20 @@ export default defineComponent({
       filterQuery.value = row.user_id;
     };
 
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "runningQueriesRefresh",
+        handler: () => { if (!isInputFocused()) refreshData(); },
+      },
+      {
+        id: "runningQueriesFocusSearch",
+        handler: () => {
+          focusSearchInput("running-queries-search-input");
+        },
+      },
+    ]);
+
     return {
       t,
       store,
@@ -851,34 +867,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.running-queries-page {
-  :deep(.q-table th),
-  :deep(.q-table td) {
-    padding: 0px 16px;
-    height: 32px;
-  }
-}
-.label-container {
-  display: flex;
-  width: 100%;
-}
-</style>
-
-<style lang="scss">
-.running-queries-page {
-  .search-input {
-    width: 250px;
-  }
-}
-
-.search-field-select {
-  .q-field__control {
-    padding-left: 12px;
-    top: -1px;
-    position: relative;
-  }
-}
-
-</style>

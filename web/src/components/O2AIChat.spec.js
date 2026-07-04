@@ -131,7 +131,9 @@ const makeStreamResponse = (chunks) => ({
       return {
         async read() {
           if (i >= chunks.length) return { done: true, value: undefined };
-          const v = new TextEncoder().encode(`data: {"content":"${chunks[i++]}"}\n`);
+          const chunk = chunks[i++];
+          const payload = typeof chunk === 'string' ? { content: chunk } : chunk;
+          const v = new TextEncoder().encode(`data: ${JSON.stringify(payload)}\n`);
           return { done: false, value: v };
         },
       };
@@ -264,6 +266,22 @@ describe('O2AIChat - sendMessage and streaming', () => {
     expect(msgs[0].role).toBe('user');
     expect(msgs[msgs.length - 1].role).toBe('assistant');
     expect(msgs[msgs.length - 1].content).toContain('World');
+  });
+
+  it('appends message_delta chunks without adding paragraph breaks', async () => {
+    fetchMock = vi.fn(async () => makeStreamResponse([
+      { type: 'message_delta', content: 'value_categorical' },
+      { type: 'message_delta', content: '`, `scorer_id' },
+    ]));
+    const wrapper = await mountChat({ isOpen: true });
+    wrapper.vm.inputMessage = 'Describe score fields';
+    await wrapper.vm.sendMessage();
+    await flushPromises();
+
+    const last = wrapper.vm.chatMessages[wrapper.vm.chatMessages.length - 1];
+    expect(last.role).toBe('assistant');
+    expect(last.content).toContain('value_categorical`, `scorer_id');
+    expect(last.content).not.toContain('value_categorical\n\n`, `scorer_id');
   });
 
   it('handles 403 error by pushing unauthorized message', async () => {

@@ -329,7 +329,7 @@ describe("PlayerEventsSidebar", () => {
     });
 
     it("should display event type text in the error event row", () => {
-      expect(wrapper.find('[data-test="player-event-row-error"]').text()).toContain("error");
+      expect(wrapper.find('[data-test="player-event-row-error"]').text()).toContain("Error");
     });
 
     it("should display event name text in the error event row", () => {
@@ -344,7 +344,8 @@ describe("PlayerEventsSidebar", () => {
 
     it("should render action event row for the action event", () => {
       expect(wrapper.find('[data-test="player-event-row-action"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="player-event-row-action"]').text()).toContain("action");
+      // Badge label comes from the `rumEventType` registry group (humanised: "action" → "Action").
+      expect(wrapper.find('[data-test="player-event-row-action"]').text()).toContain("Action");
     });
 
     it("should provide title attribute equal to event name on event name element", () => {

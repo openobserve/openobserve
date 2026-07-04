@@ -82,9 +82,6 @@ export default {
 </script>
 
 
-<style scoped>
-/* Edge delete button styles removed - using keyboard deletion instead */
-</style>
 
 
 

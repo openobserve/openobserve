@@ -7,6 +7,11 @@
 
 import { computed, ref, watch, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
+import {
+  buildEvaluatorAgentFilterWhere,
+  combineWhere,
+  type AgentFilterSelection,
+} from "../utils/agentFilterSql";
 
 export type RunStatus = "success" | "error" | "timeout" | "skipped" | "unknown";
 
@@ -26,20 +31,12 @@ export interface JobRunRow {
   targetSpanId: string;
   targetTraceId: string;
   targetStream: string;
+  targetStreamType: string;
   latencyMs: number | null;
   scoreNumeric: number | null;
   scoreBoolean: boolean | null;
   scoreCategorical: string | null;
   scoreDisplay: string;
-}
-
-/** Per-scorer rollup used by the Failures tab to show "which scorer is failing
- * most" at a glance. */
-export interface FailuresByScorer {
-  scorerId: string;
-  totalRuns: number;
-  failures: number;
-  failureRate: number; // 0-100
 }
 
 const EMPTY_KPIS: JobRunKpis = {
@@ -72,7 +69,8 @@ function bucketToMs(bucket: unknown): number {
 
 function parseStatus(raw: unknown): RunStatus {
   const s = typeof raw === "string" ? raw.toLowerCase() : "";
-  if (s === "success" || s === "error" || s === "timeout" || s === "skipped") return s;
+  if (s === "success" || s === "error" || s === "timeout" || s === "skipped")
+    return s;
   return "unknown";
 }
 
@@ -137,14 +135,31 @@ interface RawRunRow {
   attributes_target_span_id?: string | null;
   attributes_target_trace_id?: string | null;
   attributes_target_stream?: string | null;
+  attributes_target_stream_type?: string | null;
   attributes_response?: any;
   span_id?: string;
 }
 
-interface FailuresByScorerRow {
-  scorer_id?: string;
-  total_runs?: number | string;
-  failures?: number | string;
+/** Maps a raw `_evaluator` hit into a typed run row — shared by the runs and
+ * failures queries, which select the same columns. */
+function mapRunRow(r: RawRunRow): JobRunRow {
+  const score = extractScore(r.attributes_response);
+  return {
+    id:
+      r.span_id ?? `${r._timestamp ?? ""}-${r.attributes_target_span_id ?? ""}`,
+    timestampMs: bucketToMs(r._timestamp),
+    status: parseStatus(r.attributes_status),
+    scorerId: r.attributes_scorer_id ?? "",
+    targetSpanId: r.attributes_target_span_id ?? "",
+    targetTraceId: r.attributes_target_trace_id ?? "",
+    targetStream: r.attributes_target_stream ?? "",
+    targetStreamType: r.attributes_target_stream_type ?? "traces",
+    latencyMs: toNumber(r.attributes_latency_ms),
+    scoreNumeric: score.numeric,
+    scoreBoolean: score.boolean,
+    scoreCategorical: score.categorical,
+    scoreDisplay: scoreDisplayFrom(score),
+  };
 }
 
 export interface JobRunsWindow {
@@ -157,21 +172,26 @@ export function useEvalJobRuns(
   /** Active window. */
   dateWindow: Ref<JobRunsWindow>,
   /** Toggled to `true` by the parent only when the Runs or Failures tab is
-   * active, so the (heavier) runs hits + failures-by-scorer queries don't fire
-   * while a different tab is open. KPIs always run when `jobId` is set since
-   * the KPI strip is visible in every tab. */
+   * active, so the (heavier) runs + failures hits queries don't fire while a
+   * different tab is open. KPIs always run when `jobId` is set since the KPI
+   * strip is visible in every tab. */
   tableEnabled: Ref<boolean>,
+  agentFilter?: Ref<AgentFilterSelection | null | undefined>,
 ) {
   const { executeQuery } = useLLMStreamQuery();
   const isLoadingKpis = ref(false);
   const isLoading = ref(false);
   const kpis = ref<JobRunKpis>({ ...EMPTY_KPIS });
   const runs = ref<JobRunRow[]>([]);
-  const failuresByScorer = ref<FailuresByScorer[]>([]);
+  const failures = ref<JobRunRow[]>([]);
 
   const kpiSql = computed<string | null>(() => {
     const id = jobId.value;
     if (!id) return null;
+    const where = combineWhere(
+      `CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
+      buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
+    );
     return [
       "SELECT",
       "  COUNT(*) AS total_runs,",
@@ -183,13 +203,17 @@ export function useEvalJobRuns(
       // silently skips them.
       "  AVG(TRY_CAST(attributes_latency_ms AS DOUBLE)) AS avg_latency_ms",
       'FROM "_evaluator"',
-      `WHERE CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
+      `WHERE ${where}`,
     ].join("\n");
   });
 
   const runsSql = computed<string | null>(() => {
     const id = jobId.value;
     if (!id) return null;
+    const where = combineWhere(
+      `CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
+      buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
+    );
     return [
       "SELECT",
       "  span_id,",
@@ -200,26 +224,42 @@ export function useEvalJobRuns(
       "  attributes_target_span_id,",
       "  attributes_target_trace_id,",
       "  attributes_target_stream,",
+      "  attributes_target_stream_type,",
       "  attributes_response",
       'FROM "_evaluator"',
-      `WHERE CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
+      `WHERE ${where}`,
       "ORDER BY _timestamp DESC",
       "LIMIT 200",
     ].join("\n");
   });
 
-  const failuresByScorerSql = computed<string | null>(() => {
+  // Same columns as the runs query but restricted to failed statuses, so the
+  // Failures tab surfaces failures across the whole window — not just the ones
+  // that happen to fall within the latest 200 runs.
+  const failuresSql = computed<string | null>(() => {
     const id = jobId.value;
     if (!id) return null;
+    const where = combineWhere(
+      `CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
+      buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
+      "attributes_status IN ('error', 'timeout')",
+    );
     return [
       "SELECT",
-      "  CAST(attributes_scorer_id AS VARCHAR) AS scorer_id,",
-      "  COUNT(*) AS total_runs,",
-      "  COUNT(CASE WHEN attributes_status IN ('error', 'timeout') THEN 1 END) AS failures",
+      "  span_id,",
+      "  _timestamp,",
+      "  attributes_status,",
+      "  attributes_latency_ms,",
+      "  attributes_scorer_id,",
+      "  attributes_target_span_id,",
+      "  attributes_target_trace_id,",
+      "  attributes_target_stream,",
+      "  attributes_target_stream_type,",
+      "  attributes_response",
       'FROM "_evaluator"',
-      `WHERE CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
-      "GROUP BY scorer_id",
-      "ORDER BY failures DESC",
+      `WHERE ${where}`,
+      "ORDER BY _timestamp DESC",
+      "LIMIT 200",
     ].join("\n");
   });
 
@@ -262,51 +302,25 @@ export function useEvalJobRuns(
     try {
       const [runHits, failureHits] = await Promise.all([
         runsSql.value
-          ? executeQuery(runsSql.value, startUs, endUs, "traces").catch((err) => {
-              console.warn("[JobRuns:runs] failed", err);
-              return [] as RawRunRow[];
-            })
-          : Promise.resolve([] as RawRunRow[]),
-        failuresByScorerSql.value
-          ? executeQuery(failuresByScorerSql.value, startUs, endUs, "traces").catch(
+          ? executeQuery(runsSql.value, startUs, endUs, "traces").catch(
               (err) => {
-                console.warn("[JobRuns:failuresByScorer] failed", err);
-                return [] as FailuresByScorerRow[];
+                console.warn("[JobRuns:runs] failed", err);
+                return [] as RawRunRow[];
               },
             )
-          : Promise.resolve([] as FailuresByScorerRow[]),
+          : Promise.resolve([] as RawRunRow[]),
+        failuresSql.value
+          ? executeQuery(failuresSql.value, startUs, endUs, "traces").catch(
+              (err) => {
+                console.warn("[JobRuns:failures] failed", err);
+                return [] as RawRunRow[];
+              },
+            )
+          : Promise.resolve([] as RawRunRow[]),
       ]);
 
-      runs.value = (runHits as RawRunRow[]).map((r): JobRunRow => {
-        const score = extractScore(r.attributes_response);
-        return {
-          id: r.span_id ?? `${r._timestamp ?? ""}-${r.attributes_target_span_id ?? ""}`,
-          timestampMs: bucketToMs(r._timestamp),
-          status: parseStatus(r.attributes_status),
-          scorerId: r.attributes_scorer_id ?? "",
-          targetSpanId: r.attributes_target_span_id ?? "",
-          targetTraceId: r.attributes_target_trace_id ?? "",
-          targetStream: r.attributes_target_stream ?? "",
-          latencyMs: toNumber(r.attributes_latency_ms),
-          scoreNumeric: score.numeric,
-          scoreBoolean: score.boolean,
-          scoreCategorical: score.categorical,
-          scoreDisplay: scoreDisplayFrom(score),
-        };
-      });
-
-      failuresByScorer.value = (failureHits as FailuresByScorerRow[])
-        .map((row): FailuresByScorer => {
-          const total = toNumber(row.total_runs) ?? 0;
-          const fails = toNumber(row.failures) ?? 0;
-          return {
-            scorerId: String(row.scorer_id ?? ""),
-            totalRuns: total,
-            failures: fails,
-            failureRate: total > 0 ? (fails / total) * 100 : 0,
-          };
-        })
-        .filter((row) => row.scorerId);
+      runs.value = (runHits as RawRunRow[]).map(mapRunRow);
+      failures.value = (failureHits as RawRunRow[]).map(mapRunRow);
     } finally {
       isLoading.value = false;
     }
@@ -318,7 +332,7 @@ export function useEvalJobRuns(
 
   // KPIs are eager — fire whenever jobId or window changes, regardless of tab.
   watch(
-    [jobId, dateWindow],
+    [jobId, dateWindow, agentFilter ?? ref(null)],
     () => {
       if (jobId.value) void refreshKpis();
       else kpis.value = { ...EMPTY_KPIS };
@@ -326,15 +340,15 @@ export function useEvalJobRuns(
     { immediate: true },
   );
 
-  // Runs + failures-by-scorer queries are lazy — only fire when the Runs or
-  // Failures tab is active.
+  // Runs + failures queries are lazy — only fire when the Runs or Failures tab
+  // is active.
   watch(
-    [jobId, tableEnabled, dateWindow],
+    [jobId, tableEnabled, dateWindow, agentFilter ?? ref(null)],
     () => {
       if (tableEnabled.value) void refreshTables();
       else {
         runs.value = [];
-        failuresByScorer.value = [];
+        failures.value = [];
       }
     },
     { immediate: true },
@@ -345,7 +359,7 @@ export function useEvalJobRuns(
     isLoadingKpis,
     kpis,
     runs,
-    failuresByScorer,
+    failures,
     refresh,
     refreshKpis,
     refreshTables,

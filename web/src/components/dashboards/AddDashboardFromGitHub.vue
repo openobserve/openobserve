@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <ul
-            class="dashboard-list tw:my-2 tw:flex tw:flex-col tw:rounded"
+            class="dashboard-list tw:flex tw:flex-col tw:rounded tw:list-none tw:p-0 tw:m-0 tw:max-h-[calc(100dvh-200px)] tw:overflow-y-auto"
             :class="filteredDashboards.length > 0 ? 'tw:border tw:border-border' : ''"
           >
             <li
@@ -77,8 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:cursor-pointer tw:transition-colors tw:duration-200 tw:border-l-4"
               :class="[
                 isSelected(dashboard)
-                  ? 'selected-item tw:bg-primary/5 tw:border-primary'
-                  : 'tw:border-transparent hover:tw:bg-gray-50',
+                  ? 'selected-item tw:bg-(--o2-tab-bg)! tw:border-primary'
+                  : 'tw:border-transparent tw:hover:bg-gray-50',
               ]"
               data-test="add-dashboard-github-item"
             >
@@ -575,38 +575,8 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.dashboard-list {
-  max-height: calc(100dvh - 200px);
-  overflow-y: auto;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-
-  .selected-item {
-    background-color: var(--o2-tab-bg) !important;
-  }
-
-  .body--light & {
-    li:hover:not(.selected-item) {
-      background-color: var(--o2-hover-gray);
-    }
-  }
-
-  .body--dark & {
-    li:hover:not(.selected-item) {
-      background-color: var(--o2-hover-gray);
-    }
-  }
-}
-
-.folder-select {
-  :deep(.q-field__control) {
-    min-height: 56px !important;
-  }
-
-  :deep(.q-field__native) {
-    min-height: 20px !important;
-  }
+<style>
+.dashboard-list li:hover:not(.selected-item) {
+  background-color: var(--o2-hover-gray);
 }
 </style>

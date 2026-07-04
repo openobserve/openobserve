@@ -238,7 +238,7 @@ function handleRangeChange(value: DateRange | undefined) {
   </RangeCalendarRoot>
 </template>
 
-<style scoped>
+<style>
 /*
   While awaiting the second click, reka-ui flags every still-pickable cell
   with [data-highlighted] (start → max-date), which would visually wash out
@@ -250,11 +250,11 @@ function handleRangeChange(value: DateRange | undefined) {
   BOTH data-selected and data-highlighted) from being affected — it should
   continue to show the solid "selected" background.
 */
-.o-range-cal--awaiting :deep([data-highlighted]:not([data-selected])) {
+.o-range-cal--awaiting [data-highlighted]:not([data-selected]) {
   background-color: transparent;
   color: inherit;
 }
-.o-range-cal--awaiting :deep([data-preview]:not([data-selected])) {
+.o-range-cal--awaiting [data-preview]:not([data-selected]) {
   background-color: var(--color-datepicker-day-range-bg);
   color: var(--color-datepicker-day-range-text);
   outline: 1px dashed currentColor;

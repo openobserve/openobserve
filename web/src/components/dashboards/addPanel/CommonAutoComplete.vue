@@ -19,7 +19,7 @@
       </template>
     </OInput>
     <div
-      class="options-container"
+      class="options-container tw:z-10 tw:absolute tw:left-0 tw:right-0 tw:top-[42px] tw:max-h-25 tw:overflow-y-auto tw:border tw:border-[#ccc]"
       data-test="common-auto-complete-options-container"
       v-if="showOptions && fieldsFilteredOptions.length > 0"
       :style="{
@@ -29,7 +29,7 @@
       <div
         v-for="(option, index) in fieldsFilteredOptions"
         :key="index"
-        class="option"
+        class="tw:p-2 tw:cursor-pointer tw:hover:bg-[#f0f0f0b1]"
         @mousedown="selectOption(option)"
         data-test="common-auto-complete-option"
       >
@@ -137,30 +137,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-.options-container {
-  z-index: 10;
-  position: absolute;
-  left: 0;
-  right: 0;
-  border: 1px solid #ccc;
-  max-height: 100px;
-  overflow-y: auto;
-  top: 42px;
-}
-
-.relative {
-  position: relative;
-  width: 100%;
-}
-
-.option {
-  padding: 8px;
-  cursor: pointer;
-}
-
-.option:hover {
-  background-color: #f0f0f0b1;
-}
-</style>

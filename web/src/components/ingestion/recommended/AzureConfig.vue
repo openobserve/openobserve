@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:m-3 tw:mt-1 azure-config-page">
+  <div class="tw:m-3 tw:mt-1 tw:max-w-[860px]">
     <!-- Header -->
     <div class="tw:flex tw:items-start tw:gap-4 tw:mb-6">
       <OIcon
@@ -24,19 +24,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex-shrink-0"
       />
       <div>
-        <h5 class="tw:text-lg tw:font-bold tw:m-0 tw:mb-1 title">
+        <div class="tw:text-sm tw:font-medium tw:m-0 tw:mb-1" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
           Azure Activity Logs
-        </h5>
-        <p class="tw:text-sm tw:m-0 page-description">
+        </div>
+        <div class="tw:text-sm tw:m-0" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
           Stream Azure subscription activity logs to OpenObserve via Event Hub.
           The ARM template sets up the Event Hub infrastructure — you then
           configure Azure to export logs to it.
-        </p>
+        </div>
       </div>
     </div>
 
     <!-- Step 1 -->
-    <div class="step-card tw:mb-4 tw:p-4 tw:rounded">
+    <div
+      class="tw:mb-4 tw:p-4 tw:rounded tw:border-l-[3px] tw:border-l-solid"
+      :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(255,255,255,0.04)] tw:border-l-[#404040]' : 'tw:bg-[#fafafa] tw:border-l-[#e0e0e0]'"
+    >
       <div
         style="
           display: grid;
@@ -45,15 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align-items: start;
         "
       >
-        <div class="step-number">1</div>
+        <div class="tw:w-7 tw:h-7 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:font-bold tw:text-[0.85rem] tw:shrink-0 tw:bg-[#1976d2] tw:text-white">1</div>
         <div>
-          <div class="tw:font-semibold tw:mb-1 step-title">
+          <div class="tw:font-semibold tw:mb-1" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
             Deploy ARM Template
           </div>
-          <p class="tw:text-sm tw:m-0 tw:mb-3 step-desc">
+          <div class="tw:text-sm tw:m-0 tw:mb-3" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
             Creates an Event Hub namespace, Event Hub, and all required
             resources in your Azure subscription.
-          </p>
+          </div>
           <OButton
             variant="primary"
             size="sm"
@@ -70,7 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Step 2 -->
-    <div class="step-card tw:mb-4 tw:p-4 tw:rounded">
+    <div
+      class="tw:mb-4 tw:p-4 tw:rounded tw:border-l-[3px] tw:border-l-solid"
+      :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(255,255,255,0.04)] tw:border-l-[#404040]' : 'tw:bg-[#fafafa] tw:border-l-[#e0e0e0]'"
+    >
       <div
         style="
           display: grid;
@@ -79,15 +85,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align-items: start;
         "
       >
-        <div class="step-number">2</div>
+        <div class="tw:w-7 tw:h-7 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:font-bold tw:text-[0.85rem] tw:shrink-0 tw:bg-[#1976d2] tw:text-white">2</div>
         <div>
-          <div class="tw:font-semibold tw:mb-1 step-title">
+          <div class="tw:font-semibold tw:mb-1" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
             Configure Diagnostic Settings
           </div>
-          <p class="tw:text-sm tw:mb-3 step-desc">
+          <div class="tw:text-sm tw:mb-3" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
             After the ARM deployment completes, route Activity Logs to the Event
             Hub that was created.
-          </p>
+          </div>
 
           <!-- Portal / CLI toggle -->
           <OToggleGroup v-model="step2Mode" class="tw:mb-4">
@@ -97,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Portal instructions -->
           <div v-if="step2Mode === 'portal'">
-            <ol class="tw:text-sm tw:pl-4 tw:space-y-1 step-desc">
+            <ol class="tw:text-sm tw:pl-4 tw:space-y-1" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
               <li>
                 Go to
                 <strong
@@ -127,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Categories -->
             <div class="tw:mb-4">
               <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
-                <div class="tw:text-xs tw:font-semibold section-label">
+                <div class="tw:text-xs tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-[#d0d0d0]' : 'tw:text-[#333]'">
                   Log categories to enable
                 </div>
                 <div class="tw:flex tw:gap-2">
@@ -174,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <div>
-                <div class="tw:text-xs tw:mb-1 section-label">
+                <div class="tw:text-xs tw:mb-1" :class="store.state.theme === 'dark' ? 'tw:text-[#d0d0d0]' : 'tw:text-[#333]'">
                   Resource Group
                 </div>
                 <OInput
@@ -185,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div>
-                <div class="tw:text-xs tw:mb-1 section-label">
+                <div class="tw:text-xs tw:mb-1" :class="store.state.theme === 'dark' ? 'tw:text-[#d0d0d0]' : 'tw:text-[#333]'">
                   Deployment Name
                 </div>
                 <OInput
@@ -204,9 +210,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Select at least one log category above.
             </div>
             <div v-else>
-              <p class="tw:text-xs tw:mb-2 step-desc">
+              <div class="tw:text-xs tw:mb-2" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
                 Run this command after your ARM deployment completes:
-              </p>
+              </div>
               <CopyContent
                 :content="curlCommand"
                 data-test="azure-curl-command"
@@ -219,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Manual Configuration -->
     <div class="tw:mt-6">
-      <div class="tw:font-semibold tw:text-sm tw:mb-2 section-label">
+      <div class="tw:font-semibold tw:text-sm tw:mb-2" :class="store.state.theme === 'dark' ? 'tw:text-[#d0d0d0]' : 'tw:text-[#333]'">
         Manual Configuration (for reference)
       </div>
       <CopyContent :content="manualContent" />
@@ -341,6 +347,7 @@ export default defineComponent({
     };
 
     return {
+      store,
       LOG_CATEGORIES,
       step2Mode,
       enabledCategories,
@@ -353,73 +360,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.azure-config-page {
-  max-width: 860px;
-
-  .step-card {
-    border-left: 3px solid;
-  }
-
-  .step-number {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 0.85rem;
-    flex-shrink: 0;
-  }
-
-  .body--light & {
-    .title {
-      color: #1a1a1a;
-    }
-    .page-description,
-    .step-desc {
-      color: #666;
-    }
-    .section-label {
-      color: #333;
-    }
-    .step-card {
-      background: #fafafa;
-      border-color: #e0e0e0;
-    }
-    .step-title {
-      color: #1a1a1a;
-    }
-    .step-number {
-      background: #1976d2;
-      color: #fff;
-    }
-  }
-
-  .body--dark & {
-    .title {
-      color: #e0e0e0;
-    }
-    .page-description,
-    .step-desc {
-      color: #b0b0b0;
-    }
-    .section-label {
-      color: #d0d0d0;
-    }
-    .step-card {
-      background: rgba(255, 255, 255, 0.04);
-      border-color: #404040;
-    }
-    .step-title {
-      color: #e0e0e0;
-    }
-    .step-number {
-      background: #1976d2;
-      color: #fff;
-    }
-  }
-}
-</style>

@@ -146,13 +146,12 @@ describe("FrustrationEventBadge", () => {
   });
 
   describe("unknown frustration type", () => {
-    it("renders a badge with the raw type string for unknown types", () => {
+    it("renders a badge for unknown types (label humanised by the badge registry)", () => {
       // Arrange
       wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["unknown_type"] } });
 
-      // Assert
       expect(wrapper.find('[data-test="frustration-event-badge-unknown_type"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("unknown_type");
+      expect(wrapper.text()).toContain("Unknown Type");
     });
 
     it("has a title attribute for unknown type using fallback text", () => {

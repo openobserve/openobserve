@@ -343,7 +343,6 @@ describe("ReportList Component", () => {
 
       await flushPromises();
 
-      console.log(wrapper,'notify here')
 
       
 

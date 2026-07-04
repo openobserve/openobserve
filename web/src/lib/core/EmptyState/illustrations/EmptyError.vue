@@ -90,7 +90,7 @@ withDefaults(
 );
 </script>
 
-<style scoped>
+<style>
 .es-warn,
 .es-frag {
   transform-box: fill-box;

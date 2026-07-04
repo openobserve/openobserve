@@ -425,4 +425,3 @@ const shouldShowWarning = (user: any) => {
 
 </script>
 
-<style scoped></style>

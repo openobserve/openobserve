@@ -117,8 +117,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.full-height {
-  height: 100%;
-}
-</style>

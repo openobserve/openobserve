@@ -285,7 +285,9 @@ describe("VariableSettings", () => {
     });
 
     it("should display variables list header", () => {
-      expect(wrapper.find('[data-test="dashboard-variables-list-header"]').exists()).toBe(true);
+      // The raw header div was replaced by the OTable, which renders the
+      // column headers itself.
+      expect(wrapper.find('[data-test="dashboard-variables-table"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Name");
       expect(wrapper.text()).toContain("Type");
       expect(wrapper.text()).toContain("Actions");
@@ -474,9 +476,12 @@ describe("VariableSettings", () => {
       await nextTick();
     });
 
-    it("should have correct drag options", () => {
+    it("should expose drag-and-drop reorder handling", () => {
       const vm = wrapper.vm as any;
-      expect(vm.dragOptions).toEqual({ animation: 200 });
+      // Row reordering now uses SortableJS attached to the OTable body (see
+      // initSortable), with handleDragEnd persisting the new order.
+      expect(wrapper.find('[data-test="dashboard-variable-settings-drag"]').exists()).toBe(true);
+      expect(typeof vm.handleDragEnd).toBe("function");
     });
 
     it("should handle drag end successfully", async () => {

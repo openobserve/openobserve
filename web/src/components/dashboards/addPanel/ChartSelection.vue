@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div style="height: 100%">
     <div class="tw:p-0" style="width: 100px">
-      <ul class="chart-selection-list tw:flex tw:flex-wrap">
+      <ul class="tw:flex tw:flex-wrap tw:list-none tw:p-0 tw:m-0">
         <li
           v-for="(item, index) in ChartsArray"
           :key="index"
           :class="[
             'dashboard-chart-border',
-            'chart-selection-item',
-            selectedChartType === item.id ? 'chart-item-selected' : '',
+            'tw:transition-colors tw:duration-150 tw:ease-in-out tw:hover:bg-surface-subtle',
+            selectedChartType === item.id ? 'tw:bg-label-chip-url-bg' : '',
             isChartDisabled(item)
               ? 'tw:opacity-50 tw:cursor-not-allowed'
               : 'tw:cursor-pointer',
@@ -236,23 +236,3 @@ export default defineComponent({
   components: { OIcon , OTooltip },
 });
 </script>
-
-<style scoped>
-.chart-selection-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.chart-selection-item {
-  transition: background-color 0.15s ease;
-}
-
-.chart-selection-item:hover {
-  background-color: var(--color-surface-subtle);
-}
-
-.chart-item-selected {
-  background-color: var(--o2-label-chip-url-bg);
-}
-</style>
