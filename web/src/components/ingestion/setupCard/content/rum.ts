@@ -30,9 +30,8 @@ import type { RichCardContent, RichCardStepVariant } from "../types";
  */
 export const RUM_SDK_VERSION = "0.3.4";
 
-const CDN_HOST = "https://cdn.jsdelivr.net";
-const cdnUrl = (pkg: string, bundle: string) =>
-  `${CDN_HOST}/npm/@openobserve/${pkg}@${RUM_SDK_VERSION}/bundle/${bundle}`;
+const CDN_HOST = "https://browsersdk.openobserve.ai";
+const cdnUrl = (bundle: string) => `${CDN_HOST}/${RUM_SDK_VERSION}/${bundle}`;
 
 /** Per-org values substituted into the RUM snippets. */
 export interface RumCardSubs {
@@ -152,8 +151,8 @@ const cdnInstall = (subs: RumCardSubs) => `<!-- Performance: resolve DNS + open 
 <!-- Async loaders: both bundles download in parallel without blocking
      rendering. init calls queued via onReady() run as each bundle arrives. -->
 <script>
-${cdnLoader("OO_RUM", cdnUrl("browser-rum", "openobserve-rum.js"))}
-${cdnLoader("OO_LOGS", cdnUrl("browser-logs", "openobserve-logs.js"))}
+${cdnLoader("OO_RUM", cdnUrl("openobserve-rum.js"))}
+${cdnLoader("OO_LOGS", cdnUrl("openobserve-logs.js"))}
 </script>`;
 
 const cdnInit = (subs: RumCardSubs, token: string) => `<script>
