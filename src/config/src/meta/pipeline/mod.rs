@@ -135,6 +135,8 @@ impl Pipeline {
     /// 7. In the same branch, unchecked `after_flattened` FunctionNode can't follow checked
     ///    `after_flattened` checked FunctionNode
     /// 8. EnrichmentTables can only be used in Scheduled pipelines
+    /// 9. every Stream/RemoteStream/Query node's `org_id` matches the pipeline's `org` — a
+    ///    pipeline must not read from or write to another tenant's streams.
     ///
     /// If all satisfies, populates the [Pipeline::source] with the first node in nodes list
     pub fn validate(&mut self) -> Result<()> {
@@ -172,6 +174,20 @@ impl Pipeline {
             }
             _ => return Err(anyhow!("Source must be either a StreamNode or QueryNode")),
         };
+
+        // ck 9: cross-tenant node authorization. Every node that names an org_id
+        // (Stream, RemoteStream, Query source) must belong to the same org as
+        // the pipeline itself — otherwise an admin of org A could route data
+        // into (or read from) org B's streams. The check runs before the
+        // reachability / DFS checks so a malicious payload can't shortcut it by
+        // being structurally broken. `pipeline.org` is set by the API handler
+        // from the URL path, so it is the authoritative tenant identifier.
+        if self.org.is_empty() {
+            return Err(anyhow!(
+                "Pipeline org is empty; cannot enforce cross-tenant authorization"
+            ));
+        }
+        self.check_nodes_belong_to_org()?;
 
         for node in self.nodes.iter_mut() {
             // ck 4
@@ -221,6 +237,83 @@ impl Pipeline {
             false,
             &mut visited,
         )?;
+
+        Ok(())
+    }
+
+    /// Enforces that every node touching a tenant identifier — stream nodes,
+    /// remote-stream nodes, and the derived-stream source — carries an
+    /// `org_id` equal to `self.org`. This is the cross-tenant authorization
+    /// invariant: without it, an admin of tenant A could persist a pipeline
+    /// that reads from or writes to tenant B's streams. Returns an error
+    /// naming the offending node so the client can pinpoint the mismatch.
+    ///
+    /// Callers that only want the check (e.g. before enabling a pre-existing
+    /// pipeline that was stored before this defense landed) can invoke this
+    /// directly without running the full [`Pipeline::validate`] pipeline.
+    pub fn check_nodes_belong_to_org(&self) -> Result<()> {
+        let expected_org = self.org.as_str();
+        // Guard against silently passing when the pipeline org is missing —
+        // that would defeat the invariant. Callers of this helper on the
+        // enable path guarantee a non-empty org via the URL, and `validate`
+        // pre-checks it above.
+        if expected_org.is_empty() {
+            return Err(anyhow!(
+                "Pipeline org is empty; cannot enforce cross-tenant authorization"
+            ));
+        }
+
+        // Derived-stream source (Scheduled pipelines): the source's org_id is
+        // the tenant whose stream the query runs against.
+        if let PipelineSource::Scheduled(derived_stream) = &self.source
+            && derived_stream.org_id != expected_org
+        {
+            return Err(anyhow!(
+                "Pipeline source's org_id '{}' does not belong to organization '{}'",
+                derived_stream.org_id,
+                expected_org,
+            ));
+        }
+
+        for node in &self.nodes {
+            match &node.data {
+                NodeData::Stream(stream_params) => {
+                    if stream_params.org_id.as_str() != expected_org {
+                        return Err(anyhow!(
+                            "Stream node '{}' references org_id '{}' which does not belong to organization '{}'",
+                            node.id,
+                            stream_params.org_id,
+                            expected_org,
+                        ));
+                    }
+                }
+                NodeData::RemoteStream(remote_stream_params) => {
+                    if remote_stream_params.org_id.as_str() != expected_org {
+                        return Err(anyhow!(
+                            "RemoteStream node '{}' references org_id '{}' which does not belong to organization '{}'",
+                            node.id,
+                            remote_stream_params.org_id,
+                            expected_org,
+                        ));
+                    }
+                }
+                NodeData::Query(derived_stream) => {
+                    if derived_stream.org_id != expected_org {
+                        return Err(anyhow!(
+                            "Query node '{}' references org_id '{}' which does not belong to organization '{}'",
+                            node.id,
+                            derived_stream.org_id,
+                            expected_org,
+                        ));
+                    }
+                }
+                // Function, Condition, LlmEvaluation nodes do not name an
+                // org_id — they run in-process on the pipeline's own tenant.
+                NodeData::Function(_)
+                | NodeData::Condition(_)
+                | NodeData::LlmEvaluation(_) => {}
+            }
+        }
 
         Ok(())
     }
@@ -1403,5 +1496,280 @@ mod tests {
 
         let destinations = pipeline.get_all_destination_streams(&node_map, &graph);
         assert!(destinations.is_empty());
+    }
+
+    // ---------------------------------------------------------------------
+    // Cross-tenant node authorization: every stream / remote-stream node
+    // (input, output, and inner) must belong to the pipeline's own org.
+    //
+    // Regression coverage for the pipeline-node cross-tenant gap: without
+    // these checks an org admin could create (or update, or enable) a
+    // pipeline whose output node's org_id points at a different tenant's
+    // stream, silently routing data cross-tenant at processing time.
+    // ---------------------------------------------------------------------
+
+    /// Baseline: a same-org realtime pipeline validates cleanly. Paired with
+    /// the cross-tenant cases below so a failing red is provably the tenant
+    /// invariant, not a structural mistake in the fixture.
+    #[test]
+    fn test_pipeline_validation_same_org_nodes_accepted() {
+        let mut pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "org_a".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "org_a",
+                "src",
+                StreamType::Logs,
+            )),
+            kind: PipelineKind::User,
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Stream(StreamParams::new("org_a", "src", StreamType::Logs)),
+                    100.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Stream(StreamParams::new("org_a", "dst", StreamType::Logs)),
+                    300.0,
+                    100.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+            }],
+        };
+
+        assert!(
+            pipeline.validate().is_ok(),
+            "same-org pipeline must validate cleanly (baseline control)"
+        );
+    }
+
+    /// The vulnerability: a realtime pipeline in org_a whose OUTPUT stream
+    /// node carries org_b's org_id must be rejected. On unfixed code the
+    /// validation passes and the persisted pipeline routes org_a data to
+    /// org_b at ingest time.
+    #[test]
+    fn test_pipeline_validation_rejects_cross_tenant_output_node() {
+        let mut pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "org_a".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "org_a",
+                "src",
+                StreamType::Logs,
+            )),
+            kind: PipelineKind::User,
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Stream(StreamParams::new("org_a", "src", StreamType::Logs)),
+                    100.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    // Cross-tenant: output points at org_b.
+                    NodeData::Stream(StreamParams::new(
+                        "org_b",
+                        "victim_stream",
+                        StreamType::Logs,
+                    )),
+                    300.0,
+                    100.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+            }],
+        };
+
+        let result = pipeline.validate();
+        assert!(
+            result.is_err(),
+            "pipeline with a cross-tenant output node must be rejected"
+        );
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("does not belong to organization") || msg.contains("cross-tenant"),
+            "error must identify the cross-tenant node, got: {msg}",
+        );
+    }
+
+    /// Input-node authorization: a stream node marked as input whose
+    /// org_id references a foreign tenant must also be rejected — otherwise
+    /// an admin could read another tenant's stream into their own pipeline.
+    #[test]
+    fn test_pipeline_validation_rejects_cross_tenant_input_node() {
+        let mut pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "org_a".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "org_b",
+                "src",
+                StreamType::Logs,
+            )),
+            kind: PipelineKind::User,
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    // Cross-tenant input: source stream is in org_b.
+                    NodeData::Stream(StreamParams::new("org_b", "src", StreamType::Logs)),
+                    100.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Stream(StreamParams::new("org_a", "dst", StreamType::Logs)),
+                    300.0,
+                    100.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+            }],
+        };
+
+        let result = pipeline.validate();
+        assert!(
+            result.is_err(),
+            "pipeline with a cross-tenant input node must be rejected"
+        );
+    }
+
+    /// Remote-stream (destination) node authorization: same rule applies
+    /// to `remote_stream` output nodes.
+    #[test]
+    fn test_pipeline_validation_rejects_cross_tenant_remote_stream_node() {
+        let mut pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "org_a".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "org_a",
+                "src",
+                StreamType::Logs,
+            )),
+            kind: PipelineKind::User,
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Stream(StreamParams::new("org_a", "src", StreamType::Logs)),
+                    100.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::RemoteStream(crate::meta::stream::RemoteStreamParams {
+                        // Cross-tenant remote destination.
+                        org_id: "org_b".to_string().into(),
+                        destination_name: "victim_destination".to_string().into(),
+                    }),
+                    300.0,
+                    100.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+            }],
+        };
+
+        let result = pipeline.validate();
+        assert!(
+            result.is_err(),
+            "pipeline with a cross-tenant remote-stream node must be rejected"
+        );
+    }
+
+    /// Scheduled (DerivedStream) source authorization: the query source's
+    /// org_id must also match the pipeline's org.
+    #[test]
+    fn test_pipeline_validation_rejects_cross_tenant_derived_stream_source() {
+        let derived_stream = DerivedStream {
+            // Cross-tenant: derived-stream source targets org_b.
+            org_id: "org_b".to_string(),
+            stream_type: StreamType::Logs,
+            query_condition: QueryCondition {
+                sql: Some("SELECT * FROM src".to_string()),
+                ..Default::default()
+            },
+            trigger_condition: TriggerCondition {
+                period: 5,
+                ..Default::default()
+            },
+            tz_offset: 0,
+            delay: None,
+            start_at: None,
+        };
+        let mut pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "org_a".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Scheduled(derived_stream.clone()),
+            kind: PipelineKind::User,
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Query(derived_stream),
+                    100.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Stream(StreamParams::new("org_a", "dst", StreamType::Logs)),
+                    300.0,
+                    100.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+            }],
+        };
+
+        let result = pipeline.validate();
+        assert!(
+            result.is_err(),
+            "pipeline with a cross-tenant DerivedStream source must be rejected"
+        );
     }
 }

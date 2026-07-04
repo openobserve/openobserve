@@ -321,6 +321,15 @@ pub async fn enable_pipeline(
         return Err(PipelineError::NotFound(pipeline_id.to_string()));
     };
 
+    // Cross-tenant guard: re-validate the stored pipeline's node org_ids
+    // before enabling. Any pipeline that was persisted *before* the create /
+    // update path started enforcing this — e.g. an admin's pre-existing
+    // cross-tenant pipeline — must be blocked from activation so the fix
+    // covers historical rows, not just newly-written ones.
+    if enable && let Err(e) = pipeline.check_nodes_belong_to_org() {
+        return Err(PipelineError::InvalidPipeline(e.to_string()));
+    }
+
     pipeline.enabled = enable;
     // add or remove trigger if it's a scheduled pipeline
     if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
