@@ -18,7 +18,7 @@
     >
     <div
       data-test="add-role-rolename-input-btn"
-      class="trace-id-field-name o2-input tw:mb-2"
+      class="trace-id-field-name o2-input tw:mb-2 tw:w-100"
     >
       <OFormInput
         data-test="settings-org-trace-id-input"
@@ -32,7 +32,7 @@
 
     <div
       data-test="add-role-rolename-input-btn"
-      class="span-id-field-name o2-input"
+      class="span-id-field-name o2-input tw:w-100"
     >
       <OFormInput
         data-test="settings-org-span-id-input"
@@ -44,7 +44,7 @@
       />
     </div>
 
-    <div v-if="config.isCloud !== 'true'" data-test="add-toggle-ingestion" class="span-id-field-name o2-input">
+    <div v-if="config.isCloud !== 'true'" data-test="add-toggle-ingestion" class="span-id-field-name o2-input tw:w-100">
       <OFormSwitch
         data-test="add-toggle-ingestion-btn"
         name="toggleIngestionLogs"
@@ -197,10 +197,3 @@ defineExpose({
   organizationSettingsDefaults,
 });
 </script>
-
-<style scoped lang="scss">
-.trace-id-field-name,
-.span-id-field-name {
-  width: 400px;
-}
-</style>

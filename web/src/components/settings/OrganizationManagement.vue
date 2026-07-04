@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="page"
               @click="extendedTrial = page"
               :class="[
-                'tw:cursor-pointer tw:px-2 tw:py-1 page-border',
+                'tw:cursor-pointer tw:px-2 tw:py-1 tw:border tw:border-gray-300',
                 extendedTrial === page
                   ? 'tw:bg-(--o2-primary-btn-bg) tw:text-(--o2-primary-btn-text) tw:border-(--o2-primary-btn-bg)'
                   : 'tw:bg-white tw:text-gray-700 tw:border-gray-300',
@@ -755,12 +755,3 @@ export default defineComponent({
   },
 });
 </script>
-<style scoped lang="scss">
-.page-border {
-  border: 1px solid lightgray;
-}
-
-.dialog-btn {
-  text-transform: none;
-}
-</style>
