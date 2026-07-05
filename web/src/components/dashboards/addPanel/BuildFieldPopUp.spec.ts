@@ -139,9 +139,13 @@ describe("BuildFieldPopUp", () => {
       const input = wrapper.find('input[type="text"]');
       await input.setValue("New Label");
       await flushPromises();
-      // `label` is now form-owned; the form value is synced back out to the
-      // parent's modelValue (the same contract the old v-model provided).
-      expect(wrapper.vm.modelValue.label).toBe("New Label");
+      // `label` is form-owned; the form value is synced OUT to the parent via
+      // `update:modelValue` (one-way data flow — the component no longer mutates
+      // the prop in place). The parent binds with v-model, so this event carries
+      // the new label back up.
+      const emitted = wrapper.emitted("update:modelValue");
+      expect(emitted).toBeTruthy();
+      expect((emitted!.at(-1) as any[])[0].label).toBe("New Label");
     });
 
     it("should have required validation rule", () => {

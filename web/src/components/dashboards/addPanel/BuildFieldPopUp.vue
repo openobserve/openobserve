@@ -100,10 +100,11 @@ export default defineComponent({
       }),
     );
 
-    // Sync the form-owned `label` OUT to the parent's modelValue so the existing
-    // contract (parent reads modelValue.label) is preserved. This is a
-    // form → parent value handoff (the same direction the old v-model wrote),
-    // NOT a banned mirror of a form-owned field back INTO the form.
+    // Sync the form-owned `label` OUT to the parent via `update:modelValue` so the
+    // existing contract (parent reads modelValue.label) is preserved WITHOUT
+    // mutating the prop. This is a form → parent value handoff over the v-model
+    // event (the same direction the old v-model wrote); the parent binds this
+    // component with v-model, so the emitted value flows back down as modelValue.
     let stopLabelWatch: (() => void) | null = null;
     watch(
       () => buildFieldFormRef.value,
@@ -117,11 +118,23 @@ export default defineComponent({
           stopLabelWatch = watch(
             labelStore,
             (v: any) => {
-              if (props.modelValue) props.modelValue.label = v ?? "";
+              const next = v ?? "";
+              // Skip when it already matches modelValue.label so we don't emit a
+              // redundant NEW object — e.g. the immediate flush on (re)subscription
+              // when the form value still equals the incoming prop. That matters
+              // because the parent's v-model target lives inside a deeply-watched
+              // panel state, and a same-content-new-reference emit would needlessly
+              // mark it dirty.
+              if (props.modelValue?.label === next) return;
+              emit("update:modelValue", {
+                ...(props.modelValue ?? {}),
+                label: next,
+              });
             },
-            // immediate so the current form value is flushed out to modelValue as
-            // soon as the subscription is (re)established — covers the case where
-            // a change lands before the post-mount subscription runs.
+            // immediate so the current form value is flushed out as soon as the
+            // subscription is (re)established — covers the case where a change
+            // lands before the post-mount subscription runs (the guard above makes
+            // the common "unchanged" case a no-op).
             { immediate: true },
           );
         }
