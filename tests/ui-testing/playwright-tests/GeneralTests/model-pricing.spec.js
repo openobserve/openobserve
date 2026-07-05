@@ -176,20 +176,27 @@ test.describe("Model Pricing — Create & Form Validation", () => {
             const pm = new PageManager(page);
             await pm.modelPricingPage.gotoEditorCreate();
 
-            // Both fields empty → save disabled
-            await expect(pm.modelPricingPage.saveBtn).toBeDisabled({ timeout: 5000 });
+            // Save is a plain submit button — the OForm has no disabled-gate and
+            // validates submit-then-change, so field errors surface only after the
+            // first submit attempt (not on load / first keystroke).
+            await expect(pm.modelPricingPage.saveBtn).toBeEnabled();
 
-            // Name too long → inline error; fix → error clears
+            // Both fields empty → the first submit arms validation: required errors
+            // appear and the editor stays open (submit is blocked).
+            await pm.modelPricingPage.saveBtn.click();
+            await expect(pm.modelPricingPage.nameInputError).toBeVisible({ timeout: 5000 });
+            await expect(pm.modelPricingPage.patternInputError).toBeVisible({ timeout: 5000 });
+            await pm.modelPricingPage.editorTitle.waitFor({ state: 'visible', timeout: 5000 });
+
+            // Name too long → inline error; fix → error clears (revalidates on change)
             await pm.modelPricingPage.fillName('a'.repeat(257));
             await expect(pm.modelPricingPage.nameInputError).toBeVisible({ timeout: 5000 });
-            await expect(pm.modelPricingPage.saveBtn).toBeDisabled();
             await pm.modelPricingPage.fillName(validName);
             await expect(pm.modelPricingPage.nameInputError).not.toBeVisible({ timeout: 5000 });
 
             // Invalid regex → inline error; fix → error clears
             await pm.modelPricingPage.fillPattern('[invalid(');
             await expect(pm.modelPricingPage.patternInputError).toBeVisible({ timeout: 5000 });
-            await expect(pm.modelPricingPage.saveBtn).toBeDisabled();
             await pm.modelPricingPage.fillPattern(`^${validName}.*`);
             await expect(pm.modelPricingPage.patternInputError).not.toBeVisible({ timeout: 5000 });
 
