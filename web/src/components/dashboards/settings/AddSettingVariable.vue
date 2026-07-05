@@ -679,12 +679,16 @@ export default defineComponent({
         value: fieldView("value"),
         query_data: {
           get: () => formValues.value?.query_data ?? {},
-          set: (v: unknown) => form.setFieldValue("query_data", v),
+          set: (v: unknown) => {
+            form.setFieldValue("query_data", v);
+          },
           enumerable: true,
         },
         options: {
           get: () => formValues.value?.options ?? [],
-          set: (v: unknown) => form.setFieldValue("options", v),
+          set: (v: unknown) => {
+            form.setFieldValue("options", v);
+          },
           enumerable: true,
         },
         multiSelect: fieldView("multiSelect"),
@@ -692,7 +696,9 @@ export default defineComponent({
         selectAllValueForMultiSelect: fieldView("selectAllValueForMultiSelect"),
         customMultiSelectValue: {
           get: () => formValues.value?.customMultiSelectValue ?? [],
-          set: (v: unknown) => form.setFieldValue("customMultiSelectValue", v),
+          set: (v: unknown) => {
+            form.setFieldValue("customMultiSelectValue", v);
+          },
           enumerable: true,
         },
         escapeSingleQuotes: fieldView("escapeSingleQuotes"),
