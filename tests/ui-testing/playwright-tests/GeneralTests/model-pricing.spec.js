@@ -204,13 +204,19 @@ test.describe("Model Pricing — Create & Form Validation", () => {
             await pm.modelPricingPage.saveBtn.click();
             await pm.modelPricingPage.editorTitle.waitFor({ state: 'visible', timeout: 5000 });
 
-            // Key with spaces → toast error (filter by text — earlier toasts may still be visible)
-            await pm.modelPricingPage.addPriceRow('input tokens', '0.000002');
+            // Draft key with spaces → save-time toast. The "Add price" button now
+            // commits any non-empty key (bad keys get an inline row error instead),
+            // so key validation as a TOAST fires via the save() draft-row guard on an
+            // uncommitted draft. Leaving it uncommitted also keeps the form clean for
+            // the successful save below. (Filter by text — earlier toasts may linger.)
+            await pm.modelPricingPage.fillDraftPriceRow('input tokens', '0.000002');
+            await pm.modelPricingPage.saveBtn.click();
             await expect(pm.modelPricingPage.toastMessage.filter({ hasText: /must not contain spaces/i }))
                 .toBeVisible({ timeout: 5000 });
 
-            // Pure integer key → toast error
-            await pm.modelPricingPage.addPriceRow('123', '0.000002');
+            // Draft key that is a pure integer → save-time toast
+            await pm.modelPricingPage.fillDraftPriceRow('123', '0.000002');
+            await pm.modelPricingPage.saveBtn.click();
             await expect(pm.modelPricingPage.toastMessage.filter({ hasText: /cannot be a pure integer/i }))
                 .toBeVisible({ timeout: 5000 });
 

@@ -336,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="(_entry, entryIdx) in tier.prices"
                       :key="entryIdx"
-                      class="price-row tw:grid tw:grid-cols-[1fr_160px_auto] tw:gap-2 tw:items-center tw:py-0.5 tw:px-3"
+                      class="price-row tw:grid tw:grid-cols-[1fr_160px_auto] tw:gap-2 tw:items-start tw:py-0.5 tw:px-3"
                     >
                       <OFormInput
                         :name="`tiers[${idx}].prices[${entryIdx}].key`"
@@ -355,15 +355,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ><span class="price-dollar tw:text-xs tw:pb-0.5">$</span></template
                         >
                       </OFormInput>
-                      <OButton
-                        variant="outline-destructive"
-                        size="icon"
-                        type="button"
-                        :data-test="`model-pricing-price-delete-btn-${idx}-${entryIdx}`"
-                        @click="removePrice(idx, entryIdx)"
-                      >
-                        <OIcon name="delete" size="sm" />
-                      </OButton>
+                      <!-- Fixed input-height band keeps the delete button centered
+                           against the input row even when the key field grows a
+                           below-field error (row is items-start so the error can't
+                           push the value input / this button downward). -->
+                      <div class="tw:h-8.5 tw:flex tw:items-center">
+                        <OButton
+                          variant="outline-destructive"
+                          size="icon"
+                          type="button"
+                          :data-test="`model-pricing-price-delete-btn-${idx}-${entryIdx}`"
+                          @click="removePrice(idx, entryIdx)"
+                        >
+                          <OIcon name="delete" size="sm" />
+                        </OButton>
+                      </div>
                     </div>
 
                     <!-- Empty state -->
