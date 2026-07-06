@@ -1999,4 +1999,62 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     });
   });
 
+  describe("adaptive collapse", () => {
+    it("collapses inferred deps when node count exceeds threshold", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const exts = Array.from({ length: 8 }, (_, i) => ({
+        id: `ext${i}`,
+        label: `ext${i}`,
+        requests: 1,
+        errors: 0,
+        service_type: "external",
+      }));
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: {
+          nodes: [
+            { id: "svc", label: "svc", requests: 1, errors: 0 },
+            ...exts,
+          ],
+          edges: exts.map((e) => ({
+            from: "svc",
+            to: e.id,
+            total_requests: 1,
+            failed_requests: 0,
+          })),
+        },
+      } as any);
+      wrapper.vm.collapseThreshold = 5; // force collapse
+      await wrapper.vm.loadServiceGraph();
+      await flushPromises();
+      const ids = wrapper.vm.filteredGraphData.nodes.map((n: any) => n.id);
+      expect(ids).toContain("__group_external");
+      expect(ids).not.toContain("ext0");
+    });
+
+    it("expands a group when toggleGroupExpansion is called", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.toggleGroupExpansion("external");
+      await flushPromises();
+      expect(wrapper.vm.expandedKinds.has("external")).toBe(true);
+      wrapper.vm.toggleGroupExpansion("external");
+      expect(wrapper.vm.expandedKinds.has("external")).toBe(false);
+    });
+
+    it("switches collapse mode", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.setCollapseMode("expanded");
+      expect(wrapper.vm.collapseMode).toBe("expanded");
+    });
+
+    it("hides a kind via the visibility toggle", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.toggleKindVisibility("external");
+      expect(wrapper.vm.hiddenKinds.has("external")).toBe(true);
+    });
+  });
+
 });

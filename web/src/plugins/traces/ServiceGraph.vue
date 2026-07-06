@@ -283,6 +283,10 @@ import {
   convertServiceGraphToNetwork,
 } from "@/utils/traces/convertTraceData";
 import {
+  applyGraphCollapse,
+  GROUP_PREFIX,
+} from "@/utils/traces/applyGraphCollapse";
+import {
   formatNumber,
   formatLatency,
   pointToBezierDistance,
@@ -361,6 +365,35 @@ export default defineComponent({
       nodes: [],
       edges: [],
     });
+
+    // Adaptive-collapse state: when the graph is large, inferred dependency kinds
+    // (database/queue/external/rpc) collapse into per-kind boundary nodes so the
+    // overview stays readable. Users can drill into a kind, hide a kind, or
+    // override the mode. Services are never collapsed.
+    const collapseMode = ref<"auto" | "expanded" | "collapsed">("auto");
+    const collapseThreshold = ref(40);
+    const expandedKinds = ref<Set<string>>(new Set());
+    const hiddenKinds = ref<Set<string>>(new Set());
+
+    const toggleGroupExpansion = (kind: string) => {
+      const s = new Set(expandedKinds.value);
+      s.has(kind) ? s.delete(kind) : s.add(kind);
+      expandedKinds.value = s;
+      lastChartOptions.value = null;
+      applyFilters();
+    };
+    const setCollapseMode = (m: "auto" | "expanded" | "collapsed") => {
+      collapseMode.value = m;
+      lastChartOptions.value = null;
+      applyFilters();
+    };
+    const toggleKindVisibility = (kind: string) => {
+      const s = new Set(hiddenKinds.value);
+      s.has(kind) ? s.delete(kind) : s.add(kind);
+      hiddenKinds.value = s;
+      lastChartOptions.value = null;
+      applyFilters();
+    };
 
     const stats = ref<any>(null);
 
@@ -1366,7 +1399,17 @@ export default defineComponent({
         nodes = nodes.filter((n) => usedNodeIds.has(n.id));
       }
 
-      filteredGraphData.value = { nodes, edges };
+      // Adaptive collapse: fold large dependency fan-outs into boundary nodes,
+      // drop hidden kinds, honoring the current mode/expand/hide state.
+      filteredGraphData.value = applyGraphCollapse(
+        { nodes, edges },
+        {
+          mode: collapseMode.value,
+          expandedKinds: expandedKinds.value,
+          hiddenKinds: hiddenKinds.value,
+          threshold: collapseThreshold.value,
+        },
+      );
     };
 
     // Watch composable viz/layout state changes from SearchBar toolbar
@@ -1431,6 +1474,16 @@ export default defineComponent({
 
     // Side Panel Handlers
     const handleNodeClick = (params: any) => {
+      // A collapsed boundary node: clicking it expands/collapses that kind
+      // instead of opening the side panel.
+      const d = params?.data;
+      const clickedId: string | undefined = d?.id ?? d?.name;
+      if (d?.is_group || clickedId?.startsWith?.(GROUP_PREFIX)) {
+        const kind =
+          d?.service_type ?? clickedId?.slice(GROUP_PREFIX.length);
+        if (kind) toggleGroupExpansion(String(kind));
+        return;
+      }
       // Check if it's a node click (for graph visualization)
       if (params.dataType === "node" && params.data) {
         // Check if clicking the same node - if so, close the panel
@@ -1506,6 +1559,14 @@ export default defineComponent({
       applyFilters,
       onStreamFilterChange,
       resetSettings,
+      // Adaptive collapse
+      collapseMode,
+      collapseThreshold,
+      expandedKinds,
+      hiddenKinds,
+      toggleGroupExpansion,
+      setCollapseMode,
+      toggleKindVisibility,
       // Node side panel
       selectedNode,
       showSidePanel,
