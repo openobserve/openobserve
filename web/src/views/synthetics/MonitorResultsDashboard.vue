@@ -116,13 +116,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span class="run-status-dot" />
                 {{
-                  (row as RunRow).status === "failed"
-                    ? t("synthetics.results.failed")
-                    : t("synthetics.results.passed")
+                  (row as RunRow).status === "passed"
+                    ? t("synthetics.results.passed")
+                    : (row as RunRow).status === "warning"
+                      ? t("synthetics.results.warning")
+                      : (row as RunRow).status === "error"
+                        ? t("synthetics.results.error")
+                        : t("synthetics.results.failed")
                 }}
               </span>
               <small
-                v-if="(row as RunRow).status === 'failed' && (row as RunRow).error"
+                v-if="(row as RunRow).status !== 'passed' && (row as RunRow).error"
                 class="tw:text-[var(--o2-text-caption)] tw:truncate tw:max-w-[18rem]"
                 :title="(row as RunRow).error"
               >
@@ -219,19 +223,25 @@ const kpiCards = computed<KpiCard[]>(() => {
       key: "last-run",
       label: t("synthetics.results.lastRun"),
       value: lastStatus
-        ? lastStatus === "failed"
-          ? t("synthetics.results.failed")
-          : t("synthetics.results.passed")
+        ? lastStatus === "passed"
+          ? t("synthetics.results.passed")
+          : lastStatus === "warning"
+            ? t("synthetics.results.warning")
+            : lastStatus === "error"
+              ? t("synthetics.results.error")
+              : t("synthetics.results.failed")
         : "—",
       unit: kpi.value.lastRunAt
         ? relativeFromNow(kpi.value.lastRunAt)
         : undefined,
       valueClass:
-        lastStatus === "failed"
-          ? "tw:text-[var(--o2-status-error-text)]!"
-          : lastStatus === "passed"
-            ? "tw:text-[#16a34a]!"
-            : undefined,
+        lastStatus === "passed"
+          ? "tw:text-[#16a34a]!"
+          : lastStatus === "warning"
+            ? "tw:text-[var(--o2-status-warning-text)]!"
+            : lastStatus === "failed" || lastStatus === "error"
+              ? "tw:text-[var(--o2-status-error-text)]!"
+              : undefined,
     },
   ];
 });
@@ -240,7 +250,7 @@ const kpiCards = computed<KpiCard[]>(() => {
 interface RunRow {
   id: string;
   timestamp: number;
-  status: "passed" | "failed";
+  status: "passed" | "warning" | "failed" | "error";
   durationMs: number;
   location: string;
   device: string;
@@ -259,7 +269,7 @@ const runRows = computed<RunRow[]>(() =>
 const drawerOpen = ref(false);
 const selectedRun = ref<{
   job_id: string; synthetics_id: string; location: string;
-  status: "up" | "warning" | "down" | "error"; response_time_ms: number;
+  status: "passed" | "warning" | "failed" | "error"; response_time_ms: number;
   error?: string; browser_engine?: string; device?: string;
   checked_at: number; screenshot_refs: { step_id: string; key: string }[]; trace_ref?: string;
 } | null>(null);
@@ -269,7 +279,7 @@ function openRunDetail(row: RunRow) {
     job_id: row.jobId,
     synthetics_id: props.monitorId,
     location: row.location,
-    status: row.status === "passed" ? "up" : "down",
+    status: row.status,
     response_time_ms: row.durationMs,
     error: row.error || undefined,
     browser_engine: row.browserEngine || undefined,
@@ -434,7 +444,10 @@ defineExpose({ refresh });
   &--passed {
     color: #16a34a;
   }
-  &--failed {
+  &--warning {
+    color: var(--o2-status-warning-text);
+  }
+  &--failed, &--error {
     color: var(--o2-status-error-text);
   }
 

@@ -37,7 +37,7 @@ describe("syntheticResultsSchema query builders", () => {
       `FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.passed}')`,
     );
     expect(sql).toContain(
-      `FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.failed}')`,
+      `FILTER (WHERE ${SYNTHETIC_FIELDS.status} != '${STATUS_VALUES.passed}')`,
     );
     expect(sql).toContain(`approx_percentile_cont(${SYNTHETIC_FIELDS.duration}, 0.95)`);
   });
@@ -91,7 +91,7 @@ describe("mapKpi", () => {
         failed_runs: 1,
         p95_duration: 2940,
       },
-      { status: "up", ts: 1_700_000_000_000_000 },
+      { status: "passed", ts: 1_700_000_000_000_000 },
     );
     expect(kpi.totalRuns).toBe(288);
     expect(kpi.failedRuns).toBe(1);
@@ -123,7 +123,7 @@ describe("mapRun", () => {
   it("should map a raw hit to the typed run model and normalise status", () => {
     const run = mapRun({
       ts: 1_700_000_000_000_000,
-      status: "down",
+      status: "failed",
       duration: 1760,
       location: "ap-southeast-1",
       device: "desktop",
@@ -137,10 +137,12 @@ describe("mapRun", () => {
     expect(run.error).toBe("Timeout waiting for selector");
   });
 
-  it("should map raw 'down' to failed and anything else to passed", () => {
-    expect(mapRun({ status: "up" }).status).toBe("passed");
-    expect(mapRun({ status: "down" }).status).toBe("failed");
-    expect(mapRun({ status: "weird" }).status).toBe("passed");
+  it("should map probe status values to RunStatus", () => {
+    expect(mapRun({ status: "passed" }).status).toBe("passed");
+    expect(mapRun({ status: "warning" }).status).toBe("warning");
+    expect(mapRun({ status: "failed" }).status).toBe("failed");
+    expect(mapRun({ status: "error" }).status).toBe("error");
+    expect(mapRun({ status: "unknown" }).status).toBe("failed");
   });
 });
 

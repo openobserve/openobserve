@@ -6464,7 +6464,9 @@
       "location": "Location",
       "device": "Device",
       "passed": "Passed",
-      "failed": "Failed"
+      "failed": "Failed",
+      "warning": "Warning",
+      "error": "Error"
     },
     "scheduleAlert": {
       "title": "Schedule & Alerting",

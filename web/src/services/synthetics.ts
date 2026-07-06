@@ -39,11 +39,11 @@ const syntheticsService = {
   run: (orgIdentifier: string, id: string, payload: unknown) =>
     http().post(`/api/${orgIdentifier}/synthetics/${id}/run`, payload),
 
-  summary: (orgIdentifier: string, id: string) =>
-    http().get(`/api/${orgIdentifier}/synthetics/${id}/summary`),
+  getRuns: (orgIdentifier: string, id: string, params?: Record<string, string | number>) =>
+    http().get(`/api/${orgIdentifier}/synthetics/${id}/runs`, { params }),
 
-  results: (orgIdentifier: string, id: string, params?: Record<string, string | number>) =>
-    http().get(`/api/${orgIdentifier}/synthetics/${id}/results`, { params }),
+  getRun: (orgIdentifier: string, id: string, runId: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/${id}/runs/${runId}`),
 
   artifactUrl: (orgIdentifier: string, key: string) => {
     // key format: synthetics/{org}/{synthetics_id}/{year}/{month}/{day}/{job_id}/{filename}

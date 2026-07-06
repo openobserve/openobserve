@@ -42,16 +42,14 @@ export const SYNTHETIC_FIELDS = {
 } as const;
 
 /**
- * Maps the semantic pass/fail notion onto the raw `status` stream values.
- * The stream stores `"up"` (run passed) / `"down"` (run failed); the typed
- * UI model exposes `"passed"` / `"failed"`. Change the right-hand values here
- * if the stream encoding ever changes.
+ * Maps the semantic notions onto the raw `status` stream values.
+ * The stream stores `"passed"` / `"warning"` / `"failed"` / `"error"`.
  */
-export const STATUS_VALUES = { passed: "up", failed: "down" } as const;
+export const STATUS_VALUES = { passed: "passed", warning: "warning", failed: "failed", error: "error" } as const;
 
 // ── Typed UI models (stable regardless of stream schema) ─────────────────
 
-export type RunStatus = "passed" | "failed";
+export type RunStatus = "passed" | "warning" | "failed" | "error";
 
 export interface SyntheticKpi {
   /** Percentage of runs that passed in the window (0–100). */
@@ -122,8 +120,11 @@ function str(value: unknown): string {
 
 /** Map a raw status field value onto the typed (semantic) RunStatus. */
 function toRunStatus(raw: unknown): RunStatus {
-  // Only "up" counts as passed; "down", "error", "warning", or any unknown value is failed.
-  return str(raw) === STATUS_VALUES.passed ? "passed" : "failed";
+  const s = str(raw);
+  if (s === "passed") return "passed";
+  if (s === "warning") return "warning";
+  if (s === "error") return "error";
+  return "failed";
 }
 
 /**

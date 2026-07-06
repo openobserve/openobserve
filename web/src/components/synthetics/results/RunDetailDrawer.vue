@@ -11,7 +11,7 @@ interface RunSummary {
   job_id: string
   synthetics_id: string
   location: string
-  status: 'up' | 'warning' | 'down' | 'error'
+  status: 'passed' | 'warning' | 'failed' | 'error'
   response_time_ms: number
   error?: string
   browser_engine?: string
@@ -50,12 +50,14 @@ const traceUrl = computed(() =>
     : null,
 )
 
-const statusVariant = computed(() =>
-  props.run.status === 'up' ? 'success' : 'error',
-)
+const statusVariant = computed(() => {
+  if (props.run.status === 'passed') return 'success'
+  if (props.run.status === 'warning') return 'warning'
+  return 'error'
+})
 const statusLabel = computed(() => {
   const s = props.run.status
-  if (s === 'up') return 'Passed'
+  if (s === 'passed') return 'Passed'
   if (s === 'warning') return 'Warning'
   if (s === 'error') return 'Error'
   return 'Failed'

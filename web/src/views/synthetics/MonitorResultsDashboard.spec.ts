@@ -28,7 +28,7 @@ const mockKpi = ref({
   p95Ms: 0,
   failedRuns: 0,
   totalRuns: 0,
-  lastRunStatus: null as "passed" | "failed" | null,
+  lastRunStatus: null as "passed" | "warning" | "failed" | "error" | null,
   lastRunAt: null as number | null,
 });
 const mockBuckets = ref<any[]>([]);
