@@ -1,6 +1,6 @@
 ﻿<template>
-  <form class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:bg-card-bg tw:border tw:border-dialog-header-border tw:rounded-md" @submit.prevent="save">
-    <div class="tw:flex tw:items-center tw:gap-2.5 tw:min-h-12 tw:px-3.5 tw:py-2 tw:border-b tw:border-dialog-header-border tw:shrink-0">
+  <form class="flex flex-col flex-1 min-h-0 bg-card-bg border border-dialog-header-border rounded-md" @submit.prevent="save">
+    <div class="flex items-center gap-2.5 min-h-12 px-3.5 py-2 border-b border-dialog-header-border shrink-0">
       <OButton
         variant="outline"
         size="icon-sm"
@@ -9,18 +9,18 @@
         :title="t('onlineEvals.provider.backTo')"
         @click="$emit('cancel')"
       />
-      <div class="tw:m-0 tw:text-[17px] tw:font-semibold tw:text-text-primary tw:tracking-[0.005em] tw:whitespace-nowrap">
+      <div class="m-0 text-[17px] font-semibold text-text-primary tracking-[0.005em] whitespace-nowrap">
         {{
           mode === "create"
             ? t("onlineEvals.provider.createTitle")
             : t("onlineEvals.provider.editTitle")
         }}
       </div>
-      <span class="tw:text-text-secondary tw:text-xs tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:min-w-0">{{ t("onlineEvals.provider.subtitle") }}</span>
-      <div class="tw:flex-1 tw:min-w-2" />
+      <span class="text-text-secondary text-xs overflow-hidden text-ellipsis whitespace-nowrap min-w-0">{{ t("onlineEvals.provider.subtitle") }}</span>
+      <div class="flex-1 min-w-2" />
       <button
         type="button"
-        class="provider-form__close tw:inline-flex tw:items-center tw:justify-center tw:w-7 tw:h-7 tw:p-0 tw:text-text-secondary tw:bg-transparent tw:border-0 tw:rounded-md tw:cursor-pointer tw:transition-[background,color] tw:duration-150 tw:hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)] tw:hover:text-[var(--color-primary-600,#3F7994)]"
+        class="provider-form__close inline-flex items-center justify-center w-7 h-7 p-0 text-text-secondary bg-transparent border-0 rounded-md cursor-pointer transition-[background,color] duration-150 hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)] hover:text-[var(--color-primary-600,#3F7994)]"
         :aria-label="t('onlineEvals.buttons.cancel')"
         data-test="provider-form-close-btn"
         @click="$emit('cancel')"
@@ -42,19 +42,19 @@
       </button>
     </div>
 
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-auto tw:px-6 tw:py-4.5 [&_textarea]:tw:max-h-[220px] [&_textarea]:tw:overflow-y-auto [&_textarea]:tw:font-mono">
-      <section class="tw:mb-6">
-        <div class="tw:flex tw:items-center tw:gap-2.5 tw:pb-2.5 tw:border-b tw:border-dialog-header-border tw:mb-3">
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-text-secondary tw:font-bold tw:text-[11px] tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace]">01</span>
-          <div class="tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary)">{{ t("onlineEvals.provider.sectionTitle") }}</div>
+    <div class="flex-1 min-h-0 overflow-auto px-6 py-4.5 [&_textarea]:max-h-[220px] [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
+      <section class="mb-6">
+        <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+          <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-[11px] font-[ui-monospace,SFMono-Regular,Menlo,monospace]">01</span>
+          <div class="m-0 text-sm font-semibold text-(--color-text-primary)">{{ t("onlineEvals.provider.sectionTitle") }}</div>
         </div>
 
-        <div class="provider-field-row tw:grid tw:grid-cols-2 tw:gap-[14px]">
-          <div class="tw:mb-3">
-            <div class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
+        <div class="provider-field-row grid grid-cols-2 gap-[14px]">
+          <div class="mb-3">
+            <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.provider.nameLabel") }}
-              <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="tw:ml-1.5 tw:text-text-secondary" />
+              <span class="text-(--o2-status-error-text) ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
             </div>
             <OInput
               v-model.trim="form.name"
@@ -63,16 +63,16 @@
               :disabled="mode === 'edit'"
               data-test="provider-form-name-input"
             />
-            <div v-if="mode === 'edit'" class="tw:text-[11.5px] tw:text-text-secondary tw:mt-1">
+            <div v-if="mode === 'edit'" class="text-[11.5px] text-text-secondary mt-1">
               {{ t("onlineEvals.provider.cannotRename") }}
             </div>
           </div>
 
-          <div class="tw:mb-3">
-            <div class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
+          <div class="mb-3">
+            <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.provider.typeLabel") }}
-              <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="tw:ml-1.5 tw:text-text-secondary" />
+              <span class="text-(--o2-status-error-text) ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
             </div>
             <OSelect
               v-model="form.providerType"
@@ -84,21 +84,21 @@
           </div>
         </div>
 
-        <div class="tw:mb-3">
-          <div class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</div>
+        <div class="mb-3">
+          <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</div>
           <OInput
             v-model.trim="form.endpoint"
-            :placeholder="t('onlineEvals.provider.endpointPlaceholder')"
+            :placeholder="endpointPlaceholder"
             size="sm"
             data-test="provider-form-endpoint-input"
           />
         </div>
 
-        <div class="provider-field-row tw:grid tw:grid-cols-2 tw:gap-[14px]">
-          <div class="tw:mb-3">
-            <div class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
+        <div class="provider-field-row grid grid-cols-2 gap-[14px]">
+          <div class="mb-3">
+            <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.provider.defaultModelLabel") }}
-              <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
+              <span class="text-(--o2-status-error-text) ml-0.5">*</span>
             </div>
             <OInput
               v-model.trim="form.defaultModel"
@@ -108,35 +108,35 @@
             />
           </div>
 
-          <div class="tw:mb-3">
-            <div class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">{{ t("onlineEvals.provider.availableModelsLabel") }}</div>
+          <div class="mb-3">
+            <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">{{ t("onlineEvals.provider.availableModelsLabel") }}</div>
             <OInput
               v-model.trim="form.availableModels"
               :placeholder="t('onlineEvals.provider.availableModelsPlaceholder')"
               size="sm"
               data-test="provider-form-available-models-input"
             />
-            <div class="tw:text-[11.5px] tw:text-text-secondary tw:mt-1">{{ t("onlineEvals.provider.availableModelsHelp") }}</div>
+            <div class="text-[11.5px] text-text-secondary mt-1">{{ t("onlineEvals.provider.availableModelsHelp") }}</div>
           </div>
         </div>
 
       </section>
 
-      <section class="tw:mb-6">
-        <div class="tw:flex tw:items-center tw:gap-2.5 tw:pb-2.5 tw:border-b tw:border-dialog-header-border tw:mb-3">
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-text-secondary tw:font-bold tw:text-[11px] tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace]">02</span>
-          <div class="tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary)">{{ t("onlineEvals.provider.authSection") }}</div>
+      <section class="mb-6">
+        <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+          <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-[11px] font-[ui-monospace,SFMono-Regular,Menlo,monospace]">02</span>
+          <div class="m-0 text-sm font-semibold text-(--color-text-primary)">{{ t("onlineEvals.provider.authSection") }}</div>
         </div>
 
-        <div v-if="mode === 'edit'" class="provider-callout tw:flex tw:gap-2 tw:items-start tw:px-3 tw:py-2 tw:mb-3 tw:bg-[color-mix(in_srgb,var(--o2-status-info-text)_12%,transparent)] tw:border tw:border-[color-mix(in_srgb,var(--o2-status-info-text)_30%,transparent)] tw:rounded-md tw:text-[11.5px] tw:text-(--color-text-primary) tw:leading-[1.4]">
-          <OIcon name="lock" size="xs" class="tw:shrink-0 tw:mt-px tw:text-[var(--o2-status-info-text)]" />
+        <div v-if="mode === 'edit'" class="provider-callout flex gap-2 items-start px-3 py-2 mb-3 bg-[color-mix(in_srgb,var(--o2-status-info-text)_12%,transparent)] border border-[color-mix(in_srgb,var(--o2-status-info-text)_30%,transparent)] rounded-md text-[11.5px] text-(--color-text-primary) leading-[1.4]">
+          <OIcon name="lock" size="xs" class="shrink-0 mt-px text-[var(--o2-status-info-text)]" />
           <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
         </div>
 
-        <div class="tw:mb-3">
-          <div class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
+        <div class="mb-3">
+          <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
             {{ t("onlineEvals.provider.apiKeyLabel") }}
-            <span v-if="mode === 'create'" class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
+            <span v-if="mode === 'create'" class="text-(--o2-status-error-text) ml-0.5">*</span>
           </div>
           <OInput
             v-model.trim="form.apiKey"
@@ -145,12 +145,12 @@
             :placeholder="t('onlineEvals.provider.apiKeyPlaceholder')"
             data-test="provider-form-api-key-input"
           />
-          <div class="tw:text-[11.5px] tw:text-text-secondary tw:mt-1">{{ t("onlineEvals.provider.apiKeyHelp") }}</div>
+          <div class="text-[11.5px] text-text-secondary mt-1">{{ t("onlineEvals.provider.apiKeyHelp") }}</div>
         </div>
       </section>
     </div>
 
-    <footer class="tw:sticky tw:bottom-0 tw:flex tw:items-center tw:justify-end tw:gap-2 tw:px-5.5 tw:py-3 tw:border-t tw:border-dialog-header-border tw:bg-card-bg tw:shrink-0 tw:z-1">
+    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 border-t border-dialog-header-border bg-card-bg shrink-0 z-1">
       <OButton
         data-test="provider-form-cancel-btn"
         type="button"
@@ -215,6 +215,24 @@ const providerTypeOptions = computed(() => [
   { label: "OpenAI-compatible", value: "openai_compatible" },
   { label: "Other", value: "other" },
 ]);
+
+// Default API endpoint for each provider type, shown as a placeholder to hint
+// the expected URL. Providers without a canonical public endpoint (self-hosted
+// or generic) fall back to the static i18n placeholder.
+const DEFAULT_ENDPOINTS: Record<string, string> = {
+  openai: "https://api.openai.com/v1",
+  deepseek: "https://api.deepseek.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
+  azure_openai: "https://{resource}.openai.azure.com/openai/deployments/{deployment}",
+  ollama: "http://localhost:11434/v1",
+  vllm: "http://localhost:8000/v1",
+};
+
+const endpointPlaceholder = computed(
+  () =>
+    DEFAULT_ENDPOINTS[form.value.providerType] ||
+    t("onlineEvals.provider.endpointPlaceholder"),
+);
 
 function initForm(row: Provider | null) {
   if (!row) {

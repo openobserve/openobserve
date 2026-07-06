@@ -404,7 +404,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
       });
 
       expect(wrapper.find('div').exists()).toBe(true);
-      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
+      expect(wrapper.find('.p-3').exists()).toBe(true);
     });
 
     it('should render CopyContent component with correct content prop', () => {
@@ -459,7 +459,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
         },
       });
 
-      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
+      expect(wrapper.find('.p-3').exists()).toBe(true);
     });
   });
 

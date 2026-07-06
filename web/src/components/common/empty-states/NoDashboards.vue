@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #extra>
-      <p class="tw:text-xs tw:text-text-secondary">
+      <p class="text-xs text-text-secondary">
         Dashboards turn your logs, metrics, and traces into shareable
         visualizations.
       </p>

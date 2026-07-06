@@ -18,31 +18,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="visible"
     ref="menuRef"
-    class="tw:fixed tw:z-[9999] tw:bg-white tw:border tw:border-solid tw:border-[var(--o2-border)] tw:rounded tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)] tw:min-w-[200px] tw:py-1 tw:dark:bg-[#2c2c2c] tw:dark:border-[#404040] tw:dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+    class="fixed z-[9999] bg-white border border-solid border-[var(--o2-border)] rounded shadow-[0_2px_8px_rgba(0,0,0,0.15)] min-w-[200px] py-1 dark:bg-[#2c2c2c] dark:border-[#404040] dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
     :style="menuStyle"
     @click.stop
     data-test="traces-metrics-context-menu"
   >
     <div
-      class="tw:flex tw:items-center tw:px-4 tw:py-2 tw:cursor-pointer tw:transition-colors tw:text-[13px] tw:text-[#333] tw:select-none tw:dark:text-[var(--o2-border)] tw:hover:bg-[#f5f5f5] tw:dark:hover:bg-[#383838] tw:active:bg-[var(--o2-border)] tw:dark:active:bg-[#404040]"
+      class="flex items-center px-4 py-2 cursor-pointer transition-colors text-[13px] text-[#333] select-none dark:text-[var(--o2-border)] hover:bg-[#f5f5f5] dark:hover:bg-[#383838] active:bg-[var(--o2-border)] dark:active:bg-[#404040]"
       @click="handleMenuItemClick('gte')"
       @mouseenter="hoveredItem = 'gte'"
       @mouseleave="hoveredItem = null"
-      :class="{ 'tw:bg-[#f5f5f5]! tw:dark:bg-[#383838]!': hoveredItem === 'gte' }"
+      :class="{ 'bg-[#f5f5f5]! dark:bg-[#383838]!': hoveredItem === 'gte' }"
       data-test="context-menu-gte"
     >
-      <OIcon name="arrow-upward" size="xs" class="tw:mr-2" />
+      <OIcon name="arrow-upward" size="xs" class="mr-2" />
       <span>{{ fieldName }} >= {{ formattedValue }}</span>
     </div>
     <div
-      class="tw:flex tw:items-center tw:px-4 tw:py-2 tw:cursor-pointer tw:transition-colors tw:text-[13px] tw:text-[#333] tw:select-none tw:dark:text-[var(--o2-border)] tw:hover:bg-[#f5f5f5] tw:dark:hover:bg-[#383838] tw:active:bg-[var(--o2-border)] tw:dark:active:bg-[#404040]"
+      class="flex items-center px-4 py-2 cursor-pointer transition-colors text-[13px] text-[#333] select-none dark:text-[var(--o2-border)] hover:bg-[#f5f5f5] dark:hover:bg-[#383838] active:bg-[var(--o2-border)] dark:active:bg-[#404040]"
       @click="handleMenuItemClick('lte')"
       @mouseenter="hoveredItem = 'lte'"
       @mouseleave="hoveredItem = null"
-      :class="{ 'tw:bg-[#f5f5f5]! tw:dark:bg-[#383838]!': hoveredItem === 'lte' }"
+      :class="{ 'bg-[#f5f5f5]! dark:bg-[#383838]!': hoveredItem === 'lte' }"
       data-test="context-menu-lte"
     >
-      <OIcon name="arrow-downward" size="xs" class="tw:mr-2" />
+      <OIcon name="arrow-downward" size="xs" class="mr-2" />
       <span>{{ fieldName }} &lt;= {{ formattedValue }}</span>
     </div>
   </div>

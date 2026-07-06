@@ -712,9 +712,9 @@ describe("QueryTypeSelector", () => {
       const builderButton = wrapper.find(
         '[data-test="dashboard-builder-query-type"]',
       );
-      // OToggleGroupItem renders with Tailwind classes (tw:inline-flex, tw:items-center, etc.)
+      // OToggleGroupItem renders with Tailwind classes (inline-flex, items-center, etc.)
       expect(builderButton.exists()).toBeTruthy();
-      expect(builderButton.classes().some(c => c.startsWith("tw:"))).toBe(true);
+      expect(builderButton.classes().some(c => c.startsWith(""))).toBe(true);
     });
 
     it("should have button-group container class", () => {

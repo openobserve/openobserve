@@ -25,17 +25,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="$emit('update:open', false)"
     @update:open="$emit('update:open', $event)"
   >
-    <div class="tw:w-full">
+    <div class="w-full">
         <OForm id="add-user-form" ref="updateUserForm" @submit="onSubmit">
-          <!-- <p class="tw:pt-2 tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
-          <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
+          <!-- <p class="pt-2 truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
+          <p class="mt-2 truncate" v-if="!existingUser">
             {{ t("user.email") }} : <strong>{{ formData.email }}</strong>
           </p>
-          <p class="tw:mt-2 tw:truncate" v-if="!existingUser && !beingUpdated">
+          <p class="mt-2 truncate" v-if="!existingUser && !beingUpdated">
             {{ t("user.roles") }} : <strong>{{ formData.role }}</strong>
           </p>
           <p
-            class="tw:mt-2 tw:truncate"
+            class="mt-2 truncate"
             v-if="
               !existingUser && !beingUpdated && formData?.custom_role?.length
             "
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="emailError = ''"
           />
 
-          <div v-if="!beingUpdated && !existingUser" class="tw:mt-2">
+          <div v-if="!beingUpdated && !existingUser" class="mt-2">
             <OInput
               :type="isPwd ? 'password' : 'text'"
               v-model="formData.password"
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-right>
                 <OIcon
                   :name="isPwd ? 'visibility-off' : 'visibility'" size="sm"
-                  class="tw:cursor-pointer"
+                  class="cursor-pointer"
                   @click="isPwd = !isPwd"
                 />
               </template>
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!existingUser && !isCloud"
             v-model="formData.first_name"
             :label="t('user.firstName')"
-            class="showLabelOnTop tw:mt-2"
+            class="showLabelOnTop mt-2"
             data-test="user-first-name-field"
           />
 
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!existingUser && !isCloud"
             v-model="formData.last_name"
             :label="t('user.lastName')"
-            class="showLabelOnTop tw:mt-2"
+            class="showLabelOnTop mt-2"
             data-test="user-last-name-field"
           />
           <OSelect
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.role"
             :label="t('user.role') + ' *'"
             :options="roles"
-            class="showLabelOnTop tw:mt-2"
+            class="showLabelOnTop mt-2"
             data-test="user-role-field"
             :error="!!roleError"
             :error-message="roleError"
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.custom_role"
             :label="t('user.customRole')"
             :options="filterdOption"
-            class="showLabelOnTop tw:mt-2"
+            class="showLabelOnTop mt-2"
             multiple
             data-test="user-custom-role-field"
             :disable="isCloud ? filterdOption.length === 0 : (filterdOption.length === 0 || !!formData.is_external)"
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : ''
             "
           />
-          <div v-if="beingUpdated && !isCloud" class="tw:mt-2">
+          <div v-if="beingUpdated && !isCloud" class="mt-2">
             <OSwitch
               v-model="formData.change_password"
               :label="t('user.changePassword')"
@@ -147,13 +147,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :type="isOldPwd ? 'password' : 'text'"
               v-model="formData.old_password"
               :label="t('user.oldPassword') + ' *'"
-              class="showLabelOnTop tw:mt-2"
+              class="showLabelOnTop mt-2"
               data-test="user-old-passoword-field"
             >
               <template #icon-right>
                 <OIcon
                   :name="isOldPwd ? 'visibility-off' : 'visibility'" size="sm"
-                  class="tw:cursor-pointer"
+                  class="cursor-pointer"
                   @click="isOldPwd = !isOldPwd"
                 />
               </template>
@@ -164,13 +164,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :type="isNewPwd ? 'password' : 'text'"
               v-model="formData.new_password"
               :label="t('user.newPassword') + ' *'"
-              class="showLabelOnTop tw:mt-2"
+              class="showLabelOnTop mt-2"
               data-test="user-new-password-field"
             >
               <template #icon-right>
                 <OIcon
                   :name="isNewPwd ? 'visibility-off' : 'visibility'" size="sm"
-                  class="tw:cursor-pointer"
+                  class="cursor-pointer"
                   @click="isNewPwd = !isNewPwd"
                 />
               </template>
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             v-model="formData.other_organization"
             :label="t('user.otherOrganization')"
-            class="showLabelOnTop tw:mt-2"
+            class="showLabelOnTop mt-2"
             maxlength="100"
           />
         </OForm>
@@ -198,8 +198,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     primary-button-label="Ok"
     @click:primary="signout"
   >
-    <div class="tw:flex tw:items-center tw:gap-3">
-      <div class="tw:bg-[var(--o2-primary)] tw:text-white tw:inline-flex tw:items-center tw:justify-center tw:w-10 tw:h-10 tw:rounded-full tw:shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="bg-[var(--o2-primary)] text-white inline-flex items-center justify-center w-10 h-10 rounded-full shrink-0">
         <OIcon name="info" size="sm" />
       </div>
       <span>As you've chosen to change your password, you'll be automatically

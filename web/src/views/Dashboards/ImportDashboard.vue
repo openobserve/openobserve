@@ -14,11 +14,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:mx-2">
+  <div class="mx-2">
     <AppPageHeader
       :title="t('dashboard.importDashboard')"
       :back="{ label: t('dashboard.header'), onClick: goBack }"
-      class="tw:-mx-2 tw:px-4 tw:border-b tw:border-border-default"
+      class="-mx-2 px-4 border-b border-border-default"
     >
       <template #actions>
         <OButton
@@ -47,19 +47,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
     </AppPageHeader>
-    <div class="tw:flex tw:w-full">
-      <div class="tw:flex tw:w-full tw:min-w-0">
+    <div class="flex w-full">
+      <div class="flex w-full min-w-0">
         <OSplitter
           v-model="splitterModel"
-          class="tw:w-full tw:min-w-0"
+          class="w-full min-w-0"
         >
           <template #before>
             <OForm id="import-dashboard-form" :form="form">
-            <div class="tw:w-full tw:h-full">
+            <div class="w-full h-full">
               <div
-                class="card-container tw:py-[0.625rem] tw:pl-[0.625rem] tw:mb-[0.625rem]"
+                class="card-container py-[0.625rem] pl-[0.625rem] mb-[0.625rem]"
               >
-                <div class="app-tabs-container tw:h-[36px] tw:w-fit">
+                <div class="app-tabs-container h-[36px] w-fit">
                   <app-tabs
                     data-test="dashboard-import-type-tabs"
                     class="tabs-selection-container"
@@ -71,10 +71,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="activeTab == 'import_json_url'"
-                class="editor-container-url card-container tw:py-1"
+                class="editor-container-url card-container py-1"
               >
-                <div class="tw:mx-2 my-2">
-                  <div style="width: calc(100% - 10px)" class="tw:flex tw:gap-2 tw:mt-2 tw:w-full tw:items-center">
+                <div class="mx-2 my-2">
+                  <div style="width: calc(100% - 10px)" class="flex gap-2 mt-2 w-full items-center">
                     <div
                       data-test="dashboard-import-url-input"
                       style="width: 69%"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-import-url-editor"
                     ref="queryEditorFileRef"
                     editor-id="dashboards-query-editor-file"
-                    class="tw:my-4 tw:h-[calc(100vh-285px)]! tw:overflow-hidden tw:resize-none tw:border tw:border-(--o2-border-color) tw:rounded-md"
+                    class="my-4 h-[calc(100vh-285px)]! overflow-hidden resize-none border border-(--o2-border-color) rounded-md"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -111,10 +111,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="activeTab == 'import_json_file'"
-                class="dashboard-import-json-container card-container tw:py-1"
+                class="dashboard-import-json-container card-container py-1"
               >
-                <div class="tw:mx-2 tw:my-2">
-                  <div style="width: calc(100% - 10px)" class="tw:flex tw:gap-2 tw:w-full tw:items-center">
+                <div class="mx-2 my-2">
+                  <div style="width: calc(100% - 10px)" class="flex gap-2 w-full items-center">
                     <div
                       data-test="dashboard-import-file-input"
                       style="width: 69%"
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :activeFolderId="selectedFolder.value"
                       />
                     </div>
-                    <div v-if="filesImportResults.length" class="tw:py-2" data-test="dashboard-import-file-results">
+                    <div v-if="filesImportResults.length" class="py-2" data-test="dashboard-import-file-results">
                       <div v-for="importResult in filesImportResults">
                         <span
                           v-if="importResult.status == 'rejected'"
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-import-json-file-editor"
                     ref="queryEditorJsonRef"
                     editor-id="dashboards-query-editor-json"
-                    class="tw:my-4 tw:h-[calc(100vh-282px)]! tw:overflow-hidden tw:resize-none tw:border tw:border-(--o2-border-color) tw:rounded-md"
+                    class="my-4 h-[calc(100vh-282px)]! overflow-hidden resize-none border border-(--o2-border-color) rounded-md"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -174,12 +174,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="dashboard-import-error-container"
-              class="card-container tw:h-[calc(100vh-110px)] tw:border-l tw:border-border-default"
+              class="card-container h-[calc(100vh-110px)] border-l border-border-default"
             >
-              <div class="tw:text-center tw:text-[1.0625rem] tw:font-semibold tw:leading-[1.45] tw:tracking-[-0.02em] tw:text-text-primary tw:py-2">Error Validations</div>
-              <OSeparator class="tw:mt-4" />
+              <div class="text-center text-[1.0625rem] font-semibold leading-[1.45] tracking-[-0.02em] text-text-primary py-2">Error Validations</div>
+              <OSeparator class="mt-4" />
               <div
-                class="error-section tw:p-[10px] tw:mb-[10px]"
+                class="error-section p-[10px] mb-[10px]"
                 v-if="dashboardErrorsToDisplay.length > 0"
               >
                 <div class="error-reporter-container">
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       errorMessage, errorIndex
                     ) in dashboardErrorsToDisplay"
                     :key="errorIndex"
-                    class="error-item tw:py-[5px] tw:text-sm"
+                    class="error-item py-[5px] text-sm"
                   >
                     <span
                       v-if="errorMessage.field == 'dashboard_title'"

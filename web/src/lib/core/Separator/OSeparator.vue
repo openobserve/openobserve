@@ -12,8 +12,8 @@ const props = withDefaults(defineProps<OSeparatorProps>(), {
     :orientation="vertical ? 'vertical' : 'horizontal'"
     :class="
       vertical
-        ? 'tw:block tw:self-stretch tw:w-separator tw:min-h-0 tw:border-0 tw:bg-separator'
-        : 'tw:block tw:w-full tw:h-separator tw:border-0 tw:bg-separator'
+        ? 'block self-stretch w-separator min-h-0 border-0 bg-separator'
+        : 'block w-full h-separator border-0 bg-separator'
     "
   />
 </template>

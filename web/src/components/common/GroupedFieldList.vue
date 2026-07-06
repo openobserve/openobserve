@@ -19,17 +19,17 @@
     <template #group-header="{ row, groupName }">
       <slot name="group-header" :row="row" :group-name="groupName">
         <div
-          class="tw:h-full tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem] tw:font-semibold tw:text-xs tw:px-[0.325rem] tw:cursor-pointer tw:bg-surface-subtle tw:text-field-list-group-text"
+          class="h-full w-full flex justify-between items-center rounded-[0.25rem] font-semibold text-xs px-[0.325rem] cursor-pointer bg-surface-subtle text-field-list-group-text"
           @click="toggleGroup(row.group)"
         >
-          <div class="tw:flex-1 tw:min-w-0">
+          <div class="flex-1 min-w-0">
             {{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})
           </div>
           <OButton
             v-if="(groupFieldCount[row.group] ?? 0) > 0"
             variant="ghost"
             size="icon"
-            class="tw:flex-shrink-0"
+            class="flex-shrink-0"
           >
             <OIcon
               :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
@@ -48,9 +48,9 @@
     <!-- Empty state -->
     <template #empty>
       <slot name="empty">
-        <div class="tw:text-center tw:py-[0.725rem] tw:flex tw:items-center tw:justify-center">
+        <div class="text-center py-[0.725rem] flex items-center justify-center">
           <OIcon name="info" size="xs" />
-          <span class="tw:pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
+          <span class="pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
         </div>
       </slot>
     </template>

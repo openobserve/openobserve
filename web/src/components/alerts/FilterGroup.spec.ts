@@ -1806,7 +1806,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: {
           ...defaultProps,
-          conditionInputWidth: 'tw:w-[100px]'
+          conditionInputWidth: 'w-[100px]'
         },
         global: {
           plugins: [mockI18n],
@@ -1819,7 +1819,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      expect(wrapper.props('conditionInputWidth')).toBe('tw:w-[100px]');
+      expect(wrapper.props('conditionInputWidth')).toBe('w-[100px]');
     });
 
     it('should have empty string as default for conditionInputWidth', () => {

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         data-test="dashboard-custom-chart-editor-flex-col"
-        class="tw:flex tw:flex-col"
+        class="flex flex-col"
         style="height: 100%; display: flex; flex-direction: column"
       >
         <QueryEditor

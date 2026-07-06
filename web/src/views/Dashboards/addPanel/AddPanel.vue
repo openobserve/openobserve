@@ -16,12 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full">
+  <div style="overflow-y: auto" class="scroll flex flex-col h-full">
     <!-- Header Section -->
     <AppPageHeader
       :back="{ label: currentDashboardData.data?.title || t('dashboard.header'), onClick: goBack, dataTest: 'dashboard-back-btn' }"
       :title="editMode ? t('panel.editPanel') : t('panel.addPanel')"
-      class="tw:px-4 tw:border-b tw:border-border-default"
+      class="px-4 border-b border-border-default"
     >
           <template #tabs>
             <OForm id="add-panel-form" :form="form">
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('panel.name')"
                 required
                 labelPosition="inside"
-                class="dynamic-input tw:min-w-[200px] tw:max-w-[500px] tw:[transition:width_0.2s_ease]"
+                class="dynamic-input min-w-[200px] max-w-[500px] [transition:width_0.2s_ease]"
                 :style="inputStyle"
               />
             </OForm>
@@ -124,13 +124,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : 'primary'
                       "
                       size="icon-sm"
-                      class="tw:h-8.5!"
+                      class="h-8.5!"
                       :disabled="searchRequestTraceIds.length > 0"
                       icon-left="keyboard-arrow-down"
                     />
                   </template>
                   <ODropdownItem @select="runQuery(true)">
-                    <div class="tw:flex tw:items-center tw:gap-2">
+                    <div class="flex items-center gap-2">
                       <OIcon name="refresh" size="xs" />
                       <span>Refresh Cache &amp; Apply</span>
                     </div>
@@ -169,12 +169,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Add Variable Drawer -->
     <div
       v-if="isAddVariableOpen"
-      class="add-variable-drawer-overlay tw:fixed tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:z-6000 tw:flex tw:justify-end"
+      class="add-variable-drawer-overlay fixed top-0 left-0 right-0 bottom-0 z-6000 flex justify-end"
       style="background-color: rgba(0, 0, 0, 0.5)"
       :class="store.state.theme === 'dark' ? 'theme-dark' : 'theme-light'"
       @click.self="handleCloseAddVariable"
     >
-      <div class="add-variable-drawer-panel tw:px-6 tw:pt-4 tw:w-225 tw:h-screen tw:shadow-[-2px_0_8px_rgba(0,0,0,0.15)] tw:overflow-hidden tw:rounded-none!" :class="store.state.theme === 'dark' ? 'tw:bg-[#1a1a1a]' : 'tw:bg-white'">
+      <div class="add-variable-drawer-panel px-6 pt-4 w-225 h-screen shadow-[-2px_0_8px_rgba(0,0,0,0.15)] overflow-hidden rounded-none!" :class="store.state.theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-white'">
         <AddSettingVariable
           @save="handleSaveVariable"
           @close="handleCloseAddVariable"

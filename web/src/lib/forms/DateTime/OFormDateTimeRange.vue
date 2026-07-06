@@ -92,14 +92,14 @@ const onDateChange = (field: any, dt: any) => {
 <template>
   <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
-      <div v-if="props.label || props.description" class="tw:mb-2">
+      <div v-if="props.label || props.description" class="mb-2">
         <div
           v-if="props.label"
           style="font-size: 14px"
-          class="tw:font-bold tw:text-gray-500"
+          class="font-bold text-gray-500"
         >
           {{ props.label
-          }}<span v-if="props.required" class="tw:text-input-error-text"> *</span>
+          }}<span v-if="props.required" class="text-input-error-text"> *</span>
         </div>
         <div v-if="props.description" style="font-size: 12px">
           {{ props.description }}

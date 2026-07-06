@@ -15,27 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:gap-4">
+  <div class="flex gap-4">
     <!-- Priority Order (Left) -->
-    <div class="tw:flex-1 tw:border tw:rounded tw:p-4">
-      <div class="tw:text-sm tw:font-semibold tw:mb-3">{{ leftTitle }}</div>
-      <OSearchInput v-model="searchLeft" placeholder="Search..." class="tw:mb-3" />
-      <div class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto">
-        <ul class="tw:flex tw:flex-col">
+    <div class="flex-1 border rounded p-4">
+      <div class="text-sm font-semibold mb-3">{{ leftTitle }}</div>
+      <OSearchInput v-model="searchLeft" placeholder="Search..." class="mb-3" />
+      <div class="border rounded min-h-80 max-h-96 overflow-auto">
+        <ul class="flex flex-col">
           <li
             v-for="(item, index) in filteredSelected"
             :key="item.value"
             data-test="dual-list-selector-left-item"
-            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
-            :class="{ 'tw:bg-muted/30': leftSelected.includes(item.value) }"
+            class="flex items-center gap-2 px-3 py-1 cursor-pointer hover:bg-muted/50"
+            :class="{ 'bg-muted/30': leftSelected.includes(item.value) }"
             @click="toggleLeftSelection(item.value)"
           >
-            <div class="tw:flex tw:items-center tw:shrink-0">
-              <span class="tw:text-xs tw:font-bold">{{ index + 1 }}</span>
+            <div class="flex items-center shrink-0">
+              <span class="text-xs font-bold">{{ index + 1 }}</span>
             </div>
-            <div class="tw:flex tw:flex-1 tw:min-w-0 tw:text-sm">{{ item.label }}</div>
-            <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
-              <div class="tw:flex tw:gap-1">
+            <div class="flex flex-1 min-w-0 text-sm">{{ item.label }}</div>
+            <div class="flex items-center shrink-0 ms-auto">
+              <div class="flex gap-1">
                 <OButton
                   variant="ghost"
                   size="icon-xs"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </li>
           <li
             v-if="filteredSelected.length === 0"
-            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:text-gray-400 tw:text-center tw:text-sm tw:justify-center"
+            class="flex items-center gap-2 px-3 py-2 text-gray-400 text-center text-sm justify-center"
           >
             No items selected
           </li>
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Center Buttons -->
-    <div class="tw:flex tw:flex-col tw:justify-center tw:gap-2">
+    <div class="flex flex-col justify-center gap-2">
       <OButton
         variant="outline"
         size="icon-sm"
@@ -113,30 +113,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Available Items (Right) -->
-    <div class="tw:flex-1 tw:border tw:rounded tw:p-4">
-      <div class="tw:text-sm tw:font-semibold tw:mb-3">{{ rightTitle }}</div>
-      <OSearchInput v-model="searchRight" placeholder="Search..." class="tw:mb-3" />
-      <div class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto">
-        <ul class="tw:flex tw:flex-col">
+    <div class="flex-1 border rounded p-4">
+      <div class="text-sm font-semibold mb-3">{{ rightTitle }}</div>
+      <OSearchInput v-model="searchRight" placeholder="Search..." class="mb-3" />
+      <div class="border rounded min-h-80 max-h-96 overflow-auto">
+        <ul class="flex flex-col">
           <li
             v-for="item in filteredAvailable"
             :key="item.value"
             data-test="dual-list-selector-right-item"
-            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
-            :class="{ 'tw:bg-muted/30': rightSelected.includes(item.value) }"
+            class="flex items-center gap-2 px-3 py-1 cursor-pointer hover:bg-muted/50"
+            :class="{ 'bg-muted/30': rightSelected.includes(item.value) }"
             @click="toggleRightSelection(item.value)"
           >
-            <div class="tw:flex tw:items-center tw:shrink-0">
+            <div class="flex items-center shrink-0">
               <OCheckbox
                 :model-value="rightSelected.includes(item.value)"
                 @click.stop="toggleRightSelection(item.value)"
               />
             </div>
-            <div class="tw:flex tw:flex-1 tw:min-w-0 tw:text-sm">{{ item.label }}</div>
+            <div class="flex flex-1 min-w-0 text-sm">{{ item.label }}</div>
           </li>
           <li
             v-if="filteredAvailable.length === 0"
-            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:text-gray-400 tw:text-center tw:text-sm tw:justify-center"
+            class="flex items-center gap-2 px-3 py-2 text-gray-400 text-center text-sm justify-center"
           >
             No items available
           </li>

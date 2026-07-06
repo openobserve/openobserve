@@ -51,9 +51,9 @@ const widthPct = computed(() => {
 const barClass = computed(
   () =>
     ({
-      default: "tw:bg-progress-bar-default",
-      warning: "tw:bg-progress-bar-warning",
-      danger: "tw:bg-progress-bar-danger",
+      default: "bg-progress-bar-default",
+      warning: "bg-progress-bar-warning",
+      danger: "bg-progress-bar-danger",
     })[props.variant],
 );
 </script>
@@ -62,14 +62,14 @@ const barClass = computed(
   <!-- Value on top, a thin magnitude bar UNDERNEATH (no overlap with the
        number). Both right-aligned so the bars share a common right edge and
        lengths stay comparable across rows. -->
-  <div class="tw:flex tw:flex-col tw:items-end tw:justify-center tw:gap-0.75 tw:w-full tw:min-w-0">
+  <div class="flex flex-col items-end justify-center gap-0.75 w-full min-w-0">
     <span
-      class="tw:tabular-nums tw:whitespace-nowrap tw:leading-none"
-      :class="num === null ? 'tw:text-text-primary tw:text-xs' : ''"
+      class="tabular-nums whitespace-nowrap leading-none"
+      :class="num === null ? 'text-text-primary text-xs' : ''"
     >{{ text }}</span>
     <div
       v-if="widthPct > 0"
-      class="tw:h-0.75 tw:rounded-full tw:opacity-80 tw:pointer-events-none tw:transition-[width] tw:duration-300"
+      class="h-0.75 rounded-full opacity-80 pointer-events-none transition-[width] duration-300"
       :class="barClass"
       :style="{ width: widthPct + '%' }"
       aria-hidden="true"

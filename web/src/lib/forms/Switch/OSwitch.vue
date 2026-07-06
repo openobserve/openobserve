@@ -66,32 +66,32 @@ type TrackSize = { track: string; thumb: string; thumbTranslate: string };
 
 const trackSizes: Record<NonNullable<SwitchProps["size"]>, TrackSize> = {
   sm: {
-    track: "tw:w-6 tw:h-3.5",
-    thumb: "tw:size-1.5",
-    thumbTranslate: "tw:translate-x-2",
+    track: "w-6 h-3.5",
+    thumb: "size-1.5",
+    thumbTranslate: "translate-x-2",
   },
   md: {
-    track: "tw:w-7 tw:h-4.5",
-    thumb: "tw:size-2.5",
-    thumbTranslate: "tw:translate-x-2.5",
+    track: "w-7 h-4.5",
+    thumb: "size-2.5",
+    thumbTranslate: "translate-x-2.5",
   },
   lg: {
-    track: "tw:w-8 tw:h-5",
-    thumb: "tw:size-3",
-    thumbTranslate: "tw:translate-x-3",
+    track: "w-8 h-5",
+    thumb: "size-3",
+    thumbTranslate: "translate-x-3",
   },
   xl: {
-    track: "tw:w-11.5 tw:h-6",
-    thumb: "tw:size-4.5",
-    thumbTranslate: "tw:translate-x-5",
+    track: "w-11.5 h-6",
+    thumb: "size-4.5",
+    thumbTranslate: "translate-x-5",
   },
 };
 
 const labelSize: Record<NonNullable<SwitchProps["size"]>, string> = {
-  sm: "tw:text-xs",
-  md: "tw:text-sm",
-  lg: "tw:text-sm",
-  xl: "tw:text-lg",
+  sm: "text-xs",
+  md: "text-sm",
+  lg: "text-sm",
+  xl: "text-lg",
 };
 
 const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
@@ -109,9 +109,9 @@ const hasLabel = computed(
   <div
     v-bind="wrapperAttrs"
     :class="[
-      'tw:inline-flex tw:items-center tw:gap-2',
-      labelPosition === 'left' ? 'tw:flex-row-reverse' : 'tw:flex-row',
-      disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
+      'inline-flex items-center gap-2',
+      labelPosition === 'left' ? 'flex-row-reverse' : 'flex-row',
+      disabled ? 'cursor-not-allowed' : 'cursor-pointer',
     ]"
     @click="toggle"
   >
@@ -128,35 +128,35 @@ const hasLabel = computed(
       :disabled="disabled"
       :tabindex="inputTabindex"
       :class="[
-        'tw:relative tw:inline-flex tw:shrink-0 tw:rounded-full',
-        'tw:p-0.5 tw:items-center tw:border-2',
+        'relative inline-flex shrink-0 rounded-full',
+        'p-0.5 items-center border-2',
         currentSizes.track,
         /* Three visually distinct states:
            ON       → primary FILLED track + white thumb (high contrast)
            OFF      → transparent track + primary outline + primary thumb
            DISABLED → transparent + grey dashed outline + grey thumb */
         props.disabled
-          ? 'tw:bg-transparent tw:border-switch-disabled-border tw:border-dashed'
+          ? 'bg-transparent border-switch-disabled-border border-dashed'
           : isChecked
-            ? 'tw:bg-[var(--color-primary-500)] tw:border-switch-border'
-            : 'tw:bg-transparent tw:border-switch-border-off',
-        props.disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
-        'tw:outline-none',
-        'tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25',
-        'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-200',
+            ? 'bg-[var(--color-primary-500)] border-switch-border'
+            : 'bg-transparent border-switch-border-off',
+        props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+        'outline-none',
+        'focus-visible:ring-4 focus-visible:ring-primary-500/25',
+        'transition-[color,background-color,border-color,box-shadow] duration-200',
       ]"
     >
       <span
         :class="[
-          'tw:block tw:rounded-full',
-          'tw:transition-transform tw:duration-200',
+          'block rounded-full',
+          'transition-transform duration-200',
           currentSizes.thumb,
           props.disabled
-            ? 'tw:bg-switch-disabled-thumb'
+            ? 'bg-switch-disabled-thumb'
             : isChecked
-              ? 'tw:bg-white'
-              : 'tw:bg-switch-thumb-off',
-          isChecked ? currentSizes.thumbTranslate : 'tw:translate-x-0',
+              ? 'bg-white'
+              : 'bg-switch-thumb-off',
+          isChecked ? currentSizes.thumbTranslate : 'translate-x-0',
         ]"
       />
     </button>
@@ -165,7 +165,7 @@ const hasLabel = computed(
       v-if="hasLabel || $slots.tooltip"
       :id="labelId"
       :class="[
-        'o-input-label tw:text-sm tw:font-semibold tw:select-none tw:leading-tight tw:flex tw:items-center tw:gap-1',
+        'o-input-label text-sm font-semibold select-none leading-tight flex items-center gap-1',
         disabled && 'o-input-label--disabled',
       ]"
     >
@@ -175,7 +175,7 @@ const hasLabel = computed(
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="tw:cursor-help"
+        class="cursor-help"
       ><slot name="tooltip" /></OIcon>
     </span>
   </div>

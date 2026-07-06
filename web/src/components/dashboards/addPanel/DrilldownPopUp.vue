@@ -82,7 +82,7 @@
       >
         <template #default="{ field }">
           <div style="margin-top: 10px">
-            <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
+            <label class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
             <query-editor
               data-test="scheduled-alert-sql-editor"
               ref="queryEditorRef"
@@ -94,7 +94,7 @@
             />
             <span
               v-if="field.state.meta.errors.length > 0"
-              class="tw:text-xs tw:text-input-error-text tw:leading-none tw:mt-1 tw:block"
+              class="text-xs text-input-error-text leading-none mt-1 block"
               role="alert"
               data-test="dashboard-drilldown-logs-query-error"
             >
@@ -106,7 +106,7 @@
     </div>
     <div v-if="drilldownData.type == 'byUrl'">
       <div style="margin-top: 10px; display: flex; flex-direction: column">
-        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterUrl") }}</label>
+        <label class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.enterUrl") }}</label>
         <OFormTextarea
           name="data.url"
           data-test="dashboard-drilldown-url-textarea"
@@ -116,32 +116,32 @@
 
     <div v-if="drilldownData.type == 'byDashboard'">
       <div style="margin-top: 10px">
-        <div class="tw:flex tw:items-center tw:my-[10px] tw:w-full">
+        <div class="flex items-center my-[10px] w-full">
           <OFormSelect
             name="data.folder"
             :options="folderList"
             :label="t('dashboard.selectFolderDrilldown')"
-            class="tw:w-full"
+            class="w-full"
             :disabled="getFoldersListLoading.isLoading.value"
             data-test="dashboard-drilldown-folder-select"
           />
         </div>
-        <div class="tw:flex tw:items-center tw:my-[10px] tw:w-full" v-if="drilldownData.data.folder">
+        <div class="flex items-center my-[10px] w-full" v-if="drilldownData.data.folder">
           <OFormSelect
             name="data.dashboard"
             :options="dashboardList"
             :label="t('dashboard.selectDashboardDrilldown')"
-            class="tw:w-full"
+            class="w-full"
             :disabled="getDashboardListLoading.isLoading.value"
             data-test="dashboard-drilldown-dashboard-select"
           />
         </div>
-        <div class="tw:flex tw:items-center tw:my-[10px] tw:w-full" v-if="drilldownData.data.dashboard">
+        <div class="flex items-center my-[10px] w-full" v-if="drilldownData.data.dashboard">
           <OFormSelect
             name="data.tab"
             :options="tabList"
             :label="t('dashboard.selectTabDrilldown')"
-            class="tw:w-full"
+            class="w-full"
             :disabled="getTabListLoading.isLoading.value"
             data-test="dashboard-drilldown-tab-select"
           />
@@ -157,7 +157,7 @@
               align-items: center;
             "
           >
-            <span class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.variables") }}</span>
+            <span class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.variables") }}</span>
             <OButton
               variant="primary"
               size="sm"
