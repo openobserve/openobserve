@@ -176,6 +176,8 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
     // the nats handling flow will trigger limit refresh in all nodes
     match license::update().await {
         Ok(_) => HttpResponse::Ok().finish(),
-        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({"message":e.to_string()})),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"message":e.to_string()}))
+        }
     }
 }
