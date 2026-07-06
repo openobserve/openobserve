@@ -463,6 +463,8 @@ interface ServiceRow {
   infer_service_name?: string;
   infer_service_system?: string;
   infer_service_type?: string;
+  /** 1 when this entity emits its own spans (a real instrumented service). */
+  is_real_service?: number;
 }
 
 // Entity categories mirror the trace-inference taxonomy (infer_service_type).
@@ -483,8 +485,18 @@ const CATEGORY_ORDER: EntityCategory[] = [
 // Tab order in the type filter: All first, then each concrete category.
 const TYPE_FILTER_ORDER: TypeFilter[] = ["all", ...CATEGORY_ORDER];
 
-/** Map a row's infer_service_type to a catalog category. */
+/**
+ * Map a row to a catalog category.
+ *
+ * Collision rule (data-proven): an entity that emits its own spans
+ * (`is_real_service`) is a Service, even if it was ALSO inferred as external/rpc
+ * because something called it over HTTP/gRPC — that inference is a false
+ * positive. Only genuine, uninstrumented dependencies keep their inferred type.
+ * RPC targets are always redundant with a real service→service edge, so they map
+ * to service too (never a distinct RPC bucket). This mirrors the Service Graph.
+ */
 function categoryOf(row: ServiceRow): EntityCategory {
+  if (row.is_real_service) return "service";
   switch ((row.infer_service_type ?? "").toLowerCase()) {
     case "database":
       return "datastore";
@@ -497,6 +509,20 @@ function categoryOf(row: ServiceRow): EntityCategory {
     default:
       return "service";
   }
+}
+
+/**
+ * A phantom rpc dependency is an rpc-typed entity that is NOT a real service
+ * (e.g. "oteldemo.CurrencyService"). Every such rpc call is already represented
+ * by a real service→service edge, so it is dropped entirely — matching the
+ * Service Graph, which suppresses rpc. Real services that happen to carry an
+ * rpc inference are kept (is_real_service wins in categoryOf).
+ */
+function isPhantomRpc(row: ServiceRow): boolean {
+  return (
+    !row.is_real_service &&
+    (row.infer_service_type ?? "").toLowerCase() === "rpc"
+  );
 }
 
 const isLoading = ref(false);
@@ -991,6 +1017,7 @@ async function loadServicesCatalog() {
   MAX(infer_service_name) AS _infer_service_name,
   MAX(infer_service_system) AS _infer_service_system,
   MAX(infer_service_type) AS _infer_service_type,
+  MAX(CASE WHEN service_name IS NOT NULL AND (infer_service_name IS NULL OR infer_service_name = '') THEN 1 ELSE 0 END) AS _is_real_service,
   COUNT(*) AS total_requests,
   SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
   CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) / CAST(COUNT(*) AS DOUBLE) * 100 AS error_rate,
@@ -1059,12 +1086,17 @@ ORDER BY total_requests DESC`;
               p95_latency_ns: hit.p95_latency_ns ?? 0,
               p99_latency_ns: hit.p99_latency_ns ?? 0,
               status: deriveStatus(hit.error_rate ?? 0),
+              is_real_service: hit._is_real_service ?? 0,
               infer_service_name: hit._infer_service_name ?? undefined,
               infer_service_system: hit._infer_service_system ?? undefined,
               infer_service_type: hit._infer_service_type ?? undefined,
             });
           }
-          services.value = Array.from(serviceMap.values());
+          // Drop phantom rpc dependencies (redundant with real service edges),
+          // matching the Service Graph's rpc suppression.
+          services.value = Array.from(serviceMap.values()).filter(
+            (s) => !isPhantomRpc(s),
+          );
         }
       },
       error: (_payload: any, _response: any) => {

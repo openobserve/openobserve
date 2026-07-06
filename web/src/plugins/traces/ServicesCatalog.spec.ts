@@ -2019,6 +2019,45 @@ describe("ServicesCatalog", () => {
       });
     });
 
+    it("classifies a real service inferred as external back to Service (collision)", async () => {
+      // email/quote emit their own spans (is_real_service=1) but were also
+      // inferred as external because a caller reached them over HTTP.
+      wrapper = await mountWithRows([
+        {
+          service_name: "email",
+          infer_service_type: "external",
+          is_real_service: 1,
+          status: "healthy",
+          total_requests: 1,
+          error_count: 0,
+          error_rate: 0,
+          avg_duration_ns: 0,
+          max_duration_ns: 0,
+          p50_latency_ns: 0,
+          p95_latency_ns: 0,
+          p99_latency_ns: 0,
+        },
+        {
+          // genuine external — no matching real service
+          service_name: "metadata.google.internal.",
+          infer_service_type: "external",
+          is_real_service: 0,
+          status: "healthy",
+          total_requests: 1,
+          error_count: 0,
+          error_rate: 0,
+          avg_duration_ns: 0,
+          max_duration_ns: 0,
+          p50_latency_ns: 0,
+          p95_latency_ns: 0,
+          p99_latency_ns: 0,
+        },
+      ]);
+      // email → Service (collision), metadata → External (genuine).
+      expect(wrapper.vm.categoryCounts.service).toBe(1);
+      expect(wrapper.vm.categoryCounts.external).toBe(1);
+    });
+
     it("switches the visible rows when the type filter changes", async () => {
       wrapper = await mountWithRows(mixedRows);
 
