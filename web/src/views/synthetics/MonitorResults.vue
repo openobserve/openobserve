@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="monitorName"
       :back="{ label: t('synthetics.results.monitors'), to: { name: 'synthetic' } }"
-      :breadcrumb="breadcrumb"
     >
       <template #title-trail>
         <OBadge
@@ -94,7 +93,6 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import MonitorRuns from "@/views/synthetics/MonitorRuns.vue";
@@ -131,11 +129,6 @@ const statusBadge = computed(() => {
   if (!labels[s]) return null;
   return { variant: badgeVariantMap[s], label: labels[s] };
 });
-
-const breadcrumb = computed<BreadcrumbItem[]>(() => [
-  { label: t("synthetics.title"), to: { name: "synthetic" } },
-  { label: monitorName.value },
-]);
 
 // ── Date state + URL sync (same pattern as LLMInsightsPage) ────────────
 type DateValueType = "relative" | "absolute";

@@ -145,6 +145,15 @@ const useEnterpriseRoutes = () => {
         },
       },
       {
+        path: "synthetic/:id/results/run/:runId",
+        name: "synthetic-run-detail",
+        component: () => import("@/views/synthetics/RunDetail.vue"),
+        meta: { title: "Run Detail" },
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+      {
         path: "synthetic/:id",
         name: "synthetic-detail",
         component: () => import("@/views/synthetics/BrowserCheckDetail.vue"),
