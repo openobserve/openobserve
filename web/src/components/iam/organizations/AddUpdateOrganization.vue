@@ -38,14 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           readonly
           disabled
           :label="t('organization.id')"
-          class="showLabelOnTop tw:mt-2"
+          class="showLabelOnTop mt-2"
         />
 
         <OFormInput
           name="name"
           :label="t('organization.name')"
           required
-          class="showLabelOnTop tw:mt-2"
+          class="showLabelOnTop mt-2"
           :help-text="t('organization.nameHelpText')"
           data-test="org-name"
           maxlength="100"
@@ -55,15 +55,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!beingUpdated && config.isCloud == 'true' && canMakeBilledMember"
           name="makeBilledMember"
           :label="t('organization.makeBilledMember', { org: currentOrgName })"
-          class="tw:mt-4"
+          class="mt-4"
           data-test="org-make-billed-member"
         />
 
-        <div class="tw:flex tw:justify-center tw:mt-4" v-if="proPlanRequired">
+        <div class="flex justify-center mt-4" v-if="proPlanRequired">
           <OButton
             variant="secondary"
             size="md"
-            class="tw:mb-4 tw:ml-4"
+            class="mb-4 ml-4"
             @click="completeSubscriptionProcess"
           >
             {{ t('organization.proceed_subscription') }}

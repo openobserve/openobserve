@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <span data-test="rum-sessions-insight-text">{{ message }}</span>
     <template #actions>
-      <div class="tw:flex tw:items-center tw:gap-3 tw:whitespace-nowrap">
+      <div class="flex items-center gap-3 whitespace-nowrap">
         <!-- Error cluster: filter the table to THIS error, not all error
              sessions; plus a jump to Error Tracking pre-filtered. Buttons
              inherit the banner text color so they stay readable on every

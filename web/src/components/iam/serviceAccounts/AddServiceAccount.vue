@@ -40,14 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :help-text="t('serviceAccounts.form.identifier.help')"
           required
           data-test="iam-add-service-account-identifier-input"
-          class="showLabelOnTop tw:mt-2"
+          class="showLabelOnTop mt-2"
         />
 
         <OFormInput
           name="first_name"
           :label="t('user.description')"
           data-test="iam-add-service-account-description-input"
-          class="showLabelOnTop tw:mt-2"
+          class="showLabelOnTop mt-2"
         />
       </OForm>
     </div>

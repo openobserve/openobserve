@@ -35,14 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="name"
           :label="t('common.name')"
           required
-          class="showLabelOnTop tw:mt-2"
+          class="showLabelOnTop mt-2"
           maxlength="100"
           data-test="add-role-rolename-input-btn"
           :help-text="t('iam.nameHelpText')"
         />
 
-        <div data-test="add-role-start-from-section" class="tw:mt-4">
-          <div class="tw:mb-1 tw:text-sm tw:font-medium">
+        <div data-test="add-role-start-from-section" class="mt-4">
+          <div class="mb-1 text-sm font-medium">
             {{ t("iam.role.startFrom.label") }}
           </div>
           <OFormRadioGroup name="startFrom" orientation="vertical">

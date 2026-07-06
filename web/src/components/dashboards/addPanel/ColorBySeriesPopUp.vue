@@ -37,17 +37,17 @@
         <div
           v-for="(series, index) in editColorBySeries"
           :key="index"
-          class="tw:flex tw:items-center tw:justify-between tw:mb-2"
+          class="flex items-center justify-between mb-2"
         >
-          <div class="tw:cursor-move tw:p-2 tw:self-center">
+          <div class="cursor-move p-2 self-center">
             <OIcon
               name="drag-indicator" size="sm"
-              class="tw:mr-1"
+              class="mr-1"
               :data-test="`dashboard-addpanel-config-color-by-series-drag-handle-${index}`"
             />
           </div>
-          <div class="tw:flex tw:items-center tw:justify-between tw:flex-1 tw:gap-x-3">
-            <div class="tw:flex-1 tw:min-w-0">
+          <div class="flex items-center justify-between flex-1 gap-x-3">
+            <div class="flex-1 min-w-0">
               <OCombobox
                 v-model="series.value"
                 :items="seriesDataItems"
@@ -61,25 +61,25 @@
 
             <!-- Color Picker -->
             <div
-              class="tw:flex tw:items-center tw:shrink-0"
+              class="flex items-center shrink-0"
               :data-test="`dashboard-addpanel-config-color-by-series-color-section-${index}`"
             >
               <div
                 v-if="series.color !== null"
-                class="tw:items-center tw:flex tw:gap-1"
+                class="items-center flex gap-1"
               >
                 <OColor
                   v-model="series.color"
-                  class="tw:flex-1"
+                  class="flex-1"
                   clearable
                   @clear="removeColorByIndex(index)"
                 />
               </div>
-              <div v-else class="tw:w-full">
+              <div v-else class="w-full">
                 <OButton
                   variant="ghost-primary"
                   size="sm"
-                  class="tw:w-full"
+                  class="w-full"
                   :data-test="`dashboard-addpanel-config-color-by-series-set-color-btn-${index}`"
                   @click="setColorByIndex(index)"
                   >Set color</OButton

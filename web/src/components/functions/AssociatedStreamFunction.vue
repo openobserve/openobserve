@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
+  <div class="rounded-md p-0" style="min-height: inherit">
     <OTable
       data-test="log-stream-table"
       :data="filteredStreamData"
@@ -40,20 +40,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #top>
-        <div class="tw:flex tw:items-center tw:w-full tw:border-b tw:border-[var(--o2-border)] tw:pb-2 tw:mb-1">
-          <div class="tw:text-[15px] tw:font-[600]" data-test="log-stream-title-text">
+        <div class="flex items-center w-full border-b border-[var(--o2-border)] pb-2 mb-1">
+          <div class="text-[15px] font-[600]" data-test="log-stream-title-text">
             {{ t("logStream.header") }}
           </div>
-          <div class="tw:ml-auto" data-test="stream-association-search-input">
+          <div class="ml-auto" data-test="stream-association-search-input">
             <OSearchInput
               v-model="filterQuery"
-              class="tw:mb-1"
+              class="mb-1"
               :placeholder="t('logStream.search')"
             />
           </div>
           <OButton
             data-test="log-stream-refresh-stats-btn"
-            class="tw:ml-3 tw:mb-1"
+            class="ml-3 mb-1"
             variant="outline"
             size="sm-action"
             @click="getLogStream"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #expansion="{ row }">
         <div
           v-show="loadingFunctions"
-          class="tw:pl-3 tw:py-1"
+          class="pl-3 py-1"
           style="height: 60px"
         >
           <OInnerLoading
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <div
-                  class="tw:text-[15px] tw:font-[600] tw:flex tw:items-center"
+                  class="text-[15px] font-[600] flex items-center"
                   data-test="log-stream-title-text"
                 >
                   {{ t("function.associatedFunctionHeader") }}
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="stream-association-associate-function-btn"
                   variant="outline"
                   size="sm-action"
-                  class="tw:ml-3 tw:mb-1"
+                  class="ml-3 mb-1"
                   @click="addFunctionInProgress = true"
                 >
                   Associate Function
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="!row._isAddRow"
                 data-test="stream-association-delete-function-btn"
                 :title="t('function.deleteAssociatedFunction')"
-                class="tw:ml-1"
+                class="ml-1"
                 variant="ghost-destructive"
                 size="icon-sm"
                 icon-left="delete"

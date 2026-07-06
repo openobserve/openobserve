@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="thread-tool-row__name">{{
             t.tool_name || t.gen_ai_tool_name || t.operation_name
           }}</span>
-          <span class="tw:flex-1" />
+          <span class="flex-1" />
           <span
             class="thread-pill"
             :class="
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="thread-tool-body__section">
             <div class="thread-tool-body__label">
               Result
-              <span v-if="t.span_status === 'ERROR'" class="tw:text-[#dc2626]">
+              <span v-if="t.span_status === 'ERROR'" class="text-[#dc2626]">
                 · ERROR
               </span>
             </div>

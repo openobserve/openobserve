@@ -35,27 +35,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="handleApply"
   >
     <!-- Source Log Time -->
-    <div class="tw:mb-6">
-      <div class="tw:text-sm tw:font-semibold tw:mb-2">
+    <div class="mb-6">
+      <div class="text-sm font-semibold mb-2">
         {{ t("correlation.logs.timeRange.sourceTime") }}
       </div>
       <div
-        class="tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-surface-panel tw:flex tw:items-center tw:gap-2"
+        class="p-3 border border-solid border-[var(--o2-border-color)] rounded bg-surface-panel flex items-center gap-2"
       >
         <OIcon name="schedule" size="sm" />
-        <span class="tw:font-mono tw:text-sm">{{
+        <span class="font-mono text-sm">{{
           formatTimestamp(sourceTimestamp)
         }}</span>
       </div>
     </div>
 
     <!-- Time Window Presets -->
-    <div class="tw:mb-6">
-      <div class="tw:text-sm tw:font-semibold tw:mb-3">
+    <div class="mb-6">
+      <div class="text-sm font-semibold mb-3">
         {{ t("correlation.logs.timeRange.window") }}
       </div>
 
-      <div class="tw:space-y-2">
+      <div class="space-y-2">
         <ORadioGroup
           :model-value="selectedWindow"
           orientation="vertical"
@@ -96,9 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Custom Time Range Inputs (only shown when custom is selected) -->
-    <div v-if="selectedWindow === 'custom'" class="tw:mb-4 tw:space-y-3">
+    <div v-if="selectedWindow === 'custom'" class="mb-4 space-y-3">
       <div>
-        <div class="tw:text-sm tw:font-semibold tw:mb-2">
+        <div class="text-sm font-semibold mb-2">
           {{ t("correlation.logs.timeRange.customStart") }}
         </div>
         <OInput
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div>
-        <div class="tw:text-sm tw:font-semibold tw:mb-2">
+        <div class="text-sm font-semibold mb-2">
           {{ t("correlation.logs.timeRange.customEnd") }}
         </div>
         <OInput
@@ -128,30 +128,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Current Range Display -->
     <div
-      class="tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-blue-50"
+      class="p-3 border border-solid border-[var(--o2-border-color)] rounded bg-blue-50"
     >
-      <div class="tw:text-xs tw:font-semibold tw:mb-2 tw:opacity-70">
+      <div class="text-xs font-semibold mb-2 opacity-70">
         {{ t("correlation.logs.timeRange.currentRange") }}
       </div>
-      <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm">
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <span class="tw:font-semibold"
+      <div class="flex flex-col gap-1 text-sm">
+        <div class="flex items-center gap-2">
+          <span class="font-semibold"
             >{{ t("correlation.logs.timeRange.start") }}:</span
           >
-          <span class="tw:font-mono">{{
+          <span class="font-mono">{{
             formatTimestamp(pendingStartTime)
           }}</span>
         </div>
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <span class="tw:font-semibold"
+        <div class="flex items-center gap-2">
+          <span class="font-semibold"
             >{{ t("correlation.logs.timeRange.end") }}:</span
           >
-          <span class="tw:font-mono">{{
+          <span class="font-mono">{{
             formatTimestamp(pendingEndTime)
           }}</span>
         </div>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:mt-1">
-          <span class="tw:font-semibold"
+        <div class="flex items-center gap-2 mt-1">
+          <span class="font-semibold"
             >{{ t("correlation.logs.timeRange.duration") }}:</span
           >
           <span>{{ formatDuration(pendingEndTime - pendingStartTime) }}</span>

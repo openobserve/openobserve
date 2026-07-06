@@ -26,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
-    <div data-test="dialog-box" class="tw:text-left">
+    <div data-test="dialog-box" class="text-left">
       <div class="para">{{ message }}</div>
-      <div v-if="warningMessage && warningMessage.length > 0" class="tw:mt-4 tw:text-left">
+      <div v-if="warningMessage && warningMessage.length > 0" class="mt-4 text-left">
         <OBanner variant="warning" icon="warning" :content="warningMessage" />
       </div>
     </div>

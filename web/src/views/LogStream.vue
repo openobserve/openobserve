@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="alert-list-page" class="tw:h-full">
+  <div data-test="alert-list-page" class="h-full">
     <PageLayout
-      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+      :header-class="'shrink-0 px-4 border-b border-border-default'"
     >
       <!-- Row 1: standard header — title + actions only. The stream-type filter
            and search moved into the table's own toolbar below. -->
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </AppPageHeader>
       </template>
 
-      <div class="card-container tw:h-full">
+      <div class="card-container h-full">
       <OTable
         data-test="log-stream-table"
         :data="logStream"
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Toolbar inside the table frame: stream-type filter + search. -->
           <template #toolbar>
             <div
-              class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:w-full"
+              class="flex items-center justify-between gap-2 w-full"
             >
               <OToggleGroup
                 :model-value="streamActiveTab"
@@ -85,25 +85,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OToggleGroupItem value="logs" size="sm">
                   <template #icon-left
-                    ><OIcon name="search" size="xs" class="tw:shrink-0"
+                    ><OIcon name="search" size="xs" class="shrink-0"
                   /></template>
                   {{ t("logStream.labelLogs") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="metrics" size="sm">
                   <template #icon-left
-                    ><OIcon name="bar-chart" size="xs" class="tw:shrink-0"
+                    ><OIcon name="bar-chart" size="xs" class="shrink-0"
                   /></template>
                   {{ t("logStream.labelMetrics") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="traces" size="sm">
                   <template #icon-left
-                    ><OIcon name="account-tree" size="xs" class="tw:shrink-0"
+                    ><OIcon name="account-tree" size="xs" class="shrink-0"
                   /></template>
                   {{ t("logStream.labelTraces") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="metadata" size="sm">
                   <template #icon-left
-                    ><OIcon name="info" size="xs" class="tw:shrink-0"
+                    ><OIcon name="info" size="xs" class="shrink-0"
                   /></template>
                   {{ t("logStream.labelMetadata") }}
                 </OToggleGroupItem>
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 data-test="streams-search-stream-input"
                 v-model="filterQuery"
-                class="tw:w-64 no-border o2-search-input"
+                class="w-64 no-border o2-search-input"
                 :placeholder="t('logStream.search')"
                 :debounce="300"
               />
@@ -126,10 +126,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             `dashboard-name-cell-<name>` pattern in Dashboards.vue.
           -->
           <template #cell-name="{ row }">
-            <span :data-test="`log-stream-name-cell-${row.name}`" class="tw:text-text-primary">{{ row.name }}</span>
+            <span :data-test="`log-stream-name-cell-${row.name}`" class="text-text-primary">{{ row.name }}</span>
           </template>
           <template #cell-actions="{ row }">
-             <div class="tw:flex tw:items-center actions-container">
+             <div class="flex items-center actions-container">
               <OButton
                 icon-left="search"
                 :title="t('logStream.explore')"
@@ -172,10 +172,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #bottom="scope">
             <div
-              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
+              class="flex items-center justify-between w-full py-2"
             >
               <div
-                class="tw:flex tw:items-center tw:w-full tw:font-bold tw:text-[14px]"
+                class="flex items-center w-full font-bold text-[14px]"
               >
                 {{ scope.totalRows }} Stream(s)
                 <OButton
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="delete"
                   variant="outline-destructive"
                   size="sm-action"
-                  class="tw:ml-4"
+                  class="ml-4"
                   :disabled="isDeleting"
                   @click="confirmBatchDeleteAction"
                 >
@@ -215,15 +215,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmDelete = false"
       @click:primary="() => { deleteStream(); confirmDelete = false; }"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:py-1">
-        <p class="tw:text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
+      <div class="flex flex-col gap-3 py-1">
+        <p class="text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
         <div
-          class="tw:w-full tw:flex tw:items-center tw:gap-2 tw:text-sm tw:text-gray-500"
+          class="w-full flex items-center gap-2 text-sm text-gray-500"
         >
           <OCheckbox
             v-model="deleteAssociatedAlertsPipelines"
           />
-          <span class="tw:text-(--o2-text-secondary) tw:text-xs tw:font-medium">
+          <span class="text-(--o2-text-secondary) text-xs font-medium">
             {{ t("logStream.deleteAssociatedAlertsPipelines") }}
           </span>
         </div>
@@ -240,15 +240,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmBatchDelete = false"
       @click:primary="() => { deleteBatchStream(); confirmBatchDelete = false; }"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:py-1">
-        <p class="tw:text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
+      <div class="flex flex-col gap-3 py-1">
+        <p class="text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
         <div
-          class="tw:w-full tw:flex tw:items-center tw:gap-2 tw:text-sm tw:text-gray-500"
+          class="w-full flex items-center gap-2 text-sm text-gray-500"
         >
           <OCheckbox
             v-model="deleteAssociatedAlertsPipelines"
           />
-          <span class="tw:text-(--o2-text-secondary) tw:text-xs tw:font-medium">
+          <span class="text-(--o2-text-secondary) text-xs font-medium">
             Delete all Pipelines and Alerts associated with the selected streams
           </span>
         </div>
