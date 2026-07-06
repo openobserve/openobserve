@@ -24,17 +24,53 @@ shared classification function** both screens consume.
 
 ## The classification rule (data-verified)
 
-Verified by direct queries against a live `otel_demo` stream (30 entity groups):
+Verified by direct queries against a live `otel_demo` stream (30 entity groups)
+AND a purpose-built topology-matrix stream (traces_tester) that exercises every
+case: redundant rpc, genuine-uninstrumented rpc, collision, multi-system db,
+kafka producer/consumer, genuine external, unknown type. See
+`2026-07-06-traces-tester-topology-matrix.md`.
 
 ```
 if is_real_service:              → "service"    // emits its own spans; any inferred type is a false positive (collision rule wins first)
-else if inferType == "rpc":      → "drop"       // phantom: redundant with the real service→service edge
+else if inferType == "rpc":      → "rpc"        // KEEP as a dependency node (see RPC decision below); never dropped, never hidden
 else if inferType == "database": → "datastore"
 else if inferType == "queue":    → "queue"
 else if inferType == "external": → "external"
 else if inferType is non-empty:  → "external"   // UNKNOWN inferred type → safe default: it's a dependency, NOT our code
 else:                            → "service"    // truly no inferred type → real service
 ```
+
+### RPC decision (revised after matrix validation)
+
+Earlier this spec dropped ALL non-real rpc as "redundant." **The topology-matrix
+data disproved that as a general rule.** It produced two rpc entities that are
+indistinguishable by `is_real_service` (both 0) but fundamentally different:
+- `oteldemo.InventoryService` — a real `inventory-service` exists → the rpc node
+  is a *redundant duplicate* of a real service.
+- `legacy.BillingService` — NO real service exists → a *genuine uninstrumented
+  dependency*. Dropping it would hide a real dependency.
+
+We investigated non-heuristic ways to tell them apart and **both failed on real
+data**: `peer.service` was absent on all rpc spans, and resolving via the
+span-graph child link was noisy (the genuine `legacy.BillingService` falsely
+"resolved" to 4 unrelated services). Name-normalization
+(`oteldemo.InventoryService` → `inventory-service`) is the only remaining merge
+signal and it is a fragile heuristic we reject.
+
+**Final rule (principled, no guessing):**
+- An rpc target is **merged into a real service ONLY when `peer.service` is set**
+  and equals a real `service_name` (Datadog's authoritative signal; the merge is
+  the collision path — `is_real_service` becomes true for that entity). Proper
+  OTel instrumentations set `peer.service`.
+- When `peer.service` is **absent** (otel_demo, this matrix), the rpc target is
+  **kept as an `rpc` dependency node** — honest: the data cannot prove it is a
+  real service, and it may be a genuine uninstrumented backend. No name-guessing,
+  never hides a dependency, never mis-merges.
+
+Consequence: on data without `peer.service`, `oteldemo.*Service` nodes appear as
+rpc dependencies. This is *honest clutter* — they are distinct gRPC service
+identities the data cannot dedupe. On data WITH `peer.service`, they merge
+cleanly into the real services (matching Datadog).
 
 **The unknown-type branch is a deliberate safety net.** OpenTelemetry semantic
 conventions evolve; the backend may one day emit `cache`, `http`, `storage`,
@@ -55,26 +91,17 @@ first, so a real service carrying an unknown inferred type stays a Service.
   because a caller reached them over HTTP). `is_real_service` wins → Service. The
   external inference is a false positive: the caller couldn't tell the HTTP target
   was an already-instrumented service.
-- **Phantom RPC** — every rpc inferred target in the data (`oteldemo.*Service`,
-  `flagd.evaluation.v1.Service`) has a matching real service→service edge (proven
-  by cross-referencing the rpc client spans against the parent/child service-edge
-  join). The rpc node duplicates a service already in the graph, so it is dropped.
-  Non-real rpc → `"drop"`.
+- **RPC** — kept as a dependency node (see "RPC decision" above). Merged into a
+  real service only when `peer.service` identifies it (then it is a collision →
+  Service). Never dropped, so a genuine uninstrumented rpc backend is never
+  hidden. No telemetry needed — nothing is silently removed.
 
-  **Drop telemetry (required).** Dropping entities silently is a support hazard:
-  if the "all rpc is redundant" assumption ever fails (a genuinely uninstrumented
-  gRPC backend appears), it would vanish from both screens with no trace. So each
-  consumer MUST emit a single aggregated debug log per load when it drops
-  entities, listing the names:
-  `console.debug('[ServiceCatalog] Dropped N phantom RPC entities:', names)` /
-  `console.debug('[ServiceGraph] Dropped N phantom RPC entities:', names)`.
-  This gives support a breadcrumb without cluttering the UI. (A genuinely
-  uninstrumented rpc backend is not present in the observed data; if the debug
-  log ever shows an unexpected name, revisit the drop rule.)
-
-**Verified counts for otel_demo:** 30 raw groups → 17 services, 2 datastores
-(`otel`, `valkey-cart`), 1 queue (`kafka`), 2 external (`kubernetes.default.svc`,
-`metadata.google.internal.`), 8 dropped rpc. Total shown = 22.
+**Verified counts for otel_demo (no `peer.service`):** 30 raw groups → 17
+services, 2 datastores (`otel`, `valkey-cart`), 1 queue (`kafka`/topic), 2
+external (`kubernetes.default.svc`, `metadata.google.internal.`), and 8 rpc
+dependency nodes (`oteldemo.*Service`, `flagd.evaluation.v1.Service`) shown as
+honest rpc nodes. Total = 30 entities. With `peer.service` present, the 8 rpc
+would merge into their real services → 22.
 
 The rule is **general** — nothing is hardcoded to otel-demo.
 
@@ -90,8 +117,7 @@ export type EntityKind =
   | "datastore"
   | "queue"
   | "external"
-  | "rpc"
-  | "drop";
+  | "rpc"; // kept as a dependency node; never dropped
 
 /** The inferred types we branch on explicitly. */
 export type KnownInferType = "database" | "queue" | "external" | "rpc";
@@ -111,32 +137,31 @@ export interface ClassifyInput {
 export function classifyEntity(input: ClassifyInput): EntityKind;
 ```
 
-`classifyEntity` encodes the rule above, once. `"drop"` means "remove from both
-screens" (phantom rpc). The function never guesses from names — it takes the two
-facts (`isRealService`, `inferServiceType`) and returns a kind. Unknown non-empty
-`inferServiceType` values fall through to `"external"` (see the rule), so new
-OTel semconv types are treated as dependencies, never as instrumented services.
+`classifyEntity` encodes the rule above, once. The function never guesses from
+names — it takes the two facts (`isRealService`, `inferServiceType`) and returns
+a kind. Unknown non-empty `inferServiceType` values fall through to `"external"`
+(see the rule), so new OTel semconv types are treated as dependencies, never as
+instrumented services. Nothing is dropped — rpc targets are kept as `rpc` nodes.
 
 ### Consumer 1 — Service Catalog (`ServicesCatalog.vue`)
 
 - Keep the `_is_real_service` SQL flag (already added).
 - Replace `categoryOf` + `isPhantomRpc` with calls to `classifyEntity`:
   - map the returned kind to the catalog's existing `EntityCategory`
-    (`service`/`datastore`/`queue`/`external`/`rpc`); `"drop"` rows are filtered
-    out of `services.value`.
-- Remove the now-dead `isPhantomRpc` and the type-specific switch in `categoryOf`.
-- The RPC tab naturally disappears (count is always 0 after drops) — handled by
-  the existing `visibleTypeFilters` (only shows categories with entities), so no
-  extra work; verify it hides.
+    (`service`/`datastore`/`queue`/`external`/`rpc`).
+- Remove the now-dead `isPhantomRpc` filter (rpc is no longer dropped) and the
+  type-specific switch in `categoryOf`.
+- The RPC tab shows the rpc dependency count (no longer forced to 0). Existing
+  `visibleTypeFilters` already hides empty categories.
 
 ### Consumer 2 — Service Graph (`serviceGraphTopology.ts`)
 
 - `buildTopologyFromTraces` computes, per inferred target, `isRealService`
   (already has the `realServices` set) and calls `classifyEntity`:
-  - `"drop"` → skip the row (replaces the inline `if (connection_type === 'rpc')
-    continue` at the top of the inferred loop).
-  - `"service"` → merge into the real service (collision), no separate node.
-  - `datastore`/`external` → typed dependency node from the classified kind.
+  - `"service"` → merge into the real service (collision via `peer.service`), no
+    separate node.
+  - `datastore`/`external`/`rpc` → typed dependency node from the classified kind.
+  - Remove the inline `if (connection_type === 'rpc') continue` — rpc is kept.
 - **The existing `if (connection_type === 'queue') continue` STAYS as-is.** Queue
   topology is owned entirely by the separate messaging query (producer→topic→
   consumer via `messagingRows`), which already types those nodes `"queue"`.
@@ -159,28 +184,25 @@ two screens cannot drift. otel_demo shows identically on both:
 The unified rule changes what users see. Exact before/after (verified on
 otel_demo):
 
-| | Before | After | Δ |
+| | Before | After (no peer.service) | Δ |
 |---|---|---|---|
-| **All (total entities)** | 28 | 22 | −6 |
 | **Services** | 12 | **17** | **+5** |
 | Datastores | 2 | 2 | — |
 | Queues | 1 | 1 | — |
 | External | 5 | 2 | −3 |
-| **RPC** | 8 | **0 (tab hidden)** | −8 |
+| RPC | 8 | 8 (kept as rpc deps) | — |
 
-Note the headline is *positive*: **Services go UP (12 → 17)** because 5 real
-services were previously mislabeled as External, and the 8 phantom RPC duplicates
-are removed. The graph loses the `oteldemo.*Service` clutter. Total nodes drop
-28 → 22. (There is no "14" — earlier estimate corrected against the data.)
+The headline change is **Services go UP (12 → 17)** because 5 real services were
+previously mislabeled as External. RPC entities are **kept** (not dropped) —
+so both screens agree on all five buckets. With `peer.service` present the 8 rpc
+merge into their real services; without it (otel_demo) they stay as honest rpc
+dependency nodes on BOTH screens (still consistent).
 
 **Communication needed (low effort):**
-- The **RPC tab disappears** from the Catalog (count is 0). A user accustomed to
-  it may think data is missing. Recommended: a one-line note in release notes /
-  changelog — *"Service Catalog and Graph now unify duplicate gRPC calls into
-  their real services; the separate RPC category is removed as it double-counted
-  instrumented services."* No in-app banner required — the change is a strict
-  improvement and the debug log (above) covers troubleshooting.
-- No tooltip changes required; the icons/kinds already communicate node type.
+- Both screens now agree and External drops (real services reclassified). Optional
+  one-line release note: *"Service Catalog and Graph now consistently classify
+  entities; services that are also called over HTTP are no longer double-counted
+  as external."* No in-app banner or tooltip changes required.
 
 ## Out of scope
 
@@ -196,17 +218,15 @@ are removed. The graph loses the `oteldemo.*Service` clutter. Total nodes drop
 - **Unit (`serviceClassification.spec.ts`):** every branch of the rule —
   real-service-with-external-inference → service; real-service plain → service;
   real-service with UNKNOWN inferred type → service (collision wins);
-  non-real database/queue/external → their kind; non-real rpc → drop;
+  non-real database/queue/external → their kind; **non-real rpc → rpc (kept)**;
   non-real UNKNOWN non-empty type (e.g. `"cache"`, `"http"`) → external (the
   safety net, NOT service); no-infer (null/empty) → service. Table-driven, one
-  case per row of the verified otel_demo table plus the unknown-type cases.
+  case per row of the verified otel_demo + topology-matrix tables (both
+  redundant and genuine rpc kept as rpc when `peer.service` absent).
 - **Catalog:** collision reclassify (email → service), genuine external kept
-  (metadata.google.internal → external), phantom rpc dropped (oteldemo.* absent).
-- **Graph:** same three via `buildTopologyFromTraces`.
+  (metadata.google.internal → external), rpc kept as rpc (oteldemo.* present).
+- **Graph:** same via `buildTopologyFromTraces`.
 - **Regression:** existing `ServicesCatalog.spec.ts`, `ServiceGraph.spec.ts`,
   `serviceGraphTopology.spec.ts`, `convertTraceData.spec.ts` stay green.
 - **Cross-check:** a test asserting graph `kindCounts` and catalog `categoryCounts`
   produce identical numbers for the same entity set.
-- **Drop telemetry:** a test spying on `console.debug` asserts that when phantom
-  rpc entities are dropped, exactly one aggregated debug line is emitted per load
-  with the dropped count and names (both Catalog and Graph).
