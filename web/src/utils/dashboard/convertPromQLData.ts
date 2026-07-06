@@ -21,11 +21,6 @@ import {
   applySeriesColorMappings,
   getContrastColor,
 } from "./chartColorUtils";
-import {
-  calculateOptimalFontSize,
-  calculateDynamicNameGap,
-  calculateRotatedLabelBottomSpace,
-} from "./chartDimensionUtils";
 import { formatDate } from "./dateTimeUtils";
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
@@ -42,7 +37,7 @@ import {
   calculateRightLegendWidth,
 } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
-import { METRIC_COPY_BTN_RESERVE_PX } from "./sql/charts/convertSQLMetricChart";
+import { calculateMetricFontSize } from "./sql/charts/convertSQLMetricChart";
 import { getPromqlLegendName, getLegendPosition } from "./promql/shared/legendBuilder";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 
@@ -1017,9 +1012,10 @@ export const convertPromQLData = async (
                     type: "text",
                     style: {
                       text: metricText,
-                      fontSize: calculateOptimalFontSize(
+                      fontSize: calculateMetricFontSize(
                         metricText,
-                        params.coordSys.cx * 2 - METRIC_COPY_BTN_RESERVE_PX,
+                        params.coordSys.cx * 2,
+                        params.coordSys.cy * 2,
                       ), //coordSys is relative. so that we can use it to calculate the dynamic size
                       fontWeight: 500,
                       align: "center",
@@ -1045,10 +1041,7 @@ export const convertPromQLData = async (
                 height: h,
                 cx: w / 2,
                 cy: h / 2,
-                fontSize: calculateOptimalFontSize(
-                  metricText,
-                  w - METRIC_COPY_BTN_RESERVE_PX,
-                ),
+                fontSize: calculateMetricFontSize(metricText, w, h),
               };
             }
 

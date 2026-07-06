@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="chartRendererRef"
           :data="chartRendererData"
           :height="chartPanelHeight"
+          :render-type="panelSchema.type === 'metric' ? 'svg' : 'canvas'"
           @updated:data-zoom="onDataZoom"
           @error="errorDetail = $event"
           @click="onChartClick"
@@ -134,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost"
             size="icon-xs-sq"
             style="position: absolute"
-            :style="metricIconStyle(m)"
+            :style="m.iconStyle"
             @click="copyMetricItem(m)"
             data-test="dashboard-metric-copy-btn"
             :data-copied="metricCopiedIdx === m.idx ? 'true' : undefined"
@@ -584,6 +585,8 @@ export default defineComponent({
     // Metric chart: one copy icon per rendered value (multi-SQL renders many).
     // Values are already unit/decimal/timestamp formatted at the metric level;
     // _metricLayout gives the canvas pixel position so the icon sits beside it.
+    // Values whose cell has no overlap-free spot for the icon are dropped —
+    // no copy affordance beats covering the digits.
     const metricItems = computed(() => {
       if (props.panelSchema?.type !== "metric") return [];
       const series = panelData.value?.options?.series ?? [];
@@ -600,7 +603,9 @@ export default defineComponent({
             String(m.text).replace(/,/g, "").replace(/[^0-9.eE+-]/g, ""),
           );
           return Number.isNaN(num) || num !== 0;
-        });
+        })
+        .map((m: any) => ({ ...m, iconStyle: metricIconStyle(m) }))
+        .filter((m: any) => m.iconStyle !== null);
     });
     // Hover zone = each value's grid cell.
     const metricZoneStyle = (m: any) => ({
@@ -609,19 +614,63 @@ export default defineComponent({
       width: `${m.layout.width}px`,
       height: `${m.layout.height}px`,
     });
-    // Fixed copy-button width (icon-xs-sq), matching the table chart.
+    // Fixed copy-button size (icon-xs-sq), matching the table chart.
     const COPY_BTN_PX = 28;
-    // Sit just past the number's measured right edge, clamped inside the cell.
-    // Measuring (vs estimating) keeps the icon off the digits for any value.
+    // The value is centered and the font fit reserves the button's slot on
+    // both sides, so on any reasonably wide cell the icon sits immediately
+    // right of the digits — hugging the value. When the readability floor
+    // ate the slot (narrow cells), the icon wraps below the value (clearing
+    // the field label if the cell renders one), then above. In cells too
+    // small for any clean spot it docks at the right edge with a solid
+    // background — it may sit over the value's edge while hovered, but the
+    // copy affordance is always available.
+    // Measuring (vs estimating) keeps the icon snug for any value.
     const metricIconStyle = (m: any) => {
       const fs = m.layout?.fontSize || 24;
+      const cxLocal = m.layout.cx - m.layout.left;
+      const cyLocal = m.layout.cy - m.layout.top;
       const textWidth = calculateWidthText(String(m.text), `${fs}px`);
-      const left = m.layout.cx - m.layout.left + textWidth / 2 + 2;
-      const maxLeft = m.layout.width - COPY_BTN_PX - 2;
+
+      const besideLeft = cxLocal + textWidth / 2 + 2;
+      if (
+        besideLeft + COPY_BTN_PX + 2 <= m.layout.width &&
+        m.layout.height >= COPY_BTN_PX
+      ) {
+        return {
+          left: `${besideLeft}px`,
+          top: `${Math.min(
+            Math.max(cyLocal, COPY_BTN_PX / 2),
+            m.layout.height - COPY_BTN_PX / 2,
+          )}px`,
+          transform: "translateY(-50%)",
+        };
+      }
+
+      const centeredLeft = Math.max(
+        0,
+        Math.min(cxLocal - COPY_BTN_PX / 2, m.layout.width - COPY_BTN_PX),
+      );
+      // rendered line is ~1.2em tall around the vertical center
+      const halfTextHeight = (fs * 1.2) / 2;
+      const belowTop =
+        cyLocal + halfTextHeight + (m.layout.labelClearance ?? 0) + 2;
+      if (belowTop + COPY_BTN_PX <= m.layout.height) {
+        return { left: `${centeredLeft}px`, top: `${belowTop}px` };
+      }
+      const aboveTop = cyLocal - halfTextHeight - 2 - COPY_BTN_PX;
+      if (aboveTop >= 0) {
+        return { left: `${centeredLeft}px`, top: `${aboveTop}px` };
+      }
+
+      // cell too small for any clean spot — dock at the right edge with a
+      // solid background so the icon stays legible over the value's edge
       return {
-        left: `${Math.min(left, maxLeft)}px`,
-        top: `${m.layout.cy - m.layout.top}px`,
+        left: `${Math.max(0, m.layout.width - COPY_BTN_PX - 2)}px`,
+        top: `${Math.max(cyLocal, COPY_BTN_PX / 2)}px`,
         transform: "translateY(-50%)",
+        backgroundColor:
+          store.state.theme === "dark" ? "#27272a" : "#ffffff",
+        boxShadow: "0 0 3px rgba(0, 0, 0, 0.35)",
       };
     };
     const hoveredMetricIdx = ref<number | null>(null);

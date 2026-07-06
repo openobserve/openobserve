@@ -30,14 +30,29 @@ export const calculateWidthText = (
 };
 
 /**
- * Calculates the optimal font size for a given text that fits the canvas width.
+ * Calculates the optimal font size for a given text that fits the canvas width
+ * and, when provided, the canvas height.
  * @param text - The text to calculate the font size for.
  * @param canvasWidth - canvas width in pixels
+ * @param canvasHeight - optional canvas height in pixels; caps the font size so
+ * the rendered line (~1.2em tall) also fits vertically
  * @returns {number} - The optimal font size in pixels.
  */
-export const calculateOptimalFontSize = (text: string, canvasWidth: number) => {
+export const calculateOptimalFontSize = (
+  text: string,
+  canvasWidth: number,
+  canvasHeight?: number,
+) => {
   let minFontSize = 1; // Start with the smallest font size
   let maxFontSize = 90; // Set a maximum possible font size
+
+  if (canvasHeight !== undefined && canvasHeight > 0) {
+    maxFontSize = Math.max(
+      minFontSize,
+      Math.min(maxFontSize, Math.floor(canvasHeight / 1.2)),
+    );
+  }
+
   let optimalFontSize = minFontSize;
 
   while (minFontSize <= maxFontSize) {

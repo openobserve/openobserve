@@ -23,8 +23,7 @@
  */
 import { convertSQLChartData } from "./sql";
 import { applySeriesColorMappings } from "./chartColorUtils";
-import { calculateOptimalFontSize } from "./chartDimensionUtils";
-import { METRIC_COPY_BTN_RESERVE_PX } from "./sql/charts/convertSQLMetricChart";
+import { calculateMetricFontSize } from "./sql/charts/convertSQLMetricChart";
 import {
   calculateGridPositions,
   getTrellisGrid,
@@ -350,13 +349,17 @@ export const convertMultiSQLData = async (
         (s._metricText ?? "").length > acc.length ? (s._metricText ?? "") : acc,
       "",
     );
-    const sharedFontSize = calculateOptimalFontSize(
-      longestText,
-      gridData.gridWidth - METRIC_COPY_BTN_RESERVE_PX,
-    );
     const labelFontSize = Math.max(
       11,
       Math.min(14, Math.round(gridData.gridWidth / 30)),
+    );
+    // The label renders below the value inside the same cell, so the value's
+    // vertical budget is the cell height minus the label line and gaps.
+    // Sizing against the longest value keeps all cells' fonts identical.
+    const sharedFontSize = calculateMetricFontSize(
+      longestText,
+      gridData.gridWidth,
+      gridData.gridHeight - labelFontSize - 10,
     );
 
     allMetricSeries.forEach((s: any, idx: number) => {
@@ -379,6 +382,9 @@ export const convertMultiSQLData = async (
         cx,
         cy: cy - labelFontSize / 2 - 2,
         fontSize: sharedFontSize,
+        // vertical space under the value taken by the field label, so a
+        // below-the-value copy button clears it
+        labelClearance: labelFontSize * 1.2 + 8,
       };
       s.renderItem = () => {
         try {

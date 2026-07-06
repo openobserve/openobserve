@@ -2315,7 +2315,7 @@ describe("PanelSchemaRenderer", () => {
       },
     ];
 
-    const mountMetric = async (series = metricSeries()) => {
+    const mountMetric = async (series: any[] = metricSeries()) => {
       const w = createWrapper({
         panelSchema: { ...defaultProps.panelSchema, type: "metric" },
       });
@@ -2341,7 +2341,15 @@ describe("PanelSchemaRenderer", () => {
     });
 
     it("hides the copy button for zero-valued metrics", async () => {
-      const layout = { left: 0, top: 0, width: 100, height: 40, cx: 50 };
+      const layout = {
+        left: 0,
+        top: 0,
+        width: 100,
+        height: 40,
+        cx: 50,
+        cy: 20,
+        fontSize: 12,
+      };
       wrapper = await mountMetric([
         { _metricText: "0", _metricLayout: { ...layout } },
         { _metricText: "0.00", _metricLayout: { ...layout } },
