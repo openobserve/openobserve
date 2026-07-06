@@ -101,10 +101,8 @@ pub async fn list_runs<C: ConnectionTrait>(
     conn: &C,
     p: ListRunsParams<'_>,
 ) -> Result<(Vec<RunRow>, i64), errors::Error> {
-    let mut where_parts: Vec<String> = vec![
-        "org_id = $1".to_string(),
-        "synthetics_id = $2".to_string(),
-    ];
+    let mut where_parts: Vec<String> =
+        vec!["org_id = $1".to_string(), "synthetics_id = $2".to_string()];
     let mut values: Vec<Value> = vec![
         Value::from(p.org_id.to_owned()),
         Value::from(p.synthetics_id.to_owned()),
@@ -124,9 +122,7 @@ pub async fn list_runs<C: ConnectionTrait>(
     let where_clause = where_parts.join(" AND ");
 
     // Count
-    let count_sql = format!(
-        "SELECT COUNT(*) AS total FROM synthetics_runs WHERE {where_clause}"
-    );
+    let count_sql = format!("SELECT COUNT(*) AS total FROM synthetics_runs WHERE {where_clause}");
     let count_rows = conn
         .query_all(Statement::from_sql_and_values(
             conn.get_database_backend(),
