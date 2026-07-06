@@ -456,7 +456,11 @@ export default defineComponent({
     // no inferred type are instrumented services; the rest are inferred deps.
     const kindCounts = computed(() => {
       const counts = { service: 0, database: 0, queue: 0, external: 0, rpc: 0 };
-      for (const n of filteredGraphData.value.nodes || []) {
+      // Count the RAW backend topology, not the collapsed view — the legend must
+      // report the true entity counts regardless of collapse/expand state, and
+      // must never count a boundary node (which represents N members) as one.
+      for (const n of graphData.value.nodes || []) {
+        if ((n as any).is_group) continue;
         const t = (n as any).service_type;
         if (t === "database") counts.database++;
         else if (t === "queue") counts.queue++;

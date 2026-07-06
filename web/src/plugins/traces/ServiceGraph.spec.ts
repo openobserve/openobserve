@@ -1931,14 +1931,26 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
   });
 
   describe("legend kind counts", () => {
-    it("counts nodes by kind for the legend", async () => {
+    it("counts the RAW topology by kind (not the collapsed view)", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.filteredGraphData = {
+      // kindCounts reads graphData (the true backend topology), and skips
+      // boundary/group nodes, so the legend is stable regardless of collapse.
+      wrapper.vm.graphData = {
         nodes: [
           { id: "a", label: "a", requests: 1, errors: 0 },
           { id: "b", label: "b", requests: 1, errors: 0, service_type: "database" },
           { id: "c", label: "c", requests: 1, errors: 0, service_type: "external" },
+          // a collapsed boundary node must NOT be counted as one database
+          {
+            id: "__group_database",
+            label: "Database (3)",
+            requests: 3,
+            errors: 0,
+            service_type: "database",
+            is_group: true,
+            member_count: 3,
+          },
         ],
         edges: [],
       };
