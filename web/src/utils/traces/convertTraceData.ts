@@ -406,6 +406,11 @@ export const convertServiceGraphToTree = (
         },
       },
       children: children.length > 0 ? children : undefined,
+      // Carry identity so click handlers can detect collapsed boundary nodes
+      // (name is the display label, not the id).
+      id: node.id,
+      is_group: node.is_group,
+      service_type: node.service_type,
     };
   };
 
@@ -1218,6 +1223,9 @@ export const convertServiceGraphToNetwork = (
     const nodeData: any = {
       id: node.id,
       name: node.label || node.id,
+      // Carry group identity so the click handler can detect collapsed nodes.
+      is_group: node.is_group,
+      service_type: node.service_type,
       value: metrics.requests,
       errors: metrics.errors,
       symbol: iconDataUrl,

@@ -2042,6 +2042,39 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.vm.expandedKinds.has("external")).toBe(false);
     });
 
+    it("clicking a collapsed boundary node toggles its kind (graph params)", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      // ECharts graph-view click: data has id + is_group + service_type.
+      wrapper.vm.handleNodeClick({
+        dataType: "node",
+        data: {
+          id: "__group_external",
+          is_group: true,
+          service_type: "external",
+        },
+      });
+      expect(wrapper.vm.expandedKinds.has("external")).toBe(true);
+      // Side panel must NOT open for a group node.
+      expect(wrapper.vm.showSidePanel).toBe(false);
+    });
+
+    it("clicking a collapsed boundary node toggles its kind (tree params)", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      // ECharts tree-view click: data carries id (name is the label).
+      wrapper.vm.handleNodeClick({
+        componentType: "series",
+        data: {
+          id: "__group_rpc",
+          name: "Rpc (3)",
+          is_group: true,
+          service_type: "rpc",
+        },
+      });
+      expect(wrapper.vm.expandedKinds.has("rpc")).toBe(true);
+    });
+
     it("switches collapse mode", async () => {
       const wrapper = createWrapper();
       await flushPromises();
