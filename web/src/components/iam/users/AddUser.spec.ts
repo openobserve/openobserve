@@ -431,6 +431,79 @@ describe("AddUser", () => {
         expect(payload.custom_role).toEqual([]);
       });
     });
+
+    // ── Cloud parity: `supportsCustomRole` = isEnterprise || isCloud, so the
+    // isCloud branch of the gate must behave identically to Enterprise. This
+    // block toggles config.isCloud (not isEnterprise) to prove that path. ──
+    describe("Cloud (config.isCloud = 'true')", () => {
+      beforeEach(() => {
+        config.isCloud = "true";
+      });
+      afterEach(() => {
+        config.isCloud = "false";
+      });
+
+      it("create-new: omits custom_role (the select is hidden in create mode)", async () => {
+        vi.mocked(userServiece.create).mockResolvedValue({ data: {} } as any);
+        wrapper = mountComp();
+        wrapper.vm.existingUser = false;
+        await flushPromises();
+        setField(wrapper, "password", "Str0ng!Pass");
+        await submitForm(wrapper);
+
+        expect(userServiece.create).toHaveBeenCalledTimes(1);
+        const payload = vi.mocked(userServiece.create).mock.calls[0][0];
+        expect(payload).not.toHaveProperty("custom_role");
+      });
+
+      it("add-existing WITHOUT a selection: omits custom_role (untouched ⇒ omit)", async () => {
+        vi.mocked(userServiece.updateexistinguser).mockResolvedValue({
+          data: {},
+        } as any);
+        wrapper = mountComp();
+        setField(wrapper, "email", "newuser@example.com");
+        setField(wrapper, "role", "admin");
+        await submitForm(wrapper);
+
+        const body = vi.mocked(userServiece.updateexistinguser).mock.calls[0][0];
+        expect(body).toEqual({ role: "admin" });
+      });
+
+      it("add-existing WITH a selection: sends the selected custom_role", async () => {
+        vi.mocked(userServiece.updateexistinguser).mockResolvedValue({
+          data: {},
+        } as any);
+        wrapper = mountComp();
+        setField(wrapper, "email", "newuser@example.com");
+        setField(wrapper, "role", "admin");
+        setField(wrapper, "custom_role", ["custom-a"]);
+        await submitForm(wrapper);
+
+        const body = vi.mocked(userServiece.updateexistinguser).mock.calls[0][0];
+        expect(body).toEqual({ role: "admin", custom_role: ["custom-a"] });
+      });
+
+      it("edit: sends the hydrated custom_role (even an empty array)", async () => {
+        vi.mocked(userServiece.getUserRoles).mockResolvedValue({
+          data: [],
+        } as any);
+        vi.mocked(userServiece.update).mockResolvedValue({ data: {} } as any);
+        wrapper = mountComp({
+          modelValue: {
+            email: "other@example.com",
+            first_name: "Other",
+            org_member_id: "2",
+          },
+        });
+        await flushPromises(); // let getUserRoles hydrate the field
+        await submitForm(wrapper);
+
+        expect(userServiece.update).toHaveBeenCalledTimes(1);
+        const payload = vi.mocked(userServiece.update).mock.calls[0][0];
+        expect(payload).toHaveProperty("custom_role");
+        expect(payload.custom_role).toEqual([]);
+      });
+    });
   });
 
   describe("edit user — restored password rules on change_password", () => {
