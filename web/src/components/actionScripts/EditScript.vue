@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-action-script-step1-continue-btn"
                       variant="primary"
                       size="sm"
-                      @click="step++"
+                      @click="step = formType === 'scheduled' ? 2 : 3"
                       >Continue</OButton
                     >
                   </div>
@@ -705,6 +705,13 @@ const formTypeValue = form.useStore((s: any) => s.values.type);
 const formType = computed<string>(
   () => (formTypeValue.value as string) ?? formData.value.type ?? "scheduled",
 );
+
+// The Schedule step only exists for scheduled actions. If the user switches
+// type while ON that step, its panel unmounts and no step would be active —
+// snap forward to the next step (mirrors the 1 → 3 Continue skip).
+watch(formType, (t) => {
+  if (t !== "scheduled" && step.value === 2) step.value = 3;
+});
 
 // Bridge the component-owned frequency tabs (repeat/once) into the form so the
 // schema's cron superRefine can branch on it. Default-values seeds the initial
