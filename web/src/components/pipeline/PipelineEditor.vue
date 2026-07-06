@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
-    <div class="card-container tw:h-[calc(100vh-50px)]">
+  <div class="w-full h-full pr-[0.625rem]">
+    <div class="card-container h-[calc(100vh-50px)]">
       <!-- The shell (Functions.vue) renders the "Pipelines › <name>" breadcrumb
            header; we contribute the editor actions to it via the portal and the
            pipeline name for NEW pipelines (edit mode shows it in the breadcrumb). -->
@@ -50,22 +50,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </Teleport>
 
 
-      <div class="tw:flex tw:mt-3 tw:px-2">
-        <div class="nodes-drag-container tw:pr-3 tw:w-50">
+      <div class="flex mt-3 px-2">
+        <div class="nodes-drag-container pr-3 w-50">
           <div
             data-test="pipeline-editor-nodes-list-title"
-            class="nodes-header tw:mb-2 tw:mx-2 tw:text-base tw:font-semibold tw:px-1 tw:pb-2 tw:text-center tw:border-b-2 tw:tracking-wide tw:relative"
+            class="nodes-header mb-2 mx-2 text-base font-semibold px-1 pb-2 text-center border-b-2 tracking-wide relative"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:text-[rgba(255,255,255,0.95)] tw:border-[rgba(255,255,255,0.2)]'
-                : 'tw:text-[#1f2937] tw:border-[#e5e7eb]'
+                ? 'text-[rgba(255,255,255,0.95)] border-[rgba(255,255,255,0.2)]'
+                : 'text-[#1f2937] border-[#e5e7eb]'
             "
           >
             {{ t("pipeline.nodes") }}
           </div>
 
 
-          <div class="tw:flex tw:mt-2">
+          <div class="flex mt-2">
             <NodeSidebar
               v-show="
                 !pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'
@@ -77,8 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           id="pipelineChartContainer"
           ref="chartContainerRef"
-          class="relative-position pipeline-chart-container o2vf_node tw:h-[82.6vh] tw:rounded-xl tw:w-[calc(100%-200px)]"
-          :class="store.state.theme === 'dark' ? '' : 'tw:bg-gray-100'"
+          class="relative-position pipeline-chart-container o2vf_node h-[82.6vh] rounded-xl w-[calc(100%-200px)]"
+          :class="store.state.theme === 'dark' ? '' : 'bg-gray-100'"
           v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
         >
           <PipelineFlow />
@@ -1111,7 +1111,6 @@ const savePipelineJson = async (json: string) => {
     pipelineObj.currentSelectedPipeline = parsedPipeline;
     savePipeline();
   } catch (error) {
-    console.log(error, 'error')
     // Handle JSON parsing errors
     validationErrors.value = ['Invalid JSON format'];
   }

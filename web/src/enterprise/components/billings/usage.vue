@@ -15,34 +15,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="tw:p-3 " style="height: calc(100vh - 130px); width: 100%;" >
-      <div class="tw:flex tw:items-baseline tw:justify-between">
-        <div class="tw:flex tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:pb-3">
-          <span class="tw:my-auto tw:mx-[0.625rem] tw:text-[var(--o2-text-heading)]">{{ t("billing.totalUsage") }}</span>
-          <span class="tw:my-auto tw:mx-[0.625rem] tw:text-[var(--o2-text-heading)]"> {{ new Date(startTime/1000).toDateString() }} </span>
-          <span class="tw:my-auto tw:mx-[0.625rem] tw:text-[var(--o2-text-heading)]">-</span>
-          <span class="tw:my-auto tw:mx-[0.625rem] tw:text-[var(--o2-text-heading)]"> {{ new Date(endTime/1000).toDateString() }} </span>
+    <div class="p-3 " style="height: calc(100vh - 130px); width: 100%;" >
+      <div class="flex items-baseline justify-between">
+        <div class="flex text-xl tracking-[0.005em] font-[600] pb-3">
+          <span class="my-auto mx-[0.625rem] text-[var(--o2-text-heading)]">{{ t("billing.totalUsage") }}</span>
+          <span class="my-auto mx-[0.625rem] text-[var(--o2-text-heading)]"> {{ new Date(startTime/1000).toDateString() }} </span>
+          <span class="my-auto mx-[0.625rem] text-[var(--o2-text-heading)]">-</span>
+          <span class="my-auto mx-[0.625rem] text-[var(--o2-text-heading)]"> {{ new Date(endTime/1000).toDateString() }} </span>
         </div>
       </div>
       <div>
         <div v-if="Object.keys(usageData).length === 0" >
-          <div class="tw:text-xl tw:font-semibold text-weight-medium tw:text-center">
+          <div class="text-xl font-semibold text-weight-medium text-center">
             {{ t("billing.messageDataNotFound") }}
           </div>
         </div>
       </div>
       <!-- usage section new -->
-      <div class="tw:flex tw:flex-col tw:gap-4 tw:w-full">
+      <div class="flex flex-col gap-4 w-full">
       <!-- tab-info-section -->
       <!-- this will be unlocked when we get the actionscripts , rum sessions , error tracking from BE -->
-        <div v-if="false" class="tw:grid tw:grid-cols-3 tw:gap-4 tw:w-full">
-            <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
-              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
+        <div v-if="false" class="grid grid-cols-3 gap-4 w-full">
+            <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
               <!-- Top Section (60%) -->
-              <div class="tw:flex tw:flex-col tw:justify-between">
+              <div class="flex flex-col justify-between">
                 <!-- Title row -->
-                <div class="tw:flex tw:justify-between tw:items-center">
-                  <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left"> Action Scripts</div>
+                <div class="flex justify-between items-center">
+                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left"> Action Scripts</div>
                   <div style="opacity: 0.8;">
                     <img :src="actionScriptIcon" />
                   </div>
@@ -50,18 +50,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
               2
             </div>
             </div>
             </div>
-            <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
-              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
+            <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
               <!-- Top Section (60%) -->
-              <div class="tw:flex tw:flex-col tw:justify-between">
+              <div class="flex flex-col justify-between">
                 <!-- Title row -->
-                <div class="tw:flex tw:justify-between tw:items-center">
-                  <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Error Tracking</div>
+                <div class="flex justify-between items-center">
+                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left">Error Tracking</div>
                   <div style="opacity: 0.8;">
                     <img :src="errorTrackingIcon" />
                   </div>
@@ -69,18 +69,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
               300
             </div>
             </div>
             </div>
-            <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
-              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
+            <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
               <!-- Top Section (60%) -->
-              <div class="tw:flex tw:flex-col tw:justify-between">
+              <div class="flex flex-col justify-between">
                 <!-- Title row -->
-                <div class="tw:flex tw:justify-between tw:items-center">
-                  <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">RUM Session</div>
+                <div class="flex justify-between items-center">
+                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left" data-test="billings-usage-tile-title">RUM Session</div>
                   <div style="opacity: 0.8;">
                     <img :src="rumSessionIcon" />
                   </div>
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
               20
             </div>
             </div>
@@ -96,15 +96,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
         <!-- new section introduced to show the usage for ingestion , search , functions -->
-        <div v-if="!dataLoading && Object.keys(usageData).length > 0" class="tw:flex tw:flex-col tw:gap-4 tw:w-full">
-            <div class="tw:grid tw:grid-cols-3 tw:gap-4 tw:w-full">
-                <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
-              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
+        <div v-if="!dataLoading && Object.keys(usageData).length > 0" class="flex flex-col gap-4 w-full">
+            <div class="grid grid-cols-3 gap-4 w-full">
+                <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
               <!-- Top Section (60%) -->
-              <div class="tw:flex tw:flex-col tw:justify-between">
+              <div class="flex flex-col justify-between">
                 <!-- Title row -->
-                <div class="tw:flex tw:justify-between tw:items-center">
-                  <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title"> Ingestion</div>
+                <div class="flex justify-between items-center">
+                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left" data-test="billings-usage-tile-title"> Ingestion</div>
                   <div style="opacity: 0.8;">
                     <img :src="ingestionIcon" />
                   </div>
@@ -112,18 +112,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
                {{ usageData.ingestion }} {{ usageDataType.toUpperCase() }} {{ usageCost.ingestion ? '| $ '+ usageCost.ingestion : '' }}
             </div>
             </div>
                 </div>
-                <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
-              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
+                <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
                 <!-- Top Section (60%) -->
-                <div class="tw:flex tw:flex-col tw:justify-between">
+                <div class="flex flex-col justify-between">
                     <!-- Title row -->
-                    <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">Search</div>
+                    <div class="flex justify-between items-center">
+                    <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left" data-test="billings-usage-tile-title">Search</div>
                     <div style="opacity: 0.8;">
                         <img :src="searchIcon" />
                     </div>
@@ -131,18 +131,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+                <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
                 {{ usageData.search }} {{ usageDataType.toUpperCase() }} {{ usageCost.search ? '| $ '+ usageCost.search : '' }}
                 </div>
                 </div>
                 </div>
-                <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
-              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
+                <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
                 <!-- Top Section (60%) -->
-                <div class="tw:flex tw:flex-col tw:justify-between">
+                <div class="flex flex-col justify-between">
                     <!-- Title row -->
-                    <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">Functions</div>
+                    <div class="flex justify-between items-center">
+                    <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left" data-test="billings-usage-tile-title">Functions</div>
                     <div style="opacity: 0.8;">
                         <img :src="functionsIcon" />
                     </div>
@@ -150,81 +150,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+                <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
                 {{ usageData.functions }} {{ usageDataType.toUpperCase() }} {{ usageCost.functions ? '| $ '+ usageCost.functions : '' }}
                 </div>
                 </div>
                 </div>
             </div>
-            <div class="tw:grid tw:grid-cols-4 tw:gap-4 tw:w-full">
-                <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
-              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
-                <div class="tw:flex tw:flex-col tw:justify-between">
-                    <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">{{ t("billing.aiCredits") }}</div>
+            <div class="grid grid-cols-4 gap-4 w-full">
+                <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
+                <div class="flex flex-col justify-between">
+                    <div class="flex justify-between items-center">
+                    <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left">{{ t("billing.aiCredits") }}</div>
                     <div style="opacity: 0.8;">
                         <img :src="aiIcon" />
                     </div>
                     </div>
                 </div>
-                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+                <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
                 {{ usageData.ai_credits }} Credits {{ usageCost.ai_credits ? '| $ '+ usageCost.ai_credits : '' }}
                 </div>
                 </div>
                 </div>
-                <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
-              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
+                <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
                 <!-- Top Section (60%) -->
-                <div class="tw:flex tw:flex-col tw:justify-between">
+                <div class="flex flex-col justify-between">
                     <!-- Title row -->
-                    <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Pipelines</div>
-                    <div style="opacity: 0.8;" class="tw:bg-[#E6EFFE] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
-                        <img :src="pipelineIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
+                    <div class="flex justify-between items-center">
+                    <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left">Pipelines</div>
+                    <div style="opacity: 0.8;" class="bg-[#E6EFFE] flex items-center justify-center rounded-[9px] h-[33px] w-[33px]">
+                        <img :src="pipelineIcon" class="h-[18px] w-[18px] mx-[7px] my-[7px]" />
                     </div>
                     </div>
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+                <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
                 {{ usageData.pipeline }} {{ usageDataType.toUpperCase() }} {{ usageCost.pipeline ? '| $ '+ usageCost.pipeline : '' }}
                 </div>
                 </div>
                 </div>
-                <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
-              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
+                <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
                 <!-- Top Section (60%) -->
-                <div class="tw:flex tw:flex-col tw:justify-between">
+                <div class="flex flex-col justify-between">
                     <!-- Title row -->
-                    <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Remote Pipelines</div>
-                    <div style="opacity: 0.8;" class="tw:bg-[#F2DCF5] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
-                        <img :src="remotePipelineIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
+                    <div class="flex justify-between items-center">
+                    <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left">Remote Pipelines</div>
+                    <div style="opacity: 0.8;" class="bg-[#F2DCF5] flex items-center justify-center rounded-[9px] h-[33px] w-[33px]">
+                        <img :src="remotePipelineIcon" class="h-[18px] w-[18px] mx-[7px] my-[7px]" />
                     </div>
                     </div>
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+                <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
                 {{ usageData.remotepipeline }} {{ usageDataType.toUpperCase() }} {{ usageCost.remotepipeline ? '| $ '+ usageCost.remotepipeline : '' }}
                 </div>
                 </div>
                 </div>
-                <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:min-h-32 tw:flex tw:flex-col tw:justify-between tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-sm">
-              <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
+                <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
                 <!-- Top Section (60%) -->
-                <div class="tw:flex tw:flex-col tw:justify-between">
+                <div class="flex flex-col justify-between">
                     <!-- Title row -->
-                    <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Data Retention</div>
-                    <div style="opacity: 0.8;" class="tw:bg-[#FFF4E6] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
-                        <img :src="dataRetentionIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
+                    <div class="flex justify-between items-center">
+                    <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left">Data Retention</div>
+                    <div style="opacity: 0.8;" class="bg-[#FFF4E6] flex items-center justify-center rounded-[9px] h-[33px] w-[33px]">
+                        <img :src="dataRetentionIcon" class="h-[18px] w-[18px] mx-[7px] my-[7px]" />
                     </div>
                     </div>
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+                <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
                 {{ usageData.dataretention }} {{ usageDataType.toUpperCase() }} {{ usageCost.dataretention ? '| $ '+ usageCost.dataretention : '' }}
                 </div>
                 </div>
@@ -236,8 +236,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
       </div>
-      <div v-if="dataLoading" class="tw:text-xl tw:font-semibold text-weight-medium tw:text-center">
-        <OSpinner size="md" class="tw:mx-auto tw:block tw:text-center tw:mt-3" />
+      <div v-if="dataLoading" class="text-xl font-semibold text-weight-medium text-center">
+        <OSpinner size="md" class="mx-auto block text-center mt-3" />
       </div>
     </div>
   </template>
@@ -265,9 +265,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
       ChartRenderer: defineAsyncComponent(
         () => import("@/components/dashboards/panels/ChartRenderer.vue")
       ),
-      CustomChartRenderer: defineAsyncComponent(
-        () => import("@/components/dashboards/panels/CustomChartRenderer.vue")
-      ),
+      CustomChartRenderer,
       OSpinner,
     },
     setup() {

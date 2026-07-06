@@ -14,12 +14,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="cipher-keys-add-encryption-mechanism tw:flex tw:flex-col tw:gap-y-2">
+  <div class="cipher-keys-add-encryption-mechanism flex flex-col gap-y-2">
     <OSelect
       data-test="add-cipher-key-auth-method-input"
       v-model="frmData.key.mechanism.type"
       :label="t('cipherKey.providerType') + ' *'"
-      class="tw:w-full"
+      class="w-full"
       :options="providerTypeOptions"
       labelKey="label"
       valueKey="value"
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="add-cipher-algorithm-input"
       v-model="frmData.key.mechanism.simple_algorithm"
       :label="t('cipherKey.algorithm') + ' *'"
-      class="tw:w-full"
+      class="w-full"
       :options="plainAlgorithmOptions"
       labelKey="label"
       valueKey="value"

@@ -17,7 +17,7 @@ limitations under the License.
   <div data-test="prebuilt-destination-form" class="prebuilt-destination-form">
     <!-- Slack Fields -->
     <template v-if="destinationType === 'slack'">
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OInput
           v-model="credentials.webhookUrl"
           data-test="slack-webhook-url-input"
@@ -28,7 +28,7 @@ limitations under the License.
           :error-message="fieldErrors.webhookUrl"
         />
       </div>
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OInput
           v-model="credentials.channel"
           data-test="slack-channel-input"
@@ -41,7 +41,7 @@ limitations under the License.
 
     <!-- Discord Fields -->
     <template v-if="destinationType === 'discord'">
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OInput
           v-model="credentials.webhookUrl"
           data-test="discord-webhook-url-input"
@@ -52,7 +52,7 @@ limitations under the License.
           :error-message="fieldErrors.webhookUrl"
         />
       </div>
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OInput
           v-model="credentials.username"
           data-test="discord-username-input"
@@ -65,7 +65,7 @@ limitations under the License.
 
     <!-- MS Teams Fields -->
     <template v-if="destinationType === 'msteams'">
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OInput
           v-model="credentials.webhookUrl"
           data-test="msteams-webhook-url-input"
@@ -80,7 +80,7 @@ limitations under the License.
 
     <!-- PagerDuty Fields -->
     <template v-if="destinationType === 'pagerduty'">
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OInput
           v-model="credentials.integrationKey"
           data-test="pagerduty-integration-key-input"
@@ -92,7 +92,7 @@ limitations under the License.
           :error-message="fieldErrors.integrationKey"
         />
       </div>
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OSelect
           v-model="credentials.severity"
           data-test="pagerduty-severity-select"
@@ -108,7 +108,7 @@ limitations under the License.
 
     <!-- ServiceNow Fields -->
     <template v-if="destinationType === 'servicenow'">
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OInput
           v-model="credentials.instanceUrl"
           data-test="servicenow-instance-url-input"
@@ -119,7 +119,7 @@ limitations under the License.
           :error-message="fieldErrors.instanceUrl"
         />
       </div>
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OInput
           v-model="credentials.username"
           data-test="servicenow-username-input"
@@ -130,7 +130,7 @@ limitations under the License.
           :error-message="fieldErrors.username"
         />
       </div>
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OInput
           v-model="credentials.password"
           data-test="servicenow-password-input"
@@ -142,7 +142,7 @@ limitations under the License.
           :error-message="fieldErrors.password"
         />
       </div>
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OInput
           v-model="credentials.assignmentGroup"
           data-test="servicenow-assignment-group-input"
@@ -155,7 +155,7 @@ limitations under the License.
 
     <!-- Email Fields -->
     <template v-if="destinationType === 'email'">
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OInput
           v-model="credentials.recipients"
           data-test="email-recipients-input"
@@ -166,8 +166,8 @@ limitations under the License.
           :error-message="fieldErrors.recipients"
         />
       </div>
-      <!-- CC and Subject fields tw:hidden - not supported by backend Email struct -->
-      <!-- <div class="tw:w-1/2 tw:py-1">
+      <!-- CC and Subject fields hidden - not supported by backend Email struct -->
+      <!-- <div class="w-1/2 py-1">
         <OInput
           v-model="credentials.ccRecipients"
           data-test="email-cc-input"
@@ -176,13 +176,13 @@ limitations under the License.
           tabindex="0"
         >
           <template v-slot:hint>
-            <span class="tw:text-xs tw:text-gray-400">
+            <span class="text-xs text-gray-400">
               Comma-separated CC email addresses
             </span>
           </template>
         </OInput>
       </div>
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OInput
           v-model="credentials.subject"
           data-test="email-subject-input"
@@ -191,7 +191,7 @@ limitations under the License.
           tabindex="0"
         >
           <template v-slot:hint>
-            <span class="tw:text-xs tw:text-gray-400">
+            <span class="text-xs text-gray-400">
               Custom subject line (defaults to alert name)
             </span>
           </template>
@@ -201,7 +201,7 @@ limitations under the License.
 
     <!-- Opsgenie Fields -->
     <template v-if="destinationType === 'opsgenie'">
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OInput
           v-model="credentials.apiKey"
           data-test="opsgenie-api-key-input"
@@ -213,7 +213,7 @@ limitations under the License.
           :error-message="fieldErrors.apiKey"
         />
       </div>
-      <div class="tw:w-1/2 tw:py-1">
+      <div class="w-1/2 py-1">
         <OSelect
           v-model="credentials.priority"
           data-test="opsgenie-priority-select"
@@ -225,14 +225,14 @@ limitations under the License.
           tabindex="0"
         />
       </div>
-      <div class="tw:w-full tw:py-1">
+      <div class="w-full py-1">
         <OSwitch
           v-model="credentials.euRegion"
           data-test="opsgenie-eu-region-toggle"
           label="EU Region"
         >
           <template v-slot:hint>
-            <span class="tw:text-xs tw:text-gray-400">
+            <span class="text-xs text-gray-400">
               Enable for EU-based Opsgenie instances
             </span>
           </template>
@@ -241,8 +241,8 @@ limitations under the License.
     </template>
 
     <!-- Test and Preview Actions -->
-    <div v-if="!hideActions" class="tw:w-full tw:py-3">
-      <div class="tw:flex tw:items-center tw:gap-2">
+    <div v-if="!hideActions" class="w-full py-3">
+      <div class="flex items-center gap-2">
         <OButton
           data-test="destination-preview-button"
           variant="outline"

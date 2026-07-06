@@ -163,10 +163,13 @@ export class RumPage {
     }
 
     async expectTagsSectionVisible() {
-        // The .tags-title class was removed on main (da867fb16a). The OS icon's
-        // alt text is stable across builds before and after that change, with
-        // the legacy class kept as a fallback for older embedded frontends.
-        const tagsSection = this.page.getByAltText('OS').first()
+        // The Tags section title moved from a `.tags-title` class to a
+        // data-test hook when scoped SCSS was removed (#12764, earlier
+        // da867fb16a). Prefer the data-test attribute, then the OS icon's
+        // stable alt text, then the legacy class — so this works against
+        // builds before AND after that change.
+        const tagsSection = this.page.locator('[data-test="error-tags-title"]').first()
+            .or(this.page.getByAltText('OS').first())
             .or(this.page.locator('.tags-title').first());
         await expect(tagsSection.first()).toBeVisible({ timeout: 5000 });
     }

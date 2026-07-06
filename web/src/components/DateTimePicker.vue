@@ -22,19 +22,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="datetimeBtn"
         data-cy="date-time-button"
         variant="outline"
-        class="date-time-button tw:h-[30px] tw:min-h-[30px] tw:rounded-[3px] tw:py-0 tw:px-[5px] tw:min-w-auto tw:justify-start!"
+        class="date-time-button h-[30px] min-h-[30px] rounded-[3px] py-0 px-[5px] min-w-auto justify-start!"
         icon-left="schedule"
       >
-        <span class="date-time-label tw:font-semibold tw:flex-1 tw:text-left">{{ displayValue }}</span>
+        <span class="date-time-label font-semibold flex-1 text-left">{{ displayValue }}</span>
         <template #icon-right
-          ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow tw:ml-auto tw:transition tw:[transition:transform_0.25s_ease]"
+          ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow ml-auto transition [transition:transform_0.25s_ease]"
         /></template>
       </OButton>
     </template>
-    <div id="date-time-menu" class="date-time-dialog tw:w-[325px]">
-      <div class="tw:flex tw:justify-evenly tw:py-2">
+    <div id="date-time-menu" class="date-time-dialog w-[325px]">
+      <div class="flex justify-evenly py-2">
         <OButton
-          class="tw:w-38.5"
+          class="w-38.5"
           :variant="
             data.selectedDate.tab === 'relative' ? 'primary' : 'ghost-primary'
           "
@@ -43,9 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("common.datetimeRelative") }}
         </OButton>
-        <OSeparator vertical class="tw:my-2" />
+        <OSeparator vertical class="my-2" />
         <OButton
-          class="tw:w-38.5"
+          class="w-38.5"
           :variant="
             data.selectedDate.tab === 'absolute' ? 'primary' : 'ghost-primary'
           "
@@ -58,13 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSeparator />
       <OTabPanels v-model="data.selectedDate.tab" animated>
         <OTabPanel name="relative">
-          <div class="date-time-table tw:relative tw:flex tw:flex-col">
+          <div class="date-time-table relative flex flex-col">
             <div
-              class="relative-row tw:px-3 tw:py-2 tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border)]"
+              class="relative-row px-3 py-2 flex items-center border-b border-[var(--o2-border)]"
               v-for="(period, index) in relativePeriods"
               :key="'date_' + index"
             >
-              <div class="tw:text-sm tw:font-semibold tw:min-w-18.75">
+              <div class="text-sm font-semibold min-w-18.75">
                 {{ period.value }}
               </div>
               <div
@@ -90,11 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div class="relative-row tw:px-3 tw:py-2 tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border)]">
-              <div class="tw:text-sm tw:font-semibold tw:min-w-18.75">Custom</div>
+            <div class="relative-row px-3 py-2 flex items-center border-b border-[var(--o2-border)]">
+              <div class="text-sm font-semibold min-w-18.75">Custom</div>
 
-              <div class="tw:flex tw:gap-2 tw:flex-1 tw:min-w-0">
-                <div class="tw:flex tw:flex-col tw:w-20">
+              <div class="flex gap-2 flex-1 min-w-0">
+                <div class="flex flex-col w-20">
                   <OInput
                     v-model="data.selectedDate.relative.value"
                     type="number"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @change="calculateMaxValue"
                   />
                 </div>
-                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <div class="flex flex-col flex-1 min-w-0">
                   <OSelect
                     v-model="data.selectedDate.relative.period"
                     :options="relativePeriods"
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OTabPanel>
         <OTabPanel name="absolute">
-          <div class="date-time-table tw:flex tw:flex-col">
+          <div class="date-time-table flex flex-col">
             <ODateRangeCalendar
               :start-date="data.selectedDate.absolute.date.from"
               :end-date="data.selectedDate.absolute.date.to"
@@ -122,24 +122,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:start-date="data.selectedDate.absolute.date.from = $event"
               @update:end-date="data.selectedDate.absolute.date.to = $event"
             />
-            <div class="tw:pr-6 tw:pl-6 tw:text-[0.625rem] tw:text-(--o2-text-secondary)">{{ t("common.datetimeMessage") }}</div>
-            <OSeparator class="tw:my-2" />
+            <div class="pr-6 pl-6 text-[0.625rem] text-(--o2-text-secondary)">{{ t("common.datetimeMessage") }}</div>
+            <OSeparator class="my-2" />
 
-            <table class="tw:px-3 startEndTime tw:w-[calc(100%-0.8rem)] tw:mx-[0.4rem] tw:mt-2 tw:mb-[0.3rem]">
+            <table class="px-3 startEndTime w-[calc(100%-0.8rem)] mx-[0.4rem] mt-2 mb-[0.3rem]">
               <tr>
-                <td class="label tw:w-1/2 tw:text-xs tw:font-semibold">{{ t("common.startTime") }}</td>
-                <td class="label tw:w-1/2 tw:text-xs tw:font-semibold">{{ t("common.endTime") }}</td>
+                <td class="label w-1/2 text-xs font-semibold">{{ t("common.startTime") }}</td>
+                <td class="label w-1/2 text-xs font-semibold">{{ t("common.endTime") }}</td>
               </tr>
               <tr>
-                <td class="tw:w-1/2">
+                <td class="w-1/2">
                   <OTime
-                    class="tw:w-full"
+                    class="w-full"
                     v-model="data.selectedDate.absolute.startTime"
                   />
                 </td>
-                <td class="tw:w-1/2">
+                <td class="w-1/2">
                   <OTime
-                    class="tw:w-full"
+                    class="w-full"
                     v-model="data.selectedDate.absolute.endTime"
                   />
                 </td>

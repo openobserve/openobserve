@@ -16,22 +16,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="tw:flex tw:flex-col tw:h-full">
+    <div class="flex flex-col h-full">
       <DashboardHeader :title="title" backButton @back="close">
       </DashboardHeader>
 
       <div
-        class="tw:overflow-y-auto tw:px-[3px] tw:max-h-[calc(100vh-170px)] tw:[scrollbar-width:thin] tw:[&::-webkit-scrollbar]:w-[6px] tw:[&::-webkit-scrollbar]:bg-transparent tw:[&::-webkit-scrollbar-thumb]:rounded"
-        :class="store.state.theme === 'dark' ? 'tw:[scrollbar-color:#4b5563_transparent] tw:[&::-webkit-scrollbar-thumb]:bg-[#4b5563]' : 'tw:[scrollbar-color:#d1d5db_transparent] tw:[&::-webkit-scrollbar-thumb]:bg-[#d1d5db]'"
+        class="overflow-y-auto px-[3px] max-h-[calc(100vh-170px)] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded"
+        :class="store.state.theme === 'dark' ? '[scrollbar-color:#4b5563_transparent] [&::-webkit-scrollbar-thumb]:bg-[#4b5563]' : '[scrollbar-color:#d1d5db_transparent] [&::-webkit-scrollbar-thumb]:bg-[#d1d5db]'"
       >
         <OForm
           greedy
           ref="addVariableForm"
           @submit="onSubmit"
-          class="tw:px-0.5"
+          class="px-0.5"
         >
-          <div class="tw:mt-3">
-            <div class="tw:mb-3">
+          <div class="mt-3">
+            <div class="mb-3">
               <OSelect
                 :helpText="t('dashboard.variableScopeHelp')"
                 v-model="variableData.scope"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="
                 variableData.scope === 'tabs' || variableData.scope === 'panels'
               "
-              class="tw:mt-3 tw:mb-3"
+              class="mt-3 mb-3"
             >
               <OSelect
                 help-text="Variables will be available only in the selected tabs."
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variableData.scope === 'panels' &&
                 (selectedTabs.length > 0 || isFromAddPanel)
               "
-              class="tw:mt-3"
+              class="mt-3"
             >
               <OSelect
                 help-text="Variables will be available only in the selected panels."
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 label="Select panels"
                 multiple
                 searchable
-                class="tw:mb-3"
+                class="mb-3"
                 :error-message="fieldErrors.panels"
                 :error="!!fieldErrors.panels"
                 @update:model-value="fieldErrors.panels = ''"
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="tw:flex tw:flex-col">
+          <div class="flex flex-col">
             <div>
               <OSelect
                 class="showLabelOnTop"
@@ -98,11 +98,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-type-select"
               />
             </div>
-            <div class="tw:text-base tw:font-bold tw:mt-4">
+            <div class="text-base font-bold mt-4">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
-            <div class="tw:flex tw:gap-4 tw:mt-3">
-              <div class="tw:flex-1 tw:flex tw:flex-col">
+            <div class="flex gap-4 mt-3">
+              <div class="flex-1 flex flex-col">
                 <OInput
                   v-model="variableData.name"
                   :label="t('dashboard.nameOfVariable') + ' *'"
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-name"
                 />
               </div>
-              <div class="tw:flex-1 tw:flex tw:flex-col">
+              <div class="flex-1 flex flex-col">
                 <OInput
                   v-model="variableData.label"
                   :label="t('dashboard.labelOfVariable')"
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
-              class="tw:flex tw:justify-between tw:w-full tw:text-base tw:font-bold tw:mt-4"
+              class="flex justify-between w-full text-base font-bold mt-4"
               v-if="variableData.type !== 'dynamic_filters'"
             >
               <span>{{ t("dashboard.extraOptions") }}</span>
@@ -130,12 +130,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ></div>
             </div>
             <div v-if="variableData.type == 'query_values'">
-              <div class="tw:flex tw:gap-x-4 tw:items-end">
+              <div class="flex gap-x-4 items-end">
                 <OSelect
                   v-model="variableData.query_data.stream_type"
                   :label="t('dashboard.selectStreamType') + ' *'"
                   :options="streamTypeOptions"
-                  class="tw:flex-1"
+                  class="flex-1"
                   :error-message="fieldErrors.streamType"
                   :error="!!fieldErrors.streamType"
                   @update:model-value="
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   labelKey="_displayLabel"
                   valueKey="name"
                   searchable
-                  class="tw:flex-1"
+                  class="flex-1"
                   :error-message="fieldErrors.stream"
                   :error="!!fieldErrors.stream"
                   @update:model-value="
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OSelect>
               </div>
-              <div class="tw:flex tw:mt-4">
+              <div class="flex mt-4">
                 <OSelect
                   v-model="variableData.query_data.field"
                   :label="t('dashboard.selectField') + ' *'"
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   labelKey="_displayLabel"
                   valueKey="name"
                   searchable
-                  class="tw:flex-1"
+                  class="flex-1"
                   :error-message="fieldErrors.field"
                   :error="!!fieldErrors.field"
                   @update:model-value="fieldErrors.field = ''"
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OSelect>
               </div>
-              <div class="tw:mt-4">
+              <div class="mt-4">
                 <OInput
                   type="number"
                   v-model.number="variableData.query_data.max_record_size"
@@ -204,11 +204,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   /></template>
                 </OInput>
               </div>
-              <div class="tw:mt-4">
-                <div class="tw:flex tw:flex-row tw:items-center tw:gap-1.5">
+              <div class="mt-4">
+                <div class="flex flex-row items-center gap-1.5">
                   <div
                     data-test="dashboard-query-values-filter"
-                    class="tw:text-base tw:font-bold"
+                    class="text-base font-bold"
                   >
                     Filters
                   </div>
@@ -217,17 +217,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       name="info-outline"
                       data-test="dashboard-variables-setting-filter-info"
-                      class="tw:cursor-help"
+                      class="cursor-help"
                     />
                     <template #content>
                       {{ t('dashboard.filterInfoTooltip') }}
-                      <span class="bg-highlight" :class="store.state.theme === 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'">$variableName</span>.
+                      <span class="bg-highlight" :class="store.state.theme === 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">$variableName</span>.
                     </template>
                   </OTooltip>
                 </div>
                 <div>
                   <div
-                    class="tw:flex tw:flex-row tw:items-center tw:gap-x-2 tw:mb-4 tw:w-full tw:min-w-0"
+                    class="flex flex-row items-center gap-x-2 mb-4 w-full min-w-0"
                     v-for="(filter, index) in variableData.query_data.filter"
                     :key="index"
                   >
@@ -246,17 +246,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         filterNameErrors[index as number] = '';
                       "
                       data-test="dashboard-query-values-filter-name-selector"
-                      class="tw:flex-2 tw:min-w-0"
+                      class="flex-2 min-w-0"
                     >
                       <template #empty>
-                        <span class="tw:italic tw:text-gray-400"
+                        <span class="italic text-gray-400"
                           >{{ t('dashboard.noDataFound') }}</span
                         >
                       </template>
                     </OSelect>
                     <OSelect
                       v-model="filter.operator"
-                      class="operator tw:flex-[1.5] tw:min-w-0"
+                      class="operator flex-[1.5] min-w-0"
                       :error-message="filterOperatorErrors[index as number]"
                       :error="!!filterOperatorErrors[index as number]"
                       @update:model-value="
@@ -293,14 +293,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :items="dashboardVariablesFilterItems"
                       search-regex="(?:^|[^$])\$?(\w+)"
                       :debounce="1000"
-                      class="tw:flex-2 tw:min-w-0"
+                      class="flex-2 min-w-0"
                       placeholder="Enter Value"
                       :data-test="`dashboard-query-values-filter-value-selector-${index}`"
                     />
                     <OButton
                       variant="ghost"
                       size="icon"
-                      class="tw:shrink-0"
+                      class="shrink-0"
                       @click="removeFilter(index)"
                       :data-test="`dashboard-variable-adhoc-close-${index}`"
                       icon-left="close"
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-          <div class="tw:mt-3" v-if="['constant'].includes(variableData.type)">
+          <div class="mt-3" v-if="['constant'].includes(variableData.type)">
             <OInput
               v-model="variableData.value"
               :label="t('dashboard.ValueOfVariable') + ' *'"
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-variable-constant-value"
             />
           </div>
-          <div class="tw:mt-3" v-if="['textbox'].includes(variableData.type)">
+          <div class="mt-3" v-if="['textbox'].includes(variableData.type)">
             <OInput
               v-model="variableData.value"
               :label="t('dashboard.DefaultValue')"
@@ -345,15 +345,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div v-if="variableData.type == 'custom'">
-            <div class="tw:flex">
-              <div class="tw:w-6"></div>
-              <div class="tw:flex-1 tw:font-semibold tw:text-gray-500">
+            <div class="flex">
+              <div class="w-6"></div>
+              <div class="flex-1 font-semibold text-gray-500">
                 {{ t('common.label') }}
               </div>
-              <div class="tw:flex-1 tw:font-semibold tw:text-gray-500">
+              <div class="flex-1 font-semibold text-gray-500">
                 {{ t('common.value') }}
               </div>
-              <div class="tw:w-12 tw:flex tw:items-center tw:justify-center">
+              <div class="w-12 flex items-center justify-center">
                 <span v-if="!variableData.multiSelect"> Default </span>
                 <OCheckbox
                   v-if="variableData.multiSelect"
@@ -366,16 +366,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   /></template>
                 </OCheckbox>
               </div>
-              <div class="tw:w-6"></div>
+              <div class="w-6"></div>
             </div>
             <div
               v-for="(option, index) in variableData.options"
               :key="index"
-              class="tw:flex"
+              class="flex"
             >
-              <span class="tw:pt-3.5 tw:w-6">{{ index + 1 }}</span>
+              <span class="pt-3.5 w-6">{{ index + 1 }}</span>
               <OInput
-                class="tw:flex-1 tw:mr-2"
+                class="flex-1 mr-2"
                 v-model="variableData.options[index].label"
                 :data-test="`dashboard-custom-variable-${index}-label`"
                 :placeholder="'Label ' + (index + 1)"
@@ -384,12 +384,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="optionLabelErrors[index as number] = ''"
               />
               <OInput
-                class="tw:flex-1 tw:mr-2"
+                class="flex-1 mr-2"
                 v-model="variableData.options[index].value"
                 :data-test="`dashboard-custom-variable-${index}-value`"
                 :placeholder="'Value ' + (index + 1)"
               />
-              <div class="tw:flex tw:w-12 tw:item-center tw:justify-center">
+              <div class="flex w-12 item-center justify-center">
                 <OCheckbox
                   v-model="variableData.options[index].selected"
                   :data-test="`dashboard-custom-variable-${index}-checkbox`"
@@ -408,11 +408,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </div>
             </div>
-            <div class="tw:flex tw:flex-col">
+            <div class="flex flex-col">
               <OButton
                 variant="outline"
                 size="sm"
-                class="tw:mt-3 tw:w-fit"
+                class="mt-3 w-fit"
                 @click="addField()"
                 data-test="dashboard-add-option-btn"
                 icon-left="add"
@@ -424,7 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- multiselect toggle for query values and custom variables-->
           <div
             v-if="['query_values', 'custom'].includes(variableData.type)"
-            class="tw:mt-4"
+            class="mt-4"
           >
             <OSwitch
               v-model="variableData.multiSelect"
@@ -436,8 +436,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- default value for multi select variables -->
           <!-- it can be first value or all values -->
           <div v-if="['query_values'].includes(variableData.type)">
-            <div class="tw:mt-1.5 tw:mb-1.5">
-              <div class="tw:mt-1.25 tw:mb-1.25 tw:text-sm tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-[#999999]' : 'tw:text-[#666666]'">{{ t('dashboard.byDefaultSelect') }}</div>
+            <div class="mt-1.5 mb-1.5">
+              <div class="mt-1.25 mb-1.25 text-sm font-semibold" :class="store.state.theme === 'dark' ? 'text-[#999999]' : 'text-[#666666]'">{{ t('dashboard.byDefaultSelect') }}</div>
               <OToggleGroup
                 :model-value="variableData.selectAllValueForMultiSelect"
                 @update:model-value="
@@ -476,10 +476,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? variableData.customMultiSelectValue
                   : [variableData.customMultiSelectValue[0]]"
                 :key="index"
-                class="tw:mt-3"
+                class="mt-3"
                 style="flex-wrap: wrap"
               >
-                <div class="tw:flex tw:mr-2" style="width: 50%">
+                <div class="flex mr-2" style="width: 50%">
                   <OInput
                     v-model="variableData.customMultiSelectValue[index]"
                     placeholder="Enter value"
@@ -499,13 +499,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="variableData.multiSelect"
-                class="tw:flex"
+                class="flex"
                 style="width: 50%"
               >
                 <OButton
                   variant="outline"
                   size="sm"
-                  class="tw:mt-3"
+                  class="mt-3"
                   @click="addCustomValue"
                   data-test="dashboard-add-custom-value-btn"
                   icon-left="add"
@@ -515,7 +515,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- hide on dashboard toggle -->
-          <div class="tw:mt-4">
+          <div class="mt-4">
             <OSwitch
               v-model="variableData.hideOnDashboard"
               :label="t('dashboard.hideOnDashboard')"
@@ -525,7 +525,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- escape single quotes toggle -->
-          <div class="tw:mt-4">
+          <div class="mt-4">
             <OSwitch
               v-model="variableData.escapeSingleQuotes"
               :label="t('dashboard.escapeSingleQuotes')"
@@ -544,8 +544,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="tw:sticky tw:bottom-0 tw:left-0 tw:w-full tw:pt-3 tw:pb-2 tw:px-0 tw:flex tw:justify-center tw:gap-4 tw:z-10 tw:border-t"
-        :class="store.state.theme === 'dark' ? 'tw:border-t-[#333] tw:[box-shadow:rgb(20,20,20)_0px_-4px_7px_0px]' : 'tw:border-t-[#eee] tw:[box-shadow:rgb(240,240,240)_0px_-4px_7px_0px]'"
+        class="sticky bottom-0 left-0 w-full pt-3 pb-2 px-0 flex justify-center gap-4 z-10 border-t"
+        :class="store.state.theme === 'dark' ? 'border-t-[#333] [box-shadow:rgb(20,20,20)_0px_-4px_7px_0px]' : 'border-t-[#eee] [box-shadow:rgb(240,240,240)_0px_-4px_7px_0px]'"
       >
         <OButton
           variant="outline"

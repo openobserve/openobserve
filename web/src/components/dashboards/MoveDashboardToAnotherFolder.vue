@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onSubmit.execute()"
   >
   <div data-test="dashboard-folder-move-body">
-      <div class="tw:flex tw:flex-col tw:gap-3">
+      <div class="flex flex-col gap-3">
         <OInput
           :model-value="
             store.state.organizationData.folders.find(

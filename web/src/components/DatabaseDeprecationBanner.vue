@@ -16,30 +16,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="feature-card tw:mb-3"
+    class="feature-card mb-3"
     :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
     v-if="showDeprecationWarning"
     role="region"
     aria-label="MySQL deprecation warning"
     data-test="database-deprecation-banner-message"
   >
-    <div class="tw:flex tw:items-center">
-      <div class="tw:flex tw:flex-col">
+    <div class="flex items-center">
+      <div class="flex flex-col">
         <span
-          class="tw:text-base tw:font-semibold tw:leading-6 tw:text-[var(--o2-text-primary)]"
+          class="text-base font-semibold leading-6 text-[var(--o2-text-primary)]"
           data-test="database-deprecation-banner-title"
         >
           ⚠️ MySQL support is DEPRECATED and will be removed in future.
         </span>
         <br />
         <span
-          class="tw:text-sm tw:font-normal tw:leading-5 tw:text-[var(--o2-text-secondary)]"
+          class="text-sm font-normal leading-5 text-[var(--o2-text-secondary)]"
           data-test="database-deprecation-banner-subtitle"
         >
           Please migrate to PostgreSQL to ensure continued support.
         </span>
       </div>
-      <div class="col-auto tw:ml-2">
+      <div class="col-auto ml-2">
         <OButton variant="ghost" size="icon-sm" icon-left="close" @click="dismissWarning" />
       </div>
     </div>

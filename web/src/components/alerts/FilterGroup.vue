@@ -1,23 +1,23 @@
 ﻿<template>
     <!-- Preview Section (only for root level) -->
     <div v-if="depth === 0 && showSqlPreview && previewString"
-         class="tw:mb-2 tw:p-2 tw:rounded tw:border tw:w-full tw:max-h-[3.2em] tw:overflow-y-auto"
-         :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-gray-700' : 'tw:bg-gray-50 tw:border-gray-300'">
-      <div class="tw:flex tw:items-start tw:gap-1 tw:min-w-0">
-        <span class="tw:font-medium tw:text-xs tw:flex-shrink-0 tw:leading-[1.3]"
-              :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'">
+         class="mb-2 p-2 rounded border w-full max-h-[3.2em] overflow-y-auto"
+         :class="store.state.theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-300'">
+      <div class="flex items-start gap-1 min-w-0">
+        <span class="font-medium text-xs flex-shrink-0 leading-[1.3]"
+              :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'">
           Preview:
         </span>
-        <span class="tw:text-[10px] tw:font-mono tw:leading-[1.3] tw:min-w-0 tw:break-words"
-              :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">
+        <span class="text-[10px] font-mono leading-[1.3] min-w-0 break-words"
+              :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'">
           {{ previewString }}
         </span>
       </div>
     </div>
 
-    <div :class="[`  tw:px-2 tw:mb-2 el-border el-border-radius `,
-        'tw:mt-4',
-        store.state.isAiChatEnabled ? 'tw:w-full' : 'tw:xl:w-fit'
+    <div :class="[`  px-2 mb-2 el-border el-border-radius `,
+        'mt-4',
+        store.state.isAiChatEnabled ? 'w-full' : 'xl:w-fit'
     ]"
     :style="{
         opacity: computedOpacity,
@@ -27,7 +27,7 @@
     >
       <!-- V2: Group-level toggle only for nested groups (depth > 0) -->
       <!-- Root group (depth 0) doesn't need toggle - its logicalOperator is dummy -->
-      <div v-if="depth > 0" class="tw:w-fit tw:relative tw:bottom-3.5">
+      <div v-if="depth > 0" class="w-fit relative bottom-3.5">
         <OToggleGroup
           :model-value="label"
           @update:model-value="toggleLabel($event as string)"
@@ -47,13 +47,13 @@
         </OToggleGroup>
       </div>
       <!-- Spacer for root group to maintain consistent spacing -->
-      <div v-else class="tw:h-[14px]"></div>
+      <div v-else class="h-[14px]"></div>
 
       <!-- Group content -->
 
-      <div v-if="isOpen" class="tw:overflow-x-auto group-container" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
+      <div v-if="isOpen" class="overflow-x-auto group-container" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
         <!-- Items in group (V2 uses 'conditions' array) -->
-        <div class="tw:ml-2 tw:whitespace-nowrap " v-for="(item, index) in props.group.conditions" :key="index">
+        <div class="ml-2 whitespace-nowrap " v-for="(item, index) in props.group.conditions" :key="index">
           <FilterGroup
             v-if="isGroup(item)"
             :group="item"
@@ -70,8 +70,8 @@
           />
           <div
             v-else
-            class="tw:flex tw:items-center tw:gap-2  tw:mb-2 "
-            :class="store.state.isAiChatEnabled ? 'tw:pl-0' : 'tw:pl-4'"
+            class="flex items-center gap-2  mb-2 "
+            :class="store.state.isAiChatEnabled ? 'pl-0' : 'pl-4'"
             >
             <FilterCondition
                 :condition="item"
@@ -92,41 +92,41 @@
         </div>
         <!-- Action buttons -->
 
-        <div class="tw:flex tw:justify-start tw:items-center tw:ml-4"
+        <div class="flex justify-start items-center ml-4"
         >
         <OButton
             data-test="alert-conditions-add-condition-btn"
-            class="tw:ml-3"
+            class="ml-3"
             size="sm"
             variant="ghost-primary"
             @click="addCondition(props.group.groupId)"
             >
-            <OIcon class="tw:mr-1 tw:font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
-            <span class="tw:text-[0.75rem] tw:font-bold">Condition</span>
+            <OIcon class="mr-1 font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
+            <span class="text-[0.75rem] font-bold">Condition</span>
             <OTooltip :delay="300" :content="t('alerts.conditions.addConditionTooltip')" />
         </OButton>
         <OButton
             data-test="alert-conditions-add-condition-group-btn"
-            class="tw:ml-1"
+            class="ml-1"
             size="sm"
             variant="ghost-primary"
             @click="addGroup(props.group.groupId)"
             :disabled="depth >= 2"
             >
-            <OIcon class="tw:mr-1 tw:font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
-            <span class="tw:text-[0.75rem] tw:font-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
+            <OIcon class="mr-1 font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
+            <span class="text-[0.75rem] font-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
             <OTooltip v-if="depth < 2" :delay="300" :content="t('alerts.conditions.addConditionGroupTooltip')" />
             <OTooltip v-else :delay="300" :content="t('alerts.conditions.maxDepthReachedTooltip')" />
         </OButton>
         <OButton
             data-test="alert-conditions-reorder-btn"
-            class="tw:ml-1"
+            class="ml-1"
             size="sm"
             variant="ghost-primary"
             @click="reorderItems()"
             >
-            <OIcon class="tw:mr-1 tw:font-bold" size="xs" name="swap-vert" />
-            <span class="tw:text-[0.75rem] tw:font-bold">Reorder</span>
+            <OIcon class="mr-1 font-bold" size="xs" name="swap-vert" />
+            <span class="text-[0.75rem] font-bold">Reorder</span>
             <OTooltip :delay="300" content="Reorder items: Conditions first, then Groups" />
         </OButton>
      </div>

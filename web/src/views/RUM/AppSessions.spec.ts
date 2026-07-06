@@ -385,14 +385,13 @@ describe("AppSessions.vue", () => {
     it("should initialize with correct columns structure", () => {
       const columns = wrapper.vm.tableColumns;
 
-      expect(columns).toHaveLength(7);
+      expect(columns).toHaveLength(6);
       expect(columns[0].id).toBe("action_play");
-      expect(columns[1].id).toBe("timestamp");
-      expect(columns[2].id).toBe("user_email");
-      expect(columns[3].id).toBe("time_spent");
-      expect(columns[4].id).toBe("error_count");
-      expect(columns[5].id).toBe("frustration_count");
-      expect(columns[6].id).toBe("location");
+      expect(columns[1].id).toBe("session");
+      expect(columns[2].id).toBe("activity");
+      expect(columns[3].id).toBe("health");
+      expect(columns[4].id).toBe("location");
+      expect(columns[5].id).toBe("duration");
     });
 
     it("should fetch stream fields on mount", async () => {
@@ -407,12 +406,12 @@ describe("AppSessions.vue", () => {
       expect(mockQueryFunctions.buildQueryPayload).toHaveBeenCalled();
     });
 
-    it("should format session data correctly", () => {
-      const getFormattedDate = wrapper.vm.getFormattedDate;
-      const timestamp = 1672531200; // Unix timestamp
-      const formatted = getFormattedDate(timestamp);
+    it("should format session duration as compact human-readable text", () => {
+      const formatSessionDuration = wrapper.vm.formatSessionDuration;
 
-      expect(typeof formatted).toBe("string");
+      expect(formatSessionDuration(0)).toBe("0s");
+      expect(formatSessionDuration(500)).toBe("<1s");
+      expect(formatSessionDuration(839_000)).toBe("13m 59s");
     });
 
     it("should include usr_email, session_id, and view_id in the field filter set", async () => {
@@ -810,23 +809,30 @@ describe("AppSessions.vue", () => {
       expect(wrapper.vm.schemaMapping).toBeDefined();
     });
 
-    it("should have frustration_count column in columns definition", () => {
-      const frustrationColumn = wrapper.vm.tableColumns.find(
-        (col: any) => col.id === "frustration_count",
+    it("should have health column covering frustration signals", () => {
+      const healthColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "health",
       );
 
-      expect(frustrationColumn).toBeDefined();
-      expect(frustrationColumn.header).toContain("Frustration");
-      expect(frustrationColumn.sortable).toBe(true);
+      expect(healthColumn).toBeDefined();
+      expect(healthColumn.sortable).toBe(true);
     });
 
-    it("should render FrustrationBadge stub in template", () => {
-      // FrustrationBadge is stubbed and used via #cell-frustration_count slot
-      expect(
-        wrapper.vm.tableColumns.some(
-          (col: any) => col.id === "frustration_count",
-        ),
-      ).toBe(true);
+    it("should sort health column by errors first, frustrations as tiebreak", () => {
+      const healthColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "health",
+      );
+
+      const errorsOnly = healthColumn.accessorFn({
+        error_count: 2,
+        frustration_count: 0,
+      });
+      const frustrationsOnly = healthColumn.accessorFn({
+        error_count: 0,
+        frustration_count: 5,
+      });
+
+      expect(errorsOnly).toBeGreaterThan(frustrationsOnly);
     });
 
     it("should map frustration_count from API response", () => {
@@ -876,34 +882,34 @@ describe("AppSessions.vue", () => {
       ).toBe(0);
     });
 
-    it("should make frustration_count column sortable", () => {
-      const frustrationColumn = wrapper.vm.tableColumns.find(
-        (col: any) => col.id === "frustration_count",
+    it("should make health column sortable", () => {
+      const healthColumn = wrapper.vm.tableColumns.find(
+        (col: any) => col.id === "health",
       );
 
-      expect(frustrationColumn.sortable).toBe(true);
+      expect(healthColumn.sortable).toBe(true);
     });
 
-    it("should position frustration_count column after error_count", () => {
-      const errorIndex = wrapper.vm.tableColumns.findIndex(
-        (col: any) => col.id === "error_count",
+    it("should position health column after session", () => {
+      const sessionIndex = wrapper.vm.tableColumns.findIndex(
+        (col: any) => col.id === "session",
       );
-      const frustrationIndex = wrapper.vm.tableColumns.findIndex(
-        (col: any) => col.id === "frustration_count",
+      const healthIndex = wrapper.vm.tableColumns.findIndex(
+        (col: any) => col.id === "health",
       );
 
-      expect(frustrationIndex).toBeGreaterThan(errorIndex);
+      expect(healthIndex).toBeGreaterThan(sessionIndex);
     });
 
-    it("should position frustration_count column before location", () => {
-      const frustrationIndex = wrapper.vm.tableColumns.findIndex(
-        (col: any) => col.id === "frustration_count",
+    it("should position health column before location", () => {
+      const healthIndex = wrapper.vm.tableColumns.findIndex(
+        (col: any) => col.id === "health",
       );
       const locationIndex = wrapper.vm.tableColumns.findIndex(
         (col: any) => col.id === "location",
       );
 
-      expect(frustrationIndex).toBeLessThan(locationIndex);
+      expect(healthIndex).toBeLessThan(locationIndex);
     });
 
     it("should handle high frustration counts", () => {
@@ -924,11 +930,11 @@ describe("AppSessions.vue", () => {
       ).toBe(999);
     });
 
-    it("should include FrustrationBadge component import", () => {
-      // Check that the component has access to FrustrationBadge
+    it("should not render the removed FrustrationBadge component", () => {
+      // Frustration signals now render via SessionHealthCell in the health column
       expect(wrapper.findComponent({ name: "FrustrationBadge" }).exists()).toBe(
         false,
-      ); // Since it's stubbed
+      );
     });
   });
 });

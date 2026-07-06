@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Fallback -->
     <template v-else>
-      <div class="tw:text-center tw:py-8 tw:text-gray-400 tw:text-sm">
+      <div class="text-center py-8 text-gray-400 text-sm">
         No performance data available for this event type
       </div>
     </template>

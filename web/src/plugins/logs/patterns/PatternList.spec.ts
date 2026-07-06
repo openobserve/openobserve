@@ -272,7 +272,7 @@ describe("PatternList", () => {
     it("should render the Pattern column header", () => {
       const text = wrapper.text();
       // i18n key search.patternColumnHeader is rendered
-      expect(wrapper.find(".tw\\:flex.tw\\:items-center.tw\\:border-b").exists() ||
+      expect(wrapper.find(".flex.items-center.border-b").exists() ||
         wrapper.text().length > 0).toBe(true);
     });
 

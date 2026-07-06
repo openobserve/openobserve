@@ -53,14 +53,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- collected sand (bottom pile) -->
       <path d="M110 208 L166 208 L138 182 Z" fill="var(--color-warning-400)" />
       <!-- falling grains -->
-      <circle class="es-grain es-grain-a" cx="138" cy="138" r="2.4" fill="var(--color-warning-500)" tw:[transform-box:view-box] tw:origin-center tw:[animation:es-grain_1.6s_linear_infinite] />
-      <circle class="es-grain es-grain-b" cx="138" cy="138" r="2" fill="var(--color-warning-500)" tw:[transform-box:view-box] tw:origin-center tw:[animation:es-grain_1.6s_linear_infinite] tw:[animation-delay:-0.55s] />
-      <circle class="es-grain es-grain-c" cx="138" cy="138" r="2.4" fill="var(--color-warning-600)" tw:[transform-box:view-box] tw:origin-center tw:[animation:es-grain_1.6s_linear_infinite] tw:[animation-delay:-1.1s] />
+      <circle class="es-grain es-grain-a" cx="138" cy="138" r="2.4" fill="var(--color-warning-500)" [transform-box:view-box] origin-center [animation:es-grain_1.6s_linear_infinite] />
+      <circle class="es-grain es-grain-b" cx="138" cy="138" r="2" fill="var(--color-warning-500)" [transform-box:view-box] origin-center [animation:es-grain_1.6s_linear_infinite] [animation-delay:-0.55s] />
+      <circle class="es-grain es-grain-c" cx="138" cy="138" r="2.4" fill="var(--color-warning-600)" [transform-box:view-box] origin-center [animation:es-grain_1.6s_linear_infinite] [animation-delay:-1.1s] />
     </g>
 
     <!-- SMALL person seated at the base, gazing up -->
     <ellipse cx="252" cy="248" rx="32" ry="6" fill="var(--color-primary-900)" opacity="0.1" />
-    <g class="es-sit" tw:[transform-box:fill-box] tw:origin-center tw:[animation:es-breathe_4s_ease-in-out_infinite]>
+    <g class="es-sit" [transform-box:fill-box] origin-center [animation:es-breathe_4s_ease-in-out_infinite]>
       <!-- folded legs / lap -->
       <path d="M230 236 Q230 224 252 224 Q274 224 274 236 L274 242 Q274 246 268 246 L236 246 Q230 246 230 240 Z" fill="var(--color-grey-700)" />
       <ellipse cx="240" cy="232" rx="9" ry="7" fill="var(--color-grey-800)" />
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <path d="M254 226 Q246 222 244 212 Q243 207 248 208 Q252 209 253 214 Q254 220 260 222 Z" fill="var(--color-primary-600)" opacity="0.9" />
       <ellipse cx="247" cy="210" rx="4" ry="3.5" fill="#f0c29a" />
       <!-- head tilted up toward the hourglass -->
-      <g class="es-head" tw:[transform-box:view-box] tw:[transform-origin:250px_206px] tw:[animation:es-gaze_5s_ease-in-out_infinite]>
+      <g class="es-head" [transform-box:view-box] [transform-origin:250px_206px] [animation:es-gaze_5s_ease-in-out_infinite]>
         <ellipse cx="250" cy="200" rx="11" ry="12" fill="#f0c29a" transform="rotate(-12 250 200)" />
         <path d="M239 196 Q236 184 249 182 Q262 183 261 195 Q261 188 255 187 Q258 191 256 196 Q251 188 245 190 Q240 191 239 197 Z" fill="#5b4a3a" />
         <circle cx="246" cy="198" r="1.5" fill="#3a2f25" />

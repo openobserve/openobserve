@@ -16,37 +16,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="incident-service-graph tw:min-h-[400px] tw:flex tw:flex-col tw:m-3 tw:p-5 tw:rounded-xl tw:overflow-hidden tw:transition-all tw:duration-200 tw:bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] tw:border tw:border-[#e5e7eb] tw:shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] tw:hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)]"
+    class="incident-service-graph min-h-[400px] flex flex-col m-3 p-5 rounded-xl overflow-hidden transition-all duration-200 bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] border border-[#e5e7eb] shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)]"
     style="height: calc(100vh - 202px); position: relative;"
   >
     <!-- Info Icon → Graph Legend popover (hover to show, like the previous behavior) -->
     <span
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      class="info-icon-btn tw:absolute tw:top-4 tw:right-4 tw:z-10"
+      class="info-icon-btn absolute top-4 right-4 z-10"
     >
       <OButton variant="ghost" size="icon-circle-sm">
         <OIcon name="info-outline" size="sm" />
       </OButton>
       <div
-        class="graph-legend tw:absolute tw:top-[calc(100%+8px)] tw:right-0 tw:min-w-[240px] tw:py-[14px] tw:px-4 tw:text-[13px] tw:leading-normal tw:text-[#1f2937] tw:bg-white tw:border tw:border-(--o2-border) tw:rounded-lg tw:shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] tw:opacity-0 tw:invisible tw:-translate-y-1 tw:transition-all tw:duration-150 tw:pointer-events-none tw:whitespace-nowrap"
+        class="graph-legend absolute top-[calc(100%+8px)] right-0 min-w-[240px] py-[14px] px-4 text-[13px] leading-normal text-[#1f2937] bg-white border border-(--o2-border) rounded-lg shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] opacity-0 invisible -translate-y-1 transition-all duration-150 pointer-events-none whitespace-nowrap"
         role="tooltip"
       >
-        <div class="tw:font-semibold tw:text-sm tw:mb-2.5">Graph Legend</div>
-        <div class="graph-legend__row tw:flex tw:items-center tw:gap-2 tw:py-1">
-          <span class="graph-legend__dot tw:text-[14px] tw:leading-none tw:w-[14px] tw:text-center tw:shrink-0" style="color: #ef4444;">●</span>
+        <div class="font-semibold text-sm mb-2.5">Graph Legend</div>
+        <div class="graph-legend__row flex items-center gap-2 py-1">
+          <span class="graph-legend__dot text-[14px] leading-none w-[14px] text-center shrink-0" style="color: #ef4444;">●</span>
           Red = Potential Root Cause
         </div>
-        <div class="graph-legend__row tw:flex tw:items-center tw:gap-2 tw:py-1">
-          <span class="graph-legend__dot tw:text-[14px] tw:leading-none tw:w-[14px] tw:text-center tw:shrink-0" style="color: #f97316;">●</span>
+        <div class="graph-legend__row flex items-center gap-2 py-1">
+          <span class="graph-legend__dot text-[14px] leading-none w-[14px] text-center shrink-0" style="color: #f97316;">●</span>
           Orange = High Frequency
         </div>
-        <div class="graph-legend__row tw:flex tw:items-center tw:gap-2 tw:py-1">
-          <span class="graph-legend__dot tw:text-[14px] tw:leading-none tw:w-[14px] tw:text-center tw:shrink-0" style="color: #3b82f6;">●</span>
+        <div class="graph-legend__row flex items-center gap-2 py-1">
+          <span class="graph-legend__dot text-[14px] leading-none w-[14px] text-center shrink-0" style="color: #3b82f6;">●</span>
           Blue = Normal
         </div>
-        <div class="graph-legend__divider tw:h-px tw:bg-(--o2-border) tw:my-2" />
-        <div class="graph-legend__row tw:flex tw:items-center tw:gap-2 tw:py-1">
-          <span class="graph-legend__dot tw:text-[14px] tw:leading-none tw:w-[14px] tw:text-center tw:shrink-0" style="color: #a78bfa;">→</span>
+        <div class="graph-legend__divider h-px bg-(--o2-border) my-2" />
+        <div class="graph-legend__row flex items-center gap-2 py-1">
+          <span class="graph-legend__dot text-[14px] leading-none w-[14px] text-center shrink-0" style="color: #a78bfa;">→</span>
           Purple arrows show temporal flow
         </div>
       </div>
@@ -55,8 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Loading State -->
     <div
       v-if="loading"
-      class="tw:flex tw:items-center tw:justify-center tw:h-full"
-      :class="isDarkMode ? 'tw:bg-gray-900/50' : 'tw:bg-white/50'"
+      class="flex items-center justify-center h-full"
+      :class="isDarkMode ? 'bg-gray-900/50' : 'bg-white/50'"
     >
       <OSpinner size="md" />
     </div>
@@ -64,14 +64,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty State -->
     <div
       v-else-if="!graphData || !graphData.nodes || graphData.nodes.length === 0"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:h-full"
+      class="flex flex-col items-center justify-center gap-3 h-full"
     >
-      <OIcon name="hub" :class="isDarkMode ? 'tw:text-gray-600' : 'tw:text-gray-300'" style="width: 48px; height: 48px;" />
-      <div class="tw:text-center">
-        <div class="tw:text-sm tw:font-medium" :class="isDarkMode ? 'tw:text-gray-400' : 'tw:text-gray-600'">
+      <OIcon name="hub" :class="isDarkMode ? 'text-gray-600' : 'text-gray-300'" style="width: 48px; height: 48px;" />
+      <div class="text-center">
+        <div class="text-sm font-medium" :class="isDarkMode ? 'text-gray-400' : 'text-gray-600'">
           Service Graph Unavailable
         </div>
-        <div class="tw:text-xs tw:mt-1" :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'">
+        <div class="text-xs mt-1" :class="isDarkMode ? 'text-gray-500' : 'text-gray-400'">
           No topology data available for this incident.
         </div>
       </div>

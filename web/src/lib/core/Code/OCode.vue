@@ -40,20 +40,20 @@ async function copy() {
   <!-- ── Block mode: full-width scrollable pre/code ── -->
   <pre
     v-if="block"
-    class="tw:relative tw:block tw:w-full tw:rounded-md tw:border tw:border-code-border tw:bg-code-block-bg tw:text-code-block-text tw:overflow-x-auto"
+    class="relative block w-full rounded-md border border-code-border bg-code-block-bg text-code-block-text overflow-x-auto"
   ><code
       ref="codeRef"
-      class="tw:block tw:px-3 tw:py-2 tw:text-xs tw:[font-family:var(--font-mono)] tw:leading-relaxed tw:whitespace-pre"
+      class="block px-3 py-2 text-xs [font-family:var(--font-mono)] leading-relaxed whitespace-pre"
     ><slot /></code><button
       v-if="copyable"
       type="button"
       :aria-label="copied ? 'Copied!' : 'Copy to clipboard'"
-      class="tw:absolute tw:top-2 tw:right-2 tw:rounded tw:p-1 tw:transition-colors tw:duration-150 tw:text-code-copy-icon tw:hover:text-code-copy-hover-icon tw:hover:bg-code-copy-hover-bg tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-400"
+      class="absolute top-2 right-2 rounded p-1 transition-colors duration-150 text-code-copy-icon hover:text-code-copy-hover-icon hover:bg-code-copy-hover-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
       @click.prevent="copy"
     ><OIcon
         :name="copied ? 'check' : 'content-copy'"
         size="xs"
-        class="tw:pointer-events-none tw:text-inherit!"
+        class="pointer-events-none text-inherit!"
       /></button></pre>
 
   <!-- ── Inline mode: pill-shaped inline chip ── -->
@@ -61,11 +61,11 @@ async function copy() {
     v-else
     ref="codeRef"
     :class="[
-      'tw:inline-flex tw:items-center tw:gap-1',
-      'tw:rounded tw:border tw:border-code-border tw:bg-code-bg tw:text-code-text',
-      'tw:px-1 tw:py-px',
-      'tw:text-xs tw:[font-family:var(--font-mono)] tw:leading-none',
-      truncate ? 'tw:max-w-full tw:truncate' : '',
+      'inline-flex items-center gap-1',
+      'rounded border border-code-border bg-code-bg text-code-text',
+      'px-1 py-px',
+      'text-xs [font-family:var(--font-mono)] leading-none',
+      truncate ? 'max-w-full truncate' : '',
     ]"
   >
     <slot />
@@ -73,13 +73,13 @@ async function copy() {
       v-if="copyable"
       type="button"
       :aria-label="copied ? 'Copied!' : 'Copy'"
-      class="tw:shrink-0 tw:rounded tw:p-px tw:transition-colors tw:duration-150 tw:text-code-copy-icon tw:hover:text-code-copy-hover-icon tw:hover:bg-code-copy-hover-bg tw:focus-visible:outline-none tw:focus-visible:ring-1 tw:focus-visible:ring-primary-400"
+      class="shrink-0 rounded p-px transition-colors duration-150 text-code-copy-icon hover:text-code-copy-hover-icon hover:bg-code-copy-hover-bg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-400"
       @click.prevent="copy"
     >
       <OIcon
         :name="copied ? 'check' : 'content-copy'"
         size="xs"
-        class="tw:pointer-events-none tw:text-inherit!"
+        class="pointer-events-none text-inherit!"
       />
     </button>
   </code>
