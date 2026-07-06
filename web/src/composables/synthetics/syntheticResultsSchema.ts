@@ -72,20 +72,36 @@ export interface ScreenshotRef {
   key: string;
 }
 
-export interface SyntheticRun {
-  /** Run timestamp, milliseconds epoch. */
-  timestamp: number;
+/** One step execution result from last_attempt_steps or retry_history. */
+export interface StepResult {
+  stepId: string;
+  status: "ok" | "fail";
+  durationMs: number;
+  error: string;
+  screenshotKey: string | null;
+}
+
+/** One failed retry attempt stored in retry_history. */
+export interface RetryAttempt {
+  attempt: number;
+  durationMs: number;
+  steps: StepResult[];
+}
+
+/** One execution row from the stream — one per engine×device combo per run. */
+export interface RunLocationResult {
+  timestampMs: number;
   status: RunStatus;
   durationMs: number;
   location: string;
   device: string;
-  /** Failure reason for `down` runs (empty for passing runs). */
-  error: string;
-  /** KSUID job identifier — used to fetch run detail and artifacts. */
-  jobId: string;
   browserEngine: string;
-  screenshotRefs: ScreenshotRef[];
-  traceRef: string | null;
+  error: string;
+  jobId: string;
+  executionId: string;
+  traceKey: string | null;
+  steps: StepResult[];
+  retryHistory: RetryAttempt[];
 }
 
 export interface SyntheticBucket {
@@ -211,14 +227,13 @@ GROUP BY ts
 ORDER BY ts`;
 }
 
-/** Most-recent runs for the Runs table. */
-export function buildRunsSql(monitorId: string, limit: number): string {
-  const id = escapeSqlLiteral(monitorId);
-  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, ${F.error} as error, job_id, execution_id, run_id, trace_key
+/** Per-execution results for a single run — one row per engine×device combo. */
+export function buildRunDetailSql(runId: string): string {
+  const id = escapeSqlLiteral(runId);
+  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, ${F.error} as error, job_id, execution_id, trace_key, last_attempt_steps, retry_history
 FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}'
-ORDER BY ${F.timestamp} DESC
-LIMIT ${limit}`;
+WHERE run_id = '${id}'
+ORDER BY ${F.location} ASC`;
 }
 
 // ── Adapters (raw hits → typed models) ────────────────────────────────────
@@ -242,29 +257,46 @@ export function mapKpi(
   };
 }
 
-/** Parse screenshot_refs from a JSON string or array (OO stores it as a JSON string). */
-function parseScreenshotRefs(raw: unknown): ScreenshotRef[] {
-  if (!raw) return [];
+function parseJsonArray(raw: unknown): any[] {
+  if (Array.isArray(raw)) return raw;
   if (typeof raw === "string") {
-    try { return JSON.parse(raw) as ScreenshotRef[]; } catch { return []; }
+    try { return JSON.parse(raw); } catch { return []; }
   }
-  if (Array.isArray(raw)) return raw as ScreenshotRef[];
   return [];
 }
 
-/** Map one runs-table hit to the typed model. */
-export function mapRun(rawHit: Record<string, unknown>): SyntheticRun {
+function parseSteps(raw: unknown): StepResult[] {
+  return parseJsonArray(raw).map((s: any) => ({
+    stepId: str(s.step_id ?? s.id),
+    status: s.status === "ok" || s.status === "passed" ? "ok" : "fail",
+    durationMs: num(s.duration_ms),
+    error: str(s.error),
+    screenshotKey: s.screenshot_key ? str(s.screenshot_key) : null,
+  }));
+}
+
+function parseRetryHistory(raw: unknown): RetryAttempt[] {
+  return parseJsonArray(raw).map((a: any) => ({
+    attempt: num(a.attempt),
+    durationMs: num(a.duration_ms ?? a.response_time_ms),
+    steps: parseSteps(a.steps ?? []),
+  }));
+}
+
+export function mapRunLocationResult(rawHit: Record<string, unknown>): RunLocationResult {
   return {
-    timestamp: num(rawHit.ts) / 1000,
+    timestampMs: num(rawHit.ts) / 1000,
     status: toRunStatus(rawHit.status),
     durationMs: num(rawHit.duration),
     location: str(rawHit.location),
     device: str(rawHit.device),
+    browserEngine: str(rawHit.engine),
     error: str(rawHit.error),
     jobId: str(rawHit.job_id),
-    browserEngine: str(rawHit.engine),
-    screenshotRefs: [],
-    traceRef: rawHit.trace_key ? str(rawHit.trace_key) : null,
+    executionId: str(rawHit.execution_id),
+    traceKey: rawHit.trace_key ? str(rawHit.trace_key) : null,
+    steps: parseSteps(rawHit.last_attempt_steps),
+    retryHistory: parseRetryHistory(rawHit.retry_history),
   };
 }
 

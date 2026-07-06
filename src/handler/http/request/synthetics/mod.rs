@@ -966,8 +966,8 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
 pub async fn list_locations(Path(_org_id): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let locations = o2_enterprise::enterprise::synthetics::service::list_locations();
-        MetaHttpResponse::json(locations)
+        let capabilities = o2_enterprise::enterprise::synthetics::service::list_capabilities();
+        MetaHttpResponse::json(capabilities)
     }
     #[cfg(not(feature = "enterprise"))]
     {

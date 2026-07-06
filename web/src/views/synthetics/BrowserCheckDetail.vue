@@ -3,7 +3,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
-import type { BrowserCheck, SyntheticsLocation, SyntheticsFolder } from '@/types/synthetics'
+import type { BrowserCheck, SyntheticsLocation, SyntheticsDevice, SyntheticsFolder } from '@/types/synthetics'
 import { buildCreateBrowserTestPayload, mapResponseToBrowserCheck } from '@/utils/synthetics/buildPayload'
 import { getFoldersListByType } from '@/utils/commons'
 import syntheticsService from '@/services/synthetics'
@@ -74,6 +74,8 @@ const check = ref<BrowserCheck>({
 })
 
 const locations = ref<SyntheticsLocation[]>([])
+const browsers = ref<string[]>([])
+const devices = ref<SyntheticsDevice[]>([])
 const destinations = ref<string[]>([])
 const folders = ref<SyntheticsFolder[]>([])
 
@@ -110,9 +112,14 @@ async function fetchLocations() {
   try {
     const org = store.state.selectedOrganization.identifier
     const res = await syntheticsService.getLocations(org)
-    locations.value = (res.data ?? []) as SyntheticsLocation[]
+    const data = res.data ?? {}
+    locations.value = (data.locations ?? []) as SyntheticsLocation[]
+    browsers.value = (data.browsers ?? []) as string[]
+    devices.value = (data.devices ?? []) as SyntheticsDevice[]
   } catch {
     locations.value = []
+    browsers.value = []
+    devices.value = []
   }
 }
 
@@ -222,6 +229,8 @@ async function saveCheck() {
           v-model:check="check"
           check-type="browser"
           :locations="locations"
+          :browsers="browsers"
+          :devices="devices"
           :destinations="destinations"
           :folders="folders"
           @refresh:destinations="fetchDestinations"

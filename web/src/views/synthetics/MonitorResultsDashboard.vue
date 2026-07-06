@@ -81,92 +81,112 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div ref="chartEl" class="response-time-chart" />
       </section>
 
-      <!-- Runs table -->
+      <!-- Runs table (expandable) -->
       <section
         class="card-container tw:rounded-lg tw:overflow-hidden"
         data-test="synthetic-monitor-results-runs-section"
       >
-        <header class="tw:px-[0.875rem] tw:pt-[0.75rem]">
-          <h4
-            class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-heading)]"
-          >
+        <header class="tw:flex tw:items-center tw:justify-between tw:px-[0.875rem] tw:pt-[0.75rem] tw:pb-[0.5rem]">
+          <h4 class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-heading)]">
             {{ t("synthetics.results.recentRuns") }}
           </h4>
+          <span v-if="runsTotal" class="tw:text-xs tw:text-[var(--o2-text-muted)]">{{ runsTotal }} runs</span>
         </header>
-        <OTable
-          :columns="runColumns"
-          :data="runRows"
-          :loading="loading"
-          pagination="client"
-          :page-size="20"
-          :page-size-options="[10, 20, 25, 50]"
-          row-key="id"
-          :show-global-filter="false"
-          :footer-title="t('synthetics.results.runs')"
-          :empty-message="t('synthetics.results.noRuns')"
-          :row-class="() => 'tw:cursor-pointer'"
-          data-test="synthetic-monitor-results-runs-table"
-          @row-click="openRunDetail"
-        >
-          <template #cell-status="{ row }">
-            <div class="tw:flex tw:flex-col tw:gap-[0.125rem]">
-              <span
-                class="run-status"
-                :class="`run-status--${(row as RunRow).status}`"
-              >
-                <span class="run-status-dot" />
-                {{
-                  (row as RunRow).status === "passed"
-                    ? t("synthetics.results.passed")
-                    : (row as RunRow).status === "warning"
-                      ? t("synthetics.results.warning")
-                      : (row as RunRow).status === "error"
-                        ? t("synthetics.results.error")
-                        : t("synthetics.results.failed")
-                }}
+
+        <!-- Loading skeleton -->
+        <div v-if="runsLoading" class="tw:flex tw:flex-col tw:gap-1 tw:px-4 tw:py-3">
+          <div v-for="i in 5" :key="i" class="runs-skel tw:h-9 tw:rounded" />
+        </div>
+
+        <!-- Empty -->
+        <div v-else-if="!runRows.length" class="tw:flex tw:items-center tw:justify-center tw:py-12 tw:text-sm tw:text-[var(--o2-text-muted)]">
+          {{ t("synthetics.results.noRuns") }}
+        </div>
+
+        <!-- Table -->
+        <div v-else class="runs-list">
+          <!-- Column headers -->
+          <div class="runs-header tw:grid tw:text-[0.65rem] tw:font-semibold tw:uppercase tw:tracking-wider tw:text-[var(--o2-text-muted)] tw:px-4 tw:py-1.5 tw:border-b tw:border-[var(--o2-border-color)]">
+            <span class="tw:pl-5">Status</span>
+            <span>Started</span>
+            <span class="tw:text-right">Duration</span>
+            <span>Locations</span>
+            <span>Trigger</span>
+          </div>
+
+          <!-- Rows -->
+          <div
+            v-for="run in runRows"
+            :key="run.id"
+            class="tw:border-b tw:border-[var(--o2-border-color)] last:tw:border-b-0"
+          >
+            <!-- Summary row -->
+            <button
+              class="runs-row tw:w-full tw:grid tw:items-center tw:px-4 tw:py-2.5 tw:text-xs tw:text-left hover:tw:bg-[var(--o2-surface-hover)] tw:transition-colors"
+              :class="run.status === 'pending' ? 'tw:cursor-default' : 'tw:cursor-pointer'"
+              :disabled="run.status === 'pending'"
+              @click="run.status !== 'pending' && toggleRunExpansion(run.id)"
+            >
+              <!-- Chevron + status -->
+              <span class="tw:flex tw:items-center tw:gap-1.5">
+                <OIcon
+                  v-if="run.status !== 'pending'"
+                  :name="expandedRunIds.has(run.id) ? 'expand_more' : 'chevron_right'"
+                  size="xs"
+                  class="tw:text-[var(--o2-text-muted)] tw:shrink-0"
+                />
+                <span v-else class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:flex tw:items-center tw:justify-center">
+                  <span class="run-status-spinner tw:inline-block" />
+                </span>
+                <span
+                  class="run-status tw:flex tw:items-center tw:gap-1.5 tw:font-semibold"
+                  :class="`run-status--${run.status}`"
+                >
+                  <span v-if="run.status !== 'pending'" class="run-status-dot" />
+                  {{
+                    run.status === 'passed' ? t('synthetics.results.passed')
+                    : run.status === 'warning' ? t('synthetics.results.warning')
+                    : run.status === 'error' ? t('synthetics.results.error')
+                    : run.status === 'pending' ? 'In Progress'
+                    : t('synthetics.results.failed')
+                  }}
+                </span>
               </span>
-              <small
-                v-if="(row as RunRow).status !== 'passed' && (row as RunRow).error"
-                class="tw:text-[var(--o2-text-caption)] tw:truncate tw:max-w-[18rem]"
-                :title="(row as RunRow).error"
-              >
-                {{ (row as RunRow).error }}
-              </small>
-            </div>
-          </template>
-          <template #cell-started="{ row }">
-            {{ relativeFromNow((row as RunRow).timestamp) }}
-          </template>
-          <template #cell-duration="{ row }">
-            {{ formatDuration((row as RunRow).durationMs) }}
-          </template>
-        </OTable>
+              <span class="tw:text-[var(--o2-text-secondary)]">{{ relativeFromNow(run.scheduledTs / 1000) }}</span>
+              <span class="tw:text-right tw:tabular-nums tw:text-[var(--o2-text-secondary)]">
+                {{ run.durationMs ? formatDuration(run.durationMs) : '—' }}
+              </span>
+              <span class="tw:text-[var(--o2-text-muted)]">{{ run.jobsDone }}/{{ run.jobCount }}</span>
+              <span class="tw:text-[var(--o2-text-muted)] tw:capitalize">{{ run.triggerType || 'scheduled' }}</span>
+            </button>
+
+            <!-- Inline expansion -->
+            <RunRowExpansion
+              v-if="expandedRunIds.has(run.id)"
+              :run-id="run.id"
+              :scheduled-ts="run.scheduledTs"
+            />
+          </div>
+        </div>
       </section>
     </div>
-
-    <RunDetailDrawer
-      v-if="selectedRun"
-      :run="selectedRun"
-      :check-id="props.monitorId"
-      :open="drawerOpen"
-      @close="drawerOpen = false"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 import * as echarts from "echarts";
-import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import KpiSparkline from "@/plugins/traces/KpiSparkline.vue";
-import RunDetailDrawer from "@/components/synthetics/results/RunDetailDrawer.vue";
+import RunRowExpansion from "@/components/synthetics/results/RunRowExpansion.vue";
 import {
   splitDuration,
 } from "@/plugins/traces/llmInsightsDashboard.utils";
 import { formatDuration } from "@/utils/formatters";
 import useSyntheticResults from "@/composables/useSyntheticResults";
+import syntheticsService from "@/services/synthetics";
 
 interface Props {
   monitorId: string;
@@ -176,8 +196,9 @@ interface Props {
 const props = defineProps<Props>();
 
 const { t } = useI18n();
+const store = useStore();
 
-const { kpi, buckets, runs, loading, fetchAll, cancelAll } =
+const { kpi, buckets, loading, fetchAll, cancelAll } =
   useSyntheticResults();
 
 // ── KPI cards (exact LLM kpiCards design, 4 cards) ───────────────────────
@@ -246,58 +267,66 @@ const kpiCards = computed<KpiCard[]>(() => {
   ];
 });
 
-// ── Runs table ───────────────────────────────────────────────────────────
+// ── Runs table (REST API) ─────────────────────────────────────────────────
 interface RunRow {
-  id: string;
-  timestamp: number;
-  status: "passed" | "warning" | "failed" | "error";
+  id: string;          // run_id (KSUID)
+  status: "pending" | "passed" | "warning" | "failed" | "error";
+  scheduledTs: number; // microseconds
+  jobCount: number;
+  jobsDone: number;
+  completedAt: number | null; // microseconds
   durationMs: number;
-  location: string;
-  device: string;
-  error: string;
-  jobId: string;
-  browserEngine: string;
-  screenshotRefs: { step_id: string; key: string }[];
-  traceRef: string | null;
+  triggerType: string;
 }
 
-const runRows = computed<RunRow[]>(() =>
-  runs.value.map((r, i) => ({ id: `${r.timestamp}-${i}`, ...r })),
-);
+const runRows = ref<RunRow[]>([]);
+const runsLoading = ref(false);
+const runsTotal = ref(0);
 
-// ── Run detail drawer ─────────────────────────────────────────────────────
-const drawerOpen = ref(false);
-const selectedRun = ref<{
-  job_id: string; synthetics_id: string; location: string;
-  status: "passed" | "warning" | "failed" | "error"; response_time_ms: number;
-  error?: string; browser_engine?: string; device?: string;
-  checked_at: number; screenshot_refs: { step_id: string; key: string }[]; trace_ref?: string;
-} | null>(null);
-
-function openRunDetail(row: RunRow) {
-  selectedRun.value = {
-    job_id: row.jobId,
-    synthetics_id: props.monitorId,
-    location: row.location,
-    status: row.status,
-    response_time_ms: row.durationMs,
-    error: row.error || undefined,
-    browser_engine: row.browserEngine || undefined,
-    device: row.device || undefined,
-    checked_at: row.timestamp * 1000,
-    screenshot_refs: row.screenshotRefs,
-    trace_ref: row.traceRef ?? undefined,
-  };
-  drawerOpen.value = true;
+async function fetchRuns() {
+  if (!props.monitorId) return;
+  runsLoading.value = true;
+  try {
+    const org = store.state.selectedOrganization.identifier;
+    const resp = await syntheticsService.getRuns(org, props.monitorId, {
+      start_time: props.startTime,
+      end_time: props.endTime,
+      page: 0,
+      page_size: 50,
+    });
+    const data = resp.data as { runs: any[]; total: number };
+    runsTotal.value = data.total ?? 0;
+    runRows.value = (data.runs ?? []).map((r: any) => {
+      const durationUs = r.completed_at && r.scheduled_ts
+        ? r.completed_at - r.scheduled_ts
+        : null;
+      return {
+        id: r.id,
+        status: r.status,
+        scheduledTs: r.scheduled_ts,
+        jobCount: r.job_count,
+        jobsDone: r.jobs_done,
+        completedAt: r.completed_at ?? null,
+        durationMs: durationUs ? Math.round(durationUs / 1000) : 0,
+        triggerType: r.trigger_type,
+      } as RunRow;
+    });
+  } catch {
+    runRows.value = [];
+  } finally {
+    runsLoading.value = false;
+  }
 }
 
-const runColumns = computed<OTableColumnDef[]>(() => [
-  { id: "status", header: t("synthetics.results.status"), accessorKey: "status", size: 120, minSize: 100, sortable: true },
-  { id: "started", header: t("synthetics.results.started"), accessorKey: "timestamp", size: 160, minSize: 120, sortable: true },
-  { id: "duration", header: t("synthetics.results.duration"), accessorKey: "durationMs", size: 140, minSize: 100, sortable: true, meta: { align: "right" } },
-  { id: "location", header: t("synthetics.results.location"), accessorKey: "location", size: 160, minSize: 120, sortable: true },
-  { id: "device", header: t("synthetics.results.device"), accessorKey: "device", size: 140, minSize: 100, sortable: true },
-]);
+// ── Run expansion (inline accordion — multiple rows can be open) ──────────
+const expandedRunIds = ref(new Set<string>());
+
+function toggleRunExpansion(id: string) {
+  const s = new Set(expandedRunIds.value);
+  if (s.has(id)) s.delete(id);
+  else s.add(id);
+  expandedRunIds.value = s;
+}
 
 // ── Relative-time formatting ("2 min ago") ───────────────────────────────
 function relativeFromNow(ms: number): string {
@@ -404,11 +433,14 @@ onBeforeUnmount(() => {
 
 // ── Public API — parent drives all (re)loads ─────────────────────────────
 async function refresh(startTime?: number, endTime?: number) {
-  await fetchAll(
-    props.monitorId,
-    startTime ?? props.startTime,
-    endTime ?? props.endTime,
-  );
+  await Promise.all([
+    fetchAll(
+      props.monitorId,
+      startTime ?? props.startTime,
+      endTime ?? props.endTime,
+    ),
+    fetchRuns(),
+  ]);
 }
 
 defineExpose({ refresh });
@@ -450,6 +482,9 @@ defineExpose({ refresh });
   &--failed, &--error {
     color: var(--o2-status-error-text);
   }
+  &--pending {
+    color: var(--o2-text-muted);
+  }
 
   .run-status-dot {
     width: 0.5rem;
@@ -457,5 +492,44 @@ defineExpose({ refresh });
     border-radius: 50%;
     background: currentColor;
   }
+
+  .run-status-spinner {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    border: 1.5px solid currentColor;
+    border-top-color: transparent;
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+// ── Runs table ──────────────────────────────────────────────────────────
+
+$cols: 1.8fr 1.4fr 1fr 0.8fr 0.8fr;
+
+.runs-header,
+.runs-row {
+  display: grid;
+  grid-template-columns: $cols;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.runs-skel {
+  background: var(--o2-border-color);
+  animation: skel-pulse 1.4s ease-in-out infinite;
+  &:nth-child(2) { animation-delay: 0.1s; }
+  &:nth-child(3) { animation-delay: 0.2s; }
+  &:nth-child(4) { animation-delay: 0.3s; }
+  &:nth-child(5) { animation-delay: 0.4s; }
+}
+
+@keyframes skel-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
 }
 </style>

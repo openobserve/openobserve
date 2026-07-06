@@ -194,6 +194,20 @@ export interface SyntheticsLocation {
   provider: string
 }
 
+export interface SyntheticsDevice {
+  id: string
+  label: string
+  width: number
+  height: number
+}
+
+// Shape returned by GET /api/{org}/synthetics/locations (repurposed as capabilities)
+export interface SyntheticsCapabilities {
+  locations: SyntheticsLocation[]
+  browsers: string[]
+  devices: SyntheticsDevice[]
+}
+
 export interface BrowserCheck {
   id?: string
   name: string

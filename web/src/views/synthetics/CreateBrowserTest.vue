@@ -3,7 +3,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useStore } from 'vuex'
-import type { BrowserCheck, SyntheticsLocation, SyntheticsFolder } from '@/types/synthetics'
+import type { BrowserCheck, SyntheticsLocation, SyntheticsDevice, SyntheticsFolder } from '@/types/synthetics'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
 import { journeyToWireSteps } from '@/utils/synthetics/mapRecordedStep'
 import { buildCreateBrowserTestPayload, mapResponseToBrowserCheck } from '@/utils/synthetics/buildPayload'
@@ -64,6 +64,8 @@ async function probeExtension() {
 
 // Server-driven lists fetched once here and threaded down to CheckConfigure.
 const locations = ref<SyntheticsLocation[]>([])
+const browsers = ref<string[]>([])
+const devices = ref<SyntheticsDevice[]>([])
 const destinations = ref<string[]>([])
 const folders = ref<SyntheticsFolder[]>([])
 
@@ -80,10 +82,15 @@ async function fetchLocations() {
   try {
     const org = store.state.selectedOrganization.identifier
     const res = await syntheticsService.getLocations(org)
-    locations.value = (res.data ?? []) as SyntheticsLocation[]
+    const data = res.data ?? {}
+    locations.value = (data.locations ?? []) as SyntheticsLocation[]
+    browsers.value = (data.browsers ?? []) as string[]
+    devices.value = (data.devices ?? []) as SyntheticsDevice[]
   } catch {
     // Enterprise-gated endpoint — community builds return 403; fall back to empty.
     locations.value = []
+    browsers.value = []
+    devices.value = []
   }
 }
 
@@ -532,6 +539,8 @@ function onClearResults() {
             v-model:check="check"
             check-type="browser"
             :locations="locations"
+            :browsers="browsers"
+            :devices="devices"
             :destinations="destinations"
             :folders="folders"
             class="tw:border-t! tw:border-border-default! tw:w-full!"

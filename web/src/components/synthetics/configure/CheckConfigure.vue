@@ -1,9 +1,10 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import type { BrowserCheck, SyntheticsLocation, SyntheticsFolder } from '@/types/synthetics'
+import type { BrowserCheck, SyntheticsLocation, SyntheticsFolder, SyntheticsDevice } from '@/types/synthetics'
 import CheckDetails from './CheckDetails.vue'
 import CheckScheduleAlert from './CheckScheduleAlert.vue'
 import CheckLocations from './CheckLocations.vue'
+import CheckBrowserDevices from './CheckBrowserDevices.vue'
 import CheckRUM from './CheckRUM.vue'
 import CheckCapture from './CheckCapture.vue'
 
@@ -11,6 +12,8 @@ defineProps<{
   check: BrowserCheck
   checkType?: 'browser' | 'api'
   locations?: SyntheticsLocation[]
+  browsers?: string[]
+  devices?: SyntheticsDevice[]
   destinations?: string[]
   folders?: SyntheticsFolder[]
 }>()
@@ -44,6 +47,14 @@ function handleUpdate(value: BrowserCheck) {
         :check="check"
         :locations="locations ?? []"
         data-test="synthetics-check-configure-locations"
+        @update:check="handleUpdate"
+      />
+      <CheckBrowserDevices
+        v-if="(checkType ?? 'browser') === 'browser'"
+        :check="check"
+        :browsers="browsers"
+        :devices="devices"
+        data-test="synthetics-check-configure-browser-devices"
         @update:check="handleUpdate"
       />
       <CheckRUM
