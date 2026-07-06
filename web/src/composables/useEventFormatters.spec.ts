@@ -121,36 +121,36 @@ describe("useEventFormatters", () => {
   });
 
   describe("getStatusColorClass", () => {
-    it("returns 'tw:text-gray-500' for 0 (falsy)", () => {
-      expect(formatters.getStatusColorClass(0)).toBe("tw:text-gray-500");
+    it("returns 'text-gray-500' for 0 (falsy)", () => {
+      expect(formatters.getStatusColorClass(0)).toBe("text-gray-500");
     });
 
-    it("returns 'tw:text-gray-500' for null-like input", () => {
-      expect(formatters.getStatusColorClass(null as unknown as number)).toBe("tw:text-gray-500");
+    it("returns 'text-gray-500' for null-like input", () => {
+      expect(formatters.getStatusColorClass(null as unknown as number)).toBe("text-gray-500");
     });
 
     it("returns positive color class for status 200", () => {
-      expect(formatters.getStatusColorClass(200)).toBe("tw:text-[var(--o2-positive)]");
+      expect(formatters.getStatusColorClass(200)).toBe("text-[var(--o2-positive)]");
     });
 
     it("returns positive color class for status 201", () => {
-      expect(formatters.getStatusColorClass(201)).toBe("tw:text-[var(--o2-positive)]");
+      expect(formatters.getStatusColorClass(201)).toBe("text-[var(--o2-positive)]");
     });
 
     it("returns info color class for status 301", () => {
-      expect(formatters.getStatusColorClass(301)).toBe("tw:text-[var(--o2-info)]");
+      expect(formatters.getStatusColorClass(301)).toBe("text-[var(--o2-info)]");
     });
 
     it("returns warning color class for status 404", () => {
-      expect(formatters.getStatusColorClass(404)).toBe("tw:text-[var(--o2-warning)]");
+      expect(formatters.getStatusColorClass(404)).toBe("text-[var(--o2-warning)]");
     });
 
     it("returns negative color class for status 500", () => {
-      expect(formatters.getStatusColorClass(500)).toBe("tw:text-[var(--o2-negative)]");
+      expect(formatters.getStatusColorClass(500)).toBe("text-[var(--o2-negative)]");
     });
 
     it("returns negative color class for status 502", () => {
-      expect(formatters.getStatusColorClass(502)).toBe("tw:text-[var(--o2-negative)]");
+      expect(formatters.getStatusColorClass(502)).toBe("text-[var(--o2-negative)]");
     });
   });
 
@@ -190,36 +190,36 @@ describe("useEventFormatters", () => {
   describe("getEventTypeClass", () => {
     it("returns error CSS classes for type 'error'", () => {
       expect(formatters.getEventTypeClass("error")).toBe(
-        "tw:bg-red-100 tw:text-red-700 tw:border tw:border-solid tw:border-red-300"
+        "bg-red-100 text-red-700 border border-solid border-red-300"
       );
     });
 
     it("returns action CSS classes for type 'action'", () => {
       expect(formatters.getEventTypeClass("action")).toBe(
-        "tw:bg-blue-100 tw:text-blue-700 tw:border tw:border-solid tw:border-blue-300"
+        "bg-blue-100 text-blue-700 border border-solid border-blue-300"
       );
     });
 
     it("returns view CSS classes for type 'view'", () => {
       expect(formatters.getEventTypeClass("view")).toBe(
-        "tw:bg-green-100 tw:text-green-700 tw:border tw:border-solid tw:border-green-300"
+        "bg-green-100 text-green-700 border border-solid border-green-300"
       );
     });
 
     it("returns resource CSS classes for type 'resource'", () => {
       expect(formatters.getEventTypeClass("resource")).toBe(
-        "tw:bg-purple-100 tw:text-purple-700 tw:border tw:border-solid tw:border-purple-300"
+        "bg-purple-100 text-purple-700 border border-solid border-purple-300"
       );
     });
 
     it("returns default classes for an unknown type", () => {
       expect(formatters.getEventTypeClass("unknown")).toBe(
-        "tw:bg-grey-100 tw:text-grey-700"
+        "bg-grey-100 text-grey-700"
       );
     });
 
     it("returns default classes for an empty string type", () => {
-      expect(formatters.getEventTypeClass("")).toBe("tw:bg-grey-100 tw:text-grey-700");
+      expect(formatters.getEventTypeClass("")).toBe("bg-grey-100 text-grey-700");
     });
   });
 });

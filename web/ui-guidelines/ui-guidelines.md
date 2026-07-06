@@ -256,8 +256,8 @@ onMounted(() => {
 **✅ ALWAYS use classes or scoped styles:**
 ```vue
 <!-- GOOD -->
-<div class="error-text tw:m-2.5">Content</div>
-<q-tr class="tw:cursor-pointer">Content</q-tr>
+<div class="error-text m-2.5">Content</div>
+<q-tr class="cursor-pointer">Content</q-tr>
 
 <style scoped>
 .error-text {
@@ -427,11 +427,11 @@ Use Quasar's flex utilities:
 
 ### Tailwind Prefix
 
-**All Tailwind classes use the `tw:` prefix:**
+**All Tailwind classes use the `` prefix:**
 
 ```vue
-<div class="tw:flex tw:items-center tw:justify-between tw:p-4">
-  <span class="tw:text-lg tw:font-semibold">Title</span>
+<div class="flex items-center justify-between p-4">
+  <span class="text-lg font-semibold">Title</span>
 </div>
 ```
 
@@ -441,7 +441,7 @@ Tailwind is configured in `tailwind.config.js`:
 
 ```js
 {
-  prefix: "tw:",
+  prefix: "",
   content: ["./index.html", "./src/**/*.{vue,js,ts}"],
   theme: {
     extend: {
@@ -457,9 +457,9 @@ Tailwind is configured in `tailwind.config.js`:
 ### When to Use Tailwind vs Quasar
 
 **Use Tailwind for:**
-- Custom spacing: `tw:mt-4`, `tw:px-6`
-- Custom layouts: `tw:grid`, `tw:flex`
-- Typography utilities: `tw:text-sm`, `tw:font-bold`
+- Custom spacing: `mt-4`, `px-6`
+- Custom layouts: `grid`, `flex`
+- Typography utilities: `text-sm`, `font-bold`
 - Custom colors when needed
 
 **Use Quasar for:**
@@ -471,30 +471,30 @@ Tailwind is configured in `tailwind.config.js`:
 
 ```vue
 <!-- Spacing -->
-tw:m-{size}    // margin
-tw:p-{size}    // padding
-tw:gap-{size}  // gap in flex/grid
+m-{size}    // margin
+p-{size}    // padding
+gap-{size}  // gap in flex/grid
 
 <!-- Layout -->
-tw:flex, tw:grid, tw:block, tw:inline-block
-tw:items-center, tw:justify-between
-tw:w-full, tw:h-screen
+flex, grid, block, inline-block
+items-center, justify-between
+w-full, h-screen
 
 <!-- Typography -->
-tw:text-{size}, tw:font-{weight}
-tw:leading-{size}, tw:tracking-{size}
+text-{size}, font-{weight}
+leading-{size}, tracking-{size}
 
 <!-- Colors -->
-tw:bg-{color}, tw:text-{color}
-tw:border-{color}
+bg-{color}, text-{color}
+border-{color}
 
 <!-- Borders & Rounded -->
-tw:border, tw:border-{side}-{width}
-tw:rounded, tw:rounded-{size}
+border, border-{side}-{width}
+rounded, rounded-{size}
 
 <!-- Effects -->
-tw:shadow, tw:shadow-{size}
-tw:opacity-{value}
+shadow, shadow-{size}
+opacity-{value}
 ```
 
 ---
@@ -507,12 +507,12 @@ Use consistent spacing values:
 
 ```scss
 // Tailwind spacing (multiply by 4 for px)
-tw:p-1   // 4px
-tw:p-2   // 8px
-tw:p-3   // 12px
-tw:p-4   // 16px
-tw:p-6   // 24px
-tw:p-8   // 32px
+p-1   // 4px
+p-2   // 8px
+p-3   // 12px
+p-4   // 16px
+p-6   // 24px
+p-8   // 32px
 ```
 
 ### Layout Patterns
@@ -521,19 +521,19 @@ tw:p-8   // 32px
 
 ```vue
 <!-- Horizontal layout with centered items -->
-<div class="tw:flex tw:items-center tw:gap-4">
+<div class="flex items-center gap-4">
   <span>Item 1</span>
   <span>Item 2</span>
 </div>
 
 <!-- Vertical layout -->
-<div class="tw:flex tw:flex-col tw:gap-2">
+<div class="flex flex-col gap-2">
   <div>Item 1</div>
   <div>Item 2</div>
 </div>
 
 <!-- Space between -->
-<div class="tw:flex tw:justify-between tw:items-center">
+<div class="flex justify-between items-center">
   <span>Left</span>
   <span>Right</span>
 </div>
@@ -542,7 +542,7 @@ tw:p-8   // 32px
 #### Grid Layouts
 
 ```vue
-<div class="tw:grid tw:grid-cols-3 tw:gap-4">
+<div class="grid grid-cols-3 gap-4">
   <div>Column 1</div>
   <div>Column 2</div>
   <div>Column 3</div>
@@ -553,10 +553,10 @@ tw:p-8   // 32px
 
 ```vue
 <!-- Full width -->
-<div class="tw:w-full">Content</div>
+<div class="w-full">Content</div>
 
 <!-- Max width with centering -->
-<div class="tw:max-w-4xl tw:mx-auto">Content</div>
+<div class="max-w-4xl mx-auto">Content</div>
 
 <!-- Fixed width -->
 <div class="q-w-lg">Content (600px)</div>
@@ -705,13 +705,13 @@ Always provide visual feedback:
 
 ```vue
 <!-- Clickable elements -->
-<div class="tw:cursor-pointer">Clickable</div>
+<div class="cursor-pointer">Clickable</div>
 
 <!-- Disabled elements -->
-<div class="tw:cursor-not-allowed tw:opacity-50">Disabled</div>
+<div class="cursor-not-allowed opacity-50">Disabled</div>
 
 <!-- Draggable elements -->
-<div class="tw:cursor-grab">Draggable</div>
+<div class="cursor-grab">Draggable</div>
 ```
 
 ---
@@ -901,7 +901,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="chartRef" class="tw:w-full tw:h-96"></div>
+  <div ref="chartRef" class="w-full h-96"></div>
 </template>
 ```
 
@@ -1023,7 +1023,7 @@ npm run lint
 Before submitting your code, ensure:
 
 - [ ] No inline styles used
-- [ ] All Tailwind classes use `tw:` prefix
+- [ ] All Tailwind classes use `` prefix
 - [ ] Semantic color variables used instead of hardcoded colors
 - [ ] Component uses Composition API with `<script setup>`
 - [ ] TypeScript types defined for props and emits

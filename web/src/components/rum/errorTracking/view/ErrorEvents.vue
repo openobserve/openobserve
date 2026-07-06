@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <section class="tw:mt-4">
-    <h4 data-test="error-events-title" class="tw:mb-2 tw:ml-1">
+  <section class="mt-4">
+    <h4 data-test="error-events-title" class="mb-2 ml-1">
       {{ t("rum.events") }}
     </h4>
 
@@ -29,13 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ol
       v-else
-      class="event-timeline tw:list-none tw:m-0 tw:p-0"
+      class="event-timeline list-none m-0 p-0"
       data-test="error-events-timeline"
     >
       <li
         v-for="(event, index) in timelineEvents"
         :key="index"
-        class="event-timeline__item tw:relative tw:flex tw:items-start tw:gap-2 tw:pl-5 tw:pb-3"
+        class="event-timeline__item relative flex items-start gap-2 pl-5 pb-3"
         :class="{ 'event-timeline__item--error': isErrorEvent(event) }"
         :data-test="`error-events-timeline-item-${index}`"
       >
@@ -48,11 +48,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           aria-hidden="true"
         />
-        <ErrorTypeIcons :column="event" class="tw:shrink-0 tw:mt-0.5" />
-        <div class="tw:flex-1 tw:min-w-0">
-          <div class="tw:flex tw:items-baseline tw:gap-1.5 tw:flex-wrap">
+        <ErrorTypeIcons :column="event" class="shrink-0 mt-0.5" />
+        <div class="flex-1 min-w-0">
+          <div class="flex items-baseline gap-1.5 flex-wrap">
             <span
-              class="tw:font-medium"
+              class="font-medium"
               :data-test="`error-events-timeline-category-${index}`"
             >{{ getErrorCategory(event) }}</span>
             <OTag
@@ -65,9 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <ErrorEventDescription :column="event" />
         </div>
-        <div class="tw:shrink-0 tw:text-right">
+        <div class="shrink-0 text-right">
           <span
-            class="tw:tabular-nums tw:text-[var(--o2-text-secondary)]"
+            class="tabular-nums text-[var(--o2-text-secondary)]"
             :data-test="`error-events-timeline-offset-${index}`"
             :title="getFormattedDate(event._timestamp / 1000)"
           >{{ offsetLabel(event) }}</span>

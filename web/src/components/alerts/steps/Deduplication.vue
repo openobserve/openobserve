@@ -16,33 +16,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-deduplication tw:w-full tw:h-full tw:overflow-auto tw:mx-auto"
+    class="step-deduplication w-full h-full overflow-auto mx-auto"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div
-      class="step-content tw:rounded-lg tw:min-h-full tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]"
+      class="step-content rounded-lg min-h-full bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
     >
       <div
-        class="section-header tw:flex tw:items-center tw:gap-0 tw:py-2.5 tw:px-3"
+        class="section-header flex items-center gap-0 py-2.5 px-3"
         :class="
           store.state.theme === 'dark'
-            ? 'tw:border-b tw:border-[#343434]'
-            : 'tw:border-b tw:border-[#eeeeee]'
+            ? 'border-b border-[#343434]'
+            : 'border-b border-[#eeeeee]'
         "
       >
-        <div class="section-header-accent tw:w-0.75 tw:h-4 tw:rounded-sm tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
+        <div class="section-header-accent w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
         <span
-          class="section-header-title tw:text-[13px] tw:font-semibold tw:text-[var(--color-text-primary)]"
+          class="section-header-title text-[13px] font-semibold text-[var(--color-text-primary)]"
         >{{
           t("alerts.steps.deduplication")
         }}</span>
       </div>
-      <div class="tw:px-3 tw:py-2">
+      <div class="px-3 py-2">
         <!-- Fingerprint Fields -->
-        <div class="tw:mb-4">
-          <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+        <div class="mb-4">
+          <div class="font-semibold pb-2 flex items-center">
             {{ t("alerts.deduplication.fingerprintFields") }}
-            <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer">
+            <OIcon name="info" size="sm" class="ml-1 cursor-pointer">
               <OTooltip
                 :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
                 side="right"
@@ -50,23 +50,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OIcon>
           </div>
           <div
-            class="tw:text-sm tw:mb-2"
+            class="text-sm mb-2"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:text-gray-400'
-                : 'tw:text-gray-600'
+                ? 'text-gray-400'
+                : 'text-gray-600'
             "
           >
             {{ t("alerts.deduplication.fingerprintFieldsHint") }}
           </div>
-          <div class="tw:relative">
+          <div class="relative">
             <OSelect
               v-model="localDeduplication.fingerprint_fields"
               :options="props.columns || []"
               multiple
               creatable
               data-test="alert-dedup-fingerprint-fields"
-              class="tw:max-w-[600px] tw:min-w-[300px]"
+              class="max-w-[600px] min-w-[300px]"
               helpText="Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)"
               @update:model-value="emitUpdate"
               @create="addFingerprintField"
@@ -80,10 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Time Window -->
-        <div class="tw:mb-4">
-          <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+        <div class="mb-4">
+          <div class="font-semibold pb-2 flex items-center">
             {{ t("alerts.deduplication.timeWindow") }}
-            <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer">
+            <OIcon name="info" size="sm" class="ml-1 cursor-pointer">
               <OTooltip
                 :content="t('alerts.deduplication.timeWindowTooltip')"
                 side="right"
@@ -91,17 +91,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OIcon>
           </div>
           <div
-            class="tw:text-sm tw:mb-2"
+            class="text-sm mb-2"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:text-gray-400'
-                : 'tw:text-gray-600'
+                ? 'text-gray-400'
+                : 'text-gray-600'
             "
           >
             {{ t("alerts.deduplication.timeWindowHint") }}
           </div>
-          <div class="tw:flex tw:items-center">
-            <div class="tw:w-[210px] tw:ml-0">
+          <div class="flex items-center">
+            <div class="w-[210px] ml-0">
               <OInput
                 v-model="localDeduplication.time_window_minutes"
                 type="number"
@@ -118,15 +118,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 height: 28px;
                 font-weight: normal;
               "
-              :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'"
-              class="tw:flex tw:justify-center tw:items-center"
+              :class="store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'"
+              class="flex justify-center items-center"
             >
               {{ t("alerts.minutes") }}
             </div>
           </div>
         </div>
       </div>
-      <!-- end tw:px-3 tw:py-2 -->
+      <!-- end px-3 py-2 -->
     </div>
   </div>
 </template>

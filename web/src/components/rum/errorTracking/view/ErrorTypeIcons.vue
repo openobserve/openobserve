@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <img
       :alt="column.category"
       :src="typeIcons"
-      class="tw:w-[1.375rem] tw:h-[1.375rem]"
+      class="w-[1.375rem] h-[1.375rem]"
     />
   </div>
 </template>

@@ -1,13 +1,13 @@
 <template>
   <OCard
-    class="tw:flex tw:flex-col tw:h-full tw:flex-nowrap"
+    class="flex flex-col h-full flex-nowrap"
     style="min-width: 480px; max-width: 800px"
   >
     <!-- Header -->
-    <div class="tw:px-2 tw:py-3">
-      <OCardSection role="header" class="tw:w-full">
-        <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
-          <div class="tw:text-base tw:font-bold" data-test="queryList-title-text">
+    <div class="px-2 py-3">
+      <OCardSection role="header" class="w-full">
+        <div class="flex items-center justify-between w-full">
+          <div class="text-base font-bold" data-test="queryList-title-text">
             {{ t("queries.queryList") }}
           </div>
           <OButton

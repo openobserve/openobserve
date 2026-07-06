@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Override bottom slot to add legend filter alongside native pagination -->
         <!-- When legend footer is not shown, TableRenderer's default pagination will be used -->
         <template #bottom="scope" v-if="showLegendFooter">
-          <div class="tw:flex tw:items-center tw:w-full" data-test="dashboard-table-pagination">
-            <div class="tw:flex tw:items-center tw:gap-1">
+          <div class="flex items-center w-full" data-test="dashboard-table-pagination">
+            <div class="flex items-center gap-1">
               <OSelect
                 v-model="selectedLegend"
                 :options="legendOptions"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OSelect>
             </div>
-            <div class="tw:flex-1" />
+            <div class="flex-1" />
             <TablePaginationControls
               :show-pagination="config.table_pagination && !store.state.printMode"
               :pagination="scope.pagination"

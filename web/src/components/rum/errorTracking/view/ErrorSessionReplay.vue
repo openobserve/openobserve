@@ -16,16 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    class="tw:mt-4 tw:rounded-lg tw:border tw:border-border-default tw:p-3"
+    class="mt-4 rounded-lg border border-border-default p-3"
     data-test="error-session-replay-card"
   >
-    <div class="tw:flex tw:items-center tw:justify-between tw:gap-2">
-      <div class="tw:min-w-0">
+    <div class="flex items-center justify-between gap-2">
+      <div class="min-w-0">
         <h4>{{ t("rum.sessionReplay") }}</h4>
         <small data-test="error-session-replay-hint">{{
           t("rum.replayAtFailureHint")
         }}</small>
-        <div class="tw:flex tw:mt-1.5">
+        <div class="flex mt-1.5">
           <template v-for="(value, tag) in getSessionTags" :key="tag">
             <ErrorTag :tag="{ key: tag, value }" />
           </template>
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="primary"
         size="sm-action"
-        class="tw:shrink-0"
+        class="shrink-0"
         icon-left="play-circle"
         :disabled="!error.session_id"
         :title="t('rum.viewSessionReplay')"

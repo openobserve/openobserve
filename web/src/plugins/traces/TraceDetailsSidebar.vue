@@ -15,27 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full">
+  <div class="flex flex-col h-full">
     <div
-      class="tw:flex tw:justify-start tw:items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)] tw:bg-surface-panel"
+      class="flex justify-start items-center pl-3 pr-2 h-[2rem] border-b border-solid border-b-[var(--o2-border-color)] bg-surface-panel"
       data-test="trace-details-sidebar-header"
     >
       <div
         :title="span.operation_name"
         :style="{ width: 'calc(100% - 24px)' }"
-        class="tw:pb-0 tw:pl-[0.25rem] tw:truncate tw:flex tw:items-center"
+        class="pb-0 pl-[0.25rem] truncate flex items-center"
         data-test="trace-details-sidebar-header-operation-name"
       >
         <!-- Status Code Badge -->
         <span
           v-if="hasSpanError"
-          class="tw:inline-flex tw:items-center"
+          class="inline-flex items-center"
           data-test="trace-details-sidebar-header-toolbar-status-code"
         >
           <OIcon
             name="error"
             size="sm"
-            class="tw:mr-1 tw:text-[var(--o2-status-error-text)]!"
+            class="mr-1 text-[var(--o2-status-error-text)]!"
           />
         </span>
         <!-- Observation Type Badge (for LLM spans) -->
@@ -43,11 +43,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="isLLMSpan"
           type="observationType"
           :value="span.gen_ai_operation_name"
-          class="tw:mr-1 tw:normal-case!"
+          class="mr-1 normal-case!"
           data-test="trace-details-sidebar-observation-badge"
         >{{ span.gen_ai_operation_name?.charAt(0) + span.gen_ai_operation_name?.slice(1).toLowerCase() }}</OTag>
 
-        <span class="tw:truncate">{{ span.operation_name }}</span>
+        <span class="truncate">{{ span.operation_name }}</span>
       </div>
 
       <OButton
@@ -60,26 +60,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
     <div
-      class="trace-details-toolbar-container tw:bg-[rgba(248,249,250,0.5)] tw:whitespace-nowrap"
+      class="trace-details-toolbar-container bg-[rgba(248,249,250,0.5)] whitespace-nowrap"
       data-test="trace-details-sidebar-header-toolbar"
     >
       <!-- Row 1: Trace Details -->
       <div
-        class="tw:flex tw:items-center tw:justify-between tw:p-1"
+        class="flex items-center justify-between p-1"
         style="overflow-x: auto; flex-wrap: nowrap"
       >
-        <div class="tw:flex tw:items-center" style="flex-wrap: nowrap">
+        <div class="flex items-center" style="flex-wrap: nowrap">
           <!-- Service Badge -->
           <OTag
             type="metricChip"
-            class="toolbar-chip service-chip tw:mr-[0.325rem]"
+            class="toolbar-chip service-chip mr-[0.325rem]"
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
           >
             <template #icon>
               <img
                 :src="serviceIconUrl"
-                class="tw:w-[0.875rem] tw:h-[0.875rem] tw:shrink-0"
+                class="w-[0.875rem] h-[0.875rem] shrink-0"
                 aria-hidden="true"
                 alt=""
               />
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Duration Badge -->
           <OTag
             type="metricChip"
-            class="toolbar-chip duration-chip tw:mr-[0.325rem]"
+            class="toolbar-chip duration-chip mr-[0.325rem]"
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="getTTFT"
             type="metricChip"
-            class="toolbar-chip ttft-chip tw:mr-[0.325rem]"
+            class="toolbar-chip ttft-chip mr-[0.325rem]"
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Start Time Badge -->
           <OTag
             type="metricChip"
-            class="toolbar-chip time-chip tw:mr-[0.325rem]"
+            class="toolbar-chip time-chip mr-[0.325rem]"
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="spanHttpResendCount"
             type="metricChip"
-            class="toolbar-chip resend-chip tw:mr-[0.325rem]"
+            class="toolbar-chip resend-chip mr-[0.325rem]"
             :title="`Request resent ${spanHttpResendCount} time(s)`"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
@@ -144,12 +144,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTag>
         </div>
 
-        <div class="tw:flex tw:items-center">
+        <div class="flex items-center">
           <!-- Span ID Badge -->
           <OTag
             type="metricChip"
             clickable
-            class="toolbar-chip span-id-chip tw:mr-[0.325rem]"
+            class="toolbar-chip span-id-chip mr-[0.325rem]"
             :title="`Span ID: ${span.span_id}`"
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
@@ -159,22 +159,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="content-copy"
               size="xs"
-              class="tw:ml-1 copy-icon"
+              class="ml-1 copy-icon"
               data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
             />
           </OTag>
 
           <!-- View Logs Button -->
-          <span v-if="parentMode === 'standalone'" class="tw:shrink-0">
+          <span v-if="parentMode === 'standalone'" class="shrink-0">
             <!-- Single button with wrapper for tooltip functionality -->
             <span
-              class="tw:inline-block"
+              class="inline-block"
               tabindex="0"
             >
               <OButton
                 variant="outline"
                 size="xs"
-                class="tw:h-full tw:text-[0.75rem]!"
+                class="h-full text-[0.75rem]!"
                 :disabled="isViewLogsDisabled"
                 :loading="config.isEnterprise === 'true' && correlationLoading"
                 @click.stop="viewSpanLogs"
@@ -191,14 +191,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Row 2: LLM Metrics (conditional) -->
       <div
         v-if="isLLMSpan && llmMetrics && span.gen_ai_response_model"
-        class="tw:flex tw:items-center tw:justify-between tw:p-1 llm-metrics-row"
+        class="flex items-center justify-between p-1 llm-metrics-row"
         style="
           overflow-x: auto;
           flex-wrap: nowrap;
           border-top: 1px solid #e9ecef;
         "
       >
-        <div class="tw:flex tw:items-center" style="flex-wrap: nowrap">
+        <div class="flex items-center" style="flex-wrap: nowrap">
           <!-- Model Chip -->
           <OTag
             type="metricChip"
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="llm-chip model-chip"
             :title="span.gen_ai_response_model"
           >
-            <span class="chip-value tw:font-bold">{{ span.gen_ai_response_model }}</span>
+            <span class="chip-value font-bold">{{ span.gen_ai_response_model }}</span>
           </OTag>
 
           <!-- Token Usage Group -->
@@ -241,13 +241,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="llm-chip cost-chip"
             title="Total Cost"
           >
-            <span class="chip-value tw:font-bold"
+            <span class="chip-value font-bold"
               >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
             >
           </OTag>
         </div>
 
-        <div class="tw:flex tw:items-center">
+        <div class="flex items-center">
           <!-- Provider Badge -->
           <OTag
             v-if="span.gen_ai_provider_name"
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="tw:font-bold tw:mx-2 span_details_tabs ">
+    <div class="font-bold mx-2 span_details_tabs ">
       <OTabs
         v-model="activeTab"
         dense
@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label="Preview"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-preview"
-                    class="tw:font-normal!"
+                    class="font-normal!"
 
         />
 
@@ -281,20 +281,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('common.attributes')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-attributes"
-          class="tw:font-normal!"
+          class="font-normal!"
         />
         <OTab
           name="error"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-error"
-          class="tw:font-normal! tw:gap-1!"
+          class="font-normal! gap-1!"
         >
           {{ t('common.error') }}
           <OTag
             v-if="hasExceptionEvents.length"
             type="countChip"
             value="error"
-            class="tw:ml-0"
+            class="ml-0"
             data-test="trace-details-sidebar-tabs-error-count"
           >{{ hasExceptionEvents.length }}</OTag>
         </OTab>
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="database"
           :label="t('common.db')"
           style="text-transform: capitalize"
-          class="tw:font-normal!"
+          class="font-normal!"
           data-test="trace-details-sidebar-tabs-database"
         />
         <OTab
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('common.events')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-events"
-                    class="tw:font-normal!"
+                    class="font-normal!"
 
         />
         <OTab
@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('common.links')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-links"
-          class="tw:font-normal!"
+          class="font-normal!"
 
         />
         <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
@@ -329,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('correlation.correlatedLogs')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-correlated-logs"
-          class="tw:font-normal!"
+          class="font-normal!"
 
         />
         <OTab
@@ -338,35 +338,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('correlation.correlatedMetrics')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-correlated-metrics"
-          class="tw:font-normal!"
+          class="font-normal!"
         />
       </OTabs>
     </div>
-    <OSeparator class="tw:w-full" />
-    <div class="span_details_tab-panels tw:h-[calc(100%-6rem)] tw:overflow-hidden tw:p-2">
+    <OSeparator class="w-full" />
+    <div class="span_details_tab-panels h-[calc(100%-6rem)] overflow-hidden p-2">
       <OTabPanels v-model="activeTab"
 grow
-class="tw:h-full tw:overflow-y-auto">
+class="h-full overflow-y-auto">
         <!-- LLM Preview Tab Panel -->
         <OTabPanel
           v-if="isLLMSpan"
           name="preview"
-          class="llm-preview-panel tw:p-3"
+          class="llm-preview-panel p-3"
         >
-          <div class="llm-preview-container tw:overflow-hidden tw:overflow-x-auto tw:w-full tw:h-full!">
+          <div class="llm-preview-container overflow-hidden overflow-x-auto w-full h-full!">
             <!-- Input and Output Side by Side -->
             <div
-              class="tw:flex io-container tw:w-full! tw:h-full!"
+              class="flex io-container w-full! h-full!"
               :class="{ 'io-container-dark': isDarkMode }"
               ref="ioContainerRef"
             >
               <!-- Input Section -->
-              <div class="tw:w-1/2 io-section tw:pr-[0.5rem]">
+              <div class="w-1/2 io-section pr-[0.5rem]">
                 <div
-                  class="section-label tw:font-bold tw:mb-1 tw:flex tw:items-center tw:justify-between"
+                  class="section-label font-bold mb-1 flex items-center justify-between"
                 >
                   <div>Input</div>
-                  <div class="tw:flex tw:items-center tw:gap-1">
+                  <div class="flex items-center gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
@@ -393,13 +393,13 @@ class="tw:h-full tw:overflow-y-auto">
                 </div>
                 <div class="llm-content-box">
                   <!-- System Instructions (when available) -->
-                  <div v-if="parsedSystemInstructions" class="tw:mb-3">
+                  <div v-if="parsedSystemInstructions" class="mb-3">
                     <OCollapsible
                       v-model="sysInstrOpen"
                       icon="settings"
                       label="System Instructions"
                     >
-                      <div class="tw:p-2 tw:bg-[var(--o2-code-bg)]">
+                      <div class="p-2 bg-[var(--o2-code-bg)]">
                         <LLMContentRenderer
                           :content="JSON.stringify([{ role: 'system', content: parsedSystemInstructions }])"
                           :observation-type="span.gen_ai_operation_name"
@@ -428,12 +428,12 @@ class="tw:h-full tw:overflow-y-auto">
               </div>
 
               <!-- Output Section -->
-              <div class="tw:w-1/2 io-section">
+              <div class="w-1/2 io-section">
                 <div
-                  class="section-label tw:font-bold tw:mb-1 tw:flex tw:items-center tw:justify-between"
+                  class="section-label font-bold mb-1 flex items-center justify-between"
                 >
                   <div>Output</div>
-                  <div class="tw:flex tw:items-center tw:gap-1">
+                  <div class="flex items-center gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
@@ -483,9 +483,9 @@ class="tw:h-full tw:overflow-y-auto">
               v-if="span.llm_request_parameters"
               v-model="modelParamsOpen"
               label="Model Parameters"
-              class="tw:mt-3"
+              class="mt-3"
             >
-              <pre class="model-params-json tw:p-2">{{
+              <pre class="model-params-json p-2">{{
                 formatModelParams(span.llm_request_parameters)
               }}</pre>
             </OCollapsible>
@@ -494,24 +494,24 @@ class="tw:h-full tw:overflow-y-auto">
 
         <OTabPanel
           name="attributes"
-          class="tw:p-0 tw:flex tw:flex-col tw:overflow-hidden"
+          class="p-0 flex flex-col overflow-hidden"
         >
           <!-- View mode toggle toolbar -->
-          <div class="tw:flex tw:items-center tw:justify-start tw:pb-1.5! tw:h-fit!">
-            <OToggleGroup v-model="attributesViewMode" class="tw:rounded!">
+          <div class="flex items-center justify-start pb-1.5! h-fit!">
+            <OToggleGroup v-model="attributesViewMode" class="rounded!">
               <OToggleGroupItem value="json"
 size="xs"
-class="tw:h-5! tw:text-[0.75rem]!">
+class="h-5! text-[0.75rem]!">
                 <template #icon-left
-                  ><OIcon name="data-object" size="xs" class="tw:shrink-0"
+                  ><OIcon name="data-object" size="xs" class="shrink-0"
                 /></template>
                 JSON
               </OToggleGroupItem>
               <OToggleGroupItem value="table"
 size="xs"
-class="tw:h-5! tw:text-[0.75rem]!">
+class="h-5! text-[0.75rem]!">
                 <template #icon-left
-                  ><OIcon name="table-chart" size="xs" class="tw:shrink-0"
+                  ><OIcon name="table-chart" size="xs" class="shrink-0"
                 /></template>
                 Table
               </OToggleGroupItem>
@@ -520,7 +520,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
           <!-- JSON View -->
           <div
             v-if="attributesViewMode === 'json'"
-            class="tw:grow tw:overflow-auto"
+            class="grow overflow-auto"
           >
             <json-preview
               :value="attributesForDisplay"
@@ -528,12 +528,12 @@ class="tw:h-5! tw:text-[0.75rem]!">
               data-test="trace-details-sidebar-attributes-table"
             >
               <template #field-dropdown="{ field, value: fieldValue }">
-                <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+                <ul class="flex flex-col m-0 p-0 list-none">
                   <li
                     v-for="action in filterActions"
                     :key="action.operator"
                     :data-test="`trace-details-sidebar-json-filter-action-${action.operator}`"
-                    class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
+                    class="flex items-center gap-1 px-1 py-1 cursor-pointer hover:bg-muted/50"
                     @click.stop="
                       $emit('apply-filter-immediately', {
                         field,
@@ -542,17 +542,17 @@ class="tw:h-5! tw:text-[0.75rem]!">
                       })
                     "
                   >
-                    <span class="tw:mr-1 tw:inline-flex tw:shrink-0">
+                    <span class="mr-1 inline-flex shrink-0">
                       <OButton variant="ghost" size="icon-xs-circle">
                         <OIcon
                           color="currentColor"
-                          class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
+                          class="w-[0.7rem]! h-[0.7rem]! pb-[0.185rem]!"
                         >
                           <component :is="action.iconComponent" />
                         </OIcon>
                       </OButton>
                     </span>
-                    <span class="tw:text-[0.85rem]!">{{
+                    <span class="text-[0.85rem]!">{{
                       $t("traces.applyAndSearch")
                     }}</span>
                   </li>
@@ -563,11 +563,11 @@ class="tw:h-5! tw:text-[0.75rem]!">
           <!-- Table View -->
           <div
             v-else
-            class="tw:flex-1 tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)]"
+            class="flex-1 overflow-hidden tab-content-dynamic-height border-1 border-solid border-[var(--o2-border-color)]"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tw:[height:calc(100vh-312px)]'
-                : 'tw:[height:calc(100vh-276px)]'
+                ? '[height:calc(100vh-312px)]'
+                : '[height:calc(100vh-276px)]'
             "
             data-test="trace-details-sidebar-attributes-tenstack-table"
           >
@@ -585,12 +585,12 @@ class="tw:h-5! tw:text-[0.75rem]!">
               <template #cell-value="{ item }">
                 <AttributeValueCell :field="item.field" :value="item.value">
                   <template #dropdown="{ field, value: fieldValue }">
-                    <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+                    <ul class="flex flex-col m-0 p-0 list-none">
                       <li
                         v-for="action in filterActions"
                         :key="action.operator"
                         :data-test="`trace-details-sidebar-attr-filter-action-${action.operator}`"
-                        class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
+                        class="flex items-center gap-1 px-1 py-1 cursor-pointer hover:bg-muted/50"
                         @click.stop="
                           $emit('apply-filter-immediately', {
                             field,
@@ -599,17 +599,17 @@ class="tw:h-5! tw:text-[0.75rem]!">
                           })
                         "
                       >
-                        <span class="tw:mr-1 tw:inline-flex tw:shrink-0">
+                        <span class="mr-1 inline-flex shrink-0">
                           <OButton variant="ghost" size="icon-xs-circle">
                             <OIcon
                               color="currentColor"
-                              class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
+                              class="w-[0.7rem]! h-[0.7rem]! pb-[0.185rem]!"
                             >
                               <component :is="action.iconComponent" />
                             </OIcon>
                           </OButton>
                         </span>
-                        <span class="tw:text-[0.85rem]!">{{
+                        <span class="text-[0.85rem]!">{{
                           $t("traces.applyAndSearch")
                         }}</span>
                       </li>
@@ -622,25 +622,25 @@ class="tw:h-5! tw:text-[0.75rem]!">
         </OTabPanel>
         <OTabPanel
           name="events"
-          class="tw:p-0 tw:flex tw:flex-col tw:h-[30.6rem]!"
+          class="p-0 flex flex-col h-[30.6rem]!"
         >
           <template v-if="spanDetails.events.length">
             <!-- Wrap toggle toolbar -->
-            <div class="tw:flex tw:items-center tw:gap-1 tw:pb-[0.325rem] tw:pl-1">
+            <div class="flex items-center gap-1 pb-[0.325rem] pl-1">
               <OSwitch
                 v-model="eventsWrap"
                 :label="t('common.wrap')"
                 size="md"
-                class="tw:gap-1!"
+                class="gap-1!"
               />
             </div>
             <!-- TenstackTable for events -->
             <div
-              class="tw:flex-1 traces-events-table-container tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded"
+              class="flex-1 traces-events-table-container overflow-hidden tab-content-dynamic-height border-1 border-solid border-[var(--o2-border-color)] rounded"
               :class="
                 isLLMSpan && llmMetrics && span.gen_ai_response_model
-                  ? 'tw:[height:calc(100vh-312px)]'
-                  : 'tw:[height:calc(100vh-276px)]'
+                  ? '[height:calc(100vh-312px)]'
+                  : '[height:calc(100vh-276px)]'
               "
               data-test="trace-details-sidebar-events-table"
             >
@@ -663,8 +663,8 @@ class="tw:h-5! tw:text-[0.75rem]!">
                 <template #expanded-row="{ row }">
                   <json-preview
                     :value="row"
-                    class="tw:py-[0.375rem] tw:pl-[0.375rem]"
-                    copyButtonClass="tw:left-[0.25rem]! tw:w-fit! tw:sticky!"
+                    class="py-[0.375rem] pl-[0.375rem]"
+                    copyButtonClass="left-[0.25rem]! w-fit! sticky!"
                     mode="expanded"
                   />
                 </template>
@@ -673,18 +673,18 @@ class="tw:h-5! tw:text-[0.75rem]!">
           </template>
           <div
             v-else
-            class="tw:w-full tw:text-center tw:flex tw:items-center tw:justify-center tw:pt-4 tw:font-bold tab-content-dynamic-height"
+            class="w-full text-center flex items-center justify-center pt-4 font-bold tab-content-dynamic-height"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tw:[height:calc(100vh-312px)]'
-                : 'tw:[height:calc(100vh-276px)]'
+                ? '[height:calc(100vh-312px)]'
+                : '[height:calc(100vh-276px)]'
             "
             data-test="trace-details-sidebar-no-events"
           >
             No events present for this span
           </div>
         </OTabPanel>
-        <OTabPanel name="error" class="tw:h-full">
+        <OTabPanel name="error" class="h-full">
           <TraceErrorTab
             :span="span"
             :search-query="searchQuery"
@@ -695,18 +695,18 @@ class="tw:h-5! tw:text-[0.75rem]!">
           />
         </OTabPanel>
 
-        <OTabPanel name="database" class="tw:p-0 tw:h-full">
+        <OTabPanel name="database" class="p-0 h-full">
           <DbSpanDetails :span="span" />
         </OTabPanel>
 
         <OTabPanel name="links">
-          <div v-if="spanLinks.length" class="tw:overflow-auto tw:max-h-[20rem]">
+          <div v-if="spanLinks.length" class="overflow-auto max-h-[20rem]">
             <table
-              class="trace-detail-tab-table tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:w-full"
+              class="trace-detail-tab-table border border-solid border-[var(--o2-border-color)] w-full"
               data-test="trace-details-sidebar-links-table"
             >
               <thead
-                class="thead-sticky tw:text-left tw:bg-(--color-surface-accent)"
+                class="thead-sticky text-left bg-(--color-surface-accent)"
               >
                 <tr>
                   <th
@@ -728,15 +728,15 @@ class="tw:h-5! tw:text-[0.75rem]!">
                   @click="openReferenceTrace('span', row)"
                   @keydown="onLinkRowKeydown($event, row)"
                   style="cursor: pointer"
-                  class="pointer tw:focus-visible:outline-none tw:focus-visible:bg-(--color-surface-accent)"
+                  class="pointer focus-visible:outline-none focus-visible:bg-(--color-surface-accent)"
                 >
                   <td
                     v-for="column in linkColumns"
                     :key="index + '-' + column.name"
-                    class="tw:p-0 tw:mb-0.5 tw:relative tw:overflow-visible tw:cursor-default"
+                    class="p-0 mb-0.5 relative overflow-visible cursor-default"
                     style="cursor: pointer"
                   >
-                    <div class="tw:flex tw:flex tw:items-center tw:flex-nowrap">
+                    <div class="flex flex items-center flex-nowrap">
                       {{ column.prop(row) }}
                     </div>
                   </td>
@@ -746,11 +746,11 @@ class="tw:h-5! tw:text-[0.75rem]!">
           </div>
           <div
             v-else
-            class="tw:w-full tw:flex tw:items-center tw:justify-center tw:text-center tw:pt-4 tw:font-bold tab-content-dynamic-height"
+            class="w-full flex items-center justify-center text-center pt-4 font-bold tab-content-dynamic-height"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tw:[height:calc(100vh-312px)]'
-                : 'tw:[height:calc(100vh-276px)]'
+                ? '[height:calc(100vh-312px)]'
+                : '[height:calc(100vh-276px)]'
             "
             data-test="trace-details-sidebar-no-links"
           >
@@ -761,7 +761,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
         <!-- Correlated Logs Tab Panel -->
         <OTabPanel
           name="correlated-logs"
-          class="tw:p-0 full-height traces-correlated-logs-container"
+          class="p-0 full-height traces-correlated-logs-container"
         >
           <CorrelatedLogsTable
             v-if="correlationProps"
@@ -785,26 +785,26 @@ class="tw:h-5! tw:text-[0.75rem]!">
           <!-- Loading/Empty state when no data -->
           <div
             v-else
-            class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
+            class="flex items-center justify-center py-20 tab-content-dynamic-height"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tw:[height:calc(100vh-312px)]'
-                : 'tw:[height:calc(100vh-276px)]'
+                ? '[height:calc(100vh-312px)]'
+                : '[height:calc(100vh-276px)]'
             "
           >
-            <div class="tw:text-center">
+            <div class="text-center">
               <OSpinner
                 v-if="correlationLoading"
                 size="lg"
-                class="tw:mb-4"
+                class="mb-4"
               />
               <div
                 v-else-if="correlationError"
-                class="tw:text-[0.875rem] tw:font-bold"
+                class="text-[0.875rem] font-bold"
               >
                 {{ correlationError }}
               </div>
-              <div v-else class="tw:text-base tw:text-gray-500">
+              <div v-else class="text-base text-gray-500">
                 {{ t("correlation.clickToLoadLogs") }}
               </div>
             </div>
@@ -814,7 +814,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
         <!-- Correlated Metrics Tab Panel -->
         <OTabPanel
           name="correlated-metrics"
-          class="tw:p-0 full-height traces-correlated-metrics-container"
+          class="p-0 full-height traces-correlated-metrics-container"
         >
           <TelemetryCorrelationDashboard
             v-if="correlationProps"
@@ -843,26 +843,26 @@ class="tw:h-5! tw:text-[0.75rem]!">
           <!-- Loading/Empty state when no data -->
           <div
             v-else
-            class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
+            class="flex items-center justify-center py-20 tab-content-dynamic-height"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tw:[height:calc(100vh-312px)]'
-                : 'tw:[height:calc(100vh-276px)]'
+                ? '[height:calc(100vh-312px)]'
+                : '[height:calc(100vh-276px)]'
             "
           >
-            <div class="tw:text-center">
+            <div class="text-center">
               <OSpinner
                 v-if="correlationLoading"
                 size="lg"
-                class="tw:mb-4"
+                class="mb-4"
               />
               <div
                 v-else-if="correlationError"
-                class="tw:text-[0.875rem] tw:font-bold"
+                class="text-[0.875rem] font-bold"
               >
                 {{ correlationError }}
               </div>
-              <div v-else class="tw:text-base tw:text-gray-500">
+              <div v-else class="text-base text-gray-500">
                 {{ t("correlation.clickToLoadMetrics") }}
               </div>
             </div>
@@ -1202,9 +1202,9 @@ export default defineComponent({
         size: 200,
         meta: {
           headerClass:
-            "tw:border-b tw:border-r tw:border-b-[var(--o2-border-color)]",
+            "border-b border-r border-b-[var(--o2-border-color)]",
           cellClass:
-            "tw:border-r tw:border-b-[var(--o2-border-color)] tw:text-[var(--o2-json-key)]",
+            "border-r border-b-[var(--o2-border-color)] text-[var(--o2-json-key)]",
         },
       },
       {
@@ -1214,8 +1214,8 @@ export default defineComponent({
         size: 400,
         meta: {
           slot: true,
-          headerClass: "tw:border-b tw:border-b-[var(--o2-border-color)]",
-          cellClass: "tw:border-b-[var(--o2-border-color)] tw:p-0!",
+          headerClass: "border-b border-b-[var(--o2-border-color)]",
+          cellClass: "border-b-[var(--o2-border-color)] p-0!",
         },
       },
     ];
@@ -1244,14 +1244,14 @@ export default defineComponent({
         label: "Field",
         field: "field",
         align: "left" as const,
-        headerClasses: "tw:text-left!",
+        headerClasses: "text-left!",
       },
       {
         name: "value",
         label: "Value",
         field: "value",
         align: "left" as const,
-        headerClasses: "tw:text-left!",
+        headerClasses: "text-left!",
       },
     ];
 
@@ -1396,8 +1396,8 @@ export default defineComponent({
             ),
           meta: {
             headerClass:
-              "tw:border-b tw:border-r tw:border-b-[var(--o2-border-color)]",
-            cellClass: "tw:border-r tw:border-b-[var(--o2-border-color)]",
+              "border-b border-r border-b-[var(--o2-border-color)]",
+            cellClass: "border-r border-b-[var(--o2-border-color)]",
           },
         });
         allKeys.delete(tsCol);
@@ -1424,8 +1424,8 @@ export default defineComponent({
           },
           meta: {
             headerClass:
-              "tw:border-b tw:border-r tw:border-b-[var(--o2-border-color)]",
-            cellClass: "tw:border-r tw:border-b-[var(--o2-border-color)]",
+              "border-b border-r border-b-[var(--o2-border-color)]",
+            cellClass: "border-r border-b-[var(--o2-border-color)]",
           },
         });
       });

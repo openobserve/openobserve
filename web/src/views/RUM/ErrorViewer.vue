@@ -17,30 +17,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="error-viewer-container"
-    class="card-container tw:h-full tw:overflow-y-auto"
+    class="card-container h-full overflow-y-auto"
   >
     <template v-if="isLoading.length">
       <div
-        class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:h-[calc(100vh-12.5rem)]"
+        class="pb-4 flex items-center justify-center text-center h-[calc(100vh-12.5rem)]"
       >
         <div>
           <OSpinner
             size="md"
-            class="tw:mx-auto tw:block"
+            class="mx-auto block"
             data-test="error-viewer-loading-indicator"
           />
-          <div class="tw:text-center tw:w-full">
+          <div class="text-center w-full">
             {{ t("rum.loadingErrorDetails") }}
           </div>
         </div>
       </div>
     </template>
     <div v-else>
-      <div class="tw:p-[0.625rem]">
+      <div class="p-[0.625rem]">
         <ErrorHeader :error="errorDetails" />
       </div>
-      <OSeparator class="tw:w-full" />
-      <div class="tw:p-[0.625rem]">
+      <OSeparator class="w-full" />
+      <div class="p-[0.625rem]">
         <ErrorTags :error="errorDetails" />
         <ErrorStackTrace
           :error_stack="errorDetails.error_stack || []"

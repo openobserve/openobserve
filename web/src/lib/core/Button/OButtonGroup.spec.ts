@@ -24,24 +24,24 @@ describe("OButtonGroup", () => {
 
   it("applies horizontal flex classes by default", () => {
     const wrapper = mount(OButtonGroup);
-    expect(wrapper.classes().join(" ")).toContain("tw:flex-row");
+    expect(wrapper.classes().join(" ")).toContain("flex-row");
   });
 
   it("applies horizontal divide-x class by default", () => {
     const wrapper = mount(OButtonGroup);
-    expect(wrapper.classes().join(" ")).toContain("tw:divide-x");
+    expect(wrapper.classes().join(" ")).toContain("divide-x");
   });
 
   // --- Orientation: vertical ---
 
   it('applies vertical flex classes when orientation="vertical"', () => {
     const wrapper = mount(OButtonGroup, { props: { orientation: "vertical" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:flex-col");
+    expect(wrapper.classes().join(" ")).toContain("flex-col");
   });
 
   it('applies vertical divide-y class when orientation="vertical"', () => {
     const wrapper = mount(OButtonGroup, { props: { orientation: "vertical" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:divide-y");
+    expect(wrapper.classes().join(" ")).toContain("divide-y");
   });
 
   // --- Integration: OButton children ---

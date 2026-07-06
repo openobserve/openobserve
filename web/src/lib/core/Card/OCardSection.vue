@@ -13,17 +13,17 @@ const classes = computed(() => {
 
   if (props.role === "header") {
     base.push(
-      "tw:flex tw:flex-row tw:items-center tw:gap-2",
-      "tw:flex-none",
-      "tw:px-4 tw:py-3",
+      "flex flex-row items-center gap-2",
+      "flex-none",
+      "px-4 py-3",
     );
   } else if (props.role === "body") {
-    base.push("tw:flex-1 tw:min-h-0", "tw:p-4");
+    base.push("flex-1 min-h-0", "p-4");
     if (props.scrollable) {
-      base.push("tw:overflow-y-auto");
+      base.push("overflow-y-auto");
     }
   } else if (props.role === "footer") {
-    base.push("tw:flex-none", "tw:px-4 tw:py-3");
+    base.push("flex-none", "px-4 py-3");
   }
 
   return base;
