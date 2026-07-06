@@ -601,7 +601,7 @@ pub struct BrowserConfig {
     pub browser_devices: Vec<BrowserDevice>,
     pub runtime: Option<String>,
     #[serde(default)]
-    pub steps: Vec<BrowserStep>,
+    pub steps: Vec<serde_json::Value>,
     #[serde(default)]
     pub env: Vec<String>,
     #[serde(default)]
@@ -609,12 +609,6 @@ pub struct BrowserConfig {
     #[serde(default = "default_browser_timeout_ms")]
     pub timeout_ms: u32,
     pub capture: Option<BrowserCapture>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BrowserStep {
-    pub name: String,
-    pub code: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

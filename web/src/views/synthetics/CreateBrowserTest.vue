@@ -154,7 +154,7 @@ const check = ref<BrowserCheck>({
   tags: [],
   journey: [],
   schedule: { type: 'interval', intervalValue: 5, intervalUnit: 'minutes' },
-  locations: ['aws-us-east-1'],
+  locations: [],
   retries: 0,
   waitBeforeRetrySecs: 5,
   alertIfFails: 1,
