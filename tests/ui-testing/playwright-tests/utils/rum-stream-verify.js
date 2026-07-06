@@ -65,4 +65,59 @@ async function waitForStreamRows(
   }
 }
 
-module.exports = { searchStream, waitForStreamRows };
+/**
+ * Purge OLD data from the shared RUM streams (_rumdata / _rumlog /
+ * _sessionreplay) on a long-lived test instance, to bound the accumulation
+ * from repeated dataflow runs.
+ *
+ * WHY "old data" and not "this run's data": OpenObserve exposes NO row-level
+ * or predicate-scoped delete — the only stream-data delete API is
+ * `DELETE /streams/{stream}/data_by_time_range`, which takes hour-aligned
+ * start/end timestamps and removes EVERYTHING in that window regardless of
+ * `service` (verified: it 400s on a non-hour-aligned end, returns an async
+ * job id, and has no filter param). So the dataflow specs cannot delete just
+ * their own rows. This helper instead deletes data strictly OLDER than
+ * `olderThanHours`, which:
+ *   - never touches the run that just finished, and
+ *   - never touches a concurrently-running shard on the same instance,
+ * while still clearing junk left by PAST runs. It is therefore safe to run
+ * from global teardown after all tests complete.
+ *
+ * It is OPT-IN (`ZO_RUM_PURGE_STREAM_DATA=true`) and default-off because on a
+ * genuinely shared instance a time-range delete would also remove any
+ * non-test RUM data older than the cutoff.
+ *
+ * @param {import('@playwright/test').APIRequestContext} requestCtx
+ * @param {object} [opts]
+ * @param {number} [opts.olderThanHours=24]
+ * @param {string[]} [opts.streams]
+ * @returns {Promise<Array<{stream:string,status?:number,jobId?:string,error?:string}>>}
+ */
+async function purgeOldRumStreamData(
+  requestCtx,
+  { olderThanHours = 24, streams = ['_rumdata', '_rumlog', '_sessionreplay'] } = {},
+) {
+  const { orgId, baseUrl, email, password } = ctx();
+  const HOUR_MS = 3600 * 1000;
+  // Floor the cutoff to the top of the hour — the API rejects any end
+  // timestamp that is not aligned to a zero minute/second.
+  const cutoffMs = Math.floor((Date.now() - olderThanHours * HOUR_MS) / HOUR_MS) * HOUR_MS;
+  const endMicros = cutoffMs * 1000;
+  const results = [];
+  for (const stream of streams) {
+    try {
+      const res = await requestCtx.delete(
+        `${baseUrl}/api/${orgId}/streams/${stream}/data_by_time_range?type=logs&start=1&end=${endMicros}`,
+        { headers: { Authorization: authHeader(email, password) } },
+      );
+      const body = await res.json().catch(() => ({}));
+      results.push({ stream, status: res.status(), jobId: body?.id });
+    } catch (e) {
+      results.push({ stream, error: e.message });
+    }
+  }
+  testLogger.info('Purged old RUM stream data', { olderThanHours, results });
+  return results;
+}
+
+module.exports = { searchStream, waitForStreamRows, purgeOldRumStreamData };

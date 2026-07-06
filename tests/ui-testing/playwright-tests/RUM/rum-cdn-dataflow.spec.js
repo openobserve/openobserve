@@ -28,10 +28,15 @@
  *   - The instance must accept cross-origin RUM ingestion from the fixture origin
  *
  * Data cleanup: rows are written to the shared _rumdata/_rumlog/_sessionreplay
- * streams. OpenObserve has no row-level delete API, and dropping those shared
- * org-wide streams would destroy other data, so rows cannot be removed here.
- * Every row is namespaced with a unique per-run `service`, so reruns never
- * cross-assert, and stream retention ages the rows out.
+ * streams. OpenObserve exposes NO predicate-scoped delete — the only
+ * stream-data delete API removes an entire hour-aligned time window
+ * regardless of `service` — so this run's rows cannot be deleted individually
+ * or in-place (a per-spec delete would also race a concurrently-running
+ * dataflow spec on the same instance). Instead: every row is namespaced with
+ * a unique per-run `service` so reruns never cross-assert, stream retention
+ * ages rows out, and a long-lived test instance can bound accumulation with
+ * the opt-in `ZO_RUM_PURGE_STREAM_DATA=true` old-data purge that runs once in
+ * global teardown (see utils/global-teardown.js + purgeOldRumStreamData).
  */
 
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
