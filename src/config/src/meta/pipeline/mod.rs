@@ -95,6 +95,65 @@ impl MemorySize for Pipeline {
     }
 }
 
+// TODO YJDoc2: in a separate PR, use this fn in the pipeline validation below, so we have
+// same logic for pipelines and workflows as intended
+pub fn validate_nodes_edges(nodes: &[Node], edges: &[Edge]) -> Result<(), anyhow::Error> {
+    for node in nodes {
+        // ck 4
+        if let NodeData::Condition(condition_params) = &node.data {
+            let has_empty_conditions = match condition_params {
+                components::ConditionParams::V1 { conditions } => !conditions.has_conditions(),
+                components::ConditionParams::V2 { conditions } => conditions.conditions.is_empty(),
+            };
+            if has_empty_conditions {
+                return Err(anyhow!("ConditionNode must have non-empty conditions"));
+            }
+        }
+    }
+
+    if edges.len() < nodes.len() - 1 {
+        return Err(anyhow!(
+            "Insufficient number of edges to connect all nodes. Need at least {} for {} nodes, but got {}.",
+            nodes.len() - 1,
+            nodes.len(),
+            edges.len()
+        ));
+    }
+
+    // build adjacency list for ck 6 & 7
+    let source_node_id = nodes[0].id.as_str();
+    let node_map: HashMap<_, _> = nodes
+        .iter()
+        .map(|node| (node.get_node_id(), node.get_node_data()))
+        .collect();
+
+    let mut adjacency_list = HashMap::new();
+
+    for (idx, edge) in edges.iter().enumerate() {
+        if !node_map.contains_key(&edge.source) {
+            return Err(anyhow!("Edge #{idx}'s source node not found in nodes list"));
+        }
+        if !node_map.contains_key(&edge.target) {
+            return Err(anyhow!("Edge #{idx}'s target node not found in nodes list"));
+        }
+        adjacency_list
+            .entry(edge.source.clone())
+            .or_insert_with(Vec::new)
+            .push(edge.target.clone());
+    }
+
+    let mut visited = HashSet::new();
+    dfs_traversal_check(
+        source_node_id,
+        &adjacency_list,
+        &node_map,
+        false,
+        &mut visited,
+    )?;
+
+    Ok(())
+}
+
 impl Pipeline {
     /// Returns true if this is a user-created pipeline.
     pub fn is_user(&self) -> bool {

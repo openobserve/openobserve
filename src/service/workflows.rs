@@ -135,7 +135,7 @@ fn validate_workflow(workflow: &Workflow) -> Result<(), anyhow::Error> {
             ));
         }
     }
-    // TODO YJDOc2: add pipeline like validation as well
+    config::meta::pipeline::validate_nodes_edges(&workflow.nodes, &workflow.edges)?;
     Ok(())
 }
 
@@ -222,7 +222,11 @@ pub async fn execute_workflow(
         let mut inputs = Vec::with_capacity(errors.error_count as usize);
         let mut err_list = Vec::with_capacity(errors.error_count as usize);
 
-        for (e, val) in errors.errors {
+        for (mut e, val) in errors.errors {
+            // because we are storing the errors in db, we don't want to have
+            // a long string * a lot of errors
+            // so we truncate the length here, and then limit the count below
+            e.truncate(100);
             err_list.push(e);
             if let Some(mut v) = val {
                 // top level value should always be a single json value,
@@ -238,12 +242,11 @@ pub async fn execute_workflow(
                 }
             }
         }
-        // TODO YJDOc2: truncate individual error at 100 chars and
-        // total errors at 50 count
         // it is possible that we have errors, but no corresponding inputs
         // we should always show the errors to user, so we store it in db
         // but only create entry in input map if inputs are present
         if !err_list.is_empty() {
+            err_list.truncate(50);
             workflow_errors.push(WorkflowError {
                 node_id: node_id.clone(),
                 error: err_list,
