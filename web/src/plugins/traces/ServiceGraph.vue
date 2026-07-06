@@ -276,12 +276,18 @@ import * as echarts from "echarts";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import serviceGraphService from "@/services/service_graph";
+import searchService from "@/services/search";
+import streamService from "@/services/stream";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import {
   convertServiceGraphToTree,
   convertServiceGraphToNetwork,
 } from "@/utils/traces/convertTraceData";
+import {
+  buildTopologyFromTraces,
+  mergeEdgeMetrics,
+} from "@/utils/traces/serviceGraphTopology";
 import {
   formatNumber,
   formatLatency,
@@ -1135,6 +1141,65 @@ export default defineComponent({
       }
     });
 
+    // Whether the current stream's schema has the infer_service_name column.
+    // null = unchecked; re-validated when the stream changes.
+    const hasInferColumns = ref<boolean | null>(null);
+
+    // Run one trace-stream SQL query and return its hits (empty on failure).
+    const runTracesQuery = async (
+      orgId: string,
+      sql: string,
+      start: number,
+      end: number,
+      throwOnError = false,
+    ): Promise<any[]> => {
+      try {
+        const response = await searchService.search({
+          org_identifier: orgId,
+          query: {
+            query: {
+              sql,
+              start_time: start,
+              end_time: end,
+              from: 0,
+              size: -1,
+            },
+          },
+          page_type: "traces",
+        });
+        return response.data?.hits ?? [];
+      } catch (e) {
+        // The service-edges query is the topology source — its failure means the
+        // graph genuinely can't load, so let it surface. Inferred/metrics queries
+        // are optional decoration and stay graceful.
+        if (throwOnError) throw e;
+        return [];
+      }
+    };
+
+    // Build the service→service edge SQL for the given stream.
+    const serviceEdgesSql = (stream: string) =>
+      `SELECT client.service_name AS client, server.service_name AS server, ` +
+      `COUNT(*) AS total_requests, ` +
+      `SUM(CASE WHEN server.span_status = 'ERROR' THEN 1 ELSE 0 END) AS errors ` +
+      `FROM "${stream}" AS server ` +
+      `LEFT JOIN "${stream}" AS client ` +
+      `ON server.reference_parent_span_id = client.span_id AND server.trace_id = client.trace_id ` +
+      `WHERE CAST(server.span_kind AS VARCHAR) IN ('1','2') ` +
+      `AND (client.service_name IS NULL OR client.service_name != server.service_name) ` +
+      `GROUP BY client.service_name, server.service_name`;
+
+    // Build the inferred-dependency edge SQL for the given stream.
+    const inferredEdgesSql = (stream: string) =>
+      `SELECT service_name AS client, infer_service_name AS server, ` +
+      `MAX(infer_service_type) AS connection_type, ` +
+      `COUNT(*) AS total_requests, ` +
+      `SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS errors ` +
+      `FROM "${stream}" ` +
+      `WHERE CAST(span_kind AS VARCHAR) IN ('3','4') ` +
+      `AND infer_service_name IS NOT NULL AND infer_service_name != '' ` +
+      `GROUP BY service_name, infer_service_name`;
+
     const loadServiceGraph = async () => {
       // Prevent concurrent loads — if already loading, skip
       if (loading.value) return;
@@ -1156,61 +1221,57 @@ export default defineComponent({
           searchObj.data.datetime,
         );
 
-        const response = await serviceGraphService.getCurrentTopology(orgId, {
-          streamName:
-            streamFilter.value && streamFilter.value !== "all"
-              ? streamFilter.value
-              : undefined,
-          startTime,
-          endTime,
-        });
+        const stream =
+          streamFilter.value && streamFilter.value !== "all"
+            ? streamFilter.value
+            : "default";
 
-        // Convert API response to expected format
-        const rawData = response.data;
+        // Schema-gate the inferred query on the infer_service_name column,
+        // re-checking whenever the stream changed (hasInferColumns reset).
+        if (hasInferColumns.value === null) {
+          try {
+            const schemaResponse = await streamService.schema(
+              orgId,
+              stream,
+              "traces",
+            );
+            const schemaFields =
+              schemaResponse.data?.schema || schemaResponse.data?.fields || [];
+            hasInferColumns.value = schemaFields.some(
+              (f: any) => f.name === "infer_service_name",
+            );
+          } catch {
+            hasInferColumns.value = false;
+          }
+        }
 
-        // Ensure nodes have all required fields
-        const nodes = (rawData.nodes || []).map((node: any) => ({
-          id: node.id,
-          label: node.label || node.id,
-          requests: node.requests || 0,
-          errors: node.errors || 0,
-          error_rate: node.error_rate || 0,
-          is_virtual: node.is_virtual || false,
-          service_type: node.service_type || undefined,
-        }));
+        // Topology + kinds live from the raw traces stream; latency metrics from
+        // the pre-aggregated _o2_service_graph stream. Run all three in parallel.
+        const [serviceRows, inferredRows, metricEdges] = await Promise.all([
+          runTracesQuery(orgId, serviceEdgesSql(stream), startTime, endTime, true),
+          hasInferColumns.value
+            ? runTracesQuery(orgId, inferredEdgesSql(stream), startTime, endTime)
+            : Promise.resolve([]),
+          serviceGraphService
+            .getCurrentTopology(orgId, {
+              streamName:
+                streamFilter.value && streamFilter.value !== "all"
+                  ? streamFilter.value
+                  : undefined,
+              startTime,
+              endTime,
+            })
+            .then((r: any) => r?.data?.edges ?? [])
+            .catch(() => []),
+        ]);
 
-        // Ensure edges have all required fields and valid node references
-        const nodeIds = new Set(nodes.map((n: any) => n.id));
-        const edges = (rawData.edges || [])
-          .filter((edge: any) => {
-            // Filter out edges with missing endpoints
-            const hasValidEndpoints =
-              edge.from &&
-              edge.to &&
-              nodeIds.has(edge.from) &&
-              nodeIds.has(edge.to);
-            if (!hasValidEndpoints) {
-              console.warn(
-                "[ServiceGraph] Skipping edge with invalid endpoints:",
-                edge,
-              );
-            }
-            return hasValidEndpoints;
-          })
-          .map((edge: any) => ({
-            id: `${edge.from}->${edge.to}`,
-            from: edge.from,
-            to: edge.to,
-            total_requests: edge.total_requests || 0,
-            failed_requests: edge.failed_requests || 0,
-            error_rate: edge.error_rate || 0,
-            p50_latency_ns: edge.p50_latency_ns || 0,
-            p95_latency_ns: edge.p95_latency_ns || 0,
-            p99_latency_ns: edge.p99_latency_ns || 0,
-            baseline_p50_latency_ns: edge.baseline_p50_latency_ns ?? null,
-            baseline_p95_latency_ns: edge.baseline_p95_latency_ns ?? null,
-            baseline_p99_latency_ns: edge.baseline_p99_latency_ns ?? null,
-          }));
+        const topology = buildTopologyFromTraces(
+          serviceRows as any,
+          inferredRows as any,
+        );
+        const merged = mergeEdgeMetrics(topology, metricEdges as any);
+        const nodes = merged.nodes;
+        const edges = merged.edges;
 
         graphData.value = {
           nodes,
@@ -1418,6 +1479,14 @@ export default defineComponent({
           localStorage.setItem("serviceGraph_streamFilter", newStream);
           loadServiceGraph();
         }
+      },
+    );
+
+    // Re-validate the infer_service_name schema gate whenever the stream changes.
+    watch(
+      () => streamFilter.value,
+      () => {
+        hasInferColumns.value = null;
       },
     );
 
