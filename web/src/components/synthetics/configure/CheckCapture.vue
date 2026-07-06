@@ -21,15 +21,6 @@ const screenshot = computed({
       capture: { ...props.check.capture, screenshot: v },
     }),
 })
-
-const trace = computed({
-  get: () => props.check.capture.trace,
-  set: (v: BrowserCheck['capture']['trace']) =>
-    emit('update:check', {
-      ...props.check,
-      capture: { ...props.check.capture, trace: v },
-    }),
-})
 </script>
 
 <template>
@@ -47,19 +38,6 @@ const trace = computed({
         />
         <p class="tw:text-xs tw:text-[var(--o2-text-secondary)]">
           Capture a full-page screenshot at each step.
-        </p>
-      </div>
-
-      <div class="tw:flex tw:items-center tw:gap-4">
-        <label class="tw:text-sm tw:text-[var(--o2-text-primary)] tw:w-24 tw:shrink-0">Trace</label>
-        <OSelect
-          v-model="trace"
-          :options="captureOptions"
-          class="tw:w-40"
-          data-test="synthetics-check-capture-trace"
-        />
-        <p class="tw:text-xs tw:text-[var(--o2-text-secondary)]">
-          Record a Playwright trace (network, DOM snapshots, step timeline).
         </p>
       </div>
 
