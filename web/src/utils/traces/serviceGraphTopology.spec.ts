@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { buildTopologyFromTraces } from "./serviceGraphTopology";
+import {
+  buildTopologyFromTraces,
+  mergeEdgeMetrics,
+} from "./serviceGraphTopology";
 
 describe("buildTopologyFromTraces — service edges", () => {
   it("builds service nodes and edges with no service_type", () => {
@@ -82,5 +85,55 @@ describe("buildTopologyFromTraces — inferred deps & collisions", () => {
     const e = edges.find((x) => x.from === "checkout" && x.to === "email")!;
     expect(e).toBeTruthy();
     expect(e.connection_type).toBeUndefined();
+  });
+});
+
+describe("mergeEdgeMetrics", () => {
+  const topo = {
+    nodes: [
+      { id: "cart", label: "cart", requests: 10, errors: 0 },
+      {
+        id: "valkey",
+        label: "valkey",
+        requests: 10,
+        errors: 0,
+        service_type: "database",
+      },
+    ],
+    edges: [
+      {
+        from: "cart",
+        to: "valkey",
+        total_requests: 10,
+        failed_requests: 0,
+        error_rate: 0,
+        connection_type: "database",
+      },
+    ],
+  };
+
+  it("attaches latency metrics to the matching edge", () => {
+    const out = mergeEdgeMetrics(topo, [
+      {
+        from: "cart",
+        to: "valkey",
+        p50_latency_ns: 100,
+        p95_latency_ns: 200,
+        p99_latency_ns: 300,
+      },
+    ]);
+    const e = out.edges[0];
+    expect(e.p50_latency_ns).toBe(100);
+    expect(e.p95_latency_ns).toBe(200);
+    expect(e.p99_latency_ns).toBe(300);
+  });
+
+  it("leaves an unmatched edge without latency but still present", () => {
+    const out = mergeEdgeMetrics(topo, [
+      { from: "other", to: "thing", p50_latency_ns: 999 },
+    ]);
+    const e = out.edges[0];
+    expect(e.p50_latency_ns).toBeUndefined();
+    expect(e.to).toBe("valkey"); // topology unchanged
   });
 });

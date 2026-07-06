@@ -141,3 +141,43 @@ export function buildTopologyFromTraces(
 
   return { nodes: Array.from(nodes.values()), edges };
 }
+
+export interface EdgeMetrics {
+  from: string | null;
+  to: string;
+  p50_latency_ns?: number;
+  p95_latency_ns?: number;
+  p99_latency_ns?: number;
+  error_rate?: number;
+  total_requests?: number;
+}
+
+const edgeKey = (from: string | null, to: string) => `${from ?? ""} ${to}`;
+
+/**
+ * Decorate the traces-derived topology with pre-aggregated edge metrics from
+ * `_o2_service_graph`. Topology is authoritative — an edge with no matching
+ * metric keeps undefined latency but still renders.
+ */
+export function mergeEdgeMetrics(
+  topology: { nodes: GraphNode[]; edges: GraphEdge[] },
+  metricEdges: EdgeMetrics[],
+): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  const byKey = new Map<string, EdgeMetrics>();
+  for (const m of metricEdges) byKey.set(edgeKey(m.from, m.to), m);
+
+  const edges = topology.edges.map((e) => {
+    const m = byKey.get(edgeKey(e.from, e.to));
+    if (!m) return e;
+    return {
+      ...e,
+      p50_latency_ns: m.p50_latency_ns,
+      p95_latency_ns: m.p95_latency_ns,
+      p99_latency_ns: m.p99_latency_ns,
+      // Prefer live error_rate from traces; fall back to metrics if edge had none.
+      error_rate: e.error_rate || m.error_rate || 0,
+    };
+  });
+
+  return { nodes: topology.nodes, edges };
+}
