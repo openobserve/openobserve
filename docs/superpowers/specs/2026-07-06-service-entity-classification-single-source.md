@@ -27,13 +27,24 @@ shared classification function** both screens consume.
 Verified by direct queries against a live `otel_demo` stream (30 entity groups):
 
 ```
-if is_real_service:            → "service"    // emits its own spans; any inferred type is a false positive
-else if inferType == "rpc":    → "drop"       // phantom: redundant with the real service→service edge
+if is_real_service:              → "service"    // emits its own spans; any inferred type is a false positive (collision rule wins first)
+else if inferType == "rpc":      → "drop"       // phantom: redundant with the real service→service edge
 else if inferType == "database": → "datastore"
-else if inferType == "queue":  → "queue"
+else if inferType == "queue":    → "queue"
 else if inferType == "external": → "external"
-else:                          → "service"    // no inferred type and not flagged → treat as service
+else if inferType is non-empty:  → "external"   // UNKNOWN inferred type → safe default: it's a dependency, NOT our code
+else:                            → "service"    // truly no inferred type → real service
 ```
+
+**The unknown-type branch is a deliberate safety net.** OpenTelemetry semantic
+conventions evolve; the backend may one day emit `cache`, `http`, `storage`,
+`rpc.grpc`, etc. as `infer_service_type`. Such a value means "something was
+inferred" — i.e. a dependency. Defaulting an unknown *non-empty* inferred type to
+`"external"` (a dependency) is safe; defaulting it to `"service"` would wrongly
+claim an external dependency is our instrumented code and inflate the service
+count. The distinction between **unknown non-empty type → external** and **no
+type at all → service** is essential. Note `is_real_service` is still checked
+first, so a real service carrying an unknown inferred type stays a Service.
 
 **Definitions:**
 - **`is_real_service`** — the entity emits at least one span where it is the
@@ -48,9 +59,18 @@ else:                          → "service"    // no inferred type and not flag
   `flagd.evaluation.v1.Service`) has a matching real service→service edge (proven
   by cross-referencing the rpc client spans against the parent/child service-edge
   join). The rpc node duplicates a service already in the graph, so it is dropped.
-  Non-real rpc → `"drop"`. (A hypothetical genuinely-uninstrumented rpc backend
-  does not occur in the data; if one ever appears it would also be `drop`, since
-  it too would be redundant with… nothing — acceptable, revisit only if observed.)
+  Non-real rpc → `"drop"`.
+
+  **Drop telemetry (required).** Dropping entities silently is a support hazard:
+  if the "all rpc is redundant" assumption ever fails (a genuinely uninstrumented
+  gRPC backend appears), it would vanish from both screens with no trace. So each
+  consumer MUST emit a single aggregated debug log per load when it drops
+  entities, listing the names:
+  `console.debug('[ServiceCatalog] Dropped N phantom RPC entities:', names)` /
+  `console.debug('[ServiceGraph] Dropped N phantom RPC entities:', names)`.
+  This gives support a breadcrumb without cluttering the UI. (A genuinely
+  uninstrumented rpc backend is not present in the observed data; if the debug
+  log ever shows an unexpected name, revisit the drop rule.)
 
 **Verified counts for otel_demo:** 30 raw groups → 17 services, 2 datastores
 (`otel`, `valkey-cart`), 1 queue (`kafka`), 2 external (`kubernetes.default.svc`,
@@ -73,11 +93,19 @@ export type EntityKind =
   | "rpc"
   | "drop";
 
+/** The inferred types we branch on explicitly. */
+export type KnownInferType = "database" | "queue" | "external" | "rpc";
+
 export interface ClassifyInput {
   /** True when the entity emits its own spans (a real instrumented service). */
   isRealService: boolean;
-  /** infer_service_type: "database" | "queue" | "external" | "rpc" | undefined. */
-  inferServiceType?: string | null;
+  /**
+   * infer_service_type from the backend. Typed as the known union for the
+   * values we handle, but accepts an arbitrary string at the boundary (the SQL
+   * returns whatever the ingest wrote). Unknown non-empty strings are handled
+   * defensively (→ external), NOT ignored.
+   */
+  inferServiceType?: KnownInferType | (string & {}) | null;
 }
 
 export function classifyEntity(input: ClassifyInput): EntityKind;
@@ -85,7 +113,9 @@ export function classifyEntity(input: ClassifyInput): EntityKind;
 
 `classifyEntity` encodes the rule above, once. `"drop"` means "remove from both
 screens" (phantom rpc). The function never guesses from names — it takes the two
-facts (`isRealService`, `inferServiceType`) and returns a kind.
+facts (`isRealService`, `inferServiceType`) and returns a kind. Unknown non-empty
+`inferServiceType` values fall through to `"external"` (see the rule), so new
+OTel semconv types are treated as dependencies, never as instrumented services.
 
 ### Consumer 1 — Service Catalog (`ServicesCatalog.vue`)
 
@@ -124,6 +154,34 @@ Both screens call `classifyEntity`. The taxonomy lives in one tested place; the
 two screens cannot drift. otel_demo shows identically on both:
 **17 Services · 2 Datastores · 1 Queue · 2 External · (0 RPC)**.
 
+## User-visible change & communication
+
+The unified rule changes what users see. Exact before/after (verified on
+otel_demo):
+
+| | Before | After | Δ |
+|---|---|---|---|
+| **All (total entities)** | 28 | 22 | −6 |
+| **Services** | 12 | **17** | **+5** |
+| Datastores | 2 | 2 | — |
+| Queues | 1 | 1 | — |
+| External | 5 | 2 | −3 |
+| **RPC** | 8 | **0 (tab hidden)** | −8 |
+
+Note the headline is *positive*: **Services go UP (12 → 17)** because 5 real
+services were previously mislabeled as External, and the 8 phantom RPC duplicates
+are removed. The graph loses the `oteldemo.*Service` clutter. Total nodes drop
+28 → 22. (There is no "14" — earlier estimate corrected against the data.)
+
+**Communication needed (low effort):**
+- The **RPC tab disappears** from the Catalog (count is 0). A user accustomed to
+  it may think data is missing. Recommended: a one-line note in release notes /
+  changelog — *"Service Catalog and Graph now unify duplicate gRPC calls into
+  their real services; the separate RPC category is removed as it double-counted
+  instrumented services."* No in-app banner required — the change is a strict
+  improvement and the debug log (above) covers troubleshooting.
+- No tooltip changes required; the icons/kinds already communicate node type.
+
 ## Out of scope
 
 - **Queue node label** (graph shows topic `orders`; catalog shows system `kafka`).
@@ -137,8 +195,11 @@ two screens cannot drift. otel_demo shows identically on both:
 
 - **Unit (`serviceClassification.spec.ts`):** every branch of the rule —
   real-service-with-external-inference → service; real-service plain → service;
-  non-real database/queue/external → their kind; non-real rpc → drop; no-infer →
-  service. Table-driven, one case per row of the verified otel_demo table.
+  real-service with UNKNOWN inferred type → service (collision wins);
+  non-real database/queue/external → their kind; non-real rpc → drop;
+  non-real UNKNOWN non-empty type (e.g. `"cache"`, `"http"`) → external (the
+  safety net, NOT service); no-infer (null/empty) → service. Table-driven, one
+  case per row of the verified otel_demo table plus the unknown-type cases.
 - **Catalog:** collision reclassify (email → service), genuine external kept
   (metadata.google.internal → external), phantom rpc dropped (oteldemo.* absent).
 - **Graph:** same three via `buildTopologyFromTraces`.
@@ -146,3 +207,6 @@ two screens cannot drift. otel_demo shows identically on both:
   `serviceGraphTopology.spec.ts`, `convertTraceData.spec.ts` stay green.
 - **Cross-check:** a test asserting graph `kindCounts` and catalog `categoryCounts`
   produce identical numbers for the same entity set.
+- **Drop telemetry:** a test spying on `console.debug` asserts that when phantom
+  rpc entities are dropped, exactly one aggregated debug line is emitted per load
+  with the dropped count and names (both Catalog and Graph).
