@@ -86,7 +86,7 @@ describe("applyGraphCollapse — collapse", () => {
     expect(out.nodes.some((n) => n.id === "svc")).toBe(true);
   });
 
-  it("keeps a kind expanded when it is in expandedKinds", () => {
+  it("expanded kind shows members AND keeps the boundary node as a hub (fold-back handle)", () => {
     const exts = many("external", 6);
     const g = {
       nodes: [N("svc"), ...exts],
@@ -101,8 +101,21 @@ describe("applyGraphCollapse — collapse", () => {
       g,
       st({ threshold: 5, expandedKinds: new Set(["external"]) }),
     );
-    expect(out.nodes.some((n) => n.id === "__group_external")).toBe(false);
+    // Members visible…
     expect(out.nodes.some((n) => n.id === "external0")).toBe(true);
+    // …AND the boundary node stays so the user can click to re-collapse.
+    const boundary = out.nodes.find((n) => n.id === "__group_external");
+    expect(boundary).toBeTruthy();
+    expect(boundary!.is_group).toBe(true);
+    // The boundary sits between caller and members: svc → boundary → member.
+    expect(
+      out.edges.some((e) => e.from === "svc" && e.to === "__group_external"),
+    ).toBe(true);
+    expect(
+      out.edges.some(
+        (e) => e.from === "__group_external" && e.to === "external0",
+      ),
+    ).toBe(true);
   });
 
   it("mode=expanded never collapses; mode=collapsed always collapses", () => {
