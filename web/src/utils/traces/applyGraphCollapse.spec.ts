@@ -52,3 +52,88 @@ describe("applyGraphCollapse — passthrough & hidden kinds", () => {
     expect(out.edges).toHaveLength(0);
   });
 });
+
+describe("applyGraphCollapse — collapse", () => {
+  const many = (kind: string, n: number) =>
+    Array.from({ length: n }, (_, i) => N(`${kind}${i}`, kind));
+
+  it("auto-collapses a dep kind over threshold into one boundary node", () => {
+    const exts = many("external", 6);
+    const g = {
+      nodes: [N("svc"), ...exts],
+      edges: exts.map((e) => ({
+        from: "svc",
+        to: e.id,
+        total_requests: 2,
+        failed_requests: 1,
+      })),
+    };
+    // 7 nodes > threshold 5 → collapse
+    const out = applyGraphCollapse(g, st({ threshold: 5 }));
+    const group = out.nodes.find((n) => n.id === "__group_external")!;
+    expect(group).toBeTruthy();
+    expect(group.is_group).toBe(true);
+    expect(group.member_count).toBe(6);
+    expect(group.label).toContain("(6)");
+    // members gone
+    expect(out.nodes.some((n) => n.id === "external0")).toBe(false);
+    // one aggregated edge svc → group, requests summed (6*2)
+    const ge = out.edges.filter((e) => e.to === "__group_external");
+    expect(ge).toHaveLength(1);
+    expect(ge[0].total_requests).toBe(12);
+    expect(ge[0].failed_requests).toBe(6);
+    // service stays
+    expect(out.nodes.some((n) => n.id === "svc")).toBe(true);
+  });
+
+  it("keeps a kind expanded when it is in expandedKinds", () => {
+    const exts = many("external", 6);
+    const g = {
+      nodes: [N("svc"), ...exts],
+      edges: exts.map((e) => ({
+        from: "svc",
+        to: e.id,
+        total_requests: 1,
+        failed_requests: 0,
+      })),
+    };
+    const out = applyGraphCollapse(
+      g,
+      st({ threshold: 5, expandedKinds: new Set(["external"]) }),
+    );
+    expect(out.nodes.some((n) => n.id === "__group_external")).toBe(false);
+    expect(out.nodes.some((n) => n.id === "external0")).toBe(true);
+  });
+
+  it("mode=expanded never collapses; mode=collapsed always collapses", () => {
+    const exts = many("external", 3);
+    const g = {
+      nodes: [N("svc"), ...exts],
+      edges: exts.map((e) => ({
+        from: "svc",
+        to: e.id,
+        total_requests: 1,
+        failed_requests: 0,
+      })),
+    };
+    // 4 nodes < high threshold, but mode=collapsed forces it
+    const forced = applyGraphCollapse(
+      g,
+      st({ mode: "collapsed", threshold: 999 }),
+    );
+    expect(forced.nodes.some((n) => n.id === "__group_external")).toBe(true);
+    // mode=expanded ignores a low threshold
+    const shown = applyGraphCollapse(g, st({ mode: "expanded", threshold: 1 }));
+    expect(shown.nodes.some((n) => n.id === "external0")).toBe(true);
+  });
+
+  it("never collapses service nodes", () => {
+    const svcs = Array.from({ length: 10 }, (_, i) => N(`s${i}`));
+    const out = applyGraphCollapse(
+      { nodes: svcs, edges: [] },
+      st({ mode: "collapsed", threshold: 1 }),
+    );
+    expect(out.nodes.some((n) => n.id.startsWith("__group_"))).toBe(false);
+    expect(out.nodes).toHaveLength(10);
+  });
+});

@@ -83,6 +83,76 @@ export function applyGraphCollapse(
     );
   }
 
-  // Collapse decided in Task 2; for now, no collapse.
-  return { nodes, edges };
+  // 2. Decide which dependency kinds to collapse.
+  const shouldCollapseAll =
+    state.mode === "collapsed" ||
+    (state.mode === "auto" && nodes.length > state.threshold);
+  const collapseKinds = new Set<string>();
+  if (state.mode !== "expanded") {
+    for (const k of DEP_KINDS) {
+      if (state.expandedKinds.has(k)) continue;
+      if (shouldCollapseAll) collapseKinds.add(k);
+    }
+  }
+  if (!collapseKinds.size) return { nodes, edges };
+
+  // 3. Build one boundary node per collapsed kind + a member→boundary id map.
+  const memberToGroup = new Map<string, string>();
+  const groups = new Map<string, GNode>();
+  for (const n of nodes) {
+    const k = kindOf(n);
+    if (!collapseKinds.has(k)) continue;
+    const gid = GROUP_PREFIX + k;
+    memberToGroup.set(n.id, gid);
+    let g = groups.get(gid);
+    if (!g) {
+      g = {
+        id: gid,
+        label: "",
+        requests: 0,
+        errors: 0,
+        service_type: k,
+        is_group: true,
+        member_count: 0,
+      };
+      groups.set(gid, g);
+    }
+    g.requests += n.requests || 0;
+    g.errors += n.errors || 0;
+    g.member_count = (g.member_count || 0) + 1;
+  }
+  for (const g of groups.values()) {
+    const kind = g.service_type!;
+    const kindLabel = kind.charAt(0).toUpperCase() + kind.slice(1);
+    g.label = `${kindLabel} (${g.member_count})`;
+  }
+
+  // 4. Keep non-collapsed nodes + the boundary nodes.
+  const keptNodes = nodes.filter((n) => !memberToGroup.has(n.id));
+  const outNodes = [...keptNodes, ...groups.values()];
+
+  // 5. Rewire member edges onto their boundary node, dedupe by (from,to), sum.
+  const remap = (id: string | null) => (id != null && memberToGroup.get(id)) || id;
+  const edgeMap = new Map<string, GEdge>();
+  for (const e of edges) {
+    const from = remap(e.from);
+    const to = remap(e.to)!;
+    if (from === to) continue; // self-loop from collapsing both ends
+    const key = `${from ?? ""}->${to}`;
+    const existing = edgeMap.get(key);
+    if (existing) {
+      existing.total_requests += e.total_requests || 0;
+      existing.failed_requests += e.failed_requests || 0;
+    } else {
+      edgeMap.set(key, {
+        ...e,
+        from,
+        to,
+        total_requests: e.total_requests || 0,
+        failed_requests: e.failed_requests || 0,
+      });
+    }
+  }
+
+  return { nodes: outNodes, edges: Array.from(edgeMap.values()) };
 }
