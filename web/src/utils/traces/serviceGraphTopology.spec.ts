@@ -38,3 +38,49 @@ describe("buildTopologyFromTraces — service edges", () => {
     expect(edges[0].to).toBe("frontend");
   });
 });
+
+describe("buildTopologyFromTraces — inferred deps & collisions", () => {
+  it("adds a typed node for a genuine infra dependency", () => {
+    const { nodes, edges } = buildTopologyFromTraces(
+      [{ client: null, server: "cart", total_requests: 10, errors: 0 }],
+      [
+        {
+          client: "cart",
+          server: "valkey",
+          connection_type: "database",
+          total_requests: 10,
+          errors: 0,
+        },
+      ],
+    );
+    const dep = nodes.find((n) => n.id === "valkey")!;
+    expect(dep.service_type).toBe("database");
+    const e = edges.find((x) => x.from === "cart" && x.to === "valkey")!;
+    expect(e.connection_type).toBe("database");
+  });
+
+  it("merges an inferred name that is also a real service (collision)", () => {
+    const { nodes, edges } = buildTopologyFromTraces(
+      // email is a real instrumented service
+      [{ client: null, server: "email", total_requests: 5, errors: 0 }],
+      // checkout also reaches email over HTTP → inferred 'external'
+      [
+        {
+          client: "checkout",
+          server: "email",
+          connection_type: "external",
+          total_requests: 3,
+          errors: 0,
+        },
+      ],
+    );
+    // Only one email node, typed as a real service (not external).
+    const emails = nodes.filter((n) => n.id === "email");
+    expect(emails).toHaveLength(1);
+    expect(emails[0].service_type).toBeUndefined();
+    // The edge still exists, pointing at the real service, not marked inferred.
+    const e = edges.find((x) => x.from === "checkout" && x.to === "email")!;
+    expect(e).toBeTruthy();
+    expect(e.connection_type).toBeUndefined();
+  });
+});

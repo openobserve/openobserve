@@ -103,8 +103,41 @@ export function buildTopologyFromTraces(
     });
   }
 
-  // Inferred edges added in Task 2.
-  void inferredRows;
+  // A name is a "real service" if it appears as a service_name in serviceRows.
+  const realServices = new Set<string>();
+  for (const r of serviceRows) {
+    realServices.add(r.server);
+    if (r.client) realServices.add(r.client);
+  }
+
+  for (const r of inferredRows) {
+    const req = r.total_requests ?? 0;
+    const err = r.errors ?? 0;
+    const client = ensureNode(nodes, r.client); // caller is always a real service
+    client.requests += req;
+    client.errors += err;
+
+    const collides = realServices.has(r.server);
+    if (!collides) {
+      // Genuine infra dependency → typed inferred node.
+      const dep = ensureNode(nodes, r.server, r.connection_type);
+      dep.requests += req;
+      dep.errors += err;
+    } else {
+      // Collision: keep the real service node; ensure it exists, real type wins.
+      ensureNode(nodes, r.server);
+    }
+
+    edges.push({
+      from: r.client,
+      to: r.server, // retargets to the real service on collision (same id)
+      total_requests: req,
+      failed_requests: err,
+      error_rate: req > 0 ? (err / req) * 100 : 0,
+      // Only mark the edge inferred when the target is a genuine inferred node.
+      connection_type: collides ? undefined : r.connection_type,
+    });
+  }
 
   return { nodes: Array.from(nodes.values()), edges };
 }
