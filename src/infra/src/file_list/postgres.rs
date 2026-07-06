@@ -1374,10 +1374,12 @@ DO UPDATE SET
         let pool = CLIENT.clone();
 
         // quick check without the advisory lock, if there are no pending jobs
-        // we can skip the locked transaction
+        // we can skip the locked transaction. a job inserted between this check
+        // and the locked transaction is simply picked up in the next round
+        let ro_pool = CLIENT_RO.clone();
         let has_pending = sqlx::query("SELECT id FROM file_list_jobs WHERE status = $1 LIMIT 1;")
             .bind(super::FileListJobStatus::Pending)
-            .fetch_optional(&pool)
+            .fetch_optional(&ro_pool)
             .await?;
         if has_pending.is_none() {
             return Ok(Vec::new());
