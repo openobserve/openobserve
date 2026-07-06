@@ -250,9 +250,10 @@ pub async fn get_summary(
         .and_then(|h| h.get("status"))
         .and_then(|v| v.as_str())
     {
-        Some("up") => SyntheticStatus::Up,
+        Some("passed") | Some("up") => SyntheticStatus::Passed,
         Some("warning") => SyntheticStatus::Warning,
-        Some("down") => SyntheticStatus::Down,
+        Some("failed") | Some("down") => SyntheticStatus::Failed,
+        Some("error") => SyntheticStatus::Error,
         _ => SyntheticStatus::Unknown,
     };
     let last_response_ms = latest
@@ -385,9 +386,10 @@ pub async fn batch_synthetic_summary(
             let (status, last_response_ms) = match latest_map.get(id) {
                 Some((s, ms)) => (
                     match s.as_str() {
-                        "up" => SyntheticStatus::Up,
+                        "passed" | "up" => SyntheticStatus::Passed,
                         "warning" => SyntheticStatus::Warning,
-                        "down" => SyntheticStatus::Down,
+                        "failed" | "down" => SyntheticStatus::Failed,
+                        "error" => SyntheticStatus::Error,
                         _ => SyntheticStatus::Unknown,
                     },
                     Some(*ms),

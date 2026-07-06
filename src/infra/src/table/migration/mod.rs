@@ -132,6 +132,7 @@ mod m20260624_000004_add_token_type_to_org_ingestion_tokens;
 mod m20260624_000005_add_destinations_to_synthetics_monitors;
 mod m20260626_000001_create_synthetics_probe_tokens;
 mod m20260629_000001_create_gen_ai_agents_table;
+mod m20260706_000001_create_synthetics_runs;
 
 pub struct Migrator;
 
@@ -248,6 +249,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260623_000001_create_org_cleanup_tasks::Migration),
             Box::new(m20260623_000002_add_status_and_deleted_at_to_organizations::Migration),
             Box::new(m20260624_000001_create_synthetics_monitors::Migration),
+            Box::new(m20260706_000001_create_synthetics_runs::Migration),
             Box::new(m20260624_000002_create_synthetics_jobs::Migration),
             Box::new(m20260624_000004_add_token_type_to_org_ingestion_tokens::Migration),
             Box::new(m20260624_000005_add_destinations_to_synthetics_monitors::Migration),

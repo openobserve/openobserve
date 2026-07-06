@@ -18,9 +18,11 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
-const SYNTHETICS_PENDING_CHECKS_DEQUEUE_IDX: &str = "synthetics_jobs_dequeue_idx";
-const SYNTHETICS_PENDING_CHECKS_MONITOR_IDX: &str = "synthetics_jobs_monitor_idx";
-const SYNTHETICS_PENDING_CHECKS_DEDUP_UQ: &str = "synthetics_jobs_dedup_uq";
+const SYNTHETICS_JOBS_DEQUEUE_IDX: &str = "synthetics_jobs_dequeue_idx";
+const SYNTHETICS_JOBS_MONITOR_IDX: &str = "synthetics_jobs_monitor_idx";
+const SYNTHETICS_JOBS_STATUS_IDX: &str = "synthetics_jobs_status_idx";
+const SYNTHETICS_JOBS_RUN_IDX: &str = "synthetics_jobs_run_idx";
+const SYNTHETICS_JOBS_DEDUP_UQ: &str = "synthetics_jobs_dedup_uq";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -28,35 +30,29 @@ impl MigrationTrait for Migration {
         manager.create_table(create_synthetics_jobs_table()).await?;
         manager.create_index(create_dequeue_idx()).await?;
         manager.create_index(create_monitor_idx()).await?;
+        manager.create_index(create_status_idx()).await?;
+        manager.create_index(create_run_idx()).await?;
         manager.create_index(create_dedup_uq()).await?;
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_index(
-                Index::drop()
-                    .name(SYNTHETICS_PENDING_CHECKS_DEDUP_UQ)
-                    .table(SyntheticsJobs::Table)
-                    .to_owned(),
-            )
-            .await?;
-        manager
-            .drop_index(
-                Index::drop()
-                    .name(SYNTHETICS_PENDING_CHECKS_MONITOR_IDX)
-                    .table(SyntheticsJobs::Table)
-                    .to_owned(),
-            )
-            .await?;
-        manager
-            .drop_index(
-                Index::drop()
-                    .name(SYNTHETICS_PENDING_CHECKS_DEQUEUE_IDX)
-                    .table(SyntheticsJobs::Table)
-                    .to_owned(),
-            )
-            .await?;
+        for name in [
+            SYNTHETICS_JOBS_DEDUP_UQ,
+            SYNTHETICS_JOBS_RUN_IDX,
+            SYNTHETICS_JOBS_STATUS_IDX,
+            SYNTHETICS_JOBS_MONITOR_IDX,
+            SYNTHETICS_JOBS_DEQUEUE_IDX,
+        ] {
+            manager
+                .drop_index(
+                    Index::drop()
+                        .name(name)
+                        .table(SyntheticsJobs::Table)
+                        .to_owned(),
+                )
+                .await?;
+        }
         manager
             .drop_table(Table::drop().table(SyntheticsJobs::Table).to_owned())
             .await?;
@@ -101,12 +97,6 @@ fn create_synthetics_jobs_table() -> TableCreateStatement {
                 .not_null(),
         )
         .col(
-            ColumnDef::new(SyntheticsJobs::BrowserEngine)
-                .string_len(64)
-                .null(),
-        )
-        .col(ColumnDef::new(SyntheticsJobs::Device).string_len(64).null())
-        .col(
             ColumnDef::new(SyntheticsJobs::ScheduledTs)
                 .big_integer()
                 .not_null(),
@@ -143,13 +133,38 @@ fn create_synthetics_jobs_table() -> TableCreateStatement {
                 .not_null()
                 .default(0_i32),
         )
+        .col(
+            ColumnDef::new(SyntheticsJobs::RunId)
+                .string_len(27)
+                .not_null()
+                .default(""),
+        )
+        .col(ColumnDef::new(SyntheticsJobs::BrowserDevices).text().null())
+        .col(ColumnDef::new(SyntheticsJobs::Result).text().null())
+        .col(
+            ColumnDef::new(SyntheticsJobs::StartedAt)
+                .big_integer()
+                .null(),
+        )
+        .col(
+            ColumnDef::new(SyntheticsJobs::CompletedAt)
+                .big_integer()
+                .null(),
+        )
+        .foreign_key(
+            ForeignKey::create()
+                .name("fk_synthetics_jobs_run_id")
+                .from(SyntheticsJobs::Table, SyntheticsJobs::RunId)
+                .to(SyntheticsRuns::Table, SyntheticsRuns::Id)
+                .on_delete(ForeignKeyAction::Cascade),
+        )
         .to_owned()
 }
 
 fn create_dequeue_idx() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
-        .name(SYNTHETICS_PENDING_CHECKS_DEQUEUE_IDX)
+        .name(SYNTHETICS_JOBS_DEQUEUE_IDX)
         .table(SyntheticsJobs::Table)
         .col(SyntheticsJobs::Pool)
         .col(SyntheticsJobs::Status)
@@ -161,21 +176,39 @@ fn create_dequeue_idx() -> IndexCreateStatement {
 fn create_monitor_idx() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
-        .name(SYNTHETICS_PENDING_CHECKS_MONITOR_IDX)
+        .name(SYNTHETICS_JOBS_MONITOR_IDX)
         .table(SyntheticsJobs::Table)
         .col(SyntheticsJobs::SyntheticsId)
+        .to_owned()
+}
+
+fn create_status_idx() -> IndexCreateStatement {
+    sea_query::Index::create()
+        .if_not_exists()
+        .name(SYNTHETICS_JOBS_STATUS_IDX)
+        .table(SyntheticsJobs::Table)
+        .col(SyntheticsJobs::OrgId)
+        .col(SyntheticsJobs::SyntheticsId)
+        .col(SyntheticsJobs::Status)
+        .to_owned()
+}
+
+fn create_run_idx() -> IndexCreateStatement {
+    sea_query::Index::create()
+        .if_not_exists()
+        .name(SYNTHETICS_JOBS_RUN_IDX)
+        .table(SyntheticsJobs::Table)
+        .col(SyntheticsJobs::RunId)
         .to_owned()
 }
 
 fn create_dedup_uq() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
-        .name(SYNTHETICS_PENDING_CHECKS_DEDUP_UQ)
+        .name(SYNTHETICS_JOBS_DEDUP_UQ)
         .table(SyntheticsJobs::Table)
         .col(SyntheticsJobs::SyntheticsId)
         .col(SyntheticsJobs::Location)
-        .col(SyntheticsJobs::Pool)
-        .col(SyntheticsJobs::Device)
         .col(SyntheticsJobs::ScheduledTs)
         .unique()
         .to_owned()
@@ -190,8 +223,6 @@ enum SyntheticsJobs {
     OrgId,
     Location,
     Pool,
-    BrowserEngine,
-    Device,
     ScheduledTs,
     ValidUntil,
     Status,
@@ -199,6 +230,17 @@ enum SyntheticsJobs {
     ClaimedAt,
     LeaseExpiresAt,
     Attempts,
+    RunId,
+    BrowserDevices,
+    Result,
+    StartedAt,
+    CompletedAt,
+}
+
+#[derive(DeriveIden)]
+enum SyntheticsRuns {
+    Table,
+    Id,
 }
 
 #[cfg(test)]
@@ -219,14 +261,19 @@ mod tests {
                 "org_id" varchar(100) NOT NULL,
                 "location" varchar(256) NOT NULL,
                 "pool" varchar(256) NOT NULL,
-                "browser_engine" varchar(64),
                 "scheduled_ts" bigint NOT NULL,
                 "valid_until" bigint NOT NULL,
                 "status" integer NOT NULL DEFAULT 0,
                 "claimed_by" varchar(256),
                 "claimed_at" bigint,
                 "lease_expires_at" bigint,
-                "attempts" integer NOT NULL DEFAULT 0
+                "attempts" integer NOT NULL DEFAULT 0,
+                "run_id" varchar(27) NOT NULL DEFAULT '',
+                "browser_devices" text,
+                "result" text,
+                "started_at" bigint,
+                "completed_at" bigint,
+                CONSTRAINT "fk_synthetics_jobs_run_id" FOREIGN KEY ("run_id") REFERENCES "synthetics_runs" ("id") ON DELETE CASCADE
             )"#
         );
         assert_eq!(
@@ -238,8 +285,16 @@ mod tests {
             r#"CREATE INDEX IF NOT EXISTS "synthetics_jobs_monitor_idx" ON "synthetics_jobs" ("synthetics_id")"#
         );
         assert_eq!(
+            &create_status_idx().to_string(PostgresQueryBuilder),
+            r#"CREATE INDEX IF NOT EXISTS "synthetics_jobs_status_idx" ON "synthetics_jobs" ("org_id", "synthetics_id", "status")"#
+        );
+        assert_eq!(
+            &create_run_idx().to_string(PostgresQueryBuilder),
+            r#"CREATE INDEX IF NOT EXISTS "synthetics_jobs_run_idx" ON "synthetics_jobs" ("run_id")"#
+        );
+        assert_eq!(
             &create_dedup_uq().to_string(PostgresQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "synthetics_jobs_dedup_uq" ON "synthetics_jobs" ("synthetics_id", "location", "pool", "device", "scheduled_ts")"#
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "synthetics_jobs_dedup_uq" ON "synthetics_jobs" ("synthetics_id", "location", "scheduled_ts")"#
         );
     }
 
@@ -255,14 +310,19 @@ mod tests {
                 "org_id" varchar(100) NOT NULL,
                 "location" varchar(256) NOT NULL,
                 "pool" varchar(256) NOT NULL,
-                "browser_engine" varchar(64),
                 "scheduled_ts" bigint NOT NULL,
                 "valid_until" bigint NOT NULL,
                 "status" integer NOT NULL DEFAULT 0,
                 "claimed_by" varchar(256),
                 "claimed_at" bigint,
                 "lease_expires_at" bigint,
-                "attempts" integer NOT NULL DEFAULT 0
+                "attempts" integer NOT NULL DEFAULT 0,
+                "run_id" varchar(27) NOT NULL DEFAULT '',
+                "browser_devices" text,
+                "result" text,
+                "started_at" bigint,
+                "completed_at" bigint,
+                CONSTRAINT "fk_synthetics_jobs_run_id" FOREIGN KEY ("run_id") REFERENCES "synthetics_runs" ("id") ON DELETE CASCADE
             )"#
         );
     }

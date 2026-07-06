@@ -38,12 +38,13 @@ pub struct EnqueueParams<'a> {
     pub org_id: &'a str,
     pub location: &'a str,
     pub pool: &'a str,
-    /// `None` for protocol monitors; `Some("chromium"|"firefox"|"edge")` for browser.
-    pub browser_engine: Option<&'a str>,
-    /// `None` for protocol monitors; `Some("laptop_large"|"tablet"|"mobile_small")` for browser.
-    pub device: Option<&'a str>,
     pub scheduled_ts: i64,
     pub valid_until: i64,
+    /// KSUID of the parent `synthetics_runs` row.
+    pub run_id: &'a str,
+    /// JSON array of `{execution_id, engine, device}` — browser monitors only. `None` for
+    /// protocol monitors.
+    pub browser_devices: Option<&'a str>,
 }
 
 #[derive(Debug, Serialize)]
@@ -54,12 +55,12 @@ pub struct LeasedRow {
     pub org_id: String,
     pub location: String,
     pub pool: String,
-    pub browser_engine: Option<String>,
-    pub device: Option<String>,
     pub scheduled_ts: i64,
     pub valid_until: i64,
     /// Current attempt number (1-indexed). 1 = first dispatch, 2+ = retry after reaper requeue.
     pub attempts: i32,
+    pub run_id: String,
+    pub browser_devices: Option<String>,
 }
 
 /// Returned by `dead_letter_expired` for each job that exhausted all retries.
@@ -71,6 +72,7 @@ pub struct DeadLetteredRow {
     pub org_id: String,
     pub location: String,
     pub attempts: i32,
+    pub run_id: String,
 }
 
 // ── Scheduler: enqueue ────────────────────────────────────────────────────────
@@ -84,10 +86,10 @@ pub async fn enqueue<C: ConnectionTrait>(
     let id = svix_ksuid::Ksuid::new(None, None).to_string();
     let sql = r#"
         INSERT INTO synthetics_jobs
-            (id, synthetics_id, synthetics_name, org_id, location, pool, browser_engine, device,
-             scheduled_ts, valid_until, status, attempts)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, 0)
-        ON CONFLICT (synthetics_id, location, pool, device, scheduled_ts) DO NOTHING
+            (id, synthetics_id, synthetics_name, org_id, location, pool,
+             scheduled_ts, valid_until, status, attempts, run_id, browser_devices)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, 0, $9, $10)
+        ON CONFLICT (synthetics_id, location, scheduled_ts) DO NOTHING
     "#;
 
     conn.execute(Statement::from_sql_and_values(
@@ -100,14 +102,12 @@ pub async fn enqueue<C: ConnectionTrait>(
             Value::from(p.org_id),
             Value::from(p.location),
             Value::from(p.pool),
-            p.browser_engine
-                .map(Value::from)
-                .unwrap_or(Value::from(None::<String>)),
-            p.device
-                .map(Value::from)
-                .unwrap_or(Value::from(None::<String>)),
             Value::from(p.scheduled_ts),
             Value::from(p.valid_until),
+            Value::from(p.run_id),
+            p.browser_devices
+                .map(Value::from)
+                .unwrap_or(Value::from(None::<String>)),
         ],
     ))
     .await?;
@@ -115,14 +115,14 @@ pub async fn enqueue<C: ConnectionTrait>(
     Ok(id)
 }
 
-/// Gets a single pending check by its ID. Used by the job API `resolve` endpoint.
+/// Gets a single job by its ID. Used by the job API `resolve` and `artifact_urls` endpoints.
 pub async fn get_by_id<C: ConnectionTrait>(
     conn: &C,
     id: &str,
 ) -> Result<Option<LeasedRow>, errors::Error> {
     let sql = r#"
         SELECT id, synthetics_id, synthetics_name, org_id, location, pool,
-               browser_engine, device, scheduled_ts, valid_until, attempts
+               scheduled_ts, valid_until, attempts, run_id, browser_devices
         FROM synthetics_jobs
         WHERE id = $1
     "#;
@@ -144,11 +144,11 @@ pub async fn get_by_id<C: ConnectionTrait>(
                 org_id: row.try_get("", "org_id")?,
                 location: row.try_get("", "location")?,
                 pool: row.try_get("", "pool")?,
-                browser_engine: row.try_get("", "browser_engine")?,
-                device: row.try_get("", "device")?,
                 scheduled_ts: row.try_get("", "scheduled_ts")?,
                 valid_until: row.try_get("", "valid_until")?,
                 attempts: row.try_get("", "attempts")?,
+                run_id: row.try_get("", "run_id")?,
+                browser_devices: row.try_get("", "browser_devices")?,
             })
         })
         .transpose()
@@ -230,29 +230,61 @@ pub async fn lease_batch<C: ConnectionTrait>(
             org_id: m.org_id,
             location: m.location,
             pool: m.pool,
-            browser_engine: m.browser_engine,
-            device: m.device,
             scheduled_ts: m.scheduled_ts,
             valid_until: m.valid_until,
             attempts: m.attempts,
+            run_id: m.run_id,
+            browser_devices: m.browser_devices,
         })
         .collect())
 }
 
 // ── Job API: ack ──────────────────────────────────────────────────────────────
 
-/// Deletes a leased row when the probe successfully POSTs its result.
-/// Returns true if the row was found and deleted.
-pub async fn ack_delete<C: ConnectionTrait>(conn: &C, job_id: &str) -> Result<bool, errors::Error> {
-    let sql = "DELETE FROM synthetics_jobs WHERE id = $1";
-    let res = conn
-        .execute(Statement::from_sql_and_values(
+/// Marks a job as complete: sets status, result JSON, and completed_at.
+/// Returns the `run_id` of the updated row (for callers to increment run counter).
+///
+/// Status values: 3=Passed, 4=Failed, 5=Warning, 6=Error (dispatch error).
+pub async fn ack_complete<C: ConnectionTrait>(
+    conn: &C,
+    job_id: &str,
+    status: i32,
+    result_json: Option<&str>,
+    now_us: i64,
+) -> Result<Option<String>, errors::Error> {
+    let sql = r#"
+        UPDATE synthetics_jobs
+        SET status = $1, result = $2, completed_at = $3
+        WHERE id = $4
+    "#;
+    conn.execute(Statement::from_sql_and_values(
+        conn.get_database_backend(),
+        sql,
+        [
+            Value::from(status),
+            result_json
+                .map(Value::from)
+                .unwrap_or(Value::from(None::<String>)),
+            Value::from(now_us),
+            Value::from(job_id.to_owned()),
+        ],
+    ))
+    .await?;
+
+    // Fetch run_id so caller can call synthetics_runs::increment_jobs_done.
+    let select_sql = "SELECT run_id FROM synthetics_jobs WHERE id = $1";
+    let rows = conn
+        .query_all(Statement::from_sql_and_values(
             conn.get_database_backend(),
-            sql,
+            select_sql,
             [Value::from(job_id.to_owned())],
         ))
         .await?;
-    Ok(res.rows_affected() > 0)
+
+    Ok(rows
+        .into_iter()
+        .next()
+        .and_then(|row| row.try_get::<String>("", "run_id").ok()))
 }
 
 // ── Reaper ────────────────────────────────────────────────────────────────────
@@ -289,7 +321,7 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
 ) -> Result<Vec<DeadLetteredRow>, errors::Error> {
     // Step 1: find candidates before marking them dead.
     let select_sql = r#"
-        SELECT id, synthetics_id, synthetics_name, org_id, location, attempts
+        SELECT id, synthetics_id, synthetics_name, org_id, location, attempts, run_id
         FROM synthetics_jobs
         WHERE status = 1
           AND lease_expires_at < $1
@@ -317,6 +349,7 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
                 org_id: row.try_get("", "org_id").ok()?,
                 location: row.try_get("", "location").ok()?,
                 attempts: row.try_get("", "attempts").ok()?,
+                run_id: row.try_get("", "run_id").ok()?,
             })
         })
         .collect();
@@ -370,16 +403,18 @@ mod tests {
             synthetics_name: "Login Flow",
             org_id: "org1",
             location: "aws-us-east-1",
-            pool: "aws-browser-chromium",
-            browser_engine: Some("chromium"),
-            device: Some("laptop_large"),
+            pool: "aws-browser",
             scheduled_ts: 1750000000000000,
             valid_until: 1750000300000000,
+            run_id: "3Fzn001XXXXXXXXXXXXXXXX",
+            browser_devices: Some(
+                r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"laptop_large"}]"#,
+            ),
         };
         assert_eq!(p.synthetics_id, "mon-1");
         assert_eq!(p.synthetics_name, "Login Flow");
-        assert_eq!(p.browser_engine, Some("chromium"));
-        assert_eq!(p.device, Some("laptop_large"));
+        assert_eq!(p.run_id, "3Fzn001XXXXXXXXXXXXXXXX");
+        assert!(p.browser_devices.is_some());
     }
 
     #[test]
@@ -390,17 +425,16 @@ mod tests {
             synthetics_name: "Login Flow".to_string(),
             org_id: "org1".to_string(),
             location: "aws-us-east-1".to_string(),
-            pool: "aws".to_string(),
-            browser_engine: None,
-            device: None,
+            pool: "aws-browser".to_string(),
             scheduled_ts: 1750000000000000,
             valid_until: 1750000300000000,
             attempts: 1,
+            run_id: "3Fzn001XXXXXXXXXXXXXXXX".to_string(),
+            browser_devices: None,
         };
         assert_eq!(row.id, "2MNfNTxePfZ1pnY5gKVLkwsVRXv");
         assert_eq!(row.synthetics_id, "mon-1");
-        assert_eq!(row.synthetics_name, "Login Flow");
+        assert_eq!(row.run_id, "3Fzn001XXXXXXXXXXXXXXXX");
         assert_eq!(row.attempts, 1);
-        assert!(row.browser_engine.is_none());
     }
 }

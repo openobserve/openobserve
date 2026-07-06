@@ -211,26 +211,28 @@ pub enum SyntheticType {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SyntheticStatus {
-    Up,
-    /// Reached target but threshold breached or partial flow failure.
+    /// All steps passed on first attempt.
+    Passed,
+    /// Passed on retry — flaky.
     Warning,
-    Down,
+    /// All attempts failed — target is down.
+    Failed,
     #[default]
     Unknown,
-    /// O2 infra could not dispatch or complete the check (Lambda missing, creds expired, etc.).
-    /// Distinct from Down: the target service health is unknown — it's a probe infrastructure
-    /// issue.
-    Failed,
+    /// Probe infra failure — target health is unknown (Lambda missing, creds expired, etc.).
+    /// Distinct from Failed: we could not check, not that the check failed.
+    Error,
 }
 
 impl SyntheticStatus {
     /// Deserialize from `last_check_status` integer stored in DB.
+    /// DB integers are unchanged — only the variant names changed.
     pub fn from_db(i: i32) -> Self {
         match i {
-            1 => Self::Up,
+            1 => Self::Passed,
             2 => Self::Warning,
-            3 => Self::Down,
-            4 => Self::Failed,
+            3 => Self::Failed,
+            4 => Self::Error,
             _ => Self::Unknown,
         }
     }
@@ -238,20 +240,24 @@ impl SyntheticStatus {
     /// Serialize to `last_check_status` integer for DB storage.
     pub fn to_db(&self) -> i32 {
         match self {
-            Self::Up => 1,
+            Self::Passed => 1,
             Self::Warning => 2,
-            Self::Down => 3,
-            Self::Failed => 4,
+            Self::Failed => 3,
+            Self::Error => 4,
             Self::Unknown => 0,
         }
     }
 
     /// Convert a raw probe status string to `SyntheticStatus`.
+    /// Accepts both new strings ("passed"/"failed") and legacy ("up"/"down") for
+    /// backward compatibility with older probes during rollout.
     pub fn from_probe_str(s: &str) -> Self {
         match s {
-            "up" => Self::Up,
+            "passed" | "up" => Self::Passed,
             "warning" => Self::Warning,
-            _ => Self::Down, // "down", "error", or anything unrecognised → Down
+            "failed" | "down" => Self::Failed,
+            "error" => Self::Error,
+            _ => Self::Failed,
         }
     }
 }
@@ -716,37 +722,50 @@ mod tests {
     #[test]
     fn test_synthetic_status_db_roundtrip() {
         assert_eq!(SyntheticStatus::from_db(0), SyntheticStatus::Unknown);
-        assert_eq!(SyntheticStatus::from_db(1), SyntheticStatus::Up);
+        assert_eq!(SyntheticStatus::from_db(1), SyntheticStatus::Passed);
         assert_eq!(SyntheticStatus::from_db(2), SyntheticStatus::Warning);
-        assert_eq!(SyntheticStatus::from_db(3), SyntheticStatus::Down);
-        assert_eq!(SyntheticStatus::from_db(4), SyntheticStatus::Failed);
+        assert_eq!(SyntheticStatus::from_db(3), SyntheticStatus::Failed);
+        assert_eq!(SyntheticStatus::from_db(4), SyntheticStatus::Error);
         assert_eq!(SyntheticStatus::from_db(99), SyntheticStatus::Unknown);
 
         assert_eq!(SyntheticStatus::Unknown.to_db(), 0);
-        assert_eq!(SyntheticStatus::Up.to_db(), 1);
+        assert_eq!(SyntheticStatus::Passed.to_db(), 1);
         assert_eq!(SyntheticStatus::Warning.to_db(), 2);
-        assert_eq!(SyntheticStatus::Down.to_db(), 3);
-        assert_eq!(SyntheticStatus::Failed.to_db(), 4);
+        assert_eq!(SyntheticStatus::Failed.to_db(), 3);
+        assert_eq!(SyntheticStatus::Error.to_db(), 4);
     }
 
     #[test]
     fn test_synthetic_status_from_probe_str() {
-        assert_eq!(SyntheticStatus::from_probe_str("up"), SyntheticStatus::Up);
+        // new strings
+        assert_eq!(
+            SyntheticStatus::from_probe_str("passed"),
+            SyntheticStatus::Passed
+        );
         assert_eq!(
             SyntheticStatus::from_probe_str("warning"),
             SyntheticStatus::Warning
         );
         assert_eq!(
-            SyntheticStatus::from_probe_str("down"),
-            SyntheticStatus::Down
+            SyntheticStatus::from_probe_str("failed"),
+            SyntheticStatus::Failed
         );
         assert_eq!(
             SyntheticStatus::from_probe_str("error"),
-            SyntheticStatus::Down
+            SyntheticStatus::Error
+        );
+        // legacy strings — backward compat during rollout
+        assert_eq!(
+            SyntheticStatus::from_probe_str("up"),
+            SyntheticStatus::Passed
+        );
+        assert_eq!(
+            SyntheticStatus::from_probe_str("down"),
+            SyntheticStatus::Failed
         );
         assert_eq!(
             SyntheticStatus::from_probe_str("unknown_garbage"),
-            SyntheticStatus::Down
+            SyntheticStatus::Failed
         );
     }
 
