@@ -47,6 +47,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :error="errorDetails"
         />
         <ErrorSessionReplay :error="errorDetails" />
+        <TraceCorrelationCard
+          v-if="errorTraceId"
+          :trace-id="errorTraceId"
+          :session-id="errorDetails.session_id || ''"
+          :timestamp="errorDetails._timestamp || 0"
+          data-test="error-viewer-trace-correlation"
+        />
         <ErrorEvents :error="errorDetails" />
       </div>
     </div>
@@ -65,6 +72,7 @@ import { useStore } from "vuex";
 import useErrorTracking from "@/composables/useErrorTracking";
 import searchService from "@/services/search";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
+import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
 import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -85,6 +93,18 @@ onActivated(async () => {
 
 const getTimestamp = computed(() => {
   return Number(router.currentRoute.value.query.timestamp) || 30000;
+});
+
+// Trace id linking this error to a backend trace: on the error itself, or
+// on the nearest xhr/fetch event captured around the failure.
+const errorTraceId = computed(() => {
+  if (errorDetails.value?._oo_trace_id) {
+    return errorDetails.value._oo_trace_id as string;
+  }
+  const xhrWithTrace = (errorDetails.value?.events || []).find(
+    (event: any) => event.type === "resource" && event._oo_trace_id,
+  );
+  return (xhrWithTrace?._oo_trace_id as string) || "";
 });
 
 const getErrorLogs = () => {

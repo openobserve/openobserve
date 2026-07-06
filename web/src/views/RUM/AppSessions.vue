@@ -91,6 +91,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- end toolbar wrapper -->
 
+      <OSplitter
+        class="logs-horizontal-splitter flex-1 min-h-0"
+        v-model="splitterModel"
+        unit="px"
+        :horizontal="false"
+      >
+        <template #before>
+          <div class="card-container p-[0.325rem] h-full overflow-auto border-r border-border-default">
+            <SearchFieldList
+              :fields="streamFields"
+              :time-stamp="{
+                startTime: dateTime.startTime,
+                endTime: dateTime.endTime,
+              }"
+              :stream-name="rumSessionStreamName"
+              stream-type="logs"
+              :enable-grouping="true"
+              :query="completeQuery"
+              :show-count="false"
+              @event-emitted="handleSidebarEvent"
+            />
+          </div>
+        </template>
+        <template #after>
+          <div class="h-full flex flex-col min-h-0">
       <!-- KPI summary strip -->
       <div class="card-container border-b border-border-default">
         <SessionsMetricsStrip
@@ -226,141 +251,111 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <OSplitter
-        class="logs-horizontal-splitter flex-1 min-h-0"
-        v-model="splitterModel"
-        unit="px"
-        :horizontal="false"
-      >
-        <template #before>
-          <div
-            class="card-container p-[0.325rem] h-full overflow-auto border-r border-border-default"
-          >
-            <SearchFieldList
-              :fields="streamFields"
-              :time-stamp="{
-                startTime: dateTime.startTime,
-                endTime: dateTime.endTime,
-              }"
-              :stream-name="rumSessionStreamName"
-              stream-type="logs"
-              :enable-grouping="true"
-              :query="completeQuery"
-              :show-count="false"
-              @event-emitted="handleSidebarEvent"
-            />
-          </div>
-        </template>
-        <template #after>
-          <div class="h-full">
-            <div class="card-container h-full">
-              <OTable
-                :data="tableRows"
-                :columns="tableColumns"
-                :loading="isLoading.length > 0"
-                row-key="session_id"
-                pagination="none"
-                virtual-scroll
-                :dense="false"
-                :row-height="54"
-                class="h-full"
-                data-test="rum-sessions-table"
-                row-class="cursor-pointer"
-                :get-row-status-color="getSessionStatusColor"
-                @row-click="handleRowClick"
-                @scroll-end="handleScrollEnd"
-                :show-global-filter="false"
-                :default-columns="false"
-              >
-                <template #empty>
-                  <div
-                    v-if="hasSegmentFilteredOutAllRows"
-                    class="flex flex-col items-center gap-2 py-8"
-                    data-test="rum-app-sessions-segment-empty"
-                  >
-                    <p>{{ t("rum.noMatchingSessions") }}</p>
-                    <OButton
-                      variant="outline"
-                      size="sm"
-                      data-test="rum-app-sessions-reset-segments-btn"
-                      @click="resetSegments"
-                    >
-                      {{ t("rum.resetFilters") }}
-                    </OButton>
-                  </div>
-                  <NoData v-else />
-                </template>
-                <template #cell-action_play="{ row }">
-                  <OIcon
-                    name="play-circle-filled"
-                    size="md"
-                    class="cursor-pointer session-play-icon text-[var(--o2-icon-color)] hover:text-[var(--o2-primary-btn-bg)]"
-                  />
-                </template>
-                <template #cell-session="{ row }">
-                  <div class="flex flex-col justify-center gap-0.5 min-w-0">
-                    <OUserCell
-                      :value="row.user_email || 'Unknown'"
-                      class="font-medium truncate"
-                    />
+            <div class="card-container flex-1 min-h-0">
+                <OTable
+                  :data="tableRows"
+                  :columns="tableColumns"
+                  :loading="isLoading.length > 0"
+                  row-key="session_id"
+                  pagination="none"
+                  virtual-scroll
+                  :dense="false"
+                  :row-height="54"
+                  class="h-full"
+                  data-test="rum-sessions-table"
+                  row-class="cursor-pointer"
+                  :get-row-status-color="getSessionStatusColor"
+                  @row-click="handleRowClick"
+                  @scroll-end="handleScrollEnd"
+                  :show-global-filter="false"
+                  :default-columns="false"
+                >
+                  <template #empty>
                     <div
-                      class="flex items-center gap-1.5 text-xs text-[var(--o2-text-caption)]"
+                      v-if="hasSegmentFilteredOutAllRows"
+                      class="flex flex-col items-center gap-2 py-8"
+                      data-test="rum-app-sessions-segment-empty"
                     >
-                      <span
-                        class="o2-monospace-font"
-                        :title="row.session_id"
-                        data-test="rum-app-sessions-session-id-text"
-                        >{{ shortSessionId(row.session_id) }}</span
+                      <p>{{ t("rum.noMatchingSessions") }}</p>
+                      <OButton
+                        variant="outline"
+                        size="sm"
+                        data-test="rum-app-sessions-reset-segments-btn"
+                        @click="resetSegments"
                       >
-                      <span aria-hidden="true">·</span>
-                      <OTimeCell
-                        :value="row.zo_sql_timestamp"
-                        unit="us"
-                        :timezone="store.state.timezone"
-                      />
+                        {{ t("rum.resetFilters") }}
+                      </OButton>
                     </div>
-                  </div>
-                </template>
-                <template #cell-activity="{ row }">
-                  <SessionActivitySparkline
-                    :session-id="row.session_id"
-                    :start-time="row.start_time"
-                    :end-time="row.end_time"
-                    :is-bounce="row.is_bounce"
-                    :has-frustration-field="
-                      !!schemaMapping['action_frustration_type']
-                    "
-                  />
-                </template>
-                <template #cell-health="{ row }">
-                  <SessionHealthCell
-                    :error-count="row.error_count || 0"
-                    :frustration-count="row.frustration_count || 0"
-                  />
-                </template>
-                <template #cell-location="{ row }">
-                  <SessionLocationColumn :column="row" />
-                </template>
-                <template #cell-duration="{ row }">
-                  <div class="flex flex-col items-end gap-0.5">
-                    <span class="tabular-nums font-medium">{{
-                      formatSessionDuration(row.time_spent)
-                    }}</span>
-                    <small
-                      v-if="row.is_bounce"
-                      class="text-[var(--o2-status-warning-text)]"
-                      data-test="rum-app-sessions-bounced-text"
-                      >{{ t("rum.bounced").toLowerCase() }}</small
-                    >
-                    <small
-                      v-else-if="row.is_active"
-                      class="text-[var(--o2-status-success-text)]"
-                      data-test="rum-app-sessions-active-text"
-                      >{{ t("rum.active") }}</small
-                    >
-                  </div>
-                </template>
-              </OTable>
+                    <NoData v-else />
+                  </template>
+                  <template #cell-action_play="{ row }">
+                    <OIcon
+                      name="play-circle-filled"
+                      size="md"
+                      class="cursor-pointer session-play-icon text-[var(--o2-icon-color)] hover:text-[var(--o2-primary-btn-bg)]"
+                    />
+                  </template>
+                  <template #cell-session="{ row }">
+                    <div class="flex flex-col justify-center gap-0.5 min-w-0">
+                      <OUserCell
+                        :value="row.user_email || 'Unknown'"
+                        class="font-medium truncate"
+                      />
+                      <div
+                        class="flex items-center gap-1.5 text-xs text-[var(--o2-text-caption)]"
+                      >
+                        <span
+                          class="o2-monospace-font"
+                          :title="row.session_id"
+                          data-test="rum-app-sessions-session-id-text"
+                        >{{ shortSessionId(row.session_id) }}</span>
+                        <span aria-hidden="true">·</span>
+                        <OTimeCell
+                          :value="row.zo_sql_timestamp"
+                          unit="us"
+                          :timezone="store.state.timezone"
+                        />
+                      </div>
+                    </div>
+                  </template>
+                  <template #cell-activity="{ row }">
+                    <SessionActivitySparkline
+                      :session-id="row.session_id"
+                      :start-time="row.start_time"
+                      :end-time="row.end_time"
+                      :is-bounce="row.is_bounce"
+                      :has-frustration-field="
+                        !!schemaMapping['action_frustration_type']
+                      "
+                    />
+                  </template>
+                  <template #cell-health="{ row }">
+                    <SessionHealthCell
+                      :error-count="row.error_count || 0"
+                      :frustration-count="row.frustration_count || 0"
+                    />
+                  </template>
+                  <template #cell-location="{ row }">
+                    <SessionLocationColumn :column="row" />
+                  </template>
+                  <template #cell-duration="{ row }">
+                    <div class="flex flex-col items-end gap-0.5">
+                      <span class="tabular-nums font-medium">{{
+                        formatSessionDuration(row.time_spent)
+                      }}</span>
+                      <small
+                        v-if="row.is_bounce"
+                        class="text-[var(--o2-status-warning-text)]"
+                        data-test="rum-app-sessions-bounced-text"
+                      >{{ t("rum.bounced").toLowerCase() }}</small>
+                      <small
+                        v-else-if="row.is_active"
+                        class="text-[var(--o2-status-success-text)]"
+                        data-test="rum-app-sessions-active-text"
+                      >{{ t("rum.active") }}</small>
+                    </div>
+                  </template>
+                </OTable>
             </div>
           </div>
         </template>

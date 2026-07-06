@@ -287,6 +287,12 @@ const {
   loading,
   error,
   hasLoadedOnce,
+  lastRunAt,
+  loadedOrg,
+  currentPage,
+  rowsPerPage,
+  agents,
+  agentsLoaded,
   fetchPage,
   cancelAll,
 } = useSessions();
@@ -312,20 +318,19 @@ const filterMode = ref<"stream" | "agent">(
         : "stream",
 );
 const activeAgent = ref<string>(localStorage.getItem(AGENT_LS_KEY) || ALL_AGENTS_VALUE);
-const agents = ref<GenAiAgentListItem[]>([]);
-const agentsLoaded = ref(false);
+// `agents` / `agentsLoaded` are module-scoped (see useSessions) so the agent
+// picker keeps its options — and stays off its skeleton — across a remount.
 const pendingAgentName = ref<string | null>(
   filterMode.value === "agent" && urlAgentName ? urlAgentName : null,
 );
 
-// Server-side pagination state (1-indexed). OTable owns the footer controls
-// in `pagination="server"` mode and emits `pagination-change`; these refs are
-// the source of truth it reads back via `:current-page` / `:page-size`.
-const currentPage = ref(1);
+// Server-side pagination (1-indexed). OTable owns the footer controls in
+// `pagination="server"` mode and emits `pagination-change`; `currentPage` /
+// `rowsPerPage` come from useSessions (module-scoped) so the page/size survives
+// the unmount/remount cycle and stays in sync with the restored rows.
 // Page-size options match the dashboards' table pagination
 // (TablePaginationControls) so the AI module stays consistent.
-const rowsPerPage = ref(20);
-const rowsPerPageOptions = [20, 50, 100, 250, 500]; 
+const rowsPerPageOptions = [20, 50, 100, 250, 500];
 
 const agentSelectOptions = computed(() =>
   agents.value.map((agent) => ({
@@ -566,10 +571,25 @@ function clearSessionRows() {
   total.value = 0;
 }
 
-async function loadSessions(startTime?: number, endTime?: number) {
+async function loadSessions(
+  startTime?: number,
+  endTime?: number,
+  force = false,
+) {
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
   if (!start || !end) return;
+
+  // Serve the already-loaded list from memory. This is the back-navigation
+  // case (SessionsList remounts, the parent's DateTime replays its window
+  // programmatically) — we keep the previous page instead of re-fetching. Only
+  // an explicit refresh or a real date change passes `force`. A prior error or
+  // an org switch invalidates the cache so those still re-fetch.
+  const orgId = store.state.selectedOrganization?.identifier || "default";
+  if (!force && hasLoadedOnce.value && !error.value && loadedOrg.value === orgId) {
+    return;
+  }
+
   localStorage.setItem(MODE_LS_KEY, filterMode.value);
 
   // Hold the table skeleton across the whole load. We await the stream list and
@@ -617,9 +637,11 @@ async function loadSessions(startTime?: number, endTime?: number) {
   );
 }
 
+// Filter / pagination changes are deliberate user actions — force a re-fetch
+// so they bypass the "already loaded" cache guard.
 function onStreamChange() {
   currentPage.value = 1;
-  loadSessions();
+  loadSessions(undefined, undefined, true);
 }
 
 function onFilterModeChange(mode?: string | number | null) {
@@ -628,12 +650,12 @@ function onFilterModeChange(mode?: string | number | null) {
   filterMode.value = next;
   currentPage.value = 1;
   clearSessionRows();
-  loadSessions();
+  loadSessions(undefined, undefined, true);
 }
 
 function onAgentChange() {
   currentPage.value = 1;
-  loadSessions();
+  loadSessions(undefined, undefined, true);
 }
 
 // Single handler for OTable's server pagination footer. A page-size change
@@ -646,7 +668,7 @@ function onPaginationChange({ page, size }: { page: number; size: number }) {
   } else {
     currentPage.value = page;
   }
-  loadSessions();
+  loadSessions(undefined, undefined, true);
 }
 
 function handleRowClick(row: SessionRow) {
@@ -664,17 +686,15 @@ function handleRowClick(row: SessionRow) {
   });
 }
 
-async function refresh(startTime?: number, endTime?: number) {
-  currentPage.value = 1;
-  await loadSessions(startTime, endTime);
+// Explicit refresh (header button) / real date change — always re-fetches,
+// bypassing the cache guard. `lastRunAt` is stamped inside `fetchPage`, so it
+// only advances on an actual load, never on a cache hit.
+async function refresh(startTime?: number, endTime?: number, force = true) {
+  // Only snap back to page 1 when we're actually going to fetch. On the
+  // non-forced mount replay we skip the fetch and keep the restored page.
+  if (force) currentPage.value = 1;
+  await loadSessions(startTime, endTime, force);
 }
-
-// "Last refresh" timestamp for the page header's ORefreshButton — stamped when
-// a fetch settles (loading true→false), mirroring LLM Insights / the Logs page.
-const lastRunAt = ref<number | null>(null);
-watch(loading, (isLoading, wasLoading) => {
-  if (wasLoading && !isLoading) lastRunAt.value = Date.now();
-});
 
 defineExpose({ refresh, lastRunAt, loading });
 
