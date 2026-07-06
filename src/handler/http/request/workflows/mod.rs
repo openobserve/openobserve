@@ -345,3 +345,49 @@ pub async fn retry_workflow(
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
+
+/// EnableDisableWorkflowRun
+
+#[utoipa::path(
+    put,
+    path = "/{org_id}/workflows/{id}/enable",
+    context_path = "/api",
+    tag = "Workflows",
+    operation_id = "enableDisableWorkflow",
+    summary = "Enable or disable a particular workflow",
+    description = "",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+        ("id" = String, Path, description = "Workflow id"),
+    ),
+    request_body(content = inline(Object), description = "retry details", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+    )
+)]
+pub async fn enable_workflow(
+    Path((org_id, workflow_id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let value = match query.get("value") {
+        Some(v) => v.as_str(),
+        None => "true",
+    };
+
+    let value: bool = match value.parse() {
+        Ok(v) => v,
+        Err(_) => true,
+    };
+
+    match workflows::enable_disable_workflow(&org_id, &workflow_id, value).await {
+        Ok(_) => MetaHttpResponse::ok("updated"),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}

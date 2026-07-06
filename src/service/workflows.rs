@@ -151,6 +151,20 @@ pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn enable_disable_workflow(
+    org_id: &str,
+    id: &str,
+    enabled: bool,
+) -> Result<(), anyhow::Error> {
+    let workflow = infra::table::workflows::get_by_org_wid(org_id, id).await?;
+    let Some(mut workflow) = workflow else {
+        return Err(anyhow::anyhow!("workflow with id {id} not found"));
+    };
+    workflow.enabled = enabled;
+    db::workflows::update_workflow(workflow).await?;
+    Ok(())
+}
+
 pub async fn list_workflows(
     org_id: &str,
     permitted: Option<Vec<String>>,
@@ -209,6 +223,11 @@ pub async fn execute_workflow(
     let workflow = workflows::get_by_org_wid(org_id, id)
         .await?
         .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
+
+    if !workflow.enabled {
+        return Ok(());
+    }
+
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
 
     let now = chrono::Utc::now().timestamp_micros();

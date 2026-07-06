@@ -858,7 +858,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/workflows/{id}",delete(workflows::delete_workflows).put(workflows::update_workflows))
         .route("/{org_id}/workflows/{id}/test",post(workflows::test_workflow))
         .route("/{org_id}/workflows/{id}/errors",get(workflows::get_workflow_errors))
-        .route("/{org_id}/workflows/{id}/retry",post(workflows::retry_workflow));
+        .route("/{org_id}/workflows/{id}/retry",post(workflows::retry_workflow))
+        .route("/{org_id}/workflows/{id}/enable",put(workflows::enable_workflow));
 
     #[cfg(feature = "enterprise")]
     {
