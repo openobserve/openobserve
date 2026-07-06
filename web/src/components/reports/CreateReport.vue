@@ -979,11 +979,15 @@ onBeforeMount(async () => {
         originalReportData.value = snapshot();
       })
       .catch((err) => {
-        if (err.response.status != 403) {
+        // Optional chaining throughout: this catch also receives non-HTTP
+        // rejections — a TypeError from malformed report data or the literal
+        // `true` that setDashboardOptions rejects with — so `err.response` may
+        // be undefined. (Mirrors the saveReport catch handler.)
+        if (err?.response?.status != 403) {
           toast({
             variant: "error",
             message:
-              err.response?.data?.message || "Error while fetching report!",
+              err?.response?.data?.message || "Error while fetching report!",
           });
         }
       })
