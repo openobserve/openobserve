@@ -173,7 +173,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       nodes: [
         {
           id: "service-a",
-          label: "Service A",
+          label: "service-a",
           requests: 1000,
           errors: 10,
           error_rate: 1.0,
@@ -181,7 +181,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         },
         {
           id: "service-b",
-          label: "Service B",
+          label: "service-b",
           requests: 2000,
           errors: 20,
           error_rate: 1.0,
@@ -598,12 +598,19 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      // Topology comes from the traces query now; return a single service-d node.
-      vi.mocked(searchService.search).mockResolvedValue({
+      // Topology comes from getCurrentTopology now; return a single service-d node.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
         data: {
-          hits: [
-            { client: null, server: "service-d", total_requests: 4000, errors: 40 },
+          nodes: [
+            {
+              id: "service-d",
+              label: "service-d",
+              requests: 4000,
+              errors: 40,
+              error_rate: 1.0,
+            },
           ],
+          edges: [],
         },
       } as any);
 
@@ -651,9 +658,11 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const consoleError = vi
         .spyOn(console, "error")
         .mockImplementation(() => {});
-      // Topology now comes from the traces search query; its failure surfaces.
-      // getCurrentTopology failing is graceful and no longer sets error state.
-      vi.mocked(searchService.search).mockRejectedValue(new Error("API Error"));
+      // Topology comes from getCurrentTopology; its rejection surfaces to the
+      // try/catch and sets error state.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
+        new Error("API Error"),
+      );
 
       await wrapper.vm.loadServiceGraph();
       await flushPromises();
@@ -745,13 +754,19 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      // Topology now comes from the raw traces query — inject a single
-      // service-e node via a service-edge row (client=null → root node).
-      vi.mocked(searchService.search).mockResolvedValue({
+      // Topology now comes from getCurrentTopology — inject a single service-e node.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
         data: {
-          hits: [
-            { client: null, server: "service-e", total_requests: 5000, errors: 50 },
+          nodes: [
+            {
+              id: "service-e",
+              label: "service-e",
+              requests: 5000,
+              errors: 50,
+              error_rate: 1.0,
+            },
           ],
+          edges: [],
         },
       } as any);
 
@@ -881,9 +896,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     it("should handle empty API response", async () => {
       wrapper = createWrapper();
 
-      // Empty topology now means the traces query returns no hits.
-      vi.mocked(searchService.search).mockResolvedValue({
-        data: { hits: [] },
+      // Empty topology now means getCurrentTopology returns empty nodes/edges.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [], edges: [] },
       } as any);
 
       await wrapper.vm.loadServiceGraph();
@@ -910,17 +925,24 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     it("should not produce edges with dangling node references", async () => {
       wrapper = createWrapper();
 
-      // The traces-derived builder always materialises a node for every edge
-      // endpoint (client and server), so an edge can never point at a missing
-      // node. Inject a service→service row and verify both endpoints exist.
-      vi.mocked(searchService.search).mockResolvedValue({
+      // The loader filters edges to those whose endpoints exist as nodes, so an
+      // edge can never point at a missing node. Provide both endpoints as nodes.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
         data: {
-          hits: [
+          nodes: [
+            { id: "service-a", label: "service-a", requests: 100, errors: 0 },
+            { id: "service-b", label: "service-b", requests: 100, errors: 0 },
+          ],
+          edges: [
             {
-              client: "service-a",
-              server: "service-b",
+              from: "service-a",
+              to: "service-b",
               total_requests: 100,
-              errors: 0,
+              failed_requests: 0,
+              error_rate: 0,
+              p50_latency_ns: 0,
+              p95_latency_ns: 0,
+              p99_latency_ns: 0,
             },
           ],
         },
@@ -1304,25 +1326,24 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      // The two default service-edge rows produce two topology edges:
-      // (null→service-a) and (service-a→service-b).
-      expect(wrapper.vm.stats?.connections).toBe(2);
+      // The default topology has a single edge (service-a→service-b).
+      expect(wrapper.vm.stats?.connections).toBe(1);
     });
 
     it("should calculate total requests", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      // Stats sum edge.total_requests: 1000 + 1000 = 2000.
-      expect(wrapper.vm.stats?.totalRequests).toBe(2000);
+      // Stats sum edge.total_requests: single edge with 1000.
+      expect(wrapper.vm.stats?.totalRequests).toBe(1000);
     });
 
     it("should calculate total errors", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      // Stats sum edge.failed_requests: 10 + 10 = 20.
-      expect(wrapper.vm.stats?.totalErrors).toBe(20);
+      // Stats sum edge.failed_requests: single edge with 10.
+      expect(wrapper.vm.stats?.totalErrors).toBe(10);
     });
 
     it("should calculate error rate", async () => {
@@ -1334,9 +1355,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     });
 
     it("should handle zero requests for error rate", async () => {
-      // No traces hits → no edges → errorRate falls back to 0.
-      vi.mocked(searchService.search).mockResolvedValue({
-        data: { hits: [] },
+      // No edges → totalRequests is 0 → errorRate falls back to 0.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [], edges: [] },
       } as any);
 
       wrapper = createWrapper();
@@ -1425,16 +1446,17 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
   });
 
   describe("Error Handling", () => {
-    // The topology now comes from the traces search query, which is called with
-    // throwOnError=true; its rejection surfaces to loadServiceGraph's catch and
-    // sets error.value. getCurrentTopology failing is graceful, so error cases
-    // reject searchService.search. beforeEach installs a resolving search mock,
-    // so each test overrides it with a rejecting one BEFORE createWrapper().
+    // The topology comes from getCurrentTopology; its rejection surfaces to
+    // loadServiceGraph's catch and sets error.value. beforeEach installs a
+    // resolving mock, so each test overrides it with a rejecting one BEFORE
+    // createWrapper().
     it("should set error state on 404", async () => {
       const error404 = new Error("Not Found");
       (error404 as any).response = { status: 404 };
 
-      vi.mocked(searchService.search).mockRejectedValue(error404);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
+        error404,
+      );
 
       wrapper = createWrapper();
       await flushPromises();
@@ -1446,7 +1468,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const error403 = new Error("Forbidden");
       (error403 as any).response = { status: 403 };
 
-      vi.mocked(searchService.search).mockRejectedValue(error403);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
+        error403,
+      );
 
       wrapper = createWrapper();
       await flushPromises();
@@ -1458,7 +1482,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const error500 = new Error("Internal Server Error");
       (error500 as any).response = { status: 500 };
 
-      vi.mocked(searchService.search).mockRejectedValue(error500);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
+        error500,
+      );
 
       wrapper = createWrapper();
       await flushPromises();
@@ -1469,7 +1495,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     it("should set error state on timeout", async () => {
       const timeoutError = new Error("Request timeout");
 
-      vi.mocked(searchService.search).mockRejectedValue(timeoutError);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
+        timeoutError,
+      );
 
       wrapper = createWrapper();
       await flushPromises();
@@ -1480,7 +1508,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     it("should set error state on network error", async () => {
       const networkError = new Error("Network Error");
 
-      vi.mocked(searchService.search).mockRejectedValue(networkError);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
+        networkError,
+      );
 
       wrapper = createWrapper();
       await flushPromises();
@@ -1495,7 +1525,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         data: { message: "I'm a teapot" },
       };
 
-      vi.mocked(searchService.search).mockRejectedValue(unknownError);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
+        unknownError,
+      );
 
       wrapper = createWrapper();
       await flushPromises();
@@ -1532,13 +1564,36 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     });
 
     it("materialises a node for every edge endpoint (no dangling edges)", async () => {
-      // Under the traces-derived builder, every service-edge row's client and
-      // server become nodes, so edges can never reference a missing node.
-      vi.mocked(searchService.search).mockResolvedValue({
+      // The loader keeps only edges whose endpoints exist as nodes, so edges can
+      // never reference a missing node. Provide 3 nodes (a, b, c) and 2 edges.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
         data: {
-          hits: [
-            { client: "a", server: "b", total_requests: 100, errors: 0 },
-            { client: "c", server: "a", total_requests: 100, errors: 0 },
+          nodes: [
+            { id: "a", label: "a", requests: 200, errors: 0 },
+            { id: "b", label: "b", requests: 100, errors: 0 },
+            { id: "c", label: "c", requests: 100, errors: 0 },
+          ],
+          edges: [
+            {
+              from: "a",
+              to: "b",
+              total_requests: 100,
+              failed_requests: 0,
+              error_rate: 0,
+              p50_latency_ns: 0,
+              p95_latency_ns: 0,
+              p99_latency_ns: 0,
+            },
+            {
+              from: "c",
+              to: "a",
+              total_requests: 100,
+              failed_requests: 0,
+              error_rate: 0,
+              p50_latency_ns: 0,
+              p95_latency_ns: 0,
+              p99_latency_ns: 0,
+            },
           ],
         },
       } as any);
@@ -1574,9 +1629,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     });
 
     it("should handle tree mode with empty graph data", async () => {
-      // Empty topology now means the traces query returns no hits.
-      vi.mocked(searchService.search).mockResolvedValue({
-        data: { hits: [] },
+      // Empty topology now means getCurrentTopology returns empty nodes/edges.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [], edges: [] },
       } as any);
 
       // beforeEach already sets visualizationType = "tree"
@@ -1900,38 +1955,35 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
   describe("topology from traces", () => {
     it("builds a typed inferred node from the traces queries", async () => {
-      // Schema reports the infer_service_name column so the inferred query runs.
-      vi.mocked(streamService.schema).mockResolvedValue({
-        data: { schema: [{ name: "infer_service_name" }] },
-      } as any);
-
-      // search() is called twice per load (service edges, then inferred edges).
-      // Return the right rows by inspecting the SQL so ordering can't break it.
-      vi.mocked(searchService.search).mockImplementation((req: any) => {
-        const sql: string = req?.query?.query?.sql ?? "";
-        if (sql.includes("infer_service_name")) {
-          return Promise.resolve({
-            data: {
-              hits: [
-                {
-                  client: "cart",
-                  server: "valkey",
-                  connection_type: "database",
-                  total_requests: 10,
-                  errors: 0,
-                },
-              ],
+      // The backend now returns a fully classified topology; a database-typed
+      // node arrives with service_type set and is used directly.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: {
+          nodes: [
+            { id: "cart", label: "cart", requests: 10, errors: 0 },
+            {
+              id: "valkey",
+              label: "valkey",
+              requests: 10,
+              errors: 0,
+              service_type: "database",
             },
-          }) as any;
-        }
-        return Promise.resolve({
-          data: {
-            hits: [
-              { client: null, server: "cart", total_requests: 10, errors: 0 },
-            ],
-          },
-        }) as any;
-      });
+          ],
+          edges: [
+            {
+              from: "cart",
+              to: "valkey",
+              total_requests: 10,
+              failed_requests: 0,
+              error_rate: 0,
+              p50_latency_ns: 0,
+              p95_latency_ns: 0,
+              p99_latency_ns: 0,
+              connection_type: "database",
+            },
+          ],
+        },
+      } as any);
 
       const wrapper = createWrapper();
       await flushPromises();
