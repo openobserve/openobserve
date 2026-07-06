@@ -18,72 +18,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
 
     <!-- ── Header ──────────────────────────────────────────────────────── -->
-    <div class="tw:flex tw:items-start tw:gap-3 tw:mb-2">
-      <div data-test="feature-comparison-table-icon-wrapper" class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] tw:text-(--o2-primary-color)">
+    <div class="flex items-start gap-3 mb-2">
+      <div data-test="feature-comparison-table-icon-wrapper" class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] text-(--o2-primary-color)">
         <OIcon name="compare-arrows" size="md" />
       </div>
       <div>
-        <div class="tw:text-[length:var(--text-xs)] tw:font-semibold tw:uppercase tw:tracking-[0.1em] tw:text-(--o2-primary-color) tw:m-0 tw:mb-[0.125rem]">EDITIONS</div>
-        <div class="tw:text-[length:var(--text-xl)] tw:font-semibold tw:text-(--color-text-heading) tw:m-0 tw:tracking-[-0.015em]">{{ t("about.feature_comparison_lbl") }}</div>
+        <div class="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.1em] text-(--o2-primary-color) m-0 mb-[0.125rem]">EDITIONS</div>
+        <div class="text-[length:var(--text-xl)] font-semibold text-(--color-text-heading) m-0 tracking-[-0.015em]">{{ t("about.feature_comparison_lbl") }}</div>
       </div>
     </div>
-    <div class="tw:text-sm tw:font-normal tw:leading-relaxed tw:text-typography-body tw:mt-2">
+    <div class="text-sm font-normal leading-relaxed text-typography-body mt-2">
       <template v-if="buildType === 'opensource'">{{ t("about.feature_comparision_os_msg") }}</template>
       <template v-else-if="buildType === 'enterprise'">{{ t("about.feature_comparision_ent_msg") }}</template>
       <template v-else>{{ t("about.feature_comparision_subtitle") }}</template>
     </div>
 
     <!-- ── Edition Cards Grid ──────────────────────────────────────────── -->
-    <div class="tw:grid tw:grid-cols-3 tw:gap-5 tw:pt-4">
+    <div class="grid grid-cols-3 gap-5 pt-4">
       <div
         v-for="ed in editionList"
         :key="ed.id"
         data-test="feature-comparison-table-edition-card"
         :data-test-active="buildType === ed.id ? 'true' : undefined"
-        class="tw:relative tw:flex tw:flex-col tw:bg-(--o2-card-bg) tw:rounded-xl tw:p-6 tw:max-[1024px]:p-4 tw:border tw:border-(--o2-border-color)"
-        :class="{ 'tw:border-2 tw:border-(--o2-primary-color) tw:pt-7 tw:max-[1024px]:pt-5': buildType === ed.id }"
+        class="relative flex flex-col bg-(--o2-card-bg) rounded-xl p-6 max-[1024px]:p-4 border border-(--o2-border-color)"
+        :class="{ 'border-2 border-(--o2-primary-color) pt-7 max-[1024px]:pt-5': buildType === ed.id }"
       >
         <!-- Your Plan badge (floats above the card top border) -->
-        <div v-if="buildType === ed.id" data-test="feature-comparison-table-your-plan-badge" class="tw:absolute tw:top-[-14px] tw:left-1/2 tw:-translate-x-1/2 tw:inline-flex tw:items-center tw:py-1 tw:px-[0.875rem] tw:rounded-full tw:text-[0.625rem] tw:font-bold tw:uppercase tw:tracking-[0.08em] tw:whitespace-nowrap tw:bg-(--o2-primary-color) tw:text-(--o2-primary-foreground)">
-          <OIcon name="arrow-upward" size="sm" class="tw:mr-1" />
+        <div v-if="buildType === ed.id" data-test="feature-comparison-table-your-plan-badge" class="absolute top-[-14px] left-1/2 -translate-x-1/2 inline-flex items-center py-1 px-[0.875rem] rounded-full text-[0.625rem] font-bold uppercase tracking-[0.08em] whitespace-nowrap bg-(--o2-primary-color) text-(--o2-primary-foreground)">
+          <OIcon name="arrow-upward" size="sm" class="mr-1" />
           Your Plan
         </div>
 
         <!-- Edition name + hosting + price ────────────────────────────── -->
-        <div class="tw:mb-5">
-          <div class="tw:text-base tw:font-bold tw:text-(--o2-text-heading) tw:m-0 tw:mb-[0.125rem]">{{ ed.shortName }}</div>
-          <div class="tw:text-[0.8125rem] tw:text-(--o2-text-muted) tw:m-0 tw:mb-[0.875rem]">{{ ed.hosting }}</div>
-          <div class="tw:text-[1.75rem] tw:font-bold tw:text-(--o2-primary-color) tw:m-0 tw:mb-1 tw:tracking-[-0.03em] tw:leading-[1.1]">{{ ed.price }}</div>
-          <div class="tw:text-[0.8125rem] tw:text-(--o2-text-muted) tw:m-0 tw:leading-[1.4]">{{ ed.priceSub }}</div>
+        <div class="mb-5">
+          <div class="text-base font-bold text-(--o2-text-heading) m-0 mb-[0.125rem]">{{ ed.shortName }}</div>
+          <div class="text-[0.8125rem] text-(--o2-text-muted) m-0 mb-[0.875rem]">{{ ed.hosting }}</div>
+          <div class="text-[1.75rem] font-bold text-(--o2-primary-color) m-0 mb-1 tracking-[-0.03em] leading-[1.1]">{{ ed.price }}</div>
+          <div class="text-[0.8125rem] text-(--o2-text-muted) m-0 leading-[1.4]">{{ ed.priceSub }}</div>
         </div>
 
         <!-- All Five Pillars chips ────────────────────────────────────── -->
-        <div class="tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))] tw:border tw:border-[color-mix(in_srgb,var(--o2-primary-color)_15%,transparent)] tw:rounded-lg tw:p-3 tw:mb-4">
-          <div class="tw:text-[0.5625rem] tw:font-bold tw:uppercase tw:tracking-[0.12em] tw:text-(--o2-text-label) tw:m-0 tw:mb-2">ALL FIVE PILLARS</div>
-          <div class="tw:flex tw:flex-wrap tw:gap-1.5 tw:mb-1.5">
-            <span v-for="pillarId in PILLAR_IDS" :key="pillarId" data-test="feature-comparison-table-pillar-chip" class="tw:inline-flex tw:items-center tw:py-[0.1875rem] tw:px-2 tw:rounded tw:text-[0.6875rem] tw:font-medium tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:text-(--o2-primary-color) tw:border tw:border-[color-mix(in_srgb,var(--o2-primary-color)_20%,transparent)] tw:mr-[0.375rem] tw:mb-[0.375rem]">
+        <div class="bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))] border border-[color-mix(in_srgb,var(--o2-primary-color)_15%,transparent)] rounded-lg p-3 mb-4">
+          <div class="text-[0.5625rem] font-bold uppercase tracking-[0.12em] text-(--o2-text-label) m-0 mb-2">ALL FIVE PILLARS</div>
+          <div class="flex flex-wrap gap-1.5 mb-1.5">
+            <span v-for="pillarId in PILLAR_IDS" :key="pillarId" data-test="feature-comparison-table-pillar-chip" class="inline-flex items-center py-[0.1875rem] px-2 rounded text-[0.6875rem] font-medium bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] text-(--o2-primary-color) border border-[color-mix(in_srgb,var(--o2-primary-color)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">
               {{ t(`about.feature_${pillarId}`) }}
             </span>
           </div>
-          <span class="tw:inline-flex tw:items-center tw:py-[0.1875rem] tw:px-2 tw:rounded tw:text-[0.6875rem] tw:font-medium tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:text-(--o2-primary-color) tw:border tw:border-[color-mix(in_srgb,var(--o2-primary-color)_20%,transparent)] tw:mr-[0.375rem] tw:mb-[0.375rem]">{{ t('about.feature_dashboards') }}</span>
+          <span class="inline-flex items-center py-[0.1875rem] px-2 rounded text-[0.6875rem] font-medium bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] text-(--o2-primary-color) border border-[color-mix(in_srgb,var(--o2-primary-color)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">{{ t('about.feature_dashboards') }}</span>
         </div>
 
         <!-- Feature list ───────────────────────────────────────────────── -->
-        <ul class="tw:list-none tw:p-0 tw:m-0 tw:flex-1">
+        <ul class="list-none p-0 m-0 flex-1">
           <li
             v-for="feature in listFeatures"
             :key="feature.id"
             data-test="feature-comparison-table-feature-item"
-            class="tw:flex tw:items-start tw:gap-2 tw:py-[0.4375rem] tw:text-[0.8125rem] tw:border-b tw:border-(--o2-border-color) tw:last:border-b-0"
+            class="flex items-start gap-2 py-[0.4375rem] text-[0.8125rem] border-b border-(--o2-border-color) last:border-b-0"
             :class="{
-              'tw:text-[var(--o2-text-body)]': getFeatureStatus(feature, ed.id) !== 'unavailable',
-              'tw:text-[var(--o2-text-muted)]': getFeatureStatus(feature, ed.id) === 'unavailable',
+              'text-[var(--o2-text-body)]': getFeatureStatus(feature, ed.id) !== 'unavailable',
+              'text-[var(--o2-text-muted)]': getFeatureStatus(feature, ed.id) === 'unavailable',
             }"
           >
-            <span class="tw:shrink-0 tw:mt-[0.125rem] tw:leading-none"
+            <span class="shrink-0 mt-[0.125rem] leading-none"
               :class="{
-                'tw:text-[var(--o2-positive)]': getFeatureStatus(feature, ed.id) !== 'unavailable',
-                'tw:text-[var(--o2-text-muted)]': getFeatureStatus(feature, ed.id) === 'unavailable',
+                'text-[var(--o2-positive)]': getFeatureStatus(feature, ed.id) !== 'unavailable',
+                'text-[var(--o2-text-muted)]': getFeatureStatus(feature, ed.id) === 'unavailable',
               }"
             >
               <OIcon
@@ -97,9 +97,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
               />
             </span>
-            <span class="tw:flex tw:flex-col tw:gap-[0.0625rem]">
-              <span class="tw:leading-[1.45]">{{ t(getFeatureNameKey(feature)) }}</span>
-              <span v-if="getFeatureNote(feature, ed.id)" class="tw:text-[0.6875rem] tw:text-(--o2-text-muted) tw:italic">
+            <span class="flex flex-col gap-[0.0625rem]">
+              <span class="leading-[1.45]">{{ t(getFeatureNameKey(feature)) }}</span>
+              <span v-if="getFeatureNote(feature, ed.id)" class="text-[0.6875rem] text-(--o2-text-muted) italic">
                 {{ getFeatureNote(feature, ed.id) }}
               </span>
             </span>
@@ -107,16 +107,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ul>
 
         <!-- Footer: license + support + CTA ──────────────────────────── -->
-        <div class="tw:mt-4">
-          <div class="tw:h-px tw:bg-(--o2-border-color) tw:mb-3"></div>
-          <div class="tw:mb-[0.875rem]">
-            <div data-test="feature-comparison-table-footer-row" class="tw:flex tw:justify-between tw:items-baseline tw:text-[0.8125rem] tw:py-[0.125rem]">
-              <span class="tw:text-(--o2-text-muted) tw:font-medium">{{ t('about.feature_license') }}</span>
-              <span class="tw:text-(--o2-text-body) tw:font-semibold">{{ ed.license }}</span>
+        <div class="mt-4">
+          <div class="h-px bg-(--o2-border-color) mb-3"></div>
+          <div class="mb-[0.875rem]">
+            <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-[0.8125rem] py-[0.125rem]">
+              <span class="text-(--o2-text-muted) font-medium">{{ t('about.feature_license') }}</span>
+              <span class="text-(--o2-text-body) font-semibold">{{ ed.license }}</span>
             </div>
-            <div data-test="feature-comparison-table-footer-row" class="tw:flex tw:justify-between tw:items-baseline tw:text-[0.8125rem] tw:py-[0.125rem]">
-              <span class="tw:text-(--o2-text-muted) tw:font-medium">{{ t('about.feature_support') }}</span>
-              <span class="tw:text-(--o2-text-body) tw:font-semibold">{{ ed.support }}</span>
+            <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-[0.8125rem] py-[0.125rem]">
+              <span class="text-(--o2-text-muted) font-medium">{{ t('about.feature_support') }}</span>
+              <span class="text-(--o2-text-body) font-semibold">{{ ed.support }}</span>
             </div>
           </div>
           <a
@@ -125,11 +125,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             target="_blank"
             data-test="feature-comparison-table-cta-btn"
             data-test-cta="action"
-            class="tw:block tw:w-full tw:py-2 tw:px-4 tw:rounded-md tw:text-sm tw:font-semibold tw:text-center tw:no-underline tw:cursor-pointer tw:transition-all tw:duration-200 tw:border-[1.5px] tw:border-solid tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:text-(--o2-primary-color) tw:border-[color-mix(in_srgb,var(--o2-primary-color)_30%,transparent)] tw:hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_18%,var(--o2-card-bg))] tw:hover:border-(--o2-primary-color)"
+            class="block w-full py-2 px-4 rounded-md text-sm font-semibold text-center no-underline cursor-pointer transition-all duration-200 border-[1.5px] border-solid bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] text-(--o2-primary-color) border-[color-mix(in_srgb,var(--o2-primary-color)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_18%,var(--o2-card-bg))] hover:border-(--o2-primary-color)"
           >
             {{ ed.ctaLabel }}
           </a>
-          <button v-else data-test="feature-comparison-table-cta-btn" data-test-cta="current" class="tw:block tw:w-full tw:py-2 tw:px-4 tw:rounded-md tw:text-sm tw:font-semibold tw:text-center tw:no-underline tw:cursor-default tw:transition-all tw:duration-200 tw:border-[1.5px] tw:border-solid tw:bg-transparent tw:text-(--o2-text-muted) tw:border-(--o2-border-color)" disabled>
+          <button v-else data-test="feature-comparison-table-cta-btn" data-test-cta="current" class="block w-full py-2 px-4 rounded-md text-sm font-semibold text-center no-underline cursor-default transition-all duration-200 border-[1.5px] border-solid bg-transparent text-(--o2-text-muted) border-(--o2-border-color)" disabled>
             {{ ed.ctaLabel }}
           </button>
         </div>

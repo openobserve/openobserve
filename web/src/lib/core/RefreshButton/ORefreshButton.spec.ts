@@ -37,7 +37,7 @@ describe("ORefreshButton", () => {
 
   it("does not render a timestamp span when lastRunAt is not provided", () => {
     const wrapper = mount(ORefreshButton, { global: globalConfig });
-    expect(wrapper.find("span.tw\:tabular-nums").exists()).toBe(false);
+    expect(wrapper.find("span.tabular-nums").exists()).toBe(false);
   });
 
   it("renders a timestamp span when lastRunAt is provided", () => {
@@ -46,15 +46,15 @@ describe("ORefreshButton", () => {
       props: { lastRunAt: ts },
       global: globalConfig,
     });
-    expect(wrapper.find("span.tw\\:tabular-nums").exists()).toBe(true);
+    expect(wrapper.find("span.tabular-nums").exists()).toBe(true);
   });
 
   // --- dot color classes ---
 
   it("uses idle dot color when no lastRunAt", () => {
     const wrapper = mount(ORefreshButton, { global: globalConfig });
-    const dot = wrapper.find(".tw\\:rounded-full");
-    expect(dot.classes()).toContain("tw:bg-refresh-dot-idle");
+    const dot = wrapper.find(".rounded-full");
+    expect(dot.classes()).toContain("bg-refresh-dot-idle");
   });
 
   it("uses fresh dot color when lastRunAt < 30s ago", () => {
@@ -62,8 +62,8 @@ describe("ORefreshButton", () => {
       props: { lastRunAt: Date.now() - 5_000 },
       global: globalConfig,
     });
-    const dot = wrapper.find(".tw\\:rounded-full");
-    expect(dot.classes()).toContain("tw:bg-refresh-dot-fresh");
+    const dot = wrapper.find(".rounded-full");
+    expect(dot.classes()).toContain("bg-refresh-dot-fresh");
   });
 
   it("uses stale dot color when lastRunAt is 30s–5min ago", () => {
@@ -71,8 +71,8 @@ describe("ORefreshButton", () => {
       props: { lastRunAt: Date.now() - 60_000 },
       global: globalConfig,
     });
-    const dot = wrapper.find(".tw\\:rounded-full");
-    expect(dot.classes()).toContain("tw:bg-refresh-dot-stale");
+    const dot = wrapper.find(".rounded-full");
+    expect(dot.classes()).toContain("bg-refresh-dot-stale");
   });
 
   it("uses critical dot color when lastRunAt > 5min ago", () => {
@@ -80,8 +80,8 @@ describe("ORefreshButton", () => {
       props: { lastRunAt: Date.now() - 400_000 },
       global: globalConfig,
     });
-    const dot = wrapper.find(".tw\\:rounded-full");
-    expect(dot.classes()).toContain("tw:bg-refresh-dot-critical");
+    const dot = wrapper.find(".rounded-full");
+    expect(dot.classes()).toContain("bg-refresh-dot-critical");
   });
 
   it("uses idle dot color when loading=true regardless of lastRunAt", () => {
@@ -89,8 +89,8 @@ describe("ORefreshButton", () => {
       props: { lastRunAt: Date.now() - 5_000, loading: true },
       global: globalConfig,
     });
-    const dot = wrapper.find(".tw\\:rounded-full");
-    expect(dot.classes()).toContain("tw:bg-refresh-dot-idle");
+    const dot = wrapper.find(".rounded-full");
+    expect(dot.classes()).toContain("bg-refresh-dot-idle");
   });
 
   // --- emits ---

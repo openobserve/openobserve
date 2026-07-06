@@ -18,26 +18,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <transition name="slide">
     <div
       v-if="visible"
-      class="service-graph-edge-side-panel tw:absolute tw:right-0 tw:top-0 tw:w-[420px] tw:h-full tw:z-[100] tw:flex tw:flex-col tw:bg-[#1a1f2e] tw:border-l tw:border-[#2d3548] tw:shadow-[0_10px_15px_-3px_rgba(0,0,0,0.5)] tw:overflow-hidden tw:animate-[slideIn_0.3s_ease-out]"
+      class="service-graph-edge-side-panel absolute right-0 top-0 w-[420px] h-full z-[100] flex flex-col bg-[#1a1f2e] border-l border-[#2d3548] shadow-[0_10px_15px_-3px_rgba(0,0,0,0.5)] overflow-hidden animate-[slideIn_0.3s_ease-out]"
       data-test="service-graph-edge-side-panel"
     >
       <!-- Header -->
       <div
-        class="panel-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:border-b tw:border-[#2d3548] tw:bg-[#1a1f2e] tw:shrink-0"
+        class="panel-header flex items-center justify-between py-3 px-4 border-b border-[#2d3548] bg-[#1a1f2e] shrink-0"
         data-test="service-graph-edge-side-panel-header"
       >
-        <div class="panel-title tw:flex-1 tw:min-w-0">
+        <div class="panel-title flex-1 min-w-0">
           <h2
-            class="edge-name tw:text-[15px] tw:font-semibold tw:m-0 tw:leading-[1.2] tw:text-[#e4e7eb] tw:tracking-normal tw:flex tw:items-center tw:gap-2 tw:flex-wrap"
+            class="edge-name text-[15px] font-semibold m-0 leading-[1.2] text-[#e4e7eb] tracking-normal flex items-center gap-2 flex-wrap"
             data-test="service-graph-edge-side-panel-route"
           >
-            <span class="from-service tw:text-[#60a5fa] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">{{ selectedEdge?.from }}</span>
-            <OIcon name="arrow-forward" size="xs" class="edge-arrow tw:text-[rgba(255,255,255,0.35)] tw:shrink-0" />
-            <span class="to-service tw:text-[#a78bfa] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">{{ selectedEdge?.to }}</span>
+            <span class="from-service text-[#60a5fa] overflow-hidden text-ellipsis whitespace-nowrap">{{ selectedEdge?.from }}</span>
+            <OIcon name="arrow-forward" size="xs" class="edge-arrow text-[rgba(255,255,255,0.35)] shrink-0" />
+            <span class="to-service text-[#a78bfa] overflow-hidden text-ellipsis whitespace-nowrap">{{ selectedEdge?.to }}</span>
             <OTag type="serviceStatus" :value="edgeHealth.status">{{ edgeHealth.text }}</OTag>
           </h2>
         </div>
-        <div class="panel-header-actions tw:flex tw:items-center tw:shrink-0">
+        <div class="panel-header-actions flex items-center shrink-0">
           <OButton
             variant="ghost"
             size="icon"
@@ -51,11 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Content -->
       <div
-        class="panel-content tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:overflow-x-hidden tw:bg-[#0f1419] tw:px-3 tw:pb-3"
+        class="panel-content flex-1 min-h-0 flex flex-col overflow-x-hidden bg-[#0f1419] px-3 pb-3"
       >
 
         <!-- Metrics Section -->
-        <div class="panel-section metrics-section tw:p-0 tw:mt-3" data-test="service-graph-edge-side-panel-metrics">
+        <div class="panel-section metrics-section p-0 mt-3" data-test="service-graph-edge-side-panel-metrics">
           <div class="metric-card metric-card-full" data-test="service-graph-edge-side-panel-request-rate">
 
             <!-- Traffic Summary: Total | Failed | Error Rate -->
@@ -166,8 +166,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- RED Chart Section -->
-        <div class="panel-section trend-section tw:p-0 tw:mt-3 tw:flex-1 tw:min-h-0 tw:flex tw:flex-col" data-test="service-graph-edge-side-panel-trend">
-          <div class="section-header tw:flex tw:items-center tw:justify-between tw:mb-2 tw:shrink-0">
+        <div class="panel-section trend-section p-0 mt-3 flex-1 min-h-0 flex flex-col" data-test="service-graph-edge-side-panel-trend">
+          <div class="section-header flex items-center justify-between mb-2 shrink-0">
             <!-- R·E·D Tab switcher -->
             <OToggleGroup
               :model-value="activeTab"
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ tab.label }}
               </OToggleGroupItem>
             </OToggleGroup>
-            <span class="tw:shrink-0">
+            <span class="shrink-0">
               <OButton
                 variant="ghost-muted"
                 size="xs"

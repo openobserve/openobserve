@@ -338,8 +338,8 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       const legends = wrapper.find('[data-test="service-graph-legends"]');
       expect(legends.exists()).toBe(true);
-      // Legends use tw:flex-row — confirm the element has neither flex-col class
-      expect(legends.classes()).not.toContain("tw:flex-col");
+      // Legends use flex-row — confirm the element has neither flex-col class
+      expect(legends.classes()).not.toContain("flex-col");
     });
 
     it("should not render a date-time-picker inside ServiceGraph", () => {

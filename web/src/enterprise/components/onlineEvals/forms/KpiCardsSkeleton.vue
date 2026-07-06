@@ -8,7 +8,7 @@
   <div
     v-for="n in count"
     :key="n"
-    class="kpi-card-skeleton tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.5rem]"
+    class="kpi-card-skeleton rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.5rem]"
     data-test="kpi-cards-skeleton"
   >
     <SkeletonBox width="55%" height="12px" rounded />

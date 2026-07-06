@@ -7,13 +7,13 @@
     :form="form"
     v-slot="{ isSubmitting }"
     data-test="add-script-toolbar"
-    class="tw:pb-1.5 tw:w-full tw:flex tw:justify-between tw:items-center"
+    class="pb-1.5 w-full flex justify-between items-center"
   >
-    <div class="tw:flex tw:items-center">
-      <div class="tw:mr-2">
+    <div class="flex items-center">
+      <div class="mr-2">
         <div
           data-test="add-script-back-btn"
-          class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer"
+          class="flex justify-center items-center cursor-pointer"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -26,17 +26,17 @@
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
       </div>
-      <div class="tw:text-lg tw:w-full tw:mr-3">
+      <div class="text-lg w-full mr-3">
         Add Action
       </div>
       <div>
-        <div class="tw:flex tw:items-center">
+        <div class="flex items-center">
           <OFormInput
             data-test="add-script-name-input"
             name="name"
             :label="t('actions.name')"
             required
-            class="tw:p-0 tw:w-full"
+            class="p-0 w-full"
             :readonly="disableName"
             :disabled="disableName"
             style="min-width: 300px"
@@ -44,14 +44,14 @@
         </div>
       </div>
     </div>
-    <div data-test="add-script-actions" class="tw:flex tw:items-center tw:gap-2">
+    <div data-test="add-script-actions" class="flex items-center gap-2">
       <OButton
         data-test="add-script-fullscreen-btn"
         v-close-popup="true"
         variant="outline"
         size="sm"
         @click="handleFullScreen"
-        ><OIcon name="fullscreen" size="sm" class="tw:mr-1" />{{
+        ><OIcon name="fullscreen" size="sm" class="mr-1" />{{
           t("common.fullscreen")
         }}</OButton
       >

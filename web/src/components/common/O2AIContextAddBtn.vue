@@ -6,11 +6,11 @@
         size="icon-toolbar"
         @click.stop="sendToAiChat"
         data-test="o2-ai-context-add-btn"
-        :class="['tw:group o2-ai-context-btn', props.class]"
+        :class="['group o2-ai-context-btn', props.class]"
         :style="props.style"
         >
-        <div class="tw:flex tw:items-center tw:flex-nowrap">
-            <img :height="props.imageHeight" :width="props.imageWidth" :src="getBtnLogo" class="header-icon ai-icon tw:[transition:transform_0.6s_ease,filter_0.6s_ease] tw:group-hover:brightness-0 tw:group-hover:invert tw:group-hover:rotate-180" />
+        <div class="flex items-center flex-nowrap">
+            <img :height="props.imageHeight" :width="props.imageWidth" :src="getBtnLogo" class="header-icon ai-icon [transition:transform_0.6s_ease,filter_0.6s_ease] group-hover:brightness-0 group-hover:invert group-hover:rotate-180" />
         </div>
     </OButton>
 </template>

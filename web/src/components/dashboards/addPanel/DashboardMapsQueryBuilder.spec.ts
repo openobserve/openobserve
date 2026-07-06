@@ -831,7 +831,7 @@ describe("DashboardMapsQueryBuilder", () => {
       wrapper = createWrapper();
 
       const nameContainer = wrapper.find('[data-test="dashboard-name-layout"]');
-      expect(nameContainer.classes()).toContain("tw:bg-[rgba(0,0,0,0.042)]");
+      expect(nameContainer.classes()).toContain("bg-[rgba(0,0,0,0.042)]");
     });
 
     it("should apply drop-entered class when drag area matches", () => {
@@ -843,7 +843,7 @@ describe("DashboardMapsQueryBuilder", () => {
 
       const nameContainer = wrapper.find('[data-test="dashboard-name-layout"]');
       expect(nameContainer.classes()).toContain(
-        "tw:bg-[var(--color-field-list-row-hover-bg)]",
+        "bg-[var(--color-field-list-row-hover-bg)]",
       );
     });
 
@@ -857,7 +857,7 @@ describe("DashboardMapsQueryBuilder", () => {
 
       const nameContainer = wrapper.find('[data-test="dashboard-name-layout"]');
       expect(nameContainer.classes()).not.toContain(
-        "tw:bg-[var(--color-field-list-row-hover-bg)]",
+        "bg-[var(--color-field-list-row-hover-bg)]",
       );
     });
   });

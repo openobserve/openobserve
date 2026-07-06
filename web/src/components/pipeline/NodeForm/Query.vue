@@ -30,12 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
         @click="scheduledPipelineRef?.toggleAIChat()"
         data-test="menu-link-ai-item"
-        class="tw:bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! tw:transition-[background,box-shadow] tw:duration-300 tw:hover:bg-[linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]! tw:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]"
-        :class="store.state.isAiChatEnabled ? 'ai-btn-active tw:bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]!' : ''"
+        class="bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! transition-[background,box-shadow] duration-300 hover:bg-[linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]"
+        :class="store.state.isAiChatEnabled ? 'ai-btn-active bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]!' : ''"
       >
-        <img :src="scheduledPipelineRef?.getBtnLogo" class="header-icon ai-icon tw:opacity-70 tw:transition-[transform] tw:duration-[0.6s] tw:ease-[ease]" :class="store.state.isAiChatEnabled ? 'tw:opacity-100!' : ''" />
+        <img :src="scheduledPipelineRef?.getBtnLogo" class="header-icon ai-icon opacity-70 transition-[transform] duration-[0.6s] ease-[ease]" :class="store.state.isAiChatEnabled ? 'opacity-100!' : ''" />
       </OButton>
-      <div class="tw:flex tw:items-center app-tabs-container">
+      <div class="flex items-center app-tabs-container">
         <AppTabs
           data-test="scheduled-pipeline-tabs"
           :tabs="scheduledPipelineRef?.tabOptions ?? []"
@@ -71,20 +71,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="scheduledPipelineRef?.handleFullScreen()"
       >
         <template #icon-left>
-          <OIcon name="open-in-full" size="sm" v-if="!scheduledPipelineRef?.isFullscreen" class="tw:size-3.5 tw:shrink-0" />
-          <OIcon name="close-fullscreen" size="sm" v-else class="tw:size-3.5 tw:shrink-0" />
+          <OIcon name="open-in-full" size="sm" v-if="!scheduledPipelineRef?.isFullscreen" class="size-3.5 shrink-0" />
+          <OIcon name="close-fullscreen" size="sm" v-else class="size-3.5 shrink-0" />
         </template>
       </OButton>
     </template>
     <div
       data-test="add-stream-query-routing-section"
-      class="tw:w-full tw:h-full stream-routing-section"
+      class="w-full h-full stream-routing-section"
       :class="[
-        store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white',
+        store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white',
         { 'fullscreen-mode': isFullscreenMode },
       ]"
     >
-    <div class="tw:w-full tw:h-full tw:rounded-lg stream-routing-container">
+    <div class="w-full h-full rounded-lg stream-routing-container">
       <scheduled-pipeline
         ref="scheduledPipelineRef"
         :columns="filteredColumns"

@@ -28,12 +28,12 @@ const hasLabel = computed(
 const wrapperClasses = computed(() => {
   if (!hasLabel.value) return "";
   return [
-    "tw:inline-flex tw:gap-2",
+    "inline-flex gap-2",
     props.labelPosition === "top"
-      ? "tw:flex-col tw:items-start"
+      ? "flex-col items-start"
       : props.labelPosition === "right"
-        ? "tw:flex-row-reverse tw:items-center"
-        : "tw:flex-row tw:items-center",
+        ? "flex-row-reverse items-center"
+        : "flex-row items-center",
   ].join(" ");
 });
 </script>
@@ -45,7 +45,7 @@ const wrapperClasses = computed(() => {
   <div v-if="hasLabel" :class="wrapperClasses">
     <span
       :class="[
-        'o-input-label tw:text-sm tw:font-medium tw:select-none tw:leading-tight',
+        'o-input-label text-sm font-medium select-none leading-tight',
         disabled && 'o-input-label--disabled',
       ]"
     >
@@ -59,9 +59,9 @@ const wrapperClasses = computed(() => {
       :orientation="orientation"
       :data-variant="variant"
       :class="[
-        'tw:inline-flex tw:items-stretch',
-        orientation === 'vertical' ? 'tw:flex-col' : 'tw:flex-row',
-        'tw:bg-[var(--color-toggle-track-bg)] tw:rounded-lg tw:p-0.5',
+        'inline-flex items-stretch',
+        orientation === 'vertical' ? 'flex-col' : 'flex-row',
+        'bg-[var(--color-toggle-track-bg)] rounded-lg p-0.5',
       ]"
       @update:model-value="
         (v) => {
@@ -82,10 +82,10 @@ const wrapperClasses = computed(() => {
     :orientation="orientation"
     :data-variant="variant"
     :class="[
-      'tw:inline-flex tw:items-stretch',
-      orientation === 'vertical' ? 'tw:flex-col' : 'tw:flex-row',
-      'tw:bg-[var(--color-toggle-track-bg)] tw:rounded-lg tw:p-0.5',
-      'tw:border tw:border-toggle-border',
+      'inline-flex items-stretch',
+      orientation === 'vertical' ? 'flex-col' : 'flex-row',
+      'bg-[var(--color-toggle-track-bg)] rounded-lg p-0.5',
+      'border border-toggle-border',
     ]"
     @update:model-value="
       (v) => {
