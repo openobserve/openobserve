@@ -84,6 +84,106 @@ pub async fn insert_run<C: ConnectionTrait>(
     Ok(())
 }
 
+// ── Runs API ──────────────────────────────────────────────────────────────────
+
+pub struct ListRunsParams<'a> {
+    pub org_id: &'a str,
+    pub synthetics_id: &'a str,
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    pub page: i64,
+    pub page_size: i64,
+}
+
+/// Lists runs for a monitor in reverse chronological order, with optional time range filter.
+/// Returns (rows, total_count).
+pub async fn list_runs<C: ConnectionTrait>(
+    conn: &C,
+    p: ListRunsParams<'_>,
+) -> Result<(Vec<RunRow>, i64), errors::Error> {
+    let mut where_parts: Vec<String> = vec![
+        "org_id = $1".to_string(),
+        "synthetics_id = $2".to_string(),
+    ];
+    let mut values: Vec<Value> = vec![
+        Value::from(p.org_id.to_owned()),
+        Value::from(p.synthetics_id.to_owned()),
+    ];
+
+    if let Some(start) = p.start_time {
+        let n = values.len() + 1;
+        where_parts.push(format!("scheduled_ts >= ${n}"));
+        values.push(Value::from(start));
+    }
+    if let Some(end) = p.end_time {
+        let n = values.len() + 1;
+        where_parts.push(format!("scheduled_ts <= ${n}"));
+        values.push(Value::from(end));
+    }
+
+    let where_clause = where_parts.join(" AND ");
+
+    // Count
+    let count_sql = format!(
+        "SELECT COUNT(*) AS total FROM synthetics_runs WHERE {where_clause}"
+    );
+    let count_rows = conn
+        .query_all(Statement::from_sql_and_values(
+            conn.get_database_backend(),
+            &count_sql,
+            values.clone(),
+        ))
+        .await?;
+    let total: i64 = count_rows
+        .into_iter()
+        .next()
+        .and_then(|row| row.try_get::<i64>("", "total").ok())
+        .unwrap_or(0);
+
+    // Data (paginated, newest first)
+    let limit_n = values.len() + 1;
+    let offset_n = values.len() + 2;
+    let data_sql = format!(
+        "SELECT id, synthetics_id, org_id, scheduled_ts, trigger_type, job_count, \
+         jobs_done, run_result, created_at, completed_at \
+         FROM synthetics_runs \
+         WHERE {where_clause} \
+         ORDER BY scheduled_ts DESC \
+         LIMIT ${limit_n} OFFSET ${offset_n}"
+    );
+    values.push(Value::from(p.page_size));
+    values.push(Value::from(p.page * p.page_size));
+
+    let rows = conn
+        .query_all(Statement::from_sql_and_values(
+            conn.get_database_backend(),
+            &data_sql,
+            values,
+        ))
+        .await?;
+
+    let runs = rows
+        .into_iter()
+        .map(|row| -> Result<RunRow, sea_orm::DbErr> {
+            Ok(RunRow {
+                id: row.try_get("", "id")?,
+                synthetics_id: row.try_get("", "synthetics_id")?,
+                org_id: row.try_get("", "org_id")?,
+                scheduled_ts: row.try_get("", "scheduled_ts")?,
+                trigger_type: row.try_get("", "trigger_type")?,
+                job_count: row.try_get("", "job_count")?,
+                jobs_done: row.try_get("", "jobs_done")?,
+                run_result: row.try_get("", "run_result")?,
+                created_at: row.try_get("", "created_at")?,
+                completed_at: row.try_get("", "completed_at")?,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(errors::Error::from)?;
+
+    Ok((runs, total))
+}
+
 // ── Job API ───────────────────────────────────────────────────────────────────
 
 /// Fetches a run by its KSUID.

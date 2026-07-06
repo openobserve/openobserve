@@ -73,6 +73,113 @@ pub struct MoveSyntheticsRequestBody {
     pub dst_folder_id: String,
 }
 
+// ── Runs API ──────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Default, Deserialize)]
+pub struct ListRunsQuery {
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    pub page: Option<i64>,
+    pub page_size: Option<i64>,
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/synthetics/{id}/runs",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "ListSyntheticsRuns",
+    summary = "List runs for a monitor",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Monitor ID"),
+        ("start_time" = Option<i64>, Query, description = "Filter runs with scheduled_ts >= start_time (microseconds)"),
+        ("end_time" = Option<i64>, Query, description = "Filter runs with scheduled_ts <= end_time (microseconds)"),
+        ("page" = Option<i64>, Query, description = "Page number (0-indexed, default 0)"),
+        ("page_size" = Option<i64>, Query, description = "Results per page (default 20)"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Error",   content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn list_runs(
+    Path((org_id, id)): Path<(String, String)>,
+    Query(q): Query<ListRunsQuery>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let page = q.page.unwrap_or(0).max(0);
+        let page_size = q.page_size.unwrap_or(20).clamp(1, 200);
+        match o2_enterprise::enterprise::synthetics::service::list_runs(
+            &org_id,
+            &id,
+            q.start_time,
+            q.end_time,
+            page,
+            page_size,
+        )
+        .await
+        {
+            Ok(resp) => MetaHttpResponse::json(resp),
+            Err(e) => {
+                tracing::error!("[synthetics] list_runs: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/synthetics/{id}/runs/{run_id}",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "GetSyntheticsRun",
+    summary = "Get a single run by ID",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Monitor ID"),
+        ("run_id" = String, Path, description = "Run ID (KSUID)"),
+    ),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 404, description = "Not found"),
+        (status = 500, description = "Error",     content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn get_run_detail(
+    Path((org_id, id, run_id)): Path<(String, String, String)>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::synthetics::service::get_run_detail(&org_id, &id, &run_id)
+            .await
+        {
+            Ok(Some(run)) => MetaHttpResponse::json(run),
+            Ok(None) => MetaHttpResponse::not_found("run not found"),
+            Err(e) => {
+                tracing::error!("[synthetics] get_run_detail: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, id, run_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 // ── Results API ───────────────────────────────────────────────────────────────
 
 #[utoipa::path(
