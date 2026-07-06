@@ -13,7 +13,13 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
+<!--
+  MonitorResults — Page shell for the Monitor Runs multi-tab page.
 
+  Follows the LLMInsightsPage.vue pattern:
+    ROW 1: AppPageHeader (breadcrumb + title + badge + actions)
+    ROW 2: MonitorRuns (chrome-less tabbed content)
+-->
 <template>
   <div
     data-test="synthetic-monitor-results-page"
@@ -21,12 +27,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <AppPageHeader
       :title="monitorName"
-      icon="radar"
       :back="{ label: t('synthetics.results.monitors'), to: { name: 'synthetic' } }"
-      class="tw:px-4 tw:border-b tw:border-border-default"
+      :breadcrumb="breadcrumb"
     >
+      <template #title-trail>
+        <OBadge
+          v-if="statusBadge"
+          :variant="statusBadge.variant"
+          size="sm"
+          dot
+        >
+          {{ statusBadge.label }}
+        </OBadge>
+      </template>
       <template #actions>
-        <date-time
+        <DateTime
           ref="dateTimeRef"
           auto-apply
           menu-align="end"
@@ -44,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm"
           icon-left="edit"
-          title="Edit Monitor"
           data-test="synthetic-monitor-results-edit-btn"
           @click="editMonitor"
         >
@@ -55,20 +69,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           icon-left="refresh"
           :loading="isRefreshing"
-          title="Refresh"
           data-test="synthetic-monitor-results-refresh-btn"
           @click="refresh"
         />
       </template>
     </AppPageHeader>
 
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:px-4 tw:py-3">
-      <MonitorResultsDashboard
-        ref="dashboardRef"
+    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <MonitorRuns
+        ref="runsRef"
         :monitor-id="monitorId"
-        :start-time="timeRange.startTime"
-        :end-time="timeRange.endTime"
-        class="tw:h-full"
+        :monitor-name="monitorName"
+        :monitor-status="monitorStatus"
+        @edit="editMonitor"
+        @open-run="openRunDetail"
       />
     </div>
   </div>
@@ -80,8 +94,10 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import MonitorResultsDashboard from "@/views/synthetics/MonitorResultsDashboard.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import MonitorRuns from "@/views/synthetics/MonitorRuns.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 
 defineOptions({ name: "SyntheticMonitorResults" });
@@ -96,9 +112,32 @@ const monitorId = computed(() => String(route.params.id ?? ""));
 const monitorName = computed(
   () => String(route.query.name ?? "") || t("synthetics.results.title"),
 );
+const monitorStatus = computed<"healthy" | "degraded" | "critical">(
+  () => (route.query.status as any) || "degraded",
+);
 
-// Local date state + URL sync (mirrors the Logs convention used by LLM
-// Insights, minus the cross-page shared singleton).
+const badgeVariantMap: Record<string, "warning" | "success" | "error"> = {
+  healthy: "success",
+  degraded: "warning",
+  critical: "error",
+};
+const statusBadge = computed(() => {
+  const s = monitorStatus.value;
+  const labels: Record<string, string> = {
+    healthy: t("synthetics.status.healthy"),
+    degraded: t("synthetics.status.degraded"),
+    critical: t("synthetics.status.critical"),
+  };
+  if (!labels[s]) return null;
+  return { variant: badgeVariantMap[s], label: labels[s] };
+});
+
+const breadcrumb = computed<BreadcrumbItem[]>(() => [
+  { label: t("synthetics.title"), to: { name: "synthetic" } },
+  { label: monitorName.value },
+]);
+
+// ── Date state + URL sync (same pattern as LLMInsightsPage) ────────────
 type DateValueType = "relative" | "absolute";
 const timeState = ref<{
   valueType: DateValueType;
@@ -114,7 +153,7 @@ const timeState = ref<{
 
 const timeRange = ref({ startTime: 0, endTime: 0 });
 const dateTimeRef = ref<any>(null);
-const dashboardRef = ref<any>(null);
+const runsRef = ref<any>(null);
 const isRefreshing = ref(false);
 
 function applyRelative(period: string) {
@@ -129,7 +168,6 @@ function applyRelative(period: string) {
   };
 }
 
-// URL ↔ date sync. relative → ?period=15m, absolute → ?from=<micros>&to=<micros>.
 function readFromUrl(): boolean {
   const fromRaw = route.query.from;
   const toRaw = route.query.to;
@@ -190,7 +228,7 @@ async function onDateChange(value: any) {
   }
   writeToUrl();
   await nextTick();
-  dashboardRef.value?.refresh?.(
+  runsRef.value?.refresh?.(
     timeRange.value.startTime,
     timeRange.value.endTime,
   );
@@ -200,13 +238,12 @@ async function refresh() {
   if (isRefreshing.value) return;
   isRefreshing.value = true;
   try {
-    // Re-anchor a relative window to "now" so the data is genuinely fresh.
     if (timeState.value.valueType === "relative") {
       applyRelative(timeState.value.relativeTimePeriod ?? DEFAULT_RELATIVE);
       writeToUrl();
     }
     await nextTick();
-    await dashboardRef.value?.refresh?.(
+    await runsRef.value?.refresh?.(
       timeRange.value.startTime,
       timeRange.value.endTime,
     );
@@ -219,13 +256,20 @@ function editMonitor() {
   router.push({ name: "synthetic-new", query: { edit: monitorId.value } });
 }
 
+function openRunDetail(runId: string) {
+  router.push({
+    name: "synthetic-run-detail",
+    params: { id: monitorId.value, runId },
+  });
+}
+
 onMounted(() => {
   if (!readFromUrl()) {
     applyRelative(DEFAULT_RELATIVE);
   }
   writeToUrl();
   nextTick(() => {
-    dashboardRef.value?.refresh?.(
+    runsRef.value?.refresh?.(
       timeRange.value.startTime,
       timeRange.value.endTime,
     );
