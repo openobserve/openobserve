@@ -214,7 +214,7 @@ ORDER BY ts`;
 /** Most-recent runs for the Runs table. */
 export function buildRunsSql(monitorId: string, limit: number): string {
   const id = escapeSqlLiteral(monitorId);
-  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, ${F.error} as error, job_id, execution_id, run_id, screenshot_refs, trace_ref
+  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, ${F.error} as error, job_id, execution_id, run_id, trace_key
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'
 ORDER BY ${F.timestamp} DESC
@@ -263,8 +263,8 @@ export function mapRun(rawHit: Record<string, unknown>): SyntheticRun {
     error: str(rawHit.error),
     jobId: str(rawHit.job_id),
     browserEngine: str(rawHit.engine),
-    screenshotRefs: parseScreenshotRefs(rawHit.screenshot_refs),
-    traceRef: rawHit.trace_ref ? str(rawHit.trace_ref) : null,
+    screenshotRefs: [],
+    traceRef: rawHit.trace_key ? str(rawHit.trace_key) : null,
   };
 }
 
