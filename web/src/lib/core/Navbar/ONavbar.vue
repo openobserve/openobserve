@@ -127,8 +127,11 @@ function handleKeydown(event: KeyboardEvent) {
   if (!(NAV_KEYS as readonly string[]).includes(event.key)) return;
 
   const nav = event.currentTarget as HTMLElement;
+  // Match link tiles (<a>) and group triggers (<button>) so a focused group tile is found.
   const menuLinks = Array.from(
-    nav.querySelectorAll<HTMLElement>("a[data-test^='menu-link-']"),
+    nav.querySelectorAll<HTMLElement>(
+      "a[data-test^='menu-link-'], button[data-test^='menu-link-']",
+    ),
   );
 
   if (menuLinks.length === 0) return;

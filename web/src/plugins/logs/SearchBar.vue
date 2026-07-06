@@ -5597,21 +5597,6 @@ export default defineComponent({
 }
 
 
-/* Query editor placeholder — descendant text styling */
-.query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
-  /* Mirror Monaco's rendered text so the placeholder reads as the future
-     typed query, not a different (proportional) font on a different baseline:
-     same monospace family and same ~21px (1.5 × 14px) line height. */
-  font-family: monospace;
-  font-size: var(--text-base);
-  line-height: 1.3125rem;
-  color: #a0aec0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.body--dark .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
-  color: #718096;
-}
+/* Query editor placeholder text styling is global (styles/tailwind.css) —
+   shared with traces, RUM sessions, RUM error tracking, and alerts. */
 </style>

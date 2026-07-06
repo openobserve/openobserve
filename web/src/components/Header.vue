@@ -35,18 +35,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <!-- Custom logo text -->
-      <span
+      <a
         v-if="
           store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
           store.state.zoConfig?.custom_logo_text != ''
         "
-        class="text-xl font-semibold font-bold p-0 cursor-pointer mr-2 flex items-center"
-        @click="goToHome"
-        >{{ store.state.zoConfig.custom_logo_text }}</span
+        :href="homeUrl"
+        @click.prevent="goToHome"
+        class="text-xl font-semibold font-bold p-0 cursor-pointer mr-2 flex items-center tw:no-underline tw:text-inherit"
+        >{{ store.state.zoConfig.custom_logo_text }}</a
       >
 
       <!-- Custom logo image - shows appropriate logo based on current theme -->
-      <div class="flex items-center">
+      <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
         <!-- Dark mode: Show dark logo, fallback to light logo -->
         <img
           v-if="
@@ -88,13 +89,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
           style="max-width: 150px; max-height: 32px"
         />
-      </div>
+      </a>
 
       <!-- OpenObserve logo (shown alongside custom logo if configured) -->
       <div
         v-if="store.state.zoConfig.custom_hide_self_logo == false"
         class="relative inline-flex items-center min-h-10"
       >
+        <a :href="homeUrl" @click.prevent="goToHome" class="tw:inline-flex tw:items-center">
+          <img
+            data-test="header-openobserve-logo"
+            class="openobserve-logo cursor-pointer h-8 max-w-[150px] block transition-opacity duration-200 hover:opacity-80"
+            :src="
+              getImageURL(
+                store.state.theme === 'dark'
+                  ? 'images/common/openobserve_latest_dark_2.svg'
+                  : 'images/common/openobserve_latest_light_2.svg',
+              )
+            "
+            alt="OpenObserve"
+          />
+        </a>
+      </div>
+    </div>
+
+    <!-- Default OpenObserve logo (when no custom logo) -->
+    <div v-else class="relative-position relative inline-flex items-center min-h-10">
+      <a :href="homeUrl" @click.prevent="goToHome" class="tw:inline-flex tw:items-center">
         <img
           data-test="header-openobserve-logo"
           class="openobserve-logo cursor-pointer h-8 max-w-[150px] block transition-opacity duration-200 hover:opacity-80"
@@ -105,27 +126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'images/common/openobserve_latest_light_2.svg',
             )
           "
-          @click="goToHome"
           alt="OpenObserve"
         />
-      </div>
-    </div>
-
-    <!-- Default OpenObserve logo (when no custom logo) -->
-    <div v-else class="relative-position relative inline-flex items-center min-h-10">
-      <img
-        data-test="header-openobserve-logo"
-        class="openobserve-logo cursor-pointer h-8 max-w-[150px] block transition-opacity duration-200 hover:opacity-80"
-        :src="
-          getImageURL(
-            store.state.theme === 'dark'
-              ? 'images/common/openobserve_latest_dark_2.svg'
-              : 'images/common/openobserve_latest_light_2.svg',
-          )
-        "
-        @click="goToHome"
-        alt="OpenObserve"
-      />
+      </a>
     </div>
     </div><!-- end left side -->
 
@@ -437,6 +440,7 @@ size="xs" class="warning" />{{
 <script lang="ts">
 
 import { defineComponent, PropType, computed, ref, watch, nextTick } from "vue";
+import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
@@ -549,6 +553,17 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
+    const router = useRouter();
+
+    const homeUrl = computed(() => {
+      if (!router) return "/";
+      return router.resolve({
+        path: "/",
+        query: {
+          org_identifier: props.store.state.selectedOrganization?.identifier,
+        },
+      }).href;
+    });
 
     // Enterprise upgrade dialog state
     const showEnterpriseDialog = ref(false);
@@ -660,6 +675,7 @@ export default defineComponent({
       showLanguageSubmenu,
       updateOrganization,
       goToHome,
+      homeUrl,
       goToAbout,
       toggleAIChat,
       openSlack,

@@ -18,6 +18,13 @@ const parentDataTest = computed(
   () => $attrs["data-test"] as string | undefined,
 );
 
+// Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
+const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
+const wrapperAttrs = computed(() => {
+  const { tabindex, ...rest } = $attrs;
+  return rest;
+});
+
 const props = withDefaults(defineProps<TextareaProps>(), {
   rows: 3,
   size: "md",
@@ -106,7 +113,7 @@ const wrapperClasses = computed(() => [
 
 <template>
   <div
-    v-bind="$attrs"
+    v-bind="wrapperAttrs"
     :class="[
       'flex flex-col gap-1',
       fieldWidthClass,
@@ -146,6 +153,7 @@ const wrapperClasses = computed(() => [
         :maxlength="maxlength"
         :rows="autogrow ? 1 : rows"
         :autocomplete="autocomplete"
+        :tabindex="inputTabindex"
         :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
         :style="autogrow ? { overflow: 'hidden' } : undefined"
         :class="[

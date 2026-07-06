@@ -693,6 +693,12 @@
   --color-banner-error-bg:        var(--color-error-600);
   --color-banner-error-text:      var(--color-grey-0);
 
+  /* error-soft — tinted error banner for hints/insights (the solid `error`
+     variant stays reserved for hard failures). Mirrors the warning build. */
+  --color-banner-error-soft-bg:     var(--color-error-50);
+  --color-banner-error-soft-border: var(--color-error-300);
+  --color-banner-error-soft-text:   var(--color-error-700);
+
   /* ── Note Container (pipeline guideline cards) ─────────── */
   --color-note-bg:               var(--color-note-light-bg);
   --color-note-border:           var(--color-note-light-border);

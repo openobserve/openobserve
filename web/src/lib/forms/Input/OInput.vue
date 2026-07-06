@@ -23,6 +23,13 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
+// Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
+const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
+const wrapperAttrs = computed(() => {
+  const { tabindex, ...rest } = $attrs;
+  return rest;
+});
+
 const props = withDefaults(defineProps<InputProps>(), {
   type: "text",
   size: "md",
@@ -240,7 +247,7 @@ const wrapperClasses = computed(() => [
 </script>
 
 <template>
-  <div v-bind="$attrs" :class="['flex flex-col gap-1', fieldWidthClass]">
+  <div v-bind="wrapperAttrs" :class="['flex flex-col gap-1', fieldWidthClass]">
     <label
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
@@ -298,6 +305,7 @@ const wrapperClasses = computed(() => [
         :maxlength="maxlength"
         :rows="autogrow ? 1 : rows"
         :autocomplete="autocomplete"
+        :tabindex="inputTabindex"
         :style="autogrow ? { overflow: 'hidden' } : undefined"
         :class="[
           'flex-1 min-w-0 bg-transparent outline-none rounded-[inherit]',
@@ -332,6 +340,7 @@ const wrapperClasses = computed(() => [
         :autofocus="autofocus"
         :maxlength="maxlength"
         :autocomplete="autocomplete"
+        :tabindex="inputTabindex"
         :class="[
           'flex-1 min-w-0 bg-transparent outline-none rounded-[inherit]',
           'text-input-text placeholder:text-input-placeholder',

@@ -9,6 +9,13 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
+// Forward tabindex to the switch control; keep it off the wrapper (avoids a double tab-stop).
+const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
+const wrapperAttrs = computed(() => {
+  const { tabindex, ...rest } = $attrs;
+  return rest;
+});
+
 const props = withDefaults(defineProps<SwitchProps>(), {
   size: "md",
   disabled: false,
@@ -100,7 +107,7 @@ const hasLabel = computed(
 
 <template>
   <div
-    v-bind="$attrs"
+    v-bind="wrapperAttrs"
     :class="[
       'inline-flex items-center gap-2',
       labelPosition === 'left' ? 'flex-row-reverse' : 'flex-row',
@@ -119,6 +126,7 @@ const hasLabel = computed(
       :data-state="isChecked ? 'checked' : 'unchecked'"
       :data-test="parentDataTest ? `${parentDataTest}-btn` : undefined"
       :disabled="disabled"
+      :tabindex="inputTabindex"
       :class="[
         'relative inline-flex shrink-0 rounded-full',
         'p-0.5 items-center border-2',

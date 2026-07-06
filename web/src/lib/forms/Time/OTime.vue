@@ -10,6 +10,13 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
+// Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
+const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
+const wrapperAttrs = computed(() => {
+  const { tabindex, ...rest } = $attrs;
+  return rest;
+});
+
 const props = withDefaults(defineProps<TimeProps>(), {
   size: "md",
   disabled: false,
@@ -230,7 +237,7 @@ const fieldClasses = computed(() => [
 </script>
 
 <template>
-  <div v-bind="$attrs" class="flex flex-col gap-1 w-full">
+  <div v-bind="wrapperAttrs" class="flex flex-col gap-1 w-full">
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
@@ -270,6 +277,7 @@ const fieldClasses = computed(() => [
         <input
           type="time"
           :value="modelValue ?? ''"
+          :tabindex="inputTabindex"
           :step="withSeconds ? 1 : 60"
           :disabled="disabled || undefined"
           :readonly="readonly || undefined"

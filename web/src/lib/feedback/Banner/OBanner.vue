@@ -3,7 +3,7 @@ import { computed, useSlots } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 interface Props {
-  variant?: "default" | "info" | "success" | "warning" | "error";
+  variant?: "default" | "info" | "success" | "warning" | "error" | "error-soft";
   content?: string;
   icon?: string;
   dense?: boolean;
@@ -39,6 +39,9 @@ const variantClass = computed(() => {
       return "bg-(--color-banner-warning-bg) border border-(--color-banner-warning-border) border-l-4 border-l-(--color-banner-warning-border) text-(--color-banner-warning-text)";
     case "error":
       return "bg-(--color-banner-error-bg) text-(--color-banner-error-text)";
+    // Tinted error for hints/insights — solid `error` stays for hard failures.
+    case "error-soft":
+      return "bg-(--color-banner-error-soft-bg) border border-(--color-banner-error-soft-border) border-l-4 border-l-(--color-banner-error-soft-border) text-(--color-banner-error-soft-text)";
     default:
       return "bg-(--color-banner-default-bg) text-(--color-banner-default-text)";
   }

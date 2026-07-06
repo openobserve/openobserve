@@ -65,13 +65,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!searchObj.data.stream.selectedStream.length"
       class="index-table mt-1"
     >
-      <div
-        data-test="logs-search-no-field-found-text"
-        class="text-center w-5/6 mx-0 pt-3"
+      <OEmptyState
+        data-test="logs-search-no-stream-selected"
+        preset="no-stream-selected"
+        size="inline"
+        icon="database"
       >
-        <OIcon name="info" size="sm" class="align-middle mr-1" />
-        {{ t("search.noFieldFoundInStream") }}
-      </div>
+        <template v-if="quickPickStreams.length" #extra>
+          <div
+            data-test="logs-search-stream-quick-pick"
+            class="flex flex-col gap-1 w-full"
+          >
+            <span
+              class="text-text-secondary text-xs font-medium text-center mb-0.5"
+            >
+              {{ t("search.quickPickStreamsLabel") }}
+            </span>
+            <OButton
+              v-for="stream in quickPickStreams"
+              :key="stream.value"
+              :data-test="`logs-search-stream-quick-pick-${stream.value}`"
+              variant="outline"
+              size="sm"
+              icon-left="database"
+              class="w-full justify-start"
+              @click="quickSelectStream(stream.value)"
+            >
+              <span class="truncate">{{ stream.label }}</span>
+            </OButton>
+            <span
+              v-if="streamList.length > quickPickStreams.length"
+              data-test="logs-search-stream-quick-pick-more"
+              class="text-text-secondary text-xs text-center mt-0.5"
+            >
+              {{
+                t("search.quickPickMoreStreams", {
+                  count: streamList.length - quickPickStreams.length,
+                })
+              }}
+            </span>
+          </div>
+        </template>
+      </OEmptyState>
     </div>
     <div v-else class="index-table mt-1">
       <GroupedFieldList
@@ -277,6 +312,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
 import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
@@ -318,6 +354,7 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OSpinner,
+    OEmptyState,
   },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
@@ -335,6 +372,13 @@ export default defineComponent({
       });
       this.onStreamChange("");
       this.resetPagination();
+    },
+    // One-click stream pick from the empty state — mirrors a dropdown
+    // selection so fields load immediately, without opening the dropdown.
+    quickSelectStream(streamName: string) {
+      this.handleStreamSelection(
+        this.selectionMode === "single" ? streamName : [streamName],
+      );
     },
   },
   setup(props, { emit }) {
@@ -494,6 +538,27 @@ export default defineComponent({
 
     const streamList = computed(() => {
       return searchObj.data.stream.streamLists;
+    });
+
+    // First few streams surfaced as one-click picks in the no-stream empty
+    // state. Ordered by most recently ingested data (stats.doc_time_max desc)
+    // so the streams most likely worth exploring sit at the top. Capped so a
+    // narrow panel stays scannable; the rest stay reachable through the
+    // dropdown's search. Falls back to the plain stream-list order when
+    // ingestion stats aren't available.
+    const QUICK_PICK_LIMIT = 8;
+    const quickPickStreams = computed(() => {
+      const detailed = searchObj.data.streamResults?.list;
+      if (Array.isArray(detailed) && detailed.length) {
+        return [...detailed]
+          .sort(
+            (a: any, b: any) =>
+              (b?.stats?.doc_time_max ?? 0) - (a?.stats?.doc_time_max ?? 0),
+          )
+          .slice(0, QUICK_PICK_LIMIT)
+          .map((item: any) => ({ label: item.name, value: item.name }));
+      }
+      return (streamList.value || []).slice(0, QUICK_PICK_LIMIT);
     });
 
     const checkSelectedFields = computed(() => {
@@ -2040,6 +2105,7 @@ export default defineComponent({
       cancelValueApi,
       getValuesPartition,
       streamList,
+      quickPickStreams,
       hasUserDefinedSchemas,
       setPage,
       resetPagination,
