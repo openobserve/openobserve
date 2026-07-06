@@ -243,6 +243,47 @@ async fn process_stream(
                 "[ServiceGraph] Inferred-edge query failed for {org_id}/{stream_name}: {e}"
             ),
         }
+
+        // Queue CONSUMER edges (span_kind = 5): a consumer reads from a topic, so
+        // the edge is topic → service (reverse of the producer's service → topic).
+        // Inference does NOT tag consumer spans (only CLIENT/PRODUCER), so we read
+        // the raw messaging destination directly. This reconnects async flows
+        // (producer → topic → consumer, e.g. checkout → orders → fraud-detection)
+        // that the parent/child span join cannot, since consumers run in a
+        // separate trace. connection_type = 'queue' marks the topic as inferred.
+        let consumer_sql = format!(
+            r#"SELECT
+                messaging_destination_name AS client,
+                service_name AS server,
+                'queue' AS connection_type,
+                COUNT(*) AS total_requests,
+                COUNT(*) FILTER (WHERE span_status = 'ERROR') AS errors,
+                CAST(COUNT(*) FILTER (WHERE span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) AS error_rate,
+                CAST(approx_median(end_time - start_time) AS BIGINT) AS p50,
+                CAST(approx_percentile_cont(end_time - start_time, 0.95) AS BIGINT) AS p95,
+                CAST(approx_percentile_cont(end_time - start_time, 0.99) AS BIGINT) AS p99
+            FROM "{stream_name}"
+            WHERE
+                _timestamp >= {start_time} AND _timestamp < {end_time}
+                AND CAST(span_kind AS VARCHAR) = '5'
+                AND messaging_destination_name IS NOT NULL AND messaging_destination_name != ''
+            GROUP BY messaging_destination_name, service_name"#,
+        );
+        match run_graph_search(org_id, consumer_sql, start_time, end_time).await {
+            Ok(mut consumer_hits) => {
+                log::info!(
+                    "[ServiceGraph] Query returned {} queue-consumer edges from {}/{}",
+                    consumer_hits.len(),
+                    org_id,
+                    stream_name
+                );
+                hits.append(&mut consumer_hits);
+            }
+            // Non-fatal: streams without messaging columns simply return an error.
+            Err(e) => log::debug!(
+                "[ServiceGraph] Consumer-edge query (non-fatal) for {org_id}/{stream_name}: {e}"
+            ),
+        }
     }
 
     if hits.is_empty() {
