@@ -36,6 +36,16 @@
     font-size: 1rem;
     line-height: var(--tw-leading, calc(1.5 / 1));
   }
+  /* `!important` variants (`text-sm!` / `text-base!`) are separate classes and
+     must be re-pinned too, or they fall back to the smaller O2 token. */
+  .text-sm\! {
+    font-size: 0.875rem !important;
+    line-height: var(--tw-leading, calc(1.25 / 0.875)) !important;
+  }
+  .text-base\! {
+    font-size: 1rem !important;
+    line-height: var(--tw-leading, calc(1.5 / 1)) !important;
+  }
 }
 
 /*
