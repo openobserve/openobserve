@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   required
                   :options="streamTypeOptions"
                   class="tw:flex-1"
-                  @update:model-value="streamTypeUpdated()"
+                  @update:model-value="streamTypeUpdated($event)"
                   data-test="dashboard-variable-stream-type-select"
                 />
                 <OFormSelect
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   valueKey="name"
                   searchable
                   class="tw:flex-1"
-                  @update:model-value="streamUpdated()"
+                  @update:model-value="streamUpdated($event)"
                   data-test="dashboard-variable-stream-select"
                 >
                   <template #tooltip>
@@ -1154,6 +1154,18 @@ export default defineComponent({
         v.selectAllValueForMultiSelect = "";
         v.customMultiSelectValue = [];
       }
+
+      // `max_record_size` must reach the backend as an i64 (or null). The
+      // number <input> emits a STRING (or "" when cleared), so coerce here:
+      // empty / null / non-numeric → null, otherwise → Number.
+      if (v.query_data && "max_record_size" in v.query_data) {
+        const mrs = v.query_data.max_record_size;
+        const n = Number(mrs);
+        v.query_data.max_record_size =
+          mrs === "" || mrs === null || mrs === undefined || Number.isNaN(n)
+            ? null
+            : n;
+      }
       return v;
     };
 
@@ -1349,18 +1361,22 @@ export default defineComponent({
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
       useSelectAutoComplete(toRef(data, "currentFieldsList"), "name");
 
-    const streamTypeUpdated = async () => {
+    const streamTypeUpdated = async (newStreamType?: string) => {
+      // Prefer the value the select just emitted ($event) over reading it back
+      // off the reactive form projection: at the moment this handler fires the
+      // projection can still hold the PREVIOUS stream type, which would fetch the
+      // wrong type's stream list. Programmatic callers (tests) pass no arg and
+      // keep reading from the form.
+      const streamType = newStreamType ?? variableData.query_data.stream_type;
+
       // reset the stream and field (cross-field setFieldValue)
       setFormField("query_data.stream", "");
       setFormField("query_data.field", "");
 
       // if stream type is exists
-      if (variableData.query_data.stream_type) {
+      if (streamType) {
         // get all streams from current stream type
-        const streamList: any = await getStreams(
-          variableData?.query_data?.stream_type,
-          false,
-        );
+        const streamList: any = await getStreams(streamType, false);
 
         // assign the stream list
         data.streams = streamList.list ?? [];
@@ -1370,12 +1386,18 @@ export default defineComponent({
       }
     };
 
-    const streamUpdated = async () => {
+    const streamUpdated = async (newStream?: string) => {
+      // Prefer the value the select just emitted ($event) over reading it back
+      // off the reactive form projection: at the moment this handler fires the
+      // projection can still hold the PREVIOUS stream, which misclassifies a
+      // newly-selected $variable as a real stream and wrongly clears the field
+      // (blocking submit on field-required). Programmatic callers (tests) pass
+      // no arg and keep reading from the form.
+      const stream = newStream ?? variableData.query_data.stream;
       try {
         // Check if stream is a variable reference FIRST (contains $)
         const isVariableReference =
-          variableData.query_data.stream?.includes("$") ||
-          variableData.query_data.stream?.includes("{{");
+          stream?.includes("$") || stream?.includes("{{");
 
         if (isVariableReference) {
           // Don't reset field if it already has a value (editing mode)
@@ -1391,13 +1413,10 @@ export default defineComponent({
         setFormField("query_data.field", "");
 
         // if stream type and stream exists and NOT a variable
-        if (
-          variableData.query_data.stream &&
-          variableData.query_data.stream_type
-        ) {
+        if (stream && variableData.query_data.stream_type) {
           // get schema of that field using getstream
           const fieldWithSchema: any = await getStream(
-            variableData?.query_data?.stream,
+            stream,
             variableData.query_data.stream_type,
             true,
           );
@@ -1411,8 +1430,7 @@ export default defineComponent({
       } catch (error: any) {
         // Only show error if it's not a variable reference
         const isVariableReference =
-          variableData.query_data.stream?.includes("$") ||
-          variableData.query_data.stream?.includes("{{");
+          stream?.includes("$") || stream?.includes("{{");
 
         if (!isVariableReference) {
           showErrorNotification(error ?? "Failed to get stream fields", {
@@ -1601,6 +1619,7 @@ export default defineComponent({
       addField,
       saveData,
       saveVariableApiCall,
+      buildVariablePayload,
       close,
       title,
       onSubmit,

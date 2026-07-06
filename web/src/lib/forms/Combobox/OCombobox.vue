@@ -130,9 +130,24 @@ function onInputChange(val: string) {
   internalValue.value = val;
   if (props.debounce > 0) {
     if (_debounceTimer !== null) clearTimeout(_debounceTimer);
-    _debounceTimer = setTimeout(() => emit("update:modelValue", val), props.debounce);
+    _debounceTimer = setTimeout(() => {
+      _debounceTimer = null;
+      emit("update:modelValue", val);
+    }, props.debounce);
   } else {
     emit("update:modelValue", val);
+  }
+}
+
+function handleBlur() {
+  // Flush any pending debounced emit immediately on blur so that tabbing away —
+  // or clicking Save right after typing — does not lose the typed value. Mirrors
+  // OInput.handleBlur; without this a debounced combobox silently drops the last
+  // typed value when focus leaves before the debounce fires.
+  if (_debounceTimer !== null) {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = null;
+    emit("update:modelValue", internalValue.value);
   }
 }
 
@@ -235,6 +250,7 @@ const hasInsideLabel = computed(
           ]"
           :data-test="parentDataTest ? `${parentDataTest}-input` : undefined"
           @update:model-value="onInputChange"
+          @blur="handleBlur"
         />
       </ComboboxAnchor>
 

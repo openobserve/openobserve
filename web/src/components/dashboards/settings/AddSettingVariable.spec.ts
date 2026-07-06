@@ -336,6 +336,18 @@ describe("AddSettingVariable", () => {
       ]);
     });
 
+    it("uses the emitted $event value: fetches streams for the newly-selected type, not the previous one held by the form", async () => {
+      // The form projection still holds the PREVIOUS type ("logs") when the
+      // handler fires; branching on the emitted arg must fetch the NEW type's
+      // stream list. Without the fix, streamTypeUpdated would read "logs" off the
+      // form and NEVER fetch "metrics", so this assertion guards the arg is used.
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "logs");
+
+      await wrapper.vm.streamTypeUpdated("metrics");
+
+      expect(mockStreams.getStreams).toHaveBeenCalledWith("metrics", false);
+    });
+
     it("should update fields when stream changes", async () => {
       wrapper.vm.form.setFieldValue("query_data.stream_type", "logs");
       wrapper.vm.form.setFieldValue("query_data.stream", "stream1");
@@ -841,6 +853,52 @@ describe("AddSettingVariable", () => {
     });
   });
 
+  describe("max_record_size coercion (must reach backend as i64 / null)", () => {
+    // buildVariablePayload is the single place the form value is turned into the
+    // saved payload — the number <input> emits a STRING, so it must be coerced.
+    const baseQuery = (max_record_size: unknown) => ({
+      scope: "global",
+      selectedTabs: [],
+      selectedPanels: [],
+      name: "mrs",
+      type: "query_values",
+      query_data: {
+        stream_type: "logs",
+        stream: "s1",
+        field: "f1",
+        max_record_size,
+        filter: [],
+      },
+      options: [],
+    });
+
+    it("coerces a typed string (number <input>) to a Number", () => {
+      const payload = wrapper.vm.buildVariablePayload(baseQuery("100"));
+      expect(payload.query_data.max_record_size).toBe(100);
+      expect(typeof payload.query_data.max_record_size).toBe("number");
+    });
+
+    it("keeps an existing numeric value as a Number", () => {
+      const payload = wrapper.vm.buildVariablePayload(baseQuery(250));
+      expect(payload.query_data.max_record_size).toBe(250);
+    });
+
+    it("sends null when the field is empty / null / non-numeric (no limit)", () => {
+      expect(
+        wrapper.vm.buildVariablePayload(baseQuery("")).query_data
+          .max_record_size,
+      ).toBe(null);
+      expect(
+        wrapper.vm.buildVariablePayload(baseQuery(null)).query_data
+          .max_record_size,
+      ).toBe(null);
+      expect(
+        wrapper.vm.buildVariablePayload(baseQuery("abc")).query_data
+          .max_record_size,
+      ).toBe(null);
+    });
+  });
+
   describe("Edit Mode", () => {
     beforeEach(async () => {
       const editWrapper = mount(AddSettingVariable, {
@@ -1022,6 +1080,22 @@ describe("AddSettingVariable", () => {
 
       // Field should be preserved since it was already set
       expect(wrapper.vm.variableData.query_data.field).toBe("existing_field");
+    });
+
+    it("uses the emitted $event value: selecting a $variable preserves the field even while the form still holds the previous real stream", async () => {
+      // Reproduces the edit flow: the form projection still holds the PREVIOUS
+      // real stream when the handler fires, but the select emits the new
+      // $variable. Branching on the emitted arg (not the stale projection) must
+      // classify it as a variable reference and preserve the field — otherwise
+      // the field is cleared and field-required validation blocks the save.
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "logs");
+      wrapper.vm.form.setFieldValue("query_data.stream", "regular-stream");
+      wrapper.vm.form.setFieldValue("query_data.field", "existing_field");
+
+      await wrapper.vm.streamUpdated("$var1");
+
+      expect(wrapper.vm.variableData.query_data.field).toBe("existing_field");
+      expect(mockStreams.getStream).not.toHaveBeenCalled();
     });
 
     it("should clear currentFieldsList when stream is a variable reference", async () => {
