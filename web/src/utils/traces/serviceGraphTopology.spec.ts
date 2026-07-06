@@ -62,6 +62,27 @@ describe("buildTopologyFromTraces — inferred deps & collisions", () => {
     expect(e.connection_type).toBe("database");
   });
 
+  it("suppresses rpc inferred edges entirely (redundant with real service edges)", () => {
+    // Every rpc target in the OTel demo is an already-instrumented service, so
+    // the rpc inferred edge duplicates the real parent/child service edge.
+    const { nodes, edges } = buildTopologyFromTraces(
+      [{ client: "frontend", server: "currency", total_requests: 10, errors: 0 }],
+      [
+        {
+          client: "frontend",
+          server: "oteldemo.CurrencyService",
+          connection_type: "rpc",
+          total_requests: 10,
+          errors: 0,
+        },
+      ],
+    );
+    // No phantom rpc node, no rpc edge — only the real service topology.
+    expect(nodes.map((n) => n.id).sort()).toEqual(["currency", "frontend"]);
+    expect(edges.every((e) => e.connection_type !== "rpc")).toBe(true);
+    expect(nodes.some((n) => n.id === "oteldemo.CurrencyService")).toBe(false);
+  });
+
   it("merges an inferred name that is also a real service (collision)", () => {
     const { nodes, edges } = buildTopologyFromTraces(
       // email is a real instrumented service

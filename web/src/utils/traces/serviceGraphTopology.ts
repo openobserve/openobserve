@@ -111,6 +111,12 @@ export function buildTopologyFromTraces(
   }
 
   for (const r of inferredRows) {
+    // RPC inferred edges are redundant: a gRPC call to an instrumented service
+    // already produces a real service→service edge via the parent/child span
+    // join, so the rpc target (e.g. "oteldemo.CurrencyService") duplicates the
+    // real service ("currency"). Drop them to avoid phantom double nodes.
+    if (r.connection_type === "rpc") continue;
+
     const req = r.total_requests ?? 0;
     const err = r.errors ?? 0;
     const client = ensureNode(nodes, r.client); // caller is always a real service
