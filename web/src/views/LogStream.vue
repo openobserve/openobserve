@@ -361,6 +361,19 @@ export default defineComponent({
     const asc = computed(() => sortOrder.value === "asc");
     const queryClient = useQueryClient();
 
+    // After a stream is created/deleted, refresh the visible list AND evict the
+    // now-stale cached search-keyword results. `invalidateQueries` alone only
+    // marks inactive queries stale (they linger in the cache until gcTime), so
+    // we also `removeQueries` the inactive ones to keep the cache clean.
+    const syncStreamsCacheAfterMutation = () => {
+      const org = store.state.selectedOrganization.identifier;
+      queryClient.invalidateQueries({ queryKey: streamKeys.all(org) });
+      queryClient.removeQueries({
+        queryKey: streamKeys.all(org),
+        type: "inactive",
+      });
+    };
+
     const {
       data: streamsData,
       isLoading,
@@ -593,11 +606,7 @@ export default defineComponent({
             });
             removeStream(deleteStreamName, deleteStreamType);
             selectedIds.value = [];
-            queryClient.invalidateQueries({
-              queryKey: streamKeys.all(
-                store.state.selectedOrganization.identifier,
-              ),
-            });
+            syncStreamsCacheAfterMutation();
           }
         })
         .catch((err: any) => {
@@ -657,11 +666,7 @@ export default defineComponent({
           });
 
           selectedIds.value = [];
-          queryClient.invalidateQueries({
-            queryKey: streamKeys.all(
-              store.state.selectedOrganization.identifier,
-            ),
-          });
+          syncStreamsCacheAfterMutation();
         })
         .catch((error) => {
           if (error.response.status != 403) {

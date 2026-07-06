@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AddStream from "./AddStream.vue";
 import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
+import { vueQueryTestPlugin } from "@/test/unit/helpers/withVueQuery";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 
@@ -126,7 +127,11 @@ describe("AddStream", () => {
   const mountComp = (customStore?: any, extraProps: Record<string, any> = {}) =>
     mount(AddStream, {
       props: { isInPipeline: false, open: true, ...extraProps },
-      global: { plugins: [i18n, customStore ?? store], stubs: globalStubs, provide: qLayoutInjections() },
+      global: {
+        plugins: [i18n, customStore ?? store, ...vueQueryTestPlugin().plugins],
+        stubs: globalStubs,
+        provide: qLayoutInjections(),
+      },
     });
 
   describe("Component Rendering", () => {
