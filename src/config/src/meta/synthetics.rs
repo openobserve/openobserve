@@ -445,10 +445,10 @@ pub struct CheckResult {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum CheckStatus {
-    Up,
-    /// Partial failure: reached target but ≥1 step/threshold failed.
+    Passed,
+    /// Passed on retry (flaky) or partial location failure.
     Warning,
-    Down,
+    Failed,
     Error,
 }
 

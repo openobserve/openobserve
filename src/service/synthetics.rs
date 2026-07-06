@@ -68,9 +68,9 @@ fn parse_result(h: &serde_json::Value) -> Option<CheckResult> {
         location: h.get("location")?.as_str()?.to_string(),
         pool: String::new(),
         status: match h.get("status").and_then(|v| v.as_str()).unwrap_or("error") {
-            "up" => CheckStatus::Up,
+            "passed" | "up" => CheckStatus::Passed,
             "warning" => CheckStatus::Warning,
-            "down" => CheckStatus::Down,
+            "failed" | "down" => CheckStatus::Failed,
             _ => CheckStatus::Error,
         },
         response_time_ms: h
@@ -82,8 +82,10 @@ fn parse_result(h: &serde_json::Value) -> Option<CheckResult> {
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
             .map(String::from),
+        // New records use "engine"; old records used "browser_engine" — try both.
         browser_engine: h
-            .get("browser_engine")
+            .get("engine")
+            .or_else(|| h.get("browser_engine"))
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
             .map(String::from),
@@ -155,7 +157,7 @@ pub async fn list_results(
     let mid = safe_ident(monitor_id);
     let sql = format!(
         "SELECT job_id, synthetics_id, location, status, response_time_ms, \
-                error, browser_engine, device, _timestamp, screenshot_refs, trace_ref \
+                error, engine, browser_engine, device, _timestamp, screenshot_refs, trace_ref \
          FROM \"{STREAM}\" \
          WHERE _timestamp >= {start_time} AND _timestamp <= {end_time} \
            AND synthetics_id = '{mid}'{where_extra} \
@@ -418,7 +420,7 @@ pub async fn batch_synthetic_summary(
 
 /// Sends a check result notification to each configured alert destination.
 ///
-/// Only fires when the check did NOT pass (status != "up"). Passing runs are
+/// Only fires when the check did NOT pass (status != "passed"). Passing runs are
 /// intentionally suppressed — operators want alerts, not confirmations.
 ///
 /// Uses the destination's configured template for body rendering when present,
@@ -441,7 +443,7 @@ pub async fn notify_check_result(
     checked_at: i64,
 ) {
     // Suppress notifications for passing runs — only alert on failure/error.
-    if status == "up" {
+    if status == "passed" || status == "up" {
         return;
     }
 

@@ -904,7 +904,7 @@ pub async fn job_resolve(Json(body): Json<serde_json::Value>) -> Response {
     operation_id = "SyntheticsJobLease",
     summary = "Lease a batch of jobs for a probe pool (authenticated via o2syn_ token)",
     security(("Authorization" = [])),
-    request_body(content = Object, description = r#"{"pool": "aws-browser-chromium", "limit": 10}"#, content_type = "application/json"),
+    request_body(content = Object, description = r#"{"pool": "aws-browser", "limit": 10}"#, content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
