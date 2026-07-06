@@ -13,38 +13,49 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import {
+  describe,
+  expect,
+  it,
+  beforeEach,
+  vi,
+  afterEach,
+  type Mock,
+} from "vitest";
+import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { nextTick } from "vue";
 import LogStream from "@/views/LogStream.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
+import { vueQueryTestPlugin } from "@/test/unit/helpers/withVueQuery";
+import mockStreams from "@/test/unit/mockData/streams";
 
-// Install Quasar plugins
-
-// Mock services
+// ── Module mocks (hoisted) ──────────────────────────────────────────────
+// `LogStream.vue` imports the default export for delete(); `useStreamsListQuery`
+// imports the same default export's nameList(). Both resolve to this mock.
 vi.mock("@/services/stream", () => ({
   default: {
-    list: vi.fn(),
+    nameList: vi.fn(),
+    schema: vi.fn(),
     delete: vi.fn(),
-    get: vi.fn(),
-  }
+    createStream: vi.fn(),
+    updateSettings: vi.fn(),
+  },
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = (await importOriginal()) as any;
   return {
     ...actual,
-    isValidResourceName: (name) => {
-      const regex = /^[a-zA-Z0-9+=,.@_-]+$/;
-      return regex.test(name);
-    },
+    isValidResourceName: (name: string) => /^[a-zA-Z0-9+=,.@_-]+$/.test(name),
     getUUID: () => "test-uuid",
-    mergeRoutes: (route1, route2) => {
-      return [...(route1 || []), ...(route2 || [])];
-    },
+    mergeRoutes: (route1: any, route2: any) => [
+      ...(route1 || []),
+      ...(route2 || []),
+    ],
     getTimezoneOffset: () => 0,
     getTimezonesByOffset: () => [],
   };
@@ -54,66 +65,52 @@ vi.mock("@/composables/useStreams", () => ({
   default: vi.fn(() => ({
     removeStream: vi.fn(),
     getStream: vi.fn(),
-    getPaginatedStreams: vi.fn(),
     addNewStreams: vi.fn(),
-  }))
+  })),
 }));
 
 vi.mock("@/services/segment_analytics", () => ({
-  default: {
-    track: vi.fn(),
-  }
+  default: { track: vi.fn() },
 }));
 
-// Additional composable mocks to prevent inject() warnings
 vi.mock("@/composables/useLogs", () => ({
   default: vi.fn(() => ({
-    searchObj: { value: { loading: false, data: { queryResults: [], aggs: { histogram: [] } } } },
+    searchObj: {
+      value: { loading: false, data: { queryResults: [], aggs: { histogram: [] } } },
+    },
     searchAggData: { value: { histogram: [], total: 0 } },
     searchResultData: { value: { list: [] } },
-    getFunctions: vi.fn().mockResolvedValue([])
-  }))
+    getFunctions: vi.fn().mockResolvedValue([]),
+  })),
 }));
 
 vi.mock("@/composables/useDashboard", () => ({
   default: vi.fn(() => ({
     dashboards: { value: [] },
     loading: { value: false },
-    error: { value: null }
-  }))
+    error: { value: null },
+  })),
 }));
 
-
 vi.mock("@/services/auth", () => ({
-  default: {
-    sign_in_user: vi.fn(),
-    sign_out: vi.fn(),
-    get_dex_config: vi.fn()
-  }
+  default: { sign_in_user: vi.fn(), sign_out: vi.fn(), get_dex_config: vi.fn() },
 }));
 
 vi.mock("@/services/organizations", () => ({
-  default: {
-    get_organization: vi.fn(),
-    list: vi.fn(),
-    add_members: vi.fn()
-  }
+  default: { get_organization: vi.fn(), list: vi.fn(), add_members: vi.fn() },
 }));
 
 vi.mock("@/services/billings", () => ({
-  default: {
-    get_billing_info: vi.fn(),
-    get_invoice_history: vi.fn()
-  }
+  default: { get_billing_info: vi.fn(), get_invoice_history: vi.fn() },
 }));
 
-// Mock Toast (replaces quasar notify)
-const mockNotify = vi.fn(() => vi.fn()); // Return a function for dismiss
+// Toast (replaces quasar notify) — returns a dismiss fn for loading toasts.
+const mockNotify = vi.fn(() => vi.fn());
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockNotify(...args),
 }));
 
-// ODialog stub — preserves v-model:open behavior and emits primary/secondary/neutral
+// ── ODialog stub — preserves v-model:open and emits primary/secondary ─────
 const ODialogStub = {
   name: "ODialog",
   props: [
@@ -158,363 +155,505 @@ const defaultStubs = {
   ODialog: ODialogStub,
 };
 
+// Typed handles to the mocked modules.
+const nameListMock = streamService.nameList as unknown as Mock;
+const deleteMock = streamService.delete as unknown as Mock;
+const useStreamsMock = useStreams as unknown as Mock;
+
+// A default useStreams instance shared across tests. removeStream/getStream/
+// addNewStreams are the only members the component destructures.
+let removeStreamMock: Mock;
+let getStreamMock: Mock;
+let addNewStreamsMock: Mock;
+
+// Standard successful nameList response driven by the shared fixture.
+const successList = mockStreams.streams_name_list.list;
+const successTotal = mockStreams.streams_name_list.total;
+
+function resolveNameListWith(list: any[], total: number) {
+  nameListMock.mockResolvedValue({ data: { list, total } });
+}
+
+// Mount with a FRESH Vue Query client per call so the cache never leaks
+// between tests. Returns both the wrapper and its queryClient.
 function mountLogStream() {
-  return mount(LogStream, {
+  const { queryClient, plugins } = vueQueryTestPlugin();
+  const wrapper = mount(LogStream, {
     global: {
-      provide: { store: store },
-      plugins: [i18n, router],
+      provide: { store },
+      plugins: [i18n, router, ...plugins],
       stubs: defaultStubs,
     },
-  });
+  }) as VueWrapper;
+  return { wrapper, queryClient };
 }
 
 describe("LogStream Component", () => {
-  let wrapper: any;
-  let mockUseStreams: any;
-  let mockStreamService: any;
-  let dismissMock: any;
+  let wrapper: VueWrapper;
 
   beforeEach(async () => {
-    // Reset mocks completely
     vi.clearAllMocks();
-    mockNotify.mockClear();
 
-    // Setup mock implementations with fresh instances
-    mockUseStreams = {
-      removeStream: vi.fn(),
-      getStream: vi.fn(),
-      getPaginatedStreams: vi.fn().mockResolvedValue({
-        list: [
-          {
-            name: "test_stream",
-            stream_type: "logs",
-            stats: {
-              doc_num: 100,
-              storage_size: 50,
-              compressed_size: 25,
-              index_size: 10,
-            },
-            schema: [],
-            storage_type: "local",
-          }
-        ],
-        total: 1,
-      }),
-      addNewStreams: vi.fn(),
-    };
+    removeStreamMock = vi.fn();
+    getStreamMock = vi.fn().mockResolvedValue({
+      stats: { doc_time_min: 1000000, doc_time_max: 2000000 },
+    });
+    addNewStreamsMock = vi.fn();
 
-    mockStreamService = {
-      list: vi.fn().mockResolvedValue({
-        data: {
-          list: []
-        }
-      }),
-      delete: vi.fn().mockResolvedValue({
-        data: { code: 200 }
-      }),
-      get: vi.fn().mockResolvedValue({
-        stats: {
-          doc_time_min: 1000000,
-          doc_time_max: 2000000,
-        }
-      }),
-    };
+    useStreamsMock.mockReturnValue({
+      removeStream: removeStreamMock,
+      getStream: getStreamMock,
+      addNewStreams: addNewStreamsMock,
+    });
 
-    (useStreams as any).mockReturnValue(mockUseStreams);
-    Object.assign(streamService, mockStreamService);
+    resolveNameListWith(successList, successTotal);
+    deleteMock.mockResolvedValue({ data: { code: 200 } });
 
-    wrapper = mountLogStream();
-
-    // Wait for component to settle
-    await wrapper.vm.$nextTick();
-
-    // Setup notify mock
-    dismissMock = vi.fn();
+    ({ wrapper } = mountLogStream());
+    await flushPromises();
+    await nextTick();
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    wrapper?.unmount();
+    vi.clearAllMocks();
   });
 
   describe("Component Mounting", () => {
     it("should mount successfully", () => {
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
     });
 
-    it("should display correct title", () => {
-      // Title now lives in the standard AppPageHeader (row 1).
-      const title = wrapper.find(".app-page-header h1");
+    it("should display the streams title", () => {
+      const title = wrapper.find('[data-test="log-stream-title-text"]');
       expect(title.exists()).toBe(true);
       expect(title.text()).toBe("Streams");
     });
 
-    it("should render main table", () => {
-      const table = wrapper.find('[data-test="log-stream-table"]');
-      expect(table.exists()).toBe(true);
+    it("should render the main table", () => {
+      expect(wrapper.find('[data-test="log-stream-table"]').exists()).toBe(true);
     });
 
-    it("should display refresh stats button", () => {
-      const refreshBtn = wrapper.find('[data-test="log-stream-refresh-stats-btn"]');
+    it("should display the refresh stats button", () => {
+      const refreshBtn = wrapper.find(
+        '[data-test="log-stream-refresh-stats-btn"]',
+      );
       expect(refreshBtn.exists()).toBe(true);
       expect(refreshBtn.text()).toContain("Refresh Stats");
     });
   });
 
-  describe("Component Data and State", () => {
-    it("should have correct initial data", () => {
-      expect(wrapper.vm.loadingState).toBe(false);
-      expect(wrapper.vm.selectedStreamType).toBe("logs");
-      expect(wrapper.vm.filterQuery).toBe("");
-      expect(wrapper.vm.selectedIds).toEqual([]);
-      expect(wrapper.vm.logStream).toHaveLength(1);
-    });
-
-    it("should have correct pagination state", () => {
-      expect(wrapper.vm.currentPage).toBe(1);
-      expect(wrapper.vm.pageSize).toBe(20);
-      expect(typeof wrapper.vm.sortBy).toBe("string");
-      // After successful loading, totalCount should reflect our mock data
-      expect(wrapper.vm.totalCount).toBe(1);
-    });
-  });
-
-  describe("Computed Properties", () => {
-    it("should check if schema UDS is enabled", () => {
-      store.state.zoConfig.user_defined_schemas_enabled = true;
-      expect(wrapper.vm.isSchemaUDSEnabled).toBe(true);
-
-      store.state.zoConfig.user_defined_schemas_enabled = false;
-      expect(wrapper.vm.isSchemaUDSEnabled).toBe(false);
-    });
-  });
-
-  describe("API Interactions", () => {
-    it("should call getPaginatedStreams on component mount", async () => {
-      await flushPromises();
-      expect(mockUseStreams.getPaginatedStreams).toHaveBeenCalledWith(
+  describe("Query-backed data loading", () => {
+    it("should call nameList with the initial query params on mount", () => {
+      expect(nameListMock).toHaveBeenCalledWith(
+        "default",
         "logs",
-        false,
         false,
         0,
         20,
         "",
         "name",
-        true
+        true,
       );
     });
 
-    it("should handle successful stream loading", async () => {
-      await flushPromises();
-      expect(wrapper.vm.logStream).toHaveLength(1);
-      expect(wrapper.vm.logStream[0].name).toBe("test_stream");
-      expect(wrapper.vm.loadingState).toBe(false);
+    it("should map the fetched streams into table rows", () => {
+      expect(wrapper.vm.logStream).toHaveLength(3);
+      expect(wrapper.vm.logStream[0].name).toBe("stream_one");
+      expect(wrapper.vm.logStream[0]._rowKey).toBe("stream_one-logs");
+      expect(wrapper.vm.logStream[0].doc_num).toBe(100);
+      expect(wrapper.vm.logStream[0].storage_size).toBe("50 MB");
     });
 
-    it("should handle API errors gracefully", async () => {
-      mockNotify.mockClear();
+    it("should pass the mapped rows into the OTable data prop", () => {
+      const table = wrapper.findComponent('[data-test="log-stream-table"]');
+      expect(table.exists()).toBe(true);
+      const rows = table.props("data") as any[];
+      expect(rows.map((r) => r.name)).toEqual([
+        "stream_one",
+        "stream_two",
+        "stream_three",
+      ]);
+    });
 
-      mockUseStreams.getPaginatedStreams.mockRejectedValue(new Error("API Error"));
+    it("should fall back to '--' when a stream has no stats", () => {
+      const noStatsRow = wrapper.vm.logStream[2];
+      expect(noStatsRow.name).toBe("stream_three");
+      expect(noStatsRow.doc_num).toBe("--");
+      expect(noStatsRow.storage_size).toBe("--");
+    });
 
-      // Trigger refresh
-      await wrapper.vm.getLogStream();
+    it("should expose totalCount and resultTotal from the query data", () => {
+      expect(wrapper.vm.totalCount).toBe(3);
+      expect(wrapper.vm.resultTotal).toBe(3);
+    });
+
+    it("should not be loading after the query resolves", () => {
+      expect(wrapper.vm.isLoading).toBe(false);
+      expect(wrapper.vm.isFetching).toBe(false);
+    });
+
+    it("should seed the shared Vuex cache via addNewStreams", () => {
+      expect(addNewStreamsMock).toHaveBeenCalledWith("logs", successList);
+    });
+  });
+
+  describe("Initial state", () => {
+    it("should start on page 1 with default page size and sort", () => {
+      expect(wrapper.vm.currentPage).toBe(1);
+      expect(wrapper.vm.pageSize).toBe(20);
+      expect(wrapper.vm.sortBy).toBe("name");
+      expect(wrapper.vm.sortOrder).toBe("asc");
+    });
+
+    it("should default to the logs stream type with an empty filter", () => {
+      expect(wrapper.vm.selectedStreamType).toBe("logs");
+      expect(wrapper.vm.filterQuery).toBe("");
+      expect(wrapper.vm.selectedIds).toEqual([]);
+    });
+  });
+
+  describe("Computed: isSchemaUDSEnabled", () => {
+    afterEach(() => {
+      store.state.zoConfig.user_defined_schemas_enabled = false;
+    });
+
+    it("should be true when user_defined_schemas_enabled is true", async () => {
+      store.state.zoConfig.user_defined_schemas_enabled = true;
+      await nextTick();
+      expect(wrapper.vm.isSchemaUDSEnabled).toBe(true);
+    });
+
+    it("should be false when user_defined_schemas_enabled is false", async () => {
+      store.state.zoConfig.user_defined_schemas_enabled = false;
+      await nextTick();
+      expect(wrapper.vm.isSchemaUDSEnabled).toBe(false);
+    });
+  });
+
+  describe("Refresh", () => {
+    it("should refetch the streams list when the refresh button is clicked", async () => {
+      nameListMock.mockClear();
+
+      await wrapper
+        .find('[data-test="log-stream-refresh-stats-btn"]')
+        .trigger("click");
       await flushPromises();
 
-      // Error notification should use variant "error"
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "error",
-        })
+      expect(nameListMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("should refetch when getLogStream() is called directly", async () => {
+      nameListMock.mockClear();
+
+      wrapper.vm.getLogStream();
+      await flushPromises();
+
+      expect(nameListMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("Query key reactivity", () => {
+    it("should refetch with a new limit when pageSize changes", async () => {
+      nameListMock.mockClear();
+
+      wrapper.vm.onPaginationChange({ page: 1, size: 50 });
+      await flushPromises();
+
+      expect(wrapper.vm.pageSize).toBe(50);
+      expect(nameListMock).toHaveBeenLastCalledWith(
+        "default",
+        "logs",
+        false,
+        0,
+        50,
+        "",
+        "name",
+        true,
       );
     });
-  });
 
-  describe("User Interactions", () => {
-    it("should handle refresh button click", async () => {
-      const refreshBtn = wrapper.find('[data-test="log-stream-refresh-stats-btn"]');
+    it("should refetch with a new offset when the page changes", async () => {
+      nameListMock.mockClear();
 
-      await refreshBtn.trigger("click");
+      wrapper.vm.onPaginationChange({ page: 2, size: 20 });
       await flushPromises();
 
-      expect(mockUseStreams.getPaginatedStreams).toHaveBeenCalled();
+      expect(wrapper.vm.currentPage).toBe(2);
+      expect(nameListMock).toHaveBeenLastCalledWith(
+        "default",
+        "logs",
+        false,
+        20,
+        20,
+        "",
+        "name",
+        true,
+      );
     });
 
-    it("should handle stream type filter change", () => {
-      // filterLogStreamByTab is the available method
-      if (typeof wrapper.vm.filterLogStreamByTab === "function") {
-        wrapper.vm.filterLogStreamByTab("metrics");
-        expect(wrapper.vm.selectedStreamType).toBe("metrics");
-      } else {
-        // Fallback: test directly setting the filter
-        wrapper.vm.selectedStreamType = "metrics";
-        expect(wrapper.vm.selectedStreamType).toBe("metrics");
+    it("should refetch with the new sort column and order on sort change", async () => {
+      nameListMock.mockClear();
+
+      wrapper.vm.onSortChange({ column: "doc_num", order: "desc" });
+      await flushPromises();
+
+      expect(wrapper.vm.sortBy).toBe("doc_num");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+      expect(nameListMock).toHaveBeenLastCalledWith(
+        "default",
+        "logs",
+        false,
+        0,
+        20,
+        "",
+        "doc_num",
+        false,
+      );
+    });
+
+    it("should refetch with the selected stream type when the tab changes", async () => {
+      nameListMock.mockClear();
+
+      wrapper.vm.filterLogStreamByTab("metrics");
+      await flushPromises();
+
+      expect(wrapper.vm.selectedStreamType).toBe("metrics");
+      expect(nameListMock).toHaveBeenLastCalledWith(
+        "default",
+        "metrics",
+        false,
+        0,
+        20,
+        "",
+        "name",
+        true,
+      );
+    });
+
+    it("should refetch with the keyword when the filter query changes", async () => {
+      nameListMock.mockClear();
+
+      wrapper.vm.filterQuery = "err";
+      await flushPromises();
+
+      expect(nameListMock).toHaveBeenLastCalledWith(
+        "default",
+        "logs",
+        false,
+        0,
+        20,
+        "err",
+        "name",
+        true,
+      );
+    });
+
+    it("should reset to page 1 when the filter query changes", async () => {
+      wrapper.vm.onPaginationChange({ page: 3, size: 20 });
+      await flushPromises();
+      expect(wrapper.vm.currentPage).toBe(3);
+
+      wrapper.vm.filterQuery = "search";
+      await flushPromises();
+
+      expect(wrapper.vm.currentPage).toBe(1);
+    });
+  });
+
+  describe("Fetch errors", () => {
+    // These tests need a wrapper mounted with a failing/empty query, so they
+    // manage their own wrapper lifecycle inside the test with try/finally to
+    // guarantee unmount even on assertion failure.
+    it("should show an error toast when the query fails", async () => {
+      nameListMock.mockRejectedValue({
+        response: { status: 500, data: { message: "Server Error" } },
+      });
+      const { wrapper: errorWrapper } = mountLogStream();
+      try {
+        await flushPromises();
+        await nextTick();
+
+        expect(mockNotify).toHaveBeenCalledWith(
+          expect.objectContaining({
+            variant: "error",
+            message: "Server Error",
+          }),
+        );
+        expect(errorWrapper.vm.logStream).toHaveLength(0);
+      } finally {
+        errorWrapper.unmount();
       }
     });
 
-    it("should handle search input changes", async () => {
-      // The component uses filterQuery directly — set it and verify reactivity
-      wrapper.vm.filterQuery = "test";
-      await wrapper.vm.$nextTick();
+    it("should NOT show an error toast for 403 responses", async () => {
+      nameListMock.mockRejectedValue({ response: { status: 403 } });
+      const { wrapper: forbiddenWrapper } = mountLogStream();
+      try {
+        await flushPromises();
+        await nextTick();
 
-      expect(wrapper.vm.filterQuery).toBe("test");
+        const errorToasts = mockNotify.mock.calls.filter(
+          (call: any) => call[0]?.variant === "error",
+        );
+        expect(errorToasts.length).toBe(0);
+      } finally {
+        forbiddenWrapper.unmount();
+      }
     });
 
-    it("should handle pagination changes", async () => {
-      // The component uses onPaginationChange with {page, size}
-      if (typeof wrapper.vm.onPaginationChange === "function") {
-        await wrapper.vm.onPaginationChange({ page: 2, size: 50 });
+    it("should render an empty table when the list is empty", async () => {
+      resolveNameListWith([], 0);
+      const { wrapper: emptyWrapper } = mountLogStream();
+      try {
+        await flushPromises();
+        await nextTick();
 
-        expect(wrapper.vm.pageSize).toBe(50);
-        expect(wrapper.vm.currentPage).toBe(2);
-      } else {
-        // Fallback
-        wrapper.vm.pageSize = 50;
-        wrapper.vm.currentPage = 2;
-        expect(wrapper.vm.pageSize).toBe(50);
-        expect(wrapper.vm.currentPage).toBe(2);
+        expect(emptyWrapper.vm.logStream).toHaveLength(0);
+        expect(emptyWrapper.vm.totalCount).toBe(0);
+      } finally {
+        emptyWrapper.unmount();
       }
     });
   });
 
-  describe("Stream Management", () => {
-    beforeEach(() => {
-      wrapper.vm.logStream = [
-        {
-          "#": "01",
-          name: "test_stream",
-          stream_type: "logs",
-          doc_num: 100,
-          storage_size: "50 MB",
-          compressed_size: "25 MB",
-          index_size: "10 MB",
-          storage_type: "local",
-          actions: "action buttons",
-          schema: [],
-          _rowKey: "test_stream-logs",
-        }
-      ];
-    });
+  describe("Schema dialog", () => {
+    it("should open the schema dialog with the row's schema data", async () => {
+      wrapper.vm.listSchema({
+        row: { name: "stream_one", schema: [], stream_type: "logs" },
+      });
+      await nextTick();
 
-    it("should open schema dialog", async () => {
-      const props = {
-        row: {
-          name: "test_stream",
-          schema: [],
-          stream_type: "logs"
-        }
-      };
-
-      await wrapper.vm.listSchema(props);
-
-      expect(wrapper.vm.schemaData.name).toBe("test_stream");
+      expect(wrapper.vm.schemaData.name).toBe("stream_one");
       expect(wrapper.vm.schemaData.stream_type).toBe("logs");
       expect(wrapper.vm.showIndexSchemaDialog).toBe(true);
     });
+  });
 
-    it("should confirm delete action", async () => {
-      const props = {
-        row: {
-          name: "test_stream",
-          stream_type: "logs"
-        }
-      };
-
-      await wrapper.vm.confirmDeleteAction(props);
-
-      expect(wrapper.vm.confirmDelete).toBe(true);
-    });
-
-    it("should handle batch deletion via selectedIds", async () => {
-      // Component uses selectedIds (array of _rowKey strings)
-      wrapper.vm.selectedIds = ["stream1-logs", "stream2-metrics"];
-      wrapper.vm.logStream = [
-        { name: "stream1", stream_type: "logs", _rowKey: "stream1-logs" },
-        { name: "stream2", stream_type: "metrics", _rowKey: "stream2-metrics" },
-      ];
-
-      await wrapper.vm.deleteBatchStream();
-      await flushPromises();
-
-      expect(mockStreamService.delete).toHaveBeenCalledTimes(2);
-    });
-
-    it("should handle explore stream action", async () => {
-      const props = {
-        row: {
-          name: "test_stream",
-          stream_type: "logs"
-        }
-      };
-
+  describe("Explore stream", () => {
+    it("should navigate to logs with the stream context", async () => {
       const routerPushSpy = vi.spyOn(router, "push");
 
-      await wrapper.vm.exploreStream(props);
+      await wrapper.vm.exploreStream({
+        row: { name: "stream_one", stream_type: "logs" },
+      });
 
       expect(routerPushSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "logs",
           query: expect.objectContaining({
             stream_type: "logs",
-            stream: "test_stream",
+            stream: "stream_one",
             org_identifier: "default",
-          })
-        })
+          }),
+        }),
+      );
+      routerPushSpy.mockRestore();
+    });
+
+    it("should fetch the stream time range for enrichment tables", async () => {
+      getStreamMock.mockResolvedValueOnce({
+        stats: { doc_time_min: 1_000_000_000, doc_time_max: 2_000_000_000 },
+      });
+
+      await wrapper.vm.exploreStream({
+        row: { name: "lookup", stream_type: "enrichment_tables" },
+      });
+
+      expect(getStreamMock).toHaveBeenCalledWith(
+        "lookup",
+        "enrichment_tables",
+        true,
       );
     });
   });
 
   describe("ODialog — Confirm Delete (single)", () => {
     beforeEach(async () => {
-      await wrapper.vm.confirmDeleteAction({
-        row: { name: "test_stream", stream_type: "logs" },
+      wrapper.vm.confirmDeleteAction({
+        row: { name: "stream_one", stream_type: "logs" },
       });
-      await wrapper.vm.$nextTick();
+      await nextTick();
     });
 
-    it("should open the confirm-delete ODialog when confirmDeleteAction is invoked", () => {
+    it("should open the confirm-delete dialog with a destructive primary", () => {
       expect(wrapper.vm.confirmDelete).toBe(true);
-      const dialogs = wrapper.findAllComponents({ name: "ODialog" });
-      const openDialog = dialogs.find((d: any) => d.props("open") === true);
+      const openDialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("open") === true);
       expect(openDialog).toBeTruthy();
       expect(openDialog!.props("title")).toBe("Delete Stream");
       expect(openDialog!.props("primaryButtonVariant")).toBe("destructive");
     });
 
-    it("should close ODialog and not call delete when secondary (cancel) is emitted", async () => {
-      const dialog = wrapper.findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("open") === true)!;
+    it("should close the dialog and not delete when cancel is emitted", async () => {
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("open") === true)!;
 
       await dialog.vm.$emit("click:secondary");
       await flushPromises();
 
       expect(wrapper.vm.confirmDelete).toBe(false);
-      expect(mockStreamService.delete).not.toHaveBeenCalled();
+      expect(deleteMock).not.toHaveBeenCalled();
     });
 
-    it("should call deleteStream and close ODialog when primary (ok) is emitted", async () => {
-      const dialog = wrapper.findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("open") === true)!;
+    it("should call streamService.delete and remove the stream on confirm", async () => {
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("open") === true)!;
 
       await dialog.vm.$emit("click:primary");
       await flushPromises();
 
-      expect(mockStreamService.delete).toHaveBeenCalledWith(
+      expect(deleteMock).toHaveBeenCalledWith(
         "default",
-        "test_stream",
+        "stream_one",
         "logs",
         true,
       );
+      expect(removeStreamMock).toHaveBeenCalledWith("stream_one", "logs");
       expect(wrapper.vm.confirmDelete).toBe(false);
     });
 
-    it("should propagate v-model:open update from ODialog to confirmDelete state", async () => {
-      const dialog = wrapper.findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("open") === true)!;
+    it("should invalidate the streams cache and refetch after a successful delete", async () => {
+      nameListMock.mockClear();
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("open") === true)!;
+
+      await dialog.vm.$emit("click:primary");
+      await flushPromises();
+
+      // invalidateQueries on the active list key triggers a refetch.
+      expect(nameListMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("should show an error toast when delete fails (non-403)", async () => {
+      deleteMock.mockRejectedValueOnce({
+        response: { status: 500, data: { message: "Delete failed" } },
+      });
+      mockNotify.mockClear();
+
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("open") === true)!;
+
+      await dialog.vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(mockNotify).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error" }),
+      );
+    });
+
+    it("should propagate v-model:open updates to confirmDelete", async () => {
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("open") === true)!;
 
       await dialog.vm.$emit("update:open", false);
-      await wrapper.vm.$nextTick();
+      await nextTick();
 
       expect(wrapper.vm.confirmDelete).toBe(false);
     });
@@ -522,604 +661,140 @@ describe("LogStream Component", () => {
 
   describe("ODialog — Confirm Batch Delete", () => {
     beforeEach(async () => {
-      // Setup logStream rows so selectedItems computed can resolve
-      wrapper.vm.logStream = [
-        { name: "stream1", stream_type: "logs", _rowKey: "stream1-logs" },
-        { name: "stream2", stream_type: "metrics", _rowKey: "stream2-metrics" },
-      ];
-      // Use selectedIds (array of _rowKey strings) — matches OTable v-model:selected-ids
-      wrapper.vm.selectedIds = ["stream1-logs", "stream2-metrics"];
-      await wrapper.vm.confirmBatchDeleteAction();
-      await wrapper.vm.$nextTick();
+      // Rows come from the query; select the first two by their _rowKey.
+      wrapper.vm.selectedIds = ["stream_one-logs", "stream_two-logs"];
+      wrapper.vm.confirmBatchDeleteAction();
+      await nextTick();
     });
 
-    it("should open the batch-delete ODialog with destructive primary variant", () => {
+    it("should open the batch-delete dialog with a destructive primary", () => {
       expect(wrapper.vm.confirmBatchDelete).toBe(true);
-      const dialog = wrapper.findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("open") === true)!;
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("open") === true)!;
       expect(dialog).toBeTruthy();
       expect(dialog.props("title")).toBe("Delete Streams");
       expect(dialog.props("primaryButtonVariant")).toBe("destructive");
     });
 
-    it("should close batch-delete ODialog without deleting when secondary is emitted", async () => {
-      const dialog = wrapper.findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("open") === true)!;
+    it("should close without deleting when cancel is emitted", async () => {
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("open") === true)!;
 
       await dialog.vm.$emit("click:secondary");
       await flushPromises();
 
       expect(wrapper.vm.confirmBatchDelete).toBe(false);
-      expect(mockStreamService.delete).not.toHaveBeenCalled();
+      expect(deleteMock).not.toHaveBeenCalled();
     });
 
-    it("should call deleteBatchStream for each selected stream when primary is emitted", async () => {
-      const dialog = wrapper.findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("open") === true)!;
+    it("should delete every selected stream on confirm", async () => {
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("open") === true)!;
 
       await dialog.vm.$emit("click:primary");
       await flushPromises();
 
-      expect(mockStreamService.delete).toHaveBeenCalledTimes(2);
-      expect(mockStreamService.delete).toHaveBeenCalledWith(
+      expect(deleteMock).toHaveBeenCalledTimes(2);
+      expect(deleteMock).toHaveBeenCalledWith(
         "default",
-        "stream1",
+        "stream_one",
         "logs",
         true,
       );
-      expect(mockStreamService.delete).toHaveBeenCalledWith(
+      expect(deleteMock).toHaveBeenCalledWith(
         "default",
-        "stream2",
-        "metrics",
+        "stream_two",
+        "logs",
         true,
       );
       expect(wrapper.vm.confirmBatchDelete).toBe(false);
     });
 
-    it("should propagate v-model:open update to confirmBatchDelete state", async () => {
-      const dialog = wrapper.findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("open") === true)!;
+    it("should clear the selection after a successful batch delete", async () => {
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("open") === true)!;
+
+      await dialog.vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(wrapper.vm.selectedIds).toEqual([]);
+    });
+
+    it("should show an error toast when a batch delete rejects (non-403)", async () => {
+      deleteMock.mockRejectedValue({
+        response: { status: 500, data: { message: "Batch failed" } },
+      });
+      mockNotify.mockClear();
+
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("open") === true)!;
+
+      await dialog.vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(mockNotify).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error" }),
+      );
+    });
+
+    it("should propagate v-model:open updates to confirmBatchDelete", async () => {
+      const dialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("open") === true)!;
 
       await dialog.vm.$emit("update:open", false);
-      await wrapper.vm.$nextTick();
+      await nextTick();
 
       expect(wrapper.vm.confirmBatchDelete).toBe(false);
     });
   });
 
-  describe("Error Handling", () => {
-    it("should handle stream loading errors", async () => {
-      mockNotify.mockClear();
+  describe("Selection", () => {
+    it("should track selected row keys via selectedIds", async () => {
+      wrapper.vm.selectedIds = ["stream_one-logs"];
+      await nextTick();
 
-      mockUseStreams.getPaginatedStreams.mockRejectedValue({
-        response: {
-          status: 500,
-          data: { message: "Server Error" }
-        }
-      });
-
-      await wrapper.vm.getLogStream();
-      await flushPromises();
-
-      // Component uses variant: "error" for error toasts
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "error",
-        })
-      );
+      expect(wrapper.vm.selectedIds).toEqual(["stream_one-logs"]);
+      expect(wrapper.vm.selectedItems).toHaveLength(1);
+      expect(wrapper.vm.selectedItems[0].name).toBe("stream_one");
     });
 
-    it("should handle delete errors", async () => {
-      mockNotify.mockClear();
+    it("should resolve selectedItems from selected _rowKeys", async () => {
+      wrapper.vm.selectedIds = ["stream_one-logs", "stream_two-logs"];
+      await nextTick();
 
-      // Mock delete service to fail
-      mockStreamService.delete.mockRejectedValue({
-        response: {
-          status: 500,
-          data: { message: "Delete failed" }
-        }
-      });
-
-      // Test that the service throws with the right message
-      try {
-        await mockStreamService.delete("default", "test_stream", "logs", true);
-      } catch (error: any) {
-        expect(error.response.data.message).toBe("Delete failed");
-      }
-
-      // Reset service mock for subsequent tests
-      mockStreamService.delete.mockResolvedValue({ data: { code: 200 } });
-    });
-
-    it("should not show error for 403 responses", async () => {
-      mockNotify.mockClear();
-
-      // Create a fresh wrapper to test 403 handling in isolation
-      const testWrapper = mountLogStream();
-
-      // Mock 403 response after component is mounted
-      mockUseStreams.getPaginatedStreams.mockRejectedValue({
-        response: { status: 403 }
-      });
-
-      // Call getLogStream manually
-      await testWrapper.vm.getLogStream();
-      await flushPromises();
-
-      // For 403, no error toast should be shown (loading toast is expected)
-      const errorNotifications = mockNotify.mock.calls.filter(
-        (call: any) => call[0].variant === "error"
-      );
-
-      expect(errorNotifications.length).toBe(0);
-
-      testWrapper.unmount();
+      expect(wrapper.vm.selectedItems.map((s: any) => s.name)).toEqual([
+        "stream_one",
+        "stream_two",
+      ]);
     });
   });
 
-  describe("Pagination State", () => {
-    it("should have consistent initial pagination state", () => {
-      expect(wrapper.vm.currentPage).toBe(1);
-      expect(wrapper.vm.pageSize).toBe(20);
-      expect(typeof wrapper.vm.sortBy).toBe("string");
-      expect(wrapper.vm.sortOrder).toBe("asc");
-    });
-
-    it("should handle pagination updates correctly", async () => {
-      const originalTotal = wrapper.vm.totalCount;
-
-      wrapper.vm.pageSize = 50;
-      wrapper.vm.currentPage = 2;
-
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.pageSize).toBe(50);
-      expect(wrapper.vm.currentPage).toBe(2);
-
-      wrapper.vm.pageSize = 20;
-      wrapper.vm.currentPage = 1;
+  describe("Add stream dialog", () => {
+    it("should open the add-stream dialog when addStream is called", async () => {
+      wrapper.vm.addStream();
+      await nextTick();
+      expect(wrapper.vm.addStreamDialog.show).toBe(true);
     });
   });
 
-  describe("Time Range Handling", () => {
-    it("should handle stream exploration with time ranges", () => {
-      // exploreStream method exists on the component
-      expect(typeof wrapper.vm.exploreStream).toBe("function");
-    });
-  });
-
-  describe("Watch Effects", () => {
-    it("should have reactive filter query", async () => {
-      const initialQuery = wrapper.vm.filterQuery;
+  describe("Search filter", () => {
+    it("should update filterQuery reactively", async () => {
       wrapper.vm.filterQuery = "test search";
-      await wrapper.vm.$nextTick();
-
+      await nextTick();
       expect(wrapper.vm.filterQuery).toBe("test search");
-      expect(wrapper.vm.filterQuery).not.toBe(initialQuery);
     });
   });
 
-  describe("Add Stream Dialog", () => {
-    it("should respect UDS configuration", () => {
-      store.state.zoConfig.user_defined_schemas_enabled = true;
-      expect(wrapper.vm.isSchemaUDSEnabled).toBe(true);
-
-      store.state.zoConfig.user_defined_schemas_enabled = false;
-      expect(wrapper.vm.isSchemaUDSEnabled).toBe(false);
-    });
-  });
-
-  describe("Advanced Stream Operations", () => {
-    it("should handle stream selection correctly", () => {
-      // Component uses selectedIds (array of _rowKey strings)
-      wrapper.vm.selectedIds = ["test_stream-logs"];
-
-      expect(wrapper.vm.selectedIds).toHaveLength(1);
-      expect(wrapper.vm.selectedIds[0]).toBe("test_stream-logs");
-    });
-
-    it("should handle stream type switching correctly", () => {
-      if (typeof wrapper.vm.filterLogStreamByTab === "function") {
-        wrapper.vm.filterLogStreamByTab("metrics");
-        expect(wrapper.vm.selectedStreamType).toBe("metrics");
-
-        wrapper.vm.filterLogStreamByTab("traces");
-        expect(wrapper.vm.selectedStreamType).toBe("traces");
-      } else {
-        wrapper.vm.selectedStreamType = "metrics";
-        expect(wrapper.vm.selectedStreamType).toBe("metrics");
-      }
-    });
-
-    it("should handle bulk stream operations via selectedIds", () => {
-      wrapper.vm.selectedIds = [
-        "stream1-logs",
-        "stream2-logs",
-        "stream3-metrics",
-      ];
-
-      expect(wrapper.vm.selectedIds).toHaveLength(3);
-    });
-
-    it("should maintain stream statistics accuracy", () => {
-      if (wrapper.vm.logStream && wrapper.vm.logStream.length > 0) {
-        const stream = wrapper.vm.logStream[0];
-        expect(stream).toHaveProperty("name");
-        expect(stream).toHaveProperty("stream_type");
-        if (stream.doc_num !== undefined) {
-          expect(typeof stream.doc_num).toBe("number");
-        }
-      } else {
-        const mockStats = {
-          doc_num: 1000,
-          storage_size: "50 MB",
-          compressed_size: "25 MB",
-          index_size: "10 MB"
-        };
-        expect(mockStats.doc_num).toBe(1000);
-      }
-    });
-  });
-
-  describe("Performance and Memory Management", () => {
-    it("should handle large stream list efficiently", async () => {
-      // Page size change triggers a watcher that calls getLogStream,
-      // which resets totalCount from the mock. Test pageSize changes independently.
-      const originalPageSize = wrapper.vm.pageSize;
-
-      wrapper.vm.pageSize = 50;
-
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.pageSize).toBe(50);
-
-      // Calculate expected pages for a large dataset
-      const expectedPages = Math.ceil(1000 / 50);
-      expect(expectedPages).toBe(20);
-
-      // Restore
-      wrapper.vm.pageSize = originalPageSize;
-    });
-
-    it("should debounce search input correctly", async () => {
-      wrapper.vm.filterQuery = "a";
-      await wrapper.vm.$nextTick();
-      wrapper.vm.filterQuery = "ab";
-      await wrapper.vm.$nextTick();
-      wrapper.vm.filterQuery = "abc";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.filterQuery).toBe("abc");
-    });
-
-    it("should manage component lifecycle correctly", () => {
-      expect(wrapper.vm).toBeTruthy();
-      expect(wrapper.vm.loadingState).toBeDefined();
-      expect(wrapper.vm.logStream).toBeDefined();
-      expect(wrapper.vm.currentPage).toBeDefined();
-      expect(wrapper.vm.pageSize).toBeDefined();
-    });
-
-    it("should cleanup resources on component destroy", async () => {
-      wrapper.unmount();
-
-      // Remount for subsequent tests
-      wrapper = mountLogStream();
-
-      await wrapper.vm.$nextTick();
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("Data Transformation and Formatting", () => {
-    it("should format storage sizes correctly", () => {
-      const testData = [
-        { bytes: 1024, expectedUnit: "KB" },
-        { bytes: 1048576, expectedUnit: "MB" },
-        { bytes: 1073741824, expectedUnit: "GB" }
-      ];
-
-      testData.forEach(({ bytes, expectedUnit }) => {
-        const formatted = bytes >= 1073741824 ? `${(bytes / 1073741824).toFixed(1)} GB` :
-                         bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` :
-                         bytes >= 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${bytes} B`;
-        expect(formatted).toContain(expectedUnit);
-      });
-    });
-
-    it("should format timestamps correctly", () => {
-      const timestamp = 1640995200000; // 2022-01-01 00:00:00 UTC
-      const date = new Date(timestamp);
-      expect(date.getFullYear()).toBe(2022);
-    });
-
-    it("should filter streams by search query", async () => {
-      const testStreams = [
-        { name: "user_logs", stream_type: "logs" },
-        { name: "error_logs", stream_type: "logs" },
-        { name: "metrics_data", stream_type: "metrics" }
-      ];
-
-      const logsStreams = testStreams.filter((s: any) => s.name.includes("logs"));
-      expect(logsStreams).toHaveLength(2);
-
-      wrapper.vm.filterQuery = "logs";
-      expect(wrapper.vm.filterQuery).toBe("logs");
-    });
-  });
-
-  describe("Edge Cases and Error Scenarios", () => {
-    it("should handle empty stream list gracefully", async () => {
-      const originalTotal = wrapper.vm.totalCount;
-
-      // Test pagination reset for empty state
-      wrapper.vm.totalCount = 0;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.totalCount).toBe(0);
-
-      // Restore
-      wrapper.vm.totalCount = originalTotal;
-    });
-
-    it("should handle malformed stream data", () => {
-      const malformedStream = {
-        name: undefined,
-        stream_type: null,
-        doc_num: null,
-        stats: null
-      };
-
-      expect(() => {
-        const name = malformedStream.name || "default_name";
-        const type = malformedStream.stream_type || "unknown";
-        expect(name).toBe("default_name");
-        expect(type).toBe("unknown");
-      }).not.toThrow();
-
-      expect(malformedStream.stats || {}).toEqual({});
-    });
-
-    it("should handle network timeout errors", async () => {
-      mockNotify.mockClear();
-
-      mockUseStreams.getPaginatedStreams.mockRejectedValue({
-        code: "NETWORK_ERROR",
-        message: "Request timeout"
-      });
-
-      await wrapper.vm.getLogStream();
-      await flushPromises();
-
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "error",
-        })
-      );
-    });
-
-    it("should handle concurrent API requests", async () => {
-      const promise1 = wrapper.vm.getLogStream();
-      const promise2 = wrapper.vm.getLogStream();
-
-      await Promise.all([promise1, promise2]);
-
-      expect(wrapper.vm.loadingState).toBe(false);
-    });
-
-    it("should validate pagination boundaries", () => {
-      // Component uses separate refs for pagination - test they accept assignments
-      wrapper.vm.currentPage = -1;
-      wrapper.vm.pageSize = 0;
-
-      expect(wrapper.vm.currentPage).toBe(-1);
-      expect(wrapper.vm.pageSize).toBe(0);
-
-      // Reset to valid values
-      wrapper.vm.currentPage = 1;
-      wrapper.vm.pageSize = 20;
-    });
-  });
-
-  describe("User Interface Interactions", () => {
-    it("should handle keyboard navigation", async () => {
-      const table = wrapper.find('[data-test="log-stream-table"]');
-
-      if (table.exists()) {
-        await table.trigger("keydown.arrow-down");
-        await table.trigger("keydown.enter");
-
-        expect(table.exists()).toBe(true);
-      }
-    });
-
-    it("should support accessibility features", () => {
-      const searchInput = wrapper.find('[data-test="streams-search-stream-input"]');
-      const refreshButton = wrapper.find('[data-test="log-stream-refresh-stats-btn"]');
-
-      // Test search input accessibility
-      if (searchInput.exists()) {
-        const input = searchInput.find("input");
-        const hasAccessibility = searchInput.attributes("aria-label") ||
-                                 searchInput.attributes("placeholder") ||
-                                 (input.exists() && input.attributes("placeholder"));
-        if (hasAccessibility) {
-          expect(hasAccessibility).toBeTruthy();
-        } else {
-          expect(searchInput.exists()).toBe(true);
-        }
-      }
-
-      // Test refresh button accessibility
-      if (refreshButton.exists()) {
-        const hasTitle = refreshButton.attributes("title") ||
-                        refreshButton.attributes("aria-label") ||
-                        refreshButton.text().includes("Refresh");
-        expect(hasTitle).toBeTruthy();
-      }
-    });
-
-    it("should handle window resize events", async () => {
-      const initialWidth = window.innerWidth;
-
-      Object.defineProperty(window, "innerWidth", {
-        writable: true,
-        configurable: true,
-        value: 800
-      });
-
-      window.dispatchEvent(new Event("resize"));
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.exists()).toBe(true);
-
-      // Restore original width
-      Object.defineProperty(window, "innerWidth", {
-        writable: true,
-        configurable: true,
-        value: initialWidth
-      });
-    });
-
-    it("should handle drag and drop operations", () => {
-      const table = wrapper.find('[data-test="log-stream-table"]');
-
-      // Drag and drop not implemented; verify table exists
-      expect(table.exists()).toBe(true);
-    });
-
-    it("should support context menu operations", async () => {
-      const table = wrapper.find('[data-test="log-stream-table"]');
-
-      if (table.exists()) {
-        await table.trigger("contextmenu");
-
-        expect(table.exists()).toBe(true);
-      }
-    });
-  });
-
-  describe("Data Persistence and State Management", () => {
-    it("should persist user preferences", () => {
-      wrapper.vm.pageSize = 50;
-      wrapper.vm.selectedStreamType = "metrics";
-
-      expect(wrapper.vm.pageSize).toBe(50);
-      expect(wrapper.vm.selectedStreamType).toBe("metrics");
-    });
-
-    it("should handle browser back/forward navigation", () => {
-      // Router is defined and accessible
-      expect(router).toBeDefined();
-    });
-
-    it("should maintain scroll position during updates", () => {
-      // Component has logStream data which can be preserved
-      expect(wrapper.vm.logStream).toBeDefined();
-    });
-
-    it("should sync with external state changes", async () => {
-      store.state.selectedOrganization = "test-org";
-      await wrapper.vm.$nextTick();
-
-      expect(store.state.selectedOrganization).toBe("test-org");
-    });
-
-    it("should handle real-time updates", () => {
-      expect(wrapper.vm.logStream.length).toBeGreaterThanOrEqual(0);
-    });
-  });
-
-  describe("Security and Validation", () => {
-    it("should sanitize user input", () => {
-      const maliciousInput = '<script>alert("xss")</script>';
-      wrapper.vm.filterQuery = maliciousInput;
-
-      expect(wrapper.vm.filterQuery).toBe(maliciousInput);
-      expect(wrapper.exists()).toBe(true);
-
-      wrapper.vm.filterQuery = "safe_query";
-      expect(wrapper.vm.filterQuery).toBe("safe_query");
-    });
-
-    it("should validate stream names for security", () => {
-      const dangerousName = "../../../etc/passwd";
-      const safeName = "valid_stream_name";
-
-      // Basic validation
-      expect(safeName).toMatch(/^[a-zA-Z0-9_]+$/);
-      expect(dangerousName).not.toMatch(/^[a-zA-Z0-9_]+$/);
-    });
-
-    it("should handle unauthorized access gracefully", async () => {
-      mockNotify.mockClear();
-
-      mockUseStreams.getPaginatedStreams.mockRejectedValue({
-        response: { status: 401, data: { message: "Unauthorized" } }
-      });
-
-      await wrapper.vm.getLogStream();
-      await flushPromises();
-
-      // Should handle 401 gracefully
-      expect(wrapper.vm.loadingState).toBe(false);
-    });
-
-    it("should prevent CSRF attacks", () => {
-      const token = "mock-token";
-      expect(typeof token).toBe("string");
-      expect(token.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe("Integration and System Tests", () => {
-    it("should integrate with notification system", async () => {
-      mockNotify.mockClear();
-
-      // Trigger a success notification via mockNotify directly
-      mockNotify({
-        message: "Stream deleted successfully.",
-      });
-
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: "Stream deleted successfully.",
-        })
-      );
-    });
-
-    it("should handle different organization contexts", async () => {
-      const org1 = {
-        label: "org1",
-        id: 1,
-        identifier: "org1",
-        user_email: "org1@example.com",
-        subscription_type: "free"
-      };
-      const org2 = {
-        label: "org2",
-        id: 2,
-        identifier: "org2",
-        user_email: "org2@example.com",
-        subscription_type: "free"
-      };
-
-      store.state.selectedOrganization = org1;
-      await wrapper.vm.getLogStream();
-
-      store.state.selectedOrganization = org2;
-      await wrapper.vm.getLogStream();
-
-      expect(mockUseStreams.getPaginatedStreams).toHaveBeenCalled();
-    });
-
-    it("should support internationalization", () => {
-      const { t } = wrapper.vm;
-
-      if (typeof t === "function") {
-        expect(t("common.name")).toBeTruthy();
-        expect(t("common.actions")).toBeTruthy();
-      }
+  describe("Internationalization", () => {
+    it("should expose a working translation function", () => {
+      expect(typeof wrapper.vm.t).toBe("function");
+      expect(wrapper.vm.t("logStream.header")).toBe("Streams");
     });
   });
 });

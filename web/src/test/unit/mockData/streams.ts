@@ -193,6 +193,46 @@ export default {
       },
     ],
   },
+  // A small multi-stream list used by LogStream.vue tests (rows, pagination,
+  // batch delete). Shape mirrors the `nameList` response `data.list` entries.
+  streams_name_list: {
+    list: [
+      {
+        name: "stream_one",
+        storage_type: "s3",
+        stream_type: "logs",
+        schema: [{ name: "_timestamp", type: "Int64" }],
+        stats: {
+          doc_num: 100,
+          storage_size: 50,
+          compressed_size: 25,
+          index_size: 10,
+          doc_time_min: 1678448628630259,
+          doc_time_max: 1678448628652947,
+        },
+      },
+      {
+        name: "stream_two",
+        storage_type: "s3",
+        stream_type: "logs",
+        schema: [{ name: "_timestamp", type: "Int64" }],
+        stats: {
+          doc_num: 200,
+          storage_size: 80,
+          compressed_size: 40,
+          index_size: 20,
+        },
+      },
+      {
+        name: "stream_three",
+        storage_type: "local",
+        stream_type: "logs",
+        schema: [],
+        // No stats — exercises the "--" fallback in mapStreamRow.
+      },
+    ],
+    total: 3,
+  },
   stream_details: {
     name: "k8s_json",
     storage_type: "s3",

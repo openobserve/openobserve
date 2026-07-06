@@ -31,7 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="log-stream-refresh-stats-btn"
               variant="outline"
               size="sm-action"
-              @click="getLogStream(true)"
+              :loading="isFetching"
+              @click="getLogStream()"
             >
               {{ t(`logStream.refreshStats`) }}
             </OButton>
@@ -68,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:sort-order="sortOrder"
         :show-global-filter="false"
         :default-columns="false"
-        :loading="loadingState"
+        :loading="isLoading"
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="streams-log-stream-list"
@@ -160,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #empty>
-            <div v-if="!loadingState">
+            <div v-if="!isLoading">
               <OEmptyState
                 size="hero"
                 preset="no-streams"
@@ -266,7 +267,6 @@ import {
   onDeactivated,
   onUnmounted,
   onBeforeMount,
-  type Ref,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -288,6 +288,9 @@ import {
 import config from "@/aws-exports";
 import { cloneDeep } from "lodash-es";
 import useStreams from "@/composables/useStreams";
+import { useQueryClient } from "@tanstack/vue-query";
+import useStreamsListQuery from "@/composables/queries/useStreamsListQuery";
+import { streamKeys } from "@/composables/queries/streamKeys";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -325,20 +328,15 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
-    const logStream: Ref<any[]> = ref([]);
     const showIndexSchemaDialog = ref(false);
     const isDeleting = ref(false);
     const confirmDelete = ref<boolean>(false);
     const confirmBatchDelete = ref<boolean>(false);
     const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
-    const resultTotal = ref<number>(0);
     const selectedIds = ref<string[]>([]);
     const orgData: any = ref(store.state.selectedOrganization);
-    const previousOrgIdentifier = ref("");
     const filterQuery = ref("");
-    const duplicateStreamList: Ref<any[]> = ref([]);
     const selectedStreamType = ref("logs");
-    const loadingState = ref(true);
     const searchKeyword = ref("");
     const deleteAssociatedAlertsPipelines = ref(true);
     const streamActiveTab = ref("logs");
@@ -349,21 +347,100 @@ export default defineComponent({
     const currentPage = ref(1);
     const sortBy = ref("name");
     const sortOrder = ref<"asc" | "desc">("asc");
-    const totalCount = ref(0);
+
+    const streamTabs: never[] = [];
+    const { removeStream, getStream, addNewStreams } = useStreams();
+
+    // ── Streams list via TanStack Query ───────────────────────────────────
+    // The query key is reactive: changing page / size / sort / filter / stream
+    // type / org re-runs the fetch and caches per combination. Fresh combos
+    // serve from cache instantly; stale combos refetch in the background.
+    const offset = computed(() =>
+      Math.max(0, (currentPage.value - 1) * pageSize.value),
+    );
+    const asc = computed(() => sortOrder.value === "asc");
+    const queryClient = useQueryClient();
+
+    const {
+      data: streamsData,
+      isLoading,
+      isFetching,
+      isError,
+      error: streamsError,
+      refetch,
+    } = useStreamsListQuery({
+      type: selectedStreamType,
+      offset,
+      limit: pageSize,
+      keyword: filterQuery,
+      sort: sortBy,
+      asc,
+    });
+
+    // Map a raw stream record to the row shape the table renders.
+    const mapStreamRow = (data: any) => {
+      const hasStats = !!data.stats;
+      return {
+        _rowKey: `${data.name}-${data.stream_type}`,
+        name: data.name,
+        doc_num: hasStats ? data.stats.doc_num : "--",
+        storage_size: hasStats ? data.stats.storage_size + " MB" : "--",
+        compressed_size: hasStats ? data.stats.compressed_size + " MB" : "",
+        index_size: hasStats ? data.stats.index_size + " MB" : "",
+        storage_type: data.storage_type,
+        actions: "action buttons",
+        schema: data.schema ? data.schema : [],
+        stream_type: data.stream_type,
+      };
+    };
+
+    const logStream = computed(() =>
+      (streamsData.value?.list ?? []).map(mapStreamRow),
+    );
+    const totalCount = computed(() => streamsData.value?.total ?? 0);
+    const resultTotal = computed(() => streamsData.value?.list?.length ?? 0);
 
     const selectedItems = computed(() =>
       logStream.value.filter((s: any) => selectedIds.value.includes(s._rowKey))
     );
 
-    const streamTabs: never[] = [];
-    const {
-      getStreams,
-      resetStreams,
-      removeStream,
-      getStream,
-      getPaginatedStreams,
-      addNewStreams,
-    } = useStreams();
+    // Refresh helper kept for the button / shortcut / post-mutation call sites.
+    const getLogStream = () => {
+      refetch();
+      segment.track("Button Click", {
+        button: "Refresh Streams",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Streams",
+      });
+    };
+
+    // Surface fetch errors as a toast, preserving the 403 suppression.
+    watch(isError, (val) => {
+      if (!val) return;
+      const err: any = streamsError.value;
+      if (err?.response?.status != 403) {
+        toast({
+          variant: "error",
+          message: err?.response?.data?.message || "Error while fetching streams.",
+        });
+      }
+    });
+
+    // Seed the shared Vuex cache and auto-open the schema dialog when the URL
+    // carries a `?dialog=<stream>` query, mirroring the previous behaviour.
+    watch(
+      () => streamsData.value,
+      (data) => {
+        if (!data?.list?.length) return;
+        addNewStreams(selectedStreamType.value, data.list);
+        logStream.value.forEach((element: any) => {
+          if (element.name == router.currentRoute.value.query.dialog) {
+            listSchema({ row: element });
+          }
+        });
+      },
+    );
     const columns = ref<OTableColumnDef[]>([
       {
         id: "name",
@@ -476,110 +553,6 @@ export default defineComponent({
     //   },
     // );
 
-    const getLogStream = (refresh: boolean = false) => {
-      if (store.state.selectedOrganization != null) {
-        loadingState.value = true;
-        previousOrgIdentifier.value =
-          store.state.selectedOrganization.identifier;
-        const dismiss = toast({
-          variant: "loading",
-          message: "Please wait while loading streams...",
-                  timeout: 0,
-});
-        logStream.value = [];
-
-        const offset = (currentPage.value - 1) * pageSize.value;
-        let streamResponse;
-        // if(selectedStreamType.value == "all") {
-        //   streamResponse = getStreams(selectedStreamType.value || "", false, false);
-        // } else {
-        streamResponse = getPaginatedStreams(
-          selectedStreamType.value || "",
-          false,
-          false,
-          offset < 0 ? 0 : offset,
-          pageSize.value,
-          filterQuery.value,
-          sortBy.value,
-          sortOrder.value === "asc",
-        );
-        // }
-
-        streamResponse
-          .then((res: any) => {
-            logStream.value = [];
-            let doc_num = "";
-            let storage_size = "";
-            let compressed_size = "";
-            let index_size = "";
-            resultTotal.value = res.list.length;
-            totalCount.value = res.total;
-
-            logStream.value.push(
-              ...res.list.map((data: any) => {
-                doc_num = "--";
-                storage_size = "--";
-                if (data.stats) {
-                  doc_num = data.stats.doc_num;
-                  storage_size = data.stats.storage_size + " MB";
-                  compressed_size = data.stats.compressed_size + " MB";
-                  index_size = data.stats.index_size + " MB";
-                }
-                return {
-                  _rowKey: `${data.name}-${data.stream_type}`,
-                  name: data.name,
-                  doc_num: doc_num,
-                  storage_size: storage_size,
-                  compressed_size: compressed_size,
-                  index_size: index_size,
-                  storage_type: data.storage_type,
-                  actions: "action buttons",
-                  schema: data.schema ? data.schema : [],
-                  stream_type: data.stream_type,
-                };
-              }),
-            );
-            duplicateStreamList.value = [...logStream.value];
-
-            logStream.value.forEach((element: any) => {
-              if (element.name == router.currentRoute.value.query.dialog) {
-                listSchema({ row: element });
-              }
-            });
-            loadingState.value = false;
-
-            addNewStreams(selectedStreamType.value, res.list);
-
-            dismiss();
-          })
-          .catch((err) => {
-            if (err.response?.status != 403) {
-              toast({
-                variant: "error",
-                message:
-                  err.response?.data?.message ||
-                  "Error while fetching streams.",
-              });
-            }
-            loadingState.value = false;
-            dismiss();
-          })
-          .finally(() => {
-            loadingState.value = false;
-            dismiss();
-          });
-      }
-
-      segment.track("Button Click", {
-        button: "Refresh Streams",
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Streams",
-      });
-    };
-
-    getLogStream();
-
     const listSchema = (props: any) => {
       schemaData.value.name = props.row.name;
       schemaData.value.schema = props.row.schema;
@@ -620,7 +593,11 @@ export default defineComponent({
             });
             removeStream(deleteStreamName, deleteStreamType);
             selectedIds.value = [];
-            getLogStream();
+            queryClient.invalidateQueries({
+              queryKey: streamKeys.all(
+                store.state.selectedOrganization.identifier,
+              ),
+            });
           }
         })
         .catch((err: any) => {
@@ -680,7 +657,11 @@ export default defineComponent({
           });
 
           selectedIds.value = [];
-          getLogStream();
+          queryClient.invalidateQueries({
+            queryKey: streamKeys.all(
+              store.state.selectedOrganization.identifier,
+            ),
+          });
         })
         .catch((error) => {
           if (error.response.status != 403) {
@@ -698,29 +679,34 @@ export default defineComponent({
         });
     };
 
-    watch([currentPage, pageSize, sortBy, sortOrder], () => {
-      getLogStream();
-    });
-
+    // Page / size / sort / filter / stream-type changes are picked up
+    // automatically by the reactive query key — no manual refetch needed.
+    // Reset to the first page when the search filter changes.
     watch(filterQuery, () => {
       currentPage.value = 1;
-      getLogStream();
     });
 
+    // Drop the previous org's cached streams when switching orgs. The new
+    // org's data is fetched automatically via the reactive query key.
+    watch(
+      () => store.state.selectedOrganization?.identifier,
+      (newOrg, oldOrg) => {
+        if (oldOrg && newOrg !== oldOrg) {
+          queryClient.removeQueries({ queryKey: ["streams", oldOrg] });
+        }
+      },
+    );
+
     onActivated(() => {
+      // Org changes are handled by the reactive query key (org is part of it),
+      // so no manual refetch is needed here. Just re-open a schema dialog if
+      // the URL still carries a `?dialog=<stream>` query.
       if (logStream.value.length > 0) {
         logStream.value.forEach((element: any) => {
           if (element.name == router.currentRoute.value.query.dialog) {
             listSchema({ row: element });
           }
         });
-      }
-
-      if (
-        previousOrgIdentifier.value !=
-        store.state.selectedOrganization.identifier
-      ) {
-        getLogStream();
       }
     });
     /**
@@ -791,13 +777,10 @@ export default defineComponent({
     };
 
     const onChangeStreamFilter = (value: string) => {
+      // Reset to the first page; the reactive query key refetches for the
+      // newly selected stream type automatically.
+      currentPage.value = 1;
       selectedStreamType.value = value;
-      getLogStream(true);
-      // logStream.value = filterData(
-      //   duplicateStreamList.value,
-      //   filterQuery.value.toLowerCase(),
-      // );
-      // resultTotal.value = logStream.value.length;
     };
 
     const addStream = () => {
@@ -817,17 +800,17 @@ export default defineComponent({
       // });
     };
 
-    const onPaginationChange = async (params: { page: number; size: number }) => {
+    const onPaginationChange = (params: { page: number; size: number }) => {
+      // The reactive query key refetches on page / size change automatically.
       currentPage.value = params.page;
       pageSize.value = params.size;
-      await getLogStream();
     };
 
-    const onSortChange = async (params: { column: string; order: "asc" | "desc" }) => {
+    const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
+      // The reactive query key refetches on sort change automatically.
       sortBy.value = params.column;
       sortOrder.value = params.order;
       currentPage.value = 1;
-      await getLogStream();
     };
 
     const filterLogStreamByTab = (tab: string) => {
@@ -845,7 +828,7 @@ export default defineComponent({
       },
       {
         id: "streamsRefresh",
-        handler: () => { if (!isInputFocused()) getLogStream(true); },
+        handler: () => { if (!isInputFocused()) getLogStream(); },
       },
       {
         id: "streamsFocusSearch",
@@ -892,7 +875,9 @@ export default defineComponent({
       onChangeStreamFilter,
       addStreamDialog,
       addStream,
-      loadingState,
+      isLoading,
+      isFetching,
+      refetch,
       isDeleting,
       searchKeyword,
       deleteAssociatedAlertsPipelines,
