@@ -87,7 +87,7 @@ pub static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
     // dots. The domain requires at least one dot-separated label and a 2-6 letter
     // TLD. Anchored on both ends to reject any trailing/leading garbage.
     Regex::new(
-        r"^([a-zA-Z0-9_+\-]+(\.[a-zA-Z0-9_+\-]+)*)@([a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*\.[a-zA-Z]{2,6})$",
+        r"^([a-zA-Z0-9_+\-]+(\.[a-zA-Z0-9_+\-]+)*)@([a-zA-Z0-9]+([\-\.][a-zA-Z0-9]+)*\.[a-zA-Z]{2,6})$",
     )
     .unwrap()
 });
