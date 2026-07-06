@@ -26,24 +26,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          scrolling body as a flex-shrink-0 sibling, mirroring IncidentDetailDrawer.
          The card owns no horizontal padding, so the border spans edge-to-edge and
          the header pads its own content. -->
-    <div
-      class="tw:flex tw:items-center tw:flex-nowrap tw:flex-shrink-0 tw:h-[68px] tw:px-[1rem] tw:border-b tw:border-border-default"
+    <AppPageHeader
       data-test="session-detail-header"
+      class="tw:px-4 tw:border-b tw:border-border-default"
+      :title="t('traces.sessionDetail.pageTitle')"
+      :back="{
+        label: t('rum.sessions'),
+        onClick: goBack,
+        dataTest: 'session-detail-back-btn',
+      }"
     >
-      <div class="tw:flex tw:items-center tw:gap-3 tw:flex-1 tw:min-w-0">
-        <div
-          data-test="session-detail-back-btn"
-          class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer tw:border-[1.5px] tw:border-current tw:rounded-full tw:w-[22px] tw:h-[22px] tw:flex-shrink-0"
-          :title="t('traces.sessionDetail.backToSessions')"
-          @click="goBack"
-        >
-          <OIcon name="arrow-back-ios-new" size="xs" />
-        </div>
-        <div class="tw:text-xl tw:font-semibold tw:text-text-primary tw:flex-shrink-0">
-          {{ t('traces.sessionDetail.pageTitle') }}
-        </div>
-
-        <!-- Session id pill (primary-tinted, copyable) — shows the full id -->
+      <!-- Session id pill (primary-tinted, copyable) — shows the full id -->
+      <template #title-trail>
         <span
           v-if="detail"
           class="tw:font-semibold tw:px-2 tw:py-1 tw:rounded-md tw:inline-flex tw:items-center tw:gap-1.5 tw:flex-shrink-0"
@@ -58,9 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="copySessionId"
           />
         </span>
-      </div>
-
-    </div>
+      </template>
+    </AppPageHeader>
 
     <!-- Scrollable body — owns its own scroll so the header above stays fixed.
          Pads itself horizontally (the card has no px) so focus rings on edge
@@ -760,6 +753,7 @@ import {
 } from "./threadView.utils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";

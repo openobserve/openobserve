@@ -1,5 +1,11 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
+<script lang="ts">
+// Every row registers its own window keydown listener, so they all see the
+// same event — this shared set lets only the first responder act on it.
+const handledNavEvents = new WeakSet<KeyboardEvent>();
+</script>
+
 <script setup lang="ts">
 import type { Row, Table } from "@tanstack/vue-table";
 import { computed, inject, ref, onMounted, onBeforeUnmount, watch, useSlots } from "vue";
@@ -122,6 +128,10 @@ const treeConnectorX = computed(() => {
 });
 
 function onClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null;
+  if (target?.closest("button, a, input, select, textarea, label, [role='button']")) {
+    return;
+  }
   emit("row-click", props.row.original, event);
 }
 
@@ -134,6 +144,7 @@ function onDblclick(event: MouseEvent) {
 // by isHovered so only the currently hovered row responds.
 // Pages just need data-row-action="edit|delete|pause" on their action buttons.
 const isHovered = ref(false);
+const isFocused = ref(false);
 
 const ROW_ACTION_KEYS: Record<string, string> = {
   e: "edit",
@@ -146,19 +157,26 @@ const ROW_ACTION_KEYS: Record<string, string> = {
 };
 
 const handleKeydown = (e: KeyboardEvent) => {
-  if (!isHovered.value || isInputFocused()) return;
+  if ((!isHovered.value && !isFocused.value) || isInputFocused()) return;
+  const rowEl = rowRef.value?.closest("tr");
+  const active = document.activeElement;
+  if (active && active !== rowEl && active !== document.body) return;
+  if (handledNavEvents.has(e)) return;
+  handledNavEvents.add(e);
 
-  // Arrow up/down — move hover focus to the adjacent row
+  // Arrow up/down — move focus to the adjacent row
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
     const tr = rowRef.value?.closest("tr");
     if (!tr) return;
-    const sibling = e.key === "ArrowDown"
-      ? tr.nextElementSibling
-      : tr.previousElementSibling;
+    let sibling = e.key === "ArrowDown" ? tr.nextElementSibling : tr.previousElementSibling;
+    while (sibling && !sibling.matches("tr[data-test^='o2-table-row-']")) {
+      sibling = e.key === "ArrowDown" ? sibling.nextElementSibling : sibling.previousElementSibling;
+    }
     if (sibling instanceof HTMLElement) {
       e.preventDefault();
-      sibling.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
-      sibling.focus();
+      isHovered.value = false;
+      if (sibling.hasAttribute("tabindex")) sibling.focus();
+      else sibling.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
     }
     return;
   }
@@ -194,39 +212,49 @@ function onRowMouseleave() {
   isHovered.value = false;
   emit("row-mouseleave", props.row.original);
 }
+
+// focus/blur don't bubble — fires for the <tr> only, not inner action buttons.
+function onRowFocus() {
+  isFocused.value = true;
+}
+function onRowBlur() {
+  isFocused.value = false;
+}
 </script>
 
 <template>
   <tr
     ref="rowRef"
     :data-test="`o2-table-row-${row.index}`"
+    :tabindex="clickable ? 0 : undefined"
     :class="[
       'tw:group/row',
       'tw:transition-colors tw:duration-150',
       clickable ? 'tw:cursor-pointer' : '',
       'tw:hover:bg-table-row-hover-bg',
+      clickable ? 'tw:focus:outline-none tw:focus-visible:bg-table-row-hover-bg' : '',
       isRowSelected
         ? 'tw:bg-table-row-selected-bg'
         : '',
       !isRowSelected && isStriped
         ? 'tw:bg-table-row-striped-bg'
         : '',
+      statusBarColor ? 'o2-table-row-with-status' : '',
       rowClass,
     ]"
-    :style="{ height: 'var(--o2-table-row-height, 2.25rem)', ...rowStyle }"
+    :style="{
+      height: 'var(--o2-table-row-height, 2.25rem)',
+      ...(statusBarColor ? { '--o2-row-status-color': statusBarColor } : {}),
+      ...rowStyle,
+    }"
+    :data-status-bar="statusBarColor ? 'true' : undefined"
     @click="onClick"
     @dblclick="onDblclick"
     @mouseenter="onRowMouseenter"
     @mouseleave="onRowMouseleave"
+    @focus="onRowFocus"
+    @blur="onRowBlur"
   >
-    <!-- Status bar color indicator -->
-    <td
-      v-if="statusBarColor"
-      class="tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:p-0 tw:border-0 tw:z-10"
-      :style="{ backgroundColor: statusBarColor }"
-      data-test="o2-table-status-bar"
-    />
-
     <!-- Expand button cell -->
     <td
       v-if="expansionEnabled"
@@ -326,6 +354,13 @@ function onRowMouseleave() {
 </template>
 
 <style>
+/* Per-row status spine. Painted as an inset box-shadow on the row's first
+   cell — an extra <td> would add a phantom column on only the rows that have
+   a status color and shift their cells out of alignment under table-fixed. */
+.o2-table-row-with-status > td:first-child {
+  box-shadow: inset 0.25rem 0 0 0 var(--o2-row-status-color);
+}
+
 /* Continuation of the tree connector vertical line through the warning row */
 .o2-table-tree-warning-cell::after {
   content: "";
