@@ -119,6 +119,43 @@
           <span class="opacity-40">·</span>
           <span>{{ kindCounts.rpc }} RPC</span>
         </div>
+        <OSeparator vertical class="self-stretch mx-1" />
+        <!-- Density: collapse mode + per-kind visibility -->
+        <div
+          data-test="service-graph-collapse-mode"
+          class="flex items-center gap-1 text-[11px] whitespace-nowrap"
+        >
+          <span class="font-bold text-xs text-(--o2-text-4)">Density</span>
+          <button
+            v-for="m in (['auto', 'expanded', 'collapsed'] as const)"
+            :key="m"
+            :data-test="`service-graph-collapse-${m}`"
+            class="px-1.5 py-0.5 rounded capitalize"
+            :class="
+              collapseMode === m
+                ? 'bg-(--o2-tag-grey-1) font-medium text-(--o2-text-2)'
+                : 'opacity-60'
+            "
+            @click="setCollapseMode(m)"
+          >
+            {{ m }}
+          </button>
+        </div>
+        <div class="flex items-center gap-2 text-[11px] whitespace-nowrap">
+          <label
+            v-for="k in ['database', 'queue', 'external', 'rpc']"
+            :key="k"
+            :data-test="`service-graph-kind-toggle-${k}`"
+            class="flex items-center gap-1 cursor-pointer capitalize text-(--o2-text-4)"
+          >
+            <input
+              type="checkbox"
+              :checked="!hiddenKinds.has(k)"
+              @change="toggleKindVisibility(k)"
+            />
+            {{ k }}
+          </label>
+        </div>
         <OSeparator
           vertical
           v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"

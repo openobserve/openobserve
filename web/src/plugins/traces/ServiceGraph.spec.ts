@@ -2055,6 +2055,20 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper.vm.toggleKindVisibility("external");
       expect(wrapper.vm.hiddenKinds.has("external")).toBe(true);
     });
+
+    it("renders the collapse-mode control and kind toggles", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="service-graph-collapse-mode"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="service-graph-collapse-auto"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="service-graph-kind-toggle-external"]').exists(),
+      ).toBe(true);
+    });
   });
 
 });
