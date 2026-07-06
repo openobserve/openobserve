@@ -2584,7 +2584,17 @@
     "maxSeriesPerQueryValidation": "Il valore deve essere compreso tra 1.000 e 1.000.000 o lasciare vuoto per impostazione predefinita",
     "systemDefault": "impostazione predefinita del sistema",
     "usageStreamEnabledLabel": "Abilita flusso di utilizzo",
-    "aiToolsets": "Set di strumenti AI"
+    "aiToolsets": "Set di strumenti AI",
+    "blockSpecificUsers": "Blocca solo utenti specifici da {domain}",
+    "blockAllUsersFromDomain": "Blocca tutti gli utenti da {domain}",
+    "allUsersBlockedMessage": "Tutti gli utenti SSO esterni con indirizzi email che terminano con {domain} verranno bloccati dal sistema (interfaccia utente, API e ingestion).",
+    "blockedUsersHint": "Le voci bloccate si applicano solo alle identità SSO esterne (utenti SSO e account di servizio SSO/token). Sovrascrivono qualsiasi regola di autorizzazione e coprono l'interfaccia utente, l'API e l'inserimento. Gli account nativi e creati tramite API non sono interessati: eliminali invece.",
+    "addBlockedEmail": "Blocca email",
+    "blockedEmailPlaceholder": "ad esempio user {domain}",
+    "domainNeedsBlockedEmails": "Il dominio '{domain}' deve avere almeno un indirizzo email quando si bloccano utenti specifici",
+    "confirmRemoveBlockedEmail": "Sei sicuro di voler sbloccare l'email '{email}'?",
+    "blockedEmailAdded": "Indirizzo email bloccato con successo",
+    "blockedEmailRemoved": "Indirizzo email sbloccato con successo"
   },
   "iam": {
     "users": "Utenti",
