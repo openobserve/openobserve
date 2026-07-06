@@ -377,6 +377,38 @@ describe("convertTraceData", () => {
 
       expect(result.options.series[0].orient).toBe("LR");
     });
+
+    it("renders each shared node once (DAG → spanning tree, no duplication)", () => {
+      // Diamond: A→B, A→C, B→shared, C→shared. 'shared' must appear ONCE.
+      const graphData = {
+        nodes: [
+          { id: "a", label: "a" },
+          { id: "b", label: "b" },
+          { id: "c", label: "c" },
+          { id: "shared", label: "shared" },
+        ],
+        edges: [
+          { from: "a", to: "b", total_requests: 1 },
+          { from: "a", to: "c", total_requests: 1 },
+          { from: "b", to: "shared", total_requests: 1 },
+          { from: "c", to: "shared", total_requests: 1 },
+        ],
+      };
+
+      const result = convertServiceGraphToTree(graphData, "horizontal");
+
+      // Count how many times 'shared' appears anywhere in the tree data.
+      const countByName = (nodes: any[], name: string): number => {
+        let count = 0;
+        for (const n of nodes || []) {
+          if (n.name === name || n.id === name) count++;
+          if (n.children) count += countByName(n.children, name);
+        }
+        return count;
+      };
+      const roots = result.options.series[0].data;
+      expect(countByName(roots, "shared")).toBe(1);
+    });
   });
 
   describe("convertServiceGraphToNetwork", () => {

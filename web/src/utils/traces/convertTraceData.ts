@@ -283,7 +283,12 @@ export const convertServiceGraphToTree = (
     visited = new Set<string>(),
     incomingEdge: any = null,
   ): any => {
-    if (visited.has(nodeId)) return null; // Prevent cycles
+    if (visited.has(nodeId)) return null; // Prevent cycles within this path
+    // The service graph is a DAG, not a tree: a node shared by multiple parents
+    // (e.g. `cart` called from many services) would otherwise be re-expanded
+    // under each parent, exploding the tree. Render each node exactly once at
+    // its first-encountered position (DAG → spanning tree).
+    if (globalVisited.has(nodeId)) return null;
     visited.add(nodeId);
     globalVisited.add(nodeId);
 
