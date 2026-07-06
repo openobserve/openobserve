@@ -228,11 +228,11 @@ ORDER BY ts`;
 }
 
 /** Per-execution results for a single run — one row per engine×device combo. */
-export function buildRunDetailSql(runId: string): string {
-  const id = escapeSqlLiteral(runId);
+export function buildRunDetailSql(monitorId: string): string {
+  const id = escapeSqlLiteral(monitorId);
   return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, ${F.error} as error, job_id, execution_id, trace_key, last_attempt_steps
 FROM ${TABLE}
-WHERE run_id = '${id}'
+WHERE ${F.monitorId} = '${id}'
 ORDER BY ${F.location} ASC`;
 }
 

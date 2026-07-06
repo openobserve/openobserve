@@ -16,6 +16,7 @@ import syntheticsService from '@/services/synthetics'
 
 const props = defineProps<{
   runId: string
+  monitorId: string
   scheduledTs: number // microseconds
   runStatus?: string
 }>()
@@ -31,7 +32,7 @@ const executions = ref<RunLocationResult[]>([])
 
 watch(
   () => props.runId,
-  async (id) => {
+  async () => {
     loading.value = true
     queryError.value = null
     executions.value = []
@@ -39,7 +40,7 @@ watch(
       const windowUs = 5 * 60 * 1_000_000
       const start = props.scheduledTs - windowUs
       const end = props.scheduledTs + windowUs
-      const rows = await executeQuery(buildRunDetailSql(id), start, end, 'logs')
+      const rows = await executeQuery(buildRunDetailSql(props.monitorId), start, end, 'logs')
       executions.value = rows.map(mapRunLocationResult)
       initExpanded()
     } catch (e: any) {

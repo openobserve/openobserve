@@ -164,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <RunRowExpansion
               v-if="expandedRunIds.has(run.id)"
               :run-id="run.id"
+              :monitor-id="monitorId"
               :scheduled-ts="run.scheduledTs"
               :run-status="run.status"
             />
