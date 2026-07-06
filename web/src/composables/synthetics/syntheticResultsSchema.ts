@@ -230,7 +230,7 @@ ORDER BY ts`;
 /** Per-execution results for a single run — one row per engine×device combo. */
 export function buildRunDetailSql(runId: string): string {
   const id = escapeSqlLiteral(runId);
-  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, ${F.error} as error, job_id, execution_id, trace_key, last_attempt_steps, retry_history
+  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, ${F.error} as error, job_id, execution_id, trace_key, last_attempt_steps
 FROM ${TABLE}
 WHERE run_id = '${id}'
 ORDER BY ${F.location} ASC`;
@@ -296,7 +296,7 @@ export function mapRunLocationResult(rawHit: Record<string, unknown>): RunLocati
     executionId: str(rawHit.execution_id),
     traceKey: rawHit.trace_key ? str(rawHit.trace_key) : null,
     steps: parseSteps(rawHit.last_attempt_steps),
-    retryHistory: parseRetryHistory(rawHit.retry_history),
+    retryHistory: [],
   };
 }
 

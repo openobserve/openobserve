@@ -78,7 +78,7 @@ function toggle(browserId: string, deviceId: string) {
               class="tw:text-xs tw:font-semibold tw:text-[var(--o2-text-muted)] tw:uppercase tw:tracking-wide tw:text-center tw:pb-2"
             >
               <div class="tw:flex tw:flex-col tw:items-center tw:gap-1">
-                <span class="material-symbols-outlined tw:text-base tw:text-[var(--o2-text-muted)]">{{ DEVICE_ICONS[device.id] ?? 'devices' }}</span>
+                <span class="material-symbols-outlined tw:text-base tw:text-[var(--o2-text-muted)] tw:normal-case tw:not-italic">{{ DEVICE_ICONS[device.id] ?? 'devices' }}</span>
                 {{ device.label }}
               </div>
             </th>

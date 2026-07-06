@@ -17,6 +17,7 @@ import syntheticsService from '@/services/synthetics'
 const props = defineProps<{
   runId: string
   scheduledTs: number // microseconds
+  runStatus?: string
 }>()
 
 const store = useStore()
@@ -42,7 +43,13 @@ watch(
       executions.value = rows.map(mapRunLocationResult)
       initExpanded()
     } catch (e: any) {
-      queryError.value = e?.message ?? 'Query failed'
+      const msg: string = e?.message ?? ''
+      // Stream not found = no results written yet (e.g. probe infra error before first run).
+      // Treat as empty rather than surfacing a technical error.
+      const isStreamMissing = /stream.*not.*found|table.*not.*found|not.*found/i.test(msg)
+      if (!isStreamMissing) {
+        queryError.value = msg || 'Query failed'
+      }
     } finally {
       loading.value = false
     }
@@ -201,13 +208,14 @@ function totalRetries(ex: RunLocationResult): number {
     <!-- Query error -->
     <div v-else-if="queryError" class="tw:flex tw:items-center tw:gap-2 tw:p-4 tw:text-xs tw:text-[var(--o2-status-error-text)]">
       <OIcon name="error_outline" size="sm" />
-      <span>Failed to load run data: {{ queryError }}</span>
+      <span>{{ queryError }}</span>
     </div>
 
     <!-- No data -->
     <div v-else-if="!executions.length" class="tw:flex tw:items-center tw:gap-2 tw:p-4 tw:text-xs tw:text-[var(--o2-text-muted)]">
-      <OIcon name="hourglass_empty" size="sm" />
-      <span>No execution data found in stream for this run.</span>
+      <OIcon name="info" size="sm" />
+      <span v-if="runStatus === 'error'">Probe infrastructure error — no execution data was recorded for this run.</span>
+      <span v-else>No execution data found for this run.</span>
     </div>
 
     <!-- Location groups -->
