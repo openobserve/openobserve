@@ -1399,6 +1399,17 @@ DO UPDATE SET
         fast_mode: bool,
     ) -> Result<Vec<super::MergeJobRecord>> {
         let pool = CLIENT.clone();
+
+        // quick check without the advisory lock, if there are no pending jobs
+        // we can skip the locked transaction
+        let has_pending = sqlx::query("SELECT id FROM file_list_jobs WHERE status = $1 LIMIT 1;")
+            .bind(super::FileListJobStatus::Pending)
+            .fetch_optional(&pool)
+            .await?;
+        if has_pending.is_none() {
+            return Ok(Vec::new());
+        }
+
         let mut tx = pool.begin().await?;
         let lock_key = "file_list_jobs:get_pending_jobs";
         let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
