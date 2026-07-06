@@ -565,14 +565,11 @@ impl Scheduler {
 }
 
 /// Resolve the per-module pull budgets/cadences from config (A4). A per-module concurrency or
-/// interval of `0` inherits the shared default (alert concurrency / alert interval), except
-/// derived_stream's cadence which falls back to `ZO_DERIVED_STREAM_SCHEDULE_INTERVAL`. Every
-/// `TriggerModule` variant gets a lane so no module's rows are ever left unclaimed.
-///
-/// Cadence overrides are intentionally offered for only the two modules that benefit from a
-/// distinct poll rate: `Backfill` (bulk/background, polls slower) and `DerivedStream`. Alert,
-/// Report, AnomalyDetection and QueryRecommendations always poll at the shared
-/// `ZO_ALERT_SCHEDULE_INTERVAL`; add a dedicated interval env var here if one ever needs its own.
+/// interval of `0` inherits the shared default — alert concurrency
+/// (`ZO_ALERT_SCHEDULE_CONCURRENCY`) and the alert pull frequency (`ZO_ALERT_SCHEDULE_INTERVAL`)
+/// respectively. Each non-alert module has its own concurrency AND cadence env var so its puller
+/// can poll at its own rate; the alert lane simply reuses those two base vars (no duplicates).
+/// Every `TriggerModule` variant gets a lane so no module's rows are ever left unclaimed.
 fn resolve_module_configs(
     cfg: &config::Config,
     base: &SchedulerConfig,
@@ -580,46 +577,42 @@ fn resolve_module_configs(
     let default_concurrency = base.alert_schedule_concurrency;
     let default_interval = base.poll_interval_secs;
     let pick_concurrency = |v: i64| if v > 0 { v } else { default_concurrency };
-    let pick_interval = |v: i64| {
-        if v > 0 { v as u64 } else { default_interval }
-    };
-    let derived_stream_interval = if cfg.limit.scheduler_derived_stream_interval > 0 {
-        cfg.limit.scheduler_derived_stream_interval as u64
-    } else {
-        cfg.limit.derived_stream_schedule_interval as u64
-    };
+    let pick_interval = |v: i64| if v > 0 { v as u64 } else { default_interval };
 
     vec![
         ModuleSchedulerConfig {
             module: TriggerModule::Alert,
-            concurrency: pick_concurrency(cfg.limit.scheduler_alert_concurrency),
+            // Alert is the base module: its budget and cadence ARE the shared defaults
+            // (ZO_ALERT_SCHEDULE_CONCURRENCY / ZO_ALERT_SCHEDULE_INTERVAL), so no dedicated vars.
+            concurrency: default_concurrency,
             poll_interval_secs: default_interval,
         },
         ModuleSchedulerConfig {
             module: TriggerModule::Report,
             concurrency: pick_concurrency(cfg.limit.scheduler_report_concurrency),
-            poll_interval_secs: default_interval,
+            poll_interval_secs: pick_interval(cfg.limit.scheduler_report_interval),
         },
         ModuleSchedulerConfig {
             module: TriggerModule::DerivedStream,
             concurrency: pick_concurrency(cfg.limit.scheduler_derived_stream_concurrency),
-            poll_interval_secs: derived_stream_interval,
+            poll_interval_secs: pick_interval(cfg.limit.scheduler_derived_stream_interval),
         },
         ModuleSchedulerConfig {
             module: TriggerModule::Backfill,
-            // Backfill is bulk/background: smallest budget (default 1), slowest acceptable cadence.
+            // Backfill is bulk/background: smallest budget (default 1), own (typically slower)
+            // cadence.
             concurrency: std::cmp::max(1, cfg.limit.scheduler_backfill_concurrency),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_backfill_interval),
         },
         ModuleSchedulerConfig {
             module: TriggerModule::AnomalyDetection,
             concurrency: pick_concurrency(cfg.limit.scheduler_anomaly_concurrency),
-            poll_interval_secs: default_interval,
+            poll_interval_secs: pick_interval(cfg.limit.scheduler_anomaly_interval),
         },
         ModuleSchedulerConfig {
             module: TriggerModule::QueryRecommendations,
             concurrency: pick_concurrency(cfg.limit.scheduler_query_reco_concurrency),
-            poll_interval_secs: default_interval,
+            poll_interval_secs: pick_interval(cfg.limit.scheduler_query_reco_interval),
         },
     ]
 }
@@ -775,16 +768,15 @@ mod tests {
     #[test]
     fn test_resolve_module_configs_zero_inherits_base_defaults() {
         // With all per-module vars at 0, every module inherits the base (alert) concurrency and
-        // interval — except backfill (floored to 1) and derived_stream's cadence, which falls
-        // back to ZO_DERIVED_STREAM_SCHEDULE_INTERVAL.
+        // the alert pull frequency (interval) — except backfill, whose concurrency floors to 1.
         let base = make_config(); // concurrency 3, interval 10
-        let mut cfg = config::Config::default();
-        cfg.limit.derived_stream_schedule_interval = 300;
+        let cfg = config::Config::default();
         let configs = resolve_module_configs(&cfg, &base);
 
         for m in [
             TriggerModule::Alert,
             TriggerModule::Report,
+            TriggerModule::DerivedStream,
             TriggerModule::AnomalyDetection,
             TriggerModule::QueryRecommendations,
         ] {
@@ -792,7 +784,7 @@ mod tests {
             assert_eq!(c.concurrency, 3, "{m:?} should inherit base concurrency");
             assert_eq!(
                 c.poll_interval_secs, 10,
-                "{m:?} should inherit base interval"
+                "{m:?} should inherit the alert pull frequency"
             );
         }
 
@@ -800,36 +792,28 @@ mod tests {
         assert_eq!(backfill.concurrency, 1, "backfill floors to 1");
         assert_eq!(
             backfill.poll_interval_secs, 10,
-            "backfill inherits base interval"
-        );
-
-        let ds = find_module(&configs, TriggerModule::DerivedStream);
-        assert_eq!(
-            ds.concurrency, 3,
-            "derived_stream inherits base concurrency"
-        );
-        assert_eq!(
-            ds.poll_interval_secs, 300,
-            "derived_stream cadence falls back to derived_stream_schedule_interval"
+            "backfill inherits the alert pull frequency"
         );
     }
 
     #[test]
-    fn test_resolve_module_configs_overrides_take_effect() {
-        let base = make_config();
+    fn test_resolve_module_configs_concurrency_overrides_take_effect() {
+        let base = make_config(); // alert concurrency 3
         let mut cfg = config::Config::default();
-        cfg.limit.scheduler_alert_concurrency = 20;
         cfg.limit.scheduler_report_concurrency = 7;
         cfg.limit.scheduler_derived_stream_concurrency = 8;
-        cfg.limit.scheduler_derived_stream_interval = 120;
         cfg.limit.scheduler_anomaly_concurrency = 4;
         cfg.limit.scheduler_query_reco_concurrency = 2;
         cfg.limit.scheduler_backfill_concurrency = 3;
-        cfg.limit.scheduler_backfill_interval = 60;
         let configs = resolve_module_configs(&cfg, &base);
 
-        assert_eq!(find_module(&configs, TriggerModule::Alert).concurrency, 20);
+        // Alert has no dedicated var: it reuses the base (ZO_ALERT_SCHEDULE_CONCURRENCY).
+        assert_eq!(find_module(&configs, TriggerModule::Alert).concurrency, 3);
         assert_eq!(find_module(&configs, TriggerModule::Report).concurrency, 7);
+        assert_eq!(
+            find_module(&configs, TriggerModule::DerivedStream).concurrency,
+            8
+        );
         assert_eq!(
             find_module(&configs, TriggerModule::AnomalyDetection).concurrency,
             4
@@ -838,26 +822,50 @@ mod tests {
             find_module(&configs, TriggerModule::QueryRecommendations).concurrency,
             2
         );
-
-        let ds = find_module(&configs, TriggerModule::DerivedStream);
-        assert_eq!(ds.concurrency, 8);
-        assert_eq!(ds.poll_interval_secs, 120);
-
-        let backfill = find_module(&configs, TriggerModule::Backfill);
-        assert_eq!(backfill.concurrency, 3);
-        assert_eq!(backfill.poll_interval_secs, 60);
+        assert_eq!(
+            find_module(&configs, TriggerModule::Backfill).concurrency,
+            3
+        );
     }
 
     #[test]
-    fn test_resolve_module_configs_backfill_explicit_interval_overrides_base() {
-        // Backfill's own interval wins even when derived_stream/global intervals differ.
-        let base = make_config();
+    fn test_resolve_module_configs_interval_overrides_are_per_module() {
+        // Each module has its own cadence env var; a non-zero value wins, 0 inherits the alert
+        // pull frequency. Set a distinct interval per module and verify no cross-talk.
+        let base = make_config(); // interval 10
         let mut cfg = config::Config::default();
-        cfg.limit.scheduler_backfill_interval = 45;
+        cfg.limit.scheduler_report_interval = 15;
+        cfg.limit.scheduler_derived_stream_interval = 120;
+        cfg.limit.scheduler_backfill_interval = 60;
+        cfg.limit.scheduler_anomaly_interval = 30;
+        // query_reco left at 0 → inherits the alert pull frequency (10)
         let configs = resolve_module_configs(&cfg, &base);
+
+        // Alert has no dedicated var: it reuses the base (ZO_ALERT_SCHEDULE_INTERVAL).
+        assert_eq!(
+            find_module(&configs, TriggerModule::Alert).poll_interval_secs,
+            10
+        );
+        assert_eq!(
+            find_module(&configs, TriggerModule::Report).poll_interval_secs,
+            15
+        );
+        assert_eq!(
+            find_module(&configs, TriggerModule::DerivedStream).poll_interval_secs,
+            120
+        );
         assert_eq!(
             find_module(&configs, TriggerModule::Backfill).poll_interval_secs,
-            45
+            60
+        );
+        assert_eq!(
+            find_module(&configs, TriggerModule::AnomalyDetection).poll_interval_secs,
+            30
+        );
+        assert_eq!(
+            find_module(&configs, TriggerModule::QueryRecommendations).poll_interval_secs,
+            10,
+            "query_reco with 0 inherits the alert pull frequency"
         );
     }
 }

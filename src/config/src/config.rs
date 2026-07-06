@@ -1704,12 +1704,7 @@ pub struct Limit {
     // Per-module concurrency (LIMIT + channel cap + worker count). 0 = inherit
     // ZO_ALERT_SCHEDULE_CONCURRENCY. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true.
     // Backfill defaults to the smallest budget so bulk/background jobs never crowd out others.
-    #[env_config(
-        name = "ZO_SCHEDULER_ALERT_CONCURRENCY",
-        default = 0,
-        help = "Max alert jobs pulled per cycle and the alert worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
-    )]
-    pub scheduler_alert_concurrency: i64,
+    // Note: the alert lane reuses ZO_ALERT_SCHEDULE_CONCURRENCY directly (no duplicate var).
     #[env_config(
         name = "ZO_SCHEDULER_REPORT_CONCURRENCY",
         default = 0,
@@ -1740,8 +1735,22 @@ pub struct Limit {
         help = "Max query-recommendation jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
     )]
     pub scheduler_query_reco_concurrency: i64,
-    // Per-module cadence in seconds. 0 = inherit ZO_ALERT_SCHEDULE_INTERVAL, except
-    // derived_stream which falls back to ZO_DERIVED_STREAM_SCHEDULE_INTERVAL.
+    // Per-module poll cadence in seconds. 0 = inherit ZO_ALERT_SCHEDULE_INTERVAL (the alert pull
+    // frequency). Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. One var per module so each
+    // puller can poll at its own rate (e.g. backfill slower, synthetics faster). The alert lane
+    // reuses ZO_ALERT_SCHEDULE_INTERVAL directly (no duplicate var).
+    #[env_config(
+        name = "ZO_SCHEDULER_REPORT_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the report puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_report_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_DERIVED_STREAM_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the derived-stream/pipeline puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_derived_stream_interval: i64,
     #[env_config(
         name = "ZO_SCHEDULER_BACKFILL_INTERVAL",
         default = 0, // seconds
@@ -1749,11 +1758,17 @@ pub struct Limit {
     )]
     pub scheduler_backfill_interval: i64,
     #[env_config(
-        name = "ZO_SCHEDULER_DERIVED_STREAM_INTERVAL",
+        name = "ZO_SCHEDULER_ANOMALY_INTERVAL",
         default = 0, // seconds
-        help = "Poll cadence in seconds for the derived-stream/pipeline puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 falls back to ZO_DERIVED_STREAM_SCHEDULE_INTERVAL."
+        help = "Poll cadence in seconds for the anomaly-detection puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
-    pub scheduler_derived_stream_interval: i64,
+    pub scheduler_anomaly_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_QUERY_RECO_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the query-recommendation puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_query_reco_interval: i64,
     #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
     pub search_job_workers: i64,
     #[env_config(name = "ZO_SEARCH_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds
