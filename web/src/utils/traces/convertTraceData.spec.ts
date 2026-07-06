@@ -21,6 +21,7 @@ import {
   convertServiceGraphToTree,
   convertServiceGraphToNetwork,
   getServiceIconDataUrl,
+  iconSvgForType,
 } from "./convertTraceData";
 
 describe("convertTraceData", () => {
@@ -713,5 +714,80 @@ describe('convertServiceGraphToNetwork', () => {
       const result = getServiceIconDataUrl(null as any, false, "#000000");
       expect(result.startsWith("data:image/svg+xml;base64,")).toBe(true);
     });
+  });
+});
+
+describe("iconSvgForType (authoritative kind icons)", () => {
+  it("returns a distinct icon for each inferred kind", () => {
+    const db = iconSvgForType("database");
+    const queue = iconSvgForType("queue");
+    const rpc = iconSvgForType("rpc");
+    const external = iconSvgForType("external");
+    expect(db).toBeTruthy();
+    expect(queue).toBeTruthy();
+    expect(rpc).toBeTruthy();
+    expect(external).toBeTruthy();
+    // Kinds must not all map to the same glyph.
+    expect(new Set([db, queue, rpc, external]).size).toBe(4);
+  });
+
+  it("returns null for a real service (no inferred type) so regex fallback runs", () => {
+    expect(iconSvgForType(undefined)).toBeNull();
+    expect(iconSvgForType(null)).toBeNull();
+    expect(iconSvgForType("")).toBeNull();
+    expect(iconSvgForType("service")).toBeNull();
+  });
+});
+
+describe("convertServiceGraphToNetwork layered layout", () => {
+  const graph = {
+    nodes: [
+      { id: "frontend", label: "frontend", requests: 100, errors: 0 },
+      { id: "checkout", label: "checkout", requests: 80, errors: 0 },
+      {
+        id: "redis",
+        label: "redis",
+        requests: 50,
+        errors: 0,
+        service_type: "database",
+      },
+    ],
+    edges: [
+      { from: "frontend", to: "checkout", total_requests: 80 },
+      {
+        from: "checkout",
+        to: "redis",
+        total_requests: 50,
+        connection_type: "database",
+      },
+    ],
+  };
+
+  it("places the inferred dependency to the right of the services that call it", () => {
+    const opt: any = convertServiceGraphToNetwork(
+      graph,
+      "layered",
+      undefined,
+      true,
+    );
+    const series = opt.options.series[0];
+    const byId: Record<string, any> = {};
+    series.data.forEach((n: any) => (byId[n.id] = n));
+    // redis (inferred) must be the rightmost.
+    expect(byId["redis"].x).toBeGreaterThan(byId["checkout"].x);
+    expect(byId["checkout"].x).toBeGreaterThan(byId["frontend"].x);
+    expect(byId["redis"].fixed).toBe(true);
+  });
+
+  it("keeps the existing directional arrow on edges", () => {
+    // edgeSymbol is already set unconditionally by the function; assert we did
+    // not regress it while adding the layered branch.
+    const opt: any = convertServiceGraphToNetwork(
+      graph,
+      "layered",
+      undefined,
+      true,
+    );
+    expect(opt.options.series[0].edgeSymbol).toEqual(["none", "arrow"]);
   });
 });

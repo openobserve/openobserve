@@ -102,6 +102,23 @@
             </div>
           </div>
         </div>
+        <OSeparator vertical class="self-stretch mx-1" />
+        <!-- Kind counts (from backend service_type) -->
+        <div
+          data-test="service-graph-kind-counts"
+          class="flex flex-row items-center gap-2 min-w-0 whitespace-nowrap text-[11px] text-(--o2-text-4)"
+        >
+          <span class="font-bold text-xs">Kinds</span>
+          <span>{{ kindCounts.service }} Services</span>
+          <span class="opacity-40">·</span>
+          <span>{{ kindCounts.database }} Datastores</span>
+          <span class="opacity-40">·</span>
+          <span>{{ kindCounts.queue }} Queues</span>
+          <span class="opacity-40">·</span>
+          <span>{{ kindCounts.external }} External</span>
+          <span class="opacity-40">·</span>
+          <span>{{ kindCounts.rpc }} RPC</span>
+        </div>
         <OSeparator
           vertical
           v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
@@ -347,6 +364,21 @@ export default defineComponent({
 
     const stats = ref<any>(null);
 
+    // Count nodes by kind (from backend service_type) for the legend. Nodes with
+    // no inferred type are instrumented services; the rest are inferred deps.
+    const kindCounts = computed(() => {
+      const counts = { service: 0, database: 0, queue: 0, external: 0, rpc: 0 };
+      for (const n of filteredGraphData.value.nodes || []) {
+        const t = (n as any).service_type;
+        if (t === "database") counts.database++;
+        else if (t === "queue") counts.queue++;
+        else if (t === "external") counts.external++;
+        else if (t === "rpc") counts.rpc++;
+        else counts.service++;
+      }
+      return counts;
+    });
+
     // Key to control chart recreation - only change when layout/visualization type changes
     const chartKey = ref(0);
 
@@ -389,7 +421,9 @@ export default defineComponent({
             )
           : convertServiceGraphToNetwork(
               filteredGraphData.value,
-              layoutType,
+              // Graph view defaults to the layered directional layout (deps as
+              // terminal leaves); honor an explicit 'force' choice from the user.
+              layoutType === "force" ? "force" : "layered",
               new Map(),
               store.state.theme === 'dark',
               undefined,
@@ -1471,6 +1505,7 @@ export default defineComponent({
       error,
       graphData,
       filteredGraphData,
+      kindCounts,
       stats,
       showSettings,
       lastUpdated,

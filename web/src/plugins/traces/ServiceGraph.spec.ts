@@ -1931,4 +1931,27 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     });
   });
 
+  describe("legend kind counts", () => {
+    it("counts nodes by kind for the legend", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.filteredGraphData = {
+        nodes: [
+          { id: "a", label: "a", requests: 1, errors: 0 },
+          { id: "b", label: "b", requests: 1, errors: 0, service_type: "database" },
+          { id: "c", label: "c", requests: 1, errors: 0, service_type: "external" },
+        ],
+        edges: [],
+      };
+      await flushPromises();
+      expect(wrapper.vm.kindCounts).toEqual({
+        service: 1,
+        database: 1,
+        queue: 0,
+        external: 1,
+        rpc: 0,
+      });
+    });
+  });
+
 });

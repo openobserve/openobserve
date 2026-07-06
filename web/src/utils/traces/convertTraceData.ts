@@ -324,7 +324,12 @@ export const convertServiceGraphToTree = (
     const edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3";
 
     // Reuse the same SVG icon as graph view (circle + service-type icon)
-    const iconDataUrl = getServiceIconSvg(node.id, isDarkMode, borderColor);
+    const iconDataUrl = getServiceIconSvg(
+      node.id,
+      isDarkMode,
+      borderColor,
+      node.service_type,
+    );
 
     return {
       name: node.label || node.id,
@@ -704,9 +709,47 @@ const computeForceLayout = (
 // ── Service-type icon helper ──────────────────────────────────────────────────
 
 /**
+ * Authoritative kind → icon. Driven by the backend's service_type /
+ * connection_type (database/queue/rpc/external) rather than guessing from the
+ * node name. Returns null when there is no inferred type (a real instrumented
+ * service), so the caller falls back to the name-regex SERVICE_ICON_RULES.
+ *
+ * The SVG paths mirror the corresponding entries in SERVICE_ICON_RULES so the
+ * visual language stays consistent, but selection here is by explicit type,
+ * not name matching.
+ */
+const KIND_ICON_SVG: Record<string, string> = {
+  database:
+    `<ellipse cx="12" cy="5" rx="9" ry="3"/>` +
+    `<path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>` +
+    `<path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>`,
+  queue:
+    `<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>` +
+    `<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>` +
+    `<line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>`,
+  rpc: `<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.86 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>`,
+  external:
+    `<circle cx="12" cy="12" r="10"/>` +
+    `<line x1="2" y1="12" x2="22" y2="12"/>` +
+    `<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>`,
+};
+
+/**
+ * Return the raw SVG for a node's authoritative kind, or null when the node has
+ * no inferred type (a real service) so the name-regex fallback runs.
+ */
+export function iconSvgForType(
+  serviceType: string | undefined | null,
+): string | null {
+  if (!serviceType) return null;
+  return KIND_ICON_SVG[serviceType] ?? null;
+}
+
+/**
  * Returns an ECharts image:// data URL containing a full SVG node:
  *   outer circle (health-based border) + monochrome Feather-style icon.
- * The icon type is inferred from the service name via keyword matching.
+ * The icon is chosen from the authoritative service_type when present, else
+ * inferred from the service name via keyword matching.
  */
 // Ordered icon rules: first match wins. Priority: infra → data → domain → UI → default.
 // Each SVG path is a 24×24 Feather-style stroke icon (no fill).
@@ -953,6 +996,7 @@ export function getServiceIconDataUrl(
   name: string,
   isDark: boolean,
   borderColor: string,
+  serviceType?: string | null,
 ): string {
   const iconColor = isDark ? "#e4e7eb" : "#374151";
   const bgColor = isDark ? "#1a1f2e" : "#ffffff";
@@ -961,8 +1005,11 @@ export function getServiceIconDataUrl(
   // "load-generator" and "load_generator" both match /load/ or /generator/.
   const n = (name || "").toLowerCase().replace(/[-_]/g, " ");
 
+  // Authoritative kind (from backend service_type) wins; else fall back to
+  // name-regex matching.
+  const authoritative = iconSvgForType(serviceType);
   const matched = SERVICE_ICON_RULES.find(({ regex }) => regex.test(n));
-  const icon = matched ? matched.svg : SERVER_ICON_SVG;
+  const icon = authoritative ?? (matched ? matched.svg : SERVER_ICON_SVG);
 
   // 56×56 viewBox: circle r=24 centered at (28,28); icon 24×24 translated to (16,16)
   const svg =
@@ -979,8 +1026,9 @@ function getServiceIconSvg(
   name: string,
   isDark: boolean,
   borderColor: string,
+  serviceType?: string | null,
 ): string {
-  return `image://${getServiceIconDataUrl(name, isDark, borderColor)}`;
+  return `image://${getServiceIconDataUrl(name, isDark, borderColor, serviceType)}`;
 }
 
 /**
@@ -1022,11 +1070,12 @@ export const convertServiceGraphToNetwork = (
   canvasWidth: number = 1200,
   canvasHeight: number = 700,
 ) => {
-  // Graph view only supports force-directed layout
-  // Tree layouts ('horizontal', 'vertical') should use convertServiceGraphToTree instead
-  const normalizedLayoutType = "force";
+  // Graph view supports 'force' (organic) and 'layered' (directed left→right,
+  // dependencies pinned as terminal leaves). Tree layouts ('horizontal',
+  // 'vertical') use convertServiceGraphToTree instead.
+  const normalizedLayoutType = layoutType === "layered" ? "layered" : "force";
 
-  if (layoutType !== normalizedLayoutType) {
+  if (layoutType !== "force" && layoutType !== "layered") {
     console.warn(
       `[convertServiceGraphToNetwork] Invalid layout '${layoutType}' for graph view, defaulting to 'force'`,
     );
@@ -1072,6 +1121,50 @@ export const convertServiceGraphToNetwork = (
     return true;
   });
 
+  // Layered ranks: rank 0 = no inbound edge; rank = 1 + max(pred ranks).
+  // Inferred deps (service_type present) are pinned to the max rank so they are
+  // always terminal downstream leaves. The `seen` guard breaks cycles.
+  const rank = new Map<string, number>();
+  if (normalizedLayoutType === "layered") {
+    const preds = new Map<string, string[]>();
+    validNodes.forEach((n: any) => preds.set(n.id, []));
+    graphData.edges.forEach((e: any) => {
+      if (preds.has(e.to)) preds.get(e.to)!.push(e.from);
+    });
+    const visit = (id: string, seen: Set<string>): number => {
+      if (rank.has(id)) return rank.get(id)!;
+      if (seen.has(id)) return 0; // cycle guard
+      seen.add(id);
+      const ps = preds.get(id) || [];
+      const r = ps.length ? 1 + Math.max(...ps.map((p) => visit(p, seen))) : 0;
+      rank.set(id, r);
+      return r;
+    };
+    validNodes.forEach((n: any) => visit(n.id, new Set()));
+    const maxRank = Math.max(0, ...Array.from(rank.values()));
+    validNodes.forEach((n: any) => {
+      if (n.service_type) rank.set(n.id, maxRank); // deps are terminal leaves
+    });
+  }
+
+  // Vertical slot per node within its rank column, so same-rank nodes don't
+  // stack. rankMembers[rank] = ordered node ids; ySlot maps id → index.
+  const ySlot = new Map<string, number>();
+  const rankSize = new Map<number, number>();
+  if (normalizedLayoutType === "layered") {
+    const counter = new Map<number, number>();
+    validNodes.forEach((n: any) => {
+      const r = rank.get(n.id) ?? 0;
+      rankSize.set(r, (rankSize.get(r) ?? 0) + 1);
+    });
+    validNodes.forEach((n: any) => {
+      const r = rank.get(n.id) ?? 0;
+      const idx = counter.get(r) ?? 0;
+      ySlot.set(n.id, idx);
+      counter.set(r, idx + 1);
+    });
+  }
+
   const nodes = validNodes.map((node: any) => {
     const metrics = nodeMetrics.get(node.id) || {
       requests: 0,
@@ -1108,7 +1201,12 @@ export const convertServiceGraphToNetwork = (
     );
 
     // SVG symbol: circle with health-colored border + service-type icon
-    const iconDataUrl = getServiceIconSvg(node.id, isDarkMode, borderColor);
+    const iconDataUrl = getServiceIconSvg(
+      node.id,
+      isDarkMode,
+      borderColor,
+      node.service_type,
+    );
 
     // Use cached position if available
     const cachedPos = cachedPositions?.get(node.id);
@@ -1151,6 +1249,17 @@ export const convertServiceGraphToNetwork = (
     if (cachedPos) {
       nodeData.x = cachedPos.x;
       nodeData.y = cachedPos.y;
+      nodeData.fixed = true;
+    } else if (normalizedLayoutType === "layered") {
+      // Layered: x from rank column (left→right); dependencies pinned right.
+      // y spreads same-rank nodes evenly down the column.
+      const r = rank.get(node.id) ?? 0;
+      const maxRank = Math.max(1, ...Array.from(rank.values()));
+      const colGap = canvasWidth / (maxRank + 1);
+      nodeData.x = colGap * (r + 0.5);
+      const count = rankSize.get(r) ?? 1;
+      const rowGap = canvasHeight / (count + 1);
+      nodeData.y = rowGap * ((ySlot.get(node.id) ?? 0) + 1);
       nodeData.fixed = true;
     } else {
       nodeData.fixed = false;
