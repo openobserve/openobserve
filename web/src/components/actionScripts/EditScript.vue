@@ -796,13 +796,16 @@ const saveActionScript = async (value: EditScriptForm) => {
   const commonFields: Record<string, any> = {
     name: value.name,
     description: value.description,
+    // Use the validated form value (frequencyType), not the component-owned
+    // frequency.value.type — the schema's cron rule branches on frequencyType,
+    // so the payload must agree with what was validated.
     execution_details:
-      value.type === "scheduled" ? frequency.value.type : value.type,
+      value.type === "scheduled" ? value.frequencyType : value.type,
     service_account: value.service_account,
   };
 
   // Add cron expression for a scheduled action on a repeat schedule.
-  if (value.type === "scheduled" && frequency.value.type === "repeat") {
+  if (value.type === "scheduled" && value.frequencyType === "repeat") {
     commonFields.cron_expr = String(value.cron ?? "").trim();
   }
 

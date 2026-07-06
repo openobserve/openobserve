@@ -29,6 +29,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import actions from "@/services/action_scripts";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -73,6 +74,15 @@ vi.mock("@/services/service_accounts", () => ({
   },
 }));
 
+// Keep the real Toast module (other exports stay intact) but replace `toast`
+// with a spy that returns a dismiss fn — so we can assert the error toast on a
+// failed save without rendering into the DOM.
+vi.mock("@/lib/feedback/Toast/useToast", async (importActual) => {
+  const actual =
+    await importActual<typeof import("@/lib/feedback/Toast/useToast")>();
+  return { ...actual, toast: vi.fn(() => () => {}) };
+});
+
 describe("EditScript", () => {
   let wrapper: any;
 
@@ -92,6 +102,10 @@ describe("EditScript", () => {
     // NOT reset by restoreAllMocks(), so clear the call counts we assert on.
     (actions.create as any).mockClear();
     (actions.update as any).mockClear();
+    // Reset the toast spy each test and re-assert its dismiss-fn implementation
+    // (restoreAllMocks in afterEach can strip it).
+    (toast as any).mockClear();
+    (toast as any).mockImplementation(() => () => {});
 
     vi.spyOn(router, "currentRoute", "get").mockReturnValue({
       value: {
@@ -285,7 +299,7 @@ describe("EditScript", () => {
       expect(actions.create).toHaveBeenCalledTimes(1);
     });
 
-    it("jumps to step 3 when the save service errors", async () => {
+    it("jumps to step 3 and surfaces the server error when the save service errors", async () => {
       vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
       (actions.create as any).mockRejectedValueOnce({
         response: { status: 500, data: { message: "fail" } },
@@ -298,7 +312,13 @@ describe("EditScript", () => {
 
       await submit(wrapper);
 
+      // The schema passed (valid form) — it was the API that rejected — so we
+      // stay on the form, land on step 3, and surface the server's message.
       expect(wrapper.vm.step).toBe(3);
+      expect(wrapper.vm.form.state.isValid).toBe(true);
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: "fail" }),
+      );
     });
   });
 
@@ -460,6 +480,21 @@ describe("EditScript", () => {
 
     it("returns an error for an empty cron string", () => {
       expect(wrapper.vm.getCronError("")).toContain("Invalid cron expression");
+    });
+
+    it("returns an error when a valid cron's interval is below the minimum", () => {
+      // "* * * * *" is a syntactically valid every-minute (60s) cron. Force the
+      // configured minimum above that so the interval branch (not the parse
+      // branch) fires.
+      const original = store.state.zoConfig.min_auto_refresh_interval;
+      store.state.zoConfig.min_auto_refresh_interval = 3600;
+      try {
+        expect(wrapper.vm.getCronError("* * * * *")).toContain(
+          "Frequency should be greater than",
+        );
+      } finally {
+        store.state.zoConfig.min_auto_refresh_interval = original;
+      }
     });
   });
 
