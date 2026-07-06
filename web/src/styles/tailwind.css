@@ -8,19 +8,8 @@
 
 @plugin "@tailwindcss/typography";
 
-/*
- * Drive the `dark:` variant from the app's own theme, not the OS.
- *
- * The app toggles a `.dark` class on <html> to reflect the user-selected theme
- * (see utils/theme.ts `applyThemeColors`), and every `--o2-*` design token keys
- * off that same `.dark` selector. Without this line Tailwind v4 falls back to
- * its default `dark:` = `@media (prefers-color-scheme: dark)`, so all ~200
- * `dark:` utilities would follow the browser/OS setting instead. That mismatch
- * makes `dark:` styles (white text, dark surfaces) fire while the app is still
- * in light theme whenever the OS is dark — producing invisible text and
- * over-dark colors. Binding the variant to `.dark` keeps utilities in lockstep
- * with the app theme and the token layer.
- */
+/* Bind `dark:` to the app's `.dark` class (set by utils/theme.ts), not the OS
+   `prefers-color-scheme` — Tailwind v4's default — so it follows the app theme. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @source "../**/*.{vue,js,ts}";
