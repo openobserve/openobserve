@@ -75,6 +75,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div><!-- end card-container -->
       </div><!-- end toolbar wrapper -->
 
+      <OSplitter
+        class="logs-horizontal-splitter tw:flex-1 tw:min-h-0"
+        v-model="splitterModel"
+        unit="px"
+        :horizontal="false"
+      >
+        <template #before>
+          <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto tw:border-r tw:border-border-default">
+            <SearchFieldList
+              :fields="streamFields"
+              :time-stamp="{
+                startTime: dateTime.startTime,
+                endTime: dateTime.endTime,
+              }"
+              :stream-name="rumSessionStreamName"
+              stream-type="logs"
+              :enable-grouping="true"
+              :query="completeQuery"
+              :show-count="false"
+              @event-emitted="handleSidebarEvent"
+            />
+          </div>
+        </template>
+        <template #after>
+          <div class="tw:h-full tw:flex tw:flex-col tw:min-h-0">
       <!-- KPI summary strip -->
       <div class="card-container tw:border-b tw:border-border-default">
         <SessionsMetricsStrip
@@ -191,32 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <OSplitter
-        class="logs-horizontal-splitter tw:flex-1 tw:min-h-0"
-        v-model="splitterModel"
-        unit="px"
-        :horizontal="false"
-      >
-        <template #before>
-          <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto tw:border-r tw:border-border-default">
-            <SearchFieldList
-              :fields="streamFields"
-              :time-stamp="{
-                startTime: dateTime.startTime,
-                endTime: dateTime.endTime,
-              }"
-              :stream-name="rumSessionStreamName"
-              stream-type="logs"
-              :enable-grouping="true"
-              :query="completeQuery"
-              :show-count="false"
-              @event-emitted="handleSidebarEvent"
-            />
-          </div>
-        </template>
-        <template #after>
-          <div class="tw:h-full">
-            <div class="card-container tw:h-full">
+            <div class="card-container tw:flex-1 tw:min-h-0">
                 <OTable
                   :data="tableRows"
                   :columns="tableColumns"

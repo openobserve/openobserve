@@ -228,9 +228,26 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  /** µs timestamp of the correlated event; scopes the trace lookup to a
+   * ±30 min window around it instead of the trailing hour. */
+  timestamp: {
+    type: Number,
+    default: 0,
+  },
 });
 
 const router = useRouter();
+
+const HALF_HOUR_US = 1800000000;
+
+const correlationRange = computed(() =>
+  props.timestamp
+    ? {
+        startTime: props.timestamp - HALF_HOUR_US,
+        endTime: props.timestamp + HALF_HOUR_US,
+      }
+    : null,
+);
 
 const {
   correlationData,
@@ -239,7 +256,10 @@ const {
   fetchCorrelation,
   backendSpanCount,
   performanceData,
-} = useTraceCorrelation(computed(() => props.traceId));
+} = useTraceCorrelation(
+  computed(() => props.traceId),
+  correlationRange,
+);
 
 onMounted(() => {
   if (props.traceId) {
