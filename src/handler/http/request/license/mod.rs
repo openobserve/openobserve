@@ -161,21 +161,21 @@ pub async fn store_license(
 }
 
 #[post("/license/refresh")]
-pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> Response {
+pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> HttpResponse {
     let email = user_email.user_id;
     if check_license_permission(&email, "PUT").await.is_err() {
-        return MetaHttpResponse::forbidden("Unauthorized Access to license");
+        return HttpResponse::Forbidden().json("Unauthorized Access to license");
     }
 
     // check  if license is present. If not present, no point in refreshing
     match get_license().await {
         Some(_) => {}
-        None => return (StatusCode::OK, Json("")).into_response(),
+        None => return HttpResponse::Ok().finish(),
     };
 
     // the nats handling flow will trigger limit refresh in all nodes
     match license::update().await {
-        Ok(_) => (StatusCode::OK, Json("")).into_response(),
-        Err(e) => MetaHttpResponse::internal_error(e),
+        Ok(_) => HttpResponse::Ok().finish(),
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({"message":e.to_string()})),
     }
 }
