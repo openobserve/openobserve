@@ -428,19 +428,19 @@ describe("PanelLayoutSettings.vue", () => {
       // (which previously showed a lighter band in dark mode).
       const contentDiv = wrapper.find('[data-test="panel-layout-settings-content"]');
       expect(contentDiv.exists()).toBe(true);
-      expect(contentDiv.attributes("class")).toContain("tw:p-0");
-      expect(contentDiv.attributes("class")).not.toContain("tw:bg-white");
+      expect(contentDiv.attributes("class")).toContain("p-0");
+      expect(contentDiv.attributes("class")).not.toContain("bg-white");
       expect(contentDiv.attributes("class")).not.toContain(
-        "tw:bg-(--o2-primary-background)",
+        "bg-(--o2-primary-background)",
       );
     });
 
     it("should keep the content area theme-agnostic in light mode", () => {
       const contentDiv = wrapper.find('[data-test="panel-layout-settings-content"]');
       expect(contentDiv.exists()).toBe(true);
-      expect(contentDiv.attributes("class")).toContain("tw:p-0");
+      expect(contentDiv.attributes("class")).toContain("p-0");
       expect(contentDiv.attributes("class")).not.toContain(
-        "tw:bg-(--o2-primary-background)",
+        "bg-(--o2-primary-background)",
       );
     });
 

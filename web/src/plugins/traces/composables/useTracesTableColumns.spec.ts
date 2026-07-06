@@ -514,12 +514,12 @@ describe("useTracesTableColumns", () => {
       expect(typeof (col as any)?.accessorFn).toBe("function");
     });
 
-    it("should have meta.class set to 'tw:capitalize!' when auto-prepended", () => {
+    it("should have meta.class set to 'capitalize!' when auto-prepended", () => {
       const col = buildCols(false, "spans", []).find(
         (c) => c.id === "_timestamp",
       );
       const meta = col?.meta as Record<string, unknown>;
-      expect(meta?.class).toBe("tw:capitalize!");
+      expect(meta?.class).toBe("capitalize!");
     });
 
     it("should have meta.sortable=true on timestamp column", () => {

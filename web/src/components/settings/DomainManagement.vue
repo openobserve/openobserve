@@ -22,19 +22,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        ConstrainedPage's auto-height column and only forces a premature scrollbar.) -->
   <div>
     <!-- Claim Parser Function Selection -->
-    <div class="tw:mb-6">
+    <div class="mb-6">
       <div
         data-test="domain-management-claim-parser-title"
-        class="tw:text-xl tw:font-semibold tw:font-bold tw:mb-1"
+        class="text-xl font-semibold font-bold mb-1"
       >
         {{ t("settings.claimParserFunction") }}
       </div>
-      <div class="tw:text-sm tw:text-gray-400 tw:mb-3">
+      <div class="text-sm text-gray-400 mb-3">
         {{ t("settings.claimParserFunctionDescription") }}
       </div>
 
-      <div class="tw:flex tw:gap-3 tw:items-end">
-        <div class="col-auto claim-parser-select tw:min-w-100">
+      <div class="flex gap-3 items-end">
+        <div class="col-auto claim-parser-select min-w-100">
           <OSelect
             v-model="claimParserFunction"
             :options="functionOptions"
@@ -76,25 +76,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         side="right"
         :width="40"
       >
-        <div class="tw:p-4 tw:text-sm">
-          <div class="tw:mb-4 tw:p-4 tw:rounded" :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a]' : 'tw:bg-[#f5f5f5]'">
-            <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionInputTitle") }}</div>
+        <div class="p-4 text-sm">
+          <div class="mb-4 p-4 rounded" :class="store.state.theme === 'dark' ? 'bg-[#2a2a2a]' : 'bg-[#f5f5f5]'">
+            <div class="font-medium mb-2">{{ t("settings.claimParserFunctionInputTitle") }}</div>
             <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
           </div>
 
-          <div class="tw:mb-4 tw:p-4 tw:rounded" :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a]' : 'tw:bg-[#f5f5f5]'">
-            <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
-            <div class="tw:mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
-            <div class="tw:ml-4">
-              <div class="tw:mb-1">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
+          <div class="mb-4 p-4 rounded" :class="store.state.theme === 'dark' ? 'bg-[#2a2a2a]' : 'bg-[#f5f5f5]'">
+            <div class="font-medium mb-2">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
+            <div class="mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
+            <div class="ml-4">
+              <div class="mb-1">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
               <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
             </div>
           </div>
 
           <!-- Recent Errors Section -->
-          <div v-if="claimParserFunction" class="tw:p-4 tw:rounded tw:border-l-[3px]" :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a] tw:border-l-[#ff6b6b]' : 'tw:bg-[#f5f5f5] tw:border-l-[#c10015]'">
-            <div class="tw:flex tw:items-center tw:mb-2">
-              <div class="tw:flex-1 tw:font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
+          <div v-if="claimParserFunction" class="p-4 rounded border-l-[3px]" :class="store.state.theme === 'dark' ? 'bg-[#2a2a2a] border-l-[#ff6b6b]' : 'bg-[#f5f5f5] border-l-[#c10015]'">
+            <div class="flex items-center mb-2">
+              <div class="flex-1 font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
               <div>
                 <OButton
                   icon-left="refresh"
@@ -108,33 +108,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div v-if="loadingErrors" class="tw:text-center tw:py-4">
+            <div v-if="loadingErrors" class="text-center py-4">
               <OSpinner size="xs" />
             </div>
 
-            <div v-else-if="recentErrors.length === 0" class="tw:text-center tw:py-2" style="color: var(--o2-text-muted)">
+            <div v-else-if="recentErrors.length === 0" class="text-center py-2" style="color: var(--o2-text-muted)">
               {{ t("settings.noRecentErrors") }}
             </div>
 
-            <div v-else class="error-list tw:max-h-100 tw:overflow-y-auto">
+            <div v-else class="error-list max-h-100 overflow-y-auto">
               <div
                 v-for="(error, index) in recentErrors.slice(0, 3)"
                 :key="index"
-                class="tw:p-2 tw:mb-1 tw:rounded tw:border-l-2"
-                :class="store.state.theme === 'dark' ? 'tw:bg-[#2a1f1f] tw:border-l-[#ff6b6b]' : 'tw:bg-[#fff9f9] tw:border-l-[#ff9e9e]'"
+                class="p-2 mb-1 rounded border-l-2"
+                :class="store.state.theme === 'dark' ? 'bg-[#2a1f1f] border-l-[#ff6b6b]' : 'bg-[#fff9f9] border-l-[#ff9e9e]'"
               >
-                <div class="tw:flex tw:items-start tw:mb-1">
-                  <OIcon name="error" size="xs" class="tw:mr-1 tw:mt-1" />
-                  <div class="tw:flex-1">
-                    <div class="tw:text-xs tw:font-medium">{{ error.error_type }}</div>
-                    <div class="tw:text-xs" style="color: var(--o2-text-muted)">{{ formatTimestamp(error._timestamp) }}</div>
+                <div class="flex items-start mb-1">
+                  <OIcon name="error" size="xs" class="mr-1 mt-1" />
+                  <div class="flex-1">
+                    <div class="text-xs font-medium">{{ error.error_type }}</div>
+                    <div class="text-xs" style="color: var(--o2-text-muted)">{{ formatTimestamp(error._timestamp) }}</div>
                   </div>
                 </div>
-                <div class="tw:text-xs tw:wrap-break-word" :class="store.state.theme === 'dark' ? 'tw:text-[#ccc]' : 'tw:text-[#666]'">{{ error.error }}</div>
+                <div class="text-xs wrap-break-word" :class="store.state.theme === 'dark' ? 'text-[#ccc]' : 'text-[#666]'">{{ error.error }}</div>
               </div>
 
               <!-- Show More Button -->
-              <div class="tw:mt-2 tw:text-center">
+              <div class="mt-2 text-center">
                 <OButton
                   icon-right="open-in-new"
                   variant="ghost-primary"
@@ -151,21 +151,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Divider -->
-    <OSeparator class="tw:mb-8" />
+    <OSeparator class="mb-8" />
 
     <div
       data-test="domain-management-domain-restrictions-title"
-      class="tw:text-xl tw:font-semibold tw:font-bold tw:mb-1"
+      class="text-xl font-semibold font-bold mb-1"
     >
       {{ t("settings.domainRestrictionsSubsection") }}
     </div>
-    <div class="tw:text-sm tw:text-gray-400 tw:mb-4">
+    <div class="text-sm text-gray-400 mb-4">
       {{ t("settings.domainRestrictionsSubsectionDescription") }}
     </div>
 
     <!-- Domain Input Section -->
-    <div class="tw:mb-1">
-      <div class="tw:text-base tw:font-bold tw:mb-3">
+    <div class="mb-1">
+      <div class="text-base font-bold mb-3">
         {{ t("settings.domainAndAllowedUsers") }}
       </div>
       
@@ -175,9 +175,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :default-values="addDomainDefaults()"
         @submit="addDomain"
         v-slot="{ isSubmitting }"
-        class="tw:flex tw:gap-x-2 tw:items-start"
+        class="flex gap-x-2 items-start"
       >
-          <div class="tw:w-[18.75rem] tw:shrink-0">
+          <div class="w-[18.75rem] shrink-0">
             <OFormInput
               data-test="domain-management-new-domain-input"
               name="newDomain"
@@ -194,27 +194,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t('settings.addDomain') }}
           </OButton>
       </OForm>
-      <div class="tw:text-xs tw:text-gray-400 tw:mt-1">
+      <div class="text-xs text-gray-400 mt-1">
         {{ t('settings.domainHint', { at_sign: '@' }) }}
       </div>
 
-      <div class="tw:text-xs tw:text-gray-400 tw:mt-1 tw:mb-3" v-if="domains.length > 0">
+      <div class="text-xs text-gray-400 mt-1 mb-3" v-if="domains.length > 0">
         {{ t("settings.domainConfiguredCount", { count: domains.length }) }}
       </div>
     </div>
 
     <!-- Domain List -->
-    <div v-if="domains.length > 0" class="tw:mb-4">
+    <div v-if="domains.length > 0" class="mb-4">
       <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
         <div
           v-if="domain && domain.name"
-          class="tw:mb-1 tw:border tw:border-(--o2-border) tw:rounded-lg"
-          :class="store.state.theme === 'dark' ? 'tw:border-[#444] tw:bg-[#1e1e1e]' : 'tw:bg-white'"
+          class="mb-1 border border-(--o2-border) rounded-lg"
+          :class="store.state.theme === 'dark' ? 'border-[#444] bg-[#1e1e1e]' : 'bg-white'"
         >
-          <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2 tw:border-b tw:border-b-(--o2-border) tw:rounded-t-lg" :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a] tw:border-b-[#444]' : 'tw:bg-[#f5f5f5]'">
+          <div class="flex items-center justify-between px-3 py-2 border-b border-b-(--o2-border) rounded-t-lg" :class="store.state.theme === 'dark' ? 'bg-[#2a2a2a] border-b-[#444]' : 'bg-[#f5f5f5]'">
           <div
             :data-test="`domain-management-domain-name-${domain.name}`"
-            class="tw:text-base tw:font-bold"
+            class="text-base font-bold"
           >{{ domain.name }}</div>
           <OButton
             icon-left="close"
@@ -225,16 +225,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="tw:p-3">
+        <div class="p-3">
           <!-- Radio Button Options -->
           <ORadioGroup v-model="domain.allowAllUsers" orientation="vertical">
-            <div class="tw:mb-1">
+            <div class="mb-1">
               <ORadio
                 :val="true"
                 :label="t('settings.allowAllUsersFromDomain', { domain: '@'+domain.name })"
               />
             </div>
-            <div class="tw:mb-3">
+            <div class="mb-3">
               <ORadio
                 :val="false"
                 :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
@@ -245,14 +245,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Info message for all users -->
           <div
             v-if="domain.allowAllUsers"
-            class="tw:p-2 tw:rounded tw:mb-3"
-            :class="store.state.theme === 'dark' ? 'tw:bg-[#1a2535] tw:text-blue-300' : 'tw:bg-blue-50 tw:text-blue-700'"
+            class="p-2 rounded mb-3"
+            :class="store.state.theme === 'dark' ? 'bg-[#1a2535] text-blue-300' : 'bg-blue-50 text-blue-700'"
           >
             {{ t("settings.allUsersAllowedMessage", { domain: '@'+domain.name }) }}
           </div>
 
           <!-- Specific users section -->
-          <div v-if="!domain.allowAllUsers" class="specific-users-section tw:ml-6">
+          <div v-if="!domain.allowAllUsers" class="specific-users-section ml-6">
               <OForm
                 :ref="(el) => setEmailFormRef(domain.name, el)"
                 :schema="getEmailSchema(domain.name)"
@@ -262,13 +262,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Hint label above the row, so the error can grow below the
                      input without shoving the Add button out of alignment. -->
-                <div class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:mb-1">
+                <div class="o-input-label text-sm font-semibold leading-tight mb-1">
                   {{ t('settings.emailPlaceholder', { domain: '@' + domain.name }) }}
                 </div>
-                <div class="tw:flex tw:gap-x-2 tw:items-start">
+                <div class="flex gap-x-2 items-start">
                   <OFormInput
                     name="newEmail"
-                    class="email-input tw:min-w-62.5"
+                    class="email-input min-w-62.5"
                   />
                   <OButton
                     variant="primary"
@@ -284,10 +284,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(email, emailIndex) in domain.allowedEmails"
                 :key="email"
-                class="tw:flex tw:items-center tw:justify-between tw:p-2 tw:mb-1 tw:rounded tw:border tw:border-(--o2-border)"
-                :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a] tw:border-[#444]' : 'tw:bg-[#f9f9f9]'"
+                class="flex items-center justify-between p-2 mb-1 rounded border border-(--o2-border)"
+                :class="store.state.theme === 'dark' ? 'bg-[#2a2a2a] border-[#444]' : 'bg-[#f9f9f9]'"
               >
-                <div class="tw:text-sm">{{ email }}</div>
+                <div class="text-sm">{{ email }}</div>
                 <OButton
                   icon-left="close"
                   variant="ghost-destructive"
@@ -305,15 +305,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       data-test="domain-management-no-domain-message"
-      class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mt-3 tw:mb-4 tw:w-full tw:text-center tw:p-4 tw:border tw:border-(--o2-border) tw:rounded-lg"
-      :class="store.state.theme === 'dark' ? 'tw:border-[#444] tw:bg-[#1e1e1e]' : 'tw:bg-white'"
+      class="text-xl font-semibold text-gray-400 mt-3 mb-4 w-full text-center p-4 border border-(--o2-border) rounded-lg"
+      :class="store.state.theme === 'dark' ? 'border-[#444] bg-[#1e1e1e]' : 'bg-white'"
     >
       {{ t("settings.noDomainMessage") }}
     </div>
 
   </div>
     <!-- Action Buttons — flow inline at the end of the constrained column. -->
-    <div class="tw:flex tw:justify-end tw:gap-2 tw:pt-4 tw:mt-2 tw:border-t tw:border-(--o2-border-color)">
+    <div class="flex justify-end gap-2 pt-4 mt-2 border-t border-(--o2-border-color)">
       <OButton
         variant="outline"
         size="sm-action"

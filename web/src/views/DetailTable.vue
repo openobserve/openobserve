@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="tw:flex tw:flex-col tw:h-full tw:flex-nowrap tw:w-[74vw]">
+  <OCard class="flex flex-col h-full flex-nowrap w-[74vw]">
     <OCardSection role="header">
-      <div class="tw:flex tw:items-center tw:flex-nowrap">
-        <div class="tw:flex tw:flex-col">
-          <div class="tw:text-base tw:font-bold tw:text-gray-800">
+      <div class="flex items-center flex-nowrap">
+        <div class="flex flex-col">
+          <div class="text-base font-bold text-gray-800">
             {{ t("search.rowDetail") }}
           </div>
         </div>
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </OCardSection>
     <OSeparator />
-    <OTabs v-model="tab" dense class="tw:text-gray-500" align="justify">
+    <OTabs v-model="tab" dense class="text-gray-500" align="justify">
       <OTab name="table" :label="t('common.table')" />
       <OTab name="json" :label="t('common.json')" />
     </OTabs>
@@ -38,10 +38,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OTabPanels v-model="tab" animated>
       <OTabPanel name="table">
-        <OCardSection class="tw:p-0 tw:mb-6">
+        <OCardSection class="p-0 mb-6">
           <div
             v-if="rowData.length == 0"
-            class="tw:pt-3"
+            class="pt-3"
             style="max-width: 350px"
           >
             No data available.
@@ -49,13 +49,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="indexDetailsContainer">
             <ul
               style="height: calc(100vh - 220px); width: 70vw"
-              class="detail-list tw:px-0 tw:py-0 tw:flex tw:flex-col tw:divide-y tw:divide-border"
+              class="detail-list px-0 py-0 flex flex-col divide-y divide-border"
             >
-              <li class="detail-item list-head tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
-                <div class="tw:font-bold tw:w-1/4 tw:break-all">
+              <li class="detail-item list-head flex items-center gap-2 px-3 py-2">
+                <div class="font-bold w-1/4 break-all">
                   {{ t("search.sourceName") }}
                 </div>
-                <div class="tw:font-bold tw:w-3/4 tw:break-all">
+                <div class="font-bold w-3/4 break-all">
                   {{ t("search.sourceValue") }}
                 </div>
               </li>
@@ -63,12 +63,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <li
                 v-for="(key, value) in rowData"
                 :key="value"
-                class="detail-item list-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
+                class="detail-item list-item flex items-center gap-2 px-3 py-2"
               >
-                <div class="tw:w-1/4 tw:break-all">{{ value }}</div>
-                <div class="tw:w-3/4 tw:break-all">{{ key }}</div>
+                <div class="w-1/4 break-all">{{ value }}</div>
+                <div class="w-3/4 break-all">{{ key }}</div>
               </li>
-              <li class="detail-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"></li>
+              <li class="detail-item flex items-center gap-2 px-3 py-2"></li>
             </ul>
           </div>
         </OCardSection>

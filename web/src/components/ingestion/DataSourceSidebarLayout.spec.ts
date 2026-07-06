@@ -89,8 +89,8 @@ describe("DataSourceSidebarLayout.vue", () => {
         .findAll("div")
         .find(
           (d) =>
-            d.classes().includes("tw:border-r") &&
-            d.classes().includes("tw:border-border-default"),
+            d.classes().includes("border-r") &&
+            d.classes().includes("border-border-default"),
         );
       expect(bordered).toBeTruthy();
     });

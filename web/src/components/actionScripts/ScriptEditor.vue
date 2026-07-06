@@ -1,5 +1,5 @@
 <template>
-  <div class="tw:w-full tw:h-full">
+  <div class="w-full h-full">
     <FullViewContainer
       data-test="test-function-input-title-section"
       :name="file.name"
@@ -9,17 +9,17 @@
       <template #left>
         <div
           v-if="loading"
-          class="text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
+          class="text-weight-bold flex items-center text-gray-500 ml-2 text-[13px]"
         >
           <OSpinner size="xs" data-test="script-editor-loading-indicator" />
-          <div class="tw:relative tw:top-[2px]">
+          <div class="relative top-[2px]">
             {{ t("confirmDialog.loading") }}
           </div>
         </div>
         <OIcon
           v-if="!!error"
           name="info"
-          class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
+          class="text-red-600 mx-1 cursor-pointer"
           size="sm"
          />
           <OTooltip side="right" align="center" :sideOffset="10" :content="error" />
@@ -27,14 +27,14 @@
     </FullViewContainer>
     <div
       v-show="isExpanded"
-      class="tw:border-[1px] tw:border-gray-200 tw:h-[calc(100%-30px)] tw:relative tw:rounded-md tw:overflow-hidden"
+      class="border-[1px] border-gray-200 h-[calc(100%-30px)] relative rounded-md overflow-hidden"
       data-test="test-function-input-editor-section"
     >
       <query-editor
         data-test="vrl-function-test-events-editor"
         ref="eventsEditorRef"
         :editor-id="`test-function-events-input-editor-${file.name}`"
-        class="test-function-input-editor tw:w-full tw:min-h-40 tw:rounded tw:h-full"
+        class="test-function-input-editor w-full min-h-40 rounded h-full"
         v-model:query="inputScript"
         :language="file.language"
       />

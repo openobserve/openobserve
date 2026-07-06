@@ -1,17 +1,17 @@
 <template>
-  <div data-test="add-stream-routing-section" class="tw:bg-white tw:h-full">
-    <div class="tw:py-2 tw:px-3 tw:flex tw:justify-between tw:items-center">
-      <div class="tw:text-[18px]">Stream Routing</div>
+  <div data-test="add-stream-routing-section" class="bg-white h-full">
+    <div class="py-2 px-3 flex justify-between items-center">
+      <div class="text-[18px]">Stream Routing</div>
       <OIcon
         data-test="stream-routing-close-dialog-btn"
         name="cancel"
-        class="tw:cursor-pointer"
+        class="cursor-pointer"
         size="md"
         @click="emits('cancel:hideform')"
       />
     </div>
     <OSeparator />
-    <div class="tw:w-fit tw:rounded-lg tw:px-3 tw:pt-3">
+    <div class="w-fit rounded-lg px-3 pt-3">
       <div
         data-test="stream-routing-name-input"
         class="o2-input"
@@ -31,9 +31,9 @@
           @update:model-value="nameError = ''"
         />
       </div>
-      <div class="tw:flex tw:justify-start tw:items-center" style="padding-top: 0px">
+      <div class="flex justify-start items-center" style="padding-top: 0px">
         <div
-          class="alert-stream-type o2-input tw:mr-2"
+          class="alert-stream-type o2-input mr-2"
           style="padding-top: 0"
         >
           <OSelect
@@ -82,8 +82,8 @@
       />
 
       <div
-        class="tw:flex tw:justify-start tw:mt-4 tw:py-2 tw:w-full tw:gap-2"
-        :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+        class="flex justify-start mt-4 py-2 w-full gap-2"
+        :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
       >
         <OButton
           data-test="add-report-cancel-btn"

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
     <div
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-2"
+      class="flex flex-col items-center justify-center gap-2"
       style="font-size: 1.5rem"
     >
       <img
@@ -25,10 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 125px; margin: 0 auto 1rem"
         alt=""
       />
-      <span data-test="no-regex-patterns-title" class="tw:font-semibold tw:text-base tw:leading-5 tw:text-left tw:tracking-[-0.6%]">{{ t("regex_patterns.no_data") }}</span>
-        <span data-test="no-regex-patterns-subtitle" class="tw:text-sm tw:leading-5 tw:text-left tw:tracking-[-0.6%]">Import patterns from your Library or <span data-test="no-regex-patterns-create-new" class="tw:text-base tw:leading-6 tw:text-left tw:text-[#5960b2] tw:font-bold tw:cursor-pointer" @click="createNewRegexPattern">Create New</span></span>
+      <span data-test="no-regex-patterns-title" class="font-semibold text-base leading-5 text-left tracking-[-0.6%]">{{ t("regex_patterns.no_data") }}</span>
+        <span data-test="no-regex-patterns-subtitle" class="text-sm leading-5 text-left tracking-[-0.6%]">Import patterns from your Library or <span data-test="no-regex-patterns-create-new" class="text-base leading-6 text-left text-[#5960b2] font-bold cursor-pointer" @click="createNewRegexPattern">Create New</span></span>
         <div style="font-size: 1rem">
-            <OButton variant="outline" size="xs" class="tw:mt-2" @click="importRegexPattern">
+            <OButton variant="outline" size="xs" class="mt-2" @click="importRegexPattern">
               {{ t("regex_patterns.import_title") }}
             </OButton>
         </div>    

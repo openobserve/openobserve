@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-nowrap tw:items-center tw:h-10 tw:w-full tw:bg-surface-chrome-deeper tw:shrink-0">
+  <div class="flex flex-nowrap items-center h-10 w-full bg-surface-chrome-deeper shrink-0">
     <!-- LEFT SIDE: Logo -->
-    <div class="tw:flex tw:items-center tw:justify-start tw:shrink-0 tw:pl-3">
+    <div class="flex items-center justify-start shrink-0 pl-3">
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
     <!-- Shows custom logo/text if configured in enterprise mode -->
     <div
-      class="tw:flex relative-position"
+      class="flex relative-position"
       v-if="
         (config.isEnterprise == 'true' &&
           store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
@@ -42,12 +42,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :href="homeUrl"
         @click.prevent="goToHome"
-        class="tw:text-xl tw:font-semibold tw:font-bold tw:p-0 tw:cursor-pointer tw:mr-2 tw:flex tw:items-center tw:no-underline tw:text-inherit"
+        class="text-xl font-semibold font-bold p-0 cursor-pointer mr-2 flex items-center no-underline text-inherit"
         >{{ store.state.zoConfig.custom_logo_text }}</a
       >
 
       <!-- Custom logo image - shows appropriate logo based on current theme -->
-      <a :href="homeUrl" @click.prevent="goToHome" class="tw:inline-flex tw:items-center">
+      <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
         <!-- Dark mode: Show dark logo, fallback to light logo -->
         <img
           v-if="
@@ -94,12 +94,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- OpenObserve logo (shown alongside custom logo if configured) -->
       <div
         v-if="store.state.zoConfig.custom_hide_self_logo == false"
-        class="tw:relative tw:inline-flex tw:items-center tw:min-h-10"
+        class="relative inline-flex items-center min-h-10"
       >
-        <a :href="homeUrl" @click.prevent="goToHome" class="tw:inline-flex tw:items-center">
+        <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <img
             data-test="header-openobserve-logo"
-            class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 tw:hover:opacity-80"
+            class="openobserve-logo cursor-pointer h-8 max-w-[150px] block transition-opacity duration-200 hover:opacity-80"
             :src="
               getImageURL(
                 store.state.theme === 'dark'
@@ -114,11 +114,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Default OpenObserve logo (when no custom logo) -->
-    <div v-else class="relative-position tw:relative tw:inline-flex tw:items-center tw:min-h-10">
-      <a :href="homeUrl" @click.prevent="goToHome" class="tw:inline-flex tw:items-center">
+    <div v-else class="relative-position relative inline-flex items-center min-h-10">
+      <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
         <img
           data-test="header-openobserve-logo"
-          class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 tw:hover:opacity-80"
+          class="openobserve-logo cursor-pointer h-8 max-w-[150px] block transition-opacity duration-200 hover:opacity-80"
           :src="
             getImageURL(
               store.state.theme === 'dark'
@@ -133,13 +133,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div><!-- end left side -->
 
     <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
-    <div class="tw:flex-1 tw:min-w-0" />
+    <div class="flex-1 min-w-0" />
 
     <!-- RIGHT SIDE: Controls -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:shrink-0 tw:pr-3 tw:gap-1">
+    <div class="flex items-center justify-end shrink-0 pr-3 gap-1">
     <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
     <div
-      class="tw:mr-4 tw:flex tw:items-center tw:gap-1"
+      class="mr-4 flex items-center gap-1"
       v-if="store.state.organizationData.quotaThresholdMsg"
     >
       <div
@@ -156,7 +156,7 @@ size="xs" class="warning" />{{
       <OButton
         variant="secondary"
         size="sm"
-        class="tw:m-1"
+        class="m-1"
         @click="router.replace('/billings/plans')"
       >
         Upgrade to PRO Plan
@@ -164,7 +164,7 @@ size="xs" class="warning" />{{
     </div>
 
     <!-- HEADER MENU: Contains all header navigation and user controls -->
-    <div class="header-menu tw:flex tw:items-center tw:gap-x-2">
+    <div class="header-menu flex items-center gap-x-2">
       <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
       <OButton
         v-if="
@@ -178,7 +178,7 @@ size="xs" class="warning" />{{
         <OIcon
           name="warning"
           size="sm"
-          class="tw:opacity-60"
+          class="opacity-60"
           :style="{ color: ingestionQuotaColor }"
         />
         <OTooltip side="top" align="center" :content="`Warning: ${ingestionQuotaPercentage}% of ingestion limit used`" />
@@ -206,7 +206,7 @@ size="xs" class="warning" />{{
         @select="handleOrgSelection"
       />
 
-      <div class="header-utility-icons tw:flex tw:items-center tw:gap-x-2">
+      <div class="header-utility-icons flex items-center gap-x-2">
       <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel.
            Leads the utility-icon cluster, set off by a separator from the
            org selector so it reads as the primary action in this group. -->
@@ -221,7 +221,7 @@ size="xs" class="warning" />{{
           @mouseenter="handleMouseEnter"
           @mouseleave="handleMouseLeave"
         >
-          <img :src="getBtnLogo" class="ai-icon tw:w-5 tw:h-5 tw:shrink-0" />
+          <img :src="getBtnLogo" class="ai-icon w-5 h-5 shrink-0" />
           <OTooltip
             side="bottom"
             align="center"
@@ -241,7 +241,7 @@ size="xs" class="warning" />{{
         data-test="menu-link-slack-item"
         @click="openSlack"
       >
-        <component :is="slackIcon" class="tw:size-5 tw:shrink-0" />
+        <component :is="slackIcon" class="size-5 shrink-0" />
         <OTooltip side="top" align="center" :content="t('menu.slack')" />
       </OButton>
 
@@ -249,11 +249,11 @@ size="xs" class="warning" />{{
       <ODropdown side="bottom" align="end">
         <template #trigger>
           <OButton variant="ghost" size="icon-toolbar" data-test="menu-link-help-item">
-            <OIcon name="help-outline" size="sm" class="tw:size-5!" />
+            <OIcon name="help-outline" size="sm" class="size-5!" />
             <OTooltip side="top" align="center" :content="t('menu.help')" />
           </OButton>
         </template>
-        <div class="header-menu-bar tw:min-w-[250px]">
+        <div class="header-menu-bar min-w-[250px]">
           <!-- OpenAPI link (only for non-cloud deployments) -->
           <template
             v-if="
@@ -316,19 +316,19 @@ size="xs" class="warning" />{{
             <OIcon
               :name="user.picture ? user.picture : 'person'"
               size="sm"
-              class="tw:size-5!"
+              class="size-5!"
             />
             <OTooltip side="top" align="center" :content="user.given_name ? user.given_name + ' ' + user.family_name : user.email" />
           </OButton>
         </template>
-        <div class="header-menu-bar tw:min-w-[250px]">
+        <div class="header-menu-bar min-w-[250px]">
           <!-- User information (non-clickable info row) -->
-          <div class="tw:flex tw:items-center tw:gap-3 tw:px-3 tw:py-2">
+          <div class="flex items-center gap-3 px-3 py-2">
             <OIcon
               :name="user.picture ? user.picture : 'person'"
               size="xs"
             />
-            <span class="tw:text-sm tw:truncate">{{
+            <span class="text-sm truncate">{{
               user.given_name
                 ? user.given_name + " " + user.family_name
                 : user.email
@@ -339,17 +339,17 @@ size="xs" class="warning" />{{
           <!-- Language selector — nested sub-dropdown (click to open) -->
           <div
             data-test="header-language-submenu-trigger"
-            class="tw:relative tw:flex tw:items-center tw:gap-3 tw:py-1.5 tw:px-3 tw:text-sm tw:leading-[1.2] tw:cursor-pointer tw:select-none tw:hover:bg-[rgba(0,0,0,0.05)] tw:dark:hover:bg-[rgba(255,255,255,0.08)]"
+            class="relative flex items-center gap-3 py-1.5 px-3 text-sm leading-[1.2] cursor-pointer select-none hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
             @click.stop="showLanguageSubmenu = !showLanguageSubmenu"
           >
             <OIcon size="xs" name="language" class="padding-none" />
-            <span class="tw:flex-1 tw:whitespace-nowrap">{{ t("menu.language") }}</span>
-            <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:opacity-75 tw:whitespace-nowrap">
+            <span class="flex-1 whitespace-nowrap">{{ t("menu.language") }}</span>
+            <span class="inline-flex items-center gap-1.5 opacity-75 whitespace-nowrap">
               <img
                 v-if="selectedLanguage.icon && selectedLanguage.icon.startsWith('img:')"
                 :src="selectedLanguage.icon.slice(4)"
                 :alt="selectedLanguage.label"
-                class="tw:w-4 tw:h-3 tw:object-cover tw:rounded-xs tw:inline-block tw:shrink-0"
+                class="w-4 h-3 object-cover rounded-xs inline-block shrink-0"
               />
               <OIcon
                 v-else-if="selectedLanguage.icon"
@@ -364,10 +364,10 @@ size="xs" class="warning" />{{
             <!-- Submenu — absolutely positioned to the left of parent dropdown -->
             <div
               v-if="showLanguageSubmenu"
-              class="tw:absolute tw:right-full tw:top-0 tw:mr-1 tw:min-w-50 tw:border tw:rounded-md tw:py-1 tw:z-9999"
+              class="absolute right-full top-0 mr-1 min-w-50 border rounded-md py-1 z-9999"
               :class="store.state.theme === 'dark'
-                ? 'tw:bg-[#1f2937] tw:border-[rgba(255,255,255,0.12)] tw:shadow-[0_8px_24px_rgba(0,0,0,0.5)]'
-                : 'tw:bg-white tw:border-black/12 tw:shadow-[0_8px_24px_rgba(0,0,0,0.15)]'"
+                ? 'bg-[#1f2937] border-[rgba(255,255,255,0.12)] shadow-[0_8px_24px_rgba(0,0,0,0.5)]'
+                : 'bg-white border-black/12 shadow-[0_8px_24px_rgba(0,0,0,0.15)]'"
               data-test="language-dropdown-item"
               @click.stop
             >
@@ -376,12 +376,12 @@ size="xs" class="warning" />{{
                 :key="lang.code"
                 type="button"
                 :data-test="`language-dropdown-item-${lang.code}`"
-                class="tw:flex tw:items-center tw:gap-2.5 tw:w-full tw:py-1.5 tw:px-3 tw:text-sm tw:leading-[1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-inherit"
+                class="flex items-center gap-2.5 w-full py-1.5 px-3 text-sm leading-[1.2] text-left bg-transparent border-0 cursor-pointer text-inherit"
                 :class="[
                   store.state.theme === 'dark'
-                    ? 'tw:hover:bg-[rgba(255,255,255,0.08)]'
-                    : 'tw:hover:bg-[rgba(0,0,0,0.05)]',
-                  { 'tw:font-semibold': selectedLanguage.code === lang.code },
+                    ? 'hover:bg-[rgba(255,255,255,0.08)]'
+                    : 'hover:bg-[rgba(0,0,0,0.05)]',
+                  { 'font-semibold': selectedLanguage.code === lang.code },
                 ]"
                 @click="changeLanguage(lang); showLanguageSubmenu = false"
               >
@@ -389,10 +389,10 @@ size="xs" class="warning" />{{
                   v-if="lang.icon && lang.icon.startsWith('img:')"
                   :src="lang.icon.slice(4)"
                   :alt="lang.label"
-                  class="tw:w-4 tw:h-3 tw:object-cover tw:rounded-xs tw:inline-block tw:shrink-0"
+                  class="w-4 h-3 object-cover rounded-xs inline-block shrink-0"
                 />
                 <OIcon v-else-if="lang.icon" size="xs" :name="lang.icon" />
-                <span class="tw:flex-1">{{ lang.label }}</span>
+                <span class="flex-1">{{ lang.label }}</span>
                 <OIcon
                   v-if="selectedLanguage.code === lang.code"
                   size="xs"

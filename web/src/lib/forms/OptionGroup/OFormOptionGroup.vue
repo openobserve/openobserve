@@ -24,7 +24,7 @@ if (import.meta.env.DEV && !form) {
 <template>
   <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
-      <div class="tw:flex tw:flex-col tw:gap-1">
+      <div class="flex flex-col gap-1">
         <OOptionGroup
           v-bind="$attrs"
           :options="props.options"
@@ -55,7 +55,7 @@ if (import.meta.env.DEV && !form) {
           v-if="
             field.state.meta.errors.length > 0
           "
-          class="tw:text-xs tw:text-option-group-error-text"
+          class="text-xs text-option-group-error-text"
         >
           {{ firstFieldError(field.state.meta.errors) }}
         </div>

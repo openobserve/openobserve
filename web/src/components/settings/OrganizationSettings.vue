@@ -2,15 +2,15 @@
   <div>
     <!-- Section header is provided full-width by the Settings shell. The page
          gutter is owned by ConstrainedPage; this page adds none of its own. -->
-    <div class="tw:pb-3">
-      <div class="tw:text-base tw:font-bold">
+    <div class="pb-3">
+      <div class="text-base font-bold">
         {{ t("settings.logDetails") }}
       </div>
     </div>
 
     <OForm
       id="organization-settings-form"
-      class="tw:mb-3"
+      class="mb-3"
       :schema="organizationSettingsSchema"
       :default-values="organizationSettingsDefaults"
       @submit="saveOrgSettings"
@@ -18,38 +18,38 @@
     >
     <div
       data-test="add-role-rolename-input-btn"
-      class="trace-id-field-name o2-input tw:mb-2 tw:w-100"
+      class="trace-id-field-name o2-input mb-2 w-100"
     >
       <OFormInput
         data-test="settings-org-trace-id-input"
         name="traceIdFieldName"
         :label="t('settings.traceIdFieldName')"
         required
-        class="tw:py-3 showLabelOnTop"
+        class="py-3 showLabelOnTop"
         help-text="Use alphanumeric and '+=,.@-_' characters only, without spaces."
       />
     </div>
 
     <div
       data-test="add-role-rolename-input-btn"
-      class="span-id-field-name o2-input tw:w-100"
+      class="span-id-field-name o2-input w-100"
     >
       <OFormInput
         data-test="settings-org-span-id-input"
         name="spanIdFieldName"
         :label="t('settings.spanIdFieldName')"
         required
-        class="tw:py-3 showLabelOnTop"
+        class="py-3 showLabelOnTop"
         help-text="Use alphanumeric and '+=,.@-_' characters only, without spaces."
       />
     </div>
 
-    <div v-if="config.isCloud !== 'true'" data-test="add-toggle-ingestion" class="span-id-field-name o2-input tw:w-100">
+    <div v-if="config.isCloud !== 'true'" data-test="add-toggle-ingestion" class="span-id-field-name o2-input w-100">
       <OFormSwitch
         data-test="add-toggle-ingestion-btn"
         name="toggleIngestionLogs"
         :label="t('settings.toggleIngestionLogsLabel')"
-        class="tw:mt-2"
+        class="mt-2"
       />
     </div>
 
@@ -58,13 +58,13 @@
         data-test="add-toggle-usage-stream-btn"
         name="usageStreamEnabled"
         :label="t('settings.usageStreamEnabledLabel')"
-        class="tw:mt-2"
+        class="mt-2"
       />
     </div>
 
     <!-- Cross-Linking Configuration -->
     <template v-if="store.state.zoConfig?.enable_cross_linking">
-      <OSeparator class="tw:mt-6 tw:mb-4" />
+      <OSeparator class="mt-6 mb-4" />
       <CrossLinkManager
         v-model="crossLinks"
         :title="t('crossLinks.orgConfigTitle')"
@@ -73,7 +73,7 @@
       />
     </template>
 
-    <div class="tw:flex tw:gap-2 tw:mt-3">
+    <div class="flex gap-2 mt-3">
       <!-- <OButton
         data-test="add-alert-cancel-btn"
         variant="outline"

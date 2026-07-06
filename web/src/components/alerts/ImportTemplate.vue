@@ -34,19 +34,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Template-specific Error Display -->
     <template #output-content>
-      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
+      <div class="w-full h-full border-l border-border-default" style="min-width: 400px;">
         <div
           v-if="templateErrorsToDisplay.length > 0 || tempalteCreators.length > 0"
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-center text-xl font-semibold py-2"
         >
           {{ templateErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
         </div>
-        <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-        <OSeparator class="tw:mr-4 tw:mt-4" />
-        <div class="tw:h-[calc(60vh-8px)] tw:overflow-auto [resize:none] tw:w-full tw:min-w-[400px]">
+        <div v-else class="text-center text-xl font-semibold py-2">Output Messages</div>
+        <OSeparator class="mr-4 mt-4" />
+        <div class="h-[calc(60vh-8px)] overflow-auto [resize:none] w-full min-w-[400px]">
         <!-- Template Errors Section -->
         <div
-          class="error-section tw:p-2.5 tw:mb-2.5"
+          class="error-section p-2.5 mb-2.5"
           v-if="templateErrorsToDisplay.length > 0"
         >
           <div class="error-list">
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(errorMessage, errorIndex) in errorGroup"
                 :key="errorIndex"
-                class="error-item tw:py-1.25 tw:px-0 tw:text-sm tw:wrap-break-word"
+                class="error-item py-1.25 px-0 text-sm wrap-break-word"
                 :data-test="`template-import-error-${index}-${errorIndex}`"
               >
                 <span
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }"
                       :options="destinationTypes"
                       :label="'Template Type *'"
-                      class="tw:py-2 showLabelOnTop no-case"
+                      class="py-2 showLabelOnTop no-case"
                     />
                   </div>
                 </span>
@@ -158,9 +158,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="error-section tw:p-2.5 tw:mb-2.5" v-if="tempalteCreators.length > 0">
+        <div class="error-section p-2.5 mb-2.5" v-if="tempalteCreators.length > 0">
           <div
-            class="tw:text-base tw:mb-2.5 tw:uppercase text-primary"
+            class="text-base mb-2.5 uppercase text-primary"
             data-test="template-import-creation-title"
           >
             Template Creation
@@ -173,13 +173,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div
               :class="{
-                'error-item tw:py-1.25 tw:px-0 tw:text-sm tw:wrap-break-word tw:font-bold': true,
+                'error-item py-1.25 px-0 text-sm wrap-break-word font-bold': true,
                 'text-green ': val.success,
                 'text-red': !val.success,
               }"
               :data-test="`template-import-creation-${index}-message`"
             >
-              <pre class="tw:[white-space:pre-wrap] tw:[word-wrap:break-word] tw:[word-break:break-word] tw:[overflow-wrap:break-word] tw:font-[inherit] tw:m-0">{{ val.message }}</pre>
+              <pre class="[white-space:pre-wrap] [word-wrap:break-word] [word-break:break-word] [overflow-wrap:break-word] font-[inherit] m-0">{{ val.message }}</pre>
             </div>
           </div>
         </div>

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:rounded-md tw:p-0 tw:flex tw:flex-col"
+    class="rounded-md p-0 flex flex-col"
     style="min-height: 0; height: 100%; overflow: hidden"
   >
     <!-- Header -->
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dataTest: 'model-pricing-editor-back-btn',
       }"
       :title="headerTitle"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #title>
         <span data-test="model-pricing-editor-title">{{ headerTitle }}</span>
@@ -38,11 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OForm
       :form="form"
       v-slot="{ isSubmitting }"
-      class="tw:flex tw:flex-col"
+      class="flex flex-col"
       style="flex: 1; min-height: 0;"
     >
     <div
-      class="tw:px-3 tw:py-3"
+      class="px-3 py-3"
       style="
         flex: 1;
         min-height: 0;
@@ -50,29 +50,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         overflow-y: auto;
       "
     >
-      <div style="max-width: 760px" class="tw:flex tw:flex-col tw:gap-6">
+      <div style="max-width: 760px" class="flex flex-col gap-6">
         <!-- ── Model Details Card ── -->
-        <div class="tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:shadow-[0_1px_3px_rgba(0,0,0,0.05)] tw:dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-          <div class="tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-3 tw:py-[10px] tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color) tw:rounded-t-[10px] tw:dark:bg-[rgba(255,255,255,0.04)]">
+        <div class="border border-(--o2-border-color) rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <div class="flex flex-row items-center justify-between gap-3 py-[10px] px-4 bg-[rgba(0,0,0,0.025)] border-b border-(--o2-border-color) rounded-t-[10px] dark:bg-[rgba(255,255,255,0.04)]">
             <div>
-              <div class="form-card-title tw:text-[13px] tw:font-semibold">
+              <div class="form-card-title text-[13px] font-semibold">
                 {{ t("modelPricing.modelDetails") }}
               </div>
-              <div class="form-card-subtitle tw:text-[11px] tw:opacity-60 tw:mt-px">
+              <div class="form-card-subtitle text-[11px] opacity-60 mt-px">
                 {{ t("modelPricing.modelDetailsDesc") }}
               </div>
             </div>
           </div>
-          <div class="form-card-body tw:flex tw:flex-row tw:gap-4 tw:px-4 tw:pt-[10px] tw:pb-2">
-            <div class="tw:flex-1">
-              <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label tw:text-xs tw:font-semibold tw:opacity-75 tw:h-5">
+          <div class="form-card-body flex flex-row gap-4 px-4 pt-[10px] pb-2">
+            <div class="flex-1">
+              <div class="flex items-center gap-1 mb-1 field-label text-xs font-semibold opacity-75 h-5">
                 {{ t("modelPricing.modelNameField") }}
-                <OButton variant="ghost" size="icon-xs-sq" class="tw:ml-1" data-test="model-pricing-name-info-btn">
+                <OButton variant="ghost" size="icon-xs-sq" class="ml-1" data-test="model-pricing-name-info-btn">
                   <OIcon
                     name="info"
                     size="xs"
                     :class="
-                      store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
+                      store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'
                     "
                   />
                   <OTooltip
@@ -88,20 +88,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="model-pricing-name-input"
               />
             </div>
-            <div class="tw:flex-1 tw:flex tw:items-start tw:gap-1">
-              <div class="tw:flex-1">
+            <div class="flex-1 flex items-start gap-1">
+              <div class="flex-1">
                 <div
-                  class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label tw:text-xs tw:font-semibold tw:opacity-75 tw:h-5"
+                  class="flex items-center gap-1 mb-1 field-label text-xs font-semibold opacity-75 h-5"
                 >
                   {{ t("modelPricing.matchPatternField") }}
-                  <OButton variant="ghost" size="icon-xs-sq" class="tw:ml-1" data-test="model-pricing-pattern-info-btn">
+                  <OButton variant="ghost" size="icon-xs-sq" class="ml-1" data-test="model-pricing-pattern-info-btn">
                     <OIcon
                       name="info"
                       size="xs"
                       :class="
                         store.state.theme === 'dark'
-                          ? 'tw:text-gray-400'
-                          : 'tw:text-gray-400'
+                          ? 'text-gray-400'
+                          : 'text-gray-400'
                       "
                     />
                     <OTooltip
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
-                class="tw:opacity-50 tw:text-(--q-primary) tw:hover:opacity-100"
+                class="opacity-50 text-(--q-primary) hover:opacity-100"
                 data-test="model-pricing-pattern-examples-btn"
                 @click="showExamples = true"
               >
@@ -144,22 +144,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('modelPricing.patternExamplesTitle')"
           :sub-title="t('modelPricing.patternExamplesDesc')"
         >
-          <div class="examples-table tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:overflow-hidden">
-            <div class="tw:grid tw:grid-cols-[180px_1fr_auto] tw:gap-3 tw:py-[6px] tw:px-3 tw:bg-[rgba(0,0,0,0.03)] tw:border-b tw:border-(--o2-border-color) tw:text-[10px] tw:font-bold tw:uppercase tw:tracking-[0.06em] tw:opacity-45 tw:dark:bg-[rgba(255,255,255,0.05)]">
+          <div class="examples-table border border-(--o2-border-color) rounded-lg overflow-hidden">
+            <div class="grid grid-cols-[180px_1fr_auto] gap-3 py-[6px] px-3 bg-[rgba(0,0,0,0.03)] border-b border-(--o2-border-color) text-[10px] font-bold uppercase tracking-[0.06em] opacity-45 dark:bg-[rgba(255,255,255,0.05)]">
               <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
               <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
             </div>
             <div
               v-for="ex in patternExamples"
               :key="ex.name"
-              class="examples-table-row tw:grid tw:grid-cols-[180px_1fr_auto] tw:gap-3 tw:items-center tw:py-2 tw:px-3 tw:border-b tw:border-(--o2-border-color) tw:text-xs"
+              class="examples-table-row grid grid-cols-[180px_1fr_auto] gap-3 items-center py-2 px-3 border-b border-(--o2-border-color) text-xs"
             >
-              <span class="examples-model-name tw:font-medium">{{ ex.name }}</span>
-              <code class="tw:font-mono tw:text-[11px] tw:bg-[rgba(0,0,0,0.04)] tw:py-px tw:px-[6px] tw:rounded tw:break-all tw:dark:bg-[rgba(255,255,255,0.08)]">{{ ex.match_pattern }}</code>
+              <span class="examples-model-name font-medium">{{ ex.name }}</span>
+              <code class="font-mono text-[11px] bg-[rgba(0,0,0,0.04)] py-px px-[6px] rounded break-all dark:bg-[rgba(255,255,255,0.08)]">{{ ex.match_pattern }}</code>
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
-                class="tw:opacity-40 tw:hover:opacity-100"
+                class="opacity-40 hover:opacity-100"
                 :data-test="`model-pricing-example-copy-btn-${ex.name}`"
                 @click="copyPattern(ex.match_pattern)"
               >
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                   :class="
                     copiedPattern === ex.match_pattern
-                      ? 'tw:text-green-500'
+                      ? 'text-green-500'
                       : ''
                   "
                 />
@@ -190,28 +190,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODialog>
 
         <!-- ── Pricing Tiers ── -->
-        <div class="tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:shadow-[0_1px_3px_rgba(0,0,0,0.05)] tw:dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-          <div class="tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-3 tw:py-[10px] tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color) tw:rounded-t-[10px] tw:dark:bg-[rgba(255,255,255,0.04)]">
+        <div class="border border-(--o2-border-color) rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <div class="flex flex-row items-center justify-between gap-3 py-[10px] px-4 bg-[rgba(0,0,0,0.025)] border-b border-(--o2-border-color) rounded-t-[10px] dark:bg-[rgba(255,255,255,0.04)]">
             <div>
-              <div class="form-card-title tw:text-[13px] tw:font-semibold">
+              <div class="form-card-title text-[13px] font-semibold">
                 {{ t("modelPricing.pricingTiers") }}
               </div>
-              <div class="form-card-subtitle tw:text-[11px] tw:opacity-60 tw:mt-px">
+              <div class="form-card-subtitle text-[11px] opacity-60 mt-px">
                 {{ t("modelPricing.pricingTiersDesc") }}
               </div>
             </div>
           </div>
 
-          <div class="form-card-body tw:flex tw:flex-col tw:gap-3 tw:px-4 tw:pt-[10px] tw:pb-2">
+          <div class="form-card-body flex flex-col gap-3 px-4 pt-[10px] pb-2">
             <div
               v-for="(tier, idx) in formTiers"
               :key="idx"
-              class="tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:overflow-hidden tw:shadow-[0_1px_4px_rgba(0,0,0,0.05)] tw:dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
+              class="border border-(--o2-border-color) rounded-[10px] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
             >
               <!-- Tier Header -->
-              <div class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:py-2 tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color) tw:dark:bg-[rgba(255,255,255,0.04)]">
-                <div class="tw:flex tw:items-center tw:gap-2">
-                  <span class="tier-name-label tw:text-xs tw:font-medium tw:opacity-50 tw:whitespace-nowrap tw:shrink-0">{{
+              <div class="flex items-center justify-between gap-2 py-2 px-4 bg-[rgba(0,0,0,0.025)] border-b border-(--o2-border-color) dark:bg-[rgba(255,255,255,0.04)]">
+                <div class="flex items-center gap-2">
+                  <span class="tier-name-label text-xs font-medium opacity-50 whitespace-nowrap shrink-0">{{
                     t("modelPricing.tierName")
                   }}</span>
                   <OFormInput
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`model-pricing-tier-name-input-${idx}`"
                   />
                 </div>
-                <div class="tw:flex tw:items-center tw:gap-2 tw:flex-shrink-0">
+                <div class="flex items-center gap-2 flex-shrink-0">
                   <OButton
                     v-if="formTiers.length > 1"
                     variant="outline-destructive"
@@ -235,17 +235,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Tier Body -->
-              <div class="tier-body tw:p-3 tw:px-4 tw:flex tw:flex-col tw:gap-3">
+              <div class="tier-body p-3 px-4 flex flex-col gap-3">
                 <!-- Condition row (non-default tiers only) -->
                 <div
                   v-if="idx > 0 && tier.condition"
-                  class="tw:py-3 tw:px-[14px] tw:rounded-lg tw:bg-[rgba(0,0,0,0.02)] tw:border tw:border-(--o2-border-color) tw:dark:bg-[rgba(255,255,255,0.03)]"
+                  class="py-3 px-[14px] rounded-lg bg-[rgba(0,0,0,0.02)] border border-(--o2-border-color) dark:bg-[rgba(255,255,255,0.03)]"
                 >
-                  <div class="sub-label tw:mb-2 tw:text-[11px] tw:font-semibold tw:tracking-[0.06em] tw:opacity-65">
+                  <div class="sub-label mb-2 text-[11px] font-semibold tracking-[0.06em] opacity-65">
                     {{ t("modelPricing.applyTierWhen") }}
                   </div>
-                  <div class="tw:flex tw:gap-2 tw:items-end tw:flex-nowrap">
-                    <div class="tw:flex-1 tw:min-w-[130px]">
+                  <div class="flex gap-2 items-end flex-nowrap">
+                    <div class="flex-1 min-w-[130px]">
                       <OFormInput
                         :name="`tiers[${idx}].condition.usage_key`"
                         :label="t('modelPricing.usageKeyCol')"
@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`model-pricing-tier-condition-key-input-${idx}`"
                       />
                     </div>
-                    <div class="tw:w-[90px] tw:flex-shrink-0">
+                    <div class="w-[90px] flex-shrink-0">
                       <OFormSelect
                         :name="`tiers[${idx}].condition.operator`"
                         :options="operators"
@@ -262,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`model-pricing-tier-condition-operator-select-${idx}`"
                       />
                     </div>
-                    <div class="tw:w-[140px] tw:flex-shrink-0">
+                    <div class="w-[140px] flex-shrink-0">
                       <OFormInput
                         :name="`tiers[${idx}].condition.value`"
                         :label="t('modelPricing.threshold')"
@@ -274,8 +274,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Quick Setup -->
-                <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-                  <span class="sub-label tw:text-[11px] tw:font-semibold tw:tracking-[0.06em] tw:opacity-65">{{
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="sub-label text-[11px] font-semibold tracking-[0.06em] opacity-65">{{
                     t("modelPricing.quickSetup")
                   }}</span>
                   <OButton
@@ -284,20 +284,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="pricing-chip"
                     type="button"
                     :active="isTemplateActive(idx, tpl.keys)"
-                    class="tw:!rounded-[1.25rem] tw:!h-auto tw:!py-[0.3125rem] tw:!px-[0.875rem] tw:!text-xs tw:!font-medium tw:!gap-[0.375rem]"
+                    class="!rounded-[1.25rem] !h-auto !py-[0.3125rem] !px-[0.875rem] !text-xs !font-medium !gap-[0.375rem]"
                     :data-test="`model-pricing-tier-template-btn-${idx}-${tpl.name.toLowerCase()}`"
                     @click="applyTemplate(idx, tpl.keys)"
                   >
                     <template #icon-left>
                       <span
-                        class="pricing-chip-dot tw:w-[7px] tw:h-[7px] tw:rounded-full tw:shrink-0 tw:inline-block"
+                        class="pricing-chip-dot w-[7px] h-[7px] rounded-full shrink-0 inline-block"
                         :style="{ background: tpl.color }"
                       />
                     </template>
                     {{ tpl.name }}
                     <span
                       v-if="isTemplateActive(idx, tpl.keys)"
-                      class="tw:text-sm tw:leading-none tw:opacity-75 tw:ml-0.5 tw:hover:opacity-100"
+                      class="text-sm leading-none opacity-75 ml-0.5 hover:opacity-100"
                       @click.stop="clearTemplate(idx, tpl.keys)"
                       >×</span
                     >
@@ -306,18 +306,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Price Table -->
                 <div>
-                  <div class="price-table-label tw:mb-2 tw:text-[11px] tw:font-semibold tw:tracking-[0.03em]">
+                  <div class="price-table-label mb-2 text-[11px] font-semibold tracking-[0.03em]">
                     {{ t("modelPricing.tokenPrices") }}
-                    <span class="price-table-label-sub tw:font-normal tw:opacity-55 tw:tracking-normal">
+                    <span class="price-table-label-sub font-normal opacity-55 tracking-normal">
                       {{ t("modelPricing.tokenPricesUnit") }}</span
                     >
                   </div>
 
-                  <div class="price-table tw:overflow-hidden">
+                  <div class="price-table overflow-hidden">
                     <!-- Column headers (only when rows exist) -->
                     <div
                       v-if="tier.prices.length"
-                      class="price-table-head tw:grid tw:grid-cols-[1fr_160px_auto] tw:gap-2 tw:py-[6px] tw:px-3 tw:text-[11px] tw:font-semibold tw:tracking-[0.01em] tw:opacity-45"
+                      class="price-table-head grid grid-cols-[1fr_160px_auto] gap-2 py-[6px] px-3 text-[11px] font-semibold tracking-[0.01em] opacity-45"
                     >
                       <span>{{ t("modelPricing.usageKeyCol") }}</span>
                       <span>{{ t("modelPricing.pricePerMillionHeader") }}</span>
@@ -336,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="(_entry, entryIdx) in tier.prices"
                       :key="entryIdx"
-                      class="price-row tw:grid tw:grid-cols-[1fr_160px_auto] tw:gap-2 tw:items-start tw:py-0.5 tw:px-3"
+                      class="price-row grid grid-cols-[1fr_160px_auto] gap-2 items-start py-0.5 px-3"
                     >
                       <OFormInput
                         :name="`tiers[${idx}].prices[${entryIdx}].key`"
@@ -352,14 +352,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`model-pricing-price-value-input-${idx}-${entryIdx}`"
                       >
                         <template #icon-left
-                          ><span class="price-dollar tw:text-xs tw:pb-0.5">$</span></template
+                          ><span class="price-dollar text-xs pb-0.5">$</span></template
                         >
                       </OFormInput>
                       <!-- Fixed input-height band keeps the delete button centered
                            against the input row even when the key field grows a
                            below-field error (row is items-start so the error can't
                            push the value input / this button downward). -->
-                      <div class="tw:h-8.5 tw:flex tw:items-center">
+                      <div class="h-8.5 flex items-center">
                         <OButton
                           variant="outline-destructive"
                           size="icon"
@@ -375,19 +375,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Empty state -->
                     <div
                       v-if="!tier.prices.length"
-                      class="price-empty tw:flex tw:flex-col tw:items-center tw:p-4 tw:gap-[3px]"
+                      class="price-empty flex flex-col items-center p-4 gap-[3px]"
                     >
-                      <div class="price-empty-title tw:text-xs tw:font-medium">
+                      <div class="price-empty-title text-xs font-medium">
                         {{ t("modelPricing.noPricesDefined") }}
                       </div>
-                      <div class="price-empty-sub tw:text-[11px] tw:opacity-55">
+                      <div class="price-empty-sub text-[11px] opacity-55">
                         {{ t("modelPricing.noPricesDesc") }}
                       </div>
                     </div>
 
                     <!-- Add row (staging draft, form-owned) -->
                     <div
-                      class="price-add-row tw:grid tw:grid-cols-[1fr_160px_auto] tw:gap-2 tw:items-center tw:py-1 tw:px-3"
+                      class="price-add-row grid grid-cols-[1fr_160px_auto] gap-2 items-center py-1 px-3"
                       :class="{
                         'price-add-row--no-top': !tier.prices.length,
                       }"
@@ -406,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`model-pricing-add-price-value-input-${idx}`"
                       >
                         <template #icon-left
-                          ><span class="price-dollar tw:text-xs tw:pb-0.5">$</span></template
+                          ><span class="price-dollar text-xs pb-0.5">$</span></template
                         >
                       </OFormInput>
                       <OButton
@@ -425,34 +425,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Price Preview Table -->
                   <div
                     v-if="previewEntries(tier).length"
-                    class="tw:mt-5 tw:border tw:rounded"
+                    class="mt-5 border rounded"
                     style="
                       background: rgba(0, 0, 0, 0.015);
                       border-color: var(--o2-border-color);
                     "
                   >
                     <div
-                      class="tw:px-4 tw:py-2 tw:text-xs tw:text-gray-500 tw:font-semibold tw:border-b"
+                      class="px-4 py-2 text-xs text-gray-500 font-semibold border-b"
                       style="border-color: var(--o2-border-color)"
                     >
                       {{ t("modelPricing.pricePreview") }}
                     </div>
                     <table
-                      class="tw:w-full tw:text-xs"
+                      class="w-full text-xs"
                       style="border-collapse: collapse"
                     >
                       <thead>
                         <tr
-                          class="tw:text-left tw:text-gray-400 tw:border-b"
+                          class="text-left text-gray-400 border-b"
                           style="border-color: var(--o2-border-color)"
                         >
-                          <th class="tw:px-4 tw:py-2 tw:font-medium">
+                          <th class="px-4 py-2 font-medium">
                             {{ t("modelPricing.usageType") }}
                           </th>
-                          <th class="tw:px-4 tw:py-2 tw:font-medium">
+                          <th class="px-4 py-2 font-medium">
                             {{ t("modelPricing.perThousand") }}
                           </th>
-                          <th class="tw:px-4 tw:py-2 tw:font-medium">
+                          <th class="px-4 py-2 font-medium">
                             {{ t("modelPricing.perMillion") }}
                           </th>
                         </tr>
@@ -461,21 +461,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <tr
                           v-for="entry in previewEntries(tier)"
                           :key="entry.pending ? '__pending__' : entry.key"
-                          class="tw:border-b tw:last:border-none"
+                          class="border-b last:border-none"
                           :class="{
-                            'preview-row-pending tw:opacity-50 tw:italic': entry.pending,
+                            'preview-row-pending opacity-50 italic': entry.pending,
                           }"
                           style="border-color: var(--o2-border-color)"
                         >
                           <td
-                            class="tw:px-4 tw:py-2 tw:text-gray-600 tw:font-medium"
+                            class="px-4 py-2 text-gray-600 font-medium"
                           >
                             {{ entry.key }}
                           </td>
-                          <td class="tw:px-4 tw:py-2 tw:text-gray-600">
+                          <td class="px-4 py-2 text-gray-600">
                             ${{ formatPreviewCost(fromPerMillion(entry.value), 1000) }}
                           </td>
-                          <td class="tw:px-4 tw:py-2 tw:text-gray-600">
+                          <td class="px-4 py-2 text-gray-600">
                             ${{ formatPreviewCost(fromPerMillion(entry.value), 1000000) }}
                           </td>
                         </tr>
@@ -489,7 +489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               type="button"
-              class="tw:self-start"
+              class="self-start"
               data-test="model-pricing-add-tier-btn"
               @click="addTier"
             >
@@ -501,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Footer -->
-    <div class="page-footer tw:flex tw:items-center tw:justify-end tw:gap-2 tw:px-6 tw:h-[50px] tw:shrink-0 tw:border-t tw:border-(--o2-border-color)">
+    <div class="page-footer flex items-center justify-end gap-2 px-6 h-[50px] shrink-0 border-t border-(--o2-border-color)">
       <OButton
         variant="outline"
         size="sm-action"

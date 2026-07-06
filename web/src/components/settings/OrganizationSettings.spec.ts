@@ -133,7 +133,7 @@ describe("OrganizationSettings", () => {
 
     it("should display the settings title", () => {
       const wrapper = createWrapper();
-      const title = wrapper.get("div.tw\\:text-base.tw\\:font-bold");
+      const title = wrapper.get("div.text-base.font-bold");
       expect(title.text()).toContain("Log Details");
     });
 
