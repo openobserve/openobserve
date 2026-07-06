@@ -379,22 +379,6 @@ pub struct SyntheticListItem {
     pub last_response_ms: Option<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct StatusBucket {
-    pub ts: i64,
-    pub status: BucketStatus,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum BucketStatus {
-    Up,
-    /// Some checks in the bucket failed — partial health.
-    Warning,
-    Down,
-    NoData,
-}
-
 // ── Query params / responses ──────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -412,88 +396,6 @@ pub struct ListSyntheticsParams {
 pub struct SyntheticListResponse {
     pub monitors: Vec<SyntheticListItem>,
     pub total: i64,
-}
-
-// ── Results API types (from synthetics_results stream) ────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
-pub struct ScreenshotRef {
-    pub step_id: String,
-    pub key: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CheckResult {
-    pub job_id: String,
-    pub synthetics_id: String,
-    pub location: String,
-    pub pool: String,
-    pub status: CheckStatus,
-    pub response_time_ms: f64,
-    pub error: Option<String>,
-    pub browser_engine: Option<String>,
-    pub device: Option<String>,
-    pub trigger_type: TriggerType,
-    pub checked_at: i64,
-    // artifact keys — object store paths, never presigned URLs
-    #[serde(default)]
-    pub screenshot_refs: Vec<ScreenshotRef>,
-    pub trace_ref: Option<String>,
-    pub rum_session_id: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum CheckStatus {
-    Passed,
-    /// Passed on retry (flaky) or partial location failure.
-    Warning,
-    Failed,
-    Error,
-}
-
-#[derive(Debug, Clone, Deserialize, Default)]
-pub struct ListResultsParams {
-    pub location: Option<String>,
-    pub status: Option<String>,
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    pub page: Option<u64>,
-    pub page_size: Option<u64>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ListResultsResponse {
-    pub results: Vec<CheckResult>,
-    pub total: i64,
-}
-
-#[derive(Debug, Deserialize, Default)]
-pub struct SummaryParams {
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    pub location: Option<String>,
-}
-
-/// Runtime health summary computed from synthetics_results stream + synthetics_jobs.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SyntheticSummary {
-    pub status: SyntheticStatus,
-    pub last_check_at: Option<i64>,
-    pub last_response_ms: Option<f64>,
-    pub uptime_7d_pct: Option<f64>,
-    pub status_24h: Vec<StatusBucket>,
-    /// Per-location breakdown — enables "filter by location" in the UI.
-    pub by_location: Vec<LocationSummary>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LocationSummary {
-    pub location: String,
-    pub status: SyntheticStatus,
-    pub last_check_at: Option<i64>,
-    pub last_response_ms: Option<f64>,
-    pub uptime_7d_pct: Option<f64>,
 }
 
 // ── Type-specific config structs ──────────────────────────────────────────────

@@ -180,43 +180,7 @@ pub async fn get_run_detail(
     }
 }
 
-// ── Results API ───────────────────────────────────────────────────────────────
-
-#[utoipa::path(
-    get,
-    path = "/{org_id}/synthetics/{id}/results",
-    context_path = "/api",
-    tag = "Synthetics",
-    operation_id = "ListSyntheticsResults",
-    summary = "List check results for a monitor",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("id" = String, Path, description = "Monitor ID"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("location" = Option<String>, Query, description = "Filter by location"),
-        ("page" = Option<u64>, Query, description = "Page number"),
-        ("page_size" = Option<u64>, Query, description = "Page size"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 500, description = "Error",   content_type = "application/json", body = Object),
-    ),
-)]
-pub async fn list_results(
-    Path((org_id, id)): Path<(String, String)>,
-    Query(params): Query<config::meta::synthetics::ListResultsParams>,
-) -> Response {
-    match crate::service::synthetics::list_results(&org_id, &id, &params).await {
-        Ok(resp) => MetaHttpResponse::json(resp),
-        Err(e) => {
-            tracing::error!("[synthetics] list_results: {e}");
-            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                .into_response()
-        }
-    }
-}
+// ── Artifact download ─────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
 pub struct ArtifactQuery {
@@ -294,41 +258,6 @@ pub async fn job_upload(
     }
 }
 
-#[utoipa::path(
-    get,
-    path = "/{org_id}/synthetics/{id}/summary",
-    context_path = "/api",
-    tag = "Synthetics",
-    operation_id = "GetSyntheticsSummary",
-    summary = "Get uptime summary and status history for a monitor",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("id" = String, Path, description = "Monitor ID"),
-        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
-        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 500, description = "Error",   content_type = "application/json", body = Object),
-    ),
-)]
-pub async fn get_summary(
-    Path((org_id, id)): Path<(String, String)>,
-    Query(params): Query<config::meta::synthetics::SummaryParams>,
-) -> Response {
-    match crate::service::synthetics::get_summary(&org_id, &id, params.start_time, params.end_time)
-        .await
-    {
-        Ok(summary) => MetaHttpResponse::json(summary),
-        Err(e) => {
-            tracing::error!("[synthetics] get_summary: {e}");
-            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                .into_response()
-        }
-    }
-}
-
 // ── Monitors ──────────────────────────────────────────────────────────────────
 
 #[utoipa::path(
@@ -364,23 +293,7 @@ pub async fn list_synthetics(
         match o2_enterprise::enterprise::synthetics::service::list_synthetics(&org_id, &params)
             .await
         {
-            Ok(mut resp) => {
-                if !resp.monitors.is_empty() {
-                    let ids: Vec<&str> = resp.monitors.iter().map(|m| m.id.as_str()).collect();
-                    if let Ok(summaries) =
-                        crate::service::synthetics::batch_synthetic_summary(&org_id, &ids).await
-                    {
-                        for item in &mut resp.monitors {
-                            if let Some(s) = summaries.get(&item.id) {
-                                // status comes from DB (last_check_status) — do not overwrite
-                                item.last_check_at = s.last_check_at;
-                                item.last_response_ms = s.last_response_ms;
-                            }
-                        }
-                    }
-                }
-                MetaHttpResponse::json(resp)
-            }
+            Ok(resp) => MetaHttpResponse::json(resp),
             Err(e) => {
                 tracing::error!("[synthetics] list_synthetics: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
