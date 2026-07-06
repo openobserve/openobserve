@@ -95,12 +95,8 @@ pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
                     data_lifecycle_end
                 };
 
-                // quick check with the cached stream stats, if the stream has no data
-                // older than the retention boundary we can skip it without any db call.
-                // deletion works at day granularity and never touches the boundary day,
-                // so compare against the day start of the boundary, otherwise after a
-                // deletion the gate would stay open until the boundary passes doc_time_min.
-                // doc_time_min == 0 means no stats yet, fall through to the db check
+                // quick check with the cached stream stats, if the stream has no data older than
+                // the retention boundary we can skip it without any db call.
                 let retention_end_micros = stream_data_retention_end.timestamp_micros();
                 let retention_day_start =
                     retention_end_micros - retention_end_micros % day_micros(1);
