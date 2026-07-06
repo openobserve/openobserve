@@ -8,19 +8,19 @@ const props = withDefaults(defineProps<SkeletonProps>(), {
 });
 
 const shapeClasses: Record<NonNullable<SkeletonProps["type"]>, string> = {
-  rect: "tw:rounded-md tw:w-full",
-  circle: "tw:rounded-full tw:aspect-square",
-  text: "tw:rounded tw:w-full tw:h-4",
+  rect: "rounded-md w-full",
+  circle: "rounded-full aspect-square",
+  text: "rounded w-full h-4",
 };
 
 const animationClasses: Record<NonNullable<SkeletonProps["animation"]>, string> = {
-  pulse: "tw:animate-pulse",
-  wave: "tw:skeleton-wave tw:relative tw:overflow-hidden",
+  pulse: "animate-pulse",
+  wave: "skeleton-wave relative overflow-hidden",
   none: "",
 };
 
 const classes = computed(() => [
-  "tw:block tw:bg-skeleton-base",
+  "block bg-skeleton-base",
   shapeClasses[props.type ?? "rect"],
   animationClasses[props.animation ?? "pulse"],
 ]);
@@ -41,7 +41,7 @@ const classes = computed(() => [
   translateX shimmer — fundamentally more natural than background-position.
 
   Why this feels better:
-  • The base is a flat solid colour (tw:bg-skeleton-base). No moving gradient.
+  • The base is a flat solid colour (bg-skeleton-base). No moving gradient.
   • A ::after overlay physically slides across with translateX. This is
     GPU-composited (no layout cost) and maps 1:1 to visual motion.
   • ease-in-out on translateX mimics how light actually reflects off a surface —
@@ -50,7 +50,7 @@ const classes = computed(() => [
   • The shimmer beam is a 105° tilted gradient — a slight diagonal makes it
     read as a gloss catch, not a mechanical wipe.
 */
-.tw\:skeleton-wave::after {
+.skeleton-wave::after {
   content: "";
   position: absolute;
   inset: 0;

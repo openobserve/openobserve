@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+  <div class="flex flex-col flex-1 min-h-0">
     <!-- Loading state -->
     <div
       v-if="loading"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-3"
+      class="flex flex-col items-center justify-center h-full gap-3"
       data-test="rum-player-traces-tab-loading"
     >
       <OSpinner size="md" />
@@ -29,11 +29,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Error state -->
     <div
       v-else-if="error"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-4 tw:p-4"
+      class="flex flex-col items-center justify-center h-full gap-4 p-4"
       data-test="rum-player-traces-tab-error"
     >
-      <OIcon name="error-outline" size="lg" class="tw:text-[var(--o2-status-error)]" />
-      <p class="tw:text-center">{{ error }}</p>
+      <OIcon name="error-outline" size="lg" class="text-[var(--o2-status-error)]" />
+      <p class="text-center">{{ error }}</p>
       <OButton
         variant="outline"
         size="sm-action"
@@ -47,11 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state -->
     <div
       v-else-if="correlatedViews.length === 0"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-3 tw:p-4"
+      class="flex flex-col items-center justify-center h-full gap-3 p-4"
       data-test="rum-player-traces-tab-empty"
     >
-      <OIcon name="info" size="lg" class="tw:text-[var(--o2-text-muted)]" />
-      <p class="tw:text-center tw:text-[var(--o2-text-secondary)]">
+      <OIcon name="info" size="lg" class="text-[var(--o2-text-muted)]" />
+      <p class="text-center text-[var(--o2-text-secondary)]">
         {{ t("rum.noCorrelatedTraces") }}
       </p>
     </div>
@@ -59,10 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Detail view: embedded TraceDetails -->
     <div
       v-else-if="selectedTrace"
-      class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
+      class="flex flex-col h-full overflow-hidden"
     >
       <!-- Trace detail header -->
-      <div class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+      <div class="flex items-center gap-1 px-2 py-1.5 border-b border-solid border-[var(--o2-border-color)]">
         <OButton
           variant="ghost"
           size="xs"
@@ -72,37 +72,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="arrow-back" size="sm" />
         </OButton>
-        <code class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:truncate tw:min-w-0 tw:flex-1">{{ shortRoute(selectedTrace.route) || selectedTrace.label }}</code>
-        <div class="tw:flex tw:items-center tw:gap-1.5 tw:flex-shrink-0">
+        <code class="text-sm text-[var(--o2-text-secondary)] truncate min-w-0 flex-1">{{ shortRoute(selectedTrace.route) || selectedTrace.label }}</code>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
           <span
             v-if="selectedTrace.metadata?.errorCount > 0"
-            class="tw:font-bold tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-status-error-bg)]! tw:text-[var(--o2-status-error-text)]!"
+            class="font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-[var(--o2-status-error-bg)]! text-[var(--o2-status-error-text)]!"
           >
             <OIcon name="error" size="xs" />
             {{ selectedTrace.metadata.errorCount }} {{ selectedTrace.metadata.errorCount === 1 ? t("rum.error") : t("rum.errors") }}
           </span>
           <button
             v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
-            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-(--color-surface-accent) tw:text-[var(--o2-text-body)] tw:whitespace-nowrap tw:cursor-pointer tw:hover:bg-[var(--o2-border-color)]"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-(--color-surface-accent) text-[var(--o2-text-body)] whitespace-nowrap cursor-pointer hover:bg-[var(--o2-border-color)]"
             :title="t('rum.seekToMoment')"
             data-test="rum-player-traces-tab-seek-btn"
             @click="seekToTrace(selectedTrace)"
           >
-            <OIcon name="play-arrow" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
+            <OIcon name="play-arrow" size="xs" class="text-[var(--o2-text-secondary)]" />
             {{ traceTimeOffset(selectedTrace.metadata.start_time) }}
           </button>
           <span
             v-if="selectedTrace.metadata?.e2eDuration"
-            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-(--color-surface-accent) tw:text-[var(--o2-text-body)] tw:whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-(--color-surface-accent) text-[var(--o2-text-body)] whitespace-nowrap"
           >
-            <OIcon name="timer" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
+            <OIcon name="timer" size="xs" class="text-[var(--o2-text-secondary)]" />
             {{ formatTimeWithSuffix(selectedTrace.metadata.e2eDuration * 1000) }}
           </span>
           <span
             v-if="selectedTrace.metadata?.spanCount"
-            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-(--color-surface-accent) tw:text-[var(--o2-text-body)] tw:whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-(--color-surface-accent) text-[var(--o2-text-body)] whitespace-nowrap"
           >
-            <OIcon name="lan" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
+            <OIcon name="lan" size="xs" class="text-[var(--o2-text-secondary)]" />
             {{ selectedTrace.metadata.spanCount }} {{ selectedTrace.metadata.spanCount === 1 ? t("rum.span") : t("rum.spans") }}
           </span>
           <OButton
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
-      <div class="tw:flex-1 tw:overflow-hidden">
+      <div class="flex-1 overflow-hidden">
         <TraceDetails
           ref="traceDetailsRef"
           mode="embedded"
@@ -136,20 +136,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-expand-button="true"
           :enable-correlation-links="true"
           :initial-timeline-expanded="false"
-          class="tw:h-full!"
+          class="h-full!"
         />
       </div>
     </div>
 
     <!-- List view -->
-    <div v-else class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full tw:px-2">
+    <div v-else class="flex flex-col overflow-hidden h-full px-2">
       <!-- Filter bar -->
-      <div class="tw:flex tw:items-center tw:pr-2 tw:py-1  tw:shrink-0 tw:min-h-[2rem]">
+      <div class="flex items-center pr-2 py-1  shrink-0 min-h-[2rem]">
         <OTag
           type="logsResultChip"
           value="neutral"
           data-test="rum-player-traces-tab-count-badge"
-          class="tw:mr-[0.6rem]"
+          class="mr-[0.6rem]"
         >{{ `${formatLargeNumber(correlatedViews.length)} ${t("menu.traces").toLowerCase()}` }}</OTag>
         <OTag
           v-if="totalErrorCount > 0"
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Traces table -->
-      <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:rounded">
+      <div class="flex-1 min-h-0 overflow-hidden rounded">
         <TenstackTable
           :rows="correlatedViews"
           :columns="traceColumns"
@@ -177,21 +177,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #cell-timestamp="{ item, cell }">
             <div
-              class="tw:overflow-hidden tw:whitespace-nowrap"
+              class="overflow-hidden whitespace-nowrap"
               :style="{ width: cell.column.getSize() + 'px' }"
             >
-              <span class="tw:text-xs tw:tabular-nums">
+              <span class="text-xs tabular-nums">
                 {{ formatTraceTimestamp(item.metadata?.start_time) }}
               </span>
             </div>
           </template>
           <template #cell-route="{ item, cell }">
             <div
-              class="tw:overflow-hidden"
+              class="overflow-hidden"
               :style="{ width: cell.column.getSize() + 'px' }"
             >
               <span
-                class="tw:truncate tw:font-mono tw:text-xs tw:block"
+                class="truncate font-mono text-xs block"
                 :title="item.route"
               >
                 {{ shortRoute(item.route) }}
@@ -200,17 +200,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-duration="{ item, cell }">
             <div
-              class="tw:overflow-hidden tw:whitespace-nowrap"
+              class="overflow-hidden whitespace-nowrap"
               :style="{ width: cell.column.getSize() + 'px' }"
             >
-              <span class="tw:text-xs tw:tabular-nums">
+              <span class="text-xs tabular-nums">
                 {{ formatTimeWithSuffix(item.metadata?.e2eDuration * 1000) }}
               </span>
             </div>
           </template>
           <template #cell-status="{ item, cell }">
             <div
-              class="tw:overflow-hidden tw:flex tw:items-center"
+              class="overflow-hidden flex items-center"
               :style="{ width: cell.column.getSize() + 'px' }"
             >
               <TraceStatusCell :item="{ errors: item.metadata?.errorCount ?? 0 }" />

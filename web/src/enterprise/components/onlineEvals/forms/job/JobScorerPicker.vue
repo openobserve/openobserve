@@ -1,8 +1,8 @@
 <template>
-  <div class="tw:mb-4">
-    <div class="tw:flex tw:flex-col tw:gap-0.5 tw:mb-2">
-      <span class="tw:text-xs tw:font-semibold tw:text-text-primary">{{ t("onlineEvals.job.scorerPicker.title") }}</span>
-      <span class="tw:text-[11.5px] tw:text-text-secondary">{{ t("onlineEvals.job.scorerPicker.hint") }}</span>
+  <div class="mb-4">
+    <div class="flex flex-col gap-0.5 mb-2">
+      <span class="text-xs font-semibold text-text-primary">{{ t("onlineEvals.job.scorerPicker.title") }}</span>
+      <span class="text-[11.5px] text-text-secondary">{{ t("onlineEvals.job.scorerPicker.hint") }}</span>
     </div>
     <OSelect
       :model-value="modelValue"
@@ -18,7 +18,7 @@
     />
     <div
       v-if="!scorers.length"
-      class="tw:mt-2 tw:py-3 tw:px-3.5 tw:border tw:border-dashed tw:border-dialog-header-border tw:rounded-[6px] tw:text-center tw:text-text-secondary tw:text-xs"
+      class="mt-2 py-3 px-3.5 border border-dashed border-dialog-header-border rounded-[6px] text-center text-text-secondary text-xs"
     >
       {{ t("onlineEvals.job.scorerPicker.empty") }}
     </div>

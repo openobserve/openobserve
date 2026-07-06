@@ -56,9 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <path d="M96 150 L144 150 L120 128 Z" fill="var(--color-warning-400)" />
 
     <!-- falling grains -->
-    <circle class="es-grain es-grain-a tw:[transform-box:view-box] tw:[animation:es-grain_1.5s_linear_infinite]" cx="120" cy="96" r="2.4" fill="var(--color-warning-500)" />
-    <circle class="es-grain es-grain-b tw:[transform-box:view-box] tw:[animation:es-grain_1.5s_linear_infinite] tw:[animation-delay:-0.5s]" cx="120" cy="96" r="2" fill="var(--color-warning-500)" />
-    <circle class="es-grain es-grain-c tw:[transform-box:view-box] tw:[animation:es-grain_1.5s_linear_infinite] tw:[animation-delay:-1s]" cx="120" cy="96" r="2.4" fill="var(--color-warning-600)" />
+    <circle class="es-grain es-grain-a [transform-box:view-box] [animation:es-grain_1.5s_linear_infinite]" cx="120" cy="96" r="2.4" fill="var(--color-warning-500)" />
+    <circle class="es-grain es-grain-b [transform-box:view-box] [animation:es-grain_1.5s_linear_infinite] [animation-delay:-0.5s]" cx="120" cy="96" r="2" fill="var(--color-warning-500)" />
+    <circle class="es-grain es-grain-c [transform-box:view-box] [animation:es-grain_1.5s_linear_infinite] [animation-delay:-1s]" cx="120" cy="96" r="2.4" fill="var(--color-warning-600)" />
   </svg>
 </template>
 

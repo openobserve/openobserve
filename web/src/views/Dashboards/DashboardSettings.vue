@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
   <div
     data-test="dashboard-settings-main-container"
-    class="tw:p-0"
-    :class="store.state.theme == 'dark' ? 'dark-mode tw:bg-surface-panel' : 'tw:bg-white'"
+    class="p-0"
+    :class="store.state.theme == 'dark' ? 'dark-mode bg-surface-panel' : 'bg-white'"
     style="min-height: inherit"
   >
 
@@ -44,21 +44,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="generalSettings"
               icon="settings"
               :label="t('dashboard.generalSettings')"
-              class="tw:justify-start tw:py-0 tw:capitalize"
+              class="justify-start py-0 capitalize"
               data-test="dashboard-settings-general-tab"
             />
             <OTab
               name="variableSettings"
               icon="data-array"
               :label="t('dashboard.variableSettings')"
-              class="tw:justify-start tw:py-0 tw:capitalize"
+              class="justify-start py-0 capitalize"
               data-test="dashboard-settings-variable-tab"
             />
             <OTab
               name="tabSettings"
               icon="tab"
               :label="t('dashboard.tabSettings')"
-              class="tw:justify-start tw:py-0 tw:capitalize"
+              class="justify-start py-0 capitalize"
               data-test="dashboard-settings-tab-tab"
             />
           </OTabs>
@@ -70,15 +70,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="activeTab"
             animated
           >
-            <OTabPanel name="generalSettings" class="tw:!p-0" data-test="general-tab-panels-default">
+            <OTabPanel name="generalSettings" class="!p-0" data-test="general-tab-panels-default">
               <GeneralSettings @save="refreshRequired" @close="$emit('close')" />
             </OTabPanel>
 
-            <OTabPanel name="variableSettings" class="tw:!p-0" data-test="variable-tab-panels-default">
+            <OTabPanel name="variableSettings" class="!p-0" data-test="variable-tab-panels-default">
               <VariableSettings @save="refreshRequired" />
             </OTabPanel>
 
-            <OTabPanel name="tabSettings" class="tw:!p-0" data-test="tab-tab-panels-default">
+            <OTabPanel name="tabSettings" class="!p-0" data-test="tab-tab-panels-default">
               <TabsSettings @refresh="refreshRequired" />
             </OTabPanel>
           </OTabPanels>

@@ -50,8 +50,8 @@ const effectiveError = computed(
 const hasError = computed(() => !!effectiveError.value);
 
 const heightClasses: Record<NonNullable<FileProps["size"]>, string> = {
-  sm: "tw:h-6 tw:text-xs",
-  md: "tw:h-8 tw:text-sm",
+  sm: "h-6 text-xs",
+  md: "h-8 text-sm",
 };
 
 function emitFiles(fileList: FileList | File[] | null) {
@@ -184,35 +184,35 @@ function formatSize(bytes: number) {
 }
 
 const wrapperClasses = computed(() => [
-  "tw:relative tw:flex tw:items-center tw:gap-2 tw:w-full tw:rounded-md tw:border tw:px-3 tw:py-1 tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
-  "tw:ring-offset-1 tw:ring-offset-surface-base",
+  "relative flex items-center gap-2 w-full rounded-md border px-3 py-1 transition-[color,background-color,border-color,box-shadow] duration-150",
+  "ring-offset-1 ring-offset-surface-base",
   heightClasses[props.size ?? "md"],
   isDragging.value
-    ? "tw:bg-file-drag-bg tw:border-file-drag-border"
+    ? "bg-file-drag-bg border-file-drag-border"
     : hasError.value
-      ? "tw:bg-file-bg tw:border-file-error-border"
-      : "tw:bg-file-bg tw:border-file-border tw:hover:border-file-hover-border",
+      ? "bg-file-bg border-file-error-border"
+      : "bg-file-bg border-file-border hover:border-file-hover-border",
   props.disabled
-    ? "tw:bg-file-disabled-bg tw:border-file-disabled-border tw:opacity-60 tw:cursor-not-allowed"
-    : "tw:cursor-pointer",
-  "tw:focus-within:border-file-focus-border tw:focus-within:ring-2 tw:focus-within:ring-file-focus-ring",
+    ? "bg-file-disabled-bg border-file-disabled-border opacity-60 cursor-not-allowed"
+    : "cursor-pointer",
+  "focus-within:border-file-focus-border focus-within:ring-2 focus-within:ring-file-focus-ring",
 ]);
 </script>
 
 <template>
-  <div v-bind="wrapperAttrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div v-bind="wrapperAttrs" class="flex flex-col gap-1 w-full">
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
-      class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:flex tw:items-center tw:gap-1"
+      class="o-input-label text-sm font-semibold leading-tight flex items-center gap-1"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
+      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="tw:cursor-help tw:text-file-label"
+        class="cursor-help text-file-label"
       ><slot name="tooltip" /></OIcon>
     </label>
 
@@ -233,7 +233,7 @@ const wrapperClasses = computed(() => [
         :accept="accept"
         :disabled="disabled"
         :tabindex="inputTabindex"
-        class="tw:sr-only"
+        class="sr-only"
         :aria-invalid="hasError || undefined"
         @change="handleChange"
       />
@@ -243,7 +243,7 @@ const wrapperClasses = computed(() => [
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 16 16"
         fill="currentColor"
-        class="tw:size-4 tw:text-file-icon tw:shrink-0"
+        class="size-4 text-file-icon shrink-0"
         aria-hidden="true"
       >
         <path
@@ -255,7 +255,7 @@ const wrapperClasses = computed(() => [
       <!-- Selected files / placeholder -->
       <div
         v-if="files.length === 0"
-        class="tw:flex-1 tw:min-w-0 tw:text-file-placeholder tw:truncate"
+        class="flex-1 min-w-0 text-file-placeholder truncate"
       >
         {{
           placeholder ||
@@ -269,18 +269,18 @@ const wrapperClasses = computed(() => [
 
       <div
         v-else
-        class="o-file-chips tw:flex-1 tw:min-w-0 tw:flex tw:flex-nowrap tw:gap-1.5 tw:items-center tw:overflow-x-auto"
+        class="o-file-chips flex-1 min-w-0 flex flex-nowrap gap-1.5 items-center overflow-x-auto"
       >
         <span
           v-for="(file, i) in files"
           :key="`${file.name}-${i}`"
-          class="tw:inline-flex tw:items-center tw:gap-1 tw:rounded-md tw:bg-file-chip-bg tw:text-file-chip-text tw:px-2 tw:py-0.5 tw:text-xs tw:max-w-[12rem] tw:shrink-0"
+          class="inline-flex items-center gap-1 rounded-md bg-file-chip-bg text-file-chip-text px-2 py-0.5 text-xs max-w-[12rem] shrink-0"
           :data-test="`o-file-chip-${i}`"
         >
-          <span class="tw:truncate" :title="`${file.name} (${formatSize(file.size)})`">
+          <span class="truncate" :title="`${file.name} (${formatSize(file.size)})`">
             {{ file.name }}
           </span>
-          <span class="tw:text-[0.65rem] tw:opacity-70 tw:shrink-0">
+          <span class="text-[0.65rem] opacity-70 shrink-0">
             {{ formatSize(file.size) }}
           </span>
           <button
@@ -289,14 +289,14 @@ const wrapperClasses = computed(() => [
             tabindex="-1"
             aria-label="Remove file"
             :data-test="`o-file-chip-${i}-remove-btn`"
-            class="tw:flex tw:items-center tw:text-file-chip-remove tw:hover:opacity-80"
+            class="flex items-center text-file-chip-remove hover:opacity-80"
             @click.stop="removeFile(i, $event)"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 12 12"
               fill="currentColor"
-              class="tw:size-2.5"
+              class="size-2.5"
               aria-hidden="true"
             >
               <path
@@ -312,14 +312,14 @@ const wrapperClasses = computed(() => [
         type="button"
         tabindex="-1"
         aria-label="Clear all"
-        class="tw:flex tw:items-center tw:text-file-icon tw:hover:opacity-80 tw:shrink-0"
+        class="flex items-center text-file-icon hover:opacity-80 shrink-0"
         @click.stop="handleClear($event)"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 16 16"
           fill="currentColor"
-          class="tw:size-3.5"
+          class="size-3.5"
           aria-hidden="true"
         >
           <path
@@ -331,19 +331,19 @@ const wrapperClasses = computed(() => [
 
     <div
       v-if="effectiveError || helpText"
-      class="tw:flex tw:items-center tw:justify-between tw:gap-2"
+      class="flex items-center justify-between gap-2"
     >
       <span
         v-if="effectiveError && effectiveError.trim()"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
-        class="tw:text-xs tw:text-file-error-text tw:leading-none"
+        class="text-xs text-file-error-text leading-none"
         role="alert"
       >
         {{ effectiveError }}
       </span>
       <span
         v-else-if="helpText"
-        class="tw:text-xs tw:text-file-label tw:leading-none"
+        class="text-xs text-file-label leading-none"
       >
         {{ helpText }}
       </span>
