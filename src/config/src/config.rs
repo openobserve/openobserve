@@ -3246,12 +3246,36 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Strip the Windows extended-length prefix (`\\?\`) from a canonicalized path
+/// so it can be compared with sysinfo mount points that use the plain DOS form.
+///
+/// Uses [`std::path::Prefix`] to detect verbatim prefixes rather than
+/// manipulating the string directly, which would silently break on non-ASCII
+/// drive letters or UNC paths.
+fn deverbatim(path: &Path) -> std::borrow::Cow<'_, str> {
+    #[cfg(windows)]
+    {
+        use std::path::{Component, Prefix};
+        if let Some(Component::Prefix(p)) = path.components().next() {
+            if let Prefix::VerbatimDisk(drive) = p.kind() {
+                // \\?\C:\rest → C:\rest
+                // p.as_os_str() is "\\?\C:" (6 bytes); the remainder of the
+                // original string is "\rest", so prepend the plain drive letter.
+                let after_prefix = &path.to_string_lossy()[p.as_os_str().len()..];
+                return format!("{}:{}", drive as char, after_prefix).into();
+            }
+        }
+    }
+    path.to_string_lossy()
+}
+
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
-    let cache_dir = Path::new(&cfg.common.data_cache_dir)
+    let cache_dir_path = Path::new(&cfg.common.data_cache_dir)
         .canonicalize()
         .unwrap();
-    let cache_dir = cache_dir.to_str().unwrap();
+    let cache_dir_owned = deverbatim(&cache_dir_path).into_owned();
+    let cache_dir = cache_dir_owned.as_str();
 
     // disable disk cache for local disk storage
     if cfg.common.is_local_storage
