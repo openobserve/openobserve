@@ -8,6 +8,10 @@
 
 @plugin "@tailwindcss/typography";
 
+/* Bind `dark:` to the app's `.dark` class (set by utils/theme.ts), not the OS
+   `prefers-color-scheme` — Tailwind v4's default — so it follows the app theme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source "../**/*.{vue,js,ts}";
 
 /*

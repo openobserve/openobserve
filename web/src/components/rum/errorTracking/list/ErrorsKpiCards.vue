@@ -16,18 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    class="tw:grid tw:grid-cols-2 tw:gap-2 tw:h-full"
+    class="grid grid-cols-2 gap-2 h-full"
     data-test="rum-errors-kpi-cards"
     :aria-label="t('rum.errorKpisAria')"
   >
     <article
       v-for="card in cards"
       :key="card.key"
-      class="card-container tw:flex tw:flex-col tw:items-start tw:rounded-lg tw:border tw:border-border-default tw:px-2.5 tw:py-1.5 tw:min-w-0"
+      class="card-container flex flex-col items-start rounded-lg border border-border-default px-2.5 py-1.5 min-w-0"
       :data-test="`rum-errors-kpi-${card.key}-card`"
     >
       <span
-        class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:font-medium tw:uppercase tw:tracking-wide tw:text-[var(--o2-text-label)]"
+        class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-[var(--o2-text-label)]"
       >
         {{ card.label }}
         <OTag
@@ -39,18 +39,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </span>
 
-      <OSkeleton v-if="loading" variant="title" class="tw:w-16" />
+      <OSkeleton v-if="loading" variant="title" class="w-16" />
       <span
         v-else
-        class="tw:text-xl tw:font-semibold tw:tabular-nums"
+        class="text-xl font-semibold tabular-nums"
         :class="card.valueClass"
         :data-test="`rum-errors-kpi-${card.key}-value`"
-      >{{ card.value }}</span>
+        >{{ card.value }}</span
+      >
 
       <small
         v-if="!loading"
         :data-test="`rum-errors-kpi-${card.key}-caption`"
-      >{{ card.caption }}</small>
+        >{{ card.caption }}</small
+      >
     </article>
   </section>
 </template>
@@ -122,9 +124,8 @@ const cards = computed(() => {
       value:
         kpis.crashFreePct === null ? "—" : `${kpis.crashFreePct.toFixed(1)}%`,
       valueClass:
-        kpis.crashFreePct !== null &&
-        kpis.crashFreePct < CRASH_FREE_FAIR_MIN
-          ? "tw:text-[var(--o2-severity-error-color)]"
+        kpis.crashFreePct !== null && kpis.crashFreePct < CRASH_FREE_FAIR_MIN
+          ? "text-[var(--o2-severity-error-color)]"
           : "",
       caption: t("rum.sessionsHitError", {
         errorSessions: addCommasToNumber(kpis.errorSessions),
@@ -148,9 +149,7 @@ const cards = computed(() => {
       label: t("rum.newIssues"),
       value: String(kpis.newIssues),
       valueClass:
-        kpis.newIssues > 0
-          ? "tw:text-[var(--o2-severity-error-color)]"
-          : "",
+        kpis.newIssues > 0 ? "text-[var(--o2-severity-error-color)]" : "",
       caption: kpis.deployVersion
         ? t("rum.firstSeenSinceDeploy", { version: kpis.deployVersion })
         : t("rum.firstSeenInWindow"),
