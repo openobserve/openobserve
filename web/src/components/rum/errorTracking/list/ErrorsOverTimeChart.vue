@@ -16,44 +16,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    class="card-container tw:flex tw:flex-col tw:h-full tw:px-2.5 tw:py-1.5 tw:min-w-0"
+    class="card-container flex flex-col h-full px-2.5 py-1.5 min-w-0"
     data-test="rum-errors-over-time-chart"
   >
     <h4>{{ t("rum.errorsOverTime") }}</h4>
 
     <div
       v-if="loading"
-      class="tw:flex-1 tw:flex tw:items-end tw:gap-1 tw:p-2"
+      class="flex-1 flex items-end gap-1 p-2"
       data-test="rum-errors-over-time-chart-loading"
     >
       <OSkeleton
         v-for="index in 24"
         :key="index"
         variant="button"
-        class="tw:flex-1"
+        class="flex-1"
         :style="{ height: `${20 + ((index * 13) % 70)}%` }"
       />
     </div>
 
     <div
       v-else-if="!hasData"
-      class="tw:flex-1 tw:flex tw:items-center tw:justify-center"
+      class="flex-1 flex items-center justify-center"
       data-test="rum-errors-over-time-chart-empty"
     >
-      <p class="tw:text-[var(--o2-text-muted)]">
+      <p class="text-[var(--o2-text-muted)]">
         {{ t("rum.noErrorsInWindow") }}
       </p>
     </div>
 
     <template v-else>
-      <div class="tw:flex-1 tw:min-h-0">
+      <div class="flex-1 min-h-0">
         <ChartRenderer :data="{ options: chartOptions }" />
       </div>
       <small
         v-if="spikeCaption"
-        class="tw:text-right tw:font-semibold tw:text-[var(--o2-severity-error-color)]"
+        class="text-right font-semibold text-[var(--o2-severity-error-color)]"
         data-test="rum-errors-over-time-chart-spike-caption"
-      >{{ spikeCaption }}</small>
+        >{{ spikeCaption }}</small
+      >
     </template>
   </section>
 </template>
@@ -91,8 +92,7 @@ const hasData = computed(() =>
 /** Window span and bucket resolution decide the x-axis label format. */
 const labelFormat = computed(() => {
   if (props.buckets.length < 2) return "HH:mm";
-  const span =
-    props.buckets[props.buckets.length - 1].ts - props.buckets[0].ts;
+  const span = props.buckets[props.buckets.length - 1].ts - props.buckets[0].ts;
   if (span >= 86400_000_000) return "MM-dd HH:mm";
   // Sub-minute buckets would repeat identical HH:mm labels.
   const bucketSpan = props.buckets[1].ts - props.buckets[0].ts;
@@ -101,9 +101,7 @@ const labelFormat = computed(() => {
 
 const resolveToken = (token: string, fallback: string): string => {
   if (typeof window === "undefined") return fallback;
-  const value = getComputedStyle(document.body)
-    .getPropertyValue(token)
-    .trim();
+  const value = getComputedStyle(document.body).getPropertyValue(token).trim();
   return value || fallback;
 };
 

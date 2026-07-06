@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Single stable root so the IntersectionObserver has one element to
        watch across all display states. -->
-  <div ref="rootEl" class="tw:min-h-4">
+  <div ref="rootEl" class="min-h-4">
     <div
       v-if="displayBuckets.length"
-      class="tw:flex tw:flex-col tw:gap-0.5"
+      class="flex flex-col gap-0.5"
       data-test="rum-error-trend-cell"
     >
       <div
-        class="tw:flex tw:items-end tw:gap-[0.0938rem] tw:h-7"
+        class="flex items-end gap-[0.0938rem] h-7"
         role="img"
         :aria-label="ariaLabel"
         :title="ariaLabel"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-for="(value, index) in displayBuckets"
           :key="index"
-          class="trend-bar tw:w-1.5"
+          class="trend-bar w-1.5"
           :class="
             value > 0
               ? isUnhandled
@@ -47,31 +47,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="trend-annotation"
         :class="`trend-annotation--${annotation.kind}`"
         data-test="rum-error-trend-cell-annotation"
-      >{{ annotationLabel }}</small>
+        >{{ annotationLabel }}</small
+      >
     </div>
 
     <!-- Pre-intersection and in-flight cells both show the skeleton — an
          em-dash would read as "no data" for rows not yet fetched. -->
     <div
       v-else-if="buckets === null || buckets === undefined"
-      class="tw:flex tw:items-end tw:gap-[0.0938rem] tw:h-7 tw:animate-pulse"
+      class="flex items-end gap-[0.0938rem] h-7 animate-pulse"
       data-test="rum-error-trend-cell-loading"
       :aria-label="t('rum.loadingMsg')"
     >
       <span
         v-for="index in 12"
         :key="index"
-        class="trend-bar trend-bar--empty tw:w-1.5"
+        class="trend-bar trend-bar--empty w-1.5"
         :style="{ height: `${20 + ((index * 11) % 60)}%` }"
       />
     </div>
 
     <span
       v-else
-      class="tw:text-[var(--o2-text-muted)]"
+      class="text-[var(--o2-text-muted)]"
       :title="t('rum.trendNoData')"
       data-test="rum-error-trend-cell-empty"
-    >—</span>
+      >—</span
+    >
   </div>
 </template>
 
@@ -154,9 +156,7 @@ const displayBuckets = computed<number[]>(() => {
   const merged: number[] = [];
   for (let i = 0; i < buckets.length; i += chunk) {
     merged.push(
-      buckets
-        .slice(i, i + chunk)
-        .reduce((sum, value) => sum + value, 0),
+      buckets.slice(i, i + chunk).reduce((sum, value) => sum + value, 0),
     );
   }
   return merged;
