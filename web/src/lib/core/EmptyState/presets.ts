@@ -164,7 +164,7 @@ export const emptyStatePresets = {
 
   // --- no ingestion / no data flowing in -----------------------------------
   "no-streams": {
-    illustration: "hourglass",
+    illustration: "connect",
     variant: "create",
     titleKey: "emptyState.noStreams.title",
     descriptionKey: "emptyState.noStreams.description",
@@ -553,6 +553,40 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noBackfillJobs.title",
     descriptionKey: "emptyState.noBackfillJobs.description",
   },
+  "no-regex-patterns": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noRegexPatterns.title",
+    descriptionKey: "emptyState.noRegexPatterns.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noRegexPatterns.action",
+        descriptionKey: "emptyState.noRegexPatterns.actionDesc",
+      },
+      {
+        id: "import",
+        icon: "upload-file",
+        titleKey: "emptyState.noRegexPatterns.import",
+        descriptionKey: "emptyState.noRegexPatterns.importDesc",
+      },
+    ],
+  },
+  "no-storage-config": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noStorageConfig.title",
+    descriptionKey: "emptyState.noStorageConfig.description",
+    actions: [
+      {
+        id: "configure",
+        icon: "cloud-upload",
+        titleKey: "emptyState.noStorageConfig.action",
+        descriptionKey: "emptyState.noStorageConfig.actionDesc",
+      },
+    ],
+  },
 
   // LLM Insights dashboard — single empty-state shape (used for all three
   // "no data" cases: no LLM streams in the org, the active stream has no
@@ -683,6 +717,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-llm-providers": "emptyState.nouns.llmProviders",
   "no-source-maps": "emptyState.nouns.sourceMaps",
   "no-backfill-jobs": "emptyState.nouns.backfillJobs",
+  "no-regex-patterns": "emptyState.nouns.regexPatterns",
   "no-scorers": "emptyState.nouns.scorers",
   "no-eval-jobs": "emptyState.nouns.evalJobs",
   "no-score-configs": "emptyState.nouns.scoreConfigs",

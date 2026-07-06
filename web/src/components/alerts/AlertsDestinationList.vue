@@ -116,8 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="hero"
               preset="no-alert-destinations"
               :filtered="!!filterQuery"
-              :hide-action="!filterQuery"
-              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+              @action="(id) => id === 'clear-filters' ? (filterQuery = '') : (templates.length && editDestination(null))"
             />
           </template>
 

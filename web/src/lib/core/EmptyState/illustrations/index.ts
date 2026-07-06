@@ -37,6 +37,7 @@ import EmptyDataScene from "./EmptyDataScene.vue";
 import EmptyBox from "./EmptyBox.vue";
 import EmptyBoard from "./EmptyBoard.vue";
 import EmptyHourglass from "./EmptyHourglass.vue";
+import EmptyConnect from "./EmptyConnect.vue";
 import EmptyBrokenPanel from "./EmptyBrokenPanel.vue";
 import EmptyCheck from "./EmptyCheck.vue";
 import EmptyLogs from "./EmptyLogs.vue";
@@ -59,6 +60,7 @@ export const illustrations = {
   box: EmptyBox,
   board: EmptyBoard,
   hourglass: EmptyHourglass,
+  connect: EmptyConnect,
   "broken-panel": EmptyBrokenPanel,
   check: EmptyCheck,
   logs: EmptyLogs,

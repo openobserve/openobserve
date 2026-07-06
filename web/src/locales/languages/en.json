@@ -143,6 +143,20 @@
       "title": "No backfill jobs",
       "description": "Backfill jobs reprocess historical data through a pipeline. Run one to get started."
     },
+    "noRegexPatterns": {
+      "title": "No regex patterns yet",
+      "description": "Create a reusable pattern to redact sensitive data, or import one from your library.",
+      "action": "Create pattern",
+      "actionDesc": "Define a new regex pattern",
+      "import": "Import pattern",
+      "importDesc": "Reuse a pattern from your library"
+    },
+    "noStorageConfig": {
+      "title": "No bucket configured",
+      "description": "Route this org's data to a dedicated bucket — independently of other orgs and global defaults.",
+      "action": "Configure storage",
+      "actionDesc": "Connect an S3, GCS, or Azure bucket"
+    },
     "noPipelineHistory": {
       "title": "No pipeline history yet",
       "description": "Pipeline execution history will appear here once your pipelines run."
@@ -162,10 +176,12 @@
       "actionDesc": "Write a new VRL function"
     },
     "noStreams": {
-      "title": "Waiting for your first data",
-      "description": "No data has arrived yet. Connect a source and your streams will show up here automatically.",
+      "title": "Connect a source to create your first stream",
+      "description": "Streams are created automatically the moment data arrives. Set up ingestion from your app, agent, or collector to get started.",
       "action": "Set up ingestion",
-      "actionDesc": "Connect a data source"
+      "actionDesc": "Connect a data source",
+      "createAction": "New stream",
+      "createActionDesc": "Manually define a stream schema"
     },
     "noAlerts": {
       "title": "Create your first alert",
@@ -306,7 +322,8 @@
       "scorers": "scorers",
       "evalJobs": "evaluation jobs",
       "scoreConfigs": "score configs",
-      "pipelineHistory": "pipeline history"
+      "pipelineHistory": "pipeline history",
+      "regexPatterns": "regex patterns"
     }
   },
   "common": {
@@ -1602,6 +1619,11 @@
     "subtitle": "Index management and stream configuration",
     "streamNameHelpText": "Use alphanumeric characters, underscore and colon only.",
     "search": "Search Stream",
+    "emptyOr": "Or:",
+    "emptyKubernetes": "Kubernetes",
+    "emptyAws": "AWS / CloudWatch",
+    "emptyLinux": "Linux",
+    "emptyWindows": "Windows",
     "name": "Name",
     "docNum": "Events",
     "storageSize": "Ingested Data",
