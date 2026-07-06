@@ -741,7 +741,7 @@ describe("TraceDetails", () => {
           '[data-test="trace-details-trace-id"]',
         );
         if (traceId.exists()) {
-          expect(traceId.classes()).toContain("tw:cursor-pointer");
+          expect(traceId.classes()).toContain("cursor-pointer");
         }
       });
 

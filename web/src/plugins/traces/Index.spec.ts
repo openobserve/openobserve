@@ -1660,7 +1660,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(wrapper.find("#tracesSecondLevel").classes()).toContain(
-        "tw:h-full",
+        "h-full",
       );
     });
 

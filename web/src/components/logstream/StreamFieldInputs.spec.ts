@@ -153,8 +153,8 @@ describe('StreamFieldInputs', () => {
       const rows = wrapper.findAll('[data-test^="add-stream-field-row-"]');
       expect(rows.length).toBe(2);
       rows.forEach((row, i) => {
-        expect(row.classes()).toContain('tw:flex');
-        expect(row.classes()).toContain('tw:flex-wrap');
+        expect(row.classes()).toContain('flex');
+        expect(row.classes()).toContain('flex-wrap');
       });
     });
 

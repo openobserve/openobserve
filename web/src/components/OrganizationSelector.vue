@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   once and the menu hangs. Here we drive @tanstack/vue-virtual directly
   with a small overscan and plain markup.
 
-  Styling is pure Tailwind (tw: prefix) + semantic design tokens — selected
+  Styling is pure Tailwind ( prefix) + semantic design tokens — selected
   / hover states reuse the same select-item-* tokens as OSelect so the menu
   matches the rest of the app. No SCSS, no scoped classes.
 -->
@@ -194,12 +194,12 @@ const isSelected = (org: OrgOption) =>
 // consistent with every other dropdown in the app.
 const rowStateClass = (row: { org: OrgOption; index: number }) => {
   if (isSelected(row.org)) {
-    return "tw:bg-select-item-selected-bg tw:text-select-item-selected-text";
+    return "bg-select-item-selected-bg text-select-item-selected-text";
   }
   if (row.index === highlightedIndex.value) {
-    return "tw:bg-select-item-hover-bg tw:text-select-item-text";
+    return "bg-select-item-hover-bg text-select-item-text";
   }
-  return "tw:text-select-item-text";
+  return "text-select-item-text";
 };
 </script>
 
@@ -211,25 +211,25 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           variant="outline-primary"
           size="xs"
           data-test="navbar-organizations-select-trigger"
-          class="tw:w-56 tw:text-text-primary!"
-          :class="open ? 'tw:ring-1 tw:ring-inset tw:ring-primary-300' : ''"
+          class="w-56 text-text-primary!"
+          :class="open ? 'ring-1 ring-inset ring-primary-300' : ''"
         >
           <template #icon-left>
             <OIcon
               name="domain"
               size="sm"
-              class="tw:opacity-60 tw:shrink-0"
+              class="opacity-60 shrink-0"
             />
           </template>
-          <span class="tw:truncate tw:flex-1 tw:min-w-0 tw:text-left">{{
+          <span class="truncate flex-1 min-w-0 text-left">{{
             current?.label || ""
           }}</span>
           <template #icon-right>
             <OIcon
               name="arrow-drop-down"
               size="sm"
-              class="tw:opacity-70 tw:shrink-0 tw:transition-transform"
-              :class="open ? 'tw:rotate-180' : ''"
+              class="opacity-70 shrink-0 transition-transform"
+              :class="open ? 'rotate-180' : ''"
             />
           </template>
         </OButton>
@@ -237,18 +237,18 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
 
       <div
         data-test="organization-menu-list"
-        class="tw:flex tw:flex-col tw:w-94 tw:max-w-[98vw]"
+        class="flex flex-col w-94 max-w-[98vw]"
       >
         <!-- Header: title + count -->
         <div
-          class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:px-3 tw:pt-2 tw:pb-1.5"
+          class="flex items-center justify-between gap-2 px-3 pt-2 pb-1.5"
         >
-          <span class="tw:text-[13px] tw:font-semibold tw:text-text-primary">
+          <span class="text-[13px] font-semibold text-text-primary">
             {{ t("organization.header") }}
           </span>
           <span
             data-test="organization-menu-count"
-            class="tw:shrink-0 tw:text-[11px] tw:font-semibold tw:leading-none tw:px-2 tw:py-1 tw:rounded-full tw:bg-select-item-hover-bg tw:text-text-secondary"
+            class="shrink-0 text-[11px] font-semibold leading-none px-2 py-1 rounded-full bg-select-item-hover-bg text-text-secondary"
           >
             {{
               searchQuery
@@ -259,7 +259,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
         </div>
 
         <!-- Search: ↑/↓ move highlight, Enter selects, Esc closes -->
-        <div class="tw:px-3 tw:pb-3">
+        <div class="px-3 pb-3">
           <OSearchInput
             data-test="organization-search-input"
             v-model="searchQuery"
@@ -272,7 +272,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
 
         <div
           v-if="filtered.length"
-          class="tw:mx-3 tw:h-px tw:bg-select-content-border"
+          class="mx-3 h-px bg-select-content-border"
           aria-hidden="true"
         />
 
@@ -281,15 +281,15 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           v-if="filtered.length"
           ref="scrollRef"
           data-test="organization-menu-table"
-          class="tw:relative tw:max-h-80 tw:overflow-y-auto tw:overflow-x-hidden tw:pt-2 tw:pb-1"
+          class="relative max-h-80 overflow-y-auto overflow-x-hidden pt-2 pb-1"
         >
-          <div class="tw:relative tw:w-full" :style="{ height: `${totalSize}px` }">
+          <div class="relative w-full" :style="{ height: `${totalSize}px` }">
             <div
               v-for="row in rows"
               :key="row.key"
               data-test="organization-menu-item-label-item-label"
               :data-test-org-identifier="row.org.identifier"
-              class="tw:group tw:absolute tw:left-0 tw:right-0 tw:top-0 tw:box-border tw:flex tw:items-center tw:gap-2 tw:px-3 tw:rounded-md tw:cursor-pointer tw:transition-colors"
+              class="group absolute left-0 right-0 top-0 box-border flex items-center gap-2 px-3 rounded-md cursor-pointer transition-colors"
               :class="rowStateClass(row)"
               :style="{
                 transform: `translateY(${row.start}px)`,
@@ -303,15 +303,15 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                    The name takes priority and is never truncated (it only clips
                    if it alone exceeds the whole row); the id yields, truncating
                    to whatever space is left. -->
-              <div class="tw:flex tw:items-baseline tw:gap-2 tw:min-w-0 tw:flex-1">
+              <div class="flex items-baseline gap-2 min-w-0 flex-1">
                 <span
-                  class="tw:flex-none tw:max-w-full tw:min-w-0 tw:truncate tw:text-[13px] tw:font-medium tw:leading-tight"
+                  class="flex-none max-w-full min-w-0 truncate text-[13px] font-medium leading-tight"
                 >
                   {{ row.org.label }}
                 </span>
                 <span
                   v-if="row.org.identifier && row.org.identifier !== row.org.label"
-                  class="tw:shrink tw:min-w-0 tw:truncate tw:text-[11px] tw:font-mono tw:leading-tight tw:text-text-secondary"
+                  class="shrink min-w-0 truncate text-[11px] font-mono leading-tight text-text-secondary"
                 >
                   {{ row.org.identifier }}
                 </span>
@@ -324,13 +324,13 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                 type="button"
                 data-test="organization-menu-item-copy-id"
                 :aria-label="`Copy organization ID ${row.org.identifier}`"
-                class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:size-6 tw:rounded-md tw:transition tw:hover:bg-primary-200 tw:hover:text-select-item-selected-text"
+                class="shrink-0 inline-flex items-center justify-center size-6 rounded-md transition hover:bg-primary-200 hover:text-select-item-selected-text"
                 :class="
                   copiedId === row.org.identifier
-                    ? 'tw:opacity-100 tw:text-primary-600'
+                    ? 'opacity-100 text-primary-600'
                     : row.index === highlightedIndex
-                      ? 'tw:text-text-secondary tw:opacity-100'
-                      : 'tw:text-text-secondary tw:opacity-0 tw:focus-visible:opacity-100'
+                      ? 'text-text-secondary opacity-100'
+                      : 'text-text-secondary opacity-0 focus-visible:opacity-100'
                 "
                 @click.stop="copyId(row.org)"
               >
@@ -349,7 +349,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
         <div
           v-else
           data-test="organization-menu-no-data"
-          class="tw:w-full tw:text-center tw:py-7 tw:text-[13px] tw:text-text-secondary"
+          class="w-full text-center py-7 text-[13px] text-text-secondary"
         >
           No organizations found
         </div>

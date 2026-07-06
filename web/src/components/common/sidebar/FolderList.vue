@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:bg-surface-panel tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem] tw:border-r tw:border-border-default">
-      <div class="folder-header tw:bg-transparent">
-        <div class="tw:font-semibold tw:text-sm tw:text-text-primary tw:px-2 tw:py-2 tw:flex tw:items-center tw:justify-between tw:gap-2">
+  <div class="bg-surface-panel h-full flex flex-col pb-[0.3rem] border-r border-border-default">
+      <div class="folder-header bg-transparent">
+        <div class="font-semibold text-sm text-text-primary px-2 py-2 flex items-center justify-between gap-2">
           {{ t('dashboard.folders') }}
           <div>
             <OButton
@@ -34,17 +34,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <!-- Search Input -->
-        <div class="tw:p-2">
+        <div class="p-2">
           <OSearchInput
             v-model="searchQuery"
             data-test="folder-search"
             :placeholder="t('dashboard.searchFolder')"
             clearable
-            class="tw:w-full"
+            class="w-full"
           />
         </div>
       </div>
-      <div class="folders-tabs tw:flex-1 tw:px-1 tw:overflow-y-auto">
+      <div class="folders-tabs flex-1 px-1 overflow-y-auto">
         <OTabs
           orientation="vertical"
           dense
@@ -55,14 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(tab, index) in filteredTabs"
           :key="tab.folderId"
           :name="tab.folderId"
-          class="test-class tw:min-h-[1.5rem]"
+          class="test-class min-h-[1.5rem]"
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
           >
-          <div class="folder-item tw:w-full tw:flex tw:items-center tw:justify-between tw:flex-nowrap tw:gap-2 tw:min-h-6 tw:group/row" :data-test="`dashboard-folder-tab-name-${tab.name}`">
-              <span class="folder-name tw:flex-1 tw:min-w-0 tw:text-left tw:truncate" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
+          <div class="folder-item w-full flex items-center justify-between flex-nowrap gap-2 min-h-6 group/row" :data-test="`dashboard-folder-tab-name-${tab.name}`">
+              <span class="folder-name flex-1 min-w-0 text-left truncate" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
               tab.name
               }}</span>
-              <div class="tw:hidden tw:group-hover/row:flex tw:has-[[data-state=open]]:flex tw:items-center tw:shrink-0">
+              <div class="hidden group-hover/row:flex has-[[data-state=open]]:flex items-center shrink-0">
               <ODropdown
                 v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
                 side="bottom"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon"
                     variant="ghost"
                     icon-left="more-vert"
-                    class="tw:h-6 tw:w-6"
+                    class="h-6 w-6"
                     data-test="dashboard-more-icon"
                   />
                 </template>

@@ -37,15 +37,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :name="s.key"
       :data-test="`pipeline-section-tab-${s.key}`"
     >
-      <OIcon :name="s.icon" size="sm" class="tw:shrink-0" />
+      <OIcon :name="s.icon" size="sm" class="shrink-0" />
       <span>{{ s.label }}</span>
       <span
         v-if="s.count != null"
-        class="tw:text-[11px] tw:font-bold tw:leading-none tw:px-1.5 tw:py-1 tw:rounded-full"
+        class="text-[11px] font-bold leading-none px-1.5 py-1 rounded-full"
         :class="
           s.key === activeSectionKey
-            ? 'tw:bg-primary-100 tw:text-primary-700'
-            : 'tw:bg-surface-subtle tw:text-text-secondary'
+            ? 'bg-primary-100 text-primary-700'
+            : 'bg-surface-subtle text-text-secondary'
         "
       >{{ s.count }}</span>
     </OTab>

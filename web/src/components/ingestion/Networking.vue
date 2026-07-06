@@ -22,9 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     searchable
     search-data-test="networking-list-search-input"
   >
-    <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-full">
-        <div class="tw:overflow-auto tw:h-full tw:pt-0.5">
+    <div class="w-full h-full">
+      <div class="card-container h-full">
+        <div class="overflow-auto h-full pt-0.5">
           <router-view
             :title="tabs"
             :currOrgIdentifier="currOrgIdentifier"

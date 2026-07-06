@@ -1,10 +1,10 @@
 <template>
-    <div v-if="showBanner && config.isEnterprise == 'true' && config.isCloud === 'false'" class="tw:w-full tw:rounded-md tw:p-3" :class="bannerClass">
-        <div class="tw:flex">
-        <div class="tw:flex tw:flex-col">
-        <span class="tw:text-(--text-lg) tw:font-semibold tw:leading-(--leading-xl) tw:text-(--color-text-heading)">{{ message }}</span>
+    <div v-if="showBanner && config.isEnterprise == 'true' && config.isCloud === 'false'" class="w-full rounded-md p-3" :class="bannerClass">
+        <div class="flex">
+        <div class="flex flex-col">
+        <span class="text-(--text-lg) font-semibold leading-(--leading-xl) text-(--color-text-heading)">{{ message }}</span>
         <br />
-        <span class="tw:text-(--text-md) tw:font-normal tw:leading-(--leading-md) tw:text-(--color-text-body)">{{ subtitle }}</span>
+        <span class="text-(--text-md) font-normal leading-(--leading-md) text-(--color-text-body)">{{ subtitle }}</span>
         </div>
   </div>
     </div>
@@ -63,8 +63,8 @@ export default defineComponent({
 
     const bannerClass = computed(() => {
       return isSevere.value
-        ? 'tw:border tw:border-[#f87171] tw:[background:linear-gradient(to_right,transparent_60%,#fff5f5_70%,#fecdd3_100%)] tw:dark:border-[#dc2626] tw:dark:[background:linear-gradient(to_right,transparent_60%,#2d1f1f_70%,#3d2020_100%)]'
-        : 'tw:border tw:border-[#f0c674] tw:[background:linear-gradient(to_right,transparent_60%,#fffbf0_70%,#fff3cd_100%)] tw:dark:border-[#a08530] tw:dark:[background:linear-gradient(to_right,transparent_60%,#2d2a1f_70%,#3d3520_100%)]';
+        ? 'border border-[#f87171] [background:linear-gradient(to_right,transparent_60%,#fff5f5_70%,#fecdd3_100%)] dark:border-[#dc2626] dark:[background:linear-gradient(to_right,transparent_60%,#2d1f1f_70%,#3d2020_100%)]'
+        : 'border border-[#f0c674] [background:linear-gradient(to_right,transparent_60%,#fffbf0_70%,#fff3cd_100%)] dark:border-[#a08530] dark:[background:linear-gradient(to_right,transparent_60%,#2d2a1f_70%,#3d3520_100%)]';
     });
 
     return {

@@ -19,14 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+  <div class="rounded-md p-0 h-full flex flex-col">
     <!-- Standard page header: title + actions only. Search moved into the
          table's own toolbar (built-in global filter). -->
     <AppPageHeader
       :title="t('serviceAccounts.header')"
       icon="manage-accounts"
       :subtitle="t('serviceAccounts.headerSubtitle')"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
         <OButton
@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-      <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-        <div class="card-container tw:h-full">
+      <div class="w-full flex-1 min-h-0 overflow-hidden">
+        <div class="card-container h-full">
           <OTable
             :frame="false"
             :data="serviceAccountsState.service_accounts_users"
@@ -65,11 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:selected-ids="handleSelectedIdsUpdate"
           >
             <template #toolbar>
-              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+              <div class="flex items-center gap-2 w-full">
                 <OSearchInput
                   v-model="filterQuery"
                   :placeholder="t('serviceAccounts.search')"
-                  class="tw:flex-1"
+                  class="flex-1"
                   data-test="iam-service-accounts-search-input"
                 />
               </div>
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-email="{ row }">
               <template v-if="row.is_system">
                 <span data-test="service-accounts-system-account-label" class="text-weight-medium">{{ row.first_name }}</span>
-                <OTag data-test="service-accounts-system-badge" type="serviceAccountKind" value="system" class="tw:ml-2" />
+                <OTag data-test="service-accounts-system-badge" type="serviceAccountKind" value="system" class="ml-2" />
               </template>
               <template v-else>
                 <span :data-test="`service-accounts-email-${row.email}`"><OUserCell :value="row.email" /></span>
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-created_at="{ row }">
               <span
                 :data-test="`service-accounts-created-${row.email}`"
-                class="tw:text-text-primary"
+                class="text-text-primary"
               >{{ formatCreatedAt(row.created_at) }}</span>
             </template>
 
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="row.is_system">
                 <span
                   data-test="service-accounts-system-managed-badge"
-                  class="tw:inline-flex tw:items-center tw:gap-1"
+                  class="inline-flex items-center gap-1"
                 >
                   <OTag type="serviceAccountKind" value="managed" />
                   <OTooltip :content="t('serviceAccounts.row.managedByTooltip')" />
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #bottom>
-              <span class="o2-table-footer-title tw:text-text-primary">{{ serviceAccountsState.service_accounts_users.length }} {{ t('serviceAccounts.header') }}</span>
+              <span class="o2-table-footer-title text-text-primary">{{ serviceAccountsState.service_accounts_users.length }} {{ t('serviceAccounts.header') }}</span>
               <OButton
                 v-if="selectedAccounts.length > 0"
                 data-test="service-accounts-list-delete-accounts-btn"
@@ -224,19 +224,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div data-test="service-accounts-token-wizard">
         <!-- Step indicator -->
-        <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3 tw:text-xs tw:text-text-secondary">
+        <div class="flex items-center gap-2 mb-3 text-xs text-text-secondary">
           <span
-            :class="wizardStep === 1 ? 'tw:text-primary tw:font-medium' : 'tw:text-text-secondary'"
+            :class="wizardStep === 1 ? 'text-primary font-medium' : 'text-text-secondary'"
           >1. {{ t('serviceAccounts.tokenReveal.step1Title') }}</span>
-          <span class="tw:text-text-secondary">›</span>
+          <span class="text-text-secondary">›</span>
           <span
-            :class="wizardStep === 2 ? 'tw:text-primary tw:font-medium' : 'tw:text-text-secondary'"
+            :class="wizardStep === 2 ? 'text-primary font-medium' : 'text-text-secondary'"
           >2. {{ t('serviceAccounts.tokenReveal.step2Title') }}</span>
         </div>
 
         <!-- ── Step 1: copy the token (irreversible) ──────────── -->
         <div v-if="wizardStep === 1" data-test="service-accounts-token-step-1">
-          <p class="tw:text-xs tw:text-text-secondary tw:mb-3">
+          <p class="text-xs text-text-secondary mb-3">
             {{ t('serviceAccounts.tokenReveal.copyHint') }}
           </p>
 
@@ -248,23 +248,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OTabPanels v-model="tokenTab" animated>
             <OTabPanel name="curl">
-              <pre class="tw:bg-surface-subtle tw:text-text-primary tw:p-3 tw:rounded tw:text-xs tw:overflow-auto tw:whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-primary p-3 rounded text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenCurlSnippet
               }}</pre>
             </OTabPanel>
             <OTabPanel name="header">
-              <pre class="tw:bg-surface-subtle tw:text-text-primary tw:p-3 tw:rounded tw:text-xs tw:overflow-auto tw:whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-primary p-3 rounded text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenHeaderSnippet
               }}</pre>
             </OTabPanel>
             <OTabPanel name="env">
-              <pre class="tw:bg-surface-subtle tw:text-text-primary tw:p-3 tw:rounded tw:text-xs tw:overflow-auto tw:whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-primary p-3 rounded text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenEnvSnippet
               }}</pre>
             </OTabPanel>
           </OTabPanels>
 
-          <div class="tw:flex tw:items-center tw:gap-2 tw:mt-3">
+          <div class="flex items-center gap-2 mt-3">
             <OButton
               data-test="service-accounts-list-token-copy-btn"
               variant="outline"
@@ -274,22 +274,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="content-copy" size="sm" />
             </OButton>
-            <span class="tw:text-xs tw:text-text-secondary">{{ t('serviceAccounts.copyToken') }}</span>
+            <span class="text-xs text-text-secondary">{{ t('serviceAccounts.copyToken') }}</span>
 
             <OButton
               data-test="service-accounts-list-token-download-btn"
               variant="outline"
               size="icon-md"
-              class="tw:ml-2"
+              class="ml-2"
               :title="t('serviceAccounts.downloadToken')"
               @click.stop="downloadTokenAsFile(serviceToken)"
             >
               <OIcon name="file-download" size="sm" />
             </OButton>
-            <span class="tw:text-xs tw:text-text-secondary">{{ t('serviceAccounts.downloadToken') }}</span>
+            <span class="text-xs text-text-secondary">{{ t('serviceAccounts.downloadToken') }}</span>
           </div>
 
-          <div class="tw:flex tw:justify-end tw:mt-4 tw:pt-3 tw:border-t tw:border-border-default">
+          <div class="flex justify-end mt-4 pt-3 border-t border-border-default">
             <OButton
               data-test="service-accounts-token-next-btn"
               variant="primary"
@@ -305,49 +305,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else data-test="service-accounts-token-step-2">
           <div
             data-test="service-accounts-list-token-next-step"
-            class="tw:flex tw:items-start tw:gap-2"
+            class="flex items-start gap-2"
           >
             <OIcon
               v-if="showGroupLink"
               name="warning"
               size="sm"
-              class="tw:text-amber-500 tw:mt-0.5"
+              class="text-amber-500 mt-0.5"
             />
-            <span class="tw:text-xs tw:text-text-secondary">{{ tokenNextStepHint }}</span>
+            <span class="text-xs text-text-secondary">{{ tokenNextStepHint }}</span>
           </div>
 
-          <div v-if="showGroupLink" class="tw:flex tw:flex-wrap tw:items-center tw:justify-center tw:gap-3 tw:mt-3">
+          <div v-if="showGroupLink" class="flex flex-wrap items-center justify-center gap-3 mt-3">
             <router-link
               data-test="service-accounts-list-token-add-to-role"
               :to="roleLinkTarget"
-              class="tw:group tw:inline-flex tw:items-center tw:gap-1.5 tw:rounded-md tw:border tw:border-border-default tw:px-2.5 tw:py-1.5 tw:text-xs tw:text-text-primary tw:transition-colors tw:hover:border-primary tw:hover:bg-primary/5"
+              class="group inline-flex items-center gap-1.5 rounded-md border border-border-default px-2.5 py-1.5 text-xs text-text-primary transition-colors hover:border-primary hover:bg-primary/5"
               @click="isShowToken = false"
             >
-              <OIcon name="shield" size="sm" class="tw:text-primary tw:shrink-0" />
-              <span class="tw:font-medium">{{ t('serviceAccounts.tokenReveal.addToRole') }}</span>
+              <OIcon name="shield" size="sm" class="text-primary shrink-0" />
+              <span class="font-medium">{{ t('serviceAccounts.tokenReveal.addToRole') }}</span>
               <OIcon
                 name="arrow-right"
                 size="sm"
-                class="tw:text-text-secondary tw:shrink-0 tw:transition-transform tw:group-hover:translate-x-0.5"
+                class="text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
               />
             </router-link>
             <router-link
               data-test="service-accounts-list-token-add-to-group"
               :to="groupLinkTarget"
-              class="tw:group tw:inline-flex tw:items-center tw:gap-1.5 tw:rounded-md tw:border tw:border-border-default tw:px-2.5 tw:py-1.5 tw:text-xs tw:text-text-primary tw:transition-colors tw:hover:border-primary tw:hover:bg-primary/5"
+              class="group inline-flex items-center gap-1.5 rounded-md border border-border-default px-2.5 py-1.5 text-xs text-text-primary transition-colors hover:border-primary hover:bg-primary/5"
               @click="isShowToken = false"
             >
-              <OIcon name="group" size="sm" class="tw:text-primary tw:shrink-0" />
-              <span class="tw:font-medium">{{ t('serviceAccounts.tokenReveal.addToGroup') }}</span>
+              <OIcon name="group" size="sm" class="text-primary shrink-0" />
+              <span class="font-medium">{{ t('serviceAccounts.tokenReveal.addToGroup') }}</span>
               <OIcon
                 name="arrow-right"
                 size="sm"
-                class="tw:text-text-secondary tw:shrink-0 tw:transition-transform tw:group-hover:translate-x-0.5"
+                class="text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
               />
             </router-link>
           </div>
 
-          <div class="tw:flex tw:justify-between tw:mt-4 tw:pt-3 tw:border-t tw:border-border-default">
+          <div class="flex justify-between mt-4 pt-3 border-t border-border-default">
             <OButton
               data-test="service-accounts-token-back-btn"
               variant="outline"

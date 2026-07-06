@@ -15,27 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:min-h-[400px] tw:flex tw:flex-col tw:h-full">
+  <div class="min-h-[400px] flex flex-col h-full">
 
     <!-- Loading -->
-    <div v-if="loading" class="tw:flex tw:justify-center tw:items-center tw:py-12">
+    <div v-if="loading" class="flex justify-center items-center py-12">
       <OSpinner variant="dots" size="md" />
     </div>
 
     <!-- Empty state -->
     <div
       v-else-if="events.length === 0"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-16 tw:text-gray-500"
+      class="flex flex-col items-center justify-center py-16 text-gray-500"
     >
-      <OIcon name="forum" class="tw:mb-3 tw:opacity-40" style="width: 56px; height: 56px;" />
-      <div class="tw:text-base tw:font-medium tw:mb-1">No activity yet</div>
-      <div class="tw:text-sm tw:text-gray-400">Events and comments will appear here</div>
+      <OIcon name="forum" class="mb-3 opacity-40" style="width: 56px; height: 56px;" />
+      <div class="text-base font-medium mb-1">No activity yet</div>
+      <div class="text-sm text-gray-400">Events and comments will appear here</div>
     </div>
 
     <!-- Activity Feed with Timeline -->
-    <div v-else class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:relative">
+    <div v-else class="flex-1 flex flex-col min-h-0 relative">
       <!-- Scroll buttons -->
-      <div class="tw:absolute tw:top-2 tw:right-3 tw:flex tw:flex-col tw:gap-1 tw:z-10">
+      <div class="absolute top-2 right-3 flex flex-col gap-1 z-10">
         <OButton
           variant="ghost-muted"
           size="icon-circle-sm"
@@ -50,11 +50,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ><OIcon name="keyboard-arrow-down" size="sm" /><OTooltip content="Scroll to bottom" /></OButton>
       </div>
 
-      <div ref="timelineContainer" class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:px-3 tw:pt-2 tw:pb-4">
-        <div class="tw:relative">
+      <div ref="timelineContainer" class="flex-1 min-h-0 overflow-y-auto px-3 pt-2 pb-4">
+        <div class="relative">
         <!-- Vertical Timeline Line -->
         <div
-          class="tw:absolute tw:left-3 tw:top-0 tw:bottom-0 tw:w-0.5"
+          class="absolute left-3 top-0 bottom-0 w-0.5"
           :style="{
             backgroundColor: store.state.theme === 'dark' ? '#2d333b' : '#e5e7eb',
             marginTop: '12px',
@@ -63,21 +63,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ></div>
 
         <!-- Events -->
-        <div class="tw:relative tw:space-y-4">
+        <div class="relative space-y-4">
           <div
             v-for="(event, index) in events"
             :key="index"
-            class="tw:relative"
+            class="relative"
           >
             <!-- INLINE EVENTS (Status/Label Changes) -->
             <template v-if="!isCommentEvent(event)">
-              <div class="tw:flex tw:items-center tw:gap-3">
+              <div class="flex items-center gap-3">
                 <!-- Avatar for user events or Icon for system events -->
-                <div class="tw:flex-shrink-0">
+                <div class="flex-shrink-0">
                   <!-- User Avatar -->
                   <div
                     v-if="getUserId(event) !== 'System'"
-                    class="tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:z-10 tw:relative"
+                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative"
                     :style="{
                       backgroundColor: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
                       border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- System Event Icon -->
                   <div
                     v-else
-                    class="tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:z-10 tw:relative"
+                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative"
                     :style="{
                       backgroundColor: store.state.theme === 'dark' ? '#2d333b' : '#f6f8fa',
                       border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
@@ -107,19 +107,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Event Description -->
-                <div class="tw:flex-1">
-                  <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 flex-wrap">
                     <!-- For User Events: username, badge, text -->
                     <template v-if="getUserId(event) !== 'System'">
                       <span
-                        class="tw:font-semibold tw:text-sm"
-                        :class="store.state.theme === 'dark' ? 'tw:text-gray-100' : 'tw:text-gray-900'"
+                        class="font-semibold text-sm"
+                        :class="store.state.theme === 'dark' ? 'text-gray-100' : 'text-gray-900'"
                       >
                         {{ getUserId(event) }}
                       </span>
                       <span
                         v-if="event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'"
-                        class="tw:inline-flex tw:items-center tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
                         :style="{
                           backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
                           border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
@@ -128,8 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ getEventBadgeText(event) }}
                       </span>
-                      <span class="tw:text-sm"
-                        :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
+                      <span class="text-sm"
+                        :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'"
                         v-html="DOMPurify.sanitize(getInlineEventText(event))"
                       ></span>
                     </template>
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- AI events: "AI SRE" badge first, then message text -->
                       <template v-if="event.type === 'ai_analysis_begin' || event.type === 'ai_analysis_complete' || event.type === 'ai_analysis_failed'">
                         <span
-                          class="tw:inline-flex tw:items-center tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold"
+                          class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
                           :style="{
                             backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
                             border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
@@ -148,15 +148,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           AI SRE
                           <OTooltip v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)" :delay="300" side="bottom" align="start" :max-width="'24rem'" :content="getFailureTooltip(event)" />
                         </span>
-                        <span class="tw:text-sm"
-                          :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
+                        <span class="text-sm"
+                          :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'"
                           v-html="DOMPurify.sanitize(getInlineEventText(event))"
                         ></span>
                       </template>
                       <!-- For Alert events, show badge first -->
                       <template v-else-if="event.type === 'Alert'">
                         <span
-                          class="tw:inline-flex tw:items-center tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold"
+                          class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
                           :style="{
                             backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
                             border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
@@ -165,20 +165,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           {{ getEventBadgeText(event) }}
                         </span>
-                        <span class="tw:text-sm"
-                          :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
+                        <span class="text-sm"
+                          :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'"
                           v-html="DOMPurify.sanitize(getInlineEventText(event))"
                         ></span>
                       </template>
                       <!-- All other system events: text then badge (except severity changes) -->
                       <template v-else>
-                        <span class="tw:text-sm"
-                          :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
+                        <span class="text-sm"
+                          :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'"
                           v-html="getInlineEventText(event)"
                         ></span>
                         <span
                           v-if="event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'"
-                          class="tw:inline-flex tw:items-center tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold"
+                          class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
                           :style="{
                             backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
                             border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
@@ -189,8 +189,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                       </template>
                     </template>
-                    <span class="tw:text-xs"
-                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                    <span class="text-xs"
+                      :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
                     >
                       {{ formatRelativeTime(event.timestamp) }}
                     </span>
@@ -201,11 +201,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- COMMENT EVENTS (Card Style) -->
             <template v-else>
-              <div class="tw:flex tw:gap-3">
+              <div class="flex gap-3">
                 <!-- Avatar -->
-                <div class="tw:flex-shrink-0">
+                <div class="flex-shrink-0">
                   <div
-                    class="tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:z-10 tw:relative"
+                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative"
                     :style="{
                       backgroundColor: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
                       border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
@@ -220,37 +220,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Comment Card -->
-                <div class="tw:flex-1 tw:min-w-0">
+                <div class="flex-1 min-w-0">
                   <!-- Comment Box -->
                   <div
-                    class="tw:rounded-lg tw:overflow-hidden tw:shadow-sm tw:hover:shadow-md tw:transition-shadow"
+                    class="rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                     :style="store.state.theme === 'dark'
                       ? { backgroundColor: '#181a1b', border: '1px solid #3f4447' }
                       : { backgroundColor: '#ffffff', border: '1px solid #d1d5db' }"
                   >
                     <!-- Header -->
                     <div
-                      class="tw:px-4 tw:py-2 tw:flex tw:items-center tw:gap-2 tw:border-b"
+                      class="px-4 py-2 flex items-center gap-2 border-b"
                       :style="store.state.theme === 'dark'
                         ? { backgroundColor: '#0f1011', borderBottomColor: '#3f4447' }
                         : { backgroundColor: '#f9fafb', borderBottomColor: '#e5e7eb' }"
                     >
-                      <span class="tw:font-semibold tw:text-sm"
-                        :class="store.state.theme === 'dark' ? 'tw:text-gray-100' : 'tw:text-gray-900'"
+                      <span class="font-semibold text-sm"
+                        :class="store.state.theme === 'dark' ? 'text-gray-100' : 'text-gray-900'"
                       >
                         {{ getUserId(event) }}
                       </span>
-                      <span class="tw:text-xs"
-                        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                      <span class="text-xs"
+                        :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
                       >
                         commented {{ formatRelativeTime(event.timestamp) }}
                       </span>
                     </div>
 
                     <!-- Comment Body -->
-                    <div class="tw:px-4 tw:py-3">
-                      <div class="tw:text-sm tw:whitespace-pre-wrap tw:break-words tw:leading-relaxed"
-                        :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-800'"
+                    <div class="px-4 py-3">
+                      <div class="text-sm whitespace-pre-wrap break-words leading-relaxed"
+                        :class="store.state.theme === 'dark' ? 'text-gray-200' : 'text-gray-800'"
                       >
                         {{ event.data?.comment || '' }}
                       </div>
@@ -266,12 +266,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Comment Input -->
-    <div class="tw:p-4">
-      <div class="tw:flex tw:gap-3">
+    <div class="p-4">
+      <div class="flex gap-3">
         <!-- Current User Avatar -->
-        <div class="tw:flex-shrink-0 tw:pt-1">
+        <div class="flex-shrink-0 pt-1">
           <div
-            class="tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center"
+            class="w-6 h-6 rounded-full flex items-center justify-center"
             :style="{
               backgroundColor: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
               border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Input Area -->
-        <div class="tw:flex-1 tw:relative">
+        <div class="flex-1 relative">
           <OInput
             v-model="commentText"
             type="textarea"
@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- Send button inside textarea -->
-          <div class="tw:absolute tw:bottom-3 tw:right-3">
+          <div class="absolute bottom-3 right-3">
             <OButton
               variant="primary"
               size="icon-circle-sm"

@@ -16,26 +16,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:h-full"
-    :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+    class="h-full"
+    :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
   >
     <div>
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-3 tw:py-2">
+      <div class="flex justify-between items-center px-3 py-2">
         <div data-test="add-pipeline-section-title" style="font-size: 18px">
           {{ t("pipeline.addPipeline") }}
         </div>
         <OIcon
           data-test="add-pipeline-close-dialog-btn"
           name="cancel"
-          class="tw:cursor-pointer"
+          class="cursor-pointer"
           size="md"
           v-close-popup="true"
         />
       </div>
 
-      <div class="tw:w-full tw:bg-gray-300" style="height: 1px" />
+      <div class="w-full bg-gray-300" style="height: 1px" />
 
-      <div class="tw:px-3">
+      <div class="px-3">
         <div
           data-test="add-pipeline-name-input"
           class="alert-name-input o2-input"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           data-test="add-pipeline-description-input"
-          class="alert-name-input o2-input tw:mb-2"
+          class="alert-name-input o2-input mb-2"
         >
           <OInput
             v-model="formData.description"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           data-test="add-pipeline-stream-type-select"
-          class="alert-stream-type o2-input tw:mr-2 tw:mb-2"
+          class="alert-stream-type o2-input mr-2 mb-2"
           style="padding-top: 0"
         >
           <OSelect
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="tw:flex tw:gap-2 tw:mt-4 tw:px-3">
+      <div class="flex gap-2 mt-4 px-3">
         <OButton
           variant="outline"
           size="sm-action"

@@ -1378,7 +1378,7 @@ describe("PanelContainer", () => {
 
   describe("Theme Support", () => {
     // Theme is now handled globally via CSS custom property tokens
-    // (e.g. tw:border-border-subtle) that switch with the body--dark class,
+    // (e.g. border-border-subtle) that switch with the body--dark class,
     // rather than a per-component dark-mode class. We assert the panel bar
     // uses the theme-aware token class and renders consistently in both themes.
     it("should use theme-aware token classes on the panel bar in dark mode", async () => {
@@ -1388,7 +1388,7 @@ describe("PanelContainer", () => {
 
       const qBar = wrapper.find('[data-test="dashboard-panel-bar"]');
       expect(qBar.exists()).toBe(true);
-      expect(qBar.classes()).toContain('tw:border-border-subtle');
+      expect(qBar.classes()).toContain('border-border-subtle');
       expect(qBar.classes()).not.toContain('dark-mode');
     });
 
@@ -1399,7 +1399,7 @@ describe("PanelContainer", () => {
 
       const qBar = wrapper.find('[data-test="dashboard-panel-bar"]');
       expect(qBar.exists()).toBe(true);
-      expect(qBar.classes()).toContain('tw:border-border-subtle');
+      expect(qBar.classes()).toContain('border-border-subtle');
       expect(qBar.classes()).not.toContain('dark-mode');
     });
   });

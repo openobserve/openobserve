@@ -37,7 +37,7 @@ describe("OInnerLoading", () => {
       props: { showing: true },
       global: { stubs: { transition: false } },
     });
-    expect(wrapper.find("span.tw\\:text-xs.tw\\:text-inner-loading-label").exists()).toBe(false);
+    expect(wrapper.find("span.text-xs.text-inner-loading-label").exists()).toBe(false);
   });
 
   it("sets aria-label to label text when provided", () => {
@@ -66,7 +66,7 @@ describe("OInnerLoading", () => {
       global: { stubs: { transition: false } },
     });
     const overlay = wrapper.find("[role='status']");
-    expect(overlay.classes()).toContain("tw:absolute");
-    expect(overlay.classes()).toContain("tw:inset-0");
+    expect(overlay.classes()).toContain("absolute");
+    expect(overlay.classes()).toContain("inset-0");
   });
 });
