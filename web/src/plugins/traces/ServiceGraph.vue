@@ -1189,6 +1189,21 @@ export default defineComponent({
       `AND (client.service_name IS NULL OR client.service_name != server.service_name) ` +
       `GROUP BY client.service_name, server.service_name`;
 
+    // Build the messaging (queue) edge SQL: producer (span_kind 4) and consumer
+    // (span_kind 5) spans grouped by topic, so async producer→topic→consumer
+    // flows reconnect (e.g. checkout→orders→fraud-detection).
+    const messagingEdgesSql = (stream: string) =>
+      `SELECT service_name AS service, ` +
+      `CAST(span_kind AS VARCHAR) AS span_kind, ` +
+      `messaging_destination_name AS topic, ` +
+      `COUNT(*) AS total_requests, ` +
+      `SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS errors ` +
+      `FROM "${stream}" ` +
+      `WHERE messaging_system IS NOT NULL ` +
+      `AND messaging_destination_name IS NOT NULL AND messaging_destination_name != '' ` +
+      `AND CAST(span_kind AS VARCHAR) IN ('4','5') ` +
+      `GROUP BY service_name, span_kind, messaging_destination_name`;
+
     // Build the inferred-dependency edge SQL for the given stream.
     const inferredEdgesSql = (stream: string) =>
       `SELECT service_name AS client, infer_service_name AS server, ` +
@@ -1247,27 +1262,32 @@ export default defineComponent({
 
         // Topology + kinds live from the raw traces stream; latency metrics from
         // the pre-aggregated _o2_service_graph stream. Run all three in parallel.
-        const [serviceRows, inferredRows, metricEdges] = await Promise.all([
-          runTracesQuery(orgId, serviceEdgesSql(stream), startTime, endTime, true),
-          hasInferColumns.value
-            ? runTracesQuery(orgId, inferredEdgesSql(stream), startTime, endTime)
-            : Promise.resolve([]),
-          serviceGraphService
-            .getCurrentTopology(orgId, {
-              streamName:
-                streamFilter.value && streamFilter.value !== "all"
-                  ? streamFilter.value
-                  : undefined,
-              startTime,
-              endTime,
-            })
-            .then((r: any) => r?.data?.edges ?? [])
-            .catch(() => []),
-        ]);
+        const [serviceRows, inferredRows, messagingRows, metricEdges] =
+          await Promise.all([
+            runTracesQuery(orgId, serviceEdgesSql(stream), startTime, endTime, true),
+            hasInferColumns.value
+              ? runTracesQuery(orgId, inferredEdgesSql(stream), startTime, endTime)
+              : Promise.resolve([]),
+            // Messaging query is graceful — streams without messaging columns
+            // simply return no rows.
+            runTracesQuery(orgId, messagingEdgesSql(stream), startTime, endTime),
+            serviceGraphService
+              .getCurrentTopology(orgId, {
+                streamName:
+                  streamFilter.value && streamFilter.value !== "all"
+                    ? streamFilter.value
+                    : undefined,
+                startTime,
+                endTime,
+              })
+              .then((r: any) => r?.data?.edges ?? [])
+              .catch(() => []),
+          ]);
 
         const topology = buildTopologyFromTraces(
           serviceRows as any,
           inferredRows as any,
+          messagingRows as any,
         );
         const merged = mergeEdgeMetrics(topology, metricEdges as any);
         const nodes = merged.nodes;

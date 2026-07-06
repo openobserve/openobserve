@@ -109,6 +109,50 @@ describe("buildTopologyFromTraces — inferred deps & collisions", () => {
   });
 });
 
+describe("buildTopologyFromTraces — messaging (queue topic) edges", () => {
+  it("connects producer → topic → consumers on one queue node", () => {
+    const { nodes, edges } = buildTopologyFromTraces(
+      // checkout & fraud-detection & accounting are real services
+      [
+        { client: null, server: "checkout", total_requests: 16, errors: 0 },
+        { client: null, server: "fraud-detection", total_requests: 30, errors: 0 },
+        { client: null, server: "accounting", total_requests: 7, errors: 0 },
+      ],
+      [],
+      [
+        // producer: checkout → orders (span_kind 4)
+        { service: "checkout", span_kind: "4", topic: "orders", total_requests: 16, errors: 0 },
+        // consumers: orders → fraud-detection / accounting (span_kind 5)
+        { service: "fraud-detection", span_kind: "5", topic: "orders", total_requests: 30, errors: 0 },
+        { service: "accounting", span_kind: "5", topic: "orders", total_requests: 7, errors: 0 },
+      ],
+    );
+
+    // One 'orders' topic node, typed queue.
+    const topics = nodes.filter((n) => n.id === "orders");
+    expect(topics).toHaveLength(1);
+    expect(topics[0].service_type).toBe("queue");
+
+    // Producer edge checkout → orders.
+    expect(edges.some((e) => e.from === "checkout" && e.to === "orders")).toBe(true);
+    // Consumer edges orders → each consumer.
+    expect(edges.some((e) => e.from === "orders" && e.to === "fraud-detection")).toBe(true);
+    expect(edges.some((e) => e.from === "orders" && e.to === "accounting")).toBe(true);
+    // fraud-detection now exists as a node (was missing before).
+    expect(nodes.some((n) => n.id === "fraud-detection")).toBe(true);
+  });
+
+  it("drops inferred queue rows (superseded by the messaging query)", () => {
+    const { nodes } = buildTopologyFromTraces(
+      [{ client: null, server: "checkout", total_requests: 1, errors: 0 }],
+      // legacy inferred queue row should be ignored to avoid a duplicate node
+      [{ client: "checkout", server: "kafka", connection_type: "queue", total_requests: 1, errors: 0 }],
+      [],
+    );
+    expect(nodes.some((n) => n.id === "kafka")).toBe(false);
+  });
+});
+
 describe("mergeEdgeMetrics", () => {
   const topo = {
     nodes: [

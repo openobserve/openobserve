@@ -35,6 +35,21 @@ export interface InferredEdgeRow {
   errors?: number;
 }
 
+/**
+ * A messaging span grouped by (service, span_kind, topic). span_kind "4" is a
+ * PRODUCER (service → topic), "5" is a CONSUMER (topic → service). Modeling both
+ * on the topic node reconnects async producer→topic→consumer flows (e.g. Kafka
+ * `orders`) that the parent/child span join cannot, since consumers run in a
+ * separate trace. Matches Datadog's topic-named queue node.
+ */
+export interface MessagingRow {
+  service: string;
+  span_kind: string;
+  topic: string;
+  total_requests?: number;
+  errors?: number;
+}
+
 export interface GraphNode {
   id: string;
   label: string;
@@ -79,6 +94,7 @@ function ensureNode(
 export function buildTopologyFromTraces(
   serviceRows: ServiceEdgeRow[],
   inferredRows: InferredEdgeRow[],
+  messagingRows: MessagingRow[] = [],
 ): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const nodes = new Map<string, GraphNode>();
   const edges: GraphEdge[] = [];
@@ -116,6 +132,10 @@ export function buildTopologyFromTraces(
     // join, so the rpc target (e.g. "oteldemo.CurrencyService") duplicates the
     // real service ("currency"). Drop them to avoid phantom double nodes.
     if (r.connection_type === "rpc") continue;
+    // Queue inferred edges are superseded by the topic-based messaging edges
+    // (below), which name the node by topic and reconnect consumers. Drop the
+    // system-named inferred queue node (e.g. "kafka") to avoid a duplicate.
+    if (r.connection_type === "queue") continue;
 
     const req = r.total_requests ?? 0;
     const err = r.errors ?? 0;
@@ -142,6 +162,33 @@ export function buildTopologyFromTraces(
       error_rate: req > 0 ? (err / req) * 100 : 0,
       // Only mark the edge inferred when the target is a genuine inferred node.
       connection_type: collides ? undefined : r.connection_type,
+    });
+  }
+
+  // Messaging edges: model producer→topic (span_kind 4) and topic→consumer
+  // (span_kind 5) on a shared topic node so async flows reconnect. The topic
+  // node is typed 'queue'; the service side is always a real service.
+  for (const m of messagingRows) {
+    const req = m.total_requests ?? 0;
+    const err = m.errors ?? 0;
+    if (!m.topic || !m.service) continue;
+
+    const topic = ensureNode(nodes, m.topic, "queue");
+    topic.requests += req;
+    topic.errors += err;
+    const svc = ensureNode(nodes, m.service);
+    svc.requests += req;
+    svc.errors += err;
+
+    // Producer (4): service → topic. Consumer (5): topic → service.
+    const isProducer = m.span_kind === "4";
+    edges.push({
+      from: isProducer ? m.service : m.topic,
+      to: isProducer ? m.topic : m.service,
+      total_requests: req,
+      failed_requests: err,
+      error_rate: req > 0 ? (err / req) * 100 : 0,
+      connection_type: "queue",
     });
   }
 
