@@ -575,4 +575,144 @@ describe("DateTime Component", () => {
       expect(wrapper.emitted("on:date-change")).toBeTruthy();
     });
   });
+
+  describe("Editable top time range", () => {
+    it("should be editable only in absolute mode (not relative)", () => {
+      wrapper = createWrapper();
+      wrapper.vm.selectedType = "relative";
+      expect(wrapper.vm.isRangeEditable).toBe(false);
+      wrapper.vm.selectedType = "absolute";
+      expect(wrapper.vm.isRangeEditable).toBe(true);
+    });
+
+    it("should not be editable when disableRelative is set", () => {
+      wrapper = createWrapper({ disableRelative: true });
+      // disableRelative forces absolute mode but the date-only display is not
+      // exposed as an editable range.
+      expect(wrapper.vm.isRangeEditable).toBe(false);
+    });
+
+    it("should apply a pasted range with slash date separators", () => {
+      wrapper = createWrapper();
+      wrapper.vm.selectedType = "absolute";
+      wrapper.vm.editingRange =
+        "2026/06/30 14:30:00 - 2026/06/30 15:45:00";
+
+      wrapper.vm.commitRangeEdit(true);
+
+      expect(wrapper.vm.selectedType).toBe("absolute");
+      expect(wrapper.vm.selectedDate.from).toBe("2026/06/30");
+      expect(wrapper.vm.selectedDate.to).toBe("2026/06/30");
+      expect(wrapper.vm.selectedTime.startTime).toBe("14:30:00");
+      expect(wrapper.vm.selectedTime.endTime).toBe("15:45:00");
+      // Editing state is cleared after commit.
+      expect(wrapper.vm.editingRange).toBe(null);
+    });
+
+    it("should accept dash date separators and normalise to slashes", () => {
+      wrapper = createWrapper();
+      wrapper.vm.selectedType = "absolute";
+      wrapper.vm.editingRange =
+        "2026-06-30 14:30:00 - 2026-06-30 15:45:00";
+
+      wrapper.vm.commitRangeEdit(false);
+
+      expect(wrapper.vm.selectedDate.from).toBe("2026/06/30");
+      expect(wrapper.vm.selectedDate.to).toBe("2026/06/30");
+      expect(wrapper.vm.selectedTime.startTime).toBe("14:30:00");
+      expect(wrapper.vm.selectedTime.endTime).toBe("15:45:00");
+    });
+
+    it("should accept a range without seconds", () => {
+      wrapper = createWrapper();
+      wrapper.vm.selectedType = "absolute";
+      wrapper.vm.editingRange = "2026/06/30 08:05 - 2026/06/30 09:10";
+
+      wrapper.vm.commitRangeEdit(false);
+
+      expect(wrapper.vm.selectedTime.startTime).toBe("08:05:00");
+      expect(wrapper.vm.selectedTime.endTime).toBe("09:10:00");
+    });
+
+    it("should revert silently on an invalid range string", () => {
+      wrapper = createWrapper();
+      wrapper.vm.selectedType = "absolute";
+      wrapper.vm.selectedDate = { from: "2026/06/30", to: "2026/06/30" };
+      wrapper.vm.selectedTime = { startTime: "14:30:00", endTime: "15:45:00" };
+
+      wrapper.vm.editingRange = "not a valid timestamp";
+      wrapper.vm.commitRangeEdit(true);
+
+      // Values are unchanged; editing state is cleared.
+      expect(wrapper.vm.selectedDate.from).toBe("2026/06/30");
+      expect(wrapper.vm.selectedTime.startTime).toBe("14:30:00");
+      expect(wrapper.vm.editingRange).toBe(null);
+    });
+
+    it("should reject an impossible calendar date (Feb 30)", () => {
+      wrapper = createWrapper();
+      wrapper.vm.selectedType = "absolute";
+      wrapper.vm.selectedDate = { from: "2026/06/30", to: "2026/06/30" };
+      wrapper.vm.selectedTime = { startTime: "14:30:00", endTime: "15:45:00" };
+
+      wrapper.vm.editingRange = "2026/02/30 10:00:00 - 2026/02/30 11:00:00";
+      wrapper.vm.commitRangeEdit(true);
+
+      // Unchanged — Feb 30 is not a real date.
+      expect(wrapper.vm.selectedDate.from).toBe("2026/06/30");
+      expect(wrapper.vm.selectedTime.startTime).toBe("14:30:00");
+    });
+
+    it("should reject out-of-range time components", () => {
+      wrapper = createWrapper();
+      wrapper.vm.selectedType = "absolute";
+      wrapper.vm.selectedDate = { from: "2026/06/30", to: "2026/06/30" };
+      wrapper.vm.selectedTime = { startTime: "14:30:00", endTime: "15:45:00" };
+
+      wrapper.vm.editingRange = "2026/06/30 25:00:00 - 2026/06/30 26:00:00";
+      wrapper.vm.commitRangeEdit(true);
+
+      expect(wrapper.vm.selectedTime.startTime).toBe("14:30:00");
+    });
+
+    it("should do nothing when commit is called without active editing", () => {
+      wrapper = createWrapper();
+      wrapper.vm.selectedType = "absolute";
+      wrapper.vm.selectedDate = { from: "2026/06/30", to: "2026/06/30" };
+      wrapper.vm.editingRange = null;
+
+      // Should be a no-op (e.g. blur without prior edit).
+      expect(() => wrapper.vm.commitRangeEdit(false)).not.toThrow();
+      expect(wrapper.vm.selectedDate.from).toBe("2026/06/30");
+    });
+
+    it("should emit on:date-change when a valid range is committed (manual apply)", async () => {
+      wrapper = createWrapper({ autoApply: false });
+      store.state.savedViewFlag = false;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.selectedType = "absolute";
+      wrapper.vm.editingRange =
+        "2026/06/30 14:30:00 - 2026/06/30 15:45:00";
+      wrapper.vm.commitRangeEdit(true);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.emitted("on:date-change")).toBeTruthy();
+    });
+
+    it("should not open the popover while disabled (div trigger guard)", async () => {
+      wrapper = createWrapper({ disable: true });
+      // The trigger is a <div>, so a native disabled attribute can't block it;
+      // onMenuOpenChange must veto opening while disabled.
+      wrapper.vm.onMenuOpenChange(true);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.menuOpen).toBe(false);
+    });
+
+    it("should not be editable while disabled", () => {
+      wrapper = createWrapper({ disable: true });
+      wrapper.vm.selectedType = "absolute";
+      expect(wrapper.vm.isRangeEditable).toBe(false);
+    });
+  });
 });
