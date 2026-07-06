@@ -4,7 +4,8 @@
 // complexity) form: a routed create/edit page with an OStepper, a custom
 // frequency/scheduling section, and several composite controls. Built via a
 // factory so the cron min-interval message stays driven by the live zoConfig and
-// the name-required message stays i18n-driven (pass useI18n's `t`).
+// the name-required / required-field messages stay i18n-driven (pass useI18n's
+// `t`).
 //
 // Migration status (per the form-migration-playbook): the whole form is now
 // FORM-OWNED — there is no bridge left.
@@ -24,18 +25,21 @@
 //     (the VariablesInput composite has no OForm* equivalent + carries no
 //     validation) and are merged into the payload at save.
 //
-// Restores the full Quasar BEFORE validation baseline for CreateReport (the 13
-// :rules from complete-quasar-validation-inventory-BEFORE.md §5) as Zod
-// constraints (truthy -> Zod inversion); the conditional rules (custom-interval
-// mode, !cached mode, cron vs custom, scheduleLater) are expressed in superRefine.
+// Restores the Quasar BEFORE validation baseline for CreateReport (the :rules
+// from complete-quasar-validation-inventory-BEFORE.md §5) as Zod constraints
+// (truthy -> Zod inversion); the conditional rules (custom-interval mode,
+// !cached mode, cron vs custom, scheduleLater timezone) are expressed in
+// superRefine. Exception: the date/time format rules — see the NOTE below.
 //
-// NOTE on the date/time format rules: the BEFORE baseline validated
-// `scheduling.date` as DD-MM-YYYY (the old Quasar q-input format). The field is
-// now an ODate/OFormDate whose value is ISO YYYY-MM-DD (verified in saveReport,
-// which splits scheduling.date as [y,m,d]), so a literal DD-MM-YYYY regex would
-// reject every valid date. The rule is restored against the live ISO format
-// (reportDateRegex) — same validation INTENT, corrected for the migrated control.
-// Likewise the built-in `time` rule becomes an HH:MM regex (OTime's value).
+// NOTE on the BEFORE baseline's date/time format rules: they are deliberately
+// NOT restored. Those DD-MM-YYYY / HH:MM q-input rules targeted the old
+// free-typed inputs; the fields are now ODate/OTime segmented controls that can
+// only emit a well-formed value or "" — and the LIVE pre-migration
+// validateReportData never checked either field, so an untouched (empty)
+// Schedule Later date/time passes through to save. The reports E2E suite
+// (reportsScheduleLater.spec.js) pins that exact flow; enforcing the rules here
+// blocks saves that succeed in production. Making date/time required is a
+// deliberate behavior change for a follow-up (together with the E2E flow).
 //
 // Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
 // this file only describes WHAT is valid.
@@ -57,16 +61,6 @@ const RESOURCE_NAME_MESSAGE =
 export const reportEmailRegex =
   /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/;
 
-// Live ODate / OFormDate value format (ISO YYYY-MM-DD). See the header note: the
-// BEFORE baseline regex was DD-MM-YYYY; this is the same rule for the migrated
-// control's actual format.
-export const reportDateRegex = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
-
-// Live OTime / OFormTime value format (HH:MM). Restores the built-in `time` rule.
-export const reportTimeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-const REQUIRED_MESSAGE = "Field is required!";
-
 // Per-row timerange shape (the OFormDateTimeRange value).
 export const reportTimerangeSchema = z.object({
   type: z.string().optional().default("relative"),
@@ -78,31 +72,40 @@ export const reportTimerangeSchema = z.object({
 // One dashboard row. CreateReport renders exactly one (no add/remove), but it is
 // modelled as a field-array so the form owns the row and the values map straight
 // onto the saved `dashboards[]` payload. folder/dashboard/tabs are required; the
-// rest are unvalidated (no rule existed for them in the BEFORE baseline).
-export const reportDashboardRowSchema = z.object({
-  folder: z.string().min(1, REQUIRED_MESSAGE),
-  dashboard: z.string().min(1, REQUIRED_MESSAGE),
-  tabs: z.string().min(1, REQUIRED_MESSAGE),
-  report_type: z.string().optional(),
-  email_attachment_type: z.string().optional(),
-  // `<input type=number>` emits a string — coerce so a typed "1440" validates as
-  // a number (an empty field is allowed via `.optional()`; blank coerces to 0,
-  // which the save handler treats as "use server defaults").
-  attachmentWidth: z.coerce.number().optional(),
-  attachmentHeight: z.coerce.number().optional(),
-  timerange: reportTimerangeSchema.optional(),
-});
+// rest are unvalidated (no rule existed for them in the BEFORE baseline). A
+// factory: the required message is i18n-driven (see makeCreateReportSchema).
+export const makeReportDashboardRowSchema = (requiredMessage: string) =>
+  z.object({
+    folder: z.string().min(1, requiredMessage),
+    dashboard: z.string().min(1, requiredMessage),
+    tabs: z.string().min(1, requiredMessage),
+    report_type: z.string().optional(),
+    email_attachment_type: z.string().optional(),
+    // `<input type=number>` emits a string — coerce so a typed "1440" validates
+    // as a number (an empty field is allowed via `.optional()`; blank coerces to
+    // 0, which the save handler treats as "use server defaults").
+    attachmentWidth: z.coerce.number().optional(),
+    attachmentHeight: z.coerce.number().optional(),
+    timerange: reportTimerangeSchema.optional(),
+  });
 
 export const makeCreateReportSchema = (
   t: (_key: string) => string,
   zoConfig?: { min_auto_refresh_interval?: string | number } | null,
-) =>
-  z
+) => {
+  // Required-field message — i18n `validation.required` ("This field is
+  // required"), the exact message the pre-migration validateReportData showed
+  // via t('validation.required') (asserted verbatim by the reports E2E suite).
+  const REQUIRED_MESSAGE = t("validation.required");
+
+  return z
     .object({
       // ── Form-owned, genuinely user-typed scalars ─────────────────────────
+      // No .trim(): the pre-migration check validated the raw value, so a
+      // padded / whitespace-only name falls through to the resource-name rule
+      // (spaces are disallowed characters) instead of being silently trimmed.
       name: z
         .string()
-        .trim()
         .min(1, t("common.nameRequired"))
         .refine((val) => isValidResourceName(String(val)), {
           message: RESOURCE_NAME_MESSAGE,
@@ -112,7 +115,9 @@ export const makeCreateReportSchema = (
       imagePreview: z.boolean().optional().default(false),
 
       // ── Dashboard field-array (one fixed, form-owned row) ────────────────
-      dashboards: z.array(reportDashboardRowSchema).min(1, REQUIRED_MESSAGE),
+      dashboards: z
+        .array(makeReportDashboardRowSchema(REQUIRED_MESSAGE))
+        .min(1, REQUIRED_MESSAGE),
 
       // ── Frequency (OFormToggleGroup type + form-owned cron/custom inputs) ──
       frequencyType: z.string().optional().default("once"),
@@ -151,11 +156,14 @@ export const makeCreateReportSchema = (
         }
       }
 
-      // ── Cron: required + valid + min-interval (only in cron mode). ────────
+      // ── Cron: valid + 6 fields + min-interval (only in cron mode). ────────
+      // An EMPTY cron gets "Invalid cron expression!" (not the required
+      // message) — pre-migration, the empty string went straight into the cron
+      // parser, whose throw produced exactly that error.
       if (val.frequencyType === "cron") {
         const cronStr = String(val.cron ?? "").trim();
         if (!cronStr) {
-          addIssue(["cron"], REQUIRED_MESSAGE);
+          addIssue(["cron"], "Invalid cron expression!");
         } else {
           let intervalInSecs: number | undefined;
           try {
@@ -164,7 +172,9 @@ export const makeCreateReportSchema = (
             addIssue(["cron"], "Invalid cron expression!");
           }
           if (intervalInSecs !== undefined) {
-            if (cronStr.split(/\s+/).length !== 6) {
+            // Single-space split (not /\s+/): the pre-migration 6-field check
+            // was `cron.trim().split(" ")`, so doubled spaces fail it.
+            if (cronStr.split(" ").length !== 6) {
               addIssue(
                 ["cron"],
                 "Cron expression must have exactly 6 fields: [Second] [Minute] [Hour] [Day of Month] [Month] [Day of Week]",
@@ -193,30 +203,21 @@ export const makeCreateReportSchema = (
         }
       }
 
-      // ── Timezone: required in cron mode or when scheduling for later. ─────
-      if (
-        val.frequencyType === "cron" ||
-        val.selectedTimeTab === "scheduleLater"
-      ) {
+      // ── Timezone: required only when the Schedule Later tab is active. ────
+      // Pre-migration, the timezone check LOOKED unconditional but saveReport
+      // auto-filled the browser timezone before validating whenever the tab was
+      // "scheduleNow" — including cron mode, which hides the tab UI and leaves
+      // the default in place. So the check could only ever fire on the
+      // Schedule Later tab; requiring it in cron mode would block cron saves
+      // that succeed pre-migration (saveReport still auto-fills them).
+      if (val.selectedTimeTab === "scheduleLater") {
         if (!String(val.timezone ?? "").trim()) {
           addIssue(["timezone"], REQUIRED_MESSAGE);
         }
       }
 
-      // ── Date + time: required + well-formed when scheduling for later. ────
-      // (Only the non-cron "Schedule Later" tab surfaces these inputs; cron /
-      // "Schedule Now" set them programmatically at save.)
-      if (
-        val.selectedTimeTab === "scheduleLater" &&
-        val.frequencyType !== "cron"
-      ) {
-        if (!reportDateRegex.test(String(val.date ?? ""))) {
-          addIssue(["date"], "Date format is incorrect!");
-        }
-        if (!reportTimeRegex.test(String(val.time ?? ""))) {
-          addIssue(["time"], "Time format is incorrect!");
-        }
-      }
+      // (Date + time are intentionally NOT validated — see the header note on
+      // the BEFORE baseline's date/time rules.)
 
       // ── Share: title + emails required (when NOT a cached report). ────────
       if (!val.isCachedReport) {
@@ -228,6 +229,7 @@ export const makeCreateReportSchema = (
         }
       }
     });
+};
 
 export type CreateReportForm = z.infer<ReturnType<typeof makeCreateReportSchema>>;
 

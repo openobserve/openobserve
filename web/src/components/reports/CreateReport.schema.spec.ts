@@ -1,9 +1,11 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Unit tests for the CreateReport Zod schema — restores the full Quasar BEFORE
-// validation baseline (the 13 :rules from
+// Unit tests for the CreateReport Zod schema — restores the Quasar BEFORE
+// validation baseline (the :rules from
 // complete-quasar-validation-inventory-BEFORE.md §5) as Zod constraints, with the
 // conditional rules (cron / custom / !cached / scheduleLater) in superRefine.
+// Exception: the baseline's date/time format rules are intentionally absent —
+// the live pre-migration form never enforced them (see the schema header note).
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
@@ -89,6 +91,8 @@ describe("CreateReport.schema", () => {
     it("rejects invalid resource characters", () => {
       expect(errorPaths({ ...base(), name: "bad name?" })).toContain("name");
       expect(errorPaths({ ...base(), name: "a:b" })).toContain("name");
+      // Parity: no silent trim — a padded name hits the resource-name rule.
+      expect(errorPaths({ ...base(), name: " padded " })).toContain("name");
     });
 
     it("accepts a clean resource name", () => {
@@ -238,9 +242,12 @@ describe("CreateReport.schema", () => {
     });
   });
 
-  // ── timezone: required in cron mode OR when scheduling for later ───────────
+  // ── timezone: required only when the Schedule Later tab is active ──────────
+  // Pre-migration parity: saveReport auto-fills the browser timezone before
+  // validating whenever the tab is "scheduleNow" — including cron mode, which
+  // hides the tab UI — so the requirement can only fire on Schedule Later.
   describe("timezone", () => {
-    it("is required in cron mode", () => {
+    it("is NOT required in cron mode (auto-filled at save, parity)", () => {
       expect(
         errorPaths({
           ...base(),
@@ -248,7 +255,7 @@ describe("CreateReport.schema", () => {
           cron: "0 0 12 * * ?",
           timezone: "",
         }),
-      ).toContain("timezone");
+      ).not.toContain("timezone");
     });
 
     it("is required when scheduling for later", () => {
@@ -270,8 +277,12 @@ describe("CreateReport.schema", () => {
     });
   });
 
-  // ── date + time: required + well-formed in non-cron scheduleLater ──────────
-  describe("date + time (scheduleLater, non-cron)", () => {
+  // ── date + time: intentionally NOT validated (pre-migration parity) ────────
+  // The live pre-migration validateReportData never checked scheduling date/
+  // time — an untouched (empty) Schedule Later date/time saves; the
+  // reportsScheduleLater E2E suite pins that flow. (ODate/OTime segmented
+  // controls can only emit a well-formed value or "".)
+  describe("date + time (scheduleLater, non-cron) — not validated", () => {
     const laterBase = () => ({
       ...base(),
       selectedTimeTab: "scheduleLater",
@@ -286,16 +297,10 @@ describe("CreateReport.schema", () => {
       expect(paths).not.toContain("time");
     });
 
-    it("rejects a malformed date", () => {
-      expect(errorPaths({ ...laterBase(), date: "31-01-2025" })).toContain(
-        "date",
-      );
-      expect(errorPaths({ ...laterBase(), date: "" })).toContain("date");
-    });
-
-    it("rejects a malformed time", () => {
-      expect(errorPaths({ ...laterBase(), time: "9am" })).toContain("time");
-      expect(errorPaths({ ...laterBase(), time: "" })).toContain("time");
+    it("accepts empty date/time for schedule-later (parity: never validated)", () => {
+      const paths = errorPaths({ ...laterBase(), date: "", time: "" });
+      expect(paths).not.toContain("date");
+      expect(paths).not.toContain("time");
     });
 
     it("does NOT validate date/time for schedule-now", () => {
