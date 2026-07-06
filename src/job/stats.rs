@@ -13,24 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job};
+use config::{cluster::LOCAL_NODE, deverbatim, get_config, spawn_pausable_job};
 use tokio::time;
-
-/// Strip the Windows extended-length prefix (`\\?\`) from a canonicalized path.
-/// See [`std::path::Prefix`] for the prefix taxonomy.
-fn deverbatim(path: &std::path::Path) -> std::borrow::Cow<'_, str> {
-    #[cfg(windows)]
-    {
-        use std::path::{Component, Prefix};
-        if let Some(Component::Prefix(p)) = path.components().next() {
-            if let Prefix::VerbatimDisk(drive) = p.kind() {
-                let after_prefix = &path.to_string_lossy()[p.as_os_str().len()..];
-                return format!("{}:{}", drive as char, after_prefix).into();
-            }
-        }
-    }
-    path.to_string_lossy()
-}
 
 use crate::service::{compact::stats::update_stats_from_file_list, db};
 

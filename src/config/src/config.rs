@@ -3252,7 +3252,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 /// Uses [`std::path::Prefix`] to detect verbatim prefixes rather than
 /// manipulating the string directly, which would silently break on non-ASCII
 /// drive letters or UNC paths.
-fn deverbatim(path: &Path) -> std::borrow::Cow<'_, str> {
+pub fn deverbatim(path: &Path) -> std::borrow::Cow<'_, str> {
     #[cfg(windows)]
     {
         use std::path::{Component, Prefix};
