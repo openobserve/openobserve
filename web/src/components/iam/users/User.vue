@@ -660,12 +660,16 @@ export default defineComponent({
                 rawEmail: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
-                // Store the canonical role VALUE (e.g. "admin"/"viewer"), never a
-                // display string. Display is derived from it where shown: the table
-                // capitalises it in the #cell-role slot, and the edit dialogs /
-                // update_member_role consume the value directly. (Single source of
-                // truth — display is a one-way function of the value, never reversed.)
-                role: data.role,
+                // Pre-migration behavior (restored): store the display-cased role
+                // (e.g. "Admin", "Admin (Invited)"). This keeps the edit/update
+                // payloads byte-identical to pre-migration, which sent the capitalized
+                // value. NOTE: it also restores the pre-migration edit-dropdown
+                // mismatch — the OSelect option value is "admin", so a seeded "Admin"
+                // shows blank until re-picked.
+                role:
+                  data?.status == "pending"
+                    ? toCamelCase(data.role) + " (Invited)"
+                    : toCamelCase(data.role),
                 roles: rolesArr,
                 auth_type: data?.auth_type
                   ? data.auth_type

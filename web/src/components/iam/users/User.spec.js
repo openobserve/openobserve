@@ -403,16 +403,17 @@ describe("User Component", () => {
     });
   });
 
-  // Regression / model: the row must store the canonical role VALUE (e.g.
-  // "admin"), not a camel-cased display string ("Admin") — otherwise the value
-  // doesn't match the role-select options and the edit dropdown comes up blank.
-  // Display is derived from the value in the table cell, not baked into the data.
-  describe("Edit dialog role prefill (row stores the role value)", () => {
-    it("builds rows with the raw role value, not a display string", async () => {
+  // Pre-migration behavior (restored): the row stores the DISPLAY-cased role
+  // (toCamelCase → "Admin" / "User"), which is what pre-migration sent on the
+  // wire for edit/update_member_role. Accepted trade-off: this value doesn't
+  // match the lowercase role-select options, so the edit dropdown comes up
+  // blank until the role is re-picked (same as pre-migration).
+  describe("Edit dialog role prefill (row stores the display-cased role)", () => {
+    it("builds rows with the camel-cased display role", async () => {
       await flushPromises();
-      // mockUsers roles are "admin" / "user" — the row keeps them verbatim.
-      expect(wrapper.vm.usersState.users[0].role).toBe("admin");
-      expect(wrapper.vm.usersState.users[1].role).toBe("user");
+      // mockUsers roles are "admin" / "user" → stored as "Admin" / "User".
+      expect(wrapper.vm.usersState.users[0].role).toBe("Admin");
+      expect(wrapper.vm.usersState.users[1].role).toBe("User");
     });
 
     it("seeds AddUser with the row's role value", () => {
