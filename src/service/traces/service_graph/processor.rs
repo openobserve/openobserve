@@ -193,16 +193,23 @@ async fn process_stream(
     // Such a dependency has no server span, so its latency is the client span's own
     // duration (the time spent waiting on it). The anti-join drops any inferred name
     // that is actually an instrumented service in this window, so it is not
-    // double-represented. Schema-gated: skip entirely on streams without the field.
-    let has_infer =
-        infra::schema::get_stream_schema_from_cache(org_id, stream_name, StreamType::Traces)
-            .await
-            .map(|s| {
-                s.field_with_name(crate::service::traces::inferred::INFER_SERVICE_NAME)
-                    .is_ok()
-            })
-            .unwrap_or(false);
+    // Schema-gated: skip only on streams that genuinely lack the field. Use the
+    // DB-backed schema lookup (NOT the cache-only variant) so a cold in-memory
+    // cache on the compactor node does not silently disable all inferred edges.
+    let has_infer = infra::schema::get(org_id, stream_name, StreamType::Traces)
+        .await
+        .map(|s| {
+            s.field_with_name(crate::service::traces::inferred::INFER_SERVICE_NAME)
+                .is_ok()
+        })
+        .unwrap_or(false);
     if has_infer {
+        // Emit ALL inferred-dependency edges. Classification (collision merge,
+        // rpc handling) happens downstream in build_topology via classify_entity,
+        // so there is no anti-join here: an inferred name that also matches a real
+        // service is resolved at topology-build time, not dropped at query time.
+        // (The old `NOT IN (subquery)` anti-join was both semantically wrong and
+        // unsupported by the query engine.)
         let inferred_sql = format!(
             r#"SELECT
                 service_name AS client,
@@ -219,11 +226,6 @@ async fn process_stream(
                 _timestamp >= {start_time} AND _timestamp < {end_time}
                 AND CAST(span_kind AS VARCHAR) IN ('3', '4')
                 AND infer_service_name IS NOT NULL AND infer_service_name != ''
-                AND infer_service_name NOT IN (
-                    SELECT DISTINCT service_name FROM "{stream_name}"
-                    WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
-                        AND service_name IS NOT NULL
-                )
             GROUP BY service_name, infer_service_name"#,
         );
         match run_graph_search(org_id, inferred_sql, start_time, end_time).await {
