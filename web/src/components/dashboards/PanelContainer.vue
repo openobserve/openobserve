@@ -48,11 +48,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex-1" />
 
-        <!-- Show Legends button -->
+        <!-- Show Legends button (hidden when the chart has no data) -->
         <OButton
           v-if="
             isCurrentlyHoveredPanel &&
             props.showLegendsButton &&
+            !PanleSchemaRendererRef?.noData &&
             ![
               'table', 'html', 'markdown', 'custom_chart',
               'geomap', 'maps', 'heatmap', 'metric', 'gauge',

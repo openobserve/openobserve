@@ -192,9 +192,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="flex justify-end mr-2 items-center gap-2"
                   >
-                    <!-- Show Legends button -->
+                    <!-- Show Legends button (hidden when the chart has no data) -->
                     <OButton
                       v-if="
+                        !panelSchemaRendererRef?.noData &&
                         ![
                           'table', 'heatmap', 'metric', 'gauge',
                           'geomap', 'maps',
