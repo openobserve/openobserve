@@ -292,6 +292,36 @@ export function buildSQLContext(
 
   const [min, max] = getSQLMinMaxValue(yAxisKeys, missingValueData);
 
+  // Y-axis tick labels use the configured decimal precision, but when the
+  // visible range is smaller than that precision neighbouring ticks render
+  // identically (e.g. a 0–0.012 range with 2 decimals shows
+  // "0.00, 0.01, 0.01, 0.01"). Extend the precision just enough to keep the
+  // tick labels distinct.
+  const getYAxisTickDecimals = (): number => {
+    const configured = panelSchema.config?.decimals ?? 2;
+    try {
+      const convert = (v: number) =>
+        getUnitValue(
+          v,
+          panelSchema.config?.unit,
+          panelSchema.config?.unit_custom,
+          8,
+        );
+      const lo = convert(min);
+      const hi = convert(max);
+      // different unit tiers (e.g. KB vs MB) — range analysis doesn't apply
+      if (lo.unit !== hi.unit) return configured;
+      // ECharts splits a value axis into ~5 intervals by default
+      const interval = Math.abs(parseFloat(hi.value) - parseFloat(lo.value)) / 5;
+      if (!Number.isFinite(interval) || interval <= 0) return configured;
+      const needed = Math.ceil(-Math.log10(interval));
+      return Math.min(Math.max(configured, needed), 8);
+    } catch {
+      return configured;
+    }
+  };
+  const yAxisTickDecimals = getYAxisTickDecimals();
+
   const getFinalAxisValue = (
     configValue: number | null | undefined,
     dataValue: number,
@@ -683,7 +713,14 @@ export function buildSQLContext(
         fontWeight: "bold",
         fontSize: 14,
       },
+      nameTruncate: {
+        maxWidth: chartPanelRef?.value?.offsetHeight
+          ? Math.max(30, chartPanelRef.value.offsetHeight - 60)
+          : 1000,
+        ellipsis: "..",
+      },
       axisLabel: {
+        hideOverlap: true,
         formatter: function (value: any) {
           try {
             return formatUnitValue(
@@ -691,7 +728,7 @@ export function buildSQLContext(
                 value,
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals,
+                yAxisTickDecimals,
               ),
             );
           } catch (error) {
