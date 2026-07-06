@@ -120,42 +120,58 @@
           <span>{{ kindCounts.rpc }} RPC</span>
         </div>
         <OSeparator vertical class="self-stretch mx-1" />
-        <!-- Density: collapse mode + per-kind visibility -->
-        <div
-          data-test="service-graph-collapse-mode"
-          class="flex items-center gap-1 text-[11px] whitespace-nowrap"
-        >
-          <span class="font-bold text-xs text-(--o2-text-4)">Density</span>
-          <button
-            v-for="m in (['auto', 'expanded', 'collapsed'] as const)"
-            :key="m"
-            :data-test="`service-graph-collapse-${m}`"
-            class="px-1.5 py-0.5 rounded capitalize"
-            :class="
-              collapseMode === m
-                ? 'bg-(--o2-tag-grey-1) font-medium text-(--o2-text-2)'
-                : 'opacity-60'
-            "
-            @click="setCollapseMode(m)"
+        <!-- Density: single dropdown holding collapse mode + per-kind visibility.
+             Keeps the toolbar compact; only the trigger button is inline. -->
+        <ODropdown side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              data-test="service-graph-density-btn"
+              variant="outline"
+              size="xs"
+              icon-left="filter-list"
+            >
+              Density
+            </OButton>
+          </template>
+          <div
+            class="p-2 flex flex-col gap-2 min-w-[10rem]"
+            data-test="service-graph-collapse-mode"
           >
-            {{ m }}
-          </button>
-        </div>
-        <div class="flex items-center gap-2 text-[11px] whitespace-nowrap">
-          <label
-            v-for="k in ['database', 'queue', 'external', 'rpc']"
-            :key="k"
-            :data-test="`service-graph-kind-toggle-${k}`"
-            class="flex items-center gap-1 cursor-pointer capitalize text-(--o2-text-4)"
-          >
-            <input
-              type="checkbox"
-              :checked="!hiddenKinds.has(k)"
-              @change="toggleKindVisibility(k)"
-            />
-            {{ k }}
-          </label>
-        </div>
+            <div class="text-[10px] font-bold uppercase opacity-60">Layout</div>
+            <div class="flex gap-1">
+              <button
+                v-for="m in (['auto', 'expanded', 'collapsed'] as const)"
+                :key="m"
+                :data-test="`service-graph-collapse-${m}`"
+                class="flex-1 px-1.5 py-0.5 rounded capitalize text-[11px]"
+                :class="
+                  collapseMode === m
+                    ? 'bg-(--o2-tag-grey-1) font-medium text-(--o2-text-2)'
+                    : 'opacity-60'
+                "
+                @click="setCollapseMode(m)"
+              >
+                {{ m }}
+              </button>
+            </div>
+            <div class="text-[10px] font-bold uppercase opacity-60 mt-1">
+              Show kinds
+            </div>
+            <label
+              v-for="k in ['database', 'queue', 'external', 'rpc']"
+              :key="k"
+              :data-test="`service-graph-kind-toggle-${k}`"
+              class="flex items-center gap-1.5 cursor-pointer capitalize text-[11px]"
+            >
+              <input
+                type="checkbox"
+                :checked="!hiddenKinds.has(k)"
+                @change="toggleKindVisibility(k)"
+              />
+              {{ k }}
+            </label>
+          </div>
+        </ODropdown>
         <OSeparator
           vertical
           v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
@@ -344,6 +360,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ServiceGraphNoDataState from "./ServiceGraphNoDataState.vue";
 import { getEffectiveTimeRange } from "@/utils/date";
 
@@ -362,6 +379,7 @@ export default defineComponent({
     OIcon,
     OCard,
     OCardSection,
+    ODropdown,
     ServiceGraphNoDataState,
   },
   emits: ["view-traces", "request:stream-change"],

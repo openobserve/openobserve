@@ -2056,17 +2056,13 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.vm.hiddenKinds.has("external")).toBe(true);
     });
 
-    it("renders the collapse-mode control and kind toggles", async () => {
+    it("renders the compact Density dropdown trigger", async () => {
       const wrapper = createWrapper();
       await flushPromises();
+      // The controls live inside a dropdown; only the trigger is always in the
+      // toolbar (keeps it compact). The mode/kind setters are covered above.
       expect(
-        wrapper.find('[data-test="service-graph-collapse-mode"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="service-graph-collapse-auto"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="service-graph-kind-toggle-external"]').exists(),
+        wrapper.find('[data-test="service-graph-density-btn"]').exists(),
       ).toBe(true);
     });
   });
