@@ -50,23 +50,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <template v-if="!isLoading && services.length > 0">
-        <!-- Combined pill: total count + colored status dots with counts -->
-        <div
-          class="flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] text-[var(--o2-text-4)] bg-[var(--o2-tag-grey-1)]"
-          data-test="services-catalog-status-pill"
+      <!-- Entity-type filter: Services / Datastores / Queues / External / RPC.
+           Mirrors the Streams page type tabs; defaults to Services. -->
+      <OToggleGroup
+        v-if="!isLoading && services.length > 0"
+        :model-value="typeFilter"
+        data-test="services-catalog-type-filter"
+        @update:model-value="(v) => onTypeFilterChange(v as string)"
+      >
+        <OToggleGroupItem
+          v-for="cat in visibleTypeFilters"
+          :key="cat"
+          :value="cat"
+          size="sm"
+          :class="tabStatusClass(cat)"
+          :data-test="`services-catalog-type-${cat}`"
         >
-          <template v-if="filterText">
-            {{ filteredServices.length }}/{{ services.length }}
-          </template>
-          <template v-else> {{ services.length }} </template>
-          {{
-            services.length === 1
-              ? t("traces.servicesCatalog.serviceLabel")
-              : t("traces.servicesCatalog.servicesLabel")
-          }}
-        </div>
+          {{ t(`traces.servicesCatalog.types.${cat}`) }}
+          <span class="opacity-60">{{ categoryCounts[cat] }}</span>
+          <!-- Unhealthy count in a filled circle, colored by the tab's worst
+               status. The solid circle reads as "N problems", distinct from the
+               plain total to its left. Hover explains it. -->
+          <span
+            v-if="categoryUnhealthyCounts[cat] > 0"
+            class="inline-flex items-center justify-center min-w-[1.05rem] h-[1.05rem] px-[0.25rem] rounded-full text-[0.65rem] font-semibold leading-none text-white"
+            :style="{ backgroundColor: tabStatusColorVar(cat) }"
+            :data-test="`services-catalog-type-unhealthy-${cat}`"
+          >
+            {{ categoryUnhealthyCounts[cat] }}
+            <OTooltip
+              :content="
+                t('traces.servicesCatalog.unhealthyTooltip', {
+                  count: categoryUnhealthyCounts[cat],
+                  status: t(
+                    `traces.servicesCatalog.status.${categoryWorstStatus[cat]}`,
+                  ),
+                })
+              "
+            />
+          </span>
+        </OToggleGroupItem>
+      </OToggleGroup>
 
+      <template v-if="!isLoading && services.length > 0">
+        <!-- Entity count is already shown per-tab in the type filter, so no
+             separate total pill here — only the health-status pills below. -->
         <template v-if="statusCounts.critical > 0">
           <div
             class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] font-medium bg-[color-mix(in_srgb,var(--o2-service-health-critical)_12%,transparent)] text-[var(--o2-service-health-critical)]"
@@ -395,6 +423,8 @@ import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 
 const { t } = useI18n();
@@ -435,9 +465,44 @@ interface ServiceRow {
   infer_service_type?: string;
 }
 
+// Entity categories mirror the trace-inference taxonomy (infer_service_type).
+// Instrumented services have no infer_service_type; inferred dependencies carry
+// one of database/queue/external/rpc. A row always resolves to exactly one of
+// these concrete categories.
+type EntityCategory = "service" | "datastore" | "queue" | "external" | "rpc";
+// The type-filter selector additionally offers "all" (every category mixed).
+// "all" is a filter value only — a row is never classified as "all".
+type TypeFilter = "all" | EntityCategory;
+const CATEGORY_ORDER: EntityCategory[] = [
+  "service",
+  "datastore",
+  "queue",
+  "external",
+  "rpc",
+];
+// Tab order in the type filter: All first, then each concrete category.
+const TYPE_FILTER_ORDER: TypeFilter[] = ["all", ...CATEGORY_ORDER];
+
+/** Map a row's infer_service_type to a catalog category. */
+function categoryOf(row: ServiceRow): EntityCategory {
+  switch ((row.infer_service_type ?? "").toLowerCase()) {
+    case "database":
+      return "datastore";
+    case "queue":
+      return "queue";
+    case "external":
+      return "external";
+    case "rpc":
+      return "rpc";
+    default:
+      return "service";
+  }
+}
+
 const isLoading = ref(false);
 const services = ref<ServiceRow[]>([]);
 const filterText = ref("");
+const typeFilter = ref<TypeFilter>("service");
 const currentPage = ref(1);
 const rowsPerPage = ref(25);
 const rowsPerPageOptions = [10, 25, 50, 100];
@@ -600,10 +665,15 @@ const tableColumns = computed(() => [
   },
 ]);
 
+// Health pill counts are scoped to the active type tab so they reflect the
+// currently filtered set (e.g. "1 Degraded" among Datastores), not all entities.
 const statusCounts = computed(() => ({
-  critical: services.value.filter((s) => s.status === "critical").length,
-  warning: services.value.filter((s) => s.status === "warning").length,
-  degraded: services.value.filter((s) => s.status === "degraded").length,
+  critical: typeFilteredServices.value.filter((s) => s.status === "critical")
+    .length,
+  warning: typeFilteredServices.value.filter((s) => s.status === "warning")
+    .length,
+  degraded: typeFilteredServices.value.filter((s) => s.status === "degraded")
+    .length,
 }));
 
 function colMax(key: keyof ServiceRow): number {
@@ -620,10 +690,139 @@ const columnMaxes = computed(() => ({
   max_duration_ns: colMax("max_duration_ns"),
 }));
 
+// Rows matching the active type tab, before the text filter is applied.
+// "all" passes everything through; otherwise match the concrete category.
+// Used both for the table and to compute the search-pill "N of M" totals.
+const typeFilteredServices = computed(() =>
+  typeFilter.value === "all"
+    ? services.value
+    : services.value.filter((s) => categoryOf(s) === typeFilter.value),
+);
+
 const filteredServices = computed(() => {
-  if (!filterText?.value?.trim()) return services.value;
+  const byType = typeFilteredServices.value;
+  if (!filterText?.value?.trim()) return byType;
   const q = filterText.value?.trim().toLowerCase();
-  return services.value.filter((s) => s.service_name.toLowerCase().includes(q));
+  return byType.filter((s) => s.service_name.toLowerCase().includes(q));
+});
+
+// Count of entities per category, plus the "all" total, for the tab badges.
+const categoryCounts = computed<Record<TypeFilter, number>>(() => {
+  const counts: Record<TypeFilter, number> = {
+    all: services.value.length,
+    service: 0,
+    datastore: 0,
+    queue: 0,
+    external: 0,
+    rpc: 0,
+  };
+  for (const s of services.value) counts[categoryOf(s)]++;
+  return counts;
+});
+
+// Show "all" + Services always (so the default tab never disappears), plus any
+// concrete category that has at least one entity.
+const visibleTypeFilters = computed(() =>
+  TYPE_FILTER_ORDER.filter(
+    (c) => c === "all" || c === "service" || categoryCounts.value[c] > 0,
+  ),
+);
+
+/** Rows belonging to a type-filter tab ("all" spans everything). */
+function rowsForFilter(filter: TypeFilter): ServiceRow[] {
+  return filter === "all"
+    ? services.value
+    : services.value.filter((s) => categoryOf(s) === filter);
+}
+
+// Worst health status present in each tab's entities. Drives the tab's color
+// accent so an unhealthy bucket is visible without opening it. "critical" wins
+// over "warning" over "degraded"; "healthy" means no accent.
+const UNHEALTHY_RANK: Record<string, number> = {
+  degraded: 1,
+  warning: 2,
+  critical: 3,
+};
+const categoryWorstStatus = computed<Record<TypeFilter, string>>(() => {
+  const worst: Record<TypeFilter, string> = {
+    all: "healthy",
+    service: "healthy",
+    datastore: "healthy",
+    queue: "healthy",
+    external: "healthy",
+    rpc: "healthy",
+  };
+  for (const filter of TYPE_FILTER_ORDER) {
+    for (const s of rowsForFilter(filter)) {
+      if ((UNHEALTHY_RANK[s.status] ?? 0) > (UNHEALTHY_RANK[worst[filter]] ?? 0)) {
+        worst[filter] = s.status;
+      }
+    }
+  }
+  return worst;
+});
+
+// Count of non-healthy (degraded/warning/critical) entities per tab, shown in
+// brackets next to the tab's total (e.g. "Datastores 2 (1)").
+const categoryUnhealthyCounts = computed<Record<TypeFilter, number>>(() => {
+  const counts: Record<TypeFilter, number> = {
+    all: 0,
+    service: 0,
+    datastore: 0,
+    queue: 0,
+    external: 0,
+    rpc: 0,
+  };
+  for (const filter of TYPE_FILTER_ORDER) {
+    counts[filter] = rowsForFilter(filter).filter(
+      (s) => (UNHEALTHY_RANK[s.status] ?? 0) > 0,
+    ).length;
+  }
+  return counts;
+});
+
+// Tailwind text-color class for a tab's worst status; empty when healthy.
+function tabStatusClass(filter: TypeFilter): string {
+  switch (categoryWorstStatus.value[filter]) {
+    case "critical":
+      return "text-[var(--o2-service-health-critical)]";
+    case "warning":
+      return "text-[var(--o2-service-health-warning)]";
+    case "degraded":
+      return "text-[var(--o2-service-health-degraded)]";
+    default:
+      return "";
+  }
+}
+
+// CSS color (var reference) for a tab's worst-status badge fill; empty when
+// healthy. Used as the filled-circle background for the unhealthy count.
+function tabStatusColorVar(filter: TypeFilter): string {
+  switch (categoryWorstStatus.value[filter]) {
+    case "critical":
+      return "var(--o2-service-health-critical)";
+    case "warning":
+      return "var(--o2-service-health-warning)";
+    case "degraded":
+      return "var(--o2-service-health-degraded)";
+    default:
+      return "";
+  }
+}
+
+function onTypeFilterChange(value: string) {
+  typeFilter.value = value as TypeFilter;
+  currentPage.value = 1;
+}
+
+// If the active type tab disappears (e.g. after switching to a stream with no
+// datastores), fall back to Services so the table never shows an orphaned empty
+// state for a hidden tab.
+watch(visibleTypeFilters, (tabs) => {
+  if (!tabs.includes(typeFilter.value)) {
+    typeFilter.value = "service";
+    currentPage.value = 1;
+  }
 });
 
 const statusOrder: Record<string, number> = {

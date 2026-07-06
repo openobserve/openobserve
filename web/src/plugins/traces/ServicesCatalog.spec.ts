@@ -926,22 +926,13 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const pill = wrapper.find('[data-test="services-catalog-status-pill"]');
-      expect(pill.exists()).toBe(true);
-      // Just the total — no colored status dots
-      expect(pill.text()).toContain("1 service");
+      // Entity total is shown in the type-filter tabs, not a separate pill.
       expect(wrapper.vm.statusCounts.critical).toBe(0);
     });
 
     it("should show individual status pills when non-healthy statuses exist", async () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
-
-      // Total count pill
-      const totalPill = wrapper.find('[data-test="services-catalog-status-pill"]');
-      expect(totalPill.exists()).toBe(true);
-      expect(totalPill.text()).toContain("5");
-      expect(totalPill.text()).toContain("services");
 
       // Individual status pills for non-zero counts
       expect(wrapper.find('[data-test="services-catalog-pill-critical"]').exists()).toBe(true);
@@ -987,9 +978,7 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const pill = wrapper.find('[data-test="services-catalog-status-pill"]');
-      expect(pill.exists()).toBe(true);
-      // No non-healthy statuses, so pill only shows total
+      // No non-healthy statuses among the (Services) tab entities.
       expect(wrapper.vm.statusCounts.critical).toBe(0);
     });
   });
@@ -1216,11 +1205,6 @@ describe("ServicesCatalog", () => {
       expect(
         wrapper.find('[data-test="services-catalog-pill-degraded"]').exists(),
       ).toBe(false);
-
-      // Total pill should still be visible
-      expect(
-        wrapper.find('[data-test="services-catalog-status-pill"]').exists(),
-      ).toBe(true);
     });
   });
 
@@ -1291,10 +1275,10 @@ describe("ServicesCatalog", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Service count badge
+  // Entity counts live in the type-filter tabs (no separate count pill)
   // -----------------------------------------------------------------------
-  describe("service count badge", () => {
-    it("should show total count when no filter is active", async () => {
+  describe("type-filter tab counts", () => {
+    function mockAllServices() {
       mockFetchQueryDataWithHttpStream.mockImplementation(
         (_req: any, callbacks: any) => {
           const hits = mockServices.map((s) => ({
@@ -1308,7 +1292,6 @@ describe("ServicesCatalog", () => {
             p95_latency_ns: s.p95_latency_ns,
             p99_latency_ns: s.p99_latency_ns,
           }));
-
           if (callbacks?.data) {
             callbacks.data(null, {
               type: "search_response_hits",
@@ -1320,58 +1303,33 @@ describe("ServicesCatalog", () => {
           }
         },
       );
+    }
 
+    it("shows the total on the All tab and the count on the Services tab", async () => {
+      mockAllServices();
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const badge = wrapper.find('[data-test="services-catalog-status-pill"]');
-      expect(badge.exists()).toBe(true);
-      // Without filter, shows just the total
-      expect(badge.text()).toContain("5");
+      // mockServices has no infer_service_type → all classified as Services.
+      expect(wrapper.vm.categoryCounts.all).toBe(mockServices.length);
+      expect(wrapper.vm.categoryCounts.service).toBe(mockServices.length);
+
+      const allTab = wrapper.find('[data-test="services-catalog-type-all"]');
+      expect(allTab.exists()).toBe(true);
+      expect(allTab.text()).toContain(String(mockServices.length));
     });
 
-    it("should show filtered / total when filter is active", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
-
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
-
+    it("does not render a separate total count pill", async () => {
+      mockAllServices();
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      wrapper.vm.filterText = "gateway";
-      await flushPromises();
-
-      const badge = wrapper.find('[data-test="services-catalog-status-pill"]');
-      expect(badge.exists()).toBe(true);
-      // With filter, shows "filtered / total"
-      expect(badge.text()).toContain("1");
-      expect(badge.text()).toContain("5");
-      expect(badge.text()).toContain("/");
+      expect(
+        wrapper.find('[data-test="services-catalog-status-pill"]').exists(),
+      ).toBe(false);
     });
 
-    it("should not render the count badge when loading", async () => {
+    it("does not render the type filter when loading", async () => {
       mockFetchQueryDataWithHttpStream.mockImplementation(() => {
         // Keep loading — never calls complete
       });
@@ -1379,9 +1337,10 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const badge = wrapper.find('[data-test="services-catalog-status-pill"]');
-      // The badge is inside v-if="!isLoading && services.length > 0"
-      expect(badge.exists()).toBe(false);
+      // Type filter is inside v-if="!isLoading && services.length > 0".
+      expect(
+        wrapper.find('[data-test="services-catalog-type-filter"]').exists(),
+      ).toBe(false);
     });
   });
 
@@ -1993,6 +1952,274 @@ describe("ServicesCatalog", () => {
             .replace(/\./g, "="),
         );
         expect(decodedSql).toContain('FROM "production-stream"');
+      });
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Entity-type classification & filter
+  // -----------------------------------------------------------------------
+  describe("entity-type classification & filter", () => {
+    // A mixed inventory: instrumented services + inferred datastore/queue/external/rpc.
+    const mixedRows = [
+      { service_name: "backend-pos-web", infer_service_type: undefined },
+      { service_name: "backend-tss-login", infer_service_type: undefined },
+      { service_name: "redis-prod", infer_service_type: "database" },
+      { service_name: "orders-db", infer_service_type: "database" },
+      { service_name: "refund-order", infer_service_type: "queue" },
+      { service_name: "google.com", infer_service_type: "external" },
+      { service_name: "auth-rpc", infer_service_type: "rpc" },
+    ].map((r) => ({
+      status: "healthy",
+      total_requests: 100,
+      error_count: 0,
+      error_rate: 0,
+      avg_duration_ns: 0,
+      max_duration_ns: 0,
+      p50_latency_ns: 0,
+      p95_latency_ns: 0,
+      p99_latency_ns: 0,
+      ...r,
+    }));
+
+    async function mountWithRows(rows: any[]) {
+      const w = mountServicesCatalog();
+      await flushPromises();
+      w.vm.services = rows;
+      // The default fetch mock never fires `complete`, so isLoading stays true
+      // and the toolbar (type filter) stays hidden. Clear it so DOM assertions
+      // on the tabs work; vm-level computed assertions don't need this.
+      w.vm.isLoading = false;
+      await flushPromises();
+      return w;
+    }
+
+    it("defaults the type filter to Services", async () => {
+      wrapper = await mountWithRows(mixedRows);
+      expect(wrapper.vm.typeFilter).toBe("service");
+    });
+
+    it("shows only instrumented services under the default Services tab", async () => {
+      wrapper = await mountWithRows(mixedRows);
+      const names = wrapper.vm.filteredServices.map(
+        (s: any) => s.service_name,
+      );
+      expect(names.sort()).toEqual(["backend-pos-web", "backend-tss-login"]);
+    });
+
+    it("counts entities per category from infer_service_type", async () => {
+      wrapper = await mountWithRows(mixedRows);
+      expect(wrapper.vm.categoryCounts).toEqual({
+        all: 7,
+        service: 2,
+        datastore: 2,
+        queue: 1,
+        external: 1,
+        rpc: 1,
+      });
+    });
+
+    it("switches the visible rows when the type filter changes", async () => {
+      wrapper = await mountWithRows(mixedRows);
+
+      wrapper.vm.onTypeFilterChange("datastore");
+      await flushPromises();
+      expect(
+        wrapper.vm.filteredServices.map((s: any) => s.service_name).sort(),
+      ).toEqual(["orders-db", "redis-prod"]);
+
+      wrapper.vm.onTypeFilterChange("external");
+      await flushPromises();
+      expect(
+        wrapper.vm.filteredServices.map((s: any) => s.service_name),
+      ).toEqual(["google.com"]);
+    });
+
+    it("applies the text filter within the active type tab", async () => {
+      wrapper = await mountWithRows(mixedRows);
+      wrapper.vm.onTypeFilterChange("datastore");
+      wrapper.vm.filterText = "redis";
+      await flushPromises();
+      expect(
+        wrapper.vm.filteredServices.map((s: any) => s.service_name),
+      ).toEqual(["redis-prod"]);
+    });
+
+    it("hides type tabs with no entities but always keeps Services", async () => {
+      wrapper = await mountWithRows([
+        {
+          service_name: "svc-only",
+          infer_service_type: undefined,
+          status: "healthy",
+          total_requests: 1,
+          error_count: 0,
+          error_rate: 0,
+          avg_duration_ns: 0,
+          max_duration_ns: 0,
+          p50_latency_ns: 0,
+          p95_latency_ns: 0,
+          p99_latency_ns: 0,
+        },
+      ]);
+      // "all" and Services are always present even on a services-only stream.
+      expect(wrapper.vm.visibleTypeFilters).toEqual(["all", "service"]);
+    });
+
+    it("falls back to Services when the active tab disappears", async () => {
+      wrapper = await mountWithRows(mixedRows);
+      wrapper.vm.onTypeFilterChange("queue");
+      await flushPromises();
+      expect(wrapper.vm.typeFilter).toBe("queue");
+
+      // Replace inventory with services only — the Queue tab vanishes.
+      wrapper.vm.services = mixedRows.filter(
+        (r) => !r.infer_service_type,
+      );
+      await flushPromises();
+      expect(wrapper.vm.typeFilter).toBe("service");
+    });
+
+    it("treats database infer type as the Datastores category", async () => {
+      wrapper = await mountWithRows(mixedRows);
+      wrapper.vm.onTypeFilterChange("datastore");
+      await flushPromises();
+      // 'database' (infer_service_type) → 'datastore' (catalog category)
+      expect(wrapper.vm.filteredServices).toHaveLength(2);
+    });
+
+    it("offers an 'all' tab first, then Services, then present categories", async () => {
+      wrapper = await mountWithRows(mixedRows);
+      expect(wrapper.vm.visibleTypeFilters).toEqual([
+        "all",
+        "service",
+        "datastore",
+        "queue",
+        "external",
+        "rpc",
+      ]);
+    });
+
+    it("shows every entity type mixed under the 'all' tab", async () => {
+      wrapper = await mountWithRows(mixedRows);
+      wrapper.vm.onTypeFilterChange("all");
+      await flushPromises();
+      expect(wrapper.vm.filteredServices).toHaveLength(mixedRows.length);
+    });
+
+    it("applies the text filter across all types under 'all'", async () => {
+      wrapper = await mountWithRows(mixedRows);
+      wrapper.vm.onTypeFilterChange("all");
+      wrapper.vm.filterText = "order"; // matches queue 'refund-order' + db 'orders-db'
+      await flushPromises();
+      expect(
+        wrapper.vm.filteredServices.map((s: any) => s.service_name).sort(),
+      ).toEqual(["orders-db", "refund-order"]);
+    });
+
+    describe("status counts scoped to the active type tab", () => {
+      // Two datastores: one degraded, one healthy. One critical service.
+      const statusRows = [
+        { service_name: "svc-crit", infer_service_type: undefined, status: "critical", error_rate: 20 },
+        { service_name: "db-degraded", infer_service_type: "database", status: "degraded", error_rate: 3 },
+        { service_name: "db-ok", infer_service_type: "database", status: "healthy", error_rate: 0 },
+      ].map((r) => ({
+        total_requests: 100,
+        error_count: 0,
+        avg_duration_ns: 0,
+        max_duration_ns: 0,
+        p50_latency_ns: 0,
+        p95_latency_ns: 0,
+        p99_latency_ns: 0,
+        ...r,
+      }));
+
+      it("counts only the active tab's entities (Datastores → 1 Degraded, 0 Critical)", async () => {
+        wrapper = await mountWithRows(statusRows);
+        wrapper.vm.onTypeFilterChange("datastore");
+        await flushPromises();
+        expect(wrapper.vm.statusCounts.degraded).toBe(1);
+        expect(wrapper.vm.statusCounts.critical).toBe(0);
+      });
+
+      it("counts across all entities under the 'all' tab", async () => {
+        wrapper = await mountWithRows(statusRows);
+        wrapper.vm.onTypeFilterChange("all");
+        await flushPromises();
+        expect(wrapper.vm.statusCounts.critical).toBe(1);
+        expect(wrapper.vm.statusCounts.degraded).toBe(1);
+      });
+
+      it("excludes other tabs' entities (Services → 1 Critical, 0 Degraded)", async () => {
+        wrapper = await mountWithRows(statusRows);
+        // default tab is Services
+        expect(wrapper.vm.statusCounts.critical).toBe(1);
+        expect(wrapper.vm.statusCounts.degraded).toBe(0);
+      });
+    });
+
+    describe("unhealthy highlight & bracket count on tabs", () => {
+      // db-degraded + db-ok (datastore), svc-crit (service), q-ok (queue).
+      const healthRows = [
+        { service_name: "svc-crit", infer_service_type: undefined, status: "critical" },
+        { service_name: "db-degraded", infer_service_type: "database", status: "degraded" },
+        { service_name: "db-ok", infer_service_type: "database", status: "healthy" },
+        { service_name: "q-ok", infer_service_type: "queue", status: "healthy" },
+      ].map((r) => ({
+        total_requests: 100,
+        error_count: 0,
+        error_rate: 0,
+        avg_duration_ns: 0,
+        max_duration_ns: 0,
+        p50_latency_ns: 0,
+        p95_latency_ns: 0,
+        p99_latency_ns: 0,
+        ...r,
+      }));
+
+      it("reports the worst status per category", async () => {
+        wrapper = await mountWithRows(healthRows);
+        const worst = wrapper.vm.categoryWorstStatus;
+        expect(worst.service).toBe("critical");
+        expect(worst.datastore).toBe("degraded");
+        expect(worst.queue).toBe("healthy");
+        expect(worst.all).toBe("critical"); // worst across everything
+      });
+
+      it("counts unhealthy entities per category for the bracket", async () => {
+        wrapper = await mountWithRows(healthRows);
+        const unhealthy = wrapper.vm.categoryUnhealthyCounts;
+        expect(unhealthy.service).toBe(1); // svc-crit
+        expect(unhealthy.datastore).toBe(1); // db-degraded (db-ok excluded)
+        expect(unhealthy.queue).toBe(0);
+        expect(unhealthy.all).toBe(2); // svc-crit + db-degraded
+      });
+
+      it("applies the critical color class to a critical category tab", async () => {
+        wrapper = await mountWithRows(healthRows);
+        expect(wrapper.vm.tabStatusClass("service")).toContain("critical");
+        expect(wrapper.vm.tabStatusClass("datastore")).toContain("degraded");
+        expect(wrapper.vm.tabStatusClass("queue")).toBe(""); // healthy → no accent
+      });
+
+      it("exposes a worst-status color var for the count badge fill", async () => {
+        wrapper = await mountWithRows(healthRows);
+        expect(wrapper.vm.tabStatusColorVar("service")).toContain("critical");
+        expect(wrapper.vm.tabStatusColorVar("datastore")).toContain("degraded");
+        expect(wrapper.vm.tabStatusColorVar("queue")).toBe(""); // healthy → no fill
+      });
+
+      it("renders the bracket count only for tabs with unhealthy entities", async () => {
+        wrapper = await mountWithRows(healthRows);
+        expect(
+          wrapper
+            .find('[data-test="services-catalog-type-unhealthy-datastore"]')
+            .exists(),
+        ).toBe(true);
+        expect(
+          wrapper
+            .find('[data-test="services-catalog-type-unhealthy-queue"]')
+            .exists(),
+        ).toBe(false);
       });
     });
   });

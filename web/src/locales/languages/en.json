@@ -4504,6 +4504,15 @@
       "servicesLabel": "services",
       "viewTraces": "View Traces",
       "exportCsv": "Export CSV",
+      "types": {
+        "all": "All",
+        "service": "Services",
+        "datastore": "Datastores",
+        "queue": "Queues",
+        "external": "External",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{count} {status}",
       "legend": {
         "title": "Error Rate"
       }
