@@ -736,8 +736,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             match json::from_slice(&schema_versions.last().unwrap().1) {
                 Ok(s) => s,
                 Err(e) => {
-                    // A corrupt or empty schema entry (e.g. an empty value column
-                    // in metadata.sqlite) must not bring down the whole process.
+                    // A corrupt or empty schema entry (e.g. an empty or unreadable
+                    // value in the metadata store) must not bring down the whole process.
                     // Log and skip this stream; it can be repaired manually.
                     log::error!(
                         "Error parsing schema, key: {item_key}, error: {e}; skipping"
