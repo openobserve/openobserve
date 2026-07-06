@@ -231,13 +231,14 @@ pub async fn get_run<C: ConnectionTrait>(
 /// `job_result` uses SyntheticStatus DB integers: 1=Passed, 2=Warning, 3=Failed, 4=Error.
 /// Higher integer = higher severity, so `CASE WHEN ... > run_result` naturally picks worst.
 ///
-/// Returns `true` if the run is now complete (all jobs have acked).
+/// Returns `Some((run_result, job_count))` when the run is now complete (all jobs have acked),
+/// or `None` if jobs are still in progress.
 pub async fn increment_jobs_done<C: ConnectionTrait>(
     conn: &C,
     run_id: &str,
     job_result: i32,
     now_us: i64,
-) -> Result<bool, errors::Error> {
+) -> Result<Option<(i32, i32)>, errors::Error> {
     let update_sql = r#"
         UPDATE synthetics_runs
         SET
@@ -264,7 +265,7 @@ pub async fn increment_jobs_done<C: ConnectionTrait>(
     .await?;
 
     let check_sql = r#"
-        SELECT jobs_done, job_count FROM synthetics_runs WHERE id = $1
+        SELECT jobs_done, job_count, run_result FROM synthetics_runs WHERE id = $1
     "#;
     let rows = conn
         .query_all(Statement::from_sql_and_values(
@@ -277,9 +278,14 @@ pub async fn increment_jobs_done<C: ConnectionTrait>(
     if let Some(row) = rows.into_iter().next() {
         let done: i32 = row.try_get("", "jobs_done").unwrap_or(0);
         let count: i32 = row.try_get("", "job_count").unwrap_or(1);
-        Ok(done >= count)
+        if done >= count {
+            let result: Option<i32> = row.try_get("", "run_result").unwrap_or(None);
+            Ok(Some((result.unwrap_or(job_result), count)))
+        } else {
+            Ok(None)
+        }
     } else {
-        Ok(false)
+        Ok(None)
     }
 }
 

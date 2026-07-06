@@ -902,14 +902,17 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
                     },
                 );
 
-                if !resp.destinations.is_empty() {
+                // Notify once per run, not once per job ack.
+                if resp.run_complete && !resp.destinations.is_empty() {
                     let org_id = resp.org_id.clone();
                     let monitor_name = resp.synthetics_name.clone();
                     let monitor_id = resp.synthetics_id.clone();
                     let monitor_type = resp.monitor_type.clone();
                     let target = resp.target.clone();
                     let destinations = resp.destinations.clone();
-                    let location = resp.location.clone();
+                    let run_id = resp.run_id.clone();
+                    let run_status = resp.run_status.clone().unwrap_or_else(|| status.clone());
+                    let job_count = resp.job_count as i64;
                     tokio::spawn(async move {
                         crate::service::synthetics::notify_check_result(
                             &org_id,
@@ -918,9 +921,9 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
                             &monitor_type,
                             &target,
                             &destinations,
-                            &location,
-                            &status,
-                            response_time_ms,
+                            &run_id,
+                            &run_status,
+                            job_count,
                             error.as_deref(),
                             checked_at,
                         )

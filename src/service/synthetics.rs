@@ -18,10 +18,11 @@
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 
-/// Sends a check result notification to each configured alert destination.
+/// Fires once per run (when all jobs have completed) for non-passing runs.
+/// Passing runs are suppressed — operators want alerts, not confirmations.
 ///
-/// Only fires when the check did NOT pass (status != "passed"). Passing runs are
-/// intentionally suppressed — operators want alerts, not confirmations.
+/// `status` is the aggregate run status: "passed"|"warning"|"failed"|"error".
+/// `job_count` = number of locations that were checked in this run.
 #[cfg(feature = "enterprise")]
 pub async fn notify_check_result(
     org_id: &str,
@@ -30,21 +31,15 @@ pub async fn notify_check_result(
     monitor_type: &str,
     target: &str,
     destinations: &[String],
-    location: &str,
+    run_id: &str,
     status: &str,
-    response_time_ms: f64,
+    job_count: i64,
     error: Option<&str>,
     checked_at: i64,
 ) {
-    // Suppress notifications for passing runs — only alert on failure/error.
     if status == "passed" || status == "up" {
         return;
     }
-
-    // TODO: enforce alert_if_fails (consecutive failure count) and cooldown_mins (silence period).
-    // Requires a persistent state store keyed by (org_id, synthetics_id) tracking consecutive
-    // failure count and last-notified-at timestamp. Until then every failed run fires a
-    // notification.
 
     use config::meta::destinations::Module;
 
@@ -58,25 +53,20 @@ pub async fn notify_check_result(
                     continue;
                 };
 
-                // Alert-system templates use single-brace vars ({alert_name}, {alert_url})
-                // that are not defined in the synthetics context. Slack rejects payloads
-                // with unreplaced {alert_url} in button elements (invalid URI). Until
-                // synthetics has its own template system, always use the built-in payload.
-                // TODO: support synthetics-specific templates with {{monitor_name}} vars.
                 let _ = tpl;
-                let msg = default_notification_payload(
+                let msg = build_notification_payload(
                     monitor_name,
                     monitor_id,
                     monitor_type,
                     target,
-                    location,
+                    run_id,
                     status,
-                    response_time_ms,
+                    job_count,
                     error,
                     checked_at,
                 );
 
-                let subject = format!("Synthetics: {monitor_name} [{location}] is {status}");
+                let subject = format!("[OpenObserve Synthetics] {monitor_name} is {status}");
                 if let Err(e) = crate::service::alerts::alert::dispatch_notification(
                     destination_type,
                     &subject,
@@ -95,23 +85,45 @@ pub async fn notify_check_result(
 }
 
 #[cfg(feature = "enterprise")]
-fn default_notification_payload(
+fn build_notification_payload(
     monitor_name: &str,
-    _monitor_id: &str,
-    _monitor_type: &str,
+    monitor_id: &str,
+    monitor_type: &str,
     target: &str,
-    location: &str,
+    run_id: &str,
     status: &str,
-    response_time_ms: f64,
+    job_count: i64,
     error: Option<&str>,
-    _checked_at: i64,
+    checked_at: i64,
 ) -> String {
+    let status_emoji = match status {
+        "failed" | "down" => "🔴",
+        "warning" => "🟡",
+        "error" => "⚠️",
+        _ => "🔴",
+    };
+
+    let checked_secs = checked_at / 1_000_000;
+    let locations_line = if job_count > 1 {
+        format!("*Locations checked:* {job_count}\n")
+    } else {
+        String::new()
+    };
     let error_line = match error {
-        Some(e) if !e.is_empty() => format!("\nError: {e}"),
+        Some(e) if !e.is_empty() => format!("*Error:* {e}\n"),
         _ => String::new(),
     };
+
     let text = format!(
-        "Synthetic monitor *{monitor_name}* [{location}] is *{status}*\nTarget: {target}\nDuration: {response_time_ms:.0} ms{error_line}"
+        "{status_emoji} *{monitor_name}* is *{status}*\n\
+         *Type:* {monitor_type}\n\
+         *Target:* {target}\n\
+         {locations_line}\
+         {error_line}\
+         *Run ID:* `{run_id}`\n\
+         *Monitor ID:* `{monitor_id}`\n\
+         *Time:* <!date^{checked_secs}^{{date_time}}|{checked_secs}>"
     );
+
     serde_json::json!({ "text": text }).to_string()
 }
