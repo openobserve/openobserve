@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:flex-wrap tw:items-center tw:gap-4"
+    class="flex flex-wrap items-center gap-4"
     data-test="rum-errors-filter-bar"
   >
     <OToggleGroup
@@ -30,17 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         value="all"
         size="xs"
         data-test="rum-errors-filter-status-all"
-      >{{ t("rum.all") }}</OToggleGroupItem>
+        >{{ t("rum.all") }}</OToggleGroupItem
+      >
       <OToggleGroupItem
         value="new"
         size="xs"
         data-test="rum-errors-filter-status-new"
-      >{{ t("rum.statusNew") }} · {{ counts.new }}</OToggleGroupItem>
+        >{{ t("rum.statusNew") }} · {{ counts.new }}</OToggleGroupItem
+      >
       <OToggleGroupItem
         value="ongoing"
         size="xs"
         data-test="rum-errors-filter-status-ongoing"
-      >{{ t("rum.statusOngoing") }} · {{ counts.ongoing }}</OToggleGroupItem>
+        >{{ t("rum.statusOngoing") }} · {{ counts.ongoing }}</OToggleGroupItem
+      >
     </OToggleGroup>
 
     <OToggleGroup
@@ -54,30 +57,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         value="all"
         size="xs"
         data-test="rum-errors-filter-type-all"
-      >{{ t("rum.all") }}</OToggleGroupItem>
+        >{{ t("rum.all") }}</OToggleGroupItem
+      >
       <OToggleGroupItem
         value="unhandled"
         size="xs"
         data-test="rum-errors-filter-type-unhandled"
-      >{{ t("rum.unhandled") }} · {{ counts.unhandled }}</OToggleGroupItem>
+        >{{ t("rum.unhandled") }} · {{ counts.unhandled }}</OToggleGroupItem
+      >
       <OToggleGroupItem
         value="handled"
         size="xs"
         data-test="rum-errors-filter-type-handled"
-      >{{ t("rum.handled") }} · {{ counts.handled }}</OToggleGroupItem>
+        >{{ t("rum.handled") }} · {{ counts.handled }}</OToggleGroupItem
+      >
     </OToggleGroup>
 
-    <div class="tw:flex tw:items-center tw:gap-1.5 tw:ml-auto">
-      <label
-        for="rum-errors-filter-service"
-        class="tw:whitespace-nowrap"
-      >{{ t("rum.service") }}</label>
+    <div class="flex items-center gap-1.5 ml-auto">
+      <label for="rum-errors-filter-service" class="whitespace-nowrap">{{
+        t("rum.service")
+      }}</label>
       <OSelect
         id="rum-errors-filter-service"
         :model-value="service || ALL_SERVICES"
         :options="serviceOptions"
         size="sm"
-        class="tw:min-w-[9rem]"
+        class="min-w-[9rem]"
         data-test="rum-errors-filter-service-select"
         @update:model-value="onServiceSelect"
       />
