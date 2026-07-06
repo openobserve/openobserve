@@ -307,7 +307,7 @@ class="mr-1" />
                   ? 'log-row-base bg-(--o2-log-table-row-bg)'
                   : '',
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'table-row-hover table-row-focus tw:focus-visible:outline-none transition-[background-color,box-shadow] duration-[120ms] [transition-timing-function:ease-in-out] border-b-(--o2-log-table-row-border)!'
+                ? 'table-row-hover table-row-focus focus-visible:outline-none transition-[background-color,box-shadow] duration-[120ms] [transition-timing-function:ease-in-out] border-b-(--o2-log-table-row-border)!'
                 : '',
             ]"
             @click="

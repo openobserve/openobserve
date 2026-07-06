@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :href="homeUrl"
         @click.prevent="goToHome"
-        class="text-xl font-semibold font-bold p-0 cursor-pointer mr-2 flex items-center tw:no-underline tw:text-inherit"
+        class="text-xl font-semibold font-bold p-0 cursor-pointer mr-2 flex items-center no-underline text-inherit"
         >{{ store.state.zoConfig.custom_logo_text }}</a
       >
 
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="store.state.zoConfig.custom_hide_self_logo == false"
         class="relative inline-flex items-center min-h-10"
       >
-        <a :href="homeUrl" @click.prevent="goToHome" class="tw:inline-flex tw:items-center">
+        <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <img
             data-test="header-openobserve-logo"
             class="openobserve-logo cursor-pointer h-8 max-w-[150px] block transition-opacity duration-200 hover:opacity-80"
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Default OpenObserve logo (when no custom logo) -->
     <div v-else class="relative-position relative inline-flex items-center min-h-10">
-      <a :href="homeUrl" @click.prevent="goToHome" class="tw:inline-flex tw:items-center">
+      <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
         <img
           data-test="header-openobserve-logo"
           class="openobserve-logo cursor-pointer h-8 max-w-[150px] block transition-opacity duration-200 hover:opacity-80"

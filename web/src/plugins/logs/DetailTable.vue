@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="tab"
       keep-alive
       grow
-      class="tw:overflow-y-auto!"
+      class="overflow-y-auto!"
     >
       <OTabPanel name="json">
         <OCardSection

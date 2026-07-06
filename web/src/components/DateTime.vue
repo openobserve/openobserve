@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       side="bottom"
       :align="menuAlign"
       :z-index="10001"
-      content-class="tw:p-1"
+      content-class="p-1"
       @update:open="onMenuOpenChange"
     >
       <template #trigger>

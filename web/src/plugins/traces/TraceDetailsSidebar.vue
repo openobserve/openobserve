@@ -728,7 +728,7 @@ class="h-5! text-[0.75rem]!">
                   @click="openReferenceTrace('span', row)"
                   @keydown="onLinkRowKeydown($event, row)"
                   style="cursor: pointer"
-                  class="pointer tw:focus-visible:outline-none tw:focus-visible:bg-(--color-surface-accent)"
+                  class="pointer focus-visible:outline-none focus-visible:bg-(--color-surface-accent)"
                 >
                   <td
                     v-for="column in linkColumns"

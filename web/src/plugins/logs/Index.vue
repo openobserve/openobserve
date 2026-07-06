@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.data.stream.streamLists.length > 0 &&
                         searchObj.data.stream.selectedStream.length == 0
                       "
-                      class="tw:h-full"
+                      class="h-full"
                     >
                       <LogsNoStreamState
                         :org-id="store.state.selectedOrganization.identifier"
