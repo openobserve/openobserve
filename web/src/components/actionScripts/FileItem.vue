@@ -1,18 +1,18 @@
 ﻿<template>
   <li
-    class="tw:cursor-pointer tw:py-[1px] tw:px-2 tw:hover:bg-gray-200 tw:text-[14px] tw:rounded-[2px] tw:flex tw:h-[25px] tw:group file-item"
+    class="cursor-pointer py-[1px] px-2 hover:bg-gray-200 text-[14px] rounded-[2px] flex h-[25px] group file-item"
     :class="{
-      'bg-primary tw:text-white': isActive,
+      'bg-primary text-white': isActive,
     }"
     @click="openFile"
   >
-    <div class="tw:w-[calc(100%-40px)] tw:flex tw:items-center">
+    <div class="w-[calc(100%-40px)] flex items-center">
       <template v-if="isEditing">
         <input
           ref="nameInput"
           v-model.trim="fileName"
-          class="tw:w-full tw:border tw:rounded tw:h-full tw:bg-transparent tw:border-none tw:outline-none"
-          :class="isActive ? 'tw:text-white' : 'tw:text-black'"
+          class="w-full border rounded h-full bg-transparent border-none outline-none"
+          :class="isActive ? 'text-white' : 'text-black'"
           @blur="onBlur"
         />
       </template>
@@ -21,13 +21,13 @@
       </template>
     </div>
     <div
-      class="tw:w-[36px] tw:flex tw:items-center tw:space-x-2 tw:ml-auto tw:invisible tw:group-hover:visible file-actions"
+      class="w-[36px] flex items-center space-x-2 ml-auto invisible group-hover:visible file-actions"
     >
       <OButton variant="ghost" size="icon-xs-sq" @click.stop="editFile">
-        <OIcon name="edit" size="sm" :class="isActive ? 'tw:text-gray-100' : 'tw:text-gray-600'" />
+        <OIcon name="edit" size="sm" :class="isActive ? 'text-gray-100' : 'text-gray-600'" />
       </OButton>
       <OButton variant="ghost" size="icon-xs-sq" @click.stop="deleteFile">
-        <OIcon name="delete" size="sm" :class="isActive ? 'tw:text-gray-100' : 'tw:text-gray-600'" />
+        <OIcon name="delete" size="sm" :class="isActive ? 'text-gray-100' : 'text-gray-600'" />
       </OButton>
     </div>
   </li>

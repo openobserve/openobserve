@@ -86,7 +86,7 @@
         v-if="drilldownData.data.logsMode === 'custom'"
         style="margin-top: 10px"
       >
-        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
+        <label class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
         <query-editor
           data-test="scheduled-alert-sql-editor"
           ref="queryEditorRef"
@@ -100,7 +100,7 @@
     </div>
     <div v-if="drilldownData.type == 'byUrl'">
       <div style="margin-top: 10px; display: flex; flex-direction: column">
-        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterUrl") }}</label>
+        <label class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.enterUrl") }}</label>
         <OTextarea
           v-model="drilldownData.data.url"
           data-test="dashboard-drilldown-url-textarea"
@@ -117,32 +117,32 @@
 
     <div v-if="drilldownData.type == 'byDashboard'">
       <div style="margin-top: 10px">
-        <div class="tw:flex tw:items-center tw:my-[10px] tw:w-full">
+        <div class="flex items-center my-[10px] w-full">
           <OSelect
             v-model="drilldownData.data.folder"
             :options="folderList"
             :label="t('dashboard.selectFolderDrilldown')"
-            class="tw:w-full"
+            class="w-full"
             :disabled="getFoldersListLoading.isLoading.value"
             data-test="dashboard-drilldown-folder-select"
           />
         </div>
-        <div class="tw:flex tw:items-center tw:my-[10px] tw:w-full" v-if="drilldownData.data.folder">
+        <div class="flex items-center my-[10px] w-full" v-if="drilldownData.data.folder">
           <OSelect
             v-model="drilldownData.data.dashboard"
             :options="dashboardList"
             :label="t('dashboard.selectDashboardDrilldown')"
-            class="tw:w-full"
+            class="w-full"
             :disabled="getDashboardListLoading.isLoading.value"
             data-test="dashboard-drilldown-dashboard-select"
           />
         </div>
-        <div class="tw:flex tw:items-center tw:my-[10px] tw:w-full" v-if="drilldownData.data.dashboard">
+        <div class="flex items-center my-[10px] w-full" v-if="drilldownData.data.dashboard">
           <OSelect
             v-model="drilldownData.data.tab"
             :options="tabList"
             :label="t('dashboard.selectTabDrilldown')"
-            class="tw:w-full"
+            class="w-full"
             :disabled="getTabListLoading.isLoading.value"
             data-test="dashboard-drilldown-tab-select"
           />
@@ -158,7 +158,7 @@
               align-items: center;
             "
           >
-            <span class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.variables") }}</span>
+            <span class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.variables") }}</span>
             <OButton
               variant="primary"
               size="sm"

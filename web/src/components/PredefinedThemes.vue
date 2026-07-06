@@ -34,48 +34,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Light / Dark segmented mode toggle -->
-    <OCardSection class="tw:pt-2 tw:px-2">
+    <OCardSection class="pt-2 px-2">
       <OToggleGroup
         :model-value="activeTab"
         type="single"
-        class="tw:w-full"
+        class="w-full"
         @update:model-value="(v) => (activeTab = (v as string))"
       >
         <OToggleGroupItem
           data-test="predefined-themes-tab-light"
           value="light"
           icon-left="light-mode"
-          class="tw:flex-1"
+          class="flex-1"
         >Light</OToggleGroupItem>
         <OToggleGroupItem
           data-test="predefined-themes-tab-dark"
           value="dark"
           icon-left="dark-mode"
-          class="tw:flex-1"
+          class="flex-1"
         >Dark</OToggleGroupItem>
       </OToggleGroup>
     </OCardSection>
 
     <!-- Theme list for the active mode. Selecting a row applies it immediately;
          the applied row is highlighted rather than carrying an Apply button. -->
-    <OCardSection class="tw:py-2 tw:px-2 tw:max-h-[calc(100vh-100px)] tw:overflow-y-auto">
-      <ul class="tw:list-none tw:m-0 tw:p-0 tw:flex tw:flex-col tw:gap-2">
+    <OCardSection class="py-2 px-2 max-h-[calc(100vh-100px)] overflow-y-auto">
+      <ul class="list-none m-0 p-0 flex flex-col gap-2">
         <li v-for="theme in predefinedThemes" :key="theme.id">
           <button
             type="button"
             :data-test="`predefined-themes-apply-btn-${mode}-${themeNameSlug(theme.name)}`"
-            class="tw:flex tw:items-center tw:w-full tw:py-2 tw:px-3 tw:border tw:rounded-lg tw:cursor-pointer tw:transition-[border-color,background-color,box-shadow] tw:duration-150 tw:focus-visible:outline-none tw:focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--o2-primary-color)_40%,transparent)]"
+            class="flex items-center w-full py-2 px-3 border rounded-lg cursor-pointer transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--o2-primary-color)_40%,transparent)]"
             :class="isThemeApplied(theme, mode)
-              ? 'tw:border-(--o2-primary-color) tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] tw:shadow-[inset_0_0_0_1px_var(--o2-primary-color)]'
-              : 'tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:hover:border-(--o2-primary-color) tw:hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))]'"
+              ? 'border-(--o2-primary-color) bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] shadow-[inset_0_0_0_1px_var(--o2-primary-color)]'
+              : 'border-(--o2-border-color) bg-(--o2-card-bg) hover:border-(--o2-primary-color) hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))]'"
             :aria-pressed="isThemeApplied(theme, mode)"
             :aria-label="`Apply ${themeDisplayName(theme.name)} theme`"
             @click="applyTheme(theme, mode)"
           >
-            <span class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative" :style="swatchStyle(theme[mode])" />
-            <span class="tw:ml-2 tw:min-w-0 tw:flex-1 tw:text-left">
-              <span class="tw:block tw:text-sm tw:font-medium tw:truncate">{{ themeDisplayName(theme.name) }}</span>
-              <span class="tw:block tw:text-xs tw:text-gray-400 tw:truncate">{{ theme[mode].themeColor }}</span>
+            <span class="w-8 h-8 rounded border border-(--o2-border-color) shrink-0 relative" :style="swatchStyle(theme[mode])" />
+            <span class="ml-2 min-w-0 flex-1 text-left">
+              <span class="block text-sm font-medium truncate">{{ themeDisplayName(theme.name) }}</span>
+              <span class="block text-xs text-gray-400 truncate">{{ theme[mode].themeColor }}</span>
             </span>
             <OTag
               v-if="isThemeApplied(theme, mode)"
@@ -91,24 +91,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <button
             type="button"
             :data-test="`predefined-themes-card-${mode}-custom-color`"
-            class="tw:flex tw:items-center tw:w-full tw:py-2 tw:px-3 tw:border tw:border-dashed tw:rounded-lg tw:cursor-pointer tw:transition-[border-color,background-color,box-shadow] tw:duration-150 tw:focus-visible:outline-none tw:focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--o2-primary-color)_40%,transparent)]"
+            class="flex items-center w-full py-2 px-3 border border-dashed rounded-lg cursor-pointer transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--o2-primary-color)_40%,transparent)]"
             :class="isCustomThemeApplied(mode)
-              ? 'tw:border-(--o2-primary-color) tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] tw:shadow-[inset_0_0_0_1px_var(--o2-primary-color)]'
-              : 'tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:hover:border-(--o2-primary-color) tw:hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))]'"
+              ? 'border-(--o2-primary-color) bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] shadow-[inset_0_0_0_1px_var(--o2-primary-color)]'
+              : 'border-(--o2-border-color) bg-(--o2-card-bg) hover:border-(--o2-primary-color) hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))]'"
             :aria-pressed="isCustomThemeApplied(mode)"
             aria-label="Pick a custom theme color"
             @click="openColorPicker(mode)"
           >
             <span
               :data-test="`predefined-themes-custom-color-preview-${mode}`"
-              class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative"
+              class="w-8 h-8 rounded border border-(--o2-border-color) shrink-0 relative"
               :style="{ backgroundColor: mode === 'light' ? customLightColor : customDarkColor }"
             >
-              <OIcon name="colorize" size="sm" class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2" />
+              <OIcon name="colorize" size="sm" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
             </span>
-            <span class="tw:ml-2 tw:min-w-0 tw:flex-1 tw:text-left">
-              <span class="tw:block tw:text-sm tw:font-medium tw:truncate">Custom Color</span>
-              <span class="tw:block tw:text-xs tw:text-gray-400 tw:truncate">
+            <span class="ml-2 min-w-0 flex-1 text-left">
+              <span class="block text-sm font-medium truncate">Custom Color</span>
+              <span class="block text-xs text-gray-400 truncate">
                 {{ isCustomThemeApplied(mode)
                   ? (mode === 'light' ? customLightColor : customDarkColor)
                   : 'Pick any brand hex' }}
@@ -126,12 +126,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCardSection>
 
     <!-- Note at the bottom -->
-    <OCardSection class="tw:pt-0 tw:pb-2 tw:px-2">
-      <OSeparator class="tw:mb-2" />
+    <OCardSection class="pt-0 pb-2 px-2">
+      <OSeparator class="mb-2" />
       <div
-        class="tw:text-xs tw:text-gray-400 tw:flex tw:items-start tw:gap-1 tw:italic"
+        class="text-xs text-gray-400 flex items-start gap-1 italic"
       >
-        <OIcon name="info-outline" size="xs" class="tw:mt-0.5" />
+        <OIcon name="info-outline" size="xs" class="mt-0.5" />
         <span
           >Saved to this device only — themes don't sync across different
           browsers or devices.</span

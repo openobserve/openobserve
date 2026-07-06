@@ -317,7 +317,7 @@ describe("FieldListPagination.vue", () => {
       });
 
       const currentBtn = wrapper.find('[data-test="logs-page-fields-list-pagination-page-3-button"]');
-      expect(currentBtn.classes()).toContain("tw:bg-button-primary");
+      expect(currentBtn.classes()).toContain("bg-button-primary");
     });
   });
 

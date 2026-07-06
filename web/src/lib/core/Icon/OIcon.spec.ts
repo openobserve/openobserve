@@ -6,16 +6,16 @@ import OIcon from "./OIcon.vue";
 describe("OIcon", () => {
   it("renders a span wrapper with the default size class (md = 24px)", () => {
     const wrapper = mount(OIcon, { props: { name: "close" } });
-    expect(wrapper.find("span").classes()).toContain("tw:size-6");
+    expect(wrapper.find("span").classes()).toContain("size-6");
   });
 
   it("applies the correct size class for each size value", () => {
     const cases: Array<[NonNullable<import("./OIcon.types").IconProps["size"]>, string]> = [
-      ["xs", "tw:size-3"],
-      ["sm", "tw:size-4"],
-      ["md", "tw:size-6"],
-      ["lg", "tw:size-8"],
-      ["xl", "tw:size-10"],
+      ["xs", "size-3"],
+      ["sm", "size-4"],
+      ["md", "size-6"],
+      ["lg", "size-8"],
+      ["xl", "size-10"],
     ];
 
     for (const [size, expected] of cases) {

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:h-full tw:w-full tw:relative tw:border-t tw:border-border-default" data-test="logs-build-query-page">
+  <div class="h-full w-full relative border-t border-border-default" data-test="logs-build-query-page">
     <!-- PanelEditor with BUILD_PRESET -->
     <PanelEditor
       ref="panelEditorRef"

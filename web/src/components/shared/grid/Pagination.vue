@@ -17,15 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <div
-    :class="position === 'bottom' ? 'tw:py-2' : 'tw:pt-2'"
-    class="tw:w-full tw:flex tw:justify-between"
+    :class="position === 'bottom' ? 'py-2' : 'pt-2'"
+    class="w-full flex justify-between"
   >
     <div
       v-if="position === 'bottom' && maxRecords"
-      class="tw:flex tw:items-center tw:whitespace-nowrap tw:w-50 tw:justify-center"
+      class="flex items-center whitespace-nowrap w-50 justify-center"
       style="justify-content: start"
     >
-      <span class="tw:mr-4 tw:text-xs tw:font-semibold">{{ t("search.maxRecords") }}</span>
+      <span class="mr-4 text-xs font-semibold">{{ t("search.maxRecords") }}</span>
       <OInput
         v-model="maxRecords"
         @blur="changeMaxRecordToReturn"
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="position === 'top' && pageTitle"
-      class="tw:font-bold tw:flex tw:items-center"
+      class="font-bold flex items-center"
     >
       <OButton
         v-if="
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         variant="ghost"
         size="icon"
-        class="tw:mr-2"
+        class="mr-2"
         @click="toggleSidePanel"
       >
         <img
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         variant="ghost"
         size="icon"
-        class="tw:mr-2"
+        class="mr-2"
         @click="toggleSidePanel"
       >
         <img
@@ -67,13 +67,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           height="16"
         />
       </OButton>
-      <div class="tw:ml-1">
+      <div class="ml-1">
         {{ resultTotal }}
         {{ pageTitle.slice(-1) == "s" ? pageTitle.slice(0, -1) : pageTitle }}(s)
       </div>
     </div>
-    <div class="tw:ml-auto">
-      <span class="tw:mr-4 tw:text-xs tw:font-semibold">
+    <div class="ml-auto">
+      <span class="mr-4 text-xs font-semibold">
         {{ t("search.showing") }}
         {{
           resultTotal > 0
@@ -94,15 +94,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         of {{ resultTotal }} -->
       </span>
 
-      <div v-if="position === 'bottom'" class="tw:flex tw:items-center">
-        <OSeparator vertical class="tw:my-2 tw:mr-4" />
+      <div v-if="position === 'bottom'" class="flex items-center">
+        <OSeparator vertical class="my-2 mr-4" />
 
-        <span class="tw:mr-4 tw:text-xs tw:font-semibold">
+        <span class="mr-4 text-xs font-semibold">
           {{ t("search.recordsPerPage") }}
         </span>
         <OSelect
           v-model="scope.pagination.rowsPerPage"
-          class="tw:mr-3"
+          class="mr-3"
           :options="perPageOptions"
           @update:modelValue="changePagination"
         />

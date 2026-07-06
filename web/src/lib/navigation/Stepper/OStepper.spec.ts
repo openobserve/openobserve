@@ -76,7 +76,7 @@ describe('OStepper', () => {
     const wrapper = mountStepper({ modelValue: 1, stepCount: 2 })
     await wrapper.vm.$nextTick()
     // There should be 1 connector for 2 steps
-    const connectors = wrapper.findAll('[aria-hidden="true"].tw\\:h-px, [aria-hidden="true"]').filter(
+    const connectors = wrapper.findAll('[aria-hidden="true"].h-px, [aria-hidden="true"]').filter(
       el => el.classes().some(c => c.includes('h-px')) || el.element.className.includes('h-px')
     )
     // The connector div exists inside the stepper header list

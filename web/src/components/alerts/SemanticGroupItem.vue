@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="semantic-group-item tw:p-3 tw:mb-2 tw:rounded-lg tw:transition-all tw:duration-200 tw:w-full tw:max-w-full tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.12))">
-    <div class="tw:grid tw:grid-cols-[200px_1fr_auto] tw:gap-4 tw:items-start tw:w-full tw:overflow-hidden">
+  <div class="semantic-group-item p-3 mb-2 rounded-lg transition-all duration-200 w-full max-w-full bg-(--o2-card-bg) border border-(--o2-border-color,rgba(0,0,0,0.12))">
+    <div class="grid grid-cols-[200px_1fr_auto] gap-4 items-start w-full overflow-hidden">
       <!-- Left Column: Display Name only (ID is internal/read-only) -->
-      <div class="tw:flex tw:flex-col tw:gap-1 tw:min-w-0 tw:justify-center">
+      <div class="flex flex-col gap-1 min-w-0 justify-center">
         <div class="input-wrapper">
           <OInput
             data-test="semantic-group-display-input"
@@ -32,13 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <!-- Show ID as read-only caption for existing groups -->
-        <div v-if="localGroup.id" class="tw:text-xs tw:text-gray-400">
+        <div v-if="localGroup.id" class="text-xs text-gray-400">
           {{ t("common.id") }}: {{ localGroup.id }}
         </div>
         <OSwitch
           v-model="localGroup.is_workload_type"
           :label="t('correlation.isWorkloadType')"
-          class="tw:mt-1"
+          class="mt-1"
           @update:model-value="emitUpdate"
         >
           <OTooltip :content="t('correlation.isWorkloadTypeTooltip')" />
@@ -46,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Right Column: Field Names spanning both rows -->
-      <div class="tw:flex tw:flex-col tw:h-full tw:min-w-0 tw:overflow-hidden">
-        <div class="tw:flex-1 tw:flex tw:flex-col tw:min-w-0 tw:overflow-hidden">
+      <div class="flex flex-col h-full min-w-0 overflow-hidden">
+        <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
           <TagInput
             v-model="localGroup.fields"
             :placeholder="t('correlation.fieldNamePlaceholder') + ' *'"
@@ -58,8 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
       <!-- Actions Column: Delete -->
-      <div class="tw:flex tw:flex-col tw:justify-between tw:min-h-full">
-        <div class="tw:flex tw:justify-end">
+      <div class="flex flex-col justify-between min-h-full">
+        <div class="flex justify-end">
           <OButton
             data-test="semantic-group-remove-group-btn"
             :variant="isProtected ? 'ghost-muted' : 'ghost-destructive'"

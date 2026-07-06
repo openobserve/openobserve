@@ -232,13 +232,13 @@ describe("SessionViewer.vue", () => {
   // -------------------------------------------------------------------------
   describe("session details header", () => {
     it("should render the IP address info section", () => {
-      const sections = wrapper.findAll(".tw\\:truncate");
+      const sections = wrapper.findAll(".truncate");
       expect(sections.length).toBeGreaterThanOrEqual(1);
     });
 
     it("should render at least 5 info sections in the header", () => {
       // ip, date, user, location, browser/os
-      const sections = wrapper.findAll(".tw\\:truncate");
+      const sections = wrapper.findAll(".truncate");
       expect(sections.length).toBeGreaterThanOrEqual(5);
     });
   });

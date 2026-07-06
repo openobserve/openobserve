@@ -106,23 +106,23 @@ function onTickChange(newVal: CheckboxModelValue) {
     :aria-expanded="!isLeaf ? isExpanded : undefined"
     :data-test="`o-tree-node-${String(key)}`"
     :data-test-checked="checkboxState === true ? 'true' : checkboxState === 'indeterminate' ? 'indeterminate' : 'false'"
-    class="tw:list-none tw:m-0 tw:p-0"
+    class="list-none m-0 p-0"
   >
     <!-- Node row ────────────────────────────────────────────────────── -->
     <div
-      class="tw:flex tw:items-center tw:gap-1 tw:min-h-7 tw:px-1 tw:rounded tw:select-none tw:transition-colors tw:duration-100"
+      class="flex items-center gap-1 min-h-7 px-1 rounded select-none transition-colors duration-100"
       :class="
         !isLeaf
-          ? 'tw:cursor-pointer tw:hover:bg-tree-node-hover-bg'
-          : 'tw:cursor-default tw:hover:bg-tree-node-hover-bg'
+          ? 'cursor-pointer hover:bg-tree-node-hover-bg'
+          : 'cursor-default hover:bg-tree-node-hover-bg'
       "
       @click="toggleExpand"
     >
       <!-- Expand / collapse arrow (parents only) -->
       <span
         v-if="!isLeaf"
-        class="tw:flex tw:items-center tw:justify-center tw:size-4 tw:shrink-0 tw:text-text-secondary tw:transition-transform tw:duration-200 tw:ease-in-out"
-        :class="isExpanded ? 'tw:rotate-0' : 'tw:-rotate-90'"
+        class="flex items-center justify-center size-4 shrink-0 text-text-secondary transition-transform duration-200 ease-in-out"
+        :class="isExpanded ? 'rotate-0' : '-rotate-90'"
         aria-hidden="true"
       >
         <!-- Chevron-down SVG — crisp at all sizes -->
@@ -130,7 +130,7 @@ function onTickChange(newVal: CheckboxModelValue) {
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"
           fill="currentColor"
-          class="tw:size-3.5"
+          class="size-3.5"
         >
           <path d="M7 10l5 5 5-5z" />
         </svg>
@@ -141,7 +141,7 @@ function onTickChange(newVal: CheckboxModelValue) {
         The children <ul> has pl-5 (1.25rem = 20px) indentation, so the
         connector span starts 20px to the RIGHT of the parent row.
         The parent's chevron (size-4 = 16px) is centered at +8px from the
-        parent tw:flex start, so relative to the connector span start:
+        parent flex start, so relative to the connector span start:
           chevronCenterX = 8px - 20px = -12px = -0.75rem
         Accounting for the 1.5px border center (subtract 0.75px):
           left = calc(-0.75rem - 0.75px)
@@ -152,7 +152,7 @@ function onTickChange(newVal: CheckboxModelValue) {
       -->
       <span
         v-else
-        class="tw:relative tw:shrink-0 tw:self-stretch tw:opacity-35"
+        class="relative shrink-0 self-stretch opacity-35"
         style="width: 1rem;"
         aria-hidden="true"
       >
@@ -175,15 +175,15 @@ function onTickChange(newVal: CheckboxModelValue) {
         :model-value="checkboxState"
         :disabled="isDisabled"
         size="sm"
-        class="tw:cursor-pointer"
+        class="cursor-pointer"
         @click.stop
         @update:model-value="onTickChange"
       />
 
       <!-- Label -->
       <span
-        class="tw:text-sm tw:text-text-primary tw:leading-snug tw:truncate"
-        :class="isDisabled ? 'tw:opacity-50' : ''"
+        class="text-sm text-text-primary leading-snug truncate"
+        :class="isDisabled ? 'opacity-50' : ''"
       >
         {{ node.label }}
       </span>
@@ -192,12 +192,12 @@ function onTickChange(newVal: CheckboxModelValue) {
     <!-- Children (recursive) — animated expand/collapse ──────────── -->
     <div
       v-if="!isLeaf"
-      class="tw:overflow-hidden tw:transition-[grid-template-rows] tw:duration-200 tw:ease-in-out tw:grid"
+      class="overflow-hidden transition-[grid-template-rows] duration-200 ease-in-out grid"
       :style="{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }"
     >
       <ul
         role="group"
-        class="tw:list-none tw:m-0 tw:p-0 tw:pl-5 tw:overflow-hidden tw:min-h-0"
+        class="list-none m-0 p-0 pl-5 overflow-hidden min-h-0"
       >
         <OTreeNode
           v-if="isExpanded"

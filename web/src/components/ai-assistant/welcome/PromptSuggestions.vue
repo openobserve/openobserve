@@ -13,26 +13,26 @@ function selectPrompt(id: string) {
 </script>
 
 <template>
-  <section class="tw:flex tw:flex-col tw:gap-3 tw:w-full">
-    <div class="tw:m-0 tw:self-center tw:text-xs tw:font-normal tw:text-(--color-typography-meta) tw:opacity-75">
+  <section class="flex flex-col gap-3 w-full">
+    <div class="m-0 self-center text-xs font-normal text-(--color-typography-meta) opacity-75">
       {{ t("aiAssistant.welcome.tryOneOfThese") }}
     </div>
 
-    <div class="suggestions-grid tw:grid tw:w-full tw:gap-2 tw:md:grid-cols-2 tw:lg:grid-cols-3 tw:sm:grid-cols-1">
+    <div class="suggestions-grid grid w-full gap-2 md:grid-cols-2 lg:grid-cols-3 sm:grid-cols-1">
       <button
         v-for="s in PROMPT_SUGGESTIONS"
         :key="s.id"
         type="button"
-        class="suggestion-chip tw:group tw:relative tw:inline-flex tw:items-center tw:gap-2 tw:py-2 tw:px-[0.625rem] tw:pl-3 tw:rounded-lg tw:border tw:border-(--color-border-default) tw:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--color-card-bg)_100%,transparent),color-mix(in_srgb,var(--color-card-bg)_92%,transparent))] tw:text-(--color-text-secondary) tw:text-xs tw:leading-tight tw:text-left tw:cursor-pointer tw:[transition:border-color_0.15s_ease,background_0.15s_ease,color_0.15s_ease,transform_0.15s_ease,box-shadow_0.15s_ease] tw:overflow-hidden tw:hover:border-[rgba(123,97,255,0.5)] tw:hover:text-(--color-text-primary) tw:hover:-translate-y-px tw:hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_6px_16px_-8px_rgba(123,97,255,0.3)] tw:focus-visible:outline-none tw:focus-visible:border-[rgba(123,97,255,0.7)] tw:focus-visible:shadow-[0_0_0_2px_rgba(123,97,255,0.4)]"
+        class="suggestion-chip group relative inline-flex items-center gap-2 py-2 px-[0.625rem] pl-3 rounded-lg border border-(--color-border-default) bg-[linear-gradient(180deg,color-mix(in_srgb,var(--color-card-bg)_100%,transparent),color-mix(in_srgb,var(--color-card-bg)_92%,transparent))] text-(--color-text-secondary) text-xs leading-tight text-left cursor-pointer [transition:border-color_0.15s_ease,background_0.15s_ease,color_0.15s_ease,transform_0.15s_ease,box-shadow_0.15s_ease] overflow-hidden hover:border-[rgba(123,97,255,0.5)] hover:text-(--color-text-primary) hover:-translate-y-px hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_6px_16px_-8px_rgba(123,97,255,0.3)] focus-visible:outline-none focus-visible:border-[rgba(123,97,255,0.7)] focus-visible:shadow-[0_0_0_2px_rgba(123,97,255,0.4)]"
         @click="selectPrompt(s.id)"
       >
-        <span class="suggestion-chip__icon tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-[22px] tw:h-[22px] tw:rounded-md tw:bg-[color-mix(in_srgb,var(--color-border-default)_40%,transparent)] tw:text-(--color-typography-meta) tw:[transition:background_0.15s_ease,color_0.15s_ease] tw:group-hover:bg-[rgba(123,97,255,0.15)] tw:group-hover:text-[#7b61ff]">
+        <span class="suggestion-chip__icon inline-flex items-center justify-center shrink-0 w-[22px] h-[22px] rounded-md bg-[color-mix(in_srgb,var(--color-border-default)_40%,transparent)] text-(--color-typography-meta) [transition:background_0.15s_ease,color_0.15s_ease] group-hover:bg-[rgba(123,97,255,0.15)] group-hover:text-[#7b61ff]">
           <OIcon :name="s.icon" size="sm" />
         </span>
-        <span class="tw:flex-1 tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">
+        <span class="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
           {{ t(`aiAssistant.suggestions.${s.id}`) }}
         </span>
-        <span class="suggestion-chip__arrow tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:text-(--color-typography-meta) tw:opacity-0 tw:-translate-x-1 tw:[transition:opacity_0.15s_ease,transform_0.15s_ease,color_0.15s_ease] tw:group-hover:opacity-100 tw:group-hover:translate-x-0 tw:group-hover:text-[#7b61ff]" aria-hidden="true">
+        <span class="suggestion-chip__arrow inline-flex items-center justify-center shrink-0 text-(--color-typography-meta) opacity-0 -translate-x-1 [transition:opacity_0.15s_ease,transform_0.15s_ease,color_0.15s_ease] group-hover:opacity-100 group-hover:translate-x-0 group-hover:text-[#7b61ff]" aria-hidden="true">
           <OIcon name="arrow-forward" size="xs" />
         </span>
       </button>
