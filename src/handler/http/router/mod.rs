@@ -669,6 +669,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(domain_management::set_domain_management_config)
         .service(license::get_license_info)
         .service(license::store_license)
+        .service(license::refresh_license_limits)
         .service(traces::get_current_topology)
         .service(patterns::extract_patterns)
         .service(agent::chat::agent_chat)
