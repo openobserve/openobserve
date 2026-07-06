@@ -4346,4 +4346,34 @@ mod tests {
         let name = get_cluster_name();
         assert!(!name.is_empty(), "cluster name should not be empty");
     }
+
+    #[test]
+    fn test_deverbatim_plain_path_unchanged() {
+        let p = std::path::Path::new("/data/openobserve");
+        let result = deverbatim(p);
+        assert_eq!(result, "/data/openobserve");
+    }
+
+    #[test]
+    fn test_deverbatim_empty_path_unchanged() {
+        let p = std::path::Path::new("");
+        let result = deverbatim(p);
+        assert_eq!(result, "");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_deverbatim_verbatim_disk_stripped() {
+        let p = std::path::Path::new(r"\\?\C:\data\openobserve");
+        let result = deverbatim(p);
+        assert_eq!(result, r"C:\data\openobserve");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_deverbatim_plain_windows_path_unchanged() {
+        let p = std::path::Path::new(r"C:\data\openobserve");
+        let result = deverbatim(p);
+        assert_eq!(result, r"C:\data\openobserve");
+    }
 }
