@@ -16,15 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- src/components/PipelineFlow.vue -->
 <template>
-  <div data-test="pipeline-flow-container" class="tw:flex tw:items-center tw:justify-between">
-     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="tw:text-[#F5A623] tw:border tw:border-[#F5A623] tw:rounded-sm tw:flex tw:items-center tw:px-2 tw:mr-3">
-      <OIcon name="info" class="tw:mr-1 " size="sm" />
+  <div data-test="pipeline-flow-container" class="flex items-center justify-between">
+     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="text-[#F5A623] border border-[#F5A623] rounded-sm flex items-center px-2 mr-3">
+      <OIcon name="info" class="mr-1 " size="sm" />
      Unsaved changes detected. Click "Save" to preserve your updates.
    </div>
 
    <!-- Edge deletion help notification -->
-   <div v-if="showEdgeHelpNotification" class="edge-help-notification tw:absolute tw:top-5 tw:left-1/2 tw:-translate-x-1/2 tw:z-[1000] tw:bg-white tw:text-[#374151] tw:py-[10px] tw:px-4 tw:rounded-lg tw:text-sm tw:shadow-[0_4px_20px_rgba(0,0,0,0.15)] tw:border tw:border-[#e5e7eb] tw:flex tw:items-center tw:dark:bg-(--o2-primary-background) tw:dark:text-[#f3f4f6] tw:dark:border-[#374151] tw:dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] tw:[animation:slideDown_0.3s_ease-out]">
-     <OIcon name="info" class="tw:mr-1" size="sm" />
+   <div v-if="showEdgeHelpNotification" class="edge-help-notification absolute top-5 left-1/2 -translate-x-1/2 z-[1000] bg-white text-[#374151] py-[10px] px-4 rounded-lg text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-[#e5e7eb] flex items-center dark:bg-(--o2-primary-background) dark:text-[#f3f4f6] dark:border-[#374151] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] [animation:slideDown_0.3s_ease-out]">
+     <OIcon name="info" class="mr-1" size="sm" />
      Press Backspace/Delete to remove the edge
    </div>
 
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         position="top-left">
     </Controls>
     </VueFlow>
-    <div v-if="isCanvasEmpty" data-test="pipeline-flow-empty-text" class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2 tw:text-[#888] tw:text-[1.5em] tw:text-center tw:pointer-events-none tw:z-10">
+    <div v-if="isCanvasEmpty" data-test="pipeline-flow-empty-text" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[#888] text-[1.5em] text-center pointer-events-none z-10">
       {{ t('pipeline.dragDropNodesHere') }}
     </div>
     <!-- Add UI elements or buttons to interact with the methods -->

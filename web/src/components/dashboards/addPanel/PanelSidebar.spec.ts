@@ -136,7 +136,7 @@ describe("PanelSidebar", () => {
       const icon = wrapper.find('[data-test="dashboard-sidebar"]');
       expect(icon.exists()).toBe(true);
       expect(icon.attributes("name")).toBe("expand-all");
-      expect(icon.classes()).toContain("tw:mt-[10px]");
+      expect(icon.classes()).toContain("mt-[10px]");
       expect(icon.classes()).toContain("rotate-90");
     });
 
@@ -179,8 +179,8 @@ describe("PanelSidebar", () => {
       expect(collapseBtn.exists()).toBe(true);
       // OButton uses icon-left slot instead of icon prop; icon is rendered inside as OIcon
       expect(collapseBtn.html()).toContain("unfold-less");
-      // OButton applies tw:rotate-90 from the class attr; collapse-button is only a CSS definition
-      expect(collapseBtn.classes()).toContain("tw:rotate-90");
+      // OButton applies rotate-90 from the class attr; collapse-button is only a CSS definition
+      expect(collapseBtn.classes()).toContain("rotate-90");
     });
 
     it("should display title in expanded state", () => {
@@ -197,7 +197,7 @@ describe("PanelSidebar", () => {
     it("should apply correct CSS classes in expanded state", () => {
       wrapper = createWrapper({ modelValue: true });
       
-      expect(wrapper.find('[data-test="panel-sidebar-root"]').classes()).toContain("tw:w-75");
+      expect(wrapper.find('[data-test="panel-sidebar-root"]').classes()).toContain("w-75");
     });
 
     it("should show sidebar content when expanded", () => {
@@ -428,20 +428,20 @@ describe("PanelSidebar", () => {
 
       const sidebar = wrapper.find('[data-test="panel-sidebar-root"]');
       expect(sidebar.exists()).toBe(true);
-      expect(sidebar.classes()).toContain("tw:w-75");
+      expect(sidebar.classes()).toContain("w-75");
     });
 
     it("should not apply open class when collapsed", () => {
       wrapper = createWrapper({ modelValue: false });
 
-      expect(wrapper.find('[data-test="panel-sidebar-root"]').classes()).not.toContain("tw:w-75");
+      expect(wrapper.find('[data-test="panel-sidebar-root"]').classes()).not.toContain("w-75");
     });
 
     it("should apply correct icon classes", () => {
       wrapper = createWrapper({ modelValue: false });
 
       const icon = wrapper.find('[data-test="dashboard-sidebar"]');
-      expect(icon.classes()).toContain("tw:mt-[10px]");
+      expect(icon.classes()).toContain("mt-[10px]");
       expect(icon.classes()).toContain("rotate-90");
     });
 
@@ -451,8 +451,8 @@ describe("PanelSidebar", () => {
       // OButton renders as a native <button> element with Tailwind classes
       const button = wrapper.find('[data-test="dashboard-sidebar-collapse-btn"]');
       expect(button.exists()).toBe(true);
-      // OButton applies tw:rotate-90 from the class attr passed via $attrs
-      expect(button.classes()).toContain("tw:rotate-90");
+      // OButton applies rotate-90 from the class attr passed via $attrs
+      expect(button.classes()).toContain("rotate-90");
     });
 
     it("should apply scroll class to content", () => {

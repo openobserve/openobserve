@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="chartPanelRef"
-    :class="store.state.theme !== 'dark' ? 'tw:border tw:border-[#e6e6e6]' : 'tw:border tw:border-[rgb(39,39,39)]'"
+    :class="store.state.theme !== 'dark' ? 'border border-[#e6e6e6]' : 'border border-[rgb(39,39,39)]'"
     style="
       height: 100%;
       position: relative;
@@ -34,10 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty query placeholder -->
       <div
         v-if="!query && (selectedTab === 'sql' || selectedTab === 'promql')"
-        class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2"
+        class="flex flex-col items-center justify-center h-full gap-2"
       >
-        <OIcon name="edit" size="xl" class="tw:opacity-20" />
-        <span class="tw:text-sm tw:opacity-40">Write a query to see preview</span>
+        <OIcon name="edit" size="xl" class="opacity-20" />
+        <span class="text-sm opacity-40">Write a query to see preview</span>
       </div>
       <PanelSchemaRenderer
         ref="panelRendererRef"

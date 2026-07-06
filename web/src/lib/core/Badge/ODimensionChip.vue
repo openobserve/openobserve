@@ -35,18 +35,18 @@ withDefaults(
 </script>
 
 <template>
-  <span class="tw:inline-flex tw:min-w-0 tw:max-w-full">
+  <span class="inline-flex min-w-0 max-w-full">
     <OTag
       :variant="dimensionVariant(dimKey)"
       shape="rounded"
-      class="tw:min-w-0 tw:!p-0 tw:overflow-hidden"
+      class="min-w-0 !p-0 overflow-hidden"
     >
-      <span class="tw:inline-flex tw:items-stretch tw:min-w-0">
+      <span class="inline-flex items-stretch min-w-0">
         <span
-          class="tw:ps-2.5 tw:pe-1 tw:py-1.5 tw:shrink-0 tw:whitespace-nowrap tw:bg-current/8 tw:opacity-90"
+          class="ps-2.5 pe-1 py-1.5 shrink-0 whitespace-nowrap bg-current/8 opacity-90"
         >{{ keyLabel ?? dimKey }}</span>
         <span
-          class="tw:ps-1 tw:pe-2.5 tw:py-1.5 tw:truncate tw:min-w-0 tw:font-semibold"
+          class="ps-1 pe-2.5 py-1.5 truncate min-w-0 font-semibold"
         >{{ value }}</span>
       </span>
     </OTag>

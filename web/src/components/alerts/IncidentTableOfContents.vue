@@ -15,34 +15,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="toc-container" class="tw:px-2 tw:pt-4 tw:pb-2 tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+  <div data-test="toc-container" class="px-2 pt-4 pb-2 flex flex-col h-full overflow-hidden">
     <div
       data-test="toc-section-container"
-      class="tw:overflow-hidden tw:flex tw:flex-col tw:flex-1 tw:border tw:border-[var(--o2-border-color)] tw:rounded-md"
+      class="overflow-hidden flex flex-col flex-1 border border-[var(--o2-border-color)] rounded-md"
     >
       <!-- Header -->
       <div
         data-test="toc-header"
         :class="[
-          'tw:px-3 tw:py-2 tw:flex tw:items-center tw:gap-2 tw:border-b tw:flex-shrink-0 tw:!bg-[var(--o2-table-header-bg)]',
+          'px-3 py-2 flex items-center gap-2 border-b flex-shrink-0 !bg-[var(--o2-table-header-bg)]',
           isDarkMode
-            ? 'tw:border-gray-700'
-            : 'tw:border-gray-200'
+            ? 'border-gray-700'
+            : 'border-gray-200'
         ]"
       >
-        <OIcon data-test="toc-header-icon" name="format-list-bulleted" size="sm" class="tw:opacity-80" />
-        <span data-test="toc-header-title" :class="isDarkMode ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-xs tw:font-semibold">
+        <OIcon data-test="toc-header-icon" name="format-list-bulleted" size="sm" class="opacity-80" />
+        <span data-test="toc-header-title" :class="isDarkMode ? 'text-gray-300' : 'text-gray-700'" class="text-xs font-semibold">
           Table of Contents
         </span>
       </div>
 
       <!-- Content -->
-      <div data-test="toc-content" class="tw:p-3 tw:flex-1 tw:overflow-auto">
+      <div data-test="toc-content" class="p-3 flex-1 overflow-auto">
         <!-- Table of Contents -->
-        <div v-if="tableOfContents.length === 0" data-test="toc-empty-state" :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-xs tw:italic">
+        <div v-if="tableOfContents.length === 0" data-test="toc-empty-state" :class="isDarkMode ? 'text-gray-500' : 'text-gray-400'" class="text-xs italic">
           No sections available
         </div>
-        <div v-else class="tw:space-y-1">
+        <div v-else class="space-y-1">
           <!-- TOC Items -->
           <template v-for="item in tableOfContents" :key="item.id">
             <div :data-test="`toc-level1-item-${item.id}`">
@@ -50,10 +50,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 :data-test="`toc-level1-content-${item.id}`"
                 :class="[
-                  'tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1.5 tw:rounded tw:transition-colors',
+                  'flex items-center gap-2 px-2 py-1.5 rounded transition-colors',
                   isDarkMode
-                    ? 'tw:text-gray-200'
-                    : 'tw:text-gray-900'
+                    ? 'text-gray-200'
+                    : 'text-gray-900'
                 ]"
               >
                 <!-- Icon on the left -->
@@ -61,17 +61,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`toc-level1-icon-${item.id}`"
                   :name="item.children.length > 0 ? 'folder' : 'article'"
                   size="sm"
-                  class="tw:opacity-60 tw:flex-shrink-0"
+                  class="opacity-60 flex-shrink-0"
                 />
                 <!-- Text in the middle - clickable to scroll -->
                 <span
                   :data-test="`toc-level1-text-${item.id}`"
                   @click="$emit('scroll-to-section', item.id)"
                   :class="[
-                    'tw:text-xs tw:font-medium tw:truncate tw:flex-1 tw:cursor-pointer',
+                    'text-xs font-medium truncate flex-1 cursor-pointer',
                     isDarkMode
-                      ? 'tw:hover:text-blue-400'
-                      : 'tw:hover:text-blue-600'
+                      ? 'hover:text-blue-400'
+                      : 'hover:text-blue-600'
                   ]"
                 >{{ item.text }}</span>
                 <!-- Expand button on the right (only for items with children) -->
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-xs-circle"
                   @click="$emit('toggle-section', item, $event)"
-                  class="tw:flex-shrink-0"
+                  class="flex-shrink-0"
                 >
                   <OIcon :name="expandedSections[item.id] ? 'expand-more' : 'chevron-right'" size="sm" />
                   <OTooltip :content="expandedSections[item.id] ? 'Collapse' : 'Expand'" data-test="toc-expand-tooltip" side="top" />
@@ -89,17 +89,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Level 2 Children -->
-              <div v-if="expandedSections[item.id] && item.children.length > 0" :data-test="`toc-level2-container-${item.id}`" class="tw:ml-4 tw:space-y-1 tw:mt-1">
+              <div v-if="expandedSections[item.id] && item.children.length > 0" :data-test="`toc-level2-container-${item.id}`" class="ml-4 space-y-1 mt-1">
                 <template v-for="child in item.children" :key="child.id">
                   <div :data-test="`toc-level2-item-${child.id}`">
                     <!-- Level 2 Item -->
                     <div
                       :data-test="`toc-level2-content-${child.id}`"
                       :class="[
-                        'tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:rounded tw:transition-colors',
+                        'flex items-center gap-2 px-2 py-1 rounded transition-colors',
                         isDarkMode
-                          ? 'tw:text-gray-300'
-                          : 'tw:text-gray-700'
+                          ? 'text-gray-300'
+                          : 'text-gray-700'
                       ]"
                     >
                       <!-- Icon on the left -->
@@ -107,17 +107,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`toc-level2-icon-${child.id}`"
                         name="label"
                         size="xs"
-                        class="tw:opacity-60 tw:flex-shrink-0"
+                        class="opacity-60 flex-shrink-0"
                       />
                       <!-- Text in the middle - clickable to scroll -->
                       <span
                         :data-test="`toc-level2-text-${child.id}`"
                         @click="$emit('scroll-to-section', child.id)"
                         :class="[
-                          'tw:text-xs tw:truncate tw:flex-1 tw:cursor-pointer',
+                          'text-xs truncate flex-1 cursor-pointer',
                           isDarkMode
-                            ? 'tw:hover:text-blue-400'
-                            : 'tw:hover:text-blue-600'
+                            ? 'hover:text-blue-400'
+                            : 'hover:text-blue-600'
                         ]"
                       >{{ child.text }}</span>
                       <!-- Expand button on the right (only for items with children) -->
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="ghost"
                         size="icon-xs-circle"
                         @click="$emit('toggle-section', child, $event)"
-                        class="tw:flex-shrink-0"
+                        class="flex-shrink-0"
                       >
                         <OIcon :name="expandedSections[child.id] ? 'expand-more' : 'chevron-right'" size="sm" />
                         <OTooltip :content="expandedSections[child.id] ? 'Collapse' : 'Expand'" data-test="toc-expand-tooltip" side="top" />
@@ -135,21 +135,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- Level 3 Children -->
-                    <div v-if="expandedSections[child.id] && child.children.length > 0" :data-test="`toc-level3-container-${child.id}`" class="tw:ml-4 tw:space-y-1 tw:mt-1">
+                    <div v-if="expandedSections[child.id] && child.children.length > 0" :data-test="`toc-level3-container-${child.id}`" class="ml-4 space-y-1 mt-1">
                       <div
                         v-for="grandchild in child.children"
                         :key="grandchild.id"
                         :data-test="`toc-level3-item-${grandchild.id}`"
                         @click="$emit('scroll-to-section', grandchild.id)"
                         :class="[
-                          'tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:rounded tw:cursor-pointer tw:transition-colors',
+                          'flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-colors',
                           isDarkMode
-                            ? 'tw:hover:bg-gray-700 tw:text-gray-400'
-                            : 'tw:hover:bg-blue-50 tw:text-gray-600'
+                            ? 'hover:bg-gray-700 text-gray-400'
+                            : 'hover:bg-blue-50 text-gray-600'
                         ]"
                       >
-                        <OIcon :data-test="`toc-level3-icon-${grandchild.id}`" name="fiber-manual-record" size="xs" class="tw:opacity-60" />
-                        <span :data-test="`toc-level3-text-${grandchild.id}`" class="tw:text-[11px] tw:truncate">{{ grandchild.text }}</span>
+                        <OIcon :data-test="`toc-level3-icon-${grandchild.id}`" name="fiber-manual-record" size="xs" class="opacity-60" />
+                        <span :data-test="`toc-level3-text-${grandchild.id}`" class="text-[11px] truncate">{{ grandchild.text }}</span>
                       </div>
                     </div>
                   </div>

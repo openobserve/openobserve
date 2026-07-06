@@ -858,7 +858,7 @@ describe("DashboardQueryBuilder", () => {
       });
 
       const xAxis = wrapper.find('[data-test="dashboard-x-layout"]');
-      expect(xAxis.classes()).toContain("tw:[border-style:dotted]");
+      expect(xAxis.classes()).toContain("[border-style:dotted]");
     });
 
     it("should apply drop entered styling", () => {
@@ -868,7 +868,7 @@ describe("DashboardQueryBuilder", () => {
       });
 
       const xAxis = wrapper.find('[data-test="dashboard-x-layout"]');
-      expect(xAxis.classes()).toContain("tw:transition-all");
+      expect(xAxis.classes()).toContain("transition-all");
     });
   });
 

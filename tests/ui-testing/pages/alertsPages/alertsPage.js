@@ -235,7 +235,7 @@ export class AlertsPage {
 
             // Incident detail — Overview tab locators
             relatedAlertsContainer: '.o2-incident-card-bg',
-            relatedAlertItem: '[class*="tw:py-2"]',
+            relatedAlertItem: '[class*="py-2"]',
             relatedAlertName: '.tw\\:truncate',
             relatedAlertCountText: '[style*="width: 120px"]',
             severityBadge: '[data-test*="badge"], [data-test*="chip"], .severity-badge',

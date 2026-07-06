@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tracePage tw:h-full tw:min-h-full! tw:max-h-full! tw:overflow-hidden!"
+  <div class="rounded-md tracePage h-full min-h-full! max-h-full! overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
-    <div id="tracesSecondLevel" class="tw:h-full">
+    <div id="tracesSecondLevel" class="h-full">
       <OSplitter
         :class="[
-          'traces-horizontal-splitter tw:h-full',
+          'traces-horizontal-splitter h-full',
           activeTab === 'service-graph' || activeTab === 'services-catalog'
             ? 'hide-splitter-separator'
             : '',
@@ -38,8 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :separatorStyle="{ height: '9px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
         :before-class="
           activeTab === 'service-graph' || activeTab === 'services-catalog'
-            ? 'tw:z-auto tw:overflow-visible tw:max-h-[3.125rem]!'
-            : 'tw:z-auto tw:overflow-visible'
+            ? 'z-auto overflow-visible max-h-[3.125rem]!'
+            : 'z-auto overflow-visible'
         "
         @update:model-value="onSplitterUpdate"
       >
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                + 4px = 10px, aligning the bar with the 10px field-list & results
                panels below (matches the Logs page). -->
           <div
-            class="tw:w-full tw:h-full"
+            class="w-full h-full"
           >
             <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
             <search-bar
@@ -73,17 +73,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template v-slot:after>
-          <div class="tw:h-full tw:overflow-hidden">
+          <div class="h-full overflow-hidden">
           <!-- Service Graph Tab Content -->
           <div
             v-if="
               activeTab === 'service-graph' && config.isEnterprise == 'true'
             "
-            class="tw:h-full tw:overflow-hidden"
+            class="h-full overflow-hidden"
           >
             <service-graph
               ref="serviceGraphRef"
-              class="tw:h-full"
+              class="h-full"
               @view-traces="handleServiceGraphViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
             />
@@ -92,11 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Services Catalog Tab Content -->
           <div
             v-if="activeTab === 'services-catalog'"
-            class="tw:h-full tw:overflow-hidden"
+            class="h-full overflow-hidden"
           >
             <services-catalog
               ref="servicesCatalogRef"
-              class="tw:h-full"
+              class="h-full"
               @view-traces="handleServicesCatalogViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
             />
@@ -106,19 +106,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="activeTab === 'search'"
             id="tracesThirdLevel"
-            class="traces-search-result-container relative-position tw:h-full"
+            class="traces-search-result-container relative-position h-full"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <OSplitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
               style="width: 100%"
-              separatorClass="tw:w-px"
+              separatorClass="w-px"
               @update:model-value="onSplitterUpdate"
-              class="tw:h-full"
+              class="h-full"
             >
               <template #before>
-                <div class="tw:h-full tw:border-r tw:border-border-default tw:bg-surface-panel">
+                <div class="h-full border-r border-border-default bg-surface-panel">
                   <index-list
                     v-show="searchObj.meta.showFields"
                     ref="indexListRef"
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :active-include-field-values="activeIncludeFilterValues"
                     :active-exclude-field-values="activeExcludeFilterValues"
                     data-test="traces-search-index-list"
-                    class="card-container tw:h-full"
+                    class="card-container h-full"
                     :key="searchObj.data.stream.streamLists"
                     @update:changeStream="onChangeStream"
                     @update:selectedFields="updateFieldVisibility"
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #after>
-                <div class="tw:h-full tw:pb-[0.625rem]">
+                <div class="h-full pb-[0.625rem]">
                   <!-- No trace streams in org yet -->
                   <TracesNoDataState
                     v-if="
@@ -152,13 +152,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       parseInt(searchObj.data.errorCode) !== 0 &&
                       searchObj.loading == false
                     "
-                    class="card-container tw:h-full"
+                    class="card-container h-full"
                   >
-                    <div class="tw:text-center tw:pt-[2rem]">
+                    <div class="text-center pt-[2rem]">
                       <!-- Actual error case -->
                       <div
                         data-test="traces-search-error-message"
-                        class="tw:text-[1.3rem] tw:pt-4"
+                        class="text-[1.3rem] pt-4"
                       >
                         {{ t("traces.errorRetrievingTraces") }}
                         <OButton
@@ -174,17 +174,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                       </div>
                       <!-- Collapsible error detail — shown below results when toggled -->
-                      <div class="tw:text-center">
-                        <div class="tw:my-none tw:text-[1rem]! tw:px-[2rem]!">
+                      <div class="text-center">
+                        <div class="my-none text-[1rem]! px-[2rem]!">
                           <span v-if="disableMoreErrorDetails">
                             <SanitizedHtmlRenderer
                               data-test="traces-search-detail-error-message"
                               :htmlContent="searchObj?.data?.errorMsg"
-                              class="tw:pt-[1rem]"
+                              class="pt-[1rem]"
                             />
                             <div
                               v-if="searchObj?.data?.errorDetail"
-                              class="error-display__message tw:pt-[1rem]! tw:text-[var(--o2-text-2)]!"
+                              class="error-display__message pt-[1rem]! text-[var(--o2-text-2)]!"
                             >
                               {{ searchObj.data.errorDetail }}
                             </div>
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                         {{ t("traces.configureFullTextSearch") }}
                       </div>
-                      <span class="tw:text-sm">{{
+                      <span class="text-sm">{{
                         searchObj.data.additionalErrorMsg
                       }}</span>
                     </div>
@@ -220,12 +220,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.loading
                     "
                     data-test="traces-search-error-text"
-                    class="tw:text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
+                    class="text-center py-[40px] text-[20px] card-container h-full"
                   >
                     <SanitizedHtmlRenderer
                       data-test="traces-search-detail-error-message"
                       :htmlContent="searchObj?.data?.errorMsg"
-                      class="tw:pt-[1rem]"
+                      class="pt-[1rem]"
                     />
                   </div>
                   <div v-else-if="!isStreamSelected">
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-else
                     data-test="logs-search-search-result"
-                    class="tw:h-full!"
+                    class="h-full!"
                   >
                     <search-result
                       ref="searchResultRef"
@@ -1174,7 +1174,7 @@ async function getQueryData(
             if (customMessage) errorMsg = t(customMessage);
           }
           if (trace_id) {
-            errorMsg += ` <br><span class='tw:text-base tw:font-medium'>TraceID: ${trace_id}</span>`;
+            errorMsg += ` <br><span class='text-base font-medium'>TraceID: ${trace_id}</span>`;
           }
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";

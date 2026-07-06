@@ -260,7 +260,7 @@ describe("EventDetailDrawerContent", () => {
 
     it("displays event type badge text in uppercase when event has type", () => {
       // Arrange & Assert
-      const eventTypeBadge = wrapper.find("div.tw\\:uppercase");
+      const eventTypeBadge = wrapper.find("div.uppercase");
       expect(eventTypeBadge.exists()).toBe(true);
       expect(eventTypeBadge.text()).toBe("action");
     });
@@ -1105,26 +1105,26 @@ describe("EventDetailDrawerContent", () => {
       // Skip: class-based assertions are forbidden by test standards
       await wrapper.setProps({ event: createMockEvent({ type: "error" }) });
       await flushPromises();
-      expect(wrapper.find(".tw\\:bg-red-100").exists()).toBe(true);
+      expect(wrapper.find(".bg-red-100").exists()).toBe(true);
     });
 
     it.skip("applies bg-blue-100 class to badge for action event type", () => {
       // Skip: class-based assertions are forbidden by test standards
-      expect(wrapper.find(".tw\\:bg-blue-100").exists()).toBe(true);
+      expect(wrapper.find(".bg-blue-100").exists()).toBe(true);
     });
 
     it.skip("applies bg-green-100 class to badge for view event type", async () => {
       // Skip: class-based assertions are forbidden by test standards
       await wrapper.setProps({ event: createMockEvent({ type: "view" }) });
       await flushPromises();
-      expect(wrapper.find(".tw\\:bg-green-100").exists()).toBe(true);
+      expect(wrapper.find(".bg-green-100").exists()).toBe(true);
     });
 
     it.skip("applies bg-grey-100 class to badge for unknown event type", async () => {
       // Skip: class-based assertions are forbidden by test standards
       await wrapper.setProps({ event: createMockEvent({ type: "unknown" }) });
       await flushPromises();
-      expect(wrapper.find(".tw\\:bg-grey-100").exists()).toBe(true);
+      expect(wrapper.find(".bg-grey-100").exists()).toBe(true);
     });
   });
 

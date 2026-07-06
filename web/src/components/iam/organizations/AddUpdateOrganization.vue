@@ -34,13 +34,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :readonly="beingUpdated"
             :disabled="beingUpdated"
             :label="t('organization.id')"
-            class="showLabelOnTop tw:mt-2"
+            class="showLabelOnTop mt-2"
           />
 
           <OInput
             v-model.trim="organizationData.name"
             :label="t('organization.name') + '*'"
-            class="showLabelOnTop tw:mt-2"
+            class="showLabelOnTop mt-2"
             :error="showNameError"
             :error-message="nameErrorMessage"
             :help-text="!showNameError ? t('organization.nameHelpText') : undefined"
@@ -53,15 +53,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!beingUpdated && config.isCloud == 'true' && canMakeBilledMember"
             v-model="makeBilledMember"
             :label="t('organization.makeBilledMember', { org: currentOrgName })"
-            class="tw:mt-4"
+            class="mt-4"
             data-test="org-make-billed-member"
           />
 
-          <div class="tw:flex tw:justify-center tw:mt-4" v-if="proPlanRequired">
+          <div class="flex justify-center mt-4" v-if="proPlanRequired">
             <OButton
               variant="secondary"
               size="md"
-              class="tw:mb-4 tw:ml-4"
+              class="mb-4 ml-4"
               @click="completeSubscriptionProcess"
             >
               {{ t('organization.proceed_subscription') }}

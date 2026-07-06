@@ -15,16 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="sessions_page tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+  <div class="sessions_page flex flex-col flex-1 min-h-0 overflow-hidden">
     <div>
-      <div class="card-container tw:border-b tw:border-border-default tw:py-[0.375rem] tw:px-[0.375rem]">
-        <div class="tw:flex tw:items-start tw:gap-1">
+      <div class="card-container border-b border-border-default py-[0.375rem] px-[0.375rem]">
+        <div class="flex items-start gap-1">
           <!-- Query editor (flex-grow to fill available space) -->
-          <div class="tw:flex-1 tw:min-w-0 tw:relative">
+          <div class="flex-1 min-w-0 relative">
             <query-editor
               ref="errorQueryEditorRef"
               editor-id="rum-errors-query-editor"
-              :class="['tw:border', 'tw:solid', 'tw:border-[var(--o2-border-color)]', 'tw:p-[0.25rem]', 'tw:rounded-[0.375rem]', 'tw:overflow-y-auto', errorEditorHeight]"
+              :class="['border', 'solid', 'border-[var(--o2-border-color)]', 'p-[0.25rem]', 'rounded-[0.375rem]', 'overflow-y-auto', errorEditorHeight]"
               v-model:query="errorTrackingState.data.editorValue"
               :debounce-time="300"
               :keywords="effectiveKeywords"
@@ -35,14 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-if="!errorTrackingState.data.editorValue && !editorFocused"
-              class="query-editor-placeholder-overlay tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:py-0.75 tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
+              class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start py-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
             >
               <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
             </div>
           </div>
 
           <!-- Controls on the right -->
-          <div class="tw:flex tw:items-start tw:gap-1 tw:shrink-0">
+          <div class="flex items-start gap-1 shrink-0">
             <syntax-guide />
             <date-time
               auto-apply
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm-toolbar"
               :title="t('metrics.runQuery')"
               @click="runQuery"
-              class="tw:shrink-0"
+              class="shrink-0"
             >
               {{ t("metrics.runQuery") }}
             </OButton>
@@ -74,13 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div><!-- end card-container -->
     </div><!-- end toolbar wrapper -->
     <OSplitter
-      class="logs-horizontal-splitter tw:flex-1 tw:min-h-0"
+      class="logs-horizontal-splitter flex-1 min-h-0"
       v-model="splitterModel"
       unit="px"
       :horizontal="false"
     >
       <template #before>
-        <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto tw:border-r tw:border-border-default">
+        <div class="card-container p-[0.325rem] h-full overflow-auto border-r border-border-default">
           <SearchFieldList
             :fields="streamFields"
             :time-stamp="{
@@ -96,13 +96,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #after>
-        <div class="tw:h-full tw:flex tw:flex-col tw:min-h-0">
+        <div class="h-full flex flex-col min-h-0">
           <!-- Errors-over-time chart + KPI summary -->
           <div
-            class="tw:grid tw:grid-cols-1 tw:lg:grid-cols-5 tw:gap-2 tw:px-2 tw:pt-1.5 tw:h-[11rem] tw:shrink-0"
+            class="grid grid-cols-1 lg:grid-cols-5 gap-2 px-2 pt-1.5 h-[11rem] shrink-0"
           >
             <ErrorsOverTimeChart
-              class="tw:lg:col-span-3"
+              class="lg:col-span-3"
               :buckets="chartSeries"
               :deploy="latestDeploy"
               :spike-factor="deploySpikeFactor"
@@ -110,14 +110,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="isLoadingChart"
             />
             <ErrorsKpiCards
-              class="tw:lg:col-span-2"
+              class="lg:col-span-2"
               :kpis="kpis"
               :loading="isLoadingKpis"
             />
           </div>
 
           <!-- Status / type / service filters -->
-          <div class="tw:px-2 tw:py-1.5">
+          <div class="px-2 py-1.5">
             <ErrorsFilterBar
               :status="statusFilter"
               :type="typeFilter"
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+          <div class="card-container flex-1 min-h-0 overflow-hidden">
           <OTable
             :data="visibleIssues"
             :columns="tableColumns"
@@ -141,11 +141,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :dense="false"
             :row-height="60"
             :show-global-filter="false"
-            :default-columns="false"
-            class="tw:h-full"
+            horizontal-scroll
+            class="h-full"
             data-test="rum-app-errors-table"
-            row-class="tw:cursor-pointer"
-            :get-row-status-color="getIssueStatusColor"
+            row-class="cursor-pointer"
             @row-click="handleRowClick"
           >
             <template #empty>
@@ -163,9 +162,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #cell-events="{ row }">
-              <div class="tw:flex tw:flex-col tw:items-end">
+              <div class="flex flex-col items-end">
                 <span
-                  class="tw:font-semibold tw:tabular-nums"
+                  class="font-semibold tabular-nums"
                   data-test="rum-app-errors-events-count"
                 >{{ addCommasToNumber(row.events) }}</span>
                 <small>{{ t("rum.eventsUnit") }}</small>
@@ -173,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-users="{ row }">
               <span
-                class="tw:tabular-nums"
+                class="tabular-nums"
                 data-test="rum-app-errors-users-count"
               >{{
                 row.users_affected != null
@@ -182,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</span>
             </template>
             <template #cell-seen="{ row }">
-              <div class="tw:flex tw:flex-col">
+              <div class="flex flex-col">
                 <span data-test="rum-app-errors-last-seen">{{
                   formatRelativeTime(row.zo_sql_timestamp)
                 }}</span>
@@ -407,9 +406,9 @@ const onServiceFilterChange = (value: string) => {
 // Dynamic editor height based on content lines
 const errorEditorHeight = computed(() => {
   const lines = (errorTrackingState.data.editorValue.match(/\n/g) || []).length + 1;
-  if (lines === 1) return 'tw:h-[2rem]!';
-  if (lines === 2) return 'tw:h-[3.5rem]!';
-  return 'tw:h-[5rem]!'; // 3+ lines, capped at 5rem (approx 3 lines)
+  if (lines === 1) return 'h-[2rem]!';
+  if (lines === 2) return 'h-[3.5rem]!';
+  return 'h-[5rem]!'; // 3+ lines, capped at 5rem (approx 3 lines)
 });
 
 const tableColumns = [

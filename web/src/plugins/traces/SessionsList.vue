@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="sessions-list tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container"
+    class="sessions-list h-full! flex flex-col bg-[var(--o2-card-bg-solid)] card-container"
   >
     <!-- No LLM streams exist in the org at all — nothing to select, so show
          the rich first-run empty state on its own (no table chrome). -->
     <div
       v-if="streamsLoaded && availableStreams.length === 0"
-      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center"
+      class="flex-1 min-h-0 flex items-center justify-center"
       data-test="sessions-empty-no-streams"
     >
       <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
@@ -52,14 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :show-global-filter="false"
       :frame="false"
       width="100%"
-      class="tw:w-full tw:h-full"
+      class="w-full h-full"
       data-test="sessions-list-table"
       @row-click="(row: any) => handleRowClick(row)"
       @pagination-change="onPaginationChange"
     >
       <!-- Toolbar: Stream/Agent mode + matching picker aligned with the table actions. -->
       <template #toolbar>
-        <div class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:flex-1 tw:min-w-0">
+        <div class="flex items-center justify-end gap-2 flex-1 min-w-0">
           <OToggleGroup
             :model-value="filterMode"
             type="single"
@@ -70,11 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OToggleGroupItem value="agent" size="sm">Agent</OToggleGroupItem>
           </OToggleGroup>
 
-          <div class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:min-w-0">
+          <div class="flex items-center justify-end gap-2 min-w-0">
             <div
               v-if="filterMode === 'stream'"
               data-test="sessions-list-stream-selector"
-              class="tw:w-[14rem] tw:flex-shrink-0"
+              class="w-[14rem] flex-shrink-0"
             >
               <!-- Hold a picker-shaped skeleton until the stream list lands, so
                    the selector doesn't flash an empty dropdown then populate. -->
@@ -92,14 +92,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="availableStreams.map((s) => ({ label: s, value: s }))"
                 labelKey="label"
                 valueKey="value"
-                class="tw:w-full tw:rounded"
+                class="w-full rounded"
                 @update:model-value="onStreamChange"
               />
             </div>
             <div
               v-else
               data-test="sessions-list-agent-selector"
-              class="tw:w-[14rem] tw:flex-shrink-0"
+              class="w-[14rem] flex-shrink-0"
             >
               <!-- Same treatment for agents: toggling to Agent mode kicks off the
                    listAgents fetch, so show the skeleton until it resolves
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="agentSelectOptions"
                 labelKey="label"
                 valueKey="value"
-                class="tw:w-full tw:rounded"
+                class="w-full rounded"
                 @update:model-value="onAgentChange"
               />
             </div>
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-else
-          class="tw:flex tw:items-center tw:justify-center tw:py-12"
+          class="flex items-center justify-center py-12"
           data-test="sessions-empty"
         >
           <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
@@ -158,14 +158,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
         <!-- Timestamp -->
         <template #cell-firstSeenNanos="{ row }">
-          <span class="tw:text-[0.75rem] tw:tabular-nums">
+          <span class="text-[0.75rem] tabular-nums">
             {{ formatTimestamp(row.firstSeenNanos) }}
           </span>
         </template>
 
         <!-- Session ID -->
         <template #cell-sessionId="{ row }">
-          <div class="tw:text-[0.75rem] tw:truncate tw:w-full">
+          <div class="text-[0.75rem] truncate w-full">
             {{ row.sessionId }}
             <OTooltip :content="row.sessionId" />
           </div>
@@ -183,22 +183,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-firstUserMessage="{ row }">
           <div
             v-if="row.firstUserMessage"
-            class="tw:text-[0.75rem] tw:text-[var(--o2-text-secondary)] tw:truncate tw:w-full"
+            class="text-[0.75rem] text-[var(--o2-text-secondary)] truncate w-full"
           >
             {{ row.firstUserMessage }}
             <OTooltip :content="row.firstUserMessage" />
           </div>
-          <span v-else class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">—</span>
+          <span v-else class="text-[0.75rem] text-[var(--o2-text-muted)]">—</span>
         </template>
 
         <!-- Turns -->
         <template #cell-turns="{ row }">
-          <span class="tw:text-[0.75rem]">{{ row.turns }}</span>
+          <span class="text-[0.75rem]">{{ row.turns }}</span>
         </template>
 
         <!-- Duration -->
         <template #cell-durationNanos="{ row }">
-          <span class="tw:text-[0.75rem]">
+          <span class="text-[0.75rem]">
             {{ formatDuration(row.durationNanos) }}
             <OTooltip :content="`${row.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`" />
           </span>
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Tokens -->
         <template #cell-tokens="{ row }">
-          <span class="tw:text-[0.75rem] tw:tabular-nums">
+          <span class="text-[0.75rem] tabular-nums">
             {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} = {{ formatTokens(row.tokens) }}
             <OTooltip :content="t('traces.sessionsList.tokenTooltip', { input: row.inputTokens.toLocaleString(), output: row.outputTokens.toLocaleString(), total: row.tokens.toLocaleString() })" />
           </span>
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Cost -->
         <template #cell-cost="{ row }">
-          <span class="tw:text-[0.75rem]">${{ row.cost.toFixed(4) }}</span>
+          <span class="text-[0.75rem]">${{ row.cost.toFixed(4) }}</span>
         </template>
 
         <!-- Status (derived from error_count) -->

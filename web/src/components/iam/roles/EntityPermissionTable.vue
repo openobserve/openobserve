@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="row.permission[col]?.show"
           v-model="row.permission[col].value"
           :value="col"
-          class="filter-check-box tw:cursor-pointer"
+          class="filter-check-box cursor-pointer"
           @click="handlePermissionChange(row, col)"
         />
       </template>
