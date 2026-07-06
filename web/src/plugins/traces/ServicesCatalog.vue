@@ -409,6 +409,7 @@ import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import streamService from "@/services/stream";
 import { formatLatency } from "@/utils/traces/treeTooltipHelpers";
+import { classifyEntity } from "@/utils/traces/serviceClassification";
 import {
   b64EncodeUnicode,
   generateTraceContext,
@@ -486,43 +487,18 @@ const CATEGORY_ORDER: EntityCategory[] = [
 const TYPE_FILTER_ORDER: TypeFilter[] = ["all", ...CATEGORY_ORDER];
 
 /**
- * Map a row to a catalog category.
- *
- * Collision rule (data-proven): an entity that emits its own spans
- * (`is_real_service`) is a Service, even if it was ALSO inferred as external/rpc
- * because something called it over HTTP/gRPC — that inference is a false
- * positive. Only genuine, uninstrumented dependencies keep their inferred type.
- * RPC targets are always redundant with a real service→service edge, so they map
- * to service too (never a distinct RPC bucket). This mirrors the Service Graph.
+ * Map a row to a catalog category using the shared classifier — the single
+ * source of truth (mirrored in the Rust backend + the Service Graph). A real
+ * service (emits its own spans) stays a Service even if it was ALSO inferred as
+ * external/rpc (a collision); genuine dependencies keep their inferred type; rpc
+ * is kept as its own category. `classifyEntity`'s `EntityKind` values line up
+ * with `EntityCategory` exactly.
  */
 function categoryOf(row: ServiceRow): EntityCategory {
-  if (row.is_real_service) return "service";
-  switch ((row.infer_service_type ?? "").toLowerCase()) {
-    case "database":
-      return "datastore";
-    case "queue":
-      return "queue";
-    case "external":
-      return "external";
-    case "rpc":
-      return "rpc";
-    default:
-      return "service";
-  }
-}
-
-/**
- * A phantom rpc dependency is an rpc-typed entity that is NOT a real service
- * (e.g. "oteldemo.CurrencyService"). Every such rpc call is already represented
- * by a real service→service edge, so it is dropped entirely — matching the
- * Service Graph, which suppresses rpc. Real services that happen to carry an
- * rpc inference are kept (is_real_service wins in categoryOf).
- */
-function isPhantomRpc(row: ServiceRow): boolean {
-  return (
-    !row.is_real_service &&
-    (row.infer_service_type ?? "").toLowerCase() === "rpc"
-  );
+  return classifyEntity(
+    Boolean(row.is_real_service),
+    row.infer_service_type,
+  ) as EntityCategory;
 }
 
 const isLoading = ref(false);
@@ -1092,11 +1068,10 @@ ORDER BY total_requests DESC`;
               infer_service_type: hit._infer_service_type ?? undefined,
             });
           }
-          // Drop phantom rpc dependencies (redundant with real service edges),
-          // matching the Service Graph's rpc suppression.
-          services.value = Array.from(serviceMap.values()).filter(
-            (s) => !isPhantomRpc(s),
-          );
+          // RPC entities are kept as their own category (matching the Service
+          // Graph and the shared classifier) — never dropped, so a genuine
+          // uninstrumented gRPC backend is never hidden.
+          services.value = Array.from(serviceMap.values());
         }
       },
       error: (_payload: any, _response: any) => {
