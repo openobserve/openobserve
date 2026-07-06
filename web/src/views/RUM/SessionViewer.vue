@@ -15,51 +15,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col qp-2 tw:h-full">
-    <div class="tw:w-full tw:flex tw:items-end tw:border-b tw:border-border-default">
-      <div class="tw:w-full tw:flex card-container tw:px-[0.625rem] tw:py-[0.625rem]">
+  <div class="flex flex-col qp-2 h-full">
+    <div class="w-full flex items-end border-b border-border-default">
+      <div class="w-full flex card-container px-[0.625rem] py-[0.625rem]">
         <div
-          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer tw:hover:text-[var(--o2-primary-btn-bg)] tw:border-[1.5px] tw:border-solid tw:rounded-full tw:w-[1.375rem] tw:h-[1.375rem]"
+          class="flex justify-center items-center mr-3 cursor-pointer hover:text-[var(--o2-primary-btn-bg)] border-[1.5px] border-solid rounded-full w-[1.375rem] h-[1.375rem]"
           title="Go Back"
           @click="router.back()"
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+        <div class="text-xs truncate flex items-center gap-1.5 mr-3">
           <OIcon name="language" size="sm" />
           {{ sessionDetails.ip }}
         </div>
-        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+        <div class="text-xs truncate flex items-center gap-1.5 mr-3">
           <OIcon name="calendar-month" size="sm" />
           {{ sessionDetails.date }}
         </div>
-        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+        <div class="text-xs truncate flex items-center gap-1.5 mr-3">
           <OIcon name="person" size="sm" />
           {{ sessionDetails.user_email || "Unknown User" }}
         </div>
-        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+        <div class="text-xs truncate flex items-center gap-1.5 mr-3">
           <OIcon name="location-on" size="sm" />
           {{ sessionDetails.city }}, {{ sessionDetails.country }}
         </div>
-        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+        <div class="text-xs truncate flex items-center gap-1.5 mr-3">
           <OIcon name="settings" size="sm" />
           {{ sessionDetails.browser }}, {{ sessionDetails.os }}
         </div>
         <div
           v-if="frustrationCount > 0"
-          class="tw:text-xs tw:truncate tw:flex tw:items-center"
+          class="text-xs truncate flex items-center"
           :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
           data-test="session-viewer-frustration-summary"
         >
           <OIcon
             name="sentiment-very-dissatisfied"
             size="sm"
-            class="tw:pr-1"
+            class="pr-1"
             style="color: #fb923c"
             data-test="frustration-summary-icon"
           />
           <span
-            class="tw:font-semibold"
+            class="font-semibold"
             style="color: #fb923c"
             data-test="frustration-summary-text"
             >{{ frustrationCount }} Frustration{{
@@ -70,14 +70,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="tw:w-full tw:flex card-container tw:overflow-hidden tw:h-[calc(100%-3.125)]! tw:flex-1 tw:min-h-0"
+      class="w-full flex card-container overflow-hidden h-[calc(100%-3.125)]! flex-1 min-h-0"
     >
       <OSplitter
         v-model="splitterSize"
         :limits="[200, 1400]"
         unit="px"
-        class="tw:w-full tw:h-full"
-        separatorClass="tw:bg-[var(--o2-border-color)] tw:w-[1px]! tw:hover:bg-[var(--o2-theme-color)]"
+        class="w-full h-full"
+        separatorClass="bg-[var(--o2-border-color)] w-[1px]! hover:bg-[var(--o2-theme-color)]"
       >
         <template #before>
           <VideoPlayer
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :events="segmentEvents"
             :segments="segments"
             :is-loading="!!isLoading.length"
-            class="tw:h-full"
+            class="h-full"
           />
         </template>
         <template #after>
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :start-time="sessionState.data.selectedSession?.start_time || 0"
             :end-time="sessionState.data.selectedSession?.end_time || 0"
             @event-emitted="handleSidebarEvent"
-            class="tw:h-full"
+            class="h-full"
           />
         </template>
       </OSplitter>

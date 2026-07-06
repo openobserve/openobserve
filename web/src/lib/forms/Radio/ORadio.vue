@@ -46,21 +46,21 @@ watchEffect(() => {
 });
 
 const circleSize: Record<"xs" | "sm" | "md", string> = {
-  xs: "tw:size-3",
-  sm: "tw:size-3.5",
-  md: "tw:size-4",
+  xs: "size-3",
+  sm: "size-3.5",
+  md: "size-4",
 };
 
 const dotSize: Record<"xs" | "sm" | "md", string> = {
-  xs: "tw:size-1",
-  sm: "tw:size-1.5",
-  md: "tw:size-2",
+  xs: "size-1",
+  sm: "size-1.5",
+  md: "size-2",
 };
 
 const labelSize: Record<"xs" | "sm" | "md", string> = {
-  xs: "tw:text-xs",
-  sm: "tw:text-xs",
-  md: "tw:text-sm",
+  xs: "text-xs",
+  sm: "text-xs",
+  md: "text-sm",
 };
 
 const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
@@ -69,8 +69,8 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
 <template>
   <label
     :class="[
-      'tw:inline-flex tw:items-center tw:gap-2',
-      props.disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
+      'inline-flex items-center gap-2',
+      props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
     ]"
     :for="props.id"
   >
@@ -92,23 +92,23 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
       :data-test="parentDataTest"
       :data-test-value="parentDataTestValue"
       :class="[
-        'tw:shrink-0 tw:rounded-full tw:border-2 tw:flex tw:items-center tw:justify-center',
-        'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
-        'tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base',
-        'tw:focus-visible:ring-2 tw:focus-visible:ring-radio-focus-ring',
+        'shrink-0 rounded-full border-2 flex items-center justify-center',
+        'transition-[color,background-color,border-color,box-shadow] duration-150',
+        'outline-none ring-offset-1 ring-offset-surface-base',
+        'focus-visible:ring-2 focus-visible:ring-radio-focus-ring',
         circleSize[resolvedSize],
-        'tw:bg-radio-bg tw:border-radio-border',
-        'tw:enabled:hover:border-radio-hover-border',
-        'tw:data-[state=checked]:border-radio-checked-border',
-        'tw:data-disabled:bg-radio-disabled-bg',
-        'tw:data-disabled:border-radio-disabled-border',
-        'tw:data-disabled:border-dashed',
-        'tw:data-disabled:cursor-not-allowed',
+        'bg-radio-bg border-radio-border',
+        'enabled:hover:border-radio-hover-border',
+        'data-[state=checked]:border-radio-checked-border',
+        'data-disabled:bg-radio-disabled-bg',
+        'data-disabled:border-radio-disabled-border',
+        'data-disabled:border-dashed',
+        'data-disabled:cursor-not-allowed',
       ]"
     >
       <RadioGroupIndicator
         :class="[
-          'tw:rounded-full tw:bg-radio-checked-dot',
+          'rounded-full bg-radio-checked-dot',
           dotSize[resolvedSize],
         ]"
       />
@@ -117,7 +117,7 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
     <span
       v-if="$slots.label || props.label"
       :class="[
-        'o-input-label tw:text-sm tw:font-semibold tw:select-none tw:leading-tight',
+        'o-input-label text-sm font-semibold select-none leading-tight',
         props.disabled && 'o-input-label--disabled',
       ]"
     >

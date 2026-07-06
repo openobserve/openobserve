@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="aws-marketplace-setup tw:min-h-screen tw:bg-(--q-background)">
-    <div class="tw:flex relative-position tw-px-3 tw-pt-2">
+  <div class="aws-marketplace-setup min-h-screen bg-(--q-background)">
+    <div class="flex relative-position tw-px-3 tw-pt-2">
       <img
         data-test="aws-marketplace-setup-logo"
-        class="tw:h-10"
+        class="h-10"
         loading="lazy"
         :src="
           store?.state?.theme === 'dark'
@@ -29,48 +29,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div class="tw:max-w-125 tw:mx-auto tw:pt-15 tw:p-6">
+    <div class="max-w-125 mx-auto pt-15 p-6">
       <!-- No Token Error -->
-      <div v-if="state === 'no_token'" class="tw:text-center">
+      <div v-if="state === 'no_token'" class="text-center">
         <OIcon name="warning" style="width: 80px; height: 80px;" />
-        <h5 class="tw:mt-3">No Marketplace Token Found</h5>
-        <p class="tw:text-gray-400">
+        <h5 class="mt-3">No Marketplace Token Found</h5>
+        <p class="text-gray-400">
           Please start the registration process from AWS Marketplace.
         </p>
         <OButton
           variant="primary"
           size="sm-action"
-          class="tw:mt-4"
+          class="mt-4"
           @click="goToDashboard"
         >Go to Dashboard</OButton>
       </div>
 
       <!-- Error State -->
-      <div v-else-if="state === 'error'" class="tw:text-center">
+      <div v-else-if="state === 'error'" class="text-center">
         <OIcon name="error" style="width: 80px; height: 80px;" />
-        <h5 class="tw:mt-3">{{ errorMessage }}</h5>
+        <h5 class="mt-3">{{ errorMessage }}</h5>
         <OButton
           variant="primary"
           size="sm-action"
-          class="tw:mt-4"
+          class="mt-4"
           @click="resetAndRetry"
         >Try Again</OButton>
       </div>
 
       <!-- Org Selection/Creation -->
-      <div v-else-if="state === 'select_org'" class="tw:text-center">
+      <div v-else-if="state === 'select_org'" class="text-center">
         <OIcon name="cloud" style="width: 60px; height: 60px;" />
-        <h4 class="tw:mt-3">Complete AWS Marketplace Setup</h4>
-        <p class="tw:text-gray-400 tw:mb-4">
+        <h4 class="mt-3">Complete AWS Marketplace Setup</h4>
+        <p class="text-gray-400 mb-4">
           Link your AWS Marketplace subscription to an organization
         </p>
 
-        <div class="tw:max-w-100 tw:mx-auto">
+        <div class="max-w-100 mx-auto">
           <!-- Create New Org -->
-          <OCard class="tw:rounded-lg tw:transition-all tw:duration-200 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] tw:mb-4">
+          <OCard class="rounded-lg transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] mb-4">
             <OCardSection role="body">
-              <div class="tw:text-xl tw:font-semibold">Create New Organization</div>
-              <p class="tw:text-gray-400">
+              <div class="text-xl font-semibold">Create New Organization</div>
+              <p class="text-gray-400">
                 Create a new organization with AWS Marketplace billing
               </p>
               <OForm
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="aws-marketplace-org-name"
                   label="Organization Name"
                   required
-                  class="tw:mb-3"
+                  class="mb-3"
                 />
                 <OButton
                   data-test="aws-marketplace-create-link-btn"
@@ -102,11 +102,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Link to Existing Org (only show orgs without billing) -->
           <OCard
             v-if="eligibleOrganizations.length > 0"
-            class="tw:rounded-lg tw:transition-all tw:duration-200 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
+            class="rounded-lg transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
           >
             <OCardSection role="body">
-              <div class="tw:text-xl tw:font-semibold">Link to Existing Organization</div>
-              <p class="tw:text-gray-400">
+              <div class="text-xl font-semibold">Link to Existing Organization</div>
+              <p class="text-gray-400">
                 Link AWS billing to an existing organization
               </p>
               <OForm
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   value-key="identifier"
                   label="Select Organization"
                   required
-                  class="tw:mb-3"
+                  class="mb-3"
                 />
                 <OButton
                   type="submit"
@@ -139,43 +139,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Processing State -->
-      <div v-else-if="state === 'processing'" class="tw:text-center">
+      <div v-else-if="state === 'processing'" class="text-center">
         <OSpinner variant="dots" size="xl" />
-        <h5 class="tw:mt-3">Setting up your subscription...</h5>
-        <p class="tw:text-gray-400">Please wait while we configure your account.</p>
+        <h5 class="mt-3">Setting up your subscription...</h5>
+        <p class="text-gray-400">Please wait while we configure your account.</p>
       </div>
 
       <!-- Pending Activation State -->
-      <div v-else-if="state === 'pending_activation'" class="tw:text-center">
-        <h5 class="tw:mb-4">Waiting for AWS Confirmation</h5>
-        <div class="tw:flex tw:justify-center">
+      <div v-else-if="state === 'pending_activation'" class="text-center">
+        <h5 class="mb-4">Waiting for AWS Confirmation</h5>
+        <div class="flex justify-center">
           <OSpinner size="xl" />
         </div>
-        <p class="tw:text-gray-400 tw:mt-4">
+        <p class="text-gray-400 mt-4">
           Please wait while we confirm activation with AWS and set up your account.
         </p>
       </div>
 
       <!-- Success State -->
-      <div v-else-if="state === 'success'" class="tw:text-center">
+      <div v-else-if="state === 'success'" class="text-center">
         <OIcon name="check-circle" style="width: 80px; height: 80px;" />
-        <h4 class="tw:mt-3">Subscription Activated!</h4>
-        <p class="tw:text-gray-400">
+        <h4 class="mt-3">Subscription Activated!</h4>
+        <p class="text-gray-400">
           Your AWS Marketplace subscription is now active.
         </p>
         <OButton
           variant="primary"
           size="sm-action"
-          class="tw:mt-4"
+          class="mt-4"
           @click="goToDashboard"
         >Go to Dashboard</OButton>
       </div>
 
       <!-- Payment Failed State -->
-      <div v-else-if="state === 'payment_failed'" class="tw:text-center">
+      <div v-else-if="state === 'payment_failed'" class="text-center">
         <OIcon name="error" style="width: 80px; height: 80px;" />
-        <h5 class="tw:mt-3">Payment Failed</h5>
-        <p class="tw:text-gray-400">
+        <h5 class="mt-3">Payment Failed</h5>
+        <p class="text-gray-400">
           There was an issue with your AWS Marketplace payment. Please check
           your AWS account or contact AWS support.
         </p>
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           href="mailto:support@openobserve.ai"
           variant="primary"
           size="sm-action"
-          class="tw:mt-4"
+          class="mt-4"
         >Contact Support</OButton>
       </div>
     </div>

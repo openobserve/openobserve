@@ -335,7 +335,7 @@ describe("FlameGraphView", () => {
         },
       });
 
-      expect(wrapper.find(".tw\\:flex-1").exists()).toBe(true);
+      expect(wrapper.find(".flex-1").exists()).toBe(true);
     });
   });
 

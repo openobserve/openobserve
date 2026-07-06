@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span v-if="!expanded">
         {{ visibleFields }}
         <span
-          class="expand-link tw:text-(--q-primary) tw:cursor-pointer tw:font-medium tw:px-1 tw:hover:underline"
+          class="expand-link text-(--q-primary) cursor-pointer font-medium px-1 hover:underline"
           @click="expanded = true"
         >
           ... {{ hiddenCount }} more ▼
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span v-else>
         {{ fieldsText }}
         <span
-          class="expand-link tw:text-(--q-primary) tw:cursor-pointer tw:font-medium tw:px-1 tw:hover:underline"
+          class="expand-link text-(--q-primary) cursor-pointer font-medium px-1 hover:underline"
           @click="expanded = false"
         >
           ▲ collapse

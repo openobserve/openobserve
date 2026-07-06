@@ -19,12 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="alert-list-page"
-    class="tw:flex tw:flex-col tw:h-full"
+    class="flex flex-col h-full"
   >
     <PageLayout
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       :main-panel="false"
-      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+      :header-class="'shrink-0 px-4 border-b border-border-default'"
     >
       <!-- Row 1: standard header — title + actions only (Import/Add). The alert
            type toggle, search and folder scope moved into the table toolbar. -->
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #actions>
             <!-- Import button -->
             <OButton
-              :class="isCompactToolbar ? 'tw:py-0! tw:px-2! tw:min-w-0!' : ''"
+              :class="isCompactToolbar ? 'py-0! px-2! min-w-0!' : ''"
               variant="outline"
               size="sm"
               @click="importAlert"
@@ -70,11 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       data-test="alert-list-splitter"
-      class="tw:flex-1 tw:flex tw:min-h-0"
+      class="flex-1 flex min-h-0"
     >
       <!-- Left: FolderList -->
-      <div class="tw:shrink-0 tw:h-full" :style="{ width: 230 + 'px' }">
-        <div class="tw:h-full">
+      <div class="shrink-0 h-full" :style="{ width: 230 + 'px' }">
+        <div class="h-full">
           <FolderList
             type="alerts"
             @update:activeFolderId="updateActiveFolderId"
@@ -82,8 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- Right: Table -->
-      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
-        <div class="tw:h-full card-container">
+      <div class="flex-1 min-w-0 h-full">
+        <div class="h-full card-container">
               <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
               <OTable
                 :frame="false"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
                 <template #toolbar>
-                  <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                  <div class="flex items-center gap-2 w-full">
                     <OToggleGroup
                       :model-value="activeTab"
                       @update:model-value="(v) => { activeTab = v; filterAlertsByTab(); }"
@@ -130,14 +130,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.anomalyDetection") }}
                       </OToggleGroupItem>
                     </OToggleGroup>
-                    <div class="tw:flex-1 tw:min-w-0">
+                    <div class="flex-1 min-w-0">
                       <OInput
                         v-model="dynamicQueryModel"
                         :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
                         :clearable="searchAcrossFolders"
                         @clear="clearSearchHistory"
                         data-test="alert-list-search-input"
-                        class="tw:w-full"
+                        class="w-full"
                       >
                         <template #icon-left>
                           <OIcon name="search" size="sm" />
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OToggleGroup
                             :model-value="searchAcrossFolders ? 'all' : 'this'"
                             type="single"
-                            class="tw:self-center tw:mr-1"
+                            class="self-center mr-1"
                             @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                           >
                             <OToggleGroupItem
@@ -184,31 +184,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
                 <template #cell-name="{ row }">
-                  <div class="tw:flex tw:items-center tw:gap-1.5 tw:min-w-0 tw:overflow-hidden">
+                  <div class="flex items-center gap-1.5 min-w-0 overflow-hidden">
                     <OIcon
                       v-if="row.is_real_time === 'anomaly'"
                       name="query-stats"
                       size="sm"
-                      class="tw:text-blue-600 tw:shrink-0"
+                      class="text-blue-600 shrink-0"
                     />
                     <OIcon
                       v-else-if="row.is_real_time"
                       name="bolt"
                       size="sm"
-                      class="tw:text-orange-500 tw:shrink-0"
+                      class="text-orange-500 shrink-0"
                     />
                     <OIcon
                       v-else
                       name="schedule"
                       size="sm"
-                      class="tw:text-gray-400 tw:shrink-0"
+                      class="text-gray-400 shrink-0"
                     />
-                    <span class="tw:truncate">{{ row.name || "--" }}</span>
+                    <span class="truncate">{{ row.name || "--" }}</span>
                   </div>
                   <OTooltip
                     v-if="row.name"
                     :content="row.name"
-                    content-class="tw:max-w-[400px] tw:whitespace-normal tw:break-words tw:text-xs"
+                    content-class="max-w-[400px] whitespace-normal break-words text-xs"
                   />
                 </template>
 
@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #cell-status="{ row }">
                   <span
                     v-if="row.status && row.status !== '--'"
-                    class="tw:relative tw:inline-flex"
+                    class="relative inline-flex"
                   >
                     <OTag type="alertStatus" :value="row.status" />
                     <OTooltip
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :content="row.last_error"
                     />
                   </span>
-                  <span v-else class="tw:text-text-primary">—</span>
+                  <span v-else class="text-text-primary">—</span>
                 </template>
 
                 <template #cell-period="{ row }">
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #cell-actions="{ row }">
-                  <div class="tw:flex tw:items-center actions-container">
+                  <div class="flex items-center actions-container">
                     <div
                       data-test="alert-list-loading-alert"
                       v-if="alertStateLoadingMap[row.uuid]"
@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         width: 33.14px;
                         height: auto;
                       "
-                      class="tw:flex tw:justify-center tw:items-center tw:ml-1"
+                      class="flex justify-center items-center ml-1"
                       :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
                     >
                       <OSpinner size="xs" />
@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else
                       :data-row-action="row.enabled ? 'pause' : 'resume'"
                       :data-test="`alert-list-${row.name}-pause-start-alert`"
-                      class="tw:ml-1"
+                      class="ml-1"
                       :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                       size="icon-sm"
                       :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -351,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <button
                       type="button"
                       data-row-action="export"
-                      class="tw:hidden"
+                      class="hidden"
                       tabindex="-1"
                       aria-hidden="true"
                       @click.stop="exportAlert(row)"
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <button
                       type="button"
                       data-row-action="delete"
-                      class="tw:hidden"
+                      class="hidden"
                       tabindex="-1"
                       aria-hidden="true"
                       @click.stop="showDeleteDialogFn({ row })"
@@ -446,19 +446,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #empty>
                   <div
                     v-if="!templates.length || !destinations.length"
-                    class="tw:w-full tw:flex tw:flex-col tw:justify-center tw:items-center tw:text-center"
+                    class="w-full flex flex-col justify-center items-center text-center"
                   >
-                    <div style="width: 600px" class="tw:mt-6">
+                    <div style="width: 600px" class="mt-6">
                       <template v-if="!templates.length">
                         <div
-                          class="tw:text-sm"
+                          class="text-sm"
                           data-test="alert-list-create-template-text"
                         >
                           {{ t('alerts.noTemplatesMsg') }}
                         </div>
                         <OButton
                           data-test="alert-list-create-template-btn"
-                          class="tw:mt-3"
+                          class="mt-3"
                           variant="primary"
                           size="sm"
                           @click="routeTo('alertTemplates')"
@@ -466,14 +466,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <template v-if="!destinations.length && templates.length">
                         <div
-                          class="tw:text-sm"
+                          class="text-sm"
                           data-test="alert-list-create-destination-text"
                         >
                           {{ t('alerts.noDestinationsMsg') }}
                         </div>
                         <OButton
                           data-test="alert-list-create-destination-btn"
-                          class="tw:mt-3"
+                          class="mt-3"
                           variant="primary"
                           size="sm"
                           @click="routeTo('alertDestinations')"
@@ -497,9 +497,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #bottom>
-                  <div class="tw:flex tw:w-full tw:justify-between tw:items-center tw:h-[48px]">
+                  <div class="flex w-full justify-between items-center h-[48px]">
                     <div
-                      class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md"
+                      class="o2-table-footer-title flex items-center w-[200px] mr-md"
                     >
                       {{ resultTotal }} {{ t("alerts.header") }}
                     </div>
@@ -509,55 +509,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-list-move-across-folders-btn"
                       variant="outline"
                       size="sm"
-                      class="tw:mr-2"
+                      class="mr-2"
                       @click="moveMultipleAlerts"
                     >
                       <OIcon name="drive-file-move" size="sm" />
-                      <span class="tw:ml-2">Move</span>
+                      <span class="ml-2">Move</span>
                     </OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-export-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="tw:mr-2"
+                      class="mr-2"
                       @click="multipleExportAlert"
                     >
                       <OIcon name="download" size="sm" />
-                      <span class="tw:ml-2">Export</span>
+                      <span class="ml-2">Export</span>
                     </OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-pause-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="tw:mr-2"
+                      class="mr-2"
                       @click="bulkToggleAlerts('pause')"
                     >
-                      <OIcon name="pause" size="sm" class="tw:text-button-ghost-destructive-text" />
-                      <span class="tw:ml-2">Pause</span>
+                      <OIcon name="pause" size="sm" class="text-button-ghost-destructive-text" />
+                      <span class="ml-2">Pause</span>
                     </OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="tw:mr-2"
+                      class="mr-2"
                       @click="bulkToggleAlerts('resume')"
                     >
-                      <OIcon name="play-arrow" size="sm" class="tw:text-button-ghost-success-text" />
-                      <span class="tw:ml-2">Resume</span>
+                      <OIcon name="play-arrow" size="sm" class="text-button-ghost-success-text" />
+                      <span class="ml-2">Resume</span>
                     </OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-delete-alerts-btn"
                       variant="outline-destructive"
                       size="sm"
-                      class="tw:mr-2"
+                      class="mr-2"
                       @click="openBulkDeleteDialog"
                     >
                       <OIcon name="delete" size="sm" />
-                      <span class="tw:ml-2">Delete</span>
+                      <span class="ml-2">Delete</span>
                     </OButton>
                   </div>
                 </template>
@@ -634,7 +634,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label="Stream Type"
             :options="streamTypes"
             @update:model-value="updateStreams()"
-            class="tw:mt-1"
+            class="mt-1"
           />
           <OSelect
             data-test="to-be-clone-stream-name"
@@ -644,9 +644,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="indexOptions"
             searchable
             @update:model-value="updateStreamName"
-            class="tw:mt-1 tw:mb-2"
+            class="mt-1 mb-2"
           />
-          <div class="tw:mb-4">
+          <div class="mb-4">
             <SelectFolderDropDown
               :type="'alerts'"
               @folder-selected="updateFolderIdToBeCloned"

@@ -11,7 +11,7 @@
     </template>
         <OForm id="cross-link-form" :form="form">
           <!-- Name -->
-          <div class="tw:mb-3">
+          <div class="mb-3">
             <OFormInput
               name="name"
               :label="t('crossLinks.name')"
@@ -22,7 +22,7 @@
           </div>
 
           <!-- URL Template -->
-          <div class="tw:mb-3">
+          <div class="mb-3">
             <OFormInput
               name="url"
               :label="t('crossLinks.urlTemplate')"
@@ -30,32 +30,32 @@
               :placeholder="t('crossLinks.urlPlaceholder')"
               data-test="cross-link-url-input"
             />
-            <div class="tw:text-xs tw:mt-1" style="color: var(--o2-text-muted)">
+            <div class="text-xs mt-1" style="color: var(--o2-text-muted)">
               {{ t("crossLinks.urlHint") }}
             </div>
           </div>
 
           <!-- Fields -->
-          <div class="tw:mb-2">
-            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.fields") }}</label>
-            <div class="tw:text-xs tw:mb-2" style="color: var(--o2-text-muted)">
+          <div class="mb-2">
+            <label class="block text-sm font-semibold mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.fields") }}</label>
+            <div class="text-xs mb-2" style="color: var(--o2-text-muted)">
               {{ t("crossLinks.fieldsHint") }}
             </div>
-            <div v-if="formFields.length > 0" class="tw:flex tw:flex-wrap tw:gap-1 tw:mb-2">
+            <div v-if="formFields.length > 0" class="flex flex-wrap gap-1 mb-2">
               <OTag
                 v-for="(field, idx) in formFields"
                 :key="idx"
                 type="selectionChip"
-                class="tw:max-w-[250px]"
+                class="max-w-[250px]"
                 :data-test="`cross-link-field-chip-${idx}`"
               >
-                <span class="tw:truncate tw:text-xs" :title="field.name">{{ field.name }}</span>
+                <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>
                 <template #trailing>
                   <button
                     type="button"
                     :aria-label="`Remove ${field.name}`"
                     :data-test="`cross-link-field-chip-remove-${idx}`"
-                    class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+                    class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
                     @click="removeField(idx)"
                   >
                     <OIcon name="close" size="xs" />
@@ -64,7 +64,7 @@
               </OTag>
             </div>
             <div
-              class="tw:flex tw:gap-2 tw:items-center"
+              class="flex gap-2 items-center"
               @keydown="onFieldKeydown"
             >
               <!--
@@ -79,7 +79,7 @@
                 v-if="availableFields.length > 0"
                 ref="fieldComboboxRef"
                 name="newFieldName"
-                class="tw:flex-1"
+                class="flex-1"
                 :items="availableFieldOptions"
                 :placeholder="t('crossLinks.fieldInputPlaceholder')"
                 @select="onFieldSelect"
@@ -88,7 +88,7 @@
               <OFormInput
                 v-else
                 name="newFieldName"
-                class="tw:flex-1"
+                class="flex-1"
                 :placeholder="t('crossLinks.fieldInputPlaceholder')"
                 data-test="cross-link-field-input"
               />

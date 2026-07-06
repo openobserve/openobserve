@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:w-full tw:h-full tw:px-2.5 tw:bg-(--q-background)">
+  <div class="flex flex-col w-full h-full px-2.5 bg-(--q-background)">
     <!-- Top Header Bar -->
-    <div class="header-bar tw:shrink-0 card-container tw:flex tw:items-center tw:justify-between tw:py-[0.675rem] tw:h-16 tw:px-[0.675rem] tw:mb-[0.675rem] tw:border-b tw:border-[var(--o2-border-color)]">
-      <div class="tw:flex tw:items-center tw:gap-3">
+    <div class="header-bar shrink-0 card-container flex items-center justify-between py-[0.675rem] h-16 px-[0.675rem] mb-[0.675rem] border-b border-[var(--o2-border-color)]">
+      <div class="flex items-center gap-3">
         <div
           data-test="add-alert-back-btn"
-          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer"
+          class="flex justify-center items-center mr-3 cursor-pointer"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <div>
-          <div class="tw:text-xl tw:font-semibold text-weight-medium">Upload Source Maps</div>
+          <div class="text-xl font-semibold text-weight-medium">Upload Source Maps</div>
         </div>
       </div>
     </div>
@@ -47,10 +47,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-slot="{ isSubmitting }"
     >
       <!-- Form Content Area -->
-      <div class="tw:flex-1 tw:overflow-y-auto card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 172px); overflow: auto">
-        <div class="tw:max-w-300 tw:mx-auto">
+      <div class="flex-1 overflow-y-auto card-container mb-[0.675rem] p-6" style="height: calc(100vh - 172px); overflow: auto">
+        <div class="max-w-300 mx-auto">
           <!-- Input Fields -->
-          <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-3 tw:gap-4 tw:mb-6">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <!-- Service Input -->
             <OFormInput
               name="service"
@@ -79,15 +79,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- File Upload Area (form-owned `file` field, schema-validated) -->
-          <div class="tw:mb-6">
-            <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Source Map ZIP File *</div>
+          <div class="mb-6">
+            <div class="text-sm font-medium text-weight-medium mb-2">Source Map ZIP File *</div>
             <SourceMapDropzone name="file" />
           </div>
         </div>
       </div>
 
       <!-- Bottom Action Bar -->
-      <div class="action-bar tw:shrink-0 card-container tw:flex tw:items-center tw:justify-end tw:gap-3 tw:py-3 tw:pr-3 tw:border-t tw:border-[var(--o2-border-color)]"
+      <div class="action-bar shrink-0 card-container flex items-center justify-end gap-3 py-3 pr-3 border-t border-[var(--o2-border-color)]"
         style="position: sticky; z-index: 2">
         <OButton
           data-test="rum-upload-source-maps-cancel-btn"

@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="invoice-history-container" class="tw:rounded-md tw:flex tw:flex-col tw:h-full">
-    <div class="tw:flex-1 tw:min-h-0">
-      <div class="tw:w-full tw:h-full">
+  <div data-test="invoice-history-container" class="rounded-md flex flex-col h-full">
+    <div class="flex-1 min-h-0">
+      <div class="w-full h-full">
         <invoice-table></invoice-table>
       </div>
     </div>

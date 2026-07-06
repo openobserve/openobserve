@@ -1,24 +1,24 @@
 <template>
-  <div v-if="visible" class="confirmation-overlay tw:w-full tw:mb-2 tw:[animation:slideUp_0.25s_ease-out]">
+  <div v-if="visible" class="confirmation-overlay w-full mb-2 [animation:slideUp_0.25s_ease-out]">
     <div
-      class="confirmation-dialog tw:w-full tw:pt-4 tw:px-4 tw:pb-[14px] tw:rounded-xl tw:flex tw:flex-col tw:gap-[14px] tw:shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
-      :class="theme === 'dark' ? 'dark-mode tw:bg-[#1e1e1e] tw:border-2 tw:border-[#323232] tw:shadow-[0_2px_8px_rgba(0,0,0,0.3)]' : 'light-mode tw:bg-white tw:border-2 tw:border-[#e4e7ec] tw:shadow-[0_2px_8px_rgba(0,0,0,0.1)]'"
+      class="confirmation-dialog w-full pt-4 px-4 pb-[14px] rounded-xl flex flex-col gap-[14px] shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
+      :class="theme === 'dark' ? 'dark-mode bg-[#1e1e1e] border-2 border-[#323232] shadow-[0_2px_8px_rgba(0,0,0,0.3)]' : 'light-mode bg-white border-2 border-[#e4e7ec] shadow-[0_2px_8px_rgba(0,0,0,0.1)]'"
       @keydown="handleDialogKeydown"
       @click="handleDialogClick"
     >
-      <div class="confirmation-header tw:flex tw:items-start tw:gap-3">
-        <OIcon name="help-outline" size="md" class="confirmation-icon tw:shrink-0 tw:mt-[2px]" :class="theme === 'dark' ? 'tw:text-[#9ca3af]' : 'tw:text-[#6b7280]'" />
-        <span class="confirmation-title tw:flex-1 tw:text-[15px] tw:font-medium tw:leading-normal" :class="theme === 'dark' ? 'tw:text-[#f3f4f6]' : 'tw:text-[#1f2937]'">{{ formattedMessage }}</span>
+      <div class="confirmation-header flex items-start gap-3">
+        <OIcon name="help-outline" size="md" class="confirmation-icon shrink-0 mt-[2px]" :class="theme === 'dark' ? 'text-[#9ca3af]' : 'text-[#6b7280]'" />
+        <span class="confirmation-title flex-1 text-[15px] font-medium leading-normal" :class="theme === 'dark' ? 'text-[#f3f4f6]' : 'text-[#1f2937]'">{{ formattedMessage }}</span>
       </div>
 
-      <div class="confirmation-buttons tw:flex tw:flex-col tw:gap-[10px] tw:w-full tw:pt-[14px] tw:mt-1" :class="theme === 'dark' ? 'tw:border-t tw:border-[#374151]' : 'tw:border-t tw:border-[#e5e7eb]'">
+      <div class="confirmation-buttons flex flex-col gap-[10px] w-full pt-[14px] mt-1" :class="theme === 'dark' ? 'border-t border-[#374151]' : 'border-t border-[#e5e7eb]'">
         <!-- For navigation actions, show 3 buttons -->
         <template v-if="isNavigationAction">
           <OButton
             ref="yesButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn confirm-btn tw:w-full tw:text-sm tw:font-semibold tw:rounded-md tw:normal-case tw:tracking-normal tw:transition-all tw:duration-200 tw:text-[var(--q-primary)] tw:border-2 tw:border-[#d1d5db] tw:dark:border-[#4b5563] tw:bg-white tw:dark:bg-transparent tw:hover:bg-[#eff6ff] tw:hover:border-[var(--q-primary)] tw:dark:hover:bg-[rgba(59,130,246,0.1)] tw:dark:hover:border-[var(--q-primary)]"
+            class="confirmation-btn confirm-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[var(--q-primary)] border-2 border-[#d1d5db] dark:border-[#4b5563] bg-white dark:bg-transparent hover:bg-[#eff6ff] hover:border-[var(--q-primary)] dark:hover:bg-[rgba(59,130,246,0.1)] dark:hover:border-[var(--q-primary)]"
             :class="{ 'btn-focused': isFocusedYes }"
             tabindex="0"
             @click="handleConfirm"
@@ -29,7 +29,7 @@
             ref="alwaysButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn always-btn tw:w-full tw:text-sm tw:font-semibold tw:rounded-md tw:normal-case tw:tracking-normal tw:transition-all tw:duration-200 tw:text-[#059669] tw:dark:text-[#34d399] tw:border-2 tw:border-[#d1d5db] tw:dark:border-[#4b5563] tw:bg-white tw:dark:bg-transparent tw:hover:bg-[#f0fdf4] tw:hover:border-[#34d399] tw:dark:hover:bg-[rgba(5,150,105,0.1)] tw:dark:hover:border-[#34d399]"
+            class="confirmation-btn always-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[#059669] dark:text-[#34d399] border-2 border-[#d1d5db] dark:border-[#4b5563] bg-white dark:bg-transparent hover:bg-[#f0fdf4] hover:border-[#34d399] dark:hover:bg-[rgba(5,150,105,0.1)] dark:hover:border-[#34d399]"
             :class="{ 'btn-focused': isFocusedAlways }"
             tabindex="1"
             @click="handleAlwaysConfirm"
@@ -40,7 +40,7 @@
             ref="noButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn cancel-btn tw:w-full tw:text-sm tw:font-semibold tw:rounded-md tw:normal-case tw:tracking-normal tw:transition-all tw:duration-200 tw:text-[#374151] tw:dark:text-[#e5e7eb] tw:border-2 tw:border-[#d1d5db] tw:dark:border-[#4b5563] tw:bg-white tw:dark:bg-transparent tw:hover:bg-[#fef2f2] tw:hover:border-[#fca5a5] tw:dark:hover:bg-[rgba(239,68,68,0.1)] tw:dark:hover:border-[#f87171]"
+            class="confirmation-btn cancel-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[#374151] dark:text-[#e5e7eb] border-2 border-[#d1d5db] dark:border-[#4b5563] bg-white dark:bg-transparent hover:bg-[#fef2f2] hover:border-[#fca5a5] dark:hover:bg-[rgba(239,68,68,0.1)] dark:hover:border-[#f87171]"
             :class="{ 'btn-focused': isFocusedNo }"
             tabindex="2"
             @click="handleCancel"
@@ -55,7 +55,7 @@
             ref="yesButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn confirm-btn tw:w-full tw:text-sm tw:font-semibold tw:rounded-md tw:normal-case tw:tracking-normal tw:transition-all tw:duration-200 tw:text-[var(--q-primary)] tw:border-2 tw:border-[#d1d5db] tw:dark:border-[#4b5563] tw:bg-white tw:dark:bg-transparent tw:hover:bg-[#eff6ff] tw:hover:border-[var(--q-primary)] tw:dark:hover:bg-[rgba(59,130,246,0.1)] tw:dark:hover:border-[var(--q-primary)]"
+            class="confirmation-btn confirm-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[var(--q-primary)] border-2 border-[#d1d5db] dark:border-[#4b5563] bg-white dark:bg-transparent hover:bg-[#eff6ff] hover:border-[var(--q-primary)] dark:hover:bg-[rgba(59,130,246,0.1)] dark:hover:border-[var(--q-primary)]"
             :class="{ 'btn-focused': isFocusedYes }"
             tabindex="0"
             @click="handleConfirm"
@@ -66,7 +66,7 @@
             ref="noButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn cancel-btn tw:w-full tw:text-sm tw:font-semibold tw:rounded-md tw:normal-case tw:tracking-normal tw:transition-all tw:duration-200 tw:text-[#374151] tw:dark:text-[#e5e7eb] tw:border-2 tw:border-[#d1d5db] tw:dark:border-[#4b5563] tw:bg-white tw:dark:bg-transparent tw:hover:bg-[#fef2f2] tw:hover:border-[#fca5a5] tw:dark:hover:bg-[rgba(239,68,68,0.1)] tw:dark:hover:border-[#f87171]"
+            class="confirmation-btn cancel-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[#374151] dark:text-[#e5e7eb] border-2 border-[#d1d5db] dark:border-[#4b5563] bg-white dark:bg-transparent hover:bg-[#fef2f2] hover:border-[#fca5a5] dark:hover:bg-[rgba(239,68,68,0.1)] dark:hover:border-[#f87171]"
             :class="{ 'btn-focused': isFocusedNo }"
             tabindex="1"
             @click="handleCancel"

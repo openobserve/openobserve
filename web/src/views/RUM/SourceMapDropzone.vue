@@ -48,19 +48,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <div v-if="!field.state.value" class="upload-content">
-            <OIcon name="backup" size="xl" class="tw:mb-3" />
-            <div class="tw:text-xl tw:font-semibold tw:text-gray-500 tw:mb-2">Drop your file here</div>
-            <div class="tw:text-sm tw:text-gray-400 tw:mb-3">or click to browse</div>
-            <div class="tw:text-xs tw:text-gray-400">.zip files only</div>
+            <OIcon name="backup" size="xl" class="mb-3" />
+            <div class="text-xl font-semibold text-gray-500 mb-2">Drop your file here</div>
+            <div class="text-sm text-gray-400 mb-3">or click to browse</div>
+            <div class="text-xs text-gray-400">.zip files only</div>
           </div>
 
           <div v-else class="file-info">
-            <div class="tw:flex tw:items-center tw:justify-between">
-              <div class="tw:flex tw:items-center tw:gap-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
                 <OIcon name="draft" size="lg" />
                 <div>
-                  <div class="tw:text-sm tw:font-medium text-weight-medium">{{ field.state.value.name }}</div>
-                  <div class="tw:text-xs tw:text-gray-400">{{ formatFileSize(field.state.value.size) }}</div>
+                  <div class="text-sm font-medium text-weight-medium">{{ field.state.value.name }}</div>
+                  <div class="text-xs text-gray-400">{{ formatFileSize(field.state.value.size) }}</div>
                 </div>
               </div>
               <OButton
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="field.state.meta.errors.length > 0"
           data-test="rum-upload-source-maps-file-error"
-          class="tw:text-xs tw:text-file-error-text tw:mt-1"
+          class="text-xs text-file-error-text mt-1"
         >
           {{ firstFieldError(field.state.meta.errors) }}
         </div>

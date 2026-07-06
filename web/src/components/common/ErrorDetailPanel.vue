@@ -26,34 +26,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="tw:text-left tw:rounded-lg tw:border tw:border-border-default tw:bg-surface-panel tw:flex tw:flex-col"
+    class="text-left rounded-lg border border-border-default bg-surface-panel flex flex-col"
     data-test="error-detail-panel"
   >
     <!-- Summary row (always shown) -->
-    <div class="tw:px-4 tw:py-3 tw:flex tw:flex-col tw:gap-1">
+    <div class="px-4 py-3 flex flex-col gap-1">
       <p
         v-if="summaryLine"
-        class="tw:text-sm tw:font-medium tw:text-text-body tw:m-0"
+        class="text-sm font-medium text-text-body m-0"
         data-test="error-detail-summary"
       >
         {{ summaryLine }}
       </p>
       <small
         v-if="traceId"
-        class="tw:text-text-caption"
+        class="text-text-caption"
         data-test="error-detail-trace-id"
       >
-        <span class="tw:font-medium">{{ t("queryError.traceId") }}</span>
+        <span class="font-medium">{{ t("queryError.traceId") }}</span>
         {{ traceId }}
       </small>
     </div>
 
     <!-- Toggle row -->
     <template v-if="hasDetail">
-      <div class="tw:border-t tw:border-border-default tw:px-4 tw:py-1">
+      <div class="border-t border-border-default px-4 py-1">
         <button
           type="button"
-          class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary tw:py-1.5 tw:cursor-pointer tw:bg-transparent tw:border-0 tw:p-0 tw:hover:text-text-body tw:transition-colors"
+          class="flex items-center gap-1.5 text-xs text-text-secondary py-1.5 cursor-pointer bg-transparent border-0 p-0 hover:text-text-body transition-colors"
           data-test="error-detail-toggle-btn"
           @click="emit('toggle-detail')"
         >
@@ -68,11 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Expanded body — scrollable, capped height -->
       <div
         v-if="showDetail"
-        class="tw:border-t tw:border-border-default tw:px-4 tw:py-3 tw:max-h-52 tw:overflow-y-auto"
+        class="border-t border-border-default px-4 py-3 max-h-52 overflow-y-auto"
         data-test="error-detail-body"
       >
         <p
-          class="tw:text-xs tw:font-mono tw:text-text-secondary tw:m-0 tw:whitespace-pre-wrap tw:break-all"
+          class="text-xs font-mono text-text-secondary m-0 whitespace-pre-wrap break-all"
         >
           {{ detailBody }}
         </p>
