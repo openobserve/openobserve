@@ -27,21 +27,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #trigger>
         <OButton
           :data-test="dataTestName"
+          as="div"
           id="date-time-button"
           ref="datetimeBtn"
           data-cy="date-time-button"
+          role="combobox"
+          :aria-expanded="menuOpen"
+          :aria-disabled="disable || undefined"
+          :tabindex="disable ? -1 : 0"
           :variant="variant"
           size="sm-toolbar"
           :class="{
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
-            'tw:min-w-[286px]': !disableRelative && selectedType === 'absolute',
+            'tw:min-w-[330px]': !disableRelative && selectedType === 'absolute',
             'tw:w-fit': disableRelative,
+            'tw:cursor-pointer tw:hover:bg-button-outline-hover-bg tw:hover:border-button-outline-hover-border':
+              !disable,
+            'tw:opacity-50 tw:cursor-not-allowed': disable,
           }"
-          :disabled="disable"
           icon-left="schedule"
+          @keydown="onTriggerKeydown"
         >
-          <span class="date-time-label tw:font-semibold tw:flex-1 tw:text-left">{{ getDisplayValue }}</span>
+          <input
+            v-if="isRangeEditable"
+            ref="rangeInputRef"
+            :data-test="`${dataTestName}-range-input`"
+            :value="editingRange ?? getDisplayValue"
+            spellcheck="false"
+            class="date-time-label tw:font-semibold tw:flex-1 tw:text-left tw:bg-transparent tw:outline-none tw:border-0 tw:p-0 tw:min-w-0 tw:cursor-text tw:tabular-nums tw:text-datepicker-text"
+            @mousedown.stop
+            @click.stop
+            @focus="onRangeFocus"
+            @input="editingRange = ($event.target as HTMLInputElement).value"
+            @keydown.enter.stop.prevent="commitRangeEdit(true)"
+            @keydown.esc.stop.prevent="cancelRangeEdit"
+            @blur="commitRangeEdit(false)"
+          />
+          <span
+            v-else
+            class="date-time-label tw:font-semibold tw:flex-1 tw:text-left"
+            >{{ getDisplayValue }}</span
+        >
           <template #icon-right
             ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow tw:transition-transform tw:duration-250 tw:ml-auto tw:text-[18px]!"
           /></template>
@@ -183,16 +210,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:pr-6 tw:pl-6 tw:text-[0.625rem]">{{ t("common.datetimeMessage") }}</div>
               <OSeparator v-if="!disableRelative" class="tw:my-2" />
 
-              <table v-if="!hideRelativeTime" class="tw:px-3 tw:w-[calc(100%-0.8rem)] tw:mx-[0.4rem] tw:mt-2 tw:mb-[0.3rem] startEndTime">
-                <tbody>
-                  <tr>
-                    <td class="label o-input-label tw:pr-1.5 tw:text-xs tw:font-semibold tw:w-1/2">Start time</td>
-                    <td class="label o-input-label tw:pl-1.5 tw:text-xs tw:font-semibold tw:w-1/2">End time</td>
-                  </tr>
-                  <tr>
-                    <td class="tw:pr-1.5 tw:w-1/2">
+              <div
+                v-if="!hideRelativeTime"
+                class="startEndTime tw:flex tw:px-3 tw:mt-2 tw:mb-[0.3rem]"
+              >
+                <div class="tw:flex-1 tw:flex tw:justify-center">
+                  <div class="tw:flex tw:flex-col tw:gap-1">
+                    <span class="label o-input-label tw:text-xs tw:font-semibold">Start time</span>
                       <OTime
-                        class="tw:w-full"
                         v-model="selectedTime.startTime"
                         with-seconds
                         data-test="datetime-start-time"
@@ -203,10 +228,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                       />
-                    </td>
-                    <td class="tw:pl-1.5 tw:w-1/2">
+                  </div>
+                </div>
+                <div class="tw:flex-1 tw:flex tw:justify-center">
+                  <div class="tw:flex tw:flex-col tw:gap-1">
+                    <span class="label o-input-label tw:text-xs tw:font-semibold">End time</span>
                       <OTime
-                        class="tw:w-full"
                         v-model="selectedTime.endTime"
                         :with-seconds="true"
                         data-test="datetime-end-time"
@@ -217,10 +244,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                       />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                  </div>
+                </div>
+              </div>
             </div>
           </OTabPanel>
         </OTabPanels>
@@ -933,6 +959,119 @@ export default defineComponent({
       }
     });
 
+    // ── Editable top time range (absolute mode) ──────────────────
+    // Lets users type/paste a full range directly in the toolbar display,
+    // e.g. "2026/06/30 14:30:00 - 2026/06/30 15:00:00" (also accepts "-" date
+    // separators). Applies on Enter or blur; reverts silently on invalid input.
+    const rangeInputRef = ref<HTMLInputElement | null>(null);
+    // Holds the in-progress text while editing; null when not editing (the
+    // input then mirrors getDisplayValue).
+    const editingRange = ref<string | null>(null);
+    const isRangeEditable = computed(
+      () =>
+        !props.disable &&
+        !props.disableRelative &&
+        selectedType.value === "absolute",
+    );
+
+    const onRangeFocus = () => {
+      editingRange.value = getDisplayValue.value as string;
+      nextTick(() => rangeInputRef.value?.select?.());
+    };
+
+    const cancelRangeEdit = () => {
+      editingRange.value = null;
+      rangeInputRef.value?.blur?.();
+    };
+
+    // Parse a single "YYYY/MM/DD HH:MM[:SS]" (or "-" separated) chunk into the
+    // internal { date: 'YYYY/MM/DD', time: 'HH:MM:SS' } shape. Returns null when
+    // the string is not a valid calendar date/time.
+    const parseOneDateTime = (input: string) => {
+      const s = input.trim();
+      const m = s.match(
+        /^(\d{4})[/-](\d{1,2})[/-](\d{1,2})[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?$/,
+      );
+      if (!m) return null;
+      const year = +m[1];
+      const month = +m[2];
+      const day = +m[3];
+      const hour = +m[4];
+      const minute = +m[5];
+      const second = m[6] ? +m[6] : 0;
+      if (
+        month < 1 ||
+        month > 12 ||
+        day < 1 ||
+        day > 31 ||
+        hour > 23 ||
+        minute > 59 ||
+        second > 59
+      )
+        return null;
+      // Reject impossible dates (e.g. 2026/02/30) by round-tripping.
+      const dt = new Date(year, month - 1, day, hour, minute, second);
+      if (
+        dt.getFullYear() !== year ||
+        dt.getMonth() !== month - 1 ||
+        dt.getDate() !== day
+      )
+        return null;
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return {
+        date: `${year}/${pad(month)}/${pad(day)}`,
+        time: `${pad(hour)}:${pad(minute)}:${pad(second)}`,
+      };
+    };
+
+    // Parse "START - END" (start/end separated by a space-dashed hyphen).
+    const parseRangeString = (raw: string) => {
+      if (!raw) return null;
+      const parts = raw.split(/\s+-\s+/);
+      if (parts.length !== 2) return null;
+      const start = parseOneDateTime(parts[0]);
+      const end = parseOneDateTime(parts[1]);
+      if (!start || !end) return null;
+      return {
+        from: start.date,
+        to: end.date,
+        startTime: start.time,
+        endTime: end.time,
+      };
+    };
+
+    const commitRangeEdit = (fromEnter: boolean) => {
+      // Not editing (e.g. blur without prior focus edit) — nothing to do.
+      if (editingRange.value === null) return;
+      const raw = editingRange.value.trim();
+      const parsed = parseRangeString(raw);
+      // Exit editing regardless; the input falls back to getDisplayValue.
+      editingRange.value = null;
+      if (!parsed) return; // invalid — revert silently to current value
+
+      selectedType.value = "absolute";
+      selectedDate.value.from = parsed.from;
+      selectedDate.value.to = parsed.to;
+      selectedTime.value.startTime = parsed.startTime;
+      selectedTime.value.endTime = parsed.endTime;
+
+      // autoApply consumers apply via the deep selectedDate/selectedTime watcher;
+      // for manual-apply consumers, honour the "apply on Enter/blur" behaviour.
+      if (!props.autoApply) saveDate("absolute");
+      if (fromEnter) rangeInputRef.value?.blur?.();
+    };
+
+    const onTriggerKeydown = (e: KeyboardEvent) => {
+      if (props.disable) return;
+      const onInput = e.target === rangeInputRef.value;
+      if (e.key === "ArrowDown") {
+        menuOpen.value = true;
+      } else if (!onInput && (e.key === "Enter" || e.key === " ")) {
+        e.preventDefault();
+        menuOpen.value = !menuOpen.value;
+      }
+    };
+
     const timezoneFilterFn = (val, update) => {
       filteredTimezone.value = filterColumns(timezoneOptions, val, update);
     };
@@ -1171,6 +1310,13 @@ export default defineComponent({
 
     const menuOpen = ref(false);
     const onMenuOpenChange = (open: boolean) => {
+      // The trigger renders as a <div> (to host the editable range input), so a
+      // native `disabled` attribute can't block interaction the way it did on a
+      // <button>. Guard here: never allow the popover to open while disabled.
+      if (open && props.disable) {
+        menuOpen.value = false;
+        return;
+      }
       if (open) {
         onBeforeShow();
         onShow();
@@ -1216,6 +1362,13 @@ export default defineComponent({
       setAbsoluteTime,
       setRelativeTime,
       getDisplayValue,
+      rangeInputRef,
+      editingRange,
+      isRangeEditable,
+      onRangeFocus,
+      cancelRangeEdit,
+      commitRangeEdit,
+      onTriggerKeydown,
       relativePeriodsMaxValue,
       relativePeriodsSelect,
       computeRelativePeriod,
