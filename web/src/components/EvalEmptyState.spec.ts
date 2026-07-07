@@ -115,21 +115,21 @@ describe("EvalEmptyState — theme", () => {
   it("applies the dark theme chip styling when store theme is dark", () => {
     const wrapper = makeWrapper({ chips: [{ label: "OpenAI" }] }, "dark");
     expect(wrapper.find('[data-test="eval-empty-state-chip"]').classes()).toContain(
-      "tw:bg-[rgba(255,255,255,0.06)]",
+      "bg-[rgba(255,255,255,0.06)]",
     );
   });
 
   it("does not apply dark theme chip styling when theme is light", () => {
     const wrapper = makeWrapper({ chips: [{ label: "OpenAI" }] }, "light");
     expect(wrapper.find('[data-test="eval-empty-state-chip"]').classes()).not.toContain(
-      "tw:bg-[rgba(255,255,255,0.06)]",
+      "bg-[rgba(255,255,255,0.06)]",
     );
   });
 
   it("applies dark border styling on the icon ring when theme is dark", () => {
     const wrapper = makeWrapper({}, "dark");
     expect(wrapper.find('[data-test="test-empty-state"]').exists()).toBe(true);
-    expect(wrapper.html()).toContain("tw:bg-[rgba(66,133,244,0.18)]");
+    expect(wrapper.html()).toContain("bg-[rgba(66,133,244,0.18)]");
   });
 });
 

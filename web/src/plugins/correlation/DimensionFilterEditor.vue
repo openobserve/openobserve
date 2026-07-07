@@ -29,14 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="handleApply"
   >
         <!-- Description -->
-        <div class="tw:mb-4 tw:text-sm tw:text-gray-600">
+        <div class="mb-4 text-sm text-gray-600">
           {{ t('correlation.logs.filters.description') }}
         </div>
 
         <!-- Matched Dimensions (Stable) -->
-        <div class="tw:mb-6">
-          <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
-            <h3 class="tw:text-base tw:font-semibold tw:m-0">
+        <div class="mb-6">
+          <div class="flex items-center gap-2 mb-3">
+            <h3 class="text-base font-semibold m-0">
               {{ t('correlation.logs.filters.matchedDimensions') }}
             </h3>
             <OIcon name="info" size="sm">
@@ -44,19 +44,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OIcon>
           </div>
 
-          <div class="tw:space-y-3">
+          <div class="space-y-3">
             <div
               v-for="(value, key) in matchedDimensions"
               :key="`matched-${key}`"
-              class="tw:flex tw:items-center tw:gap-3 tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded"
+              class="flex items-center gap-3 p-3 border border-solid border-[var(--o2-border-color)] rounded"
               :data-test="`matched-dimension-${key}`"
             >
-              <div class="tw:flex-1 tw:flex tw:items-center tw:gap-3">
+              <div class="flex-1 flex items-center gap-3">
                 <OIcon name="lock" size="sm" />
-                <span class="tw:font-semibold tw:text-sm">{{ key }}:</span>
+                <span class="font-semibold text-sm">{{ key }}:</span>
                 <OInput
                   v-model="pendingFilters[key]"
-                  class="tw:flex-1"
+                  class="flex-1"
                   :placeholder="String(value)"
                   :data-test="`matched-dimension-input-${key}`"
                 />
@@ -69,9 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Additional Dimensions (Unstable) -->
-        <div v-if="Object.keys(additionalDimensions).length > 0" class="tw:mb-4">
-          <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
-            <h3 class="tw:text-base tw:font-semibold tw:m-0">
+        <div v-if="Object.keys(additionalDimensions).length > 0" class="mb-4">
+          <div class="flex items-center gap-2 mb-3">
+            <h3 class="text-base font-semibold m-0">
               {{ t('correlation.logs.filters.additionalDimensions') }}
             </h3>
             <OIcon name="info" size="sm">
@@ -79,30 +79,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OIcon>
           </div>
 
-          <div class="tw:space-y-3">
+          <div class="space-y-3">
             <div
               v-for="(value, key) in additionalDimensions"
               :key="`additional-${key}`"
-              class="tw:flex tw:items-center tw:gap-3 tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-surface-panel"
+              class="flex items-center gap-3 p-3 border border-solid border-[var(--o2-border-color)] rounded bg-surface-panel"
               :data-test="`additional-dimension-${key}`"
             >
-              <div class="tw:flex-1 tw:flex tw:flex-col tw:gap-2">
-                <div class="tw:flex tw:items-center tw:gap-3">
+              <div class="flex-1 flex flex-col gap-2">
+                <div class="flex items-center gap-3">
                   <OIcon name="warning" size="sm" />
-                  <span class="tw:font-semibold tw:text-sm">{{ key }}:</span>
+                  <span class="font-semibold text-sm">{{ key }}:</span>
                   <OInput
                     v-model="pendingFilters[key]"
-                    class="tw:flex-1"
+                    class="flex-1"
                     :placeholder="String(value)"
                     :data-test="`additional-dimension-input-${key}`"
                   />
                 </div>
-                <div class="tw:ml-8">
+                <div class="ml-8">
                   <OButton
                     icon-left="all-inclusive"
                     variant="ghost"
                     size="sm-action"
-                    :class="pendingFilters[key] === SELECT_ALL_VALUE ? 'tw:text-green-600' : ''"
+                    :class="pendingFilters[key] === SELECT_ALL_VALUE ? 'text-green-600' : ''"
                     @click="toggleWildcard(key)"
                     :data-test="`toggle-wildcard-${key}`"
                   >
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : t('correlation.logs.filters.setToAll')
                     }}
                   </OButton>
-                  <span class="tw:ml-2 tw:text-xs tw:text-gray-500">
+                  <span class="ml-2 text-xs text-gray-500">
                     {{ t('correlation.logs.filters.wildcardHelp') }}
                   </span>
                 </div>
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Additional Dimensions Message -->
         <div
           v-else
-          class="tw:p-3 tw:border tw:border-dashed tw:border-gray-300 tw:rounded tw:text-center tw:text-sm tw:text-gray-500"
+          class="p-3 border border-dashed border-gray-300 rounded text-center text-sm text-gray-500"
         >
           {{ t('correlation.logs.filters.noAdditionalDimensions') }}
         </div>

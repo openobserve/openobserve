@@ -36,7 +36,10 @@ use serde::{Deserialize, Serialize};
 use sha256::digest;
 
 use crate::{
-    meta::{cluster, stream::QueryPartitionStrategy},
+    meta::{
+        cluster,
+        stream::{QueryPartitionStrategy, StreamType},
+    },
     utils::sysinfo,
 };
 
@@ -562,6 +565,14 @@ impl std::str::FromStr for FileFormat {
 }
 
 impl FileFormat {
+    pub fn for_ingester_stream(stream_type: StreamType, configured: Self) -> Self {
+        if stream_type == StreamType::Metrics {
+            Self::Parquet
+        } else {
+            configured
+        }
+    }
+
     pub fn extension(&self) -> &'static str {
         match self {
             Self::Parquet => FILE_EXT_PARQUET,
@@ -1945,6 +1956,12 @@ pub struct Compact {
     pub enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
+    #[env_config(
+        name = "ZO_COMPACT_DATA_RETENTION_INTERVAL",
+        default = 3600,
+        help = "Interval in seconds for the data retention job, default is 3600. Retention works at day granularity, so it doesn't need to run at ZO_COMPACT_INTERVAL"
+    )] // seconds
+    pub data_retention_interval: u64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_INTERVAL", default = 3600)] // seconds
     pub old_data_interval: u64,
     #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")]
@@ -3235,12 +3252,36 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Strip the Windows extended-length prefix (`\\?\`) from a canonicalized path
+/// so it can be compared with sysinfo mount points that use the plain DOS form.
+///
+/// Uses [`std::path::Prefix`] to detect verbatim prefixes rather than
+/// manipulating the string directly, which would silently break on non-ASCII
+/// drive letters or UNC paths.
+pub fn deverbatim(path: &Path) -> std::borrow::Cow<'_, str> {
+    #[cfg(windows)]
+    {
+        use std::path::{Component, Prefix};
+        if let Some(Component::Prefix(p)) = path.components().next() {
+            if let Prefix::VerbatimDisk(drive) = p.kind() {
+                // \\?\C:\rest → C:\rest
+                // p.as_os_str() is "\\?\C:" (6 bytes); the remainder of the
+                // original string is "\rest", so prepend the plain drive letter.
+                let after_prefix = &path.to_string_lossy()[p.as_os_str().len()..];
+                return format!("{}:{}", drive as char, after_prefix).into();
+            }
+        }
+    }
+    path.to_string_lossy()
+}
+
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
-    let cache_dir = Path::new(&cfg.common.data_cache_dir)
+    let cache_dir_path = Path::new(&cfg.common.data_cache_dir)
         .canonicalize()
         .unwrap();
-    let cache_dir = cache_dir.to_str().unwrap();
+    let cache_dir_owned = deverbatim(&cache_dir_path).into_owned();
+    let cache_dir = cache_dir_owned.as_str();
 
     // disable disk cache for local disk storage
     if cfg.common.is_local_storage
@@ -3383,6 +3424,9 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.compact.delete_files_delay_hours = 2;
     }
 
+    if cfg.compact.data_retention_interval < 1 {
+        cfg.compact.data_retention_interval = 3600;
+    }
     if cfg.compact.old_data_interval < 1 {
         cfg.compact.old_data_interval = 3600;
     }
@@ -3781,6 +3825,22 @@ mod tests {
     }
 
     #[test]
+    fn test_file_format_for_ingester_stream() {
+        assert_eq!(
+            FileFormat::for_ingester_stream(StreamType::Metrics, FileFormat::Vortex),
+            FileFormat::Parquet
+        );
+        assert_eq!(
+            FileFormat::for_ingester_stream(StreamType::Logs, FileFormat::Vortex),
+            FileFormat::Vortex
+        );
+        assert_eq!(
+            FileFormat::for_ingester_stream(StreamType::Traces, FileFormat::Parquet),
+            FileFormat::Parquet
+        );
+    }
+
+    #[test]
     fn test_file_format_from_extension() {
         assert_eq!(
             FileFormat::from_extension("data.parquet"),
@@ -4083,6 +4143,7 @@ mod tests {
         cfg.compact.interval = 0;
         cfg.compact.max_file_size = 0;
         cfg.compact.delete_files_delay_hours = 0;
+        cfg.compact.data_retention_interval = 0;
         cfg.compact.old_data_interval = 0;
         cfg.compact.old_data_max_days = 0;
         cfg.compact.old_data_min_hours = 0;
@@ -4094,6 +4155,7 @@ mod tests {
         assert_eq!(cfg.compact.interval, 10);
         assert_eq!(cfg.compact.max_file_size, 512 * 1024 * 1024);
         assert_eq!(cfg.compact.delete_files_delay_hours, 2);
+        assert_eq!(cfg.compact.data_retention_interval, 3600);
         assert_eq!(cfg.compact.old_data_interval, 3600);
         assert_eq!(cfg.compact.old_data_max_days, 7);
         assert_eq!(cfg.compact.old_data_min_hours, 2);
@@ -4294,5 +4356,35 @@ mod tests {
     fn test_get_cluster_name_returns_nonempty() {
         let name = get_cluster_name();
         assert!(!name.is_empty(), "cluster name should not be empty");
+    }
+
+    #[test]
+    fn test_deverbatim_plain_path_unchanged() {
+        let p = std::path::Path::new("/data/openobserve");
+        let result = deverbatim(p);
+        assert_eq!(result, "/data/openobserve");
+    }
+
+    #[test]
+    fn test_deverbatim_empty_path_unchanged() {
+        let p = std::path::Path::new("");
+        let result = deverbatim(p);
+        assert_eq!(result, "");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_deverbatim_verbatim_disk_stripped() {
+        let p = std::path::Path::new(r"\\?\C:\data\openobserve");
+        let result = deverbatim(p);
+        assert_eq!(result, r"C:\data\openobserve");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_deverbatim_plain_windows_path_unchanged() {
+        let p = std::path::Path::new(r"C:\data\openobserve");
+        let result = deverbatim(p);
+        assert_eq!(result, r"C:\data\openobserve");
     }
 }

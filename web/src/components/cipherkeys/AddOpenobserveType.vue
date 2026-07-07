@@ -20,19 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-cipher-key-openobserve-secret-input"
         v-model="formData.key.store.local"
         :label="t('cipherKey.secret') + ' *'"
-        class="tw:w-full tw:pb-1"
+        class="w-full pb-1"
         :error="(secretTouched || submitAttempted) && !formData.key.store.local"
         :error-message="t('cipherKey.secretRequired')"
         @update:model-value="secretTouched = true"
         @blur="secretTouched = true"
       />
-      <OButton data-test="add-cipher-key-openobserve-secret-input-cancel" variant="outline" size="sm-action" class="tw:mt-2" v-if="formData.isUpdate && formData.key.store.local != ''" @click="isUpdate = false">{{ t('common.cancel') }}</OButton>
+      <OButton data-test="add-cipher-key-openobserve-secret-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="formData.isUpdate && formData.key.store.local != ''" @click="isUpdate = false">{{ t('common.cancel') }}</OButton>
     </div>
     <div v-else>
-      <label class="tw:flex q-field tw:mb-3">
+      <label class="flex q-field mb-3">
         <b>{{ t('cipherKey.secret') }}</b>
       </label>
-      <pre class="tw:[text-wrap:auto] tw:break-words tw:border tw:border-(--o2-border-input) tw:p-[5px] tw:mb-[5px]">{{ formData.key.store.local }}</pre>
+      <pre class="[text-wrap:auto] break-words border border-(--o2-border-input) p-[5px] mb-[5px]">{{ formData.key.store.local }}</pre>
       <OButton data-test="add-cipher-key-openobserve-secret-input-update" variant="primary" size="sm-action" @click="isUpdate = true">{{ t('common.update') }}</OButton>
     </div>
   </div>

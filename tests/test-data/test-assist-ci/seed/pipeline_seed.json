@@ -1,0 +1,38 @@
+{
+  "name": "ci_seed_pipeline",
+  "description": "CI-seed pipeline: routes 'default' logs through a passthrough transform to 'ci_pipeline_out'. Gives the Pipelines page something to display for test-assist runs.",
+  "source": {
+    "source_type": "realtime",
+    "stream_name": "default",
+    "stream_type": "logs",
+    "org_id": "default"
+  },
+  "nodes": [
+    {
+      "id": "src-1",
+      "type": "input",
+      "data": {
+        "node_type": "stream",
+        "stream_name": "default",
+        "stream_type": "logs",
+        "org_id": "default"
+      },
+      "position": { "x": 100, "y": 100 }
+    },
+    {
+      "id": "dst-1",
+      "type": "output",
+      "data": {
+        "node_type": "stream",
+        "stream_name": "ci_pipeline_out",
+        "stream_type": "logs",
+        "org_id": "default"
+      },
+      "position": { "x": 400, "y": 100 }
+    }
+  ],
+  "edges": [
+    { "id": "e-1", "source": "src-1", "target": "dst-1" }
+  ],
+  "enabled": true
+}

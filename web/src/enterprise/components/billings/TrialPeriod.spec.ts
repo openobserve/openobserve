@@ -565,8 +565,8 @@ describe("TrialPeriod.vue", () => {
       wrapper = createWrapper({}, mockStore);
       const container = wrapper.find('[data-test="trial-period-container"]');
       expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain('tw:w-full');
-      expect(container.classes()).toContain('tw:rounded-md');
+      expect(container.classes()).toContain('w-full');
+      expect(container.classes()).toContain('rounded-md');
     });
 
     it("should display correct subtitle text", () => {

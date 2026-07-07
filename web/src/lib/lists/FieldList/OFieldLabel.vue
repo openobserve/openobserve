@@ -16,18 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="o-field-label tw:flex tw:items-center tw:gap-[0.375rem] tw:min-w-0 tw:flex-1 tw:py-[0.25rem]"
+    class="o-field-label flex items-center gap-[0.375rem] min-w-0 flex-1 py-[0.25rem]"
   >
     <OIcon
       v-if="showTypeIcon"
       :name="getTypeIcon(field.type)"
       size="xs"
-      class="tw:flex-shrink-0 tw:opacity-60 tw:text-field-list-label-icon"
+      class="flex-shrink-0 opacity-60 text-field-list-label-icon"
     />
     <OTooltip :content="field.label ?? field.name" :disabled="!isTruncated" side="right">
       <span
         ref="labelRef"
-        class="tw:truncate tw:flex-1 tw:min-w-0 tw:leading-relaxed tw:text-[0.82rem] tw:text-field-list-label-text"
+        class="truncate flex-1 min-w-0 leading-relaxed text-[0.82rem] text-field-list-label-text"
       >
         {{ field.label ?? field.name }}
       </span>

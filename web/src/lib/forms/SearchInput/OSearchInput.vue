@@ -1,13 +1,21 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import { computed } from "vue";
+import { computed, useAttrs } from "vue";
 import type { SearchInputProps, SearchInputEmits } from "./OSearchInput.types";
 import type { InputSize } from "@/lib/forms/Input/OInput.types";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
+const $attrs = useAttrs();
+
+// Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
+const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
+const wrapperAttrs = computed(() => {
+  const { tabindex, ...rest } = $attrs;
+  return rest;
+});
 
 const props = withDefaults(defineProps<SearchInputProps>(), {
   modelValue: "",
@@ -31,13 +39,14 @@ const iconSize = computed(() => (props.size === "xs" ? "xs" : "sm"));
 
 <template>
   <OInput
-    v-bind="$attrs"
+    v-bind="wrapperAttrs"
     :model-value="modelValue"
     :placeholder="placeholder"
     :size="inputSize"
     :clearable="clearable"
     :debounce="debounce"
     :disabled="disabled"
+    :tabindex="inputTabindex"
     @update:model-value="emit('update:modelValue', $event as string)"
     @clear="emit('clear')"
   >
@@ -45,7 +54,7 @@ const iconSize = computed(() => (props.size === "xs" ? "xs" : "sm"));
       <OIcon
         name="search"
         :size="iconSize"
-        class="tw:cursor-pointer"
+        class="cursor-pointer"
       />
     </template>
   </OInput>

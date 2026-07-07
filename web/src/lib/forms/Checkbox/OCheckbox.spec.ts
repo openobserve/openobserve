@@ -44,17 +44,17 @@ describe("OCheckbox", () => {
 
   it("applies sm size classes", () => {
     wrapper = mount(OCheckbox, { props: { size: "sm" } });
-    expect(wrapper.find("button").classes()).toContain("tw:size-3.5");
+    expect(wrapper.find("button").classes()).toContain("size-3.5");
   });
 
   it("applies xs size classes", () => {
     wrapper = mount(OCheckbox, { props: { size: "xs" } });
-    expect(wrapper.find("button").classes()).toContain("tw:size-3");
+    expect(wrapper.find("button").classes()).toContain("size-3");
   });
 
   it("applies md size classes by default", () => {
     wrapper = mount(OCheckbox);
-    expect(wrapper.find("button").classes()).toContain("tw:size-4");
+    expect(wrapper.find("button").classes()).toContain("size-4");
   });
 
   it("supports val alias with array model", async () => {

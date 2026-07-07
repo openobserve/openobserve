@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="eval-template-editor-page"
-    class="tw:flex tw:flex-col tw:px-2.5"
+    class="flex flex-col px-2.5"
     style="height: calc(100vh - var(--navbar-height) - 14px)"
   >
     <!-- Standard app header: back tile + title (Save/Cancel stay in the footer). -->
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         onClick: cancel,
         dataTest: 'eval-template-editor-back-btn',
       }"
-      class="tw:-mx-2.5 tw:px-4 tw:border-b tw:border-border-default tw:mb-2 tw:shrink-0"
+      class="-mx-2.5 px-4 border-b border-border-default mb-2 shrink-0"
     >
       <template #title>
         <span data-test="eval-template-editor-title">{{
@@ -38,13 +38,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
 
     <!-- Form content -->
-    <div class="card-container tw:flex-1 tw:min-h-0 tw:mb-2 tw:flex tw:flex-col" style="padding: 1rem">
+    <div class="card-container flex-1 min-h-0 mb-2 flex flex-col" style="padding: 1rem">
       <!-- Row 1: Name & Description -->
       <div style="display: flex; gap: 1rem; margin-bottom: 1rem">
         <div style="flex: 1; display: flex; flex-direction: column">
-          <div class="tw:flex tw:items-center tw:gap-1 tw:mb-2">
-            <label class="tw:text-xs tw:font-medium tw:mb-0 tw:text-(--q-color-text) tw:leading-none">{{ t("evalTemplate.templateName") }} *</label>
-            <OIcon name="info" size="xs" class="tw:opacity-45 tw:cursor-default tw:shrink-0 tw:hover:opacity-75">
+          <div class="flex items-center gap-1 mb-2">
+            <label class="text-xs font-medium mb-0 text-(--q-color-text) leading-none">{{ t("evalTemplate.templateName") }} *</label>
+            <OIcon name="info" size="xs" class="opacity-45 cursor-default shrink-0 hover:opacity-75">
               <OTooltip :content="t('evalTemplate.tooltipName')" side="top" />
             </OIcon>
           </div>
@@ -56,9 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div style="flex: 1; display: flex; flex-direction: column">
-          <div class="tw:flex tw:items-center tw:gap-1 tw:mb-2">
-            <label class="tw:text-xs tw:font-medium tw:mb-0 tw:text-(--q-color-text) tw:leading-none">{{ t("common.description") }}</label>
-            <OIcon name="info" size="xs" class="tw:opacity-45 tw:cursor-default tw:shrink-0 tw:hover:opacity-75">
+          <div class="flex items-center gap-1 mb-2">
+            <label class="text-xs font-medium mb-0 text-(--q-color-text) leading-none">{{ t("common.description") }}</label>
+            <OIcon name="info" size="xs" class="opacity-45 cursor-default shrink-0 hover:opacity-75">
               <OTooltip :content="t('evalTemplate.tooltipDescription')" side="top" />
             </OIcon>
           </div>
@@ -71,9 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Row 2: Response Type & Dimensions -->
       <div style="display: flex; gap: 1rem; margin-bottom: 1rem">
         <div style="flex: 0 0 200px; display: flex; flex-direction: column">
-          <div class="tw:flex tw:items-center tw:gap-1 tw:mb-2">
-            <label class="tw:text-xs tw:font-medium tw:mb-0 tw:text-(--q-color-text) tw:leading-none">{{ t("evalTemplate.responseType") }} *</label>
-            <OIcon name="info" size="xs" class="tw:opacity-45 tw:cursor-default tw:shrink-0 tw:hover:opacity-75">
+          <div class="flex items-center gap-1 mb-2">
+            <label class="text-xs font-medium mb-0 text-(--q-color-text) leading-none">{{ t("evalTemplate.responseType") }} *</label>
+            <OIcon name="info" size="xs" class="opacity-45 cursor-default shrink-0 hover:opacity-75">
               <OTooltip :content="t('evalTemplate.tooltipResponseType')" side="top" />
             </OIcon>
           </div>
@@ -88,9 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden">
-          <div class="tw:flex tw:items-center tw:gap-1 tw:mb-2">
-            <label class="tw:text-xs tw:font-medium tw:mb-0 tw:text-(--q-color-text) tw:leading-none">{{ t("evalTemplate.dimensions") }} *</label>
-            <OIcon name="info" size="xs" class="tw:opacity-45 tw:cursor-default tw:shrink-0 tw:hover:opacity-75">
+          <div class="flex items-center gap-1 mb-2">
+            <label class="text-xs font-medium mb-0 text-(--q-color-text) leading-none">{{ t("evalTemplate.dimensions") }} *</label>
+            <OIcon name="info" size="xs" class="opacity-45 cursor-default shrink-0 hover:opacity-75">
               <OTooltip :content="t('evalTemplate.tooltipDimensions')" side="top" />
             </OIcon>
           </div>
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSelect
               v-model="dimensionsInput"
               :options="defaultDimensionOptions"
-              class="no-case dimensions-select tw:w-full"
+              class="no-case dimensions-select w-full"
               multiple
               searchable
               creatable
@@ -111,9 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Row 3: Prompt Template -->
       <div style="display: flex; flex-direction: column; flex: 1; min-height: 0">
-        <div class="tw:flex tw:items-center tw:gap-1 tw:mb-2">
-          <label class="tw:text-xs tw:font-medium tw:mb-0 tw:text-(--q-color-text) tw:leading-none">{{ t("evalTemplate.promptTemplate") }} *</label>
-          <OIcon name="info" size="xs" class="tw:opacity-45 tw:cursor-default tw:shrink-0 tw:hover:opacity-75">
+        <div class="flex items-center gap-1 mb-2">
+          <label class="text-xs font-medium mb-0 text-(--q-color-text) leading-none">{{ t("evalTemplate.promptTemplate") }} *</label>
+          <OIcon name="info" size="xs" class="opacity-45 cursor-default shrink-0 hover:opacity-75">
             <OTooltip :content="t('evalTemplate.tooltipPromptTemplate')" side="top" />
           </OIcon>
         </div>
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Footer -->
     <div
-      class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2"
+      class="card-container flex items-center justify-end px-3 py-2.5 shrink-0 gap-2"
     >
       <OButton
         data-test="eval-template-editor-cancel-btn"

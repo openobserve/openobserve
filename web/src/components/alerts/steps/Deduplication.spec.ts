@@ -460,12 +460,12 @@ describe("Deduplication.vue", () => {
 
   describe("UI Rendering", () => {
     it("should render fingerprint fields label", () => {
-      const label = wrapper.find(".tw\\:font-semibold");
+      const label = wrapper.find(".font-semibold");
       expect(label.exists()).toBe(true);
     });
 
     it("should render time window label", () => {
-      const labels = wrapper.findAll(".tw\\:font-semibold");
+      const labels = wrapper.findAll(".font-semibold");
       expect(labels.length).toBeGreaterThan(1);
     });
 
@@ -482,7 +482,7 @@ describe("Deduplication.vue", () => {
     });
 
     it("should render minutes label for time window", () => {
-      const minutesLabel = wrapper.find(".tw\\:flex.tw\\:justify-center.tw\\:items-center");
+      const minutesLabel = wrapper.find(".flex.justify-center.items-center");
       expect(minutesLabel.exists()).toBe(true);
     });
   });

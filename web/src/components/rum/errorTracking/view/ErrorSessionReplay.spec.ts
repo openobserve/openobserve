@@ -15,290 +15,293 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import ErrorSessionReplay from "@/components/rum/errorTracking/view/ErrorSessionReplay.vue";
 import i18n from "@/locales";
 
+// ---------------------------------------------------------------------------
+// Module mocks — hoisted before component import
+// ---------------------------------------------------------------------------
+
 const mockRouterPush = vi.fn();
+
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: mockRouterPush }),
 }));
 
+vi.mock("@/components/rum/errorTracking/view/ErrorTag.vue", () => ({
+  default: {
+    name: "ErrorTag",
+    template: '<div data-test="error-tag">{{ tag.key }}: {{ tag.value }}</div>',
+    props: ["tag"],
+  },
+}));
+
+vi.mock("@/lib/core/Button/OButton.vue", () => ({
+  default: {
+    name: "OButton",
+    template:
+      '<button :data-test="$attrs[\'data-test\']" :disabled="disabled" @click="!disabled && $emit(\'click\')"><slot /></button>',
+    props: ["variant", "size", "iconLeft", "title", "disabled"],
+    emits: ["click"],
+    inheritAttrs: false,
+  },
+}));
+
+import ErrorSessionReplay from "@/components/rum/errorTracking/view/ErrorSessionReplay.vue";
+
+// ---------------------------------------------------------------------------
+// Test data
+// ---------------------------------------------------------------------------
+
+// _timestamp is in µs; event_time = Math.floor(µs / 1000) = ms
+const TIMESTAMP_US = 1_704_110_400_000_000;
+const EVENT_TIME_MS = Math.floor(TIMESTAMP_US / 1000); // 1_704_110_400_000
+
 const mockError = {
   session_id: "session-abc123",
   view_id: "view-def456",
-  _timestamp: 1704110400000,
+  _timestamp: TIMESTAMP_US,
 };
 
-function mountComponent(error = mockError) {
+// ---------------------------------------------------------------------------
+// Mount factory
+// ---------------------------------------------------------------------------
+
+function mountComponent(error: Record<string, any> = mockError) {
   return mount(ErrorSessionReplay, {
     props: { error },
-    global: {
-      plugins: [i18n],
-      stubs: {
-        ErrorTag: {
-          name: "ErrorTag",
-          template: '<div data-test="error-tag">{{ tag.key }}: {{ tag.value }}</div>',
-          props: ["tag"],
-        },
-        OButton: {
-          name: "OButton",
-          template: '<button data-test="play-button" @click="$emit(\'click\')"><slot /></button>',
-          emits: ["click"],
-          props: ["variant", "size", "iconLeft", "title"],
-        },
-      },
-    },
+    global: { plugins: [i18n] },
   });
 }
 
-describe("ErrorSessionReplay Component", () => {
-  let wrapper: any;
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("ErrorSessionReplay", () => {
+  let wrapper: ReturnType<typeof mountComponent>;
 
   beforeEach(async () => {
+    vi.clearAllMocks();
     wrapper = mountComponent();
     await flushPromises();
   });
 
   afterEach(() => {
-    wrapper.unmount();
-    vi.restoreAllMocks();
+    wrapper?.unmount();
+    vi.clearAllMocks();
   });
 
-  it("mounts successfully", () => {
-    // Arrange + Act handled in beforeEach
+  // =========================================================================
+  // Rendering
+  // =========================================================================
 
-    // Assert
-    expect(wrapper.exists()).toBe(true);
-  });
+  describe("rendering", () => {
+    it("renders the card container", () => {
+      // Assert
+      expect(wrapper.find('[data-test="error-session-replay-card"]').exists()).toBe(true);
+    });
 
-  it("shows the Session Replay title", () => {
-    // Arrange + Act handled in beforeEach
+    it("renders a heading with Session Replay text", () => {
+      // Assert
+      expect(wrapper.find("h4").text()).toContain("Session Replay");
+    });
 
-    // Assert
-    expect(wrapper.text()).toContain("Session Replay");
-  });
+    it("renders the hint small element", () => {
+      // Assert
+      const hint = wrapper.find('[data-test="error-session-replay-hint"]');
+      expect(hint.exists()).toBe(true);
+      expect(hint.text().length).toBeGreaterThan(0);
+    });
 
-  it("renders ErrorTag components for session details", () => {
-    // Arrange + Act handled in beforeEach
+    it("renders the play button", () => {
+      // Assert
+      expect(wrapper.find('[data-test="error-session-replay-play-btn"]').exists()).toBe(true);
+    });
 
-    // Assert
-    const tags = wrapper.findAll('[data-test="error-tag"]');
-    expect(tags.length).toBeGreaterThan(0);
-  });
+    it("renders exactly two ErrorTag components (session_id, view_id)", () => {
+      // Assert
+      const tags = wrapper.findAllComponents({ name: "ErrorTag" });
+      expect(tags).toHaveLength(2);
+    });
 
-  it("shows the session_id in a tag", () => {
-    // Arrange + Act handled in beforeEach
+    it("passes correct tag prop for session_id ErrorTag", () => {
+      // Assert
+      const tags = wrapper.findAllComponents({ name: "ErrorTag" });
+      const sessionTag = tags.find((t) => t.props("tag").key === "session_id");
+      expect(sessionTag).toBeDefined();
+      expect(sessionTag!.props("tag")).toEqual({ key: "session_id", value: "session-abc123" });
+    });
 
-    // Assert
-    const tags = wrapper.findAll('[data-test="error-tag"]');
-    const sessionTag = tags.find((t: any) => t.text().includes("session_id"));
-    expect(sessionTag).toBeDefined();
-    expect(sessionTag!.text()).toContain("session-abc123");
-  });
-
-  it("shows the view_id in a tag", () => {
-    // Arrange + Act handled in beforeEach
-
-    // Assert
-    const tags = wrapper.findAll('[data-test="error-tag"]');
-    const viewTag = tags.find((t: any) => t.text().includes("view_id"));
-    expect(viewTag).toBeDefined();
-    expect(viewTag!.text()).toContain("view-def456");
-  });
-
-  it("renders exactly two ErrorTag components", () => {
-    // Arrange + Act handled in beforeEach
-
-    // Assert
-    const errorTagComponents = wrapper.findAllComponents({ name: "ErrorTag" });
-    expect(errorTagComponents).toHaveLength(2);
-  });
-
-  it("passes correct props to the session_id ErrorTag", () => {
-    // Arrange + Act handled in beforeEach
-
-    // Assert
-    const errorTagComponents = wrapper.findAllComponents({ name: "ErrorTag" });
-    const sessionIdTag = errorTagComponents.find(
-      (c: any) => c.props("tag").key === "session_id",
-    );
-    expect(sessionIdTag?.props("tag")).toEqual({
-      key: "session_id",
-      value: "session-abc123",
+    it("passes correct tag prop for view_id ErrorTag", () => {
+      // Assert
+      const tags = wrapper.findAllComponents({ name: "ErrorTag" });
+      const viewTag = tags.find((t) => t.props("tag").key === "view_id");
+      expect(viewTag).toBeDefined();
+      expect(viewTag!.props("tag")).toEqual({ key: "view_id", value: "view-def456" });
     });
   });
 
-  it("passes correct props to the view_id ErrorTag", () => {
-    // Arrange + Act handled in beforeEach
+  // =========================================================================
+  // Play button state
+  // =========================================================================
 
-    // Assert
-    const errorTagComponents = wrapper.findAllComponents({ name: "ErrorTag" });
-    const viewIdTag = errorTagComponents.find(
-      (c: any) => c.props("tag").key === "view_id",
-    );
-    expect(viewIdTag?.props("tag")).toEqual({
-      key: "view_id",
-      value: "view-def456",
+  describe("play button disabled state", () => {
+    it("is NOT disabled when session_id is present", () => {
+      // Assert
+      const btn = wrapper.find('[data-test="error-session-replay-play-btn"]');
+      expect(btn.attributes("disabled")).toBeUndefined();
+    });
+
+    it("is DISABLED when session_id is missing", async () => {
+      // Arrange
+      wrapper.unmount();
+      wrapper = mountComponent({ view_id: "view-xyz", _timestamp: TIMESTAMP_US });
+      await flushPromises();
+
+      // Assert
+      const btn = wrapper.find('[data-test="error-session-replay-play-btn"]');
+      expect(btn.attributes("disabled")).toBeDefined();
+    });
+
+    it("is DISABLED when session_id is null", async () => {
+      // Arrange
+      wrapper.unmount();
+      wrapper = mountComponent({ session_id: null, view_id: "view-xyz", _timestamp: TIMESTAMP_US });
+      await flushPromises();
+
+      // Assert
+      const btn = wrapper.find('[data-test="error-session-replay-play-btn"]');
+      expect(btn.attributes("disabled")).toBeDefined();
+    });
+
+    it("is DISABLED when session_id is empty string", async () => {
+      // Arrange
+      wrapper.unmount();
+      wrapper = mountComponent({ session_id: "", view_id: "view-xyz", _timestamp: TIMESTAMP_US });
+      await flushPromises();
+
+      // Assert
+      const btn = wrapper.find('[data-test="error-session-replay-play-btn"]');
+      expect(btn.attributes("disabled")).toBeDefined();
     });
   });
 
-  it("renders the play button", () => {
-    // Arrange + Act handled in beforeEach
+  // =========================================================================
+  // Play button — navigation
+  // =========================================================================
 
-    // Assert
-    expect(wrapper.find('[data-test="play-button"]').exists()).toBe(true);
-  });
+  describe("play button click — router navigation", () => {
+    it("pushes to SessionViewer with correct params and query on click", async () => {
+      // Act
+      await wrapper.find('[data-test="error-session-replay-play-btn"]').trigger("click");
 
-  it("shows Play Session Replay text in the button", () => {
-    // Arrange + Act handled in beforeEach
+      // Assert
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "SessionViewer",
+        params: { id: "session-abc123" },
+        query: {
+          start_time: TIMESTAMP_US,
+          end_time: TIMESTAMP_US,
+          event_time: EVENT_TIME_MS,
+        },
+      });
+    });
 
-    // Assert
-    expect(wrapper.find('[data-test="play-button"]').text()).toContain(
-      "Play Session Replay",
-    );
-  });
+    it("includes event_time as Math.floor(_timestamp / 1000)", async () => {
+      // Act
+      await wrapper.find('[data-test="error-session-replay-play-btn"]').trigger("click");
 
-  it("navigates to SessionViewer with correct params when play button is clicked", async () => {
-    // Arrange
-    const button = wrapper.find('[data-test="play-button"]');
+      // Assert
+      const call = mockRouterPush.mock.calls[0][0];
+      expect(call.query.event_time).toBe(Math.floor(TIMESTAMP_US / 1000));
+    });
 
-    // Act
-    await button.trigger("click");
+    it("uses the updated session_id after prop change", async () => {
+      // Arrange
+      const newTs = 1_704_196_800_000_000;
+      await wrapper.setProps({
+        error: { session_id: "new-session", view_id: "new-view", _timestamp: newTs },
+      });
 
-    // Assert
-    expect(mockRouterPush).toHaveBeenCalledWith({
-      name: "SessionViewer",
-      params: { id: "session-abc123" },
-      query: {
-        start_time: 1704110400000,
-        end_time: 1704110400000,
-      },
+      // Act
+      await wrapper.find('[data-test="error-session-replay-play-btn"]').trigger("click");
+
+      // Assert
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "SessionViewer",
+        params: { id: "new-session" },
+        query: {
+          start_time: newTs,
+          end_time: newTs,
+          event_time: Math.floor(newTs / 1000),
+        },
+      });
+    });
+
+    it("does NOT call router.push when session_id is missing (disabled)", async () => {
+      // Arrange
+      wrapper.unmount();
+      wrapper = mountComponent({ view_id: "view-xyz", _timestamp: TIMESTAMP_US });
+      await flushPromises();
+
+      // Act
+      await wrapper.find('[data-test="error-session-replay-play-btn"]').trigger("click");
+
+      // Assert
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    });
+
+    it("calls router.push for each click", async () => {
+      // Arrange
+      const btn = wrapper.find('[data-test="error-session-replay-play-btn"]');
+
+      // Act
+      await btn.trigger("click");
+      await btn.trigger("click");
+
+      // Assert
+      expect(mockRouterPush).toHaveBeenCalledTimes(2);
     });
   });
 
-  it("uses the correct timestamp for start_time and end_time", async () => {
-    // Arrange
-    await wrapper.setProps({
-      error: { session_id: "test-session", view_id: "test-view", _timestamp: 9999999999 },
-    });
-    const button = wrapper.find('[data-test="play-button"]');
+  // =========================================================================
+  // Props reactivity
+  // =========================================================================
 
-    // Act
-    await button.trigger("click");
+  describe("props reactivity", () => {
+    it("updates ErrorTag values when error prop changes", async () => {
+      // Act
+      await wrapper.setProps({
+        error: { session_id: "updated-sess", view_id: "updated-view", _timestamp: TIMESTAMP_US },
+      });
 
-    // Assert
-    expect(mockRouterPush).toHaveBeenCalledWith({
-      name: "SessionViewer",
-      params: { id: "test-session" },
-      query: { start_time: 9999999999, end_time: 9999999999 },
-    });
-  });
-
-  it("has a playSessionReplay method exposed", () => {
-    // Assert
-    expect(typeof wrapper.vm.playSessionReplay).toBe("function");
-  });
-
-  it("has a getSessionTags computed property that returns session and view ids", () => {
-    // Assert
-    expect(wrapper.vm.getSessionTags).toBeDefined();
-    expect(wrapper.vm.getSessionTags.session_id).toBe("session-abc123");
-    expect(wrapper.vm.getSessionTags.view_id).toBe("view-def456");
-  });
-
-  it("getSessionTags updates when error prop changes", async () => {
-    // Arrange + Act
-    await wrapper.setProps({
-      error: { session_id: "new-session", view_id: "new-view", _timestamp: 1704196800000 },
-    });
-
-    // Assert
-    expect(wrapper.vm.getSessionTags.session_id).toBe("new-session");
-    expect(wrapper.vm.getSessionTags.view_id).toBe("new-view");
-  });
-
-  it("routes to SessionViewer with updated session id after prop change", async () => {
-    // Arrange
-    const customError = {
-      session_id: "custom-session-789",
-      view_id: "custom-view-101",
-      _timestamp: 1704283200000,
-    };
-    await wrapper.setProps({ error: customError });
-
-    // Act
-    await wrapper.find('[data-test="play-button"]').trigger("click");
-
-    // Assert
-    expect(mockRouterPush).toHaveBeenCalledWith({
-      name: "SessionViewer",
-      params: { id: "custom-session-789" },
-      query: { start_time: 1704283200000, end_time: 1704283200000 },
+      // Assert
+      const tags = wrapper.findAllComponents({ name: "ErrorTag" });
+      const sessionTag = tags.find((t) => t.props("tag").key === "session_id");
+      expect(sessionTag!.props("tag").value).toBe("updated-sess");
     });
   });
 
-  it("passes undefined start/end times when _timestamp is missing", async () => {
-    // Arrange
-    await wrapper.setProps({
-      error: { session_id: "session-no-time", view_id: "view-no-time" },
+  // =========================================================================
+  // Edge cases
+  // =========================================================================
+
+  describe("edge cases", () => {
+    it("handles missing _timestamp by passing undefined to query", async () => {
+      // Arrange
+      wrapper.unmount();
+      wrapper = mountComponent({ session_id: "sess-no-time", view_id: "v1" });
+      await flushPromises();
+
+      // Act
+      await wrapper.find('[data-test="error-session-replay-play-btn"]').trigger("click");
+
+      // Assert
+      const call = mockRouterPush.mock.calls[0][0];
+      expect(call.query.start_time).toBeUndefined();
+      expect(call.query.end_time).toBeUndefined();
+      // event_time = Math.floor(undefined / 1000) = NaN
+      expect(Number.isNaN(call.query.event_time)).toBe(true);
     });
-
-    // Act
-    await wrapper.find('[data-test="play-button"]').trigger("click");
-
-    // Assert
-    expect(mockRouterPush).toHaveBeenCalledWith({
-      name: "SessionViewer",
-      params: { id: "session-no-time" },
-      query: { start_time: undefined, end_time: undefined },
-    });
-  });
-
-  it("passes null values through to router when session data is null", async () => {
-    // Arrange
-    await wrapper.setProps({
-      error: { session_id: null, view_id: null, _timestamp: null },
-    });
-
-    // Act
-    await wrapper.find('[data-test="play-button"]').trigger("click");
-
-    // Assert
-    expect(mockRouterPush).toHaveBeenCalledWith({
-      name: "SessionViewer",
-      params: { id: null },
-      query: { start_time: null, end_time: null },
-    });
-  });
-
-  it("session_id tag is undefined when session_id is missing from error", async () => {
-    // Arrange
-    await wrapper.setProps({
-      error: { view_id: "view-only", _timestamp: 1704110400000 },
-    });
-
-    // Assert
-    expect(wrapper.vm.getSessionTags.session_id).toBeUndefined();
-    expect(wrapper.vm.getSessionTags.view_id).toBe("view-only");
-  });
-
-  it("calls router.push multiple times for multiple button clicks", async () => {
-    // Arrange
-    mockRouterPush.mockClear();
-    const button = wrapper.find('[data-test="play-button"]');
-
-    // Act
-    await button.trigger("click");
-    await button.trigger("click");
-    await button.trigger("click");
-
-    // Assert
-    expect(mockRouterPush).toHaveBeenCalledTimes(3);
-  });
-
-  it("requires the error prop", () => {
-    // Assert
-    expect(ErrorSessionReplay.props?.error?.required).toBe(true);
-    expect(ErrorSessionReplay.props?.error?.type).toBe(Object);
   });
 });

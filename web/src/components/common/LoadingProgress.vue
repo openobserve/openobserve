@@ -1,21 +1,21 @@
 <template>
   <div
-    class="tw:absolute tw:top-0 tw:left-0 tw:w-full tw:z-[999] tw:transition-opacity tw:duration-500 tw:ease-out"
+    class="absolute top-0 left-0 w-full z-[999] transition-opacity duration-500 ease-out"
     :class="{
-      'tw:opacity-0': !loading && !isFadingOut,
-      'tw:opacity-100': loading || isFadingOut,
+      'opacity-0': !loading && !isFadingOut,
+      'opacity-100': loading || isFadingOut,
     }"
   >
     <div
-      class="tw:w-full tw:h-[2px] tw:relative tw:overflow-x-hidden"
+      class="w-full h-[2px] relative overflow-x-hidden"
       :class="
-        store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-200'
+        store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
       "
     >
       <div
-        class="tw:h-full tw:relative tw:overflow-hidden"
+        class="h-full relative overflow-hidden"
         :class="
-          store.state.theme === 'dark' ? 'tw:bg-[#5960B2]' : 'tw:bg-[#5960B2]'
+          store.state.theme === 'dark' ? 'bg-[#5960B2]' : 'bg-[#5960B2]'
         "
         :style="{
           width: `${displayPercentage}%`,
@@ -27,11 +27,11 @@
         }"
       >
         <div
-          class="tw:absolute tw:inset-0 tw:bg-gradient-to-r tw:from-transparent tw:to-transparent "
+          class="absolute inset-0 bg-gradient-to-r from-transparent to-transparent "
           :class="
             store.state.theme === 'dark'
-              ? 'tw:via-gray-300/40'
-              : 'tw:via-white/40'
+              ? 'via-gray-300/40'
+              : 'via-white/40'
           "
           :style="{
             animation: 'shimmer 1.5s infinite linear',
@@ -42,9 +42,9 @@
       </div>
       <!-- Moving circle indicator -->
       <div
-        class="tw:absolute tw:top-0 tw:w-[3px] tw:h-[2px] tw:rounded-full tw:shadow-[0_0_10px_2px_rgba(89,96,178,0.5)] tw:transform tw:translate-x-[-50%]"
+        class="absolute top-0 w-[3px] h-[2px] rounded-full shadow-[0_0_10px_2px_rgba(89,96,178,0.5)] transform translate-x-[-50%]"
         :class="
-          store.state.theme === 'dark' ? 'tw:bg-[#5960B2]' : 'tw:bg-[#5960B2]'
+          store.state.theme === 'dark' ? 'bg-[#5960B2]' : 'bg-[#5960B2]'
         "
         :style="{
           left: `${displayPercentage}%`,
@@ -54,11 +54,11 @@
         }"
       >
         <div
-          class="tw:absolute tw:inset-0 tw:rounded-full tw:animate-pulse"
+          class="absolute inset-0 rounded-full animate-pulse"
           :class="
             store.state.theme === 'dark'
-              ? 'tw:bg-gray-300/20'
-              : 'tw:bg-white/20'
+              ? 'bg-gray-300/20'
+              : 'bg-white/20'
           "
         ></div>
       </div>
@@ -163,7 +163,7 @@ export default defineComponent({
   }
 }
 
-.tw:animate-pulse {
+.animate-pulse {
   animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 </style>

@@ -1,23 +1,23 @@
 <template>
-  <div class="tw:relative">
+  <div class="relative">
     <OButton
       v-if="showCopyButton"
       variant="secondary"
       size="icon-sm"
-      class="tw:absolute! tw:top-0! tw:right-0 tw:z-10"
+      class="absolute! top-0! right-0 z-10"
       :class="copyButtonClass"
       @click="copyToClipboard"
     >
       <OIcon name="content-copy" size="sm" />
       <OTooltip :content="t('common.copyToClipboard')" />
     </OButton>
-    <div class="tw:pb-1 tw:flex tw:justify-start tw:items-center tw:px-3 copy-log-btn">
+    <div class="pb-1 flex justify-start items-center px-3 copy-log-btn">
       <!-- Toolbar slot: consumers add context-specific buttons (View Trace, View Related, etc.) -->
       <slot name="toolbar" />
     </div>
     {
     <div
-      class="log_json_content tw:flex"
+      class="log_json_content flex"
       v-for="(key, index) in Object.keys(value)"
       :key="key"
     >
@@ -33,13 +33,13 @@
             data-test="json-preview-field-dropdown-btn"
             size="xs"
             variant="ghost"
-            class="tw:ml-2 log-json-field-dropdown-btn"
+            class="ml-2 log-json-field-dropdown-btn"
             aria-label="Add icon"
           >
             <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
           </OButton>
         </template>
-        <div class="logs-table-list tw:min-w-[180px]">
+        <div class="logs-table-list min-w-[180px]">
           <slot name="field-dropdown"
 :field="key"
 :value="value[key]" />
@@ -47,7 +47,7 @@
       </ODropdown>
 
       <span
-        class="tw:pl-[0.625rem]"
+        class="pl-[0.625rem]"
         :data-test="`json-preview-key-${key}`"
         :class="store.state.theme === 'dark' ? 'dark' : ''"
       >

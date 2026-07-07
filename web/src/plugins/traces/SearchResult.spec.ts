@@ -148,7 +148,7 @@ const globalOptions = {
     "q-resize-observer": true,
     TracesSearchResultList: {
       name: "TracesSearchResultList",
-      template: '<div data-test="traces-search-result-list" class="search-list tw:w-full"></div>',
+      template: '<div data-test="traces-search-result-list" class="search-list w-full"></div>',
       props: ["hits", "loading", "searchPerformed", "showHeader"],
       emits: ["row-click", "load-more"],
     },
@@ -184,14 +184,14 @@ describe("SearchResult", () => {
   it("should render the main container with correct data-test attribute", () => {
     const container = wrapper.find('[data-test="traces-search-result"]');
     expect(container.exists()).toBe(true);
-    expect(container.classes()).toContain("tw:overflow-hidden");
+    expect(container.classes()).toContain("overflow-hidden");
   });
 
   it("should render the search list container", () => {
     const searchList = wrapper.find('[data-test="traces-search-result-list"]');
     expect(searchList.exists()).toBe(true);
     expect(searchList.classes()).toContain("search-list");
-    expect(searchList.classes()).toContain("tw:w-full");
+    expect(searchList.classes()).toContain("w-full");
   });
 
   it("should render TracesMetricsDashboard component", () => {

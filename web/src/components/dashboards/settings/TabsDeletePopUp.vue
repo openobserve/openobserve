@@ -39,11 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardData?.tabs?.find((tab: any) => tab.tabId === tabId)?.panels
             ?.length
         "
-        class="tw:mt-4"
+        class="mt-4"
         data-test="dashboard-tab-delete-tab-panels-container"
       >
-        <div class="tw:flex tw:flex-col" data-test="dashboard-tab-delete-radio-group">
-          <ORadioGroup v-model="action" orientation="vertical" class="tw:gap-4">
+        <div class="flex flex-col" data-test="dashboard-tab-delete-radio-group">
+          <ORadioGroup v-model="action" orientation="vertical" class="gap-4">
             <div style="display: flex; flex-direction: row">
               <ORadio
                 val="move"
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-tab-delete-tab-panels-move"
                 label="Move panels to another tab"
               />
-              <div v-if="action === 'move'" class="tw:ml-5 tw:min-w-50 tw:max-w-75 tw:mb-2.5">
+              <div v-if="action === 'move'" class="ml-5 min-w-50 max-w-75 mb-2.5">
                 <OSelect
                   v-model="selectedTabToMovePanels"
                   :options="moveTabOptions"

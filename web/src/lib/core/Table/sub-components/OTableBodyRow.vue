@@ -1,13 +1,30 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
+<script lang="ts">
+// Every row registers its own window keydown listener, so they all see the
+// same event — this shared set lets only the first responder act on it.
+const handledNavEvents = new WeakSet<KeyboardEvent>();
+</script>
+
 <script setup lang="ts">
 import type { Row, Table } from "@tanstack/vue-table";
-import { computed, inject, ref, onMounted, onBeforeUnmount, watch, useSlots } from "vue";
+import {
+  computed,
+  inject,
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  watch,
+  useSlots,
+} from "vue";
 import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH, TABLE_CHECKBOX_COL_PAD_LEFT } from "../OTable.types";
+import {
+  TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH,
+  TABLE_CHECKBOX_COL_PAD_LEFT,
+} from "../OTable.types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const props = defineProps<{
@@ -39,7 +56,7 @@ const props = defineProps<{
   statusBarColor?: string;
   /** Enable hover-visible copy button on cells */
   enableCellCopy?: boolean;
-  /** Per-cell tw:inline style function */
+  /** Per-cell inline style function */
   getCellStyle?: (params: {
     columnId: string;
     row: any;
@@ -54,9 +71,7 @@ const emit = defineEmits<{
   "row-dblclick": [row: any, event: MouseEvent];
   "row-mouseenter": [row: any, event: MouseEvent];
   "row-mouseleave": [row: any];
-  "cell-click": [
-    params: { columnId: string; row: any; value: any },
-  ];
+  "cell-click": [params: { columnId: string; row: any; value: any }];
 }>();
 
 const slots = useSlots();
@@ -94,12 +109,13 @@ const treeMeta = computed(() => {
 });
 const isTreeParent = computed(() => !!treeMeta.value?.isParent);
 const isTreeExpanded = computed(() => !!treeMeta.value?.isExpanded);
-const showTreeWarning = computed(() =>
-  treeCtx?.value?.enabled &&
-  isTreeParent.value &&
-  isTreeExpanded.value &&
-  treeCtx.value.hasWarning(props.row.original) &&
-  !!slots["tree-warning"],
+const showTreeWarning = computed(
+  () =>
+    treeCtx?.value?.enabled &&
+    isTreeParent.value &&
+    isTreeExpanded.value &&
+    treeCtx.value.hasWarning(props.row.original) &&
+    !!slots["tree-warning"],
 );
 
 /**
@@ -108,8 +124,8 @@ const showTreeWarning = computed(() =>
  */
 const treeConnectorX = computed(() => {
   const selectionWidth = props.selectionEnabled ? TABLE_CHECKBOX_COL_WIDTH : 0;
-  const expansionWidth = props.expansionEnabled ? 32 : 0; // tw:w-8
-  const cellPaddingLeft = 8; // tw:px-2
+  const expansionWidth = props.expansionEnabled ? 32 : 0; // w-8
+  const cellPaddingLeft = 8; // px-2
   const halfChevron = 9; // 18px / 2
   const parentDepth = treeMeta.value?.depth ?? 0;
   return (
@@ -122,6 +138,14 @@ const treeConnectorX = computed(() => {
 });
 
 function onClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null;
+  if (
+    target?.closest(
+      "button, a, input, select, textarea, label, [role='button']",
+    )
+  ) {
+    return;
+  }
   emit("row-click", props.row.original, event);
 }
 
@@ -134,6 +158,7 @@ function onDblclick(event: MouseEvent) {
 // by isHovered so only the currently hovered row responds.
 // Pages just need data-row-action="edit|delete|pause" on their action buttons.
 const isHovered = ref(false);
+const isFocused = ref(false);
 
 const ROW_ACTION_KEYS: Record<string, string> = {
   e: "edit",
@@ -146,19 +171,31 @@ const ROW_ACTION_KEYS: Record<string, string> = {
 };
 
 const handleKeydown = (e: KeyboardEvent) => {
-  if (!isHovered.value || isInputFocused()) return;
+  if ((!isHovered.value && !isFocused.value) || isInputFocused()) return;
+  const rowEl = rowRef.value?.closest("tr");
+  const active = document.activeElement;
+  if (active && active !== rowEl && active !== document.body) return;
+  if (handledNavEvents.has(e)) return;
+  handledNavEvents.add(e);
 
-  // Arrow up/down — move hover focus to the adjacent row
+  // Arrow up/down — move focus to the adjacent row
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
     const tr = rowRef.value?.closest("tr");
     if (!tr) return;
-    const sibling = e.key === "ArrowDown"
-      ? tr.nextElementSibling
-      : tr.previousElementSibling;
+    let sibling =
+      e.key === "ArrowDown" ? tr.nextElementSibling : tr.previousElementSibling;
+    while (sibling && !sibling.matches("tr[data-test^='o2-table-row-']")) {
+      sibling =
+        e.key === "ArrowDown"
+          ? sibling.nextElementSibling
+          : sibling.previousElementSibling;
+    }
     if (sibling instanceof HTMLElement) {
       e.preventDefault();
-      sibling.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
-      sibling.focus();
+      isHovered.value = false;
+      if (sibling.hasAttribute("tabindex")) sibling.focus();
+      else
+        sibling.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
     }
     return;
   }
@@ -166,7 +203,9 @@ const handleKeydown = (e: KeyboardEvent) => {
   // Enter triggers the row's click handler (same as a mouse click)
   if (e.key === "Enter") {
     e.preventDefault();
-    rowRef.value?.closest("tr")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    rowRef.value
+      ?.closest("tr")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     return;
   }
 
@@ -180,7 +219,10 @@ const handleKeydown = (e: KeyboardEvent) => {
   const btn = rowRef.value?.querySelector<HTMLElement>(
     `[data-row-action='${action}']`,
   );
-  if (btn) { e.preventDefault(); btn.click(); }
+  if (btn) {
+    e.preventDefault();
+    btn.click();
+  }
 };
 
 onMounted(() => window.addEventListener("keydown", handleKeydown));
@@ -194,43 +236,52 @@ function onRowMouseleave() {
   isHovered.value = false;
   emit("row-mouseleave", props.row.original);
 }
+
+// focus/blur don't bubble — fires for the <tr> only, not inner action buttons.
+function onRowFocus() {
+  isFocused.value = true;
+}
+function onRowBlur() {
+  isFocused.value = false;
+}
 </script>
 
 <template>
   <tr
     ref="rowRef"
     :data-test="`o2-table-row-${row.index}`"
+    :tabindex="clickable ? 0 : undefined"
     :class="[
-      'tw:group/row',
-      'tw:transition-colors tw:duration-150',
-      clickable ? 'tw:cursor-pointer' : '',
-      'tw:hover:bg-table-row-hover-bg',
-      isRowSelected
-        ? 'tw:bg-table-row-selected-bg'
-        : '',
-      !isRowSelected && isStriped
-        ? 'tw:bg-table-row-striped-bg'
-        : '',
+      'group/row',
+      'transition-colors duration-150',
+      clickable ? 'cursor-pointer' : '',
+      'hover:bg-table-row-hover-bg',
+      clickable ? 'focus:outline-none focus-visible:bg-table-row-hover-bg' : '',
+      isRowSelected ? 'bg-table-row-selected-bg' : '',
+      !isRowSelected && isStriped ? 'bg-table-row-striped-bg' : '',
+      statusBarColor ? 'o2-table-row-with-status' : '',
       rowClass,
     ]"
-    :style="{ height: 'var(--o2-table-row-height, 2.25rem)', ...rowStyle }"
+    :style="{
+      height: 'var(--o2-table-row-height, 2.25rem)',
+      ...(statusBarColor ? { '--o2-row-status-color': statusBarColor } : {}),
+      ...rowStyle,
+    }"
+    :data-status-bar="statusBarColor ? 'true' : undefined"
     @click="onClick"
     @dblclick="onDblclick"
     @mouseenter="onRowMouseenter"
     @mouseleave="onRowMouseleave"
+    @focus="onRowFocus"
+    @blur="onRowBlur"
   >
-    <!-- Status bar color indicator -->
-    <td
-      v-if="statusBarColor"
-      class="tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:p-0 tw:border-0 tw:z-10"
-      :style="{ backgroundColor: statusBarColor }"
-      data-test="o2-table-status-bar"
-    />
-
     <!-- Expand button cell -->
     <td
       v-if="expansionEnabled"
-      :class="['tw:w-4 tw:min-w-4 tw:px-0 tw:text-center tw:align-middle', bordered ? 'tw:border-b tw:border-table-row-divider' : '']"
+      :class="[
+        'w-4 min-w-4 px-0 text-center align-middle',
+        bordered ? 'border-b border-table-row-divider' : '',
+      ]"
       data-test="o2-table-expand-cell"
     >
       <OTableExpandButton
@@ -245,14 +296,21 @@ function onRowMouseleave() {
     <td
       v-if="selectionEnabled"
       :class="[
-        'tw:text-left tw:align-middle',
-        bordered ? 'tw:border-b tw:border-table-row-divider' : '',
-        isRowSelectable && !isRowSelectable(row.original) ? 'tw:cursor-not-allowed' : '',
+        'text-left align-middle',
+        bordered ? 'border-b border-table-row-divider' : '',
+        isRowSelectable && !isRowSelectable(row.original)
+          ? 'cursor-not-allowed'
+          : '',
       ]"
-      :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
+      :style="{
+        width: TABLE_CHECKBOX_COL_WIDTH + 'px',
+        minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px',
+        maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px',
+        paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px',
+      }"
       data-test="o2-table-select-cell"
     >
-      <div class="tw:flex tw:items-center tw:justify-start">
+      <div class="flex items-center justify-start">
         <OTableSelectCheckbox
           :model-value="isRowSelected ?? false"
           :row-id="String(row.index)"
@@ -294,17 +352,21 @@ function onRowMouseleave() {
   <tr
     v-if="showTreeWarning"
     :data-test="`o2-table-tree-warning-${row.index}`"
-    class="tw:bg-(--color-warning-surface,rgba(251,191,36,0.08))"
+    class="bg-(--color-warning-surface,rgba(251,191,36,0.08))"
   >
     <td
-      :colspan="row.getVisibleCells().length + (expansionEnabled ? 1 : 0) + (selectionEnabled ? 1 : 0)"
+      :colspan="
+        row.getVisibleCells().length +
+        (expansionEnabled ? 1 : 0) +
+        (selectionEnabled ? 1 : 0)
+      "
       :class="[
-        'o2-table-tree-warning-cell tw:relative',
-        bordered ? 'tw:border-b tw:border-table-row-divider' : '',
+        'o2-table-tree-warning-cell relative',
+        bordered ? 'border-b border-table-row-divider' : '',
       ]"
       :style="{ '--o2-tree-connector-x': treeConnectorX + 'px' }"
     >
-      <div class="tw:relative tw:z-1 tw:flex tw:items-center tw:justify-center">
+      <div class="relative z-1 flex items-center justify-center">
         <slot name="tree-warning" :row="row.original" />
       </div>
     </td>
@@ -314,11 +376,15 @@ function onRowMouseleave() {
   <tr
     v-if="hasExpansionSlot && isExpanded"
     :data-test="`o2-table-expanded-row-${row.index}`"
-    class="tw:bg-table-row-expanded-bg"
+    class="bg-table-row-expanded-bg"
   >
     <td
-      :colspan="row.getVisibleCells().length + (expansionEnabled ? 1 : 0) + (selectionEnabled ? 1 : 0)"
-      :class="bordered ? 'tw:border-b tw:border-table-row-divider' : ''"
+      :colspan="
+        row.getVisibleCells().length +
+        (expansionEnabled ? 1 : 0) +
+        (selectionEnabled ? 1 : 0)
+      "
+      :class="bordered ? 'border-b border-table-row-divider' : ''"
     >
       <slot name="expansion" :row="row.original" />
     </td>
@@ -326,6 +392,13 @@ function onRowMouseleave() {
 </template>
 
 <style>
+/* Per-row status spine. Painted as an inset box-shadow on the row's first
+   cell — an extra <td> would add a phantom column on only the rows that have
+   a status color and shift their cells out of alignment under table-fixed. */
+.o2-table-row-with-status > td:first-child {
+  box-shadow: inset 0.25rem 0 0 0 var(--o2-row-status-color);
+}
+
 /* Continuation of the tree connector vertical line through the warning row */
 .o2-table-tree-warning-cell::after {
   content: "";

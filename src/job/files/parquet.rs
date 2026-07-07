@@ -22,8 +22,6 @@ use std::{
 use arrow_schema::Schema;
 use bytes::Bytes;
 use chrono::{Duration, Utc};
-#[cfg(feature = "enterprise")]
-use config::utils::parquet::get_recordbatch_reader_from_bytes;
 use config::{
     FxIndexMap, cluster, get_config,
     meta::{
@@ -50,6 +48,19 @@ use ingester::WAL_PARQUET_METADATA;
 use tokio::{
     fs::remove_file,
     sync::{Mutex, RwLock},
+};
+#[cfg(feature = "enterprise")]
+use {
+    config::{FileFormat, cluster::LOCAL_NODE, utils::parquet::get_recordbatch_reader_from_bytes},
+    o2_enterprise::enterprise::{
+        common::config::get_config as get_enterprise_config,
+        service_streams::{
+            batch_processor::queue_services, cache::get_coverage_deficit, meta::ServiceMetadata,
+            processor::StreamProcessor, sampler::should_process_file,
+        },
+    },
+    std::collections::HashMap,
+    tokio::sync::mpsc,
 };
 
 use crate::{
@@ -800,8 +811,12 @@ async fn merge_files(
         }
     };
 
-    let (buf, mut new_file_meta) = match buf {
-        MergeParquetResult::Single(buf, meta) => (buf, meta),
+    let (buf, mut new_file_meta, file_format) = match buf {
+        MergeParquetResult::Single {
+            buf,
+            file_meta,
+            file_format,
+        } => (buf, file_meta, file_format),
         MergeParquetResult::Multiple { .. } => {
             // ingester should not support multiple files, it will be handled in compactor mode
             panic!("[INGESTER:JOB] merge_parquet_files error: multiple files");
@@ -813,8 +828,13 @@ async fn merge_files(
             "merge_parquet_files error: compressed_size is 0"
         ));
     }
-    let new_file_key =
-        super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
+    let new_file_key = super::generate_ingester_storage_file_key(
+        &org_id,
+        stream_type,
+        &stream_name,
+        &file_name,
+        file_format,
+    );
     log::info!(
         "[INGESTER:JOB:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
         retain_file_list.len(),
@@ -840,9 +860,7 @@ async fn merge_files(
     // This runs BEFORE indexing checks to ensure all stream types are discovered
     #[cfg(feature = "enterprise")]
     {
-        use config::cluster::LOCAL_NODE;
-        let service_streams_config =
-            &o2_enterprise::enterprise::common::config::get_config().service_streams;
+        let service_streams_config = &get_enterprise_config().service_streams;
 
         let valid_stream_type = stream_type == StreamType::Logs
             || stream_type == StreamType::Metrics
@@ -863,25 +881,20 @@ async fn merge_files(
             // active), tapering back to normal as coverage fills in.
             // Passing (0, 0) when disabled is the documented no-op sentinel for the sampler.
             let coverage_deficit = if service_streams_config.coverage_catchup_enabled {
-                o2_enterprise::enterprise::service_streams::cache::get_coverage_deficit(
-                    &org_id,
-                    stream_type,
-                )
-                .await
+                get_coverage_deficit(&org_id, stream_type).await
             } else {
                 (0, 0)
             };
 
             // Check if we should process this file (adaptive per-type sampling with fast lane)
-            let should_process =
-                o2_enterprise::enterprise::service_streams::sampler::should_process_file(
-                    &org_id,
-                    stream_type,
-                    &stream_name,
-                    &new_file_key,
-                    stream_count,
-                    coverage_deficit,
-                );
+            let should_process = should_process_file(
+                &org_id,
+                stream_type,
+                &stream_name,
+                &new_file_key,
+                stream_count,
+                coverage_deficit,
+            );
 
             if should_process {
                 let buf_clone = buf.clone();
@@ -890,20 +903,17 @@ async fn merge_files(
 
                 // Queue services for batched processing (non-blocking)
                 tokio::spawn(async move {
-                    if let Err(e) = queue_services_from_parquet(
+                    if let Err(e) = queue_services_from_data_file(
                         &org_id_clone,
                         stream_type,
                         &stream_name_clone,
-                        &buf_clone,
+                        file_format,
+                        buf_clone,
                     )
                     .await
                     {
                         log::error!(
-                            "[ServiceStreams] Failed to queue services for {}/{}/{}: {}",
-                            org_id_clone,
-                            stream_type,
-                            stream_name_clone,
-                            e
+                            "[ServiceStreams] Failed to queue services for {org_id_clone}/{stream_type}/{stream_name_clone}: {e}"
                         );
                     }
                 });
@@ -961,16 +971,13 @@ fn split_perfix(prefix: &str) -> (String, StreamType, String, String) {
 }
 
 #[cfg(feature = "enterprise")]
-async fn queue_services_from_parquet(
+async fn queue_services_from_data_file(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    parquet_data: &[u8],
+    file_format: FileFormat,
+    file_data: Bytes,
 ) -> Result<(), anyhow::Error> {
-    use std::collections::HashMap;
-
-    use tokio::sync::mpsc;
-
     let start = std::time::Instant::now();
 
     // Get semantic field groups upfront (before spawning tasks)
@@ -982,27 +989,21 @@ async fn queue_services_from_parquet(
     // Create bounded channel for backpressure - drops records if consumer can't keep up
     // ARROW-NATIVE: Channel now sends RecordBatch directly (no HashMap conversion!)
     let (tx, mut rx) = mpsc::channel::<arrow::record_batch::RecordBatch>(
-        o2_enterprise::enterprise::common::config::get_config()
-            .service_streams
-            .channel_capacity,
+        get_enterprise_config().service_streams.channel_capacity,
     );
 
-    // Clone data needed for producer task
-    let parquet_bytes = Bytes::copy_from_slice(parquet_data);
-
-    // Spawn producer task to read parquet and send Arrow batches through channel
+    // Spawn producer task to read the data file and send Arrow batches through channel.
     // ARROW-NATIVE: No HashMap conversion! Sends RecordBatch directly.
     let producer_handle = tokio::spawn(async move {
         let mut records_sent = 0u64;
         let mut records_dropped = 0u64;
         let mut batches_sent = 0u64;
 
-        let file_format = config::get_config().common.file_format;
-        let reader_result = get_recordbatch_reader_from_bytes(file_format, parquet_bytes).await;
+        let reader_result = get_recordbatch_reader_from_bytes(file_format, file_data).await;
         let (_schema, mut reader) = match reader_result {
             Ok(r) => r,
             Err(e) => {
-                log::error!("[ServiceStreams] Failed to read parquet: {e}");
+                log::error!("[ServiceStreams] Failed to read {file_format} file: {e}");
                 return (records_sent, records_dropped);
             }
         };
@@ -1051,16 +1052,9 @@ async fn queue_services_from_parquet(
     });
 
     // Consumer: Process batches as they arrive
-    let processor = o2_enterprise::enterprise::service_streams::processor::StreamProcessor::new(
-        org_id.to_string(),
-        semantic_groups,
-        identity_config,
-    );
+    let processor = StreamProcessor::new(org_id.to_string(), semantic_groups, identity_config);
 
-    let mut all_services: HashMap<
-        String,
-        o2_enterprise::enterprise::service_streams::meta::ServiceMetadata,
-    > = HashMap::new();
+    let mut all_services: HashMap<String, ServiceMetadata> = HashMap::new();
     let mut total_records_processed = 0u64;
 
     // Process Arrow batches from channel
@@ -1089,10 +1083,7 @@ async fn queue_services_from_parquet(
 
     if records_dropped > 0 {
         log::warn!(
-            "[ServiceStreams] Dropped {} records due to backpressure for {}/{}",
-            records_dropped,
-            org_id,
-            stream_name
+            "[ServiceStreams] Dropped {records_dropped} records due to backpressure for {org_id}/{stream_name}",
         );
         metrics::SERVICE_STREAMS_RECORDS_DROPPED
             .with_label_values(&[org_id, &stream_type.to_string()])
@@ -1115,22 +1106,16 @@ async fn queue_services_from_parquet(
         .observe(duration.as_secs_f64());
 
     log::debug!(
-        "[ServiceStreams] Processed {} records, discovered {} services in {:?} for {}/{} (sent: {}, dropped: {})",
-        total_records_processed,
-        service_count,
-        duration,
-        org_id,
-        stream_name,
-        records_sent,
-        records_dropped
+        "[ServiceStreams] Processed {total_records_processed} records, discovered {service_count} services in {duration:?} for {org_id}/{stream_name} (sent: {records_sent}, dropped: {records_dropped})",
     );
 
     // Queue services for batched processing
-    o2_enterprise::enterprise::service_streams::batch_processor::queue_services(
-        org_id.to_string(),
-        all_services,
-    )
-    .await;
+    queue_services(org_id.to_string(), all_services).await;
+
+    let duration = start.elapsed().as_millis();
+    log::info!(
+        "[ServiceStreams] queue_services_from_data_file completed in {duration} ms for {org_id}/{stream_name} (processed: {total_records_processed}, services: {service_count}, sent: {records_sent}, dropped: {records_dropped})",
+    );
 
     Ok(())
 }

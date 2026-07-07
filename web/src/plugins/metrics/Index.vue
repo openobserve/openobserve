@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full" data-test="metrics-page">
+  <div style="overflow-y: auto" class="scroll flex flex-col h-full" data-test="metrics-page">
     <!-- Standard page header: title + icon + all query controls on ONE line
          (syntax guide, legends, date range, refresh, Run). No extra toolbar row. -->
     <AppPageHeader
       :title="t('search.metrics')"
       icon="bar-chart"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
         <syntax-guide-metrics />
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="selectedDate"
           ref="dateTimePickerRef"
           :disable="disable"
-          class="tw:h-8"
+          class="h-8"
           data-test="metrics-date-picker"
         />
         <AutoRefreshInterval
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state?.zoConfig?.min_auto_refresh_interval || 5
           "
           @trigger="runQuery"
-          class="tw:h-8"
+          class="h-8"
           data-test="metrics-auto-refresh"
         />
         <ShareButton
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="icon-toolbar"
           data-test="metrics-share-btn"
-          class="tw:h-8"
+          class="h-8"
         />
         <template
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
@@ -70,9 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-cancel"
             @click="cancelAddPanelQuery"
           >
-            <span class="tw:relative tw:flex tw:items-center tw:justify-center">
-              <span class="tw:invisible">{{ t("metrics.runQuery") }}</span>
-              <span class="tw:absolute">{{ t("panel.cancel") }}</span>
+            <span class="relative flex items-center justify-center">
+              <span class="invisible">{{ t("metrics.runQuery") }}</span>
+              <span class="absolute">{{ t("panel.cancel") }}</span>
             </span>
           </OButton>
           <OButton
