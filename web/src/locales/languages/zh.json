@@ -2058,6 +2058,7 @@
     "defaultTokenBadge": "默认",
     "createTokenBtn": "创建新令牌",
     "createTokenTitle": "创建令牌",
+    "searchToken": "搜索令牌",
     "tokenNameLabel": "名称",
     "tokenDescriptionLabel": "描述",
     "rotateTokenBtn": "旋转",

@@ -2058,6 +2058,7 @@
     "defaultTokenBadge": "VARSAYILAN",
     "createTokenBtn": "Yeni Token Oluştur",
     "createTokenTitle": "Token Oluştur",
+    "searchToken": "Token ara",
     "tokenNameLabel": "İsim",
     "tokenDescriptionLabel": "Açıklama",
     "rotateTokenBtn": "Döndür",

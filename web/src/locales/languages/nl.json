@@ -2058,6 +2058,7 @@
     "defaultTokenBadge": "STANDAARD",
     "createTokenBtn": "Maak een nieuw token",
     "createTokenTitle": "Token aanmaken",
+    "searchToken": "Tokens zoeken",
     "tokenNameLabel": "Naam",
     "tokenDescriptionLabel": "Omschrijving",
     "rotateTokenBtn": "Roteren",

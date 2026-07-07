@@ -2058,6 +2058,7 @@
     "defaultTokenBadge": "PREDETERMINADO",
     "createTokenBtn": "Crear un token nuevo",
     "createTokenTitle": "Crear token",
+    "searchToken": "Buscar tokens",
     "tokenNameLabel": "Nombre",
     "tokenDescriptionLabel": "Descripción",
     "rotateTokenBtn": "Rotar",

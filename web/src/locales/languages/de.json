@@ -1415,14 +1415,14 @@
     },
     "form": {
       "identifier": {
-        "label": "Identifier",
+        "label": "Kennung",
         "placeholder": "Geben Sie die E-Mail-Adresse ein",
         "help": "E-Mail-Adresse, die als Dienstkonto-ID verwendet wird"
       }
     },
     "list": {
       "col": {
-        "identifier": "Identifier",
+        "identifier": "Kennung",
         "description": "Beschreibung",
         "token": "Wertmarke",
         "created": "Erstellt"
@@ -2058,6 +2058,7 @@
     "defaultTokenBadge": "STANDARD",
     "createTokenBtn": "Neues Token erstellen",
     "createTokenTitle": "Token erstellen",
+    "searchToken": "Token suchen",
     "tokenNameLabel": "Name",
     "tokenDescriptionLabel": "Beschreibung",
     "rotateTokenBtn": "Rotieren",

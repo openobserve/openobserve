@@ -2058,6 +2058,7 @@
     "defaultTokenBadge": "PAR DÉFAUT",
     "createTokenBtn": "Créer un nouveau jeton",
     "createTokenTitle": "Créer un jeton",
+    "searchToken": "Rechercher des jetons",
     "tokenNameLabel": "Nom",
     "tokenDescriptionLabel": "Descriptif",
     "rotateTokenBtn": "Faire pivoter",

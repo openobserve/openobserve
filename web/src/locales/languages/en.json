@@ -2059,6 +2059,7 @@
     "defaultTokenBadge": "DEFAULT",
     "createTokenBtn": "Create New Token",
     "createTokenTitle": "Create Token",
+    "searchToken": "Search tokens",
     "tokenNameLabel": "Name",
     "tokenDescriptionLabel": "Description",
     "rotateTokenBtn": "Rotate",

@@ -2058,6 +2058,7 @@
     "defaultTokenBadge": "디폴트",
     "createTokenBtn": "새 토큰 생성",
     "createTokenTitle": "토큰 생성",
+    "searchToken": "토큰 검색",
     "tokenNameLabel": "이름",
     "tokenDescriptionLabel": "설명",
     "rotateTokenBtn": "회전",

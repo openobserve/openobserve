@@ -66,7 +66,7 @@
     "yAxisMax": "Y-Axis Max",
     "legendWidth": "Legend Width",
     "exceptions": "Exceptions",
-    "nameRequired": "Name is required",
+    "nameRequired": "नाम आवश्यक है।",
     "edit": "Edit",
     "delete": "Delete",
     "actions": "Actions",
@@ -133,7 +133,9 @@
     "enabled": "सक्षम",
     "disabled": "अक्षम",
     "error": "त्रुटि",
-    "db": "डेटाबेस"
+    "db": "डेटाबेस",
+    "invalidEmail": "कृपया एक मान्य ईमेल पता दर्ज करें।",
+    "nameMaxLength": "नाम अधिकतम {max} वर्णों का होना चाहिए।"
   },
   "search": {
     "selectIndex": "पहले स्ट्रीम का चयन करें",
@@ -950,7 +952,15 @@
     "revokeInvitationTitle": "आमंत्रण रद्द करें",
     "revokeInvitationMsg": "क्या आप वाकई {email} के लिए आमंत्रण रद्द करना चाहते हैं?",
     "deleteUsersTitle": "उपयोगकर्ता हटाएँ",
-    "deleteUsersMsg": "क्या आप वाकई {count} उपयोगकर्ता हटाना चाहते हैं?"
+    "deleteUsersMsg": "क्या आप वाकई {count} उपयोगकर्ता हटाना चाहते हैं?",
+    "fieldRequired": "यह फ़ील्ड आवश्यक है",
+    "roleRequired": "भूमिका आवश्यक है",
+    "passwordRequired": "पासवर्ड आवश्यक है।",
+    "currentPasswordRequired": "वर्तमान पासवर्ड आवश्यक है।",
+    "newPasswordRequired": "नया पासवर्ड आवश्यक है।",
+    "passwordPolicyHint": "पासवर्ड 8-128 वर्णों का होना चाहिए और इसमें कम से कम एक लोअरकेस अक्षर, एक अपरकेस अक्षर, एक अंक और एक विशेष वर्ण होना चाहिए।",
+    "inviteEmailInvalid": "कृपया सही ईमेल आईडी दर्ज करें।",
+    "otherOrgInvalid": "संगठन का नाम अक्षर से शुरू होना चाहिए और अल्फ़ान्यूमेरिक, _ या - होना चाहिए।"
   },
   "ticket": {
     "header": "सहायता टिकट",
@@ -1245,12 +1255,18 @@
     "defaultTokenBadge": "डिफ़ॉल्ट",
     "createTokenBtn": "नया टोकन बनाएँ",
     "createTokenTitle": "टोकन बनाएँ",
+    "searchToken": "टोकन खोजें",
     "tokenNameLabel": "नाम",
     "tokenDescriptionLabel": "विवरण",
     "rotateTokenBtn": "रोटेट करें",
     "deleteTokenBtn": "हटाएँ",
     "copyTokenBtn": "कॉपी करें",
     "copyTokenWarning": "इस टोकन को अभी कॉपी करें। यह फिर से नहीं दिखाया जाएगा।",
+    "tokenAuthHeader": "प्राधिकरण",
+    "authHeaderLabel": "प्राधिकरण हेडर (उपयोग के लिए तैयार)",
+    "authHeaderHelp": "इसे अपने इन्जेशन अनुरोध के प्राधिकरण हेडर में पेस्ट करें — किसी मैन्युअल एन्कोडिंग की आवश्यकता नहीं।",
+    "copyAuthHeaderBtn": "प्राधिकरण हेडर कॉपी करें",
+    "copyRawTokenBtn": "रॉ टोकन कॉपी करें",
     "newTokenRevealed": "नया टोकन जनरेट किया गया",
     "deleteTokenConfirm": "टोकन \"{name}\" हटाएँ? इस टोकन का उपयोग करने वाली पाइपलाइनें काम करना बंद कर देंगी।",
     "rotateTokenConfirm": "टोकन \"{name}\" रोटेट करें? इस टोकन का उपयोग करने वाली सभी पाइपलाइनों को नए मान के साथ अद्यतन करना होगा।",
@@ -3037,21 +3053,75 @@
     "search": "आमंत्रण खोजें"
   },
   "serviceAccounts": {
-    "header": "Service Accounts",
-    "search": "Search Service Account",
-    "refresh": "Refresh Service Token",
-    "showToken": "Show Service Token",
-    "hideToken": "Hide Service Token",
-    "delete": "Delete Service Account",
-    "update": "Update Service Account",
-    "copyToken": "Copy Token",
-    "add": "New service account",
-    "confirmDeleteMsg": "Are you sure you want to delete this service account?",
-    "confirmDeleteHead": "Delete Service Account",
-    "confirmRefreshMsg": "Are you sure you want to refresh this service account token?",
-    "confirmRefreshHead": "Refresh Service Token",
-    "downloadToken": "Download Token",
-    "token": "Token"
+    "header": "सेवा खाते",
+    "emailInvalid": "कृपया एक मान्य ईमेल पता दर्ज करें",
+    "headerSubtitle": "API के लिए प्रोग्रामेटिक एक्सेस टोकन",
+    "search": "सेवा खाता खोजें",
+    "refresh": "सेवा टोकन रिफ़्रेश करें",
+    "rotate": "टोकन रोटेट करें",
+    "showToken": "सेवा टोकन दिखाएँ",
+    "hideToken": "सेवा टोकन छिपाएँ",
+    "delete": "हटाएँ",
+    "deleteServiceAccount": "सेवा खाता हटाएँ",
+    "update": "सेवा खाता अपडेट करें",
+    "copyToken": "टोकन कॉपी करें",
+    "add": "नया सेवा खाता",
+    "confirmDeleteMsg": "क्या आप वाकई {identifier} को हटाना चाहते हैं?",
+    "confirmDeleteHead": "सेवा खाता हटाएँ",
+    "confirmDeleteBtn": "खाता हटाएँ",
+    "confirmRefreshMsg": "क्या आप वाकई {identifier} के लिए टोकन रोटेट करना चाहते हैं?",
+    "confirmRefreshHead": "सेवा टोकन रोटेट करें",
+    "confirmRefreshBtn": "टोकन रोटेट करें",
+    "confirmBulkDeleteHead": "सेवा खाते हटाएँ",
+    "confirmBulkDeleteMsg": "क्या आप वाकई {count} सेवा खाता(खातों) को हटाना चाहते हैं?",
+    "confirmBulkDeleteBtn": "{count} खाते हटाएँ",
+    "downloadToken": "टोकन डाउनलोड करें",
+    "token": "टोकन",
+    "tokenDialogTitle": "सेवा खाता टोकन",
+    "tokenReveal": {
+      "curl": "cURL",
+      "header": "हेडर",
+      "env": "एनवायरनमेंट वेरिएबल",
+      "nextStep": "अपने API अनुरोधों में इस टोकन का उपयोग करें। इसे सुरक्षित रूप से संग्रहीत करें; यह दोबारा नहीं दिखाया जाएगा।",
+      "nextStepCloud": "अपने API अनुरोधों में इस टोकन का उपयोग करें। API एंडपॉइंट के लिए अपने व्यवस्थापक से संपर्क करें।",
+      "nextStepGrant": "इस सेवा खाते के पास अभी तक कोई अनुमति नहीं है। एक्सेस देने के लिए इसे कोई भूमिका असाइन करें, या इसे किसी उपयोगकर्ता समूह में जोड़ें।",
+      "nextStepOss": "भूमिकाएँ और समूह पृष्ठ से एक्सेस प्रदान करें।",
+      "addToGroup": "उपयोगकर्ता समूह में जोड़ें",
+      "addToRole": "एक भूमिका असाइन करें",
+      "step1Title": "अपना टोकन कॉपी करें",
+      "step2Title": "अनुमतियाँ प्रदान करें",
+      "copyHint": "इस टोकन को अभी कॉपी करें — आप इसे दोबारा नहीं देख पाएँगे।",
+      "next": "अगला: अनुमतियाँ प्रदान करें",
+      "back": "वापस",
+      "done": "पूर्ण"
+    },
+    "form": {
+      "identifier": {
+        "label": "पहचानकर्ता",
+        "placeholder": "ईमेल पता दर्ज करें",
+        "help": "सेवा खाता पहचानकर्ता के रूप में उपयोग किया जाने वाला ईमेल पता"
+      }
+    },
+    "list": {
+      "col": {
+        "identifier": "पहचानकर्ता",
+        "description": "विवरण",
+        "token": "टोकन",
+        "created": "बनाया गया"
+      }
+    },
+    "empty": {
+      "title": "अभी तक कोई सेवा खाता नहीं",
+      "description": "प्रोग्रामेटिक एक्सेस के लिए API टोकन जनरेट करने हेतु एक सेवा खाता बनाएँ।",
+      "cta": "सेवा खाता जोड़ें"
+    },
+    "row": {
+      "managedBy": "सिस्टम द्वारा प्रबंधित",
+      "managedByTooltip": "यह एक सिस्टम-प्रबंधित सेवा खाता है और इसे संशोधित नहीं किया जा सकता",
+      "checkboxTooltip": "सिस्टम-प्रबंधित खाते बल्क ऑपरेशन से बाहर रखे गए हैं"
+    },
+    "bulkDelete": "हटाएँ",
+    "bulkDeleteNotice": "सिस्टम-प्रबंधित खाते बल्क ऑपरेशन से बाहर रखे गए हैं"
   },
   "iam": {
     "users": "Users",
@@ -3096,7 +3166,58 @@
     "quotaDesc": "प्रति भूमिका लागू उपयोग सीमाएँ",
     "organizationsDesc": "वे संगठन जिन तक आप पहुँच सकते हैं",
     "nameHelpText": "केवल अल्फ़ान्यूमेरिक और '_' वर्णों का उपयोग करें, बिना स्पेस के।",
-    "ingestionTokens": "इन्जेशन टोकन"
+    "ingestionTokens": "इन्जेशन टोकन",
+    "editGroup": {
+      "unsavedDot": {
+        "title": "इस टैब में सहेजे न गए परिवर्तन हैं।"
+      },
+      "leaveConfirm": {
+        "title": "सहेजे न गए परिवर्तन छोड़ें?",
+        "message": "आपके पास सहेजे न गए भूमिका या सदस्य परिवर्तन हैं। इस पृष्ठ को छोड़ने पर वे रद्द हो जाएँगे।"
+      }
+    },
+    "editRole": {
+      "unsavedDot": {
+        "title": "इस टैब में सहेजे न गए परिवर्तन हैं।"
+      },
+      "leaveConfirm": {
+        "title": "सहेजे न गए परिवर्तन छोड़ें?",
+        "message": "आपके पास सहेजे न गए अनुमति या सदस्य परिवर्तन हैं। इस पृष्ठ को छोड़ने पर वे रद्द हो जाएँगे।"
+      }
+    },
+    "groupsPage": {
+      "subtitle": "उपयोगकर्ता समूह भूमिकाओं को एक साथ बाँधते हैं — किसी समूह में सदस्य जोड़ें ताकि उन्हें एक ही बार में उसकी सभी भूमिकाएँ मिल जाएँ।",
+      "delete": {
+        "impact": "{count} सदस्य इस समूह द्वारा प्रदान की गई भूमिकाएँ खो देंगे।"
+      },
+      "bulkDelete": {
+        "impact": "इन समूहों के सदस्य इनके द्वारा प्रदान की गई भूमिकाएँ खो देंगे।"
+      }
+    },
+    "rolesPage": {
+      "subtitle": "भूमिकाएँ अनुमतियों को एक साथ बाँधती हैं — एक्सेस देने के लिए इन्हें उपयोगकर्ताओं, सेवा खातों या समूहों को असाइन करें।",
+      "delete": {
+        "impact": "{count} उपयोगकर्ता और इस भूमिका से बंधे कोई भी सेवा खाते एक्सेस खो देंगे।"
+      },
+      "bulkDelete": {
+        "impact": "इन भूमिकाओं से बंधे कोई भी उपयोगकर्ता और सेवा खाते एक्सेस खो देंगे।"
+      }
+    },
+    "group": {
+      "name": {
+        "invalidChars": "केवल अक्षर, संख्याएँ और अंडरस्कोर का उपयोग करें, बिना रिक्त स्थान के।"
+      }
+    },
+    "role": {
+      "name": {
+        "invalidChars": "केवल अक्षर, संख्याएँ और अंडरस्कोर का उपयोग करें, बिना रिक्त स्थान के।"
+      },
+      "startFrom": {
+        "label": "यहाँ से आरंभ करें",
+        "custom": "कस्टम (खाली भूमिका)",
+        "readonly": "केवल-पढ़ने योग्य (सभी संसाधनों तक देखने की पहुँच)"
+      }
+    }
   },
   "pipeline": {
     "header": "Pipelines",

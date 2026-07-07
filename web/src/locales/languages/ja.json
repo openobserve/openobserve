@@ -2058,6 +2058,7 @@
     "defaultTokenBadge": "デフォルト",
     "createTokenBtn": "新しいトークンを作成",
     "createTokenTitle": "トークンを作成",
+    "searchToken": "トークンを検索",
     "tokenNameLabel": "[名前]",
     "tokenDescriptionLabel": "[説明]",
     "rotateTokenBtn": "回転",
