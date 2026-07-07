@@ -1564,16 +1564,25 @@ const responseChartOption = computed(() => {
   const axisColor = cssVar("--o2-text-caption", "#6c707e");
   const splitColor = cssVar("--o2-border-color", "#e2e8f0");
   const p95Color = cssVar("--o2-status-warning-text", "#f59e0b");
-  const rB = seedRand(31);
-  const buckets = 24;
-  const now = Date.now();
-  const seriesData: [number, number][] = [];
-  for (let i = 0; i < buckets; i++) {
-    seriesData.push([
-      now - (buckets - i) * 3600000,
-      1900 + Math.sin(i / 4) * 300 + (rB() - 0.5) * 500,
-    ]);
+
+  // Use real histogram data when available, fall back to seeded mock
+  let seriesData: [number, number][];
+  if (synthetics.hasLoadedOnce.value && synthetics.buckets.value.length > 0) {
+    // p95 per bucket
+    seriesData = synthetics.buckets.value.map((b) => [b.tsMs, b.p95Ms] as [number, number]);
+  } else {
+    const rB = seedRand(31);
+    const bucketCount = 24;
+    const now = Date.now();
+    seriesData = [];
+    for (let i = 0; i < bucketCount; i++) {
+      seriesData.push([
+        now - (bucketCount - i) * 3600000,
+        1900 + Math.sin(i / 4) * 300 + (rB() - 0.5) * 500,
+      ]);
+    }
   }
+
   return {
     grid: { left: 52, right: 52, top: 16, bottom: 28 },
     tooltip: {
@@ -1624,18 +1633,30 @@ const errorChartOption = computed(() => {
   const axisColor = cssVar("--o2-text-caption", "#6c707e");
   const splitColor = cssVar("--o2-border-color", "#e2e8f0");
   const errorColor = cssVar("--o2-status-error-text", "#dc2626");
-  const rB = seedRand(31);
-  const buckets = 24;
-  const now = Date.now();
-  const categories: string[] = [];
-  const data: number[] = [];
-  for (let i = 0; i < buckets; i++) {
-    const date = new Date(now - (buckets - i) * 3600000);
-    categories.push(
-      date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-    );
-    data.push(Math.max(0, Math.round(rB() < 0.25 ? 1 + rB() * 2 : 0)));
+
+  let categories: string[];
+  let data: number[];
+  if (synthetics.hasLoadedOnce.value && synthetics.buckets.value.length > 0) {
+    categories = synthetics.buckets.value.map((b) => {
+      const d = new Date(b.tsMs);
+      return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    });
+    data = synthetics.buckets.value.map((b) => b.failedRuns);
+  } else {
+    const rB = seedRand(31);
+    const bucketCount = 24;
+    const now = Date.now();
+    categories = [];
+    data = [];
+    for (let i = 0; i < bucketCount; i++) {
+      const date = new Date(now - (bucketCount - i) * 3600000);
+      categories.push(
+        date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+      );
+      data.push(Math.max(0, Math.round(rB() < 0.25 ? 1 + rB() * 2 : 0)));
+    }
   }
+
   return {
     grid: { left: 44, right: 16, top: 16, bottom: 28 },
     tooltip: {
