@@ -19,6 +19,7 @@ import OrgStorageEditor from "./OrgStorageEditor.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
+import { makeOrgStorageEditorSchema } from "./OrgStorageEditor.schema";
 
 const { mockCreate, mockUpdate, mockGet, mockToast } = vi.hoisted(() => ({
   mockCreate: vi.fn(),
@@ -226,6 +227,95 @@ describe("OrgStorageEditor", () => {
           external_id: "ext-123",
         },
       });
+    });
+  });
+
+  describe("Azure provider validation (real OForm)", () => {
+    it("blocks submit and does NOT call create when Azure required fields are empty", async () => {
+      const wrapper = createWrapper("add");
+      await selectProvider(wrapper, "AzureCredentials");
+
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(getForm(wrapper).state.isValid).toBe(false);
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it("creates the Azure config with the correct payload when valid", async () => {
+      const wrapper = createWrapper("add");
+      await selectProvider(wrapper, "AzureCredentials");
+
+      const form = getForm(wrapper);
+      form.setFieldValue("storage_account", "myaccount");
+      form.setFieldValue("bucket_name", "az-bucket");
+      form.setFieldValue("secret_key", "az-secret");
+      await nextTick();
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(mockCreate).toHaveBeenCalledWith("test-org-123", {
+        provider: "AzureCredentials",
+        data: {
+          bucket_name: "az-bucket",
+          server_url: "",
+          storage_account: "myaccount",
+          secret_key: "az-secret",
+        },
+      });
+    });
+  });
+
+  describe("Provider switch reset (④c dependent-field side-effect)", () => {
+    it("clears the previous provider's credentials when the provider changes", async () => {
+      const wrapper = createWrapper("add");
+      await selectProvider(wrapper, "AwsCredentials");
+
+      const form = getForm(wrapper);
+      form.setFieldValue("bucket_name", "aws-bucket");
+      form.setFieldValue("access_key", "AKIA-should-clear");
+      form.setFieldValue("secret_key", "secret-should-clear");
+      await nextTick();
+      // sanity: the credentials are set before the provider switch
+      expect(form.state.values.access_key).toBe("AKIA-should-clear");
+
+      // Switching the provider fires the create-mode watch → form.reset(blank),
+      // wiping the previous provider's credentials (the rulebook's ④c side-effect).
+      await selectProvider(wrapper, "AwsRoleArn");
+      await flushPromises();
+
+      const values = getForm(wrapper).state.values;
+      expect(values.selectedProvider).toBe("AwsRoleArn");
+      expect(values.access_key).toBe("");
+      expect(values.secret_key).toBe("");
+      expect(values.bucket_name).toBe("");
+    });
+  });
+
+  describe("GCP provider validation (schema-level — card not in the grid)", () => {
+    // GCP is intentionally not offered as a provider card (providerDefinitions
+    // comments it out), so it can't be exercised through the UI — but the
+    // superRefine branch still exists, so it is covered directly here.
+    const schema = makeOrgStorageEditorSchema((k: string) => k);
+
+    it("requires bucket_name and access_key for GcpCredentials", () => {
+      const res = schema.safeParse({ selectedProvider: "GcpCredentials" });
+      expect(res.success).toBe(false);
+      const paths = res.success
+        ? []
+        : res.error.issues.map((iss: any) => iss.path.join("."));
+      expect(paths).toContain("bucket_name");
+      expect(paths).toContain("access_key");
+    });
+
+    it("passes for GcpCredentials when bucket_name and access_key are present", () => {
+      const res = schema.safeParse({
+        selectedProvider: "GcpCredentials",
+        bucket_name: "gcp-bucket",
+        access_key: "gcp-key",
+      });
+      expect(res.success).toBe(true);
     });
   });
 

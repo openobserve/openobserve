@@ -408,6 +408,46 @@ describe("ModelPricingEditor.vue", () => {
     });
   });
 
+  describe("Schema validation: price-row key", () => {
+    const schema = makeModelPricingSchema(i18n.global.t as any);
+    // Isolate the committed price-row key rule (path tiers[i].prices[j].key).
+    const keyIssue = (key: string) => {
+      const res = schema.safeParse({
+        name: "X",
+        match_pattern: "gpt",
+        tiers: [
+          { name: "Default", condition: null, prices: [{ key, value: 1 }] },
+        ],
+      });
+      return res.success
+        ? ""
+        : res.error.issues.find(
+            (iss: any) =>
+              iss.path[0] === "tiers" &&
+              iss.path[2] === "prices" &&
+              iss.path[4] === "key",
+          )?.message ?? "";
+    };
+
+    it("rejects a pure-integer price key", () => {
+      expect(keyIssue("123")).toBe("Usage key cannot be a pure integer");
+    });
+
+    it("rejects a price key that contains spaces", () => {
+      expect(keyIssue("input tokens")).toBe(
+        "Usage key must not contain spaces",
+      );
+    });
+
+    it("accepts a valid alphanumeric price key", () => {
+      expect(keyIssue("input")).toBe("");
+    });
+
+    it("ignores an empty price key (blank/draft row)", () => {
+      expect(keyIssue("")).toBe("");
+    });
+  });
+
   describe("Schema validation (real OForm)", () => {
     it("blocks submit and calls neither create nor update when name/pattern are empty", async () => {
       const wrapper = createWrapper();
@@ -778,6 +818,47 @@ describe("ModelPricingEditor.vue", () => {
       await flushPromises();
       const payload = mockService.create.mock.calls[0][1];
       expect(payload.tiers[0].prices.input).toBeCloseTo(0.001);
+    });
+
+    it("sends the exact API tier shape (keys + types) and leaks no draft/helper fields", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      // A tier with a committed row AND a draft row: the draft must be committed
+      // into `prices`, and the form-only draftKey/draftValue must NOT leak into
+      // the payload (the {...value} regression ④b guards against).
+      fillValid(wrapper, [
+        tier({
+          prices: [row("input", 1000)],
+          draftKey: "output",
+          draftValue: 2000,
+        }),
+      ]);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(mockService.create).toHaveBeenCalledTimes(1);
+      const payload = mockService.create.mock.calls[0][1];
+
+      // top-level scalars — exact value + correct type
+      expect(typeof payload.name).toBe("string");
+      expect(payload.name).toBe("GPT 4o");
+      expect(typeof payload.match_pattern).toBe("string");
+      expect(payload.match_pattern).toBe("gpt-4o");
+      expect(Array.isArray(payload.tiers)).toBe(true);
+
+      // EXACT tier shape — only {condition, name, prices}; NO draftKey/draftValue leak
+      const t0 = payload.tiers[0];
+      expect(Object.keys(t0).sort()).toEqual(["condition", "name", "prices"]);
+      expect(t0.condition).toBeNull(); // default (first) tier
+      expect(typeof t0.name).toBe("string");
+
+      // prices is a per-token MAP of numbers (committed row + committed draft)
+      expect(Object.keys(t0.prices).sort()).toEqual(["input", "output"]);
+      expect(typeof t0.prices.input).toBe("number");
+      expect(typeof t0.prices.output).toBe("number");
+      expect(t0.prices.input).toBeCloseTo(0.001); // 1000 per-million → per-token
+      expect(t0.prices.output).toBeCloseTo(0.002); // 2000 per-million → per-token
     });
 
     it("calls update when the model has an id", async () => {
