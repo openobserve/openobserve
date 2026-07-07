@@ -1006,22 +1006,22 @@ export const convertPromQLData = async (
                 _metricText: metricText,
                 renderItem: function (params: any) {
                   const backgroundColor =
-                    panelSchema.config?.background?.value?.color;
-                  const isDarkTheme = store.state.theme === "dark";
+                    panelSchema?.config?.background?.value?.color;
+                  const isDarkTheme = store?.state?.theme === "dark";
                   return {
                     type: "text",
                     style: {
                       text: metricText,
                       fontSize: calculateMetricFontSize(
                         metricText,
-                        params.coordSys.cx * 2,
-                        params.coordSys.cy * 2,
+                        params?.coordSys?.cx * 2,
+                        params?.coordSys?.cy * 2,
                       ), //coordSys is relative. so that we can use it to calculate the dynamic size
                       fontWeight: 500,
                       align: "center",
                       verticalAlign: "middle",
-                      x: params.coordSys.cx,
-                      y: params.coordSys.cy,
+                      x: params?.coordSys?.cx,
+                      y: params?.coordSys?.cy,
                       fill: getContrastColor(backgroundColor, isDarkTheme),
                     },
                   };
@@ -1032,8 +1032,8 @@ export const convertPromQLData = async (
             // Rect for the per-value copy icon overlay (single metric fills the area).
             const panelEl = chartPanelRef?.value;
             if (panelEl) {
-              const w = panelEl.offsetWidth;
-              const h = panelEl.offsetHeight;
+              const w = panelEl?.offsetWidth;
+              const h = panelEl?.offsetHeight;
               series[0]._metricLayout = {
                 left: 0,
                 top: 0,

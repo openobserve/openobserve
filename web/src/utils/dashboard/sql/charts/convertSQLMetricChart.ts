@@ -46,10 +46,14 @@ export const calculateMetricFontSize = (
     height,
   );
   const heightCap = Math.max(1, Math.floor(height / 1.2));
+  const floorCap = Math.min(METRIC_MIN_FONT_PX, heightCap);
+  // common case: the fit already clears the readability floor, so the
+  // full-width fit (a second measurement binary search) is not needed
+  if (fit >= floorCap) return fit;
   // the floor may ignore the button slots (the button wraps instead), but it
   // must never exceed what the full cell width fits — that would clip digits
   const fullWidthFit = calculateOptimalFontSize(text, width, height);
-  return Math.max(fit, Math.min(METRIC_MIN_FONT_PX, heightCap, fullWidthFit));
+  return Math.max(fit, Math.min(floorCap, fullWidthFit));
 };
 
 /**
@@ -68,16 +72,17 @@ export function applyMetricChart(ctx: SQLContext): void {
     chartPanelRef,
   } = ctx;
 
-  const key1 = yAxisKeys[0];
+  const key1 = yAxisKeys?.[0];
   const yAxisValue = getAxisDataFromKey(key1);
   const unitValue = getUnitValue(
-    yAxisValue.length > 0 ? yAxisValue[0] : 0,
-    panelSchema.config?.unit,
-    panelSchema.config?.unit_custom,
-    panelSchema.config?.decimals,
+    yAxisValue?.length > 0 ? yAxisValue[0] : 0,
+    panelSchema?.config?.unit,
+    panelSchema?.config?.unit_custom,
+    panelSchema?.config?.decimals,
   );
   const metricText = formatUnitValue(unitValue);
-  options.backgroundColor = panelSchema.config?.background?.value?.color ?? "";
+  options.backgroundColor =
+    panelSchema?.config?.background?.value?.color ?? "";
   options.dataset = { source: [[]] };
   options.tooltip = {
     show: false,
@@ -92,11 +97,11 @@ export function applyMetricChart(ctx: SQLContext): void {
   options.xAxis = [];
   options.yAxis = [];
   const metricFillColor = getContrastColor(
-    panelSchema.config?.background?.value?.color,
-    store.state.theme === "dark",
+    panelSchema?.config?.background?.value?.color,
+    store?.state?.theme === "dark",
   );
   const metricFieldLabel =
-    panelSchema.queries[0]?.fields?.y?.[0]?.label || key1;
+    panelSchema?.queries?.[0]?.fields?.y?.[0]?.label || key1;
   options.series = [
     {
       ...defaultSeriesProps,
@@ -105,8 +110,9 @@ export function applyMetricChart(ctx: SQLContext): void {
       _metricLabel: metricFieldLabel,
       renderItem: function (params: any) {
         try {
-          const backgroundColor = panelSchema.config?.background?.value?.color;
-          const isDarkTheme = store.state.theme === "dark";
+          const backgroundColor =
+            panelSchema?.config?.background?.value?.color;
+          const isDarkTheme = store?.state?.theme === "dark";
           return {
             type: "text",
             style: {

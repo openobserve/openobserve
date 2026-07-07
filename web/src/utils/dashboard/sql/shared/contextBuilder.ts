@@ -17,6 +17,7 @@ import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import {
   calculateWidthText,
   calculateDynamicNameGap,
+  calculateNiceTickValues,
   calculateRotatedLabelBottomSpace,
 } from "../../chartDimensionUtils";
 import {
@@ -292,35 +293,83 @@ export function buildSQLContext(
 
   const [min, max] = getSQLMinMaxValue(yAxisKeys, missingValueData);
 
-  // Y-axis tick labels use the configured decimal precision, but when the
-  // visible range is smaller than that precision neighbouring ticks render
-  // identically (e.g. a 0–0.012 range with 2 decimals shows
-  // "0.00, 0.01, 0.01, 0.01"). Extend the precision just enough to keep the
-  // tick labels distinct.
-  const getYAxisTickDecimals = (): number => {
-    const configured = panelSchema.config?.decimals ?? 2;
-    try {
-      const convert = (v: number) =>
+  // Compute the ticks the y-axis will render (calculateNiceTickValues
+  // mirrors ECharts' nice-interval algorithm): formatting and measuring
+  // these exact values keeps the axis name clear of the labels ("995.56GB"
+  // is a smaller value than "1.34TB" but a wider label) and lets us extend
+  // the decimal precision when neighbouring ticks would otherwise format
+  // identically (a 0–0.012 range with 2 decimals shows "0.00, 0.01, 0.01").
+  // min/max are already computed for the color palette, so only stacked
+  // charts need an extra dataset pass for their stack-sum extent.
+  const getYAxisTickInfo = (): {
+    decimals: number;
+    widestLabelWidth: number;
+  } => {
+    const configured = panelSchema?.config?.decimals ?? 2;
+    const format = (v: number, decimals: number) =>
+      formatUnitValue(
         getUnitValue(
           v,
-          panelSchema.config?.unit,
-          panelSchema.config?.unit_custom,
-          8,
-        );
-      const lo = convert(min);
-      const hi = convert(max);
-      // different unit tiers (e.g. KB vs MB) — range analysis doesn't apply
-      if (lo.unit !== hi.unit) return configured;
-      // ECharts splits a value axis into ~5 intervals by default
-      const interval = Math.abs(parseFloat(hi.value) - parseFloat(lo.value)) / 5;
-      if (!Number.isFinite(interval) || interval <= 0) return configured;
-      const needed = Math.ceil(-Math.log10(interval));
-      return Math.min(Math.max(configured, needed), 8);
+          panelSchema?.config?.unit,
+          panelSchema?.config?.unit_custom,
+          decimals,
+        ),
+      );
+    try {
+      const usesStackExtent =
+        (panelSchema?.type === "stacked" ||
+          panelSchema?.type === "area-stacked") &&
+        (breakDownKeys?.length ?? 0) > 0;
+      const hi = usesStackExtent
+        ? Number(getLargestLabel()) || 0
+        : Number.isFinite(max)
+          ? max
+          : 0;
+      const lo = Number.isFinite(min) ? Math.min(min, hi) : 0;
+
+      const ticks = calculateNiceTickValues(lo, hi);
+      if (!ticks?.length) throw new Error("no ticks");
+
+      let decimals = configured;
+      if (ticks.length > 1) {
+        const toDisplay = (v: number) => {
+          const u = getUnitValue(
+            v,
+            panelSchema?.config?.unit,
+            panelSchema?.config?.unit_custom,
+            8,
+          );
+          return { n: parseFloat(u?.value), unit: u?.unit };
+        };
+        const a = toDisplay(ticks[ticks.length - 2]);
+        const b = toDisplay(ticks[ticks.length - 1]);
+        // different unit tiers (e.g. KB vs MB) — precision analysis n/a
+        if (a?.unit === b?.unit) {
+          const interval = Math.abs(b.n - a.n);
+          if (Number.isFinite(interval) && interval > 0) {
+            decimals = Math.min(
+              Math.max(configured, Math.ceil(-Math.log10(interval))),
+              8,
+            );
+          }
+        }
+      }
+
+      const widestLabelWidth = Math.max(
+        ...ticks.map((v: number) => calculateWidthText(format(v, decimals))),
+      );
+      return { decimals, widestLabelWidth };
     } catch {
-      return configured;
+      return {
+        decimals: configured,
+        widestLabelWidth: calculateWidthText(
+          format(Number.isFinite(max) ? max : 0, configured),
+        ),
+      };
     }
   };
-  const yAxisTickDecimals = getYAxisTickDecimals();
+  const { decimals: yAxisTickDecimals, widestLabelWidth: widestYAxisTickLabel } =
+    getYAxisTickInfo();
 
   const getFinalAxisValue = (
     configValue: number | null | undefined,
@@ -337,9 +386,18 @@ export function buildSQLContext(
 
   const hasXAxisName = panelSchema.queries[0]?.fields?.x[0]?.label;
 
+  // On panels too narrow to fit the rotated name + tick labels + a usable
+  // plot, ECharts squeezes the name onto the labels no matter the nameGap —
+  // drop the name instead (the ~110px covers the name column, the right
+  // margin and a minimum plot width).
+  const panelWidthPx = chartPanelRef?.value?.offsetWidth ?? 0;
+  const yAxisNameFits =
+    !panelWidthPx || panelWidthPx >= widestYAxisTickLabel + 110;
+
   const hasYAxisName =
-    panelSchema.queries[0]?.fields?.y?.length == 1 &&
-    panelSchema.queries[0]?.fields?.y[0]?.label;
+    yAxisNameFits &&
+    panelSchema?.queries?.[0]?.fields?.y?.length == 1 &&
+    panelSchema?.queries?.[0]?.fields?.y?.[0]?.label;
 
   // Check if x-axis will be time-based by looking for timestamp fields
   const hasTimestampField = panelSchema.queries[0].fields?.x?.some(
@@ -689,26 +747,20 @@ export function buildSQLContext(
     }),
     yAxis: {
       type: "value",
-      name:
-        panelSchema.queries[0]?.fields?.y?.length == 1
-          ? panelSchema.queries[0]?.fields?.y[0]?.label
-          : "",
+      name: hasYAxisName || "",
       nameLocation: "middle",
       min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
+      // nameGap positions the name's CENTERLINE from the axis, so it must
+      // clear the label column (widest label + ECharts' 8px label margin)
+      // plus half the rotated name's own line height (14px font) and a small
+      // buffer — "+8" alone leaves the name's near edge ~7px inside the labels
       nameGap:
-        calculateWidthText(
-          panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"
-            ? largestLabel(getAxisDataFromKey(yAxisKeys[0]))
-            : formatUnitValue(
-                getUnitValue(
-                  getLargestLabel(),
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals,
-                ),
-              ),
-        ) + 8,
+        (panelSchema?.type == "h-bar" || panelSchema?.type == "h-stacked"
+          ? calculateWidthText(
+              largestLabel(getAxisDataFromKey(yAxisKeys?.[0])),
+            )
+          : widestYAxisTickLabel) + 18,
       nameTextStyle: {
         fontWeight: "bold",
         fontSize: 14,
@@ -726,8 +778,8 @@ export function buildSQLContext(
             return formatUnitValue(
               getUnitValue(
                 value,
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
+                panelSchema?.config?.unit,
+                panelSchema?.config?.unit_custom,
                 yAxisTickDecimals,
               ),
             );

@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="chartRendererRef"
           :data="chartRendererData"
           :height="chartPanelHeight"
-          :render-type="panelSchema.type === 'metric' ? 'svg' : 'canvas'"
+          :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
           @updated:data-zoom="onDataZoom"
           @error="errorDetail = $event"
           @click="onChartClick"
@@ -605,14 +605,14 @@ export default defineComponent({
           return Number.isNaN(num) || num !== 0;
         })
         .map((m: any) => ({ ...m, iconStyle: metricIconStyle(m) }))
-        .filter((m: any) => m.iconStyle !== null);
+        .filter((m: any) => m?.iconStyle !== null);
     });
     // Hover zone = each value's grid cell.
     const metricZoneStyle = (m: any) => ({
-      left: `${m.layout.left}px`,
-      top: `${m.layout.top}px`,
-      width: `${m.layout.width}px`,
-      height: `${m.layout.height}px`,
+      left: `${m?.layout?.left ?? 0}px`,
+      top: `${m?.layout?.top ?? 0}px`,
+      width: `${m?.layout?.width ?? 0}px`,
+      height: `${m?.layout?.height ?? 0}px`,
     });
     // Fixed copy-button size (icon-xs-sq), matching the table chart.
     const COPY_BTN_PX = 28;
@@ -626,21 +626,25 @@ export default defineComponent({
     // copy affordance is always available.
     // Measuring (vs estimating) keeps the icon snug for any value.
     const metricIconStyle = (m: any) => {
-      const fs = m.layout?.fontSize || 24;
-      const cxLocal = m.layout.cx - m.layout.left;
-      const cyLocal = m.layout.cy - m.layout.top;
-      const textWidth = calculateWidthText(String(m.text), `${fs}px`);
+      const layout = m?.layout;
+      if (!layout) return null;
+      const fs = layout?.fontSize || 24;
+      const width = layout?.width ?? 0;
+      const height = layout?.height ?? 0;
+      const cxLocal = (layout?.cx ?? 0) - (layout?.left ?? 0);
+      const cyLocal = (layout?.cy ?? 0) - (layout?.top ?? 0);
+      const textWidth = calculateWidthText(String(m?.text ?? ""), `${fs}px`);
 
       const besideLeft = cxLocal + textWidth / 2 + 2;
       if (
-        besideLeft + COPY_BTN_PX + 2 <= m.layout.width &&
-        m.layout.height >= COPY_BTN_PX
+        besideLeft + COPY_BTN_PX + 2 <= width &&
+        height >= COPY_BTN_PX
       ) {
         return {
           left: `${besideLeft}px`,
           top: `${Math.min(
             Math.max(cyLocal, COPY_BTN_PX / 2),
-            m.layout.height - COPY_BTN_PX / 2,
+            height - COPY_BTN_PX / 2,
           )}px`,
           transform: "translateY(-50%)",
         };
@@ -648,13 +652,13 @@ export default defineComponent({
 
       const centeredLeft = Math.max(
         0,
-        Math.min(cxLocal - COPY_BTN_PX / 2, m.layout.width - COPY_BTN_PX),
+        Math.min(cxLocal - COPY_BTN_PX / 2, width - COPY_BTN_PX),
       );
       // rendered line is ~1.2em tall around the vertical center
       const halfTextHeight = (fs * 1.2) / 2;
       const belowTop =
-        cyLocal + halfTextHeight + (m.layout.labelClearance ?? 0) + 2;
-      if (belowTop + COPY_BTN_PX <= m.layout.height) {
+        cyLocal + halfTextHeight + (layout?.labelClearance ?? 0) + 2;
+      if (belowTop + COPY_BTN_PX <= height) {
         return { left: `${centeredLeft}px`, top: `${belowTop}px` };
       }
       const aboveTop = cyLocal - halfTextHeight - 2 - COPY_BTN_PX;
@@ -665,20 +669,20 @@ export default defineComponent({
       // cell too small for any clean spot — dock at the right edge with a
       // solid background so the icon stays legible over the value's edge
       return {
-        left: `${Math.max(0, m.layout.width - COPY_BTN_PX - 2)}px`,
+        left: `${Math.max(0, width - COPY_BTN_PX - 2)}px`,
         top: `${Math.max(cyLocal, COPY_BTN_PX / 2)}px`,
         transform: "translateY(-50%)",
         backgroundColor:
-          store.state.theme === "dark" ? "#27272a" : "#ffffff",
+          store?.state?.theme === "dark" ? "#27272a" : "#ffffff",
         boxShadow: "0 0 3px rgba(0, 0, 0, 0.35)",
       };
     };
     const hoveredMetricIdx = ref<number | null>(null);
     const metricCopiedIdx = ref<number | null>(null);
     const copyMetricItem = (m: any) => {
-      if (m.text == null) return;
+      if (m?.text == null) return;
       copyToClipboard(String(m.text), { silent: true }).then(() => {
-        metricCopiedIdx.value = m.idx;
+        metricCopiedIdx.value = m?.idx;
         setTimeout(() => {
           if (metricCopiedIdx.value === m.idx) metricCopiedIdx.value = null;
         }, 3000);

@@ -165,6 +165,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { copyToClipboard } from "@/utils/clipboard";
+import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 
 
 describe("PanelSchemaRenderer", () => {
@@ -2383,9 +2384,9 @@ describe("PanelSchemaRenderer", () => {
     it("positions the icon beside the number, clamped inside the cell", async () => {
       wrapper = await mountMetric();
       const style = wrapper.vm.metricIconStyle(wrapper.vm.metricItems[0]);
-      // jsdom has no layout so calculateWidthText returns 0:
-      // left = (cx 100 - left 0) + 0/2 + 2 = 102; maxLeft = 200 - 28 - 2 = 170.
-      expect(style.left).toBe("102px");
+      // left = cx (100) + measured text width / 2 + 2px gap, inside the cell
+      const textWidth = calculateWidthText("1.50KB", "24px");
+      expect(style.left).toBe(`${100 + textWidth / 2 + 2}px`);
       expect(style.top).toBe("50px");
       expect(style.transform).toBe("translateY(-50%)");
     });

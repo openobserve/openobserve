@@ -47,22 +47,22 @@ let htmlPanelSeq = 0;
 const DOCUMENT_SELECTOR = /^(html|body|:root)(?![\w-])/i;
 
 const prefixSelectors = (rules: CSSRuleList, prefix: string): void => {
-  for (const rule of Array.from(rules) as any[]) {
-    if (rule.type === CSSRule.STYLE_RULE) {
+  for (const rule of Array.from(rules ?? []) as any[]) {
+    if (rule?.type === CSSRule.STYLE_RULE && rule?.selectorText) {
       rule.selectorText = rule.selectorText
         .split(",")
         .map((sel: string) => {
-          const trimmed = sel.trim();
+          const trimmed = sel?.trim() ?? "";
           return DOCUMENT_SELECTOR.test(trimmed)
             ? trimmed.replace(DOCUMENT_SELECTOR, prefix)
             : `${prefix} ${trimmed}`;
         })
         .join(", ");
     } else if (
-      rule.type === CSSRule.MEDIA_RULE ||
-      rule.type === CSSRule.SUPPORTS_RULE
+      rule?.type === CSSRule.MEDIA_RULE ||
+      rule?.type === CSSRule.SUPPORTS_RULE
     ) {
-      prefixSelectors(rule.cssRules, prefix);
+      prefixSelectors(rule?.cssRules, prefix);
     }
     // @keyframes and @font-face have no element selectors — leave as-is
   }
@@ -75,8 +75,8 @@ const scopeCss = (cssText: string, prefix: string): string => {
     const sheet = new CSSStyleSheet();
     sheet.replaceSync(cssText);
     prefixSelectors(sheet.cssRules, prefix);
-    return Array.from(sheet.cssRules)
-      .map((rule) => rule.cssText)
+    return Array.from(sheet.cssRules ?? [])
+      .map((rule) => rule?.cssText ?? "")
       .join("\n");
   } catch {
     // constructable stylesheets unavailable — fall back to @scope so the
