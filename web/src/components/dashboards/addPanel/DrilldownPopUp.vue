@@ -106,9 +106,10 @@
     </div>
     <div v-if="drilldownData.type == 'byUrl'">
       <div style="margin-top: 10px; display: flex; flex-direction: column">
-        <label class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.enterUrl") }}</label>
         <OFormTextarea
           name="data.url"
+          :label="t('dashboard.enterUrl')"
+          required
           data-test="dashboard-drilldown-url-textarea"
         />
       </div>
@@ -121,6 +122,7 @@
             name="data.folder"
             :options="folderList"
             :label="t('dashboard.selectFolderDrilldown')"
+            required
             class="w-full"
             :disabled="getFoldersListLoading.isLoading.value"
             data-test="dashboard-drilldown-folder-select"
@@ -131,6 +133,7 @@
             name="data.dashboard"
             :options="dashboardList"
             :label="t('dashboard.selectDashboardDrilldown')"
+            required
             class="w-full"
             :disabled="getDashboardListLoading.isLoading.value"
             data-test="dashboard-drilldown-dashboard-select"
@@ -141,6 +144,7 @@
             name="data.tab"
             :options="tabList"
             :label="t('dashboard.selectTabDrilldown')"
+            required
             class="w-full"
             :disabled="getTabListLoading.isLoading.value"
             data-test="dashboard-drilldown-tab-select"
