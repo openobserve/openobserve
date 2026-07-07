@@ -385,6 +385,8 @@
     "legendWidth": "Breite der Legende",
     "exceptions": "Ausnahmen",
     "nameRequired": "Name ist erforderlich",
+    "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein.",
+    "nameMaxLength": "Der Name darf aus maximal {max} Zeichen bestehen.",
     "edit": "Bearbeiten",
     "delete": "Löschen",
     "remove": "entfernen",
@@ -1322,6 +1324,14 @@
     "newPassword": "Neues Passwort",
     "organization": "Organisation",
     "otherOrganization": "Andere Organisation",
+    "roleRequired": "Rolle ist erforderlich",
+    "fieldRequired": "Feld ist erforderlich",
+    "passwordRequired": "Passwort ist erforderlich.",
+    "passwordPolicyHint": "Das Passwort muss aus 8 bis 128 Zeichen bestehen und mindestens einen Kleinbuchstaben, einen Großbuchstaben, eine Ziffer und ein Sonderzeichen enthalten.",
+    "currentPasswordRequired": "Das aktuelle Passwort ist erforderlich.",
+    "newPasswordRequired": "Ein neues Passwort ist erforderlich.",
+    "otherOrgInvalid": "Der Name der Organisation muss mit einem Buchstaben beginnen und alphanumerisch, _ oder -, sein.",
+    "inviteEmailInvalid": "Bitte geben Sie die richtige E-Mail-ID ein.",
     "isExistingUser": "Existierender Benutzer?",
     "deleteAPIKeyMessage": "Möchten Sie diesen Benutzer-API-Schlüssel wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. Klicken Sie zur Bestätigung auf Ok.",
     "apiKeyNotFound": "Benutzer-API-Schlüssel wurde nicht gefunden.",
@@ -1362,6 +1372,7 @@
   },
   "serviceAccounts": {
     "header": "Dienstkonten",
+    "emailInvalid": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
     "headerSubtitle": "Programmatische Zugriffstoken für APIs",
     "search": "Suchdienstkonto",
     "refresh": "Service-Token aktualisieren",
@@ -1404,14 +1415,14 @@
     },
     "form": {
       "identifier": {
-        "label": "Identifier",
+        "label": "Kennung",
         "placeholder": "Geben Sie die E-Mail-Adresse ein",
         "help": "E-Mail-Adresse, die als Dienstkonto-ID verwendet wird"
       }
     },
     "list": {
       "col": {
-        "identifier": "Identifier",
+        "identifier": "Kennung",
         "description": "Beschreibung",
         "token": "Wertmarke",
         "created": "Erstellt"
@@ -2047,6 +2058,7 @@
     "defaultTokenBadge": "STANDARD",
     "createTokenBtn": "Neues Token erstellen",
     "createTokenTitle": "Token erstellen",
+    "searchToken": "Token suchen",
     "tokenNameLabel": "Name",
     "tokenDescriptionLabel": "Beschreibung",
     "rotateTokenBtn": "Rotieren",

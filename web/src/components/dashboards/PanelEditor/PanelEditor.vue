@@ -101,8 +101,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="layout-panel-container flex flex-col w-full h-full"
                   :style="layoutPanelContainerStyle"
                 >
-                  <!-- Mode selection (left) + Add To Dashboard (right) row -->
+                  <!-- Mode selection + Add To Dashboard row. Skip when empty (e.g.
+                       dashboard mode) so its `my-2` margin isn't dead space. -->
                   <div
+                    v-if="pageType === 'build' || resolvedConfig.showAddToDashboardButton"
                     class="flex justify-between items-center my-2 mx-2"
                   >
                     <QueryTypeSelector
@@ -188,11 +190,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Warning icons and last refreshed time -->
                   <div
-                    class="flex justify-end mr-2 mt-1 items-center gap-2"
+                    class="flex justify-end mr-2 items-center gap-2"
                   >
-                    <!-- Show Legends button -->
+                    <!-- Show Legends button (hidden when the chart has no data) -->
                     <OButton
                       v-if="
+                        !panelSchemaRendererRef?.noData &&
                         ![
                           'table', 'heatmap', 'metric', 'gauge',
                           'geomap', 'maps',
