@@ -107,62 +107,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ========== NOT CONFIGURED: enterprise empty state ========== -->
     <div
       v-else-if="!isConfigured && !isCloud"
-      class="ent-empty flex flex-col items-center justify-center text-center py-12 px-6"
+      class="w-full"
       :style="{ minHeight: 'calc(100vh - var(--navbar-height) - 160px)' }"
-      :class="store.state.theme === 'dark' ? 'ent-empty--dark' : ''"
     >
-      <!-- double-ring icon -->
-      <div class="ent-empty__icon-outer w-[100px] h-[100px] rounded-full border border-dashed border-[rgba(66,133,244,0.25)] flex items-center justify-center mb-7" :class="store.state.theme === 'dark' ? 'border-[rgba(66,133,244,0.3)]' : ''">
-        <div class="ent-empty__icon-inner w-[68px] h-[68px] rounded-full bg-[rgba(66,133,244,0.09)] flex items-center justify-center" style="border: 1.5px solid rgba(66,133,244,0.22);" :class="store.state.theme === 'dark' ? 'ent-empty__icon-inner--dark bg-[rgba(66,133,244,0.18)] border-[rgba(66,133,244,0.35)]' : ''">
-          <OIcon name="cloud-upload" size="lg" class="ent-empty__icon text-(--q-primary) opacity-85" />
-        </div>
-      </div>
-
-      <div class="ent-empty__title font-bold text-[#111827] mb-[10px]" :class="store.state.theme === 'dark' ? 'text-[#f1f1f5]' : ''" style="font-size: 1.2rem; letter-spacing: -0.2px;">{{ t("storage_settings.noStorageConfigured") }}</div>
-
-      <div class="ent-empty__desc text-[#6b7280] leading-[1.65] max-w-[400px] mb-6" :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : ''" style="font-size: 0.88rem;">
-        {{ t("storage_settings.routeDataDesc") }}
-      </div>
-
-      <!-- key fact chips -->
-      <div class="ent-empty__chips flex items-center gap-2 flex-wrap justify-center mb-8">
-        <span class="ent-empty__chip inline-flex items-center font-medium text-[#6b7280] bg-[#f3f4f6] border border-[#e5e7eb] rounded-[20px] py-1 px-3" style="gap: 5px; font-size: 0.75rem;" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark text-[#9ca3af] bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.1)]' : ''">
-          <OIcon name="corporate-fare" size="xs" />
-          {{ t("storage_settings.perOrgIsolation") }}
-        </span>
-        <span class="ent-empty__chip inline-flex items-center font-medium text-[#6b7280] bg-[#f3f4f6] border border-[#e5e7eb] rounded-[20px] py-1 px-3" style="gap: 5px; font-size: 0.75rem;" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark text-[#9ca3af] bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.1)]' : ''">
-          <OIcon name="bolt" size="xs" />
-          {{ t("storage_settings.appliesImmediately") }}
-        </span>
-        <span class="ent-empty__chip inline-flex items-center font-medium text-[#6b7280] bg-[#f3f4f6] border border-[#e5e7eb] rounded-[20px] py-1 px-3" style="gap: 5px; font-size: 0.75rem;" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark text-[#9ca3af] bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.1)]' : ''">
-          <OIcon name="lock" size="xs" />
-          {{ t("storage_settings.usesOrgCredentials") }}
-        </span>
-      </div>
-
-      <OButton
-        data-test="storage-settings-configure-btn"
-        variant="primary"
-        class="no-border o2-primary-button ent-empty__btn h-10 font-semibold mb-9 px-6" style="font-size: 0.92rem;"
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        @click="navigateToCreate"
+      <OEmptyState
+        size="hero"
+        preset="no-storage-config"
+        data-test="org-storage-settings-empty-state"
+        @action="(id) => id === 'configure' && navigateToCreate()"
       >
-        {{ t("storage_settings.configureStorage") }}
-      </OButton>
-
-      <div class="ent-empty__providers flex items-center gap-3">
-        <span class="ent-empty__providers-label font-medium whitespace-nowrap text-[#aaa]" :class="store.state.theme === 'dark' ? 'text-[#666]' : ''" style="font-size: 0.78rem;">{{ t("storage_settings.supportedProviders") }}</span>
-        <div class="ent-empty__providers-logos flex items-center" style="gap: 10px;">
-          <div
-            v-for="p in providerDefinitions"
-            :key="p.value"
-            class="ent-empty__logo-wrap w-7 h-7 flex items-center justify-center shrink-0 cursor-default opacity-[0.65] transition-opacity duration-150"
-          >
-            <img :src="p.image" :alt="p.label" class="ent-empty__logo w-7 h-7 max-w-[28px] max-h-[28px] object-contain block" />
-            <OTooltip :content="p.label" />
+        <template #extra>
+          <!-- key fact chips -->
+          <div class="flex items-center gap-2 flex-wrap justify-center">
+            <span class="inline-flex items-center gap-1.5 font-medium text-xs text-text-secondary bg-surface-subtle border border-border-default rounded-full py-1 px-3">
+              <OIcon name="corporate-fare" size="xs" />
+              {{ t("storage_settings.perOrgIsolation") }}
+            </span>
+            <span class="inline-flex items-center gap-1.5 font-medium text-xs text-text-secondary bg-surface-subtle border border-border-default rounded-full py-1 px-3">
+              <OIcon name="bolt" size="xs" />
+              {{ t("storage_settings.appliesImmediately") }}
+            </span>
+            <span class="inline-flex items-center gap-1.5 font-medium text-xs text-text-secondary bg-surface-subtle border border-border-default rounded-full py-1 px-3">
+              <OIcon name="lock" size="xs" />
+              {{ t("storage_settings.usesOrgCredentials") }}
+            </span>
           </div>
-        </div>
-      </div>
+
+          <!-- supported providers -->
+          <div class="flex items-center gap-3">
+            <span class="font-medium whitespace-nowrap text-xs text-text-disabled">{{ t("storage_settings.supportedProviders") }}</span>
+            <div class="flex items-center gap-2.5">
+              <div
+                v-for="p in providerDefinitions"
+                :key="p.value"
+                class="w-7 h-7 flex items-center justify-center shrink-0 cursor-default opacity-65 hover:opacity-100 transition-opacity duration-150"
+              >
+                <img :src="p.image" :alt="p.label" class="w-7 h-7 max-w-7 max-h-7 object-contain block" />
+                <OTooltip :content="p.label" />
+              </div>
+            </div>
+          </div>
+        </template>
+      </OEmptyState>
     </div>
 
     <!-- ========== CONFIGURED ========== -->
@@ -277,6 +263,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OrgStorageEditor from "./OrgStorageEditor.vue";
 
 const store = useStore();
@@ -420,9 +407,5 @@ onMounted(() => {
 .feature-card:hover {
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
   transform: translateY(-1px);
-}
-
-.ent-empty__logo-wrap:hover {
-  opacity: 1;
 }
 </style>
