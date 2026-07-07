@@ -162,6 +162,8 @@ import streamService from "@/services/stream";
 import { useStore } from "vuex";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
+import { useMutation, useQueryClient } from "@tanstack/vue-query";
+import { streamKeys } from "@/composables/queries/streamKeys";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -187,6 +189,48 @@ const props = defineProps<{
 
 
 const { addStream, getStream } = useStreams();
+const queryClient = useQueryClient();
+
+// Create a stream via TanStack Query mutation. On success it fetches the new
+// stream's schema, patches the local cache, invalidates the streams queries so
+// every consumer refetches fresh, and notifies the parent.
+const createStreamMutation = useMutation({
+  mutationFn: (payload: any) =>
+    streamService.createStream(
+      store.state.selectedOrganization.identifier,
+      streamInputs.value.name,
+      streamInputs.value.stream_type,
+      payload,
+    ),
+  onSuccess: async () => {
+    toast({
+      message: "Stream created successfully",
+      variant: "success",
+    });
+    const streamRes: any = await streamService.schema(
+      store.state.selectedOrganization.identifier,
+      streamInputs.value.name,
+      streamInputs.value.stream_type,
+    );
+    addStream(streamRes.data);
+    // Refresh the visible list and evict now-stale cached search-keyword
+    // results so they don't linger in the cache after the new stream appears.
+    const org = store.state.selectedOrganization.identifier;
+    queryClient.invalidateQueries({ queryKey: streamKeys.all(org) });
+    queryClient.removeQueries({ queryKey: streamKeys.all(org), type: "inactive" });
+    emits("streamAdded");
+    emits("close");
+    emits("added:stream-added", streamInputs.value);
+  },
+  onError: (err: any) => {
+    if (err?.response?.status != 403) {
+      toast({
+        message: err?.response?.data?.message || "Failed to create stream",
+        variant: "error",
+      });
+    }
+  },
+});
 
 const fields: Ref<any[]> = ref([]);
 const addStreamFormRef = ref<any>(null);
@@ -306,44 +350,11 @@ const saveStream = async () => {
   if (isStreamPresent) return;
 
   const payload = getStreamPayload();
-  streamService
-    .createStream(
-      store.state.selectedOrganization.identifier,
-      streamInputs.value.name,
-      streamInputs.value.stream_type,
-      payload
-    )
-    .then(() => {
-      toast({
-        message: "Stream created successfully",
-        variant: "success",
-      });
-
-      streamService
-        .schema(
-          store.state.selectedOrganization.identifier,
-          streamInputs.value.name,
-          streamInputs.value.stream_type
-        )
-        .then((streamRes: any) => {
-          addStream(streamRes.data);
-          emits("streamAdded");
-          emits("close");
-          emits("added:stream-added", streamInputs.value);
-        });
-    })
-    .catch((err) => {
-      if(err.response.status != 403){
-        toast({
-        message: err.response?.data?.message || "Failed to create stream",
-        variant: "error",
-      });
-      }
-    });
-    track("Button Click", {
-      button: "Save Stream",
-      page: "Add Stream"
-    });
+  createStreamMutation.mutate(payload);
+  track("Button Click", {
+    button: "Save Stream",
+    page: "Add Stream"
+  });
 
 };
 

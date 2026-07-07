@@ -32,6 +32,8 @@ import {
 import { buildVersionChecker } from "./utils/buildVersionChecker";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
+import { VueQueryPlugin } from "@tanstack/vue-query";
+import { vueQueryPluginOptions } from "@/plugins/vue-query";
 
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).
@@ -44,6 +46,7 @@ app.use(i18n);
 
 // const router = createRouter(store);
 app.use(store).use(router);
+app.use(VueQueryPlugin, vueQueryPluginOptions);
 
 // Initialize default context provider globally
 const defaultProvider = createDefaultContextProvider(router, store);

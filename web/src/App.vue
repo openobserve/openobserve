@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   ></router-view>
   <OToastProvider />
   <ConfirmDialogProvider />
+  <VueQueryDevtools v-if="isDev" :initial-is-open="false" button-position="bottom-right" />
 </template>
 
 <script lang="ts">
@@ -30,12 +31,15 @@ import config from "@/aws-exports";
 import { applyCurrentTheme } from "@/utils/themeManager";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
+import { VueQueryDevtools } from "@tanstack/vue-query-devtools";
 
 export default {
-  components: { OToastProvider, ConfirmDialogProvider },
+  components: { OToastProvider, ConfirmDialogProvider, VueQueryDevtools },
   setup() {
     const store = useStore();
     const router = useRouter();
+    // Dev-only: the devtools panel is tree-shaken out of production builds.
+    const isDev = import.meta.env.DEV;
     const creds = localStorage.getItem("creds");
     if (creds) {
       router.push("/logs");
@@ -75,6 +79,7 @@ export default {
 
     return {
       store,
+      isDev,
     }
   },
 };
