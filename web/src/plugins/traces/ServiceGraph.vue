@@ -338,6 +338,7 @@ import {
 import {
   applyGraphCollapse,
   GROUP_PREFIX,
+  groupKind,
 } from "@/utils/traces/applyGraphCollapse";
 import {
   formatNumber,
@@ -1538,8 +1539,11 @@ export default defineComponent({
       const d = params?.data;
       const clickedId: string | undefined = d?.id ?? d?.name;
       if (d?.is_group || clickedId?.startsWith?.(GROUP_PREFIX)) {
+        // Boundary id is `__group_<kind>__<caller>`; extract the kind. Toggling a
+        // kind expands/collapses ALL of that kind's per-caller groups at once,
+        // which is the intuitive "show me the externals" gesture.
         const kind =
-          d?.service_type ?? clickedId?.slice(GROUP_PREFIX.length);
+          d?.service_type ?? (clickedId ? groupKind(clickedId) : null);
         if (kind) toggleGroupExpansion(String(kind));
         return;
       }

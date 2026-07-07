@@ -2040,7 +2040,8 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       await wrapper.vm.loadServiceGraph();
       await flushPromises();
       const ids = wrapper.vm.filteredGraphData.nodes.map((n: any) => n.id);
-      expect(ids).toContain("__group_external");
+      // Per-caller boundary node: svc's externals collapse into svc's own group.
+      expect(ids).toContain("__group_external__svc");
       expect(ids).not.toContain("ext0");
     });
 

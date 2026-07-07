@@ -57,7 +57,7 @@ describe("applyGraphCollapse — collapse", () => {
   const many = (kind: string, n: number) =>
     Array.from({ length: n }, (_, i) => N(`${kind}${i}`, kind));
 
-  it("auto-collapses a dep kind over threshold into one boundary node", () => {
+  it("collapses a caller's externals into ITS OWN boundary node (per-caller)", () => {
     const exts = many("external", 6);
     const g = {
       nodes: [N("svc"), ...exts],
@@ -70,23 +70,58 @@ describe("applyGraphCollapse — collapse", () => {
     };
     // 7 nodes > threshold 5 → collapse
     const out = applyGraphCollapse(g, st({ threshold: 5 }));
-    const group = out.nodes.find((n) => n.id === "__group_external")!;
+    const group = out.nodes.find((n) => n.id === "__group_external__svc")!;
     expect(group).toBeTruthy();
     expect(group.is_group).toBe(true);
     expect(group.member_count).toBe(6);
     expect(group.label).toContain("(6)");
-    // members gone
     expect(out.nodes.some((n) => n.id === "external0")).toBe(false);
-    // one aggregated edge svc → group, requests summed (6*2)
-    const ge = out.edges.filter((e) => e.to === "__group_external");
+    // svc → its own boundary, requests summed (6*2)
+    const ge = out.edges.filter((e) => e.to === "__group_external__svc");
     expect(ge).toHaveLength(1);
+    expect(ge[0].from).toBe("svc");
     expect(ge[0].total_requests).toBe(12);
     expect(ge[0].failed_requests).toBe(6);
-    // service stays
     expect(out.nodes.some((n) => n.id === "svc")).toBe(true);
   });
 
-  it("expanded kind shows members AND keeps the boundary node as a hub (fold-back handle)", () => {
+  it("gives EACH caller its own group of only the externals IT calls (the real bug)", () => {
+    // payment→{e0,e1}, product→{e2}, and e0 is ALSO shared by product.
+    const g = {
+      nodes: [
+        N("payment"),
+        N("product"),
+        N("e0", "external"),
+        N("e1", "external"),
+        N("e2", "external"),
+      ],
+      edges: [
+        { from: "payment", to: "e0", total_requests: 1, failed_requests: 0 },
+        { from: "payment", to: "e1", total_requests: 1, failed_requests: 0 },
+        { from: "product", to: "e2", total_requests: 1, failed_requests: 0 },
+        { from: "product", to: "e0", total_requests: 1, failed_requests: 0 },
+      ],
+    };
+    const out = applyGraphCollapse(g, st({ mode: "collapsed", threshold: 1 }));
+    const paymentGrp = out.nodes.find((n) => n.id === "__group_external__payment");
+    const productGrp = out.nodes.find((n) => n.id === "__group_external__product");
+    // Two SEPARATE per-caller groups — not one global node.
+    expect(paymentGrp!.member_count).toBe(2); // e0, e1
+    expect(productGrp!.member_count).toBe(2); // e2, e0 (shared)
+    // Each caller points only at its own group.
+    expect(
+      out.edges.some((e) => e.from === "payment" && e.to === "__group_external__payment"),
+    ).toBe(true);
+    expect(
+      out.edges.some((e) => e.from === "product" && e.to === "__group_external__product"),
+    ).toBe(true);
+    // No cross-wiring: payment must NOT point at product's group.
+    expect(
+      out.edges.some((e) => e.from === "payment" && e.to === "__group_external__product"),
+    ).toBe(false);
+  });
+
+  it("expanded kind shows members under EACH caller's boundary (fold-back handle)", () => {
     const exts = many("external", 6);
     const g = {
       nodes: [N("svc"), ...exts],
@@ -101,19 +136,17 @@ describe("applyGraphCollapse — collapse", () => {
       g,
       st({ threshold: 5, expandedKinds: new Set(["external"]) }),
     );
-    // Members visible…
     expect(out.nodes.some((n) => n.id === "external0")).toBe(true);
-    // …AND the boundary node stays so the user can click to re-collapse.
-    const boundary = out.nodes.find((n) => n.id === "__group_external");
+    const boundary = out.nodes.find((n) => n.id === "__group_external__svc");
     expect(boundary).toBeTruthy();
     expect(boundary!.is_group).toBe(true);
-    // The boundary sits between caller and members: svc → boundary → member.
+    // svc → boundary → member.
     expect(
-      out.edges.some((e) => e.from === "svc" && e.to === "__group_external"),
+      out.edges.some((e) => e.from === "svc" && e.to === "__group_external__svc"),
     ).toBe(true);
     expect(
       out.edges.some(
-        (e) => e.from === "__group_external" && e.to === "external0",
+        (e) => e.from === "__group_external__svc" && e.to === "external0",
       ),
     ).toBe(true);
   });
@@ -129,13 +162,11 @@ describe("applyGraphCollapse — collapse", () => {
         failed_requests: 0,
       })),
     };
-    // 4 nodes < high threshold, but mode=collapsed forces it
     const forced = applyGraphCollapse(
       g,
       st({ mode: "collapsed", threshold: 999 }),
     );
-    expect(forced.nodes.some((n) => n.id === "__group_external")).toBe(true);
-    // mode=expanded ignores a low threshold
+    expect(forced.nodes.some((n) => n.id === "__group_external__svc")).toBe(true);
     const shown = applyGraphCollapse(g, st({ mode: "expanded", threshold: 1 }));
     expect(shown.nodes.some((n) => n.id === "external0")).toBe(true);
   });

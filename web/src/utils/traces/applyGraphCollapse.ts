@@ -52,8 +52,10 @@ export interface GEdge {
   [k: string]: any;
 }
 
-/** Boundary-node id prefix, e.g. `__group_external`. */
+/** Boundary-node id prefix, e.g. `__group_external__payment`. */
 export const GROUP_PREFIX = "__group_";
+/** Separator between the kind and the caller in a boundary-node id. */
+const GROUP_SEP = "__";
 
 /** Inferred-dependency kinds that may collapse. Services are never collapsed. */
 const DEP_KINDS = ["database", "queue", "external", "rpc"];
@@ -61,9 +63,24 @@ const DEP_KINDS = ["database", "queue", "external", "rpc"];
 /** A node's kind: its `service_type`, or `"service"` when it has none. */
 const kindOf = (n: GNode) => (n.service_type ? n.service_type : "service");
 
+/** Per-caller boundary id: `__group_<kind>__<caller>` (caller "" for roots). */
+const groupId = (kind: string, caller: string | null) =>
+  `${GROUP_PREFIX}${kind}${GROUP_SEP}${caller ?? ""}`;
+
+/** Extract the kind from a boundary id (for click→toggle). */
+export function groupKind(id: string): string | null {
+  if (!id.startsWith(GROUP_PREFIX)) return null;
+  const rest = id.slice(GROUP_PREFIX.length);
+  const sep = rest.indexOf(GROUP_SEP);
+  return sep === -1 ? rest : rest.slice(0, sep);
+}
+
 /**
- * Transform a complete topology into the presented graph: drop hidden kinds, and
- * (in Task 2) collapse dependency kinds into boundary nodes per the state.
+ * Transform the complete topology into the presented graph: drop hidden kinds,
+ * and collapse each CALLER's inferred dependencies (per kind) into its OWN
+ * boundary node. Collapsing is per-(caller, kind), not global — so `payment`'s
+ * externals and `product`'s externals are separate groups, faithfully attached
+ * to their real caller. Services are never collapsed.
  */
 export function applyGraphCollapse(
   graph: { nodes: GNode[]; edges: GEdge[] },
@@ -83,15 +100,14 @@ export function applyGraphCollapse(
     );
   }
 
-  // 2. Decide, per dependency kind, whether it collapses. A kind that WOULD
-  // collapse but is in `expandedKinds` becomes a HUB: the boundary node stays
-  // visible (so the user can click it to fold back) while its members are also
-  // shown, hanging off the boundary.
+  // 2. Decide, per kind, whether it collapses. A kind in `expandedKinds` becomes
+  //    a HUB (boundary + members both shown, so it can be folded back); otherwise
+  //    it fully collapses (members hidden behind the boundary).
   const shouldCollapseAll =
     state.mode === "collapsed" ||
     (state.mode === "auto" && nodes.length > state.threshold);
-  const collapseKinds = new Set<string>(); // fully folded (members hidden)
-  const hubKinds = new Set<string>(); // boundary + members both shown
+  const collapseKinds = new Set<string>();
+  const hubKinds = new Set<string>();
   if (state.mode !== "expanded" && shouldCollapseAll) {
     for (const k of DEP_KINDS) {
       if (state.expandedKinds.has(k)) hubKinds.add(k);
@@ -100,95 +116,138 @@ export function applyGraphCollapse(
   }
   if (!collapseKinds.size && !hubKinds.size) return { nodes, edges };
 
-  // 3. Build one boundary node per collapsed OR hub kind. For collapsed kinds we
-  //    also map member→boundary so their edges rewire onto it; hub members keep
-  //    their own node and get a boundary→member containment edge instead.
-  const memberToGroup = new Map<string, string>(); // collapsed members only
-  const hubMembers: GNode[] = []; // (member, boundaryId) for hub kinds
-  const groups = new Map<string, GNode>();
-  const ensureGroup = (k: string) => {
-    const gid = GROUP_PREFIX + k;
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  const isDep = (id: string) => {
+    const n = nodeById.get(id);
+    return n ? DEP_KINDS.includes(kindOf(n)) : false;
+  };
+  const collapsibleKinds = new Set([...collapseKinds, ...hubKinds]);
+
+  // 3. Walk edges CALLER→dep. Each such edge assigns the dep to the caller's
+  //    per-kind boundary group. (Deps are terminal leaves, so they only ever
+  //    appear as an edge target; a dep called by two services joins both callers'
+  //    groups — faithful, since it really is called by both.)
+  const groups = new Map<string, GNode>(); // boundary id → node
+  // boundary id → set of member dep ids (for containment edges + counts)
+  const groupMembers = new Map<string, Set<string>>();
+  // dep id → the caller→dep edge(s) it came in on (to aggregate caller→boundary)
+  const ensureGroup = (gid: string, kind: string, caller: string | null) => {
     let g = groups.get(gid);
     if (!g) {
       g = {
         id: gid, label: "", requests: 0, errors: 0,
-        service_type: k, is_group: true, member_count: 0,
+        service_type: kind, is_group: true, member_count: 0,
+        group_caller: caller,
       };
       groups.set(gid, g);
+      groupMembers.set(gid, new Set());
     }
     return g;
   };
-  for (const n of nodes) {
-    const k = kindOf(n);
-    const gid = GROUP_PREFIX + k;
-    if (collapseKinds.has(k)) {
-      memberToGroup.set(n.id, gid);
-      const g = ensureGroup(k);
-      g.requests += n.requests || 0;
-      g.errors += n.errors || 0;
-      g.member_count = (g.member_count || 0) + 1;
-    } else if (hubKinds.has(k)) {
-      const g = ensureGroup(k);
-      g.requests += n.requests || 0;
-      g.errors += n.errors || 0;
-      g.member_count = (g.member_count || 0) + 1;
-      hubMembers.push(n);
+
+  // caller→boundary aggregated edge metrics, and boundary→member metrics.
+  const callerEdge = new Map<string, GEdge>(); // key from->gid
+  const memberEdge = new Map<string, GEdge>(); // key gid->member
+
+  for (const e of edges) {
+    const depId = e.to;
+    if (!isDep(depId)) continue;
+    const kind = kindOf(nodeById.get(depId)!);
+    if (!collapsibleKinds.has(kind)) continue;
+    const caller = e.from; // the real service calling this dep
+    const gid = groupId(kind, caller);
+    ensureGroup(gid, kind, caller);
+    const mem = groupMembers.get(gid)!;
+    if (!mem.has(depId)) mem.add(depId);
+
+    // caller → boundary (aggregate this edge's metrics)
+    const ck = `${caller ?? ""}->${gid}`;
+    const ce = callerEdge.get(ck);
+    if (ce) {
+      ce.total_requests += e.total_requests || 0;
+      ce.failed_requests += e.failed_requests || 0;
+    } else {
+      callerEdge.set(ck, {
+        ...e, from: caller, to: gid,
+        total_requests: e.total_requests || 0,
+        failed_requests: e.failed_requests || 0,
+        connection_type: kind,
+      });
+    }
+    // boundary → member (containment; carries the original edge metrics)
+    const mk = `${gid}->${depId}`;
+    const me = memberEdge.get(mk);
+    if (me) {
+      me.total_requests += e.total_requests || 0;
+      me.failed_requests += e.failed_requests || 0;
+    } else {
+      memberEdge.set(mk, {
+        ...e, from: gid, to: depId,
+        total_requests: e.total_requests || 0,
+        failed_requests: e.failed_requests || 0,
+        connection_type: kind,
+      });
     }
   }
-  for (const g of groups.values()) {
+
+  // Finalize group node counts/labels + roll member metrics into the boundary.
+  for (const [gid, g] of groups) {
+    const members = groupMembers.get(gid)!;
+    g.member_count = members.size;
+    for (const mid of members) {
+      const m = nodeById.get(mid)!;
+      g.requests += m.requests || 0;
+      g.errors += m.errors || 0;
+    }
     const kind = g.service_type!;
     const kindLabel = kind.charAt(0).toUpperCase() + kind.slice(1);
     const isHub = hubKinds.has(kind);
-    g.is_expanded = isHub;
+    (g as any).is_expanded = isHub;
     // ▾ = expanded (click to collapse), ▸ = collapsed (click to expand).
     g.label = `${kindLabel} (${g.member_count}) ${isHub ? "▾" : "▸"}`;
   }
 
-  // 4. Nodes: keep everything except collapsed members; add boundary nodes.
-  //    Hub members stay (they are shown under their boundary).
-  const keptNodes = nodes.filter((n) => !memberToGroup.has(n.id));
-  const outNodes = [...keptNodes, ...groups.values()];
+  // 4. Which dep member ids are collapsed away (fully-collapsed kinds only).
+  //    Hub members stay visible; collapsed members are hidden behind boundaries.
+  const collapsedMemberIds = new Set<string>();
+  for (const g of groups.values()) {
+    if (collapseKinds.has(g.service_type!)) {
+      for (const mid of groupMembers.get(g.id)!) collapsedMemberIds.add(mid);
+    }
+  }
 
-  // 5. Edges:
-  //    - collapsed members: rewire their edges onto the boundary (dedupe + sum).
-  //    - hub members: rewire the CALLER→member edge to caller→boundary
-  //      (aggregated), and add a boundary→member containment edge, so the flow
-  //      reads caller → boundary → member.
-  const hubMemberIds = new Set(hubMembers.map((m) => m.id));
-  const nodeById = new Map(nodes.map((n) => [n.id, n]));
-  const remap = (id: string | null) => {
-    if (id == null) return id;
-    if (memberToGroup.has(id)) return memberToGroup.get(id)!;
-    if (hubMemberIds.has(id)) return GROUP_PREFIX + kindOf(nodeById.get(id)!);
-    return id;
-  };
+  // 5. Assemble nodes: keep non-collapsed nodes (services + hub members) and add
+  //    all boundary nodes.
+  const keptNodes = nodes.filter((n) => !collapsedMemberIds.has(n.id));
+  const outNodes = [...keptNodes, ...groups.values()];
+  const keptIds = new Set(outNodes.map((n) => n.id));
+
+  // 6. Assemble edges:
+  //    - original non-dep edges (service→service) pass through unchanged.
+  //    - caller→boundary edges for every collapsed/hub group.
+  //    - boundary→member edges only for HUB groups (members are visible).
   const edgeMap = new Map<string, GEdge>();
-  const addEdge = (from: string | null, to: string, e: Partial<GEdge>) => {
-    if (from === to) return;
-    const key = `${from ?? ""}->${to}`;
-    const existing = edgeMap.get(key);
-    if (existing) {
-      existing.total_requests += e.total_requests || 0;
-      existing.failed_requests += e.failed_requests || 0;
+  const put = (e: GEdge) => {
+    if (e.from === e.to) return;
+    if (e.from != null && !keptIds.has(e.from)) return;
+    if (!keptIds.has(e.to)) return;
+    const key = `${e.from ?? ""}->${e.to}`;
+    const ex = edgeMap.get(key);
+    if (ex) {
+      ex.total_requests += e.total_requests || 0;
+      ex.failed_requests += e.failed_requests || 0;
     } else {
-      edgeMap.set(key, {
-        ...(e as GEdge), from, to,
-        total_requests: e.total_requests || 0,
-        failed_requests: e.failed_requests || 0,
-      });
+      edgeMap.set(key, e);
     }
   };
+  // Original edges that are NOT caller→dep (those became boundary edges).
   for (const e of edges) {
-    addEdge(remap(e.from), remap(e.to)!, e);
+    if (isDep(e.to) && collapsibleKinds.has(kindOf(nodeById.get(e.to)!))) continue;
+    put({ ...e });
   }
-  // Containment edges: boundary → each hub member.
-  for (const m of hubMembers) {
-    const gid = GROUP_PREFIX + kindOf(m);
-    addEdge(gid, m.id, {
-      total_requests: m.requests || 0,
-      failed_requests: m.errors || 0,
-      connection_type: m.service_type,
-    });
+  for (const ce of callerEdge.values()) put(ce);
+  for (const me of memberEdge.values()) {
+    if (hubKinds.has(me.connection_type as string)) put(me);
   }
 
   return { nodes: outNodes, edges: Array.from(edgeMap.values()) };
