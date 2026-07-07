@@ -5,7 +5,7 @@ const {
 } = require("../utils/enhanced-baseFixtures.js");
 import PageManager from "../../pages/page-manager";
 import { ingestion } from "./utils/dashIngestion.js";
-import { cleanupTestDashboard } from "./utils/dashCreation.js";
+import { cleanupTestDashboard, setupTestDashboard } from "./utils/dashCreation.js";
 import {
   generateDashboardName,
   setupTablePanelWithConfig,
@@ -221,11 +221,29 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
 
-    await setupTablePanelWithConfig(page, pm, dashboardName);
+    // Build the panel manually (not via setupTablePanelWithConfig) so the x-axis is an
+    // explicit raw field (kubernetes_container_hash, 7 distinct values in the fixture)
+    // instead of the default histogram(_timestamp) grouping. The ingestion endpoint
+    // stamps the whole fixture batch with one ingestion-time timestamp (the fixture has
+    // no explicit _timestamp field), so histogram(_timestamp) collapses to a single
+    // bucket in CI — this made the test flaky/failing there despite passing locally,
+    // where hours of accumulated repeat test runs gave the dev server real timestamp
+    // spread that CI's single fresh ingestion doesn't have.
+    await setupTestDashboard(page, pm, dashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectChartType("table");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "x");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
+    await pm.dashboardPanelActions.addPanelName("Test Panel");
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelConfigs.openConfigPanel();
 
-    // Target the x-axis column (_timestamp) — a genuine text/date column — so the
-    // unique-color toggle has real distinct string values to color, independent of
-    // whatever aggregation the y-axis defaults to.
+    // Target the x-axis column (kubernetes_container_hash) — a genuine text column with
+    // guaranteed multi-value cardinality — so the unique-color toggle has real distinct
+    // string values to color.
     await addXAxisOverrideColumn(pm);
     await pm.dashboardPanelConfigs.toggleAutoColor();
     testLogger.info("Auto/unique color toggled on for text column");
