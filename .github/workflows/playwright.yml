@@ -68,11 +68,17 @@ jobs:
 
       - id: check
         run: |
-          # Skip the suite when a PR touches only docs or images. Anything else — source,
-          # web/, workflows (incl. this file) — runs the suite.
-          IGNORE_RE='(\.md$|^docs/|\.(png|jpe?g|gif|svg|webp)$)'
+          # Skip when a PR touches only docs, images, or unrelated workflow files (e.g. a
+          # dependabot bump to another workflow) — none can affect the app. Source, web/, and
+          # this workflow (playwright.yml) still run the suite.
+          IGNORE_RE='(\.md$|^docs/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'
           CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qvE "$IGNORE_RE"; then
+          # Files not matching IGNORE_RE. Captured (not `grep -qv`) so the check doesn't depend
+          # on grep -qv exit semantics, which differ across grep builds; the `|| true` keeps
+          # `set -e` from aborting when grep matches nothing (exit 1). The `grep -qE` below is a
+          # loop-safe `if`-condition term (`set -e` doesn't fire there), so it needs no `|| true`.
+          RELEVANT=$(printf '%s' "$CHANGED" | grep -vE "$IGNORE_RE" || true)
+          if [ -z "$CHANGED" ] || [ -n "$RELEVANT" ] || printf '%s' "$CHANGED" | grep -qE '^\.github/workflows/playwright\.yml$'; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
@@ -85,9 +91,10 @@ jobs:
     # Run when there are e2e-relevant changes AND either this is not a pull_request
     # (push to main / merge_group always run) or the PR carries the 'e2e' label.
     if: >-
-      needs.check_changes.outputs.has_changes == 'true' &&
-      (github.event_name != 'pull_request' ||
-       contains(github.event.pull_request.labels.*.name, 'e2e'))
+      (github.event_name == 'pull_request' &&
+       contains(github.event.pull_request.labels.*.name, 'e2e')) ||
+      (github.event_name != 'pull_request' &&
+       needs.check_changes.outputs.has_changes == 'true')
     runs-on:
       labels: ubicloud-standard-16
     permissions:
@@ -311,6 +318,8 @@ jobs:
                 "dashboard-table-chart.spec.js",
                 "dashboard-table-copy-cell.spec.js",
                 "dashboard-table-csv-download.spec.js",
+                "dashboard-table-column-formatting.spec.js",
+                "dashboard-table-column-filtering.spec.js",
                 "dashboard-metric-camelcase.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
@@ -376,6 +385,27 @@ jobs:
                 "tracesAnalyzeDimensions.spec.js",
                 "traces-autocomplete-suggestions.spec.js",
               ]
+          # The RUM ingest/token/sourcemaps routes are part of the standard
+          # (OSS) router (src/handler/http/router/mod.rs), so these specs run
+          # against the OSS binary built by this workflow. Ingestion-auth
+          # negative cases live in the API suite (tests/api-testing/tests/rum).
+          - testfolder: "RUM"
+            browser: "chrome"
+            run_files:
+              [
+                "rum-cdn-dataflow.spec.js",
+                "rum-npm-dataflow.spec.js",
+                "rum-page-dataflow.spec.js",
+                "rum-onboarding-snippets.spec.js",
+                "sourcemap-ui.spec.js",
+                "sourcemap-upload-pretty.spec.js",
+              ]
+          # rum-token.spec.js RESETS the org RUM token; running it beside the
+          # dataflow specs (workers run files in parallel) would 401 their
+          # in-flight SDK beacons. Own shard = own isolated instance.
+          - testfolder: "RUM-Token"
+            browser: "chrome"
+            run_files: ["rum-token.spec.js"]
           - testfolder: "Metrics"
             browser: "chrome"
             run_files:
@@ -677,6 +707,9 @@ jobs:
                 ;;
               "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboard-Pivot-Table"|"Dashboards-Panel-Level-DateTime-Config"|"Dashboard-Config-Settings")
                 ACTUAL_FOLDER="Dashboards"
+                ;;
+              "RUM-Token")
+                ACTUAL_FOLDER="RUM"
                 ;;
               *)
                 ACTUAL_FOLDER="${{ matrix.testfolder }}"
@@ -1281,21 +1314,25 @@ jobs:
             exit 1
           fi
 
-          # 2. No e2e-relevant changes (docs/images/meta only) → the suite legitimately did
-          #    not run. Allow the merge; no 'e2e' label required.
-          if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
-            echo "✅ No e2e-relevant file changes — Playwright suite not required for this PR."
+          # 2. On a pull_request WITHOUT the 'e2e' label the suite did not run: block (fail)
+          #    when the change is Playwright-relevant so the author opts in, else bypass (pass).
+          #    Adding the 'e2e' label always runs the suite (see build_binary's if).
+          if [ "${{ github.event_name }}" == "pull_request" ] && \
+             [ "${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}" != "true" ]; then
+            if [ "${{ needs.check_changes.outputs.has_changes }}" == "true" ]; then
+              echo "::error::This PR changes Playwright-relevant files but has no 'e2e' label, so the suite did not run."
+              echo "::error::Add the 'e2e' label to the PR to run the full Playwright suite before merging."
+              exit 1
+            fi
+            echo "✅ No Playwright-relevant changes and no 'e2e' label — suite not required for this PR."
             exit 0
           fi
 
-          # 3. The change IS e2e-relevant. On a pull_request it must carry the 'e2e' label,
-          #    otherwise the suite was intentionally not run and we BLOCK the merge until the
-          #    author opts in. (push to main / merge_group are never label-gated.)
-          if [ "${{ github.event_name }}" == "pull_request" ] && \
-             [ "${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}" != "true" ]; then
-            echo "::error::This PR changes e2e-relevant files but has no 'e2e' label, so the Playwright suite did not run."
-            echo "::error::Add the 'e2e' label to the PR to run the full Playwright suite before merging."
-            exit 1
+          # 3. Non-PR event (push / merge queue) with nothing relevant → nothing ran → allow.
+          if [ "${{ github.event_name }}" != "pull_request" ] && \
+             [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
+            echo "✅ No Playwright-relevant changes — suite not required."
+            exit 0
           fi
 
           # 4. Suite was expected to run — pass only if build + tests actually succeeded.

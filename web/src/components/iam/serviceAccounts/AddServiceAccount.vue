@@ -21,47 +21,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="beingUpdated ? t('serviceAccounts.update') : t('serviceAccounts.add')"
     :primaryButtonLabel="t('user.save')"
     :secondaryButtonLabel="t('user.cancel')"
-    @click:primary="onSubmit"
+    form-id="add-service-account-form"
     @click:secondary="$emit('update:open', false)"
     @update:open="$emit('update:open', $event)"
   >
     <div>
-      <div>
-          <OInput
-            v-if="!beingUpdated"
-            v-model="formData.email"
-            :label="t('serviceAccounts.form.identifier.label') + ' *'"
-            :placeholder="t('serviceAccounts.form.identifier.placeholder')"
-            :help-text="t('serviceAccounts.form.identifier.help')"
-            data-test="iam-add-service-account-identifier-input"
-            class="showLabelOnTop mt-2"
-            :error="!!emailError"
-            :error-message="emailError"
-            @update:model-value="emailError = ''"
-          />
+      <OForm
+        id="add-service-account-form"
+        :schema="addServiceAccountSchema"
+        :default-values="addServiceAccountDefaults"
+        @submit="onSubmit"
+      >
+        <OFormInput
+          v-if="!beingUpdated"
+          name="email"
+          :label="t('serviceAccounts.form.identifier.label')"
+          :placeholder="t('serviceAccounts.form.identifier.placeholder')"
+          :help-text="t('serviceAccounts.form.identifier.help')"
+          required
+          data-test="iam-add-service-account-identifier-input"
+          class="showLabelOnTop mt-2"
+        />
 
-          <OInput
-            v-model="firstName"
-            :label="t('user.description')"
-            data-test="iam-add-service-account-description-input"
-            class="showLabelOnTop mt-2"
-          />
-        </div>
+        <OFormInput
+          name="first_name"
+          :label="t('user.description')"
+          data-test="iam-add-service-account-description-input"
+          class="showLabelOnTop mt-2"
+        />
+      </OForm>
     </div>
   </ODialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, watch } from "vue";
+import { defineComponent, computed } from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
-import { getImageURL } from "@/utils/zincutils";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeAddServiceAccountSchema,
+  type AddServiceAccountForm,
+} from "./AddServiceAccount.schema";
 
 const defaultValue: any = () => {
   return {
@@ -75,7 +81,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { ODialog, OInput },
+  components: { ODialog, OForm, OFormInput },
   props: {
     open: {
       type: Boolean,
@@ -93,133 +99,98 @@ export default defineComponent({
   emits: ["update:modelValue", "updated", "update:open"],
   setup(props) {
     const store: any = useStore();
-    const router: any = useRouter();
     const { t } = useI18n();
     const { track } = useReo();
-    const formData: any = ref(defaultValue());
-    const existingUser = ref(false);
-    const beingUpdated: any = ref(false);
-    const userForm: any = ref(null);
-    let organizationOptions: any = ref([]);
-    const loadingOrganizations = ref(true);
-    const logout_confirm = ref(false);
 
-    const firstName = ref(formData.value.first_name);
-    const emailError = ref('');
-
-    onActivated(() => {
-      /* v8 ignore next */ // only runs under Vue keep-alive, not reachable in jsdom unit tests
-      formData.value.organization = store.state.selectedOrganization.identifier;
-    });
-
-    watch(
-      () => props.modelValue,
-      (newVal) => {
-        if (newVal && newVal.email) {
-          beingUpdated.value = true;
-          formData.value = { ...newVal };
-          firstName.value = newVal.first_name ?? "";
-        } else {
-          beingUpdated.value = props.isUpdated;
-          formData.value = defaultValue();
-          formData.value.organization =
-            store.state.selectedOrganization.identifier;
-          firstName.value = "";
-        }
-      },
-      { deep: true, immediate: true },
+    // Form-base: the OForm owns the only editable fields (email + first_name).
+    // Update mode is derived from the externally-provided modelValue (it carries
+    // an existing email) or the isUpdated flag — no mirrored formData needed.
+    const beingUpdated = computed(
+      () => !!props.modelValue?.email || props.isUpdated,
     );
+
+    // Schema mode follows beingUpdated (email is create-only). The dialog body
+    // remounts per open, so OForm always reads the correct variant at mount.
+    const addServiceAccountSchema = computed(() =>
+      makeAddServiceAccountSchema(beingUpdated.value, t),
+    );
+
+    // The OForm owns email + first_name. Email is always blank on create; the
+    // description prefills from the externally-provided modelValue in update mode.
+    const addServiceAccountDefaults = computed((): AddServiceAccountForm => ({
+      email: "",
+      first_name: props.modelValue?.first_name ?? "",
+    }));
 
     return {
       t,
       store,
-      router,
-      formData,
       beingUpdated,
-      userForm,
-      organizationOptions,
-      existingUser,
-      getImageURL,
-      loadingOrganizations,
-      logout_confirm,
-      firstName,
+      addServiceAccountSchema,
+      addServiceAccountDefaults,
       track,
-      emailError,
     };
   },
 
   methods: {
-    onSubmit() {
-      if (!this.beingUpdated) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!this.formData.email || !emailRegex.test(this.formData.email)) {
-          this.emailError = 'Please enter a valid email address';
-          return;
-        }
-      }
-      const dismiss = toast({
-        variant: "loading",
-        message: "Please wait...",
-              timeout: 0,
-});
-      let selectedOrg = this.store.state.selectedOrganization.identifier;
-      this.formData.organization =
-        this.store.state.selectedOrganization.identifier;
-      if (selectedOrg == "other") {
-        selectedOrg = encodeURIComponent(this.formData.other_organization);
-      }
-      this.formData.first_name = this.firstName;
-      if (this.beingUpdated) {
-        const userEmail = this.formData.email;
-        delete this.formData.email;
-        service_accounts
-          .update(this.formData, selectedOrg, userEmail)
-          .then((res: any) => {
-            this.formData.email = userEmail;
-              this.$emit("updated", res.data, this.formData, "updated");
-              this.$emit("update:open", false);
-          })
-          .catch((err: any) => {
-            if (err.response?.status != 403) {
-              if (err?.response?.data?.message) {
-                toast({
-                  message: err?.response?.data?.message,
-                  variant: "error",
-                });
-              }
-            }
+    // Plain async @submit handler — fires only after the schema passes (email
+    // required + valid in create mode). Awaited by OForm, so the footer Save
+    // spinner spans the request automatically (no manual loading toast). The
+    // request body is built here from the @submit `value` (the editable fields)
+    // plus the non-form context (org from the store; the existing record from
+    // modelValue) — no `formData` mirror.
+    async onSubmit(value: AddServiceAccountForm) {
+      const organization = this.store.state.selectedOrganization.identifier;
 
-            dismiss();
-            this.formData.email = userEmail;
-          });
-          this.track("Button Click", {
-            button: "Update Service Account",
-            page: "Add Service Account"
-          });
-      } else {
-          service_accounts
-            .create(this.formData, selectedOrg)
-            .then((res: any) => {
-              dismiss();
-              this.$emit("updated", res.data, this.formData, "created");
-              this.$emit("update:open", false);
-            })
-            .catch((err: any) => {
-              if(err.response?.status != 403){
-                if(err?.response?.data?.message ) {
-                  toast({
-                    message: err?.response?.data?.message,
-                    variant: "error",
-                  });
-                }
-              }
-              
-              dismiss();
+      if (this.beingUpdated) {
+        // Round-trip the existing record (minus email, which is passed
+        // separately) with the edited description.
+        const { email: userEmail, ...rest } = this.modelValue;
+        const payload: any = { ...rest, organization, first_name: value.first_name };
+        try {
+          const res = await service_accounts.update(
+            payload,
+            organization,
+            userEmail,
+          );
+          this.$emit("updated", res.data, { ...payload, email: userEmail }, "updated");
+          this.$emit("update:open", false);
+        } catch (err: any) {
+          if (err.response?.status != 403 && err?.response?.data?.message) {
+            toast({
+              message: err?.response?.data?.message,
+              variant: "error",
             });
-          this.track("Button Click", {
-            button: "Create Service Account",
-            page: "Add Service Account"
-          });
+          }
+        }
+        this.track("Button Click", {
+          button: "Update Service Account",
+          page: "Add Service Account",
+        });
+      } else {
+        const payload: any = {
+          org_member_id: "",
+          role: "admin",
+          organization,
+          email: value.email,
+          first_name: value.first_name,
+        };
+        try {
+          const res = await service_accounts.create(payload, organization);
+          this.$emit("updated", res.data, payload, "created");
+          this.$emit("update:open", false);
+        } catch (err: any) {
+          if (err.response?.status != 403 && err?.response?.data?.message) {
+            toast({
+              message: err?.response?.data?.message,
+              variant: "error",
+            });
+          }
+        }
+        this.track("Button Click", {
+          button: "Create Service Account",
+          page: "Add Service Account",
+        });
       }
     },
   },
