@@ -147,7 +147,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="hero"
               preset="no-source-maps"
               :filtered="!!(filters.version || filters.service || filters.environment)"
-              :hide-action="!(filters.version || filters.service || filters.environment)"
               @action="(id) => id === 'upload' && navigateToUpload()"
             />
           </template>
