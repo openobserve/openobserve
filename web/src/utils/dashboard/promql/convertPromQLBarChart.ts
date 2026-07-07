@@ -216,12 +216,12 @@ export class BarConverter implements PromQLChartConverter {
     // Configure axes based on orientation
     const axisConfig = isHorizontal
       ? {
-          xAxis: buildValueAxis(panelSchema),
-          yAxis: buildCategoryYAxis(categories, panelSchema),
+          xAxis: buildValueAxis(panelSchema, store),
+          yAxis: buildCategoryYAxis(categories, panelSchema, store),
         }
       : {
-          xAxis: buildCategoryXAxis(categories, panelSchema),
-          yAxis: buildValueAxis(panelSchema),
+          xAxis: buildCategoryXAxis(categories, panelSchema, store),
+          yAxis: buildValueAxis(panelSchema, store),
         };
 
     if (isHorizontal) {
@@ -232,17 +232,24 @@ export class BarConverter implements PromQLChartConverter {
       };
     }
 
+    // containLabel already reserves the category/tick label area, so the
+    // grid insets only need small fixed margins — percentage insets waste
+    // huge bands on wide panels ("15%" ≈ 280px on a full-width panel) and
+    // starve short panels ("10%" bottom is less than the legend row needs).
+    const legendAtBottom =
+      config.show_legends && config.legends_position !== "right";
     return {
       series,
       ...axisConfig,
       grid: {
-        left: isHorizontal ? "15%" : "3%",
+        left: 8,
         right: "4%",
-        bottom: "10%",
+        top: 8,
+        bottom: legendAtBottom ? 40 : 12,
         containLabel: true,
         ...(config.axis_width && { left: config.axis_width }),
       },
-      tooltip: buildTooltip(panelSchema, "axis"),
+      tooltip: buildTooltip(panelSchema, "axis", store),
       // Legend config will be applied by applyLegendConfiguration in convertPromQLChartData
       // This ensures consistent behavior with SQL charts (applies to stacked and non-stacked)
     };

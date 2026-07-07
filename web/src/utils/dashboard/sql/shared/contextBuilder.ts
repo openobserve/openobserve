@@ -478,7 +478,7 @@ export function buildSQLContext(
       containLabel: panelSchema.config?.axis_width == null ? true : false,
       left: hasYAxisName ? (panelSchema.config?.axis_width ?? 30) : 5,
       right: 20,
-      top: "15",
+      top: 8,
       bottom: hasXAxisName
         ? (() => {
             // Reserve enough vertical space below the plot for the tick labels, the
