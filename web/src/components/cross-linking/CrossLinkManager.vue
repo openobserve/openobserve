@@ -1,10 +1,10 @@
 <template>
   <div class="cross-link-manager">
     <!-- Header -->
-    <div class="tw:flex tw:justify-between tw:items-center tw:mb-3">
+    <div class="flex justify-between items-center mb-3">
       <div>
-        <div class="tw:text-base tw:font-bold">{{ title }}</div>
-        <div v-if="subtitle" class="tw:text-xs" style="color: var(--o2-text-muted)">
+        <div class="text-base font-bold">{{ title }}</div>
+        <div v-if="subtitle" class="text-xs" style="color: var(--o2-text-muted)">
           {{ subtitle }}
         </div>
       </div>
@@ -25,14 +25,14 @@
       <div
         v-for="(link, idx) in links"
         :key="link.name"
-        class="cross-link-item el-border tw:rounded-md tw:mb-1 tw:p-2"
+        class="cross-link-item el-border rounded-md mb-1 p-2"
         :data-test="`cross-link-item-${idx}`"
       >
-        <div class="tw:flex tw:justify-between tw:items-start">
-          <div class="tw:flex-1 tw:min-w-0">
+        <div class="flex justify-between items-start">
+          <div class="flex-1 min-w-0">
             <!-- Name -->
             <div
-              class="tw:text-sm tw:font-medium tw:font-bold tw:truncate"
+              class="text-sm font-medium font-bold truncate"
               :title="link.name"
               style="color: var(--o2-text-primary)"
               :data-test="`cross-link-item-name-${idx}`"
@@ -42,12 +42,12 @@
                 v-if="link._source"
                 type="crossLinkSource"
                 :value="link._source"
-                class="tw:ml-1"
+                class="ml-1"
               />
             </div>
             <!-- URL -->
             <div
-              class="tw:text-xs tw:truncate tw:mt-1"
+              class="text-xs truncate mt-1"
               :title="link.url"
               style="color: var(--o2-text-muted)"
               :data-test="`cross-link-item-url-${idx}`"
@@ -55,20 +55,20 @@
               {{ link.url }}
             </div>
             <!-- Fields -->
-            <div v-if="link.fields?.length" class="tw:flex tw:flex-wrap tw:gap-1 tw:mt-1">
+            <div v-if="link.fields?.length" class="flex flex-wrap gap-1 mt-1">
               <OTag
                 v-for="(field, fIdx) in link.fields"
                 :key="fIdx"
                 type="fieldTag"
-                class="tw:max-w-[200px]"
+                class="max-w-[200px]"
                 :data-test="`cross-link-field-chip-${fIdx}`"
               >
-                <span class="tw:truncate tw:text-xs" :title="field.name">{{ field.name }}</span>
+                <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>
               </OTag>
             </div>
           </div>
           <!-- Actions -->
-          <div v-if="!readonly" class="tw:flex tw:items-center tw:gap-1 tw:ml-2 tw:shrink-0">
+          <div v-if="!readonly" class="flex items-center gap-1 ml-2 shrink-0">
             <OButton
               variant="ghost"
               size="icon-sm"
@@ -91,7 +91,7 @@
     <!-- Empty State -->
     <div
       v-else
-      class="tw:text-center tw:py-4 tw:text-sm"
+      class="text-center py-4 text-sm"
       style="color: var(--o2-text-muted)"
       data-test="cross-link-empty"
     >

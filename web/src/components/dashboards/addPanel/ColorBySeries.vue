@@ -17,7 +17,7 @@
 <template>
   <div>
     <div
-      class="tw:mb-2"
+      class="mb-2"
       style="font-weight: 600; display: flex; align-items: center"
     >
       <span>{{ t("dashboard.colorBySeriesTitle") }}</span>

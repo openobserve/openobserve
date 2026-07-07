@@ -1,12 +1,12 @@
 <template>
   <div
     data-test="promql-query-builder"
-    class="tw:px-2.5 tw:max-w-350 tw:mx-auto tw:h-[calc(100vh-50px)] tw:overflow-auto"
+    class="px-2.5 max-w-350 mx-auto h-[calc(100vh-50px)] overflow-auto"
   >
     <OCard>
       <OCardSection role="header">
-        <div class="tw:text-2xl tw:font-semibold">PromQL Query Builder</div>
-        <div class="tw:text-sm tw:font-medium tw:text-gray-400">
+        <div class="text-2xl font-semibold">PromQL Query Builder</div>
+        <div class="text-sm font-medium text-gray-400">
           Build and test PromQL queries visually
         </div>
       </OCardSection>
@@ -15,7 +15,7 @@
 
       <OCardSection role="body">
         <!-- Query Builder Section -->
-        <div class="tw:flex tw:flex-col tw:gap-5">
+        <div class="flex flex-col gap-5">
           <!-- Metric Selector -->
           <MetricSelector
             v-model:metric="visualQuery.metric"
@@ -39,21 +39,21 @@
 
       <!-- Generated Query Display -->
       <OCardSection>
-        <div class="tw:text-base tw:font-medium tw:mb-2">Generated PromQL Query:</div>
-        <OCard class="tw:bg-surface-panel">
+        <div class="text-base font-medium mb-2">Generated PromQL Query:</div>
+        <OCard class="bg-surface-panel">
           <OCardSection>
-            <pre class="tw:m-0 tw:p-3 tw:font-mono tw:text-sm tw:leading-relaxed tw:whitespace-pre-wrap tw:wrap-break-word tw:text-[#1976d2] tw:font-medium">{{ generatedQuery || "No query built yet" }}</pre>
+            <pre class="m-0 p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap wrap-break-word text-[#1976d2] font-medium">{{ generatedQuery || "No query built yet" }}</pre>
           </OCardSection>
         </OCard>
 
-        <div class="tw:mt-3 tw:flex tw:gap-2">
+        <div class="mt-3 flex gap-2">
           <OButton
             variant="primary"
             size="sm-action"
             @click="copyQuery"
             :disabled="!generatedQuery"
           >
-            <OIcon name="content-copy" size="xs" class="tw:mr-1" />
+            <OIcon name="content-copy" size="xs" class="mr-1" />
             Copy Query
           </OButton>
           <OButton
@@ -61,7 +61,7 @@
             size="sm-action"
             @click="clearQuery"
           >
-            <OIcon name="close" size="xs" class="tw:mr-1" />
+            <OIcon name="close" size="xs" class="mr-1" />
             Clear All
           </OButton>
           <OButton
@@ -70,7 +70,7 @@
             @click="testQuery"
             :disabled="!generatedQuery"
           >
-            <OIcon name="play-arrow" size="xs" class="tw:mr-1" />
+            <OIcon name="play-arrow" size="xs" class="mr-1" />
             Test Query
           </OButton>
         </div>
@@ -78,10 +78,10 @@
 
       <!-- Query Result Preview -->
       <OCardSection v-if="queryResult">
-        <div class="tw:text-base tw:font-medium tw:mb-2">Query Result Preview:</div>
-        <OCard class="tw:bg-surface-panel">
+        <div class="text-base font-medium mb-2">Query Result Preview:</div>
+        <OCard class="bg-surface-panel">
           <OCardSection>
-            <pre class="tw:m-0 tw:p-3 tw:font-mono tw:text-sm tw:leading-relaxed tw:whitespace-pre-wrap tw:wrap-break-word tw:text-[#424242] tw:max-h-100 tw:overflow-y-auto">{{ queryResult }}</pre>
+            <pre class="m-0 p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap wrap-break-word text-[#424242] max-h-100 overflow-y-auto">{{ queryResult }}</pre>
           </OCardSection>
         </OCard>
       </OCardSection>

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0" data-test="alerts-page" style="min-height: inherit">
+  <div class="rounded-md p-0" data-test="alerts-page" style="min-height: inherit">
     <RouterView />
   </div>
 </template>

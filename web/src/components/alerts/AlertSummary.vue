@@ -15,25 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="alerts-alert-summary" class="tw:h-full tw:flex tw:flex-col tw:relative">
-    <div data-test="alerts-alert-summary-content" class="tw:text-[0.8125rem] tw:leading-[2.2] tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-4 tw:flex tw:flex-col" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
-      <p v-if="summaryText" data-test="alerts-alert-summary-text" class="summary-text tw:m-0 tw:whitespace-pre-line tw:tracking-[0.03em]" v-html="DOMPurify.sanitize(summaryText)" @click="handleSummaryClick"></p>
-      <div v-else data-test="alerts-alert-summary-empty-state" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:min-h-[120px] tw:gap-2 tw:p-4">
-        <OIcon name="article" size="lg" class="tw:opacity-20" />
-        <span class="tw:text-[0.8125rem] tw:font-medium tw:text-center tw:opacity-50">{{ t('alerts.summary.configureAlert') || 'Configure your alert to see a summary' }}</span>
+  <div data-test="alerts-alert-summary" class="h-full flex flex-col relative">
+    <div data-test="alerts-alert-summary-content" class="text-[0.8125rem] leading-[2.2] flex-1 min-h-0 overflow-y-auto p-4 flex flex-col" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
+      <p v-if="summaryText" data-test="alerts-alert-summary-text" class="summary-text m-0 whitespace-pre-line tracking-[0.03em]" v-html="DOMPurify.sanitize(summaryText)" @click="handleSummaryClick"></p>
+      <div v-else data-test="alerts-alert-summary-empty-state" class="flex flex-col items-center justify-center h-full min-h-[120px] gap-2 p-4">
+        <OIcon name="article" size="lg" class="opacity-20" />
+        <span class="text-[0.8125rem] font-medium text-center opacity-50">{{ t('alerts.summary.configureAlert') || 'Configure your alert to see a summary' }}</span>
       </div>
     </div>
 
     <!-- Scroll to bottom button -->
     <div
       v-show="showScrollToBottom"
-      class="tw:absolute tw:bottom-5 tw:right-5 tw:z-[1000] tw:transition-all tw:duration-300 tw:pointer-events-none"
+      class="absolute bottom-5 right-5 z-[1000] transition-all duration-300 pointer-events-none"
     >
       <OButton
         round
         variant="ghost"
         size="icon-circle-sm"
-        class="scroll-to-bottom-btn tw:transition-all tw:duration-300 tw:ease-[ease] tw:pointer-events-auto tw:backdrop-blur-sm tw:shadow-[0_2px_8px_rgba(0,0,0,0.2)] tw:border-2! tw:border-[var(--q-primary)]! tw:text-[var(--q-primary)]! tw:bg-[rgba(255,255,255,0.95)]! tw:dark:bg-[rgba(30,30,30,0.9)]! tw:hover:scale-110 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:hover:bg-white! tw:hover:opacity-80 tw:dark:hover:bg-[rgba(40,40,40,0.95)]! tw:dark:hover:opacity-80 tw:active:scale-100"
+        class="scroll-to-bottom-btn transition-all duration-300 ease-[ease] pointer-events-auto backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.2)] border-2! border-[var(--q-primary)]! text-[var(--q-primary)]! bg-[rgba(255,255,255,0.95)]! dark:bg-[rgba(30,30,30,0.9)]! hover:scale-110 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:bg-white! hover:opacity-80 dark:hover:bg-[rgba(40,40,40,0.95)]! dark:hover:opacity-80 active:scale-100"
         @click="scrollToBottomSmooth"
       >
         <OIcon name="arrow-downward" size="sm" />

@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="o-drawer-close-btn"
         @mousedown.prevent
         @click="openCancelDialog"
-        class="tw:shrink-0 tw:flex tw:items-center tw:justify-center tw:h-7 tw:w-7 tw:rounded-md tw:text-dialog-close-text tw:hover:bg-dialog-close-hover-bg tw:active:bg-dialog-close-active-bg tw:transition-colors tw:duration-150 tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-dialog-focus-ring tw:cursor-pointer"
+        class="shrink-0 flex items-center justify-center h-7 w-7 rounded-md text-dialog-close-text hover:bg-dialog-close-hover-bg active:bg-dialog-close-active-bg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring cursor-pointer"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <line x1="18" y1="6" x2="6" y2="18" />
@@ -50,20 +50,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div
       data-test="add-condition-section"
-      class="stream-routing-section tw:w-full tw:min-h-full"
-      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+      class="stream-routing-section w-full min-h-full"
+      :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
     >
 
 
-    <div class="tw:w-full tw:rounded-lg tw:px-3 stream-routing-container">
+    <div class="w-full rounded-lg px-3 stream-routing-container">
       <div>
         <div
-          class="showLabelOnTop tw:font-bold text-h7"
+          class="showLabelOnTop font-bold text-h7"
           data-test="add-condition-query-input-title"
         >
           <div></div>
           <!-- Wrapper for FilterGroup with pipeline-specific styling -->
-          <div class="pipeline-filter-group-wrapper tw:max-w-full tw:overflow-x-visible!" @submit.stop.prevent>
+          <div class="pipeline-filter-group-wrapper max-w-full overflow-x-visible!" @submit.stop.prevent>
             <FilterGroup
               v-if="
                 conditionGroup &&
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :stream-fields="filteredColumns"
               :group="conditionGroup"
               :depth="0"
-              condition-input-width="tw:w-[130px]"
+              condition-input-width="w-[130px]"
               :allow-custom-columns="true"
               module="pipelines"
               @add-condition="(updatedGroup) => updateGroup(updatedGroup)"
@@ -81,51 +81,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @remove-group="(groupId) => removeConditionGroup(groupId)"
               @input:update="(name, field) => onInputUpdate(name, field)"
             />
-            <div v-else class="tw:p-3 tw:text-gray-400">Loading conditions...</div>
+            <div v-else class="p-3 text-gray-400">Loading conditions...</div>
           </div>
           <div
-            class="note-container tw:bg-[#f9f290] tw:text-[#2d3748] tw:w-full tw:rounded-md tw:p-3 tw:my-3 tw:flex tw:flex-col tw:gap-2"
+            class="note-container bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 my-3 flex flex-col gap-2"
             data-test="add-condition-note-container"
           >
             <div
-              class="tw:text-sm tw:text-gray-800"
+              class="text-sm text-gray-800"
               data-test="add-condition-note-heading"
             >
               Condition value Guidelines:
             </div>
             <div
-              class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800"
+              class="flex flex-col gap-1 text-sm text-gray-800"
               data-test="add-condition-note-info"
             >
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+              <div class="flex items-start gap-2">
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                 <span>
                   To check for an empty value, use
-                  <span class="highlight tw:font-bold tw:text-[#007bff]">""</span>. Example:
-                  <span class="code tw:font-mono tw:py-[1px] tw:px-[4px] tw:rounded-[3px] tw:bg-[rgba(0,0,0,0.06)] tw:text-[#b30059]">app_name != ""</span>
+                  <span class="highlight font-bold text-[#007bff]">""</span>. Example:
+                  <span class="code font-mono py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">app_name != ""</span>
                 </span>
               </div>
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+              <div class="flex items-start gap-2">
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                 <span>
                   To check for an Null value, use
-                  <span class="highlight tw:font-bold tw:text-[#007bff]">null</span>. Example:
-                  <span class="code tw:font-mono tw:py-[1px] tw:px-[4px] tw:rounded-[3px] tw:bg-[rgba(0,0,0,0.06)] tw:text-[#b30059]">app_name != null</span>
+                  <span class="highlight font-bold text-[#007bff]">null</span>. Example:
+                  <span class="code font-mono py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">app_name != null</span>
                 </span>
               </div>
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+              <div class="flex items-start gap-2">
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                 <span>
                   To add a custom column, type column name and press
-                  <span class="highlight tw:font-bold tw:text-[#007bff]">Enter</span>.
+                  <span class="highlight font-bold text-[#007bff]">Enter</span>.
                 </span>
               </div>
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="warning" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-red-500" />
+              <div class="flex items-start gap-2">
+                <OIcon name="warning" size="sm" class="shrink-0 mt-0.5 text-red-500" />
                 <span>If conditions are not met, the record will be dropped.</span>
               </div>
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="warning" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-red-500" />
+              <div class="flex items-start gap-2">
+                <OIcon name="warning" size="sm" class="shrink-0 mt-0.5 text-red-500" />
                 <span>If the record does not have the specified field, it will be dropped.</span>
               </div>
             </div>

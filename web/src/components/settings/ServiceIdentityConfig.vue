@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full service-identity-config tw:mt-2 tw:bg-(--o2-card-bg)">
+  <div class="w-full service-identity-config mt-2 bg-(--o2-card-bg)">
     <!-- Loading State -->
-    <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
+    <div v-if="loading" class="flex justify-center py-8">
       <OSpinner size="sm" />
     </div>
 
@@ -26,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <GroupHeader
         :title="t('settings.correlation.serviceIdentityTitle')"
         :showIcon="false"
-        class="tw:mb-2"
+        class="mb-2"
       />
-      <div class="tw:text-sm tw:mb-4">
+      <div class="text-sm mb-4">
         {{ t("settings.correlation.serviceIdentityDescription") }}
       </div>
 
@@ -37,25 +37,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="howItWorksOpen"
         icon="help-outline"
         :label="t('settings.correlation.howItWorksTitle')"
-        class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid"
+        class="mb-4 rounded-lg border border-solid"
         :class="
           store.state.theme === 'dark'
-            ? 'tw:bg-gray-700 tw:border-gray-700'
-            : 'tw:bg-gray-100 tw:border-gray-200'
+            ? 'bg-gray-700 border-gray-700'
+            : 'bg-gray-100 border-gray-200'
         "
       >
-        <div class="tw:p-4 tw:text-sm tw:leading-relaxed">
-          <div class="tw:mb-3">
-            <div class="tw:font-semibold text-primary tw:mb-1">
+        <div class="p-4 text-sm leading-relaxed">
+          <div class="mb-3">
+            <div class="font-semibold text-primary mb-1">
               {{ t("settings.correlation.serviceIdentityLabel") }}
             </div>
             <div>{{ t("settings.correlation.howItWorksDescription") }}</div>
           </div>
           <div
-            class="tw:mb-3 tw:p-3 tw:rounded"
-            :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'bg-white'"
+            class="mb-3 p-3 rounded"
+            :class="store.state.theme === 'dark' ? 'bg-gray-800' : 'bg-white'"
           >
-            <div class="tw:font-semibold text-primary tw:mb-1">
+            <div class="font-semibold text-primary mb-1">
               {{ t("settings.correlation.exampleLabel") }}
             </div>
             <div>
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag
                     type="exampleChip"
                     value="dim"
-                    class="tw:mx-1 tw:my-1 example-chip"
+                    class="mx-1 my-1 example-chip"
                     >k8s-cluster=prod</OTag
                   >
                 </template>
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag
                     type="exampleChip"
                     value="dim"
-                    class="tw:mx-1 tw:my-1 example-chip"
+                    class="mx-1 my-1 example-chip"
                     >k8s-deployment=api-server</OTag
                   >
                 </template>
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag
                     type="exampleChip"
                     value="value"
-                    class="tw:mx-1 tw:my-1 example-chip"
+                    class="mx-1 my-1 example-chip"
                     >prod/api-server</OTag
                   >
                 </template>
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div>
-            <div class="tw:font-semibold text-primary tw:mb-1">
+            <div class="font-semibold text-primary mb-1">
               {{ t("settings.correlation.correlationLabel") }}
             </div>
             <div>
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 tag="span"
               >
                 <template #field>
-                  <span class="tw:font-mono tw:font-semibold tw:text-sm"
+                  <span class="font-mono font-semibold text-sm"
                     >service</span
                   >
                 </template>
@@ -113,21 +113,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon="category"
         :label="t('settings.correlation.semanticFieldTitle')"
         :caption="t('settings.correlation.semanticFieldDescription')"
-        class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid"
+        class="mb-4 rounded-lg border border-solid"
         :class="
           store.state.theme === 'dark'
-            ? 'tw:border-gray-700'
-            : 'tw:border-gray-200'
+            ? 'border-gray-700'
+            : 'border-gray-200'
         "
       >
-        <div class="tw:p-4">
+        <div class="p-4">
           <SemanticFieldGroupsConfig
             v-model:semantic-field-groups="localSemanticGroups"
             @update:semantic-field-groups="handleSemanticGroupsUpdate"
           />
 
           <!-- Save Semantic Mappings Button -->
-          <div class="tw:flex tw:justify-end tw:mt-4">
+          <div class="flex justify-end mt-4">
             <OButton
               variant="primary"
               size="sm-action"

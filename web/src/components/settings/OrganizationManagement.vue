@@ -15,16 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
-    <div class="tw:flex tw:flex-col tw:h-full">
+  <div class="rounded-md flex flex-col h-full p-0">
+    <div class="flex flex-col h-full">
       <!-- Standard section header: title only. Search moved into the table toolbar. -->
       <AppPageHeader
         :title="t('settings.organizationManagement')"
         icon="lan"
         :subtitle="'Create and manage organizations'"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="shrink-0 px-4 border-b border-border-default"
       />
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:mt-2.5 tw:overflow-hidden">
+      <div class="card-container flex-1 min-h-0 mt-2.5 overflow-hidden">
       <OTable
         :frame="false"
         data-test="org-management-list-table"
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             data-test="org-management-search-input"
             v-model="filterQuery"
-            class="tw:w-64 no-border o2-search-input"
+            class="w-64 no-border o2-search-input"
             :placeholder="t('settings.searchOrgs')"
           />
         </template>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+          <div class="flex items-center gap-1 justify-center">
             <OButton
               variant="ghost"
               size="icon-xs-circle"
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-circle"
               icon-left="cloud-done"
               disabled
-              class="tw:text-green-500"
+              class="text-green-500"
               data-test="org-management-storage-enabled-btn"
             >
               <OTooltip content="Storage Enabled" />
@@ -140,18 +140,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="extendTrialPrompt = false"
       @click:primary="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3">
-        <div class="tw:font-bold">Week(s)</div>
-        <div class="tw:flex tw:gap-1">
+      <div class="flex flex-col gap-3">
+        <div class="font-bold">Week(s)</div>
+        <div class="flex gap-1">
           <span
             v-for="page in 4"
             :key="page"
             @click="extendedTrial = page"
             :class="[
-              'tw:cursor-pointer tw:px-2 tw:py-1 tw:border tw:border-gray-300',
+              'cursor-pointer px-2 py-1 border border-gray-300',
               extendedTrial === page
-                ? 'tw:bg-(--o2-primary-btn-bg) tw:text-(--o2-primary-btn-text) tw:border-(--o2-primary-btn-bg)'
-                : 'tw:bg-white tw:text-gray-700 tw:border-gray-300',
+                ? 'bg-(--o2-primary-btn-bg) text-(--o2-primary-btn-text) border-(--o2-primary-btn-bg)'
+                : 'bg-white text-gray-700 border-gray-300',
             ]"
           >
             {{ page }}
@@ -171,8 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="contractPrompt = false"
       @click:primary="submitContract"
     >
-      <div class="tw:mb-3">
-        <div class="tw:font-bold tw:mb-1">
+      <div class="mb-3">
+        <div class="font-bold mb-1">
           {{ contractMode === 'create' ? 'End Date' : 'New End Date' }}
         </div>
         <OInput
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="contractMode === 'extend' && contractDataRow?.contract_end_date"
-        class="tw:text-xs tw:text-gray-500"
+        class="text-xs text-gray-500"
       >
         Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
       </div>

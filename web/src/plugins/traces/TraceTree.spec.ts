@@ -420,7 +420,7 @@ describe("TraceTree", () => {
 
       const highlightedSpans = wrapper
         .findAll('[data-test^="trace-tree-span-service-name-"]')
-        .filter((el) => el.classes().includes("tw:bg-yellow-300"));
+        .filter((el) => el.classes().includes("bg-yellow-300"));
       expect(highlightedSpans.length).toBeGreaterThan(0);
     });
 
@@ -433,7 +433,7 @@ describe("TraceTree", () => {
 
       const currentMatch = wrapper
         .findAll('[data-test^="trace-tree-span-service-name-"]')
-        .filter((el) => el.classes().includes("tw:text-red-600"));
+        .filter((el) => el.classes().includes("text-red-600"));
       expect(currentMatch.length).toBeGreaterThan(0);
     });
 
@@ -446,7 +446,7 @@ describe("TraceTree", () => {
 
       const highlightedSpans = wrapper
         .findAll('[data-test^="trace-tree-span-service-name-"]')
-        .filter((el) => el.classes().includes("tw:bg-yellow-300"));
+        .filter((el) => el.classes().includes("bg-yellow-300"));
       expect(highlightedSpans.length).toBe(0);
     });
 

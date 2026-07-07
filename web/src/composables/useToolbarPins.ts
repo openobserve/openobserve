@@ -16,6 +16,7 @@ import { computed, ref } from "vue";
 
 // Canonical keys for every pinnable item in the logs More menu.
 export type ToolbarPinKey =
+  | "histogram"
   | "sqlMode"
   | "quickMode"
   | "functionEditor"
@@ -25,6 +26,7 @@ export type ToolbarPinKey =
 // Fixed left-to-right render order for pinned controls. Pinning never changes an
 // item's position — it only toggles whether the item is shown outside the menu.
 export const TOOLBAR_PIN_ORDER: ToolbarPinKey[] = [
+  "histogram",
   "sqlMode",
   "quickMode",
   "functionEditor",
@@ -34,18 +36,32 @@ export const TOOLBAR_PIN_ORDER: ToolbarPinKey[] = [
 
 const STORAGE_KEY = "logs_toolbar_pinned_items";
 
+// Histogram was a fixed toolbar control before it became pinnable, so it is
+// pinned by default. Its absence from STORAGE_KEY (including arrays persisted
+// before histogram existed as a pin key) means "never decided", not "unpinned" —
+// this flag records the user's first explicit pin/unpin of histogram, after
+// which STORAGE_KEY alone is authoritative.
+const HISTOGRAM_PIN_DECIDED_KEY = "logs_toolbar_histogram_pin_decided";
+
 const isValidKey = (key: string): key is ToolbarPinKey =>
   (TOOLBAR_PIN_ORDER as string[]).includes(key);
 
 const readInitial = (): ToolbarPinKey[] => {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((k): k is ToolbarPinKey => typeof k === "string" && isValidKey(k));
+    const parsed = raw ? JSON.parse(raw) : [];
+    const pins: ToolbarPinKey[] = Array.isArray(parsed)
+      ? parsed.filter(
+          (k): k is ToolbarPinKey => typeof k === "string" && isValidKey(k),
+        )
+      : [];
+    const histogramDecided =
+      window.localStorage.getItem(HISTOGRAM_PIN_DECIDED_KEY) === "true";
+    if (!histogramDecided && !pins.includes("histogram"))
+      pins.push("histogram");
+    return pins;
   } catch {
-    return [];
+    return ["histogram"];
   }
 };
 
@@ -72,6 +88,13 @@ export function useToolbarPins() {
     if (next.has(key)) next.delete(key);
     else next.add(key);
     pinnedSet.value = next;
+    if (key === "histogram") {
+      try {
+        window.localStorage.setItem(HISTOGRAM_PIN_DECIDED_KEY, "true");
+      } catch {
+        // localStorage may be unavailable — the default-pinned fallback reapplies next session.
+      }
+    }
     persist();
   };
 

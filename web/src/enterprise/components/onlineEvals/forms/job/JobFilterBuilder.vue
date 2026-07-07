@@ -1,17 +1,17 @@
 <template>
-  <div class="tw:mb-4">
-    <div class="tw:flex tw:flex-col tw:gap-0.5 tw:mb-2">
-      <span class="tw:text-xs tw:font-semibold tw:text-text-primary">{{ t("onlineEvals.job.filter.title") }}</span>
-      <span class="tw:text-[11.5px] tw:text-text-secondary">{{ t("onlineEvals.job.filter.hint") }}</span>
+  <div class="mb-4">
+    <div class="flex flex-col gap-0.5 mb-2">
+      <span class="text-xs font-semibold text-text-primary">{{ t("onlineEvals.job.filter.title") }}</span>
+      <span class="text-[11.5px] text-text-secondary">{{ t("onlineEvals.job.filter.hint") }}</span>
     </div>
-    <div class="job-filter__group tw:min-w-0">
+    <div class="job-filter__group min-w-0">
       <FilterGroup
         :group="group"
         :depth="0"
         :stream-fields="streamFields"
         :stream-fields-map="streamFieldsMap"
         :show-sql-preview="true"
-        condition-input-width="tw:w-[220px]"
+        condition-input-width="w-[150px]"
         :allow-custom-columns="true"
         module="alerts"
         @add-condition="handleUpdate"

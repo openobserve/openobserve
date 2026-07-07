@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md tw:p-0" style="min-height: inherit; height: calc(100vh - 88px);">
+  <div class="rounded-md p-0" style="min-height: inherit; height: calc(100vh - 88px);">
     <div v-if="!showAddDialog">
       <!-- Standard section header: title + actions only. Search moved into the
            table toolbar below. -->
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('aiToolset.header')"
         icon="smart-toy"
         :subtitle="'Configure AI tool integrations'"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="shrink-0 px-4 border-b border-border-default"
       >
         <template #actions>
           <OButton
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </AppPageHeader>
 
       <!-- Table -->
-      <div class="card-container tw:mt-2.5 tw:overflow-hidden">
+      <div class="card-container mt-2.5 overflow-hidden">
       <OTable
         :frame="false"
         :data="visibleRows"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar>
           <OSearchInput
             v-model="filterQuery"
-            class="tw:w-64 no-border o2-search-input"
+            class="w-64 no-border o2-search-input"
             :placeholder="t('aiToolset.search')"
           />
         </template>
