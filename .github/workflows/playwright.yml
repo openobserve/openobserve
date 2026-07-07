@@ -318,6 +318,8 @@ jobs:
                 "dashboard-table-chart.spec.js",
                 "dashboard-table-copy-cell.spec.js",
                 "dashboard-table-csv-download.spec.js",
+                "dashboard-table-column-formatting.spec.js",
+                "dashboard-table-column-filtering.spec.js",
                 "dashboard-metric-camelcase.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
