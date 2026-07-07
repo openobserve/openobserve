@@ -98,6 +98,13 @@ fn create_synthetics_runs_table() -> TableCreateStatement {
                 .big_integer()
                 .null(),
         )
+        .foreign_key(
+            ForeignKey::create()
+                .name("fk_synthetics_runs_synthetics_id")
+                .from(SyntheticsRuns::Table, SyntheticsRuns::SyntheticsId)
+                .to(SyntheticsMonitors::Table, SyntheticsMonitors::Id)
+                .on_delete(ForeignKeyAction::Cascade),
+        )
         .to_owned()
 }
 
@@ -127,6 +134,12 @@ enum SyntheticsRuns {
     CompletedAt,
 }
 
+#[derive(DeriveIden)]
+enum SyntheticsMonitors {
+    Table,
+    Id,
+}
+
 #[cfg(test)]
 mod tests {
     use collapse::*;
@@ -148,7 +161,8 @@ mod tests {
                 "jobs_done" integer NOT NULL DEFAULT 0,
                 "run_result" integer,
                 "created_at" bigint NOT NULL,
-                "completed_at" bigint
+                "completed_at" bigint,
+                CONSTRAINT "fk_synthetics_runs_synthetics_id" FOREIGN KEY ("synthetics_id") REFERENCES "synthetics_monitors" ("id") ON DELETE CASCADE
             )"#
         );
         assert_eq!(
@@ -172,7 +186,8 @@ mod tests {
                 "jobs_done" integer NOT NULL DEFAULT 0,
                 "run_result" integer,
                 "created_at" bigint NOT NULL,
-                "completed_at" bigint
+                "completed_at" bigint,
+                CONSTRAINT "fk_synthetics_runs_synthetics_id" FOREIGN KEY ("synthetics_id") REFERENCES "synthetics_monitors" ("id") ON DELETE CASCADE
             )"#
         );
     }

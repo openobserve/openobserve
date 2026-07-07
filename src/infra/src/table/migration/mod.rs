@@ -133,7 +133,6 @@ mod m20260624_000005_add_destinations_to_synthetics_monitors;
 mod m20260626_000001_create_synthetics_probe_tokens;
 mod m20260629_000001_create_gen_ai_agents_table;
 mod m20260706_000001_create_synthetics_runs;
-mod m20260707_000001_add_fk_synthetics_runs_monitor;
 
 pub struct Migrator;
 
