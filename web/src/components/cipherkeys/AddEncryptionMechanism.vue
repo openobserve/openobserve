@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="cipher-keys-add-encryption-mechanism tw:flex tw:flex-col tw:gap-y-2">
+  <div class="cipher-keys-add-encryption-mechanism flex flex-col gap-y-2">
     <!-- Both selects are OForm* controls connected to the parent OForm (in
          AddCipherKey.vue) by `name`; their rules live in AddCipherKey.schema.ts.
          No manual error/touched refs, no validate() — the parent schema gates. -->
@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       name="key.mechanism.type"
       :label="t('cipherKey.providerType')"
       required
-      class="tw:w-full"
+      class="w-full"
       :options="providerTypeOptions"
       labelKey="label"
       valueKey="value"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       name="key.mechanism.simple_algorithm"
       :label="t('cipherKey.algorithm')"
       required
-      class="tw:w-full"
+      class="w-full"
       :options="plainAlgorithmOptions"
       labelKey="label"
       valueKey="value"

@@ -14,13 +14,13 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:rounded-md tw:p-0" style="min-height: inherit;">
+  <div class="rounded-md p-0" style="min-height: inherit;">
     <AppPageHeader
       :back="{
         label: t('cipherKey.header'),
         onClick: () => emit('cancel:hideform'),
       }"
-      class="tw:px-3 tw:border-b tw:border-border-default"
+      class="px-3 border-b border-border-default"
     >
       <template #title>
         <span data-test="add-template-title">
@@ -38,15 +38,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Constrain the whole form to a sensible reading width on wide screens
                while staying fluid below the breakpoint. Uses Tailwind's design-system
                max-width token (max-w-3xl ≈ 48rem) instead of arbitrary px values. -->
-          <div class="tw:w-full tw:max-w-3xl">
-            <div class="tw:flex">
-              <div class="tw:w-1/3 o2-input tw:flex tw:mx-3 tw:mt-3 tw:mb-4">
+          <div class="w-full max-w-3xl">
+            <div class="flex">
+              <div class="w-1/3 o2-input flex mx-3 mt-3 mb-4">
                 <OFormInput
                   data-test="add-cipher-key-name-input"
                   name="name"
                   :label="t('cipherKey.name')"
                   required
-                  class="tw:w-full"
+                  class="w-full"
                   :readonly="isUpdatingCipherKey"
                   :disabled="isUpdatingCipherKey"
                   tabindex="0"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 orientation="vertical"
                 animated
                 navigable
-                class="tw:mx-3 tw:p-0 tw:h-full"
+                class="mx-3 p-0 h-full"
               >
                 <OStep
                   data-test="cipher-key-key-store-detils-step"
@@ -70,13 +70,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :done="step > 1"
                 >
                   <div>
-                    <div class="tw:w-full">
+                    <div class="w-full">
                       <OFormSelect
                         data-test="add-cipher-key-type-input"
                         name="key.store.type"
                         :label="t('cipherKey.type')"
                         required
-                        class="tw:w-full"
+                        class="w-full"
                         :options="cipherKeyTypes"
                         labelKey="label"
                         valueKey="value"
@@ -85,15 +85,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <add-openobserve-type
                       v-if="storeType === 'local'"
-                      class="tw:mt-2"
+                      class="mt-2"
                       :is-update="isUpdatingCipherKey"
                     />
                     <add-akeyless-type
                       v-else-if="storeType === 'akeyless'"
-                      class="tw:mt-2"
+                      class="mt-2"
                       :is-update="isUpdatingCipherKey"
                     />
-                    <div class="tw:flex tw:gap-2 tw:mt-4">
+                    <div class="flex gap-2 mt-4">
                       <OButton
                         data-test="add-report-step1-continue-btn"
                         variant="primary"
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :done="step > 2"
                 >
                   <add-encryption-mechanism />
-                  <div class="tw:flex tw:gap-2 tw:mt-4">
+                  <div class="flex gap-2 mt-4">
                     <OButton
                       data-test="add-cipher-key-step2-back-btn"
                       variant="outline"
@@ -131,8 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <div class="tw:mx-2">
-          <div class="tw:flex tw:justify-end tw:px-2 tw:py-4 tw:w-full tw:gap-2 tw:border-t tw:border-border-default"
+        <div class="mx-2">
+          <div class="flex justify-end px-2 py-4 w-full gap-2 border-t border-border-default"
             style="position: sticky; bottom: 0px; z-index: 2"
           >
             <OButton

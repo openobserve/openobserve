@@ -616,7 +616,7 @@ export class CorrelationSettingsPage {
         // Available dimensions are in the second q-list (right side) within service-identity-config
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
+        // Lists have q-list--bordered class (from Quasar bordered prop) and h-80 height class
         const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const rightList = lists.last();
         await rightList.waitFor({ state: 'visible', timeout: 5000 });
@@ -634,7 +634,7 @@ export class CorrelationSettingsPage {
         // Priority dimensions are in the first q-list (left side) within service-identity-config
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
+        // Lists have q-list--bordered class (from Quasar bordered prop) and h-80 height class
         const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const leftList = lists.first();
         await leftList.waitFor({ state: 'visible', timeout: 5000 });
@@ -651,7 +651,7 @@ export class CorrelationSettingsPage {
     async getPriorityDimensionsCount() {
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
+        // Lists have q-list--bordered class (from Quasar bordered prop) and h-80 height class
         const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const leftList = lists.first();
         await leftList.waitFor({ state: 'visible', timeout: 5000 });
@@ -666,7 +666,7 @@ export class CorrelationSettingsPage {
      */
     async expectPriorityDimensionExists(dimensionName) {
         const serviceConfig = this.page.locator('.service-identity-config');
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
+        // Lists have q-list--bordered class (from Quasar bordered prop) and h-80 height class
         const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const leftList = lists.first();
         const item = leftList.locator('[role="option"], [data-test$="-item"]').filter({ hasText: dimensionName }).first(); // TODO: verify data-test
@@ -679,7 +679,7 @@ export class CorrelationSettingsPage {
      */
     async expectPriorityDimensionNotExists(dimensionName) {
         const serviceConfig = this.page.locator('.service-identity-config');
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
+        // Lists have q-list--bordered class (from Quasar bordered prop) and h-80 height class
         const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const leftList = lists.first();
         const item = leftList.locator('[role="option"], [data-test$="-item"]').filter({ hasText: dimensionName }).first(); // TODO: verify data-test
@@ -857,7 +857,7 @@ export class CorrelationSettingsPage {
     async getFirstAvailableDimensionName() {
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
+        // Lists have q-list--bordered class (from Quasar bordered prop) and h-80 height class
         const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const rightList = lists.last();
         await rightList.waitFor({ state: 'visible', timeout: 5000 });
@@ -881,7 +881,7 @@ export class CorrelationSettingsPage {
     async getFirstPriorityDimensionName() {
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
+        // Lists have q-list--bordered class (from Quasar bordered prop) and h-80 height class
         const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const leftList = lists.first();
         await leftList.waitFor({ state: 'visible', timeout: 5000 });

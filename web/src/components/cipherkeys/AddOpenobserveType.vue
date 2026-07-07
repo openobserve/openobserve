@@ -25,13 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="key.store.local"
         :label="t('cipherKey.secret')"
         required
-        class="tw:w-full tw:pb-1"
+        class="w-full pb-1"
       />
       <OButton
         data-test="add-cipher-key-openobserve-secret-input-cancel"
         variant="outline"
         size="sm-action"
-        class="tw:mt-2"
+        class="mt-2"
         v-if="isUpdate && localValue != ''"
         @click="showSecretEdit = false"
       >
@@ -41,10 +41,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Read-only display branch (edit mode, secret present, not editing): pure
          UI outside the form (R1) — not an editable field. -->
     <div v-else>
-      <label class="tw:flex q-field tw:mb-3">
+      <label class="flex q-field mb-3">
         <b>{{ t('cipherKey.secret') }}</b>
       </label>
-      <pre class="tw:[text-wrap:auto] tw:break-words tw:border tw:border-(--o2-border-input) tw:p-[5px] tw:mb-[5px]">{{ localValue }}</pre>
+      <pre class="[text-wrap:auto] break-words border border-(--o2-border-input) p-[5px] mb-[5px]">{{ localValue }}</pre>
       <OButton
         data-test="add-cipher-key-openobserve-secret-input-update"
         variant="primary"

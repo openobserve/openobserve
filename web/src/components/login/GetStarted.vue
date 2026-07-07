@@ -1,7 +1,7 @@
 ﻿<template>
-<div class="tw:flex tw:h-screen">
+<div class="flex h-screen">
   <!-- Left Banner Section -->
-  <div class="tw:hidden tw:lg:flex tw:lg:w-[40%] tw:bg-[url('@/assets/images/common/openobserve_banner_compreesed.png')] tw:bg-cover tw:bg-center tw:bg-no-repeat">
+  <div class="hidden lg:flex lg:w-[40%] bg-[url('@/assets/images/common/openobserve_banner_compreesed.png')] bg-cover bg-center bg-no-repeat">
 
     <div style="display: flex; justify-content: start; align-items: end; height: 100%;">
     <div style="margin-bottom: 34px; margin-left: 32px;">
@@ -16,15 +16,15 @@
 
   <!-- Right Form Section -->
   <div :class="[
-    store.state.theme == 'dark' ? 'tw:bg-black' : 'tw:bg-white'
-  ]" class="tw:w-full tw:lg:w-[60%]  tw:h-full tw:flex tw:flex-col tw:justify-center tw:items-center tw:relative">
+    store.state.theme == 'dark' ? 'bg-black' : 'bg-white'
+  ]" class="w-full lg:w-[60%]  h-full flex flex-col justify-center items-center relative">
 
     <!-- Top Section: Logo and Heading -->
-    <div class="tw:flex tw:flex-col tw:items-center tw:mb-4">
+    <div class="flex flex-col items-center mb-4">
       <img style="height: 64px;" src="@/assets/images/common/o2_logo.svg" alt="Get Started Banner" />
-      <div class="tw:text-[24px] tw:md:text-[32px] tw:font-semibold  tw:text-center"
+      <div class="text-[24px] md:text-[32px] font-semibold  text-center"
       :class="[
-        store.state.theme == 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#525252]'
+        store.state.theme == 'dark' ? 'text-[#ffffff]' : 'text-[#525252]'
       ]"
       >
         One last thing before we begin
@@ -33,9 +33,9 @@
 
     <!-- Form Section -->
 <!-- Form Section -->
-<div class="tw:w-full tw:flex tw:justify-center">
-  <div class="tw:w-full tw:max-w-[500px] tw:flex tw:flex-col tw:items-center tw:gap-y-2 tw:px-4">
-    <OForm ref="formRef" :schema="getStartedSchema" :default-values="getStartedDefaults()" @submit="doSubmit" v-slot="{ isSubmitting }" class="tw:w-full tw:flex tw:flex-col tw:gap-y-2">
+<div class="w-full flex justify-center">
+  <div class="w-full max-w-[500px] flex flex-col items-center gap-y-2 px-4">
+    <OForm ref="formRef" :schema="getStartedSchema" :default-values="getStartedDefaults()" @submit="doSubmit" v-slot="{ isSubmitting }" class="w-full flex flex-col gap-y-2">
     <OFormInput
       name="hearAboutUs"
       data-test="onboarding-get-started-hear-about-us"
@@ -48,24 +48,24 @@
     <OFormInput
       name="whereDoYouWork"
       data-test="onboarding-get-started-where-do-you-work"
-      class="tw:-mt-2"
+      class="-mt-2"
       label="Where do you work?"
       required
       placeholder="Company Name"
       style="width: 100%;"
     />
-    <div class="tw:w-full">
+    <div class="w-full">
       <OFormCheckbox name="isAgree" data-test="onboarding-get-started-agree-checkbox">
         <template #label>
-          <span class="tw:text-sm">
+          <span class="text-sm">
             I have read and agree with the
-            <a href="#" class="tw:text-[#6B76E3] hover:underline">Terms of use</a> and
-            <a href="#" class="tw:text-[#6B76E3] hover:underline">Privacy policy*</a>
+            <a href="#" class="text-[#6B76E3] hover:underline">Terms of use</a> and
+            <a href="#" class="text-[#6B76E3] hover:underline">Privacy policy*</a>
           </span>
         </template>
       </OFormCheckbox>
     </div>
-    <div class="tw:w-full tw:mt-4">
+    <div class="w-full mt-4">
       <OButton
         data-test="onboarding-get-started-submit-btn"
         variant="primary"
@@ -84,9 +84,9 @@
 
 
     <!-- Footer -->
-    <div class="tw:absolute tw:bottom-5 tw:text-sm tw:mb-[16px]"
+    <div class="absolute bottom-5 text-sm mb-[16px]"
     :class="[
-      store.state.theme == 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#767676]'
+      store.state.theme == 'dark' ? 'text-[#ffffff]' : 'text-[#767676]'
     ]"
     >
       &copy; OpenObserve <span id="year">{{ new Date().getFullYear() }}</span>

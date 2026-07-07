@@ -27,7 +27,7 @@ if (import.meta.env.DEV && !form) {
     :name="props.name"
   >
     <template #default="{ field }">
-      <div class="tw:flex tw:flex-col tw:gap-1">
+      <div class="flex flex-col gap-1">
         <OSlider
           v-bind="$attrs"
           :label="props.label"
@@ -62,7 +62,7 @@ if (import.meta.env.DEV && !form) {
           v-if="
             field.state.meta.errors.length > 0
           "
-          class="tw:text-xs tw:text-slider-error-text"
+          class="text-xs text-slider-error-text"
         >
           {{ firstFieldError(field.state.meta.errors) }}
         </div>

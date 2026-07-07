@@ -443,10 +443,10 @@ describe("OTable", () => {
       });
 
       const idCell = wrapper.find('[data-test="o2-table-cell-id"]');
-      expect(idCell.classes()).toContain("tw:text-center");
+      expect(idCell.classes()).toContain("text-center");
 
       const nameCell = wrapper.find('[data-test="o2-table-cell-name"]');
-      expect(nameCell.classes()).toContain("tw:text-right");
+      expect(nameCell.classes()).toContain("text-right");
     });
   });
 

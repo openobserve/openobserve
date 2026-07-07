@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="(v) => { if (!v) handleClose() }"
   >
     <template #header-right>
-      <div class="tw:flex tw:items-center tw:gap-2">
+      <div class="flex items-center gap-2">
         <OTag type="serviceStatus" :value="serviceHealth.status" data-test="service-health-badge">{{ serviceHealth.text }}</OTag>
         <ODropdown side="bottom" align="start">
           <template #trigger>
@@ -53,29 +53,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Content Scrollable Area -->
-      <div class="panel-content tw:flex-1 tw:overflow-y-auto tw:overflow-x-hidden tw:bg-[#0f1419] tw:p-2.5">
+      <div class="panel-content flex-1 overflow-y-auto overflow-x-hidden bg-[#0f1419] p-2.5">
         <!-- RED Charts Section -->
         <div
           v-if="streamFilter !== 'all' && dashboardData"
-          class="panel-section red-charts-section tw:flex tw:flex-col tw:p-0 tw:mb-0!"
+          class="panel-section red-charts-section flex flex-col p-0 mb-0!"
           data-test="service-graph-side-panel-red-charts"
         >
           <!-- DataZoom filter chips + View in Traces button -->
           <div
             v-if="filterChips.length"
-            class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-[0.3rem] tw:flex-wrap"
+            class="flex items-center gap-2 px-2 py-[0.3rem] flex-wrap"
             data-test="service-graph-side-panel-filter-chips"
           >
             <!-- Filter chip pills -->
             <div
               v-for="chip in filterChips"
               :key="chip.key"
-              class="tw:inline-flex tw:items-center tw:gap-1 tw:rounded tw:border tw:border-[var(--o2-border)] tw:px-2 tw:py-[0.325rem] tw:text-[0.7rem] tw:leading-none tw:text-[var(--o2-text-primary)]"
+              class="inline-flex items-center gap-1 rounded border border-[var(--o2-border)] px-2 py-[0.325rem] text-[0.7rem] leading-none text-[var(--o2-text-primary)]"
               :data-test="`service-graph-filter-chip-${chip.key}`"
               :class="
                 chip.type === 'duration'
-                  ? 'tw:text-[var(--o2-latency-p95)]'
-                  : 'tw:text-[var(--o2-status-error-text)]'
+                  ? 'text-[var(--o2-latency-p95)]'
+                  : 'text-[var(--o2-status-error-text)]'
               "
             >
               <!-- Duration chip icon -->
@@ -83,27 +83,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="chip.type === 'duration'"
                 name="schedule"
                 size="xs"
-                class="tw:text-[var(--o2-latency-p95)]"
+                class="text-[var(--o2-latency-p95)]"
               />
               <!-- Error chip icon -->
               <OIcon
                 v-else-if="chip.type === 'error'"
                 name="warning"
                 size="xs"
-                class="tw:text-[var(--o2-status-error-text)]"
+                class="text-[var(--o2-status-error-text)]"
               />
               <span
                 :class="
                   chip.type === 'duration'
-                    ? 'tw:text-[var(--o2-latency-p95)]'
-                    : 'tw:text-[var(--o2-status-error-text)]'
+                    ? 'text-[var(--o2-latency-p95)]'
+                    : 'text-[var(--o2-status-error-text)]'
                 "
                 >{{ chip.label }}</span
               >
               <OButton
                 variant="ghost"
                 size="icon-chip"
-                class="tw:ml-0.5"
+                class="ml-0.5"
                 :data-test="`service-graph-filter-chip-remove-${chip.key}`"
                 @click="removeLocalRangeFilter(chip.key)"
               >
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Spacer -->
-            <div class="tw:flex-1" />
+            <div class="flex-1" />
 
             <!-- View in Traces button -->
             <OButton
@@ -127,8 +127,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               View Traces
             </OButton>
           </div>
-          <div class="charts-wrapper tw:py-0! tw:min-h-[10.875rem] tw:w-full">
-            <div class="charts-container tw:w-full">
+          <div class="charts-wrapper py-0! min-h-[10.875rem] w-full">
+            <div class="charts-container w-full">
               <RenderDashboardCharts
                 ref="dashboardChartsRef"
                 :viewOnly="true"
@@ -143,18 +143,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <OSeparator v-if="streamFilter !== 'all' && dashboardData" class="tw:my-[1rem]!" />
+        <OSeparator v-if="streamFilter !== 'all' && dashboardData" class="my-[1rem]!" />
         <!-- Tabs: Operations / Nodes / Pods -->
         <template v-if="streamFilter !== 'all'">
           <div
-            class="tw:flex tw:items-end tw:border-b tw:border-b-[var(--o2-border-color)] tw:mx-[0.5rem] tw:mb-[0.375rem]"
+            class="flex items-end border-b border-b-[var(--o2-border-color)] mx-[0.5rem] mb-[0.375rem]"
             data-test="service-graph-node-panel-tabs-row"
           >
             <OTabs
               v-model="activeTab"
               dense
               align="left"
-              class="tw:font-bold tw:flex-1 tw:w-[calc(100%-2rem)]!"
+              class="font-bold flex-1 w-[calc(100%-2rem)]!"
               data-test="service-graph-node-panel-tabs"
             >
               <OTab
@@ -198,12 +198,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </template>
               <div
-                class="tw:min-w-[12rem]!"
+                class="min-w-[12rem]!"
                 data-test="service-graph-node-panel-workload-fields-menu"
               >
                 <template v-for="env in detectedEnvironments" :key="env.key">
                   <div
-                    class="tw:text-xs tw:px-3 tw:pb-0 tw:py-[0.375rem]! tw:uppercase tw:tracking-wide tw:text-muted-foreground"
+                    class="text-xs px-3 pb-0 py-[0.375rem]! uppercase tracking-wide text-muted-foreground"
                   >
                     {{ env.label }}
                   </div>
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     )"
                     :key="cfg.id"
                     :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
-                    class="tw:px-[0.325rem]! tw:h-[30px]! tw:min-h-[30px]!"
+                    class="px-[0.325rem]! h-[30px]! min-h-[30px]!"
                     @select="(e) => { e.preventDefault(); toggleWorkloadField(cfg.id); }"
                   >
                     <template #icon-left>
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </span>
                     </template>
-                    <span class="tw:text-xs">
+                    <span class="text-xs">
                       {{ cfg.label }}
                       <OTooltip :content="cfg.groupField" />
                     </span>
@@ -238,19 +238,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Operations Tab -->
             <OTabPanel
               name="operations"
-              class="tw:p-0! panel-section tw:mb-0!"
+              class="p-0! panel-section mb-0!"
               data-test="service-graph-side-panel-recent-operations"
             >
               <div
                 v-if="recentOperations.length === 0 && !loadingOperations"
-                class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                class="text-xs italic py-2 text-center"
                 style="color: var(--o2-text-secondary)"
               >
                 No operations found
               </div>
               <div
                   v-else-if="recentOperations.length > 0 || loadingOperations"
-                  class="tw:overflow-hidden tw:rounded"
+                  class="overflow-hidden rounded"
                   data-test="service-graph-side-panel-operations-table"
                 >
                   <TenstackTable
@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         :class="
                           item.errors > 0
-                            ? 'tw:text-[var(--q-negative)] tw:font-semibold'
+                            ? 'text-[var(--q-negative)] font-semibold'
                             : ''
                         "
                         >{{ item.errors }}</span
@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="active"
                         variant="ghost"
                         size="icon"
-                        class="tw:ml-1 tw:absolute! tw:right-2!"
+                        class="ml-1 absolute! right-2!"
                         data-test="service-graph-side-panel-view-traces-btn"
                         @click.stop="
                           navigateToTraces({
@@ -329,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                     <template #empty>
                       <div
-                        class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                        class="text-xs italic py-2 text-center"
                         style="color: var(--o2-text-secondary)"
                       >
                         No operations found
@@ -345,19 +345,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="cfg in activeResourceTabConfigs"
               :key="cfg.id"
               :name="cfg.id"
-              class="tw:p-0! panel-section tw:mb-3"
+              class="p-0! panel-section mb-3"
               :data-test="`service-graph-side-panel-${cfg.id}`"
             >
               <div
                 v-if="!resourceTabData[cfg.id]?.length && !resourceTabLoading[cfg.id]"
-                class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                class="text-xs italic py-2 text-center"
                 style="color: var(--o2-text-secondary)"
               >
                 No {{ cfg.label.toLowerCase() }} data found
               </div>
               <div
                 v-else-if="resourceTabData[cfg.id]?.length > 0 || resourceTabLoading[cfg.id]"
-                class="tw:overflow-hidden tw:rounded"
+                class="overflow-hidden rounded"
                 :data-test="`service-graph-side-panel-${cfg.id}-table`"
               >
                 <TenstackTable
@@ -388,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="active"
                       variant="ghost"
                       size="icon"
-                      class="tw:ml-1 tw:absolute! tw:right-2!"
+                      class="ml-1 absolute! right-2!"
                       :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                       @click.stop="
                         navigateToTraces({
@@ -408,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       :class="
                         item.errors > 0
-                          ? 'tw:text-[var(--q-negative)] tw:font-semibold'
+                          ? 'text-[var(--q-negative)] font-semibold'
                           : ''
                       "
                       >{{ item.errors }}</span
@@ -438,7 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template #empty>
                     <div
-                      class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                      class="text-xs italic py-2 text-center"
                       style="color: var(--o2-text-secondary)"
                     >
                       No {{ cfg.label.toLowerCase() }} data found
@@ -452,13 +452,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTabPanel
               v-if="!isInferred"
               name="metrics"
-              class="tw:p-0! panel-section tw:mb-0! tw:h-full!"
+              class="p-0! panel-section mb-0! h-full!"
               data-test="service-graph-side-panel-metrics"
             >
               <!-- Loading state -->
               <div
                 v-if="metricsCorrelationLoading"
-                class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
+                class="flex items-center gap-2 py-3 text-sm"
                 style="color: var(--o2-text-secondary)"
                 data-test="service-graph-side-panel-metrics-loading"
               >
@@ -469,7 +469,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Error state -->
               <div
                 v-else-if="metricsCorrelationError"
-                class="tw:flex tw:flex-col tw:items-center tw:gap-3 tw:py-6 tw:text-center tw:text-sm"
+                class="flex flex-col items-center gap-3 py-6 text-center text-sm"
                 style="color: var(--o2-text-secondary)"
                 data-test="service-graph-side-panel-metrics-error"
               >
@@ -512,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Empty state -->
               <div
                 v-else-if="metricsCorrelationLoaded"
-                class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                class="text-xs italic py-2 text-center"
                 style="color: var(--o2-text-secondary)"
                 data-test="service-graph-side-panel-metrics-empty"
               >

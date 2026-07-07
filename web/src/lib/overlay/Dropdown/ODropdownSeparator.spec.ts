@@ -10,6 +10,6 @@ describe("ODropdownSeparator", () => {
 
   it("applies separator bg class", () => {
     const wrapper = mount(ODropdownSeparator);
-    expect(wrapper.classes().join(" ")).toContain("tw:bg-dropdown-separator");
+    expect(wrapper.classes().join(" ")).toContain("bg-dropdown-separator");
   });
 });
