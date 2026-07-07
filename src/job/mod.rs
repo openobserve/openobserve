@@ -481,11 +481,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         });
     }
 
-    // Domain management (allow-list + blocklist) is enforced in the auth path — `validate_credentials`,
-    // `validate_credentials_ext` and `process_token` — which runs on ALL node roles, including
-    // single-role routers. Initialize and watch its cache BEFORE the router early-return below so a
-    // router keeps the blocklist fresh; otherwise its cache would go stale and a newly-blocked user
-    // could keep authenticating/ingesting through that router.
+    // Domain management (allow-list + blocklist) is enforced in the auth path —
+    // `validate_credentials`, `validate_credentials_ext` and `process_token` — which runs on
+    // ALL node roles, including single-role routers. Initialize and watch its cache BEFORE the
+    // router early-return below so a router keeps the blocklist fresh; otherwise its cache
+    // would go stale and a newly-blocked user could keep authenticating/ingesting through that
+    // router.
     #[cfg(feature = "enterprise")]
     {
         o2_enterprise::enterprise::domain_management::db::cache()
