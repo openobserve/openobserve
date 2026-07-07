@@ -540,6 +540,9 @@ export const convertPromQLData = async (
       min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       axisLabel: {
+        // hide colliding tick labels instead of drawing them on top of each
+        // other (short panels fit fewer labels than ECharts offers)
+        hideOverlap: true,
         formatter: function (name: any) {
           return formatUnitValue(
             getUnitValue(
