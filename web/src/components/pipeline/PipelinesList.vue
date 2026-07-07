@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="pipeline-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="flex flex-col h-full min-h-0"
     v-if="currentRouteName === 'pipelines'"
   >
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="card-container h-full">
       <OTable
         :frame="false"
         :key="activeTab"
@@ -42,13 +42,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:selected-ids="selectedPipelineIds"
         :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
         :expand-on-row-click="(row: any) => row.source?.source_type === 'scheduled'"
-        :row-class="(row: any) => row.source?.source_type === 'scheduled' ? 'tw:cursor-pointer' : ''"
+        :row-class="(row: any) => row.source?.source_type === 'scheduled' ? 'cursor-pointer' : ''"
         v-model:expanded-ids="expandedId"
         width="100%"
-        class="tw:w-full tw:h-full"
+        class="w-full h-full"
       >
         <template #toolbar>
-          <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+          <div class="flex items-center gap-2 w-full">
             <OToggleGroup
               :model-value="activeTab"
               @update:model-value="(v) => { activeTab = v as string; updateActiveTab(); }"
@@ -67,11 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("pipeline_list.tab_realtime") }}
               </OToggleGroupItem>
             </OToggleGroup>
-            <div class="tw:flex-1 tw:min-w-0">
+            <div class="flex-1 min-w-0">
               <OInput
                 data-test="pipeline-list-search-input"
                 v-model="filterQuery"
-                class="tw:w-full"
+                class="w-full"
                 :placeholder="t('pipeline.search')"
               >
                 <template #icon-left>
@@ -87,15 +87,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center actions-container">
+          <div class="flex items-center actions-container">
             <OButton
               :data-test="`pipeline-list-${row.name}-pause-start-action`"
-              variant="ghost"
+              :data-row-action="row.enabled ? 'pause' : 'resume'"
+              :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
               size="icon-sm"
-              :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
               @click.stop="togglePipeline(row)"
-            />
+            >
+              <OTooltip
+                side="bottom"
+                :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                :shortcut-id="row.enabled ? 'pipelinesRowPause' : undefined"
+              />
+            </OButton>
             <OButton
               :data-test="`pipeline-list-${row.name}-view-pipeline`"
               variant="ghost"
@@ -111,10 +117,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`pipeline-list-${row.name}-update-pipeline`"
+              data-row-action="edit"
               variant="ghost"
               size="icon-sm"
               @click.stop="editPipeline(row)"
               icon-left="edit"
+            >
+              <OTooltip side="bottom" :content="t('alerts.edit')" shortcut-id="pipelinesRowEdit" />
+            </OButton>
+            <!-- Hidden proxies so the row-hover shortcuts reach the more-menu
+                 actions (teleported out of the row): x = export, Del = delete. -->
+            <button
+              type="button"
+              data-row-action="export"
+              class="hidden"
+              tabindex="-1"
+              aria-hidden="true"
+              @click.stop="exportPipeline(row)"
+            />
+            <button
+              type="button"
+              data-row-action="delete"
+              class="hidden"
+              tabindex="-1"
+              aria-hidden="true"
+              @click.stop="openDeleteDialog(row)"
             />
             <ODropdown align="end">
               <template #trigger>
@@ -128,6 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <ODropdownItem
                 :data-test="`pipeline-list-${row.name}-export-action`"
+                shortcut-id="pipelinesRowExport"
                 @select="exportPipeline(row)"
               >
                 <template #icon-left>
@@ -138,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownSeparator />
               <ODropdownItem
                 :data-test="`pipeline-list-${row.name}-delete-pipeline`"
+                shortcut-id="pipelinesRowDelete"
                 @select="openDeleteDialog(row)"
                 variant="destructive"
               >
@@ -174,9 +203,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left>
                   <OIcon size="sm" name="error" />
                 </template>
-                <div class="tw:flex tw:flex-col">
+                <div class="flex flex-col">
                   <div>View Error</div>
-                  <div class="tw:text-xs tw:text-gray-500">
+                  <div class="text-xs text-gray-500">
                     {{
                       new Date(
                         row.last_error.last_error_timestamp / 1000,
@@ -193,17 +222,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="row?.sql_query"
             data-test="scheduled-pipeline-expanded-content"
-            class="tw:text-left tw:px-2 tw:mb-2 expanded-content"
+            class="text-left px-12 py-0 mb-2 max-h-screen overflow-hidden"
           >
-            <div class="tw:flex tw:items-center tw:py-2">
+            <div class="flex items-center py-2">
               <strong
                 >{{ t("pipeline_list.sql_query") }} : <span></span
               ></strong>
             </div>
-            <div class="tw:flex tw:items-start tw:justify-center">
+            <div class="flex items-start justify-center">
               <div
                 data-test="scheduled-pipeline-expanded-sql"
-                class="scrollable-content expanded-sql"
+                class="w-full overflow-y-auto p-2.5 border border-[#ddd] border-l-[3px] border-l-[#7a54a2] h-full max-h-[200px] whitespace-normal bg-[#e8e8e8] text-black"
               >
                 <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
               </div>
@@ -229,16 +258,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #bottom="bottomProps">
           <div
-            class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-1"
+            class="flex items-center justify-between w-full py-1"
           >
             <div
-              class="tw:flex tw:items-center tw:text-sm tw:mr-4"
+              class="flex items-center text-sm mr-4"
             >
               {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
             </div>
             <div
               v-if="selectedPipelineIds.length > 0"
-              class="tw:flex tw:items-center tw:gap-2"
+              class="flex items-center gap-2"
             >
               <OButton
                 data-test="pipeline-list-export-pipelines-btn"
@@ -335,16 +364,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="closeErrorDialog"
   >
     <template #header-left>
-      <OIcon name="error" size="md" class="error-icon" />
+      <OIcon name="error" size="md" class="text-[#ef4444]" />
     </template>
 
-    <div v-if="errorDialog.data" class="pipeline-error-content">
+    <div v-if="errorDialog.data" class="pipeline-error-content px-6 py-5 max-h-[60vh] overflow-y-auto">
       <!-- Error Summary -->
-      <div v-if="errorDialog.data.last_error.error_summary" class="tw:mb-4">
-        <div class="section-label tw:mb-2">
+      <div v-if="errorDialog.data.last_error.error_summary" class="mb-4">
+        <div class="section-label mb-2 text-[13px] font-semibold tracking-[0.02em] opacity-80">
           {{ t("pipeline_list.error_summary") }}
         </div>
-        <div class="error-summary-box">
+        <div class="error-summary-box p-4 rounded-lg font-mono text-[13px] leading-[1.6] whitespace-pre-wrap wrap-break-word bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] text-[#dc2626]">
           {{ errorDialog.data.last_error.error_summary }}
         </div>
       </div>
@@ -356,30 +385,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Object.keys(errorDialog.data.last_error.node_errors).length > 0
         "
       >
-        <div class="section-label tw:mb-3">
+        <div class="section-label mb-3 text-[13px] font-semibold tracking-[0.02em] opacity-80">
           {{ t("pipeline_list.node_errors") }}
         </div>
-        <div class="node-errors-container">
+        <div class="node-errors-container flex flex-col gap-3">
           <div
             v-for="(nodeError, nodeId) in errorDialog.data.last_error
               .node_errors"
             :key="nodeId"
-            class="node-error-item"
+            class="node-error-item p-4 rounded-lg bg-[rgba(0,0,0,0.02)] border border-[rgba(0,0,0,0.08)] transition-all hover:bg-[rgba(0,0,0,0.04)]"
           >
-            <div class="node-error-header">
-              <span class="node-name">{{ nodeError.node_name || nodeId }}</span>
-              <span class="node-type">{{ nodeError.node_type }}</span>
+            <div class="node-error-header flex items-center justify-between mb-2.5">
+              <span class="node-name font-semibold text-sm">{{ nodeError.node_name || nodeId }}</span>
+              <span class="node-type text-xs px-2.5 py-1 rounded-xl bg-[rgba(99,102,241,0.1)] text-[#6366f1] font-medium">{{ nodeError.node_type }}</span>
             </div>
             <div
               v-if="
                 nodeError.error_messages && nodeError.error_messages.length > 0
               "
-              class="node-error-messages"
+              class="node-error-messages flex flex-col gap-2"
             >
               <div
                 v-for="(msg, idx) in nodeError.error_messages"
                 :key="idx"
-                class="error-message"
+                class="error-message p-3 rounded-md bg-[rgba(239,68,68,0.06)] border-l-[3px] border-l-[#ef4444] font-mono text-xs leading-[1.5] whitespace-pre-wrap wrap-break-word text-[#991b1b]"
               >
                 {{ msg }}
               </div>
@@ -422,6 +451,8 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
@@ -1124,116 +1155,26 @@ const onBackfillSuccess = (jobId: string) => {
   // Navigate to backfill jobs page after successful creation
   goToBackfillJobs();
 };
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcuts([
+  {
+    id: "pipelinesAdd",
+    handler: () => { if (!isInputFocused()) goToCreatePipeline(); },
+  },
+  {
+    id: "pipelinesImport",
+    handler: () => { if (!isInputFocused()) goToImportPipeline(); },
+  },
+  {
+    id: "pipelinesRefresh",
+    handler: () => { if (!isInputFocused()) getPipelines(); },
+  },
+  {
+    id: "pipelinesFocusSearch",
+    handler: () => {
+      focusSearchInput("pipeline-list-search-input");
+    },
+  },
+]);
 </script>
-<style lang="scss" scoped>
-.expanded-content {
-  padding: 0 3rem;
-  max-height: 100vh; /* Set a fixed height for the container */
-  overflow: hidden; /* Hide overflow by default */
-}
-
-.scrollable-content {
-  width: 100%; /* Use the full width of the parent */
-  overflow-y: auto; /* Enable vertical scrolling for long content */
-  padding: 10px; /* Optional: padding for aesthetics */
-  border: 1px solid #ddd; /* Optional: border for visibility */
-  height: 100%;
-  max-height: 200px;
-  /* Use the full height of the parent */
-  text-wrap: normal;
-  background-color: #e8e8e8;
-  color: black;
-}
-.expanded-sql {
-  border-left: #7a54a2 3px solid;
-}
-
-.error-icon {
-  color: #ef4444;
-}
-
-.pipeline-error-content {
-  padding: 20px 24px;
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.section-label {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  opacity: 0.8;
-}
-
-.error-summary-box {
-  padding: 16px;
-  border-radius: 8px;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: #dc2626;
-}
-
-.node-errors-container {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.node-error-item {
-  padding: 16px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.02);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  transition: all 0.2s;
-
-  &:hover {
-    background: rgba(0, 0, 0, 0.04);
-  }
-}
-
-.node-error-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-
-  .node-name {
-    font-weight: 600;
-    font-size: 14px;
-  }
-
-  .node-type {
-    font-size: 12px;
-    padding: 4px 10px;
-    border-radius: 12px;
-    background: rgba(99, 102, 241, 0.1);
-    color: #6366f1;
-    font-weight: 500;
-  }
-}
-
-.node-error-messages {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.error-message {
-  padding: 12px;
-  border-radius: 6px;
-  background: rgba(239, 68, 68, 0.06);
-  border-left: 3px solid #ef4444;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: #991b1b;
-}
-
-</style>

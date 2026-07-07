@@ -1,13 +1,13 @@
 <template>
-  <section class="qsc-overview" data-test="quality-score-configs-overview">
-    <div v-if="isLoading && rows.length === 0" class="qsc-overview__loading">
+  <section class="flex flex-col gap-[10px] min-h-0 flex-1" data-test="quality-score-configs-overview">
+    <div v-if="isLoading && rows.length === 0" class="flex flex-col items-center gap-2 py-8 px-3 border border-dashed border-[var(--color-dialog-header-border,var(--o2-border))] rounded-md text-center text-[var(--color-text-secondary,var(--o2-text-secondary))]">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.overview.loading") }}</span>
     </div>
 
     <div
-      v-else-if="rows.length === 0"
-      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center"
+      v-if="rows.length === 0 && !isLoading"
+      class="flex-1 min-h-0 flex items-center justify-center"
       data-test="quality-overview-empty"
     >
       <OEmptyState
@@ -24,7 +24,7 @@
          so a fresh setup reads as "configs are here, scores will fill in"
          rather than a blank screen. -->
 
-    <div v-else class="qsc-overview__table-wrap">
+    <div v-else class="flex-1 min-h-0 flex flex-col">
       <OTable
         data-test="quality-overview-table"
         :data="filteredRows"
@@ -34,13 +34,13 @@
         :footer-title="t('onlineEvals.quality.overview.title')"
         :show-global-filter="false"
         :page-size="20"
-        :page-size-options="[20, 50, 100]"
+        :page-size-options="[20, 50, 100, 250, 500]"
         :default-columns="false"
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="quality-score-configs"
         width="100%"
-        class="tw:w-full tw:h-full"
+        class="w-full h-full"
         @row-click="(row: any) => $emit('select', row)"
       >
         <!-- Filter moved into the table toolbar so OTable's column chooser
@@ -50,7 +50,7 @@
             v-model="filter"
             :placeholder="t('onlineEvals.quality.overview.searchPlaceholder')"
             size="sm"
-            class="tw:flex-1 tw:min-w-0"
+            class="flex-1 min-w-0"
             data-test="quality-overview-filter-input"
           >
             <template #icon-left>
@@ -60,43 +60,36 @@
         </template>
 
         <template #cell-status="{ row }">
-          <span class="qsc-status" :class="`qsc-status--${row.status}`" :aria-label="row.status">●</span>
+          <OTag type="qualityStatus" :value="row.status" label="" :aria-label="row.status" />
         </template>
 
         <template #cell-name="{ row }">
-          <div
-            class="qsc-name"
-            :class="{ 'qsc-name--no-data': row.status === 'noData' }"
-          >
-            {{ row.name }}
-          </div>
+          <div class="font-semibold text-[var(--color-text-primary,currentColor)]">{{ row.name }}</div>
         </template>
 
         <template #cell-type="{ row }">
-          <OBadge
+          <OTag
             v-if="shortType(row.dataType) !== '—'"
-            :variant="dataTypeBadgeVariant(row.dataType)"
-            size="sm"
-          >
-            {{ row.dataType }}
-          </OBadge>
-          <span v-else class="qsc-muted">—</span>
+            type="evalDataType"
+            :value="row.dataType"
+          />
+          <span v-else class="text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
         </template>
 
         <template #cell-totalScores="{ row }">
-          <span class="qsc-mono">{{ formatCount(row.totalScores) }}</span>
+          <span class="[font-variant-numeric:tabular-nums]">{{ formatCount(row.totalScores) }}</span>
         </template>
 
         <template #cell-coverage="{ row }">
-          <span v-if="row.coveragePct != null" class="qsc-mono">{{ formatPct(row.coveragePct) }}</span>
-          <span v-else class="qsc-muted">—</span>
+          <span v-if="row.coveragePct != null" class="[font-variant-numeric:tabular-nums]">{{ formatPct(row.coveragePct) }}</span>
+          <span v-else class="text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
         </template>
 
         <template #cell-trend="{ row }">
           <svg
             v-if="row.trendSparkline.length > 0"
-            class="qsc-spark"
-            :class="`qsc-spark--${row.status}`"
+            class="w-full h-5"
+            :class="sparkClass(row.status)"
             viewBox="0 0 100 20"
             preserveAspectRatio="none"
             aria-hidden="true"
@@ -108,14 +101,14 @@
               :points="sparkPoints(row.trendSparkline)"
             />
           </svg>
-          <span v-else class="qsc-muted">—</span>
+          <span v-else class="text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
         </template>
 
         <template #cell-updated="{ row }">
-          <span v-if="row.lastUpdatedMs" class="qsc-updated">
+          <span v-if="row.lastUpdatedMs" class="text-[11px] text-[var(--color-text-secondary,var(--o2-text-secondary))] [font-variant-numeric:tabular-nums]">
             {{ relativeTime(row.lastUpdatedMs) }}
           </span>
-          <span v-else class="qsc-muted">—</span>
+          <span v-else class="text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
         </template>
       </OTable>
     </div>
@@ -130,7 +123,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";
@@ -172,6 +165,17 @@ const filteredRows = computed(() => {
     (r) => r.name.toLowerCase().includes(q) || r.description.toLowerCase().includes(q),
   );
 });
+
+function sparkClass(status: string): string {
+  if (status === 'unhealthy' || status === 'warn') return 'text-[var(--o2-status-warning-text,#b25400)]';
+  if (status === 'healthy') return 'text-[var(--o2-status-success-text,#2e7d32)]';
+  if (status === 'noData') return 'text-[var(--color-text-secondary,var(--o2-text-secondary))] opacity-[0.55]';
+  return 'text-[var(--color-text-secondary,var(--o2-text-secondary))]';
+}
+
+function rowClassOf(row: ScoreConfigRow): string {
+  return row.status === "noData" ? "opacity-[0.6] hover:opacity-[0.85]" : "";
+}
 
 const columns = computed(() => [
   {
@@ -246,15 +250,6 @@ function shortType(type: ScoreConfigRow["dataType"]): string {
   return "—";
 }
 
-// Map a score-config data type to a neutral design-system OBadge soft variant
-// (numeric → blue, categorical → purple, boolean → teal). Data types are just
-// labels, so use neutral palette colors rather than semantic variants.
-function dataTypeBadgeVariant(type: ScoreConfigRow["dataType"]) {
-  if (type === "categorical") return "purple-soft" as const;
-  if (type === "boolean") return "teal-soft" as const;
-  return "blue-soft" as const; // numeric
-}
-
 function formatCount(n: number | null): string {
   if (n == null) return "—";
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
@@ -300,118 +295,3 @@ function relativeTime(timestampMs: number): string {
 }
 </script>
 
-<style lang="scss" scoped>
-.qsc-overview {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-height: 0;
-  flex: 1;
-}
-
-.qsc-overview__loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 32px 12px;
-  border: 1px dashed var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  text-align: center;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qsc-overview__table-wrap {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.qsc-status {
-  display: inline-flex;
-  font-size: 16px;
-  line-height: 1;
-}
-
-.qsc-status--unhealthy { color: var(--o2-status-warning-text, #b25400); }
-.qsc-status--warn { color: var(--o2-status-warning-text, #b25400); opacity: 0.7; }
-.qsc-status--healthy { color: var(--o2-status-success-text, #2e7d32); }
-.qsc-status--noThreshold { color: var(--color-text-secondary, var(--o2-text-secondary)); }
-.qsc-status--noData { color: var(--color-text-secondary, var(--o2-text-secondary)); opacity: 0.55; }
-
-.qsc-name {
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-}
-
-/* De-emphasize the name of configs that have no scores in the selected
- * window. The row stays at full opacity (so counts/coverage stay readable);
- * only the name recedes to flag the inactive scorer. */
-.qsc-name--no-data {
-  opacity: 0.55;
-}
-
-.qsc-mono {
-  font-variant-numeric: tabular-nums;
-}
-
-.qsc-no-threshold {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-style: italic;
-}
-
-.qsc-unhealthy {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-variant-numeric: tabular-nums;
-}
-
-.qsc-bar {
-  flex: 0 0 80px;
-  height: 6px;
-  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.qsc-bar__fill {
-  height: 100%;
-  background: var(--o2-status-warning-text, #b25400);
-}
-
-.qsc-unhealthy__pct {
-  font-weight: 600;
-  font-size: 12px;
-  color: var(--color-text-primary, currentColor);
-}
-
-.qsc-unhealthy__count {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qsc-muted {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qsc-updated {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-variant-numeric: tabular-nums;
-}
-
-.qsc-spark {
-  width: 100%;
-  height: 20px;
-  color: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
-}
-
-.qsc-spark--unhealthy { color: var(--o2-status-warning-text, #b25400); }
-.qsc-spark--healthy { color: var(--o2-status-success-text, #2e7d32); }
-.qsc-spark--warn { color: var(--o2-status-warning-text, #b25400); }
-.qsc-spark--noThreshold { color: var(--color-text-secondary, var(--o2-text-secondary)); }
-.qsc-spark--noData { color: var(--color-text-secondary, var(--o2-text-secondary)); opacity: 0.55; }
-</style>

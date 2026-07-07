@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -22,19 +22,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="datetimeBtn"
         data-cy="date-time-button"
         variant="outline"
-        class="date-time-button"
+        class="date-time-button h-[30px] min-h-[30px] rounded-[3px] py-0 px-[5px] min-w-auto justify-start!"
         icon-left="schedule"
       >
-        <span class="date-time-label">{{ displayValue }}</span>
+        <span class="date-time-label font-semibold flex-1 text-left">{{ displayValue }}</span>
         <template #icon-right
-          ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow"
+          ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow ml-auto transition [transition:transform_0.25s_ease]"
         /></template>
       </OButton>
     </template>
-    <div id="date-time-menu" class="date-time-dialog">
-      <div class="tw:flex tw:justify-evenly tw:py-2">
+    <div id="date-time-menu" class="date-time-dialog w-[325px]">
+      <div class="flex justify-evenly py-2">
         <OButton
-          class="tab-button"
+          class="w-38.5"
           :variant="
             data.selectedDate.tab === 'relative' ? 'primary' : 'ghost-primary'
           "
@@ -43,9 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("common.datetimeRelative") }}
         </OButton>
-        <OSeparator vertical class="tw:my-2" />
+        <OSeparator vertical class="my-2" />
         <OButton
-          class="tab-button"
+          class="w-38.5"
           :variant="
             data.selectedDate.tab === 'absolute' ? 'primary' : 'ghost-primary'
           "
@@ -58,13 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSeparator />
       <OTabPanels v-model="data.selectedDate.tab" animated>
         <OTabPanel name="relative">
-          <div class="date-time-table tw:relative tw:flex tw:flex-col">
+          <div class="date-time-table relative flex flex-col">
             <div
-              class="relative-row tw:px-3 tw:py-2"
+              class="relative-row px-3 py-2 flex items-center border-b border-[var(--o2-border)]"
               v-for="(period, index) in relativePeriods"
               :key="'date_' + index"
             >
-              <div class="relative-period-name">
+              <div class="text-sm font-semibold min-w-18.75">
                 {{ period.value }}
               </div>
               <div
@@ -90,11 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div class="relative-row tw:px-3 tw:py-2">
-              <div class="relative-period-name">Custom</div>
+            <div class="relative-row px-3 py-2 flex items-center border-b border-[var(--o2-border)]">
+              <div class="text-sm font-semibold min-w-18.75">Custom</div>
 
-              <div class="tw:flex tw:gap-2 tw:flex-1 tw:min-w-0">
-                <div class="tw:flex tw:flex-col tw:w-20">
+              <div class="flex gap-2 flex-1 min-w-0">
+                <div class="flex flex-col w-20">
                   <OInput
                     v-model="data.selectedDate.relative.value"
                     type="number"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @change="calculateMaxValue"
                   />
                 </div>
-                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <div class="flex flex-col flex-1 min-w-0">
                   <OSelect
                     v-model="data.selectedDate.relative.period"
                     :options="relativePeriods"
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OTabPanel>
         <OTabPanel name="absolute">
-          <div class="date-time-table">
+          <div class="date-time-table flex flex-col">
             <ODateRangeCalendar
               :start-date="data.selectedDate.absolute.date.from"
               :end-date="data.selectedDate.absolute.date.to"
@@ -122,24 +122,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:start-date="data.selectedDate.absolute.date.from = $event"
               @update:end-date="data.selectedDate.absolute.date.to = $event"
             />
-            <div class="notePara">{{ t("common.datetimeMessage") }}</div>
-            <OSeparator class="tw:my-2" />
+            <div class="pr-6 pl-6 text-[0.625rem] text-(--o2-text-secondary)">{{ t("common.datetimeMessage") }}</div>
+            <OSeparator class="my-2" />
 
-            <table class="tw:px-3 startEndTime">
+            <table class="px-3 startEndTime w-[calc(100%-0.8rem)] mx-[0.4rem] mt-2 mb-[0.3rem]">
               <tr>
-                <td class="label">{{ t("common.startTime") }}</td>
-                <td class="label">{{ t("common.endTime") }}</td>
+                <td class="label w-1/2 text-xs font-semibold">{{ t("common.startTime") }}</td>
+                <td class="label w-1/2 text-xs font-semibold">{{ t("common.endTime") }}</td>
               </tr>
               <tr>
-                <td>
+                <td class="w-1/2">
                   <OTime
-                    class="tw:w-full"
+                    class="w-full"
                     v-model="data.selectedDate.absolute.startTime"
                   />
                 </td>
-                <td>
+                <td class="w-1/2">
                   <OTime
-                    class="tw:w-full"
+                    class="w-full"
                     v-model="data.selectedDate.absolute.endTime"
                   />
                 </td>
@@ -374,232 +374,12 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.q-btn--rectangle {
-  border-radius: 3px;
+<style>
+.date-time-button.isOpen .date-time-arrow {
+  transform: rotate(180deg);
 }
 
-.date-time-button {
-  height: 30px;
-  min-height: 30px;
-  border-radius: 3px;
-  padding: 0px 5px;
-  min-width: auto;
-  justify-content: flex-start !important;
-
-  .date-time-label {
-    font-weight: 600;
-    flex: 1;
-    text-align: left;
-  }
-
-  .date-time-arrow {
-    transition: transform 0.25s ease;
-    margin-left: auto;
-  }
-
-  &.isOpen .date-time-arrow {
-    transform: rotate(180deg);
-  }
-}
-
-.date-time-dialog {
-  width: 325px;
-
-  .tab-button {
-    &.q-btn {
-      padding-bottom: 0.6rem;
-      padding-top: 0.6rem;
-      font-size: 0.75rem;
-      font-weight: 700;
-
-      &.text-primary {
-        .q-btn__content {
-        }
-      }
-    }
-  }
-}
-
-.date-time-table {
-  display: flex;
-  flex-direction: column;
-
-  .relative-row {
-    display: flex;
-    align-items: center;
-    border-bottom: 1px solid $border-color;
-
-    .block {
-      font-weight: 700;
-    }
-
-    .q-field {
-      &__control {
-        height: 40px;
-      }
-
-      &__native {
-        color: $light-text2;
-        font-size: 0.875rem;
-        font-weight: 600;
-      }
-
-      .q-select__dropdown-icon {
-        color: $light-text2;
-      }
-    }
-
-    > * {
-      margin-right: 6px;
-    }
-  }
-}
-
-.absolute-calendar {
-  box-shadow: none;
-
-  .q-date__header {
-    display: none;
-  }
-
-  .q-date__view {
-    padding: 0;
-  }
-}
-
-.relative-period-name {
-  font-size: 0.875rem;
-  font-weight: 600;
-  min-width: 75px;
-}
-
-.rp-selector,
-.rp-selector-selected {
-  height: 32px;
-  width: 32px;
-  // border: $secondary;
-  background: rgba(0, 0, 0, 0.07);
-}
-
-.rp-selector-selected {
-  color: #ffffff;
-  background: var(--o2-primary-btn-bg);
-}
-
-.tab-button {
-  width: 154px;
-}
-
-.notePara {
-  padding-right: 1.5rem;
-  padding-left: 1.5rem;
-  font-size: 0.625rem;
-  color: $light-text;
-}
-
-.q-date {
-  &__navigation {
-    justify-content: center;
-    padding: 0 0.5rem;
-
-    .q-date__arrow {
-      & + .q-date__arrow {
-        margin-left: auto;
-      }
-
-      & + .col {
-        flex: initial;
-      }
-    }
-
-    .q-btn .block {
-      font-size: 0.75rem;
-      color: $dark-page;
-      font-weight: 700;
-    }
-  }
-
-  &__calendar {
-    &-item .block {
-      color: $light-text;
-      font-weight: 700;
-    }
-
-    &-weekdays > div {
-      font-size: 0.875rem;
-      font-weight: 700;
-      opacity: 1;
-    }
-  }
-
-  &__range {
-    &,
-    &-from,
-    &-to {
-      .block {
-        color: white;
-      }
-
-      &:before {
-        bottom: 3px;
-        top: 3px;
-      }
-    }
-
-    .block {
-      color: $dark-page;
-    }
-  }
-}
-
-.startEndTime {
-  width: calc(100% - 0.8rem);
-  margin: 0.5rem 0.4rem 0.3rem 0.4rem;
-  td {
-    width: 50%;
-  }
-  .q-field {
-    padding-bottom: 0.125rem;
-  }
-
-  .label {
-    font-size: 0.75rem;
-    // color: $dark-page;
-    font-weight: 600;
-  }
-
-  .timeInput {
-    .q-field__control {
-      padding-right: 0.375rem;
-    }
-
-    .q-btn-group {
-      & > .q-btn-item {
-        border-radius: 2px;
-      }
-
-      .q-btn {
-        padding: 0 0.3125rem;
-
-        .block {
-          font-size: 0.625rem;
-          font-weight: 700;
-        }
-      }
-    }
-  }
-}
-
-.drawer-footer {
-  .q-btn {
-    font-size: 0.75rem;
-    font-weight: 700;
-
-    &.clearBtn {
-      margin-right: 1rem;
-      color: $dark-page;
-    }
-  }
+.date-time-table .relative-row > * {
+  margin-right: 6px;
 }
 </style>

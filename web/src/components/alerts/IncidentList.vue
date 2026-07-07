@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="incident-list" class="tw:h-full">
+  <div data-test="incident-list" class="h-full">
     <PageLayout
-      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+      :header-class="'shrink-0 px-4 border-b border-border-default'"
     >
       <!-- Row 1: standard header — title + actions only. Search moved into the
            table's own toolbar below. -->
@@ -55,12 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="alerts-incident-list"
-        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
         data-test="incident-list-table"
         @row-click="viewIncident"
       >
         <template #toolbar>
-          <div class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:w-full">
+          <div class="flex items-center justify-between gap-2 w-full">
             <OToggleGroup
               :model-value="statusFilter"
               @update:model-value="(v) => filterByStatus(v as string)"
@@ -85,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
             <OSearchInput
               v-model="searchQuery"
-              class="tw:w-64"
+              class="w-64"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
               clearable
@@ -102,45 +101,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-severity="{ row }">
-          <OBadge
-            :variant="getSeverityVariant(row.severity)"
-            dot
+          <OTag
+            type="severity"
+            :value="row.severity"
             size="sm"
             data-test="incident-severity-badge"
-          >{{ row.severity }}</OBadge>
+          />
         </template>
         <template #cell-title="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-1">
+          <div class="flex items-center gap-1">
             <span>
               {{ row.title || formatDimensions(row.group_values) }}
             </span>
           </div>
         </template>
         <template #cell-dimensions="{ row }">
-          <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-1 tw:min-w-0 tw:overflow-hidden">
-            <span
+          <div class="flex flex-nowrap items-center gap-1 min-w-0 overflow-hidden">
+            <ODimensionChip
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
-              class="tw:inline-flex tw:min-w-0"
-            >
-              <OBadge :variant="getDimensionVariant(key)" size="sm" class="tw:min-w-0 tw:!p-0 tw:overflow-hidden">
-                <span class="tw:inline-flex tw:items-stretch tw:min-w-0">
-                  <span class="tw:ps-2.5 tw:pe-1 tw:py-1.5 tw:shrink-0 tw:whitespace-nowrap tw:bg-current/8 tw:opacity-90">{{ key }}</span>
-                  <span class="tw:ps-1 tw:pe-2.5 tw:py-1.5 tw:truncate tw:min-w-0 tw:font-semibold">{{ value }}</span>
-                </span>
-              </OBadge>
-              <OTooltip :delay="300" :content="key + '=' + value" />
-            </span>
-            <OBadge
+              :dim-key="key"
+              :value="value"
+              :tooltip="true"
+              class="min-w-0"
+            />
+            <OTag
               v-if="getSortedDimensions(row.group_values).length > 2"
-              variant="default-soft"
-              size="sm"
-              class="tw:shrink-0"
+              type="countChip"
+              value="neutral"
+              class="shrink-0"
             >
               +{{ getSortedDimensions(row.group_values).length - 2 }} more
               <OTooltip :delay="300" :max-width="'28rem'">
                 <template #content>
-                  <div class="tw:space-y-1">
+                  <div class="space-y-1">
                     <div
                       v-for="[key, value] in getSortedDimensions(row.group_values).slice(2)"
                       :key="key"
@@ -150,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </OTooltip>
-            </OBadge>
+            </OTag>
           </div>
         </template>
         <template #cell-last_alert_at="{ row }">
@@ -163,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-actions="{ row }">
-          <div class="action-buttons">
+          <div class="flex justify-end items-center">
             <OButton
               v-if="row.status === 'open'"
               variant="ghost-warning"
@@ -190,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Empty state -->
         <template #empty>
-          <div v-if="!loading" class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full">
+          <div v-if="!loading" class="flex items-center justify-center w-full h-full">
             <OEmptyState
               size="hero"
               preset="no-incidents"
@@ -203,8 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Bottom -->
         <template #bottom>
-          <div class="bottom-btn tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
+          <div class="flex w-full justify-between items-center h-[48px]">
+            <div class="o2-table-footer-title flex items-center w-[100px] mr-md">
               {{ visibleIncidents.length }} {{ visibleIncidents.length === 1 ? 'Incident' : 'Incidents' }}
             </div>
           </div>
@@ -231,13 +225,11 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import { BADGE_GROUPS, normalizeKey } from "@/lib/core/Badge/badgeGroups";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
@@ -254,7 +246,7 @@ export default defineComponent({
     OIcon,
     OTable,
     OTag,
-    OBadge,
+    ODimensionChip,
     OTimeCell,
     OToggleGroup,
     OToggleGroupItem,
@@ -498,26 +490,6 @@ export default defineComponent({
       }
     };
 
-    const getSeverityVariant = (severity: string): BadgeVariant => {
-      switch (severity) {
-        case "P1": return "error-soft";
-        case "P2": return "orange-soft";
-        case "P3": return "amber-soft";
-        case "P4": return "blue-soft";
-        default: return "default-soft";
-      }
-    };
-
-    const getSeverityColorClass = (severity: string) => {
-      switch (severity) {
-        case "P1": return "severity-p1";
-        case "P2": return "severity-p2";
-        case "P3": return "severity-p3";
-        case "P4": return "severity-p4";
-        default: return "severity-default";
-      }
-    };
-
     const formatTimestamp = (timestamp: number) => {
       return formatToReadable(timestamp);
     };
@@ -570,24 +542,6 @@ export default defineComponent({
         hash = hash & hash;
       }
       return classes[Math.abs(hash) % classes.length];
-    };
-
-    const DIMENSION_FALLBACK_VARIANTS: BadgeVariant[] = [
-      'default-soft', 'amber-soft', 'purple-soft', 'blue-soft', 'teal-soft', 'indigo-soft',
-    ];
-    const getDimensionVariant = (key: string): BadgeVariant => {
-      const values = BADGE_GROUPS.dimensionKey.values as Record<string, { variant: BadgeVariant }>;
-      const nk = normalizeKey(key);
-      if (values[nk]) return values[nk].variant;
-      for (const [pattern, cfg] of Object.entries(values)) {
-        if (nk.includes(pattern)) return cfg.variant;
-      }
-      let hash = 0;
-      for (let i = 0; i < key.length; i++) {
-        hash = ((hash << 5) - hash) + key.charCodeAt(i);
-        hash = hash & hash;
-      }
-      return DIMENSION_FALLBACK_VARIANTS[Math.abs(hash) % DIMENSION_FALLBACK_VARIANTS.length];
     };
 
     const restoreStateFromStore = (): boolean => {
@@ -678,13 +632,10 @@ export default defineComponent({
       reopenIncident,
       getStatusColorClass,
       getStatusLabel,
-      getSeverityVariant,
-      getSeverityColorClass,
       formatTimestamp,
       formatDimensions,
       getSortedDimensions,
       getDimensionColorClass,
-      getDimensionVariant,
       qTableRef,
       store,
     };
@@ -692,28 +643,8 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.bottom-btn {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.o2-search-input {
-  width: 250px;
-}
-
+<style>
 /* Status badge styling */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
 .status-open {
   border: 1px solid #dc2626;
 }
@@ -731,15 +662,6 @@ export default defineComponent({
 }
 
 /* Severity badge styling */
-.severity-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
 .severity-p1 {
   border: 1px solid #991b1b;
 }
@@ -761,44 +683,15 @@ export default defineComponent({
 }
 
 /* Dark mode adjustments for status and severity badges */
-body.body--dark {
-  .status-open { border: 1px solid #fca5a5; }
-  .status-acknowledged { border: 1px solid #fbbf24; }
-  .status-resolved { border: 1px solid #6ee7b7; }
-  .status-default { border: 1px solid #d1d5db; }
-  .severity-p1 { border: 1px solid #fca5a5; }
-  .severity-p2 { border: 1px solid #fdba74; }
-  .severity-p3 { border: 1px solid #fcd34d; }
-  .severity-p4 { border: 1px solid #d1d5db; }
-  .severity-default { border: 1px solid #d1d5db; }
-}
-
-/* Dimension badge base styling */
-.dimension-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  margin: 2px;
-  max-width: 180px;
-  overflow: hidden;
-
-  span {
-    display: inline-block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
-.badge-more {
-  background: var(--color-surface-panel);
-  color: var(--o2-text-secondary);
-  font-weight: 500;
-}
+body.body--dark .status-open { border: 1px solid #fca5a5; }
+body.body--dark .status-acknowledged { border: 1px solid #fbbf24; }
+body.body--dark .status-resolved { border: 1px solid #6ee7b7; }
+body.body--dark .status-default { border: 1px solid #d1d5db; }
+body.body--dark .severity-p1 { border: 1px solid #fca5a5; }
+body.body--dark .severity-p2 { border: 1px solid #fdba74; }
+body.body--dark .severity-p3 { border: 1px solid #fcd34d; }
+body.body--dark .severity-p4 { border: 1px solid #d1d5db; }
+body.body--dark .severity-default { border: 1px solid #d1d5db; }
 
 /* Color scheme matching schema.scss type badges */
 .badge-blue { border: 1px solid #1d4ed8; }
@@ -817,27 +710,18 @@ body.body--dark {
 .badge-rose { border: 1px solid #e11d48; }
 
 /* Dark mode adjustments */
-body.body--dark {
-  .badge-blue { border: 1px solid #93c5fd; }
-  .badge-green { border: 1px solid #6ee7b7; }
-  .badge-yellow { border: 1px solid #fcd34d; }
-  .badge-pink { border: 1px solid #f9a8d4; }
-  .badge-purple { border: 1px solid #c4b5fd; }
-  .badge-orange { border: 1px solid #fdba74; }
-  .badge-cyan { border: 1px solid #67e8f9; }
-  .badge-indigo { border: 1px solid #a5b4fc; }
-  .badge-teal { border: 1px solid #5eead4; }
-  .badge-red { border: 1px solid #fca5a5; }
-  .badge-gray { border: 1px solid #d1d5db; }
-  .badge-amber { border: 1px solid #fbbf24; }
-  .badge-violet { border: 1px solid #c4b5fd; }
-  .badge-rose { border: 1px solid #fda4af; }
-}
-
-/* Action buttons styling */
-.action-buttons {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-}
+body.body--dark .badge-blue { border: 1px solid #93c5fd; }
+body.body--dark .badge-green { border: 1px solid #6ee7b7; }
+body.body--dark .badge-yellow { border: 1px solid #fcd34d; }
+body.body--dark .badge-pink { border: 1px solid #f9a8d4; }
+body.body--dark .badge-purple { border: 1px solid #c4b5fd; }
+body.body--dark .badge-orange { border: 1px solid #fdba74; }
+body.body--dark .badge-cyan { border: 1px solid #67e8f9; }
+body.body--dark .badge-indigo { border: 1px solid #a5b4fc; }
+body.body--dark .badge-teal { border: 1px solid #5eead4; }
+body.body--dark .badge-red { border: 1px solid #fca5a5; }
+body.body--dark .badge-gray { border: 1px solid #d1d5db; }
+body.body--dark .badge-amber { border: 1px solid #fbbf24; }
+body.body--dark .badge-violet { border: 1px solid #c4b5fd; }
+body.body--dark .badge-rose { border: 1px solid #fda4af; }
 </style>

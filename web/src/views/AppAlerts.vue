@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0" data-test="alerts-page" style="min-height: inherit">
+  <div class="rounded-md p-0" data-test="alerts-page" style="min-height: inherit">
     <RouterView
       :templates="templates"
       :destinations="destinations"
@@ -77,39 +77,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-.alerts-tabs {
-  .q-tabs {
-    &--vertical {
-      margin: 16px 8px 0 8px;
-      .q-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-        text-transform: capitalize;
-        min-height: 40px !important;
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          background-color: $accent;
-          color: black;
-        }
-      }
-    }
-  }
-}
-</style>

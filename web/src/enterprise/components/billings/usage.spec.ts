@@ -532,21 +532,21 @@ describe("Usage Component", () => {
 
   // Test 39: Hidden action script tiles
   it("should not display action script tiles when v-if is false", () => {
-    const actionScriptTiles = wrapper.findAll('.usage-tile-title');
+    const actionScriptTiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
     const actionScriptExists = actionScriptTiles.some((tile: any) => tile.text().includes('Action Scripts'));
     expect(actionScriptExists).toBe(false);
   });
 
   // Test 40: Hidden error tracking tiles
   it("should not display error tracking tiles when v-if is false", () => {
-    const tiles = wrapper.findAll('.usage-tile-title');
+    const tiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
     const errorTrackingExists = tiles.some((tile: any) => tile.text().includes('Error Tracking'));
     expect(errorTrackingExists).toBe(false);
   });
 
   // Test 41: Hidden RUM session tiles
   it("should not display RUM session tiles when v-if is false", () => {
-    const tiles = wrapper.findAll('.usage-tile-title');
+    const tiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
     const rumSessionExists = tiles.some((tile: any) => tile.text().includes('RUM Session'));
     expect(rumSessionExists).toBe(false);
   });
@@ -557,7 +557,7 @@ describe("Usage Component", () => {
     wrapper.vm.dataLoading = false;
     await nextTick();
 
-    const usageTiles = wrapper.findAll('.usage-tile-title');
+    const usageTiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
     const tileTexts = usageTiles.map((tile: any) => tile.text());
 
     expect(tileTexts).toContain('Ingestion');
@@ -571,7 +571,7 @@ describe("Usage Component", () => {
     wrapper.vm.usageData = {};
     await nextTick();
 
-    const tiles = wrapper.findAll('.usage-tile-title');
+    const tiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
     const ingestionExists = tiles.some((tile: any) => tile.text().includes('Ingestion'));
     expect(ingestionExists).toBe(false);
   });
@@ -582,7 +582,7 @@ describe("Usage Component", () => {
     wrapper.vm.dataLoading = false;
     await nextTick();
 
-    const tiles = wrapper.findAll('.usage-tile-title');
+    const tiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
     const ingestionExists = tiles.some((tile: any) => tile.text().includes('Ingestion'));
     expect(ingestionExists).toBe(false);
   });

@@ -16,18 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="height: 100%">
-    <div class="tw:p-0" style="width: 100px">
-      <ul class="chart-selection-list tw:flex tw:flex-wrap">
+    <div class="p-0" style="width: 100px">
+      <ul class="flex flex-wrap list-none p-0 m-0">
         <li
           v-for="(item, index) in ChartsArray"
           :key="index"
           :class="[
             'dashboard-chart-border',
-            'chart-selection-item',
-            selectedChartType === item.id ? 'chart-item-selected' : '',
+            'transition-colors duration-150 ease-in-out hover:bg-surface-subtle',
+            selectedChartType === item.id ? 'bg-label-chip-url-bg' : '',
             isChartDisabled(item)
-              ? 'tw:opacity-50 tw:cursor-not-allowed'
-              : 'tw:cursor-pointer',
+              ? 'opacity-50 cursor-not-allowed'
+              : 'cursor-pointer',
           ]"
           @click="!isChartDisabled(item) && $emit('update:selectedChartType', item.id)"
           style="width: 50px"
@@ -37,12 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             :data-test="`selected-chart-${item.id}-item`"
             :data-selected="selectedChartType === item.id ? 'true' : 'false'"
-            class="tw:flex tw:flex-col tw:items-center tw:relative"
+            class="flex flex-col items-center relative"
           >
             <img
               :src="item.image.replace('img:', '')"
               :alt="item.title"
-              class="tw:mx-auto tw:my-2"
+              class="mx-auto my-2"
               style="width: 24px; height: 24px;"
               data-test="dashboard-addpanel-chart-selection-icon"
             />
@@ -236,23 +236,3 @@ export default defineComponent({
   components: { OIcon , OTooltip },
 });
 </script>
-
-<style scoped>
-.chart-selection-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.chart-selection-item {
-  transition: background-color 0.15s ease;
-}
-
-.chart-selection-item:hover {
-  background-color: var(--color-surface-subtle);
-}
-
-.chart-item-selected {
-  background-color: var(--o2-label-chip-url-bg);
-}
-</style>

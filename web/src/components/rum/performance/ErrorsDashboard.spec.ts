@@ -152,7 +152,7 @@ describe("ErrorsDashboard", () => {
 
     it("renders the performance-error-dashboard container", () => {
       // Act
-      const container = wrapper.find(".performance-error-dashboard");
+      const container = wrapper.find('[data-test="performance-error-dashboard"]');
 
       // Assert
       expect(container.exists()).toBe(true);

@@ -1,5 +1,5 @@
 <template>
-  <div ref="chartEl" class="qtrend" data-test="quality-trend-chart" />
+  <div ref="chartEl" class="w-full h-full min-h-55" data-test="quality-trend-chart" />
 </template>
 
 <script setup lang="ts">
@@ -136,11 +136,3 @@ onBeforeUnmount(() => {
   chart = null;
 });
 </script>
-
-<style lang="scss" scoped>
-.qtrend {
-  width: 100%;
-  height: 100%;
-  min-height: 220px;
-}
-</style>

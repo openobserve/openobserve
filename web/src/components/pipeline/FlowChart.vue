@@ -33,14 +33,7 @@ const edges = ref<Edge<any, any, string>[]>([
 </script>
 
 <template>
-  <div id="graph-container">
+  <div id="graph-container" class="w-[1000px] h-[1000px]">
     <VueFlow v-model:nodes="nodes" v-model:edges="edges"></VueFlow>
   </div>
 </template>
-
-<style scoped>
-#graph-container {
-  width: 1000px;
-  height: 1000px;
-}
-</style>

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
+  <div class="rounded-md flex flex-col h-full p-0">
     <!-- Full-page Import View -->
     <ImportModelPricing
       v-if="showImportModelPricingPage"
@@ -30,17 +30,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <TestModelMatchDialog v-model="showTestMatchDialog" />
 
     <!-- Main List View -->
-    <div v-if="!showImportModelPricingPage" class="tw:flex tw:flex-col tw:h-full">
+    <div v-if="!showImportModelPricingPage" class="flex flex-col h-full">
       <!-- List View Header -->
       <!-- Standard section header: title + actions only. Tabs + search moved
            into the table toolbar below. -->
-      <AppPageHeader icon="paid" :subtitle="'LLM model cost configuration'" class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default">
+      <AppPageHeader icon="paid" :subtitle="'LLM model cost configuration'" class="shrink-0 px-4 border-b border-border-default">
         <template #title>
           {{ t("modelPricing.header") }}
           <OButton
             variant="ghost"
             size="icon-sm"
-            class="tw:-ml-1"
+            class="-ml-1"
             data-test="model-pricing-info-btn"
           >
             <OIcon name="info-outline" size="sm" />
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </AppPageHeader>
 
       <!-- List Table -->
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="card-container flex-1 min-h-0 overflow-hidden">
       <OTable
         ref="qTableRef"
         :frame="false"
@@ -113,8 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Toolbar: Built-in/Custom tabs + search -->
         <template #toolbar>
-          <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-            <div class="app-tabs-container tw:h-9">
+          <div class="flex items-center gap-2 w-full">
+            <div class="app-tabs-container h-9">
               <app-tabs
                 class="tabs-selection-container"
                 :tabs="tabOptions"
@@ -124,15 +124,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OSearchInput
               v-model="filterQuery"
-              class="tw:ml-auto tw:w-64"
+              class="ml-auto w-64"
               :placeholder="t('modelPricing.searchPlaceholder')"
             />
           </div>
         </template>
         <template #tree-warning="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-2 tw:py-1 tw:text-sm tw:leading-none">
-            <OIcon name="warning-amber" size="sm" class="shadowed-icon" />
-            <span class="tw:leading-tight">
+          <div class="flex items-center gap-2 py-1 text-sm leading-none">
+            <OIcon name="warning-amber" size="sm" class="text-[#f59e0b] opacity-85" />
+            <span class="leading-tight">
               {{
                 t("modelPricing.shadowedWarningBanner", { name: row.name })
               }}
@@ -140,14 +140,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-name="{ row }">
-          <div class="tw:flex tw:items-center tw:flex-nowrap tree-node-content">
+          <div class="flex items-center flex-nowrap relative z-[2] min-h-[24px]">
             <span
               v-if="getSource(row) === 'built_in'"
-              class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1"
+              class="shrink-0 cursor-default inline-flex mr-1"
             >
               <img
                 :src="ooLogo"
-                class="tw:w-[16px] tw:h-[16px]"
+                class="w-[16px] h-[16px]"
                 alt="OpenObserve"
               />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
@@ -158,79 +158,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 (getSource(row) === 'org' &&
                   row.org_id !== orgIdentifier)
               "
-              class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1"
+              class="shrink-0 cursor-default inline-flex mr-1"
             >
               <OIcon
                 name="corporate-fare"
                 size="sm"
-                class="source-icon"
+                class="text-[#757575] dark:text-[#bdbdbd]"
                />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
             </span>
             <span
               v-else
-              class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1"
+              class="shrink-0 cursor-default inline-flex mr-1"
             >
               <OIcon
                 name="person"
                 size="sm"
-                class="source-icon"
+                class="text-[#757575] dark:text-[#bdbdbd]"
                />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
             </span>
-            <div class="o2-table-cell-content">{{ row.name }}</div>
+            <div class="truncate w-full block">{{ row.name }}</div>
           </div>
         </template>
         <template #cell-match_pattern="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-1 tw:min-w-0">
+          <div class="flex items-center gap-1 min-w-0">
             <code
-              class="tw:text-xs tw:block tw:max-w-full pattern-code"
-              :class="{ 'shadowed-pattern': isChildRow(row) }"
+              class="text-xs block max-w-full bg-[rgba(0,0,0,0.04)] border border-(--o2-border-color) py-[2px] px-[6px] rounded text-inherit dark:bg-[rgba(255,255,255,0.05)]"
+              :class="{ 'opacity-50 [text-decoration:line-through] [text-decoration-color:currentColor]': isChildRow(row) }"
               >{{ row.match_pattern }}</code
             >
             <OIcon
               v-if="isChildRow(row)"
               name="warning-amber"
               size="xs"
-              class="tw:shrink-0 shadowed-icon"
+              class="shrink-0 text-[#f59e0b] opacity-85"
             >
               <OTooltip side="top" align="center" :content="t('modelPricing.shadowedTooltip', { name: getParentName(row) })" />
             </OIcon>
           </div>
         </template>
         <template #cell-pricing="{ row }">
-          <div class="tw:flex tw:flex-wrap tw:gap-1">
+          <div class="flex flex-wrap gap-1">
             <template
               v-if="
                 getDefaultTier(row) &&
                 Object.keys(getDefaultTier(row).prices || {}).length
               "
             >
-              <span
+              <ODimensionChip
                 v-for="(price, key) in getVisiblePrices(row)"
                 :key="key"
-                class="dimension-badge"
-                :class="getPriceKeyColorClass(key as string)"
-              >
-                <span class="tw:font-medium">{{
-                  formatPriceKey(key as string)
-                }}</span
-                >=<span>{{ formatPerMillion(price as number) }}</span>
-              </span>
-              <span
+                :dim-key="key as string"
+                :key-label="formatPriceKey(key as string)"
+                :value="formatPerMillion(price as number)"
+              />
+              <OTag
                 v-if="getOverflowCount(row) > 0"
-                class="dimension-badge badge-more tw:cursor-pointer"
+                type="countChip"
+                value="neutral"
+                clickable
                 @click.stop="openPricingDialog(row)"
               >
                 +{{ getOverflowCount(row) }}
                 {{ t("modelPricing.overflowMore") }}
                 <OTooltip>
                   <template #content>
-                    <div class="pricing-breakdown-tooltip">
-                      <div class="pricing-breakdown-title">
+                    <div class="min-w-[240px]">
+                      <div class="font-bold text-[13px] mb-[3px]">
                         {{ row.name }}
                       </div>
-                      <table class="pricing-breakdown-table">
+                      <table class="w-full border-collapse pricing-breakdown-table">
                         <thead>
                           <tr>
                             <th>{{ t("modelPricing.usageType") }}</th>
@@ -254,17 +252,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                 </OTooltip>
-              </span>
+              </OTag>
             </template>
-            <span v-else class="tw:text-text-primary">&mdash;</span>
+            <span v-else class="text-text-primary">&mdash;</span>
           </div>
         </template>
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-1 tw:justify-end">
+          <div class="flex items-center gap-1 justify-end">
             <template v-if="!isReadOnly(row)">
               <OButton
                 :variant="
-                  row.enabled ? 'ghost-destructive' : 'ghost'
+                  row.enabled ? 'ghost-destructive' : 'ghost-success'
                 "
                 size="icon-sm"
                 :title="
@@ -274,6 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 @click.stop="toggleEnabled(row, !row.enabled)"
                 data-test="model-pricing-toggle-btn"
+                :data-row-action="row.enabled ? 'pause' : 'resume'"
                 :icon-left="row.enabled ? 'pause' : 'play-arrow'"
               />
               <OButton
@@ -282,6 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('modelPricing.actionEdit')"
                 @click.stop="openEditor(row)"
                 data-test="model-pricing-edit-btn"
+                data-row-action="edit"
                 icon-left="edit"
               />
               <OButton
@@ -290,6 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('modelPricing.actionDelete')"
                 @click.stop="confirmDelete(row)"
                 data-test="model-pricing-delete-btn"
+                data-row-action="delete"
                 icon-left="delete"
               />
               <OButton
@@ -298,6 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('modelPricing.actionDuplicate')"
                 @click.stop="duplicateModel(row)"
                 data-test="model-pricing-duplicate-btn"
+                data-row-action="duplicate"
                 icon-left="content-copy"
               />
             </template>
@@ -308,6 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('modelPricing.actionClone')"
                 @click.stop="duplicateModel(row)"
                 data-test="model-pricing-clone-btn"
+                data-row-action="duplicate"
                 icon-left="content-copy"
               />
             </template>
@@ -316,19 +319,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #empty>
           <div
-            class="tw:w-full tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-y-3"
+            class="w-full flex flex-col items-center justify-center gap-y-3"
           >
-            <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="tw:text-gray-400" />
-            <div class="tw:text-base tw:font-medium tw:text-gray-400 tw:mt-2">
+            <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="text-gray-400" />
+            <div class="text-base font-medium text-gray-400 mt-2">
               {{ t("modelPricing.noModels") }}
             </div>
-            <div class="tw:text-xs tw:text-gray-400">
+            <div class="text-xs text-gray-400">
               {{ t("modelPricing.noModelsDesc") }}
             </div>
             <OButton
               variant="primary"
               size="sm"
-              class="tw:self-center"
+              class="self-center"
               @click="openEditor(null)"
               data-test="model-pricing-empty-add-btn"
             >
@@ -338,9 +341,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #bottom="scope">
-          <div class="bottom-btn tw:h-[48px] tw:gap-x-2">
+          <div class="flex items-center w-full h-[48px] gap-x-2">
             <div
-              class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px]"
+              class="o2-table-footer-title flex items-center w-[100px]"
             >
               {{ t("modelPricing.modelsCount", { count: resultTotal }) }}
             </div>
@@ -378,11 +381,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header-left>
         <span
             v-if="getSource(pricingDialogRow) === 'built_in'"
-            class="tw:shrink-0 tw:cursor-default tw:inline-flex"
+            class="shrink-0 cursor-default inline-flex"
           >
             <img
               :src="ooLogo"
-              class="tw:w-[18px] tw:h-[18px]"
+              class="w-[18px] h-[18px]"
               alt="OpenObserve"
             />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
@@ -394,42 +397,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 (getSource(pricingDialogRow) === 'org' &&
                   pricingDialogRow.org_id !== orgIdentifier))
             "
-            class="tw:shrink-0 tw:cursor-default tw:inline-flex"
+            class="shrink-0 cursor-default inline-flex"
           >
             <OIcon
               name="corporate-fare"
               size="sm"
-              class="source-icon"
+              class="text-[#757575] dark:text-[#bdbdbd]"
              />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
           </span>
           <span
             v-else
-            class="tw:shrink-0 tw:cursor-default tw:inline-flex"
+            class="shrink-0 cursor-default inline-flex"
           >
             <OIcon
               name="person"
               size="sm"
-              class="source-icon"
+              class="text-[#757575] dark:text-[#bdbdbd]"
              />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
           </span>
       </template>
 
-      <div class="tw:p-3 pricing-dialog-body">
+      <div class="p-3 flex-1 overflow-y-auto">
         <div v-if="pricingDialogRow">
-          <div class="tw:mb-4">
-            <div class="pricing-section-label">
+          <div class="mb-4">
+            <div class="text-xs font-semibold mb-[6px] text-[#555] dark:text-[#aaa]">
               {{ t("modelPricing.colPattern") }}
             </div>
-            <code class="tw:text-xs pattern-code pattern-code-panel">{{
+            <code class="text-xs block bg-[rgba(0,0,0,0.04)] border border-(--o2-border-color) py-[2px] px-[6px] rounded text-inherit text-[13px] px-[10px] py-[6px] whitespace-pre-wrap break-all max-h-[300px] overflow-y-auto dark:bg-[rgba(255,255,255,0.05)]">{{
               pricingDialogRow.match_pattern
             }}</code>
           </div>
-          <OSeparator class="tw:mb-4" />
+          <OSeparator class="mb-4" />
 
           <div>
-            <div class="pricing-section-label tw:mt-2">
+            <div class="text-xs font-semibold mb-[6px] text-[#555] mt-2 pricing-section-label">
               {{ t("modelPricing.colPricing") }}
             </div>
             <div
@@ -438,9 +441,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   getDefaultTier(pricingDialogRow)?.prices || {},
                 ).length
               "
-              class="pricing-panel-table-wrap"
+              class="mt-2 border border-(--o2-border-color) rounded-lg overflow-hidden"
             >
-              <table class="pricing-panel-table">
+              <table class="w-full border-collapse pricing-panel-table">
                 <thead>
                   <tr>
                     <th>{{ t("modelPricing.usageType") }}</th>
@@ -460,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </tbody>
               </table>
             </div>
-            <span v-else class="tw:text-gray-400">&mdash;</span>
+            <span v-else class="text-gray-400">&mdash;</span>
           </div>
         </div>
       </div>
@@ -495,6 +498,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -681,29 +686,6 @@ function formatPriceKey(key: string): string {
   return key.replace(/_tokens$/, "").replace(/_/g, "-");
 }
 
-function getPriceKeyColorClass(key: string): string {
-  const k = key.toLowerCase();
-  if (k.includes("input")) return "badge-blue";
-  if (k.includes("output")) return "badge-green";
-  const palette = [
-    "badge-cyan",
-    "badge-purple",
-    "badge-pink",
-    "badge-orange",
-    "badge-amber",
-    "badge-violet",
-    "badge-rose",
-    "badge-teal",
-    "badge-indigo",
-  ];
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash << 5) - hash + key.charCodeAt(i);
-    hash = hash & hash;
-  }
-  return palette[Math.abs(hash) % palette.length];
-}
-
 function formatPerMillion(pricePerToken: number | undefined | null): string {
   if (pricePerToken == null || pricePerToken === undefined) return "$0.00";
   if (pricePerToken === 0) return "$0.00";
@@ -731,7 +713,7 @@ function sortedPriceEntries(
   });
 }
 
-/** Return the first N prices to display tw:inline as chips. */
+/** Return the first N prices to display inline as chips. */
 const MAX_VISIBLE_PRICES = 2;
 function getVisiblePrices(model: any): Record<string, number> {
   const tier = getDefaultTier(model);
@@ -741,7 +723,7 @@ function getVisiblePrices(model: any): Record<string, number> {
   );
 }
 
-/** How many prices are tw:hidden behind the overflow "+N" chip. */
+/** How many prices are hidden behind the overflow "+N" chip. */
 function getOverflowCount(model: any): number {
   const tier = getDefaultTier(model);
   if (!tier?.prices) return 0;
@@ -948,349 +930,71 @@ onActivated(() => {
 });
 </script>
 
-<style lang="scss">
-.bottom-btn {
-  display: flex;
-  align-items: center;
-  width: 100%;
+<style>
+/* Dark mode for pricing panel table header (th element selector — cannot inline) */
+.body--dark .pricing-panel-table th {
+  background: rgba(255, 255, 255, 0.04);
 }
 
-.o2-table-cell-content {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  width: 100%;
-  display: block;
-}
-
-.section-header-cell {
-  padding: 10px 16px;
-  background: rgba(0, 0, 0, 0.04);
-  border-bottom: 1px solid var(--o2-border-color);
-
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.06);
-  }
-}
-
-.section-header-title {
-  font-weight: 700;
-  opacity: 0.8;
-}
-
-.section-header-subtitle {
-  opacity: 0.6;
-}
-
-/* Add pattern code tw:block styling */
-.pattern-code {
-  background: rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--o2-border-color);
-  padding: 2px 6px;
-  border-radius: 4px;
-  color: inherit;
-}
-
-body.body--dark .pattern-code {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.pricing-section-label {
-  font-size: 12px;
-  font-weight: 600;
-  margin-bottom: 6px;
-  color: #555;
-
-  .body--dark & {
-    color: #aaa;
-  }
-}
-
-.pattern-code-panel {
-  display: block;
-  font-size: 13px;
-  padding: 6px 10px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-/* ── Dimension badges (pricing) ─────────────────────── */
-.dimension-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 8px;
-  border-radius: 6px;
+/* ── Pricing panel table (side panel) child selectors ──────────────── */
+.pricing-panel-table th {
   font-size: 11px;
-  font-weight: 400;
-  white-space: nowrap;
-  border: 1px solid #d1d5db;
-  color: inherit;
-}
-
-.badge-more {
-  background: #e5e7eb;
-  color: #6b7280;
-  font-weight: 500;
-  border: none;
-}
-
-body.body--dark .badge-more {
-  background: #4b5563;
-  color: #d1d5db;
-}
-
-/* ── Pricing detail side panel ────────────────────── */
-.pricing-dialog-panel {
-  width: 30vw !important;
-  min-width: 320px;
-  max-width: 100vw;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-
-  .add-stream-header {
-    min-height: 64px;
-  }
-}
-
-.pricing-dialog-body {
-  flex: 1;
-  overflow-y: auto;
-}
-
-/* ── Pricing panel table (side panel) ──────────────── */
-.pricing-panel-table-wrap {
-  margin-top: 8px;
-  border: 1px solid var(--o2-border-color);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.pricing-panel-table {
-  width: 100%;
-  border-collapse: collapse;
-
-  th {
-    font-size: 11px;
-    font-weight: 600;
-    opacity: 0.5;
-    text-align: left;
-    padding: 6px 14px;
-    background: rgba(0, 0, 0, 0.025);
-    border-bottom: 1px solid var(--o2-border-color);
-
-    .body--dark & {
-      background: rgba(255, 255, 255, 0.04);
-    }
-
-    &:last-child {
-      text-align: right;
-    }
-  }
-
-  td {
-    font-size: 13px;
-    padding: 8px 14px;
-    border-bottom: 1px solid var(--o2-border-color);
-
-    &:last-child {
-      text-align: right;
-      font-weight: 600;
-    }
-  }
-
-  tr:last-child td {
-    border-bottom: none;
-  }
-}
-
-/* ── Pricing overflow tooltip ──────────────────────── */
-.pricing-overflow-tooltip {
-  padding: 12px 16px;
-  min-width: 260px;
-}
-
-.pricing-breakdown-tooltip {
-  min-width: 240px;
-}
-
-.pricing-breakdown-title {
-  font-weight: 700;
-  font-size: 13px;
-  margin-bottom: 3px;
-}
-
-.pricing-breakdown-table {
-  width: 100%;
-  border-collapse: collapse;
-
-  th {
-    font-size: 11px;
-    font-weight: 600;
-    opacity: 0.65;
-    text-align: left;
-    padding: 0 16px 4px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-
-    &:last-child {
-      text-align: right;
-      padding-right: 0;
-    }
-  }
-
-  td {
-    font-size: 12px;
-    padding: 2px 16px 2px 0;
-    border-bottom: none;
-
-    &:last-child {
-      text-align: right;
-      padding-right: 0;
-      font-weight: 500;
-    }
-  }
-
-  tr:last-child td {
-    border-bottom: none;
-  }
-}
-
-body.body--dark {
-  .dimension-badge {
-    color: #ffffff;
-    border-color: #4b5563;
-  }
-}
-
-/* ── Column header info icon ───────────────────────────── */
-.col-header-info-icon {
-  opacity: 0.35;
-  cursor: default;
-  vertical-align: middle;
-  &:hover {
-    opacity: 0.7;
-  }
-}
-
-/* ── Source icons (person / corporate_fare) ────────────── */
-.source-icon {
-  color: #757575;
-
-  .body--dark & {
-    color: #bdbdbd;
-  }
-}
-
-/* ── Shadowed pattern (strikethrough + dim) ────────────── */
-.shadowed-pattern {
+  font-weight: 600;
   opacity: 0.5;
-  text-decoration: line-through;
-  text-decoration-color: currentColor;
+  text-align: left;
+  padding: 6px 14px;
+  background: rgba(0, 0, 0, 0.025);
+  border-bottom: 1px solid var(--o2-border-color);
 }
 
-/* ── Shadowed icon (orange-ish, muted) ─────────────────── */
-.shadowed-icon {
-  color: #f59e0b;
-  opacity: 0.85;
-
-  .body--dark & {
-    color: #fbbf24;
-  }
+.pricing-panel-table th:last-child {
+  text-align: right;
 }
 
-/* ── Tree connector lines ────── */
-
-.tree-name-cell {
-  position: relative;
+.pricing-panel-table td {
+  font-size: 13px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--o2-border-color);
 }
 
-.tree-parent-expanded.tree-name-cell::after {
-  content: "";
-  position: absolute;
-  left: 14px;
-  top: calc(50% + 11px);
-  bottom: 0;
-  width: 1.5px;
-  background-color: var(--q-primary);
-  opacity: 0.6;
-  z-index: 1;
+.pricing-panel-table td:last-child {
+  text-align: right;
+  font-weight: 600;
 }
 
-.tree-child.tree-name-cell {
-  &::before {
-    content: "";
-    position: absolute;
-    left: 14px;
-    top: 0;
-    bottom: 0;
-    width: 1.5px;
-    background-color: var(--q-primary);
-    opacity: 0.6;
-    z-index: 1;
-  }
-
-  &.tree-last-child::before {
-    bottom: 50%;
-  }
-
-  &::after {
-    content: "";
-    position: absolute;
-    left: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 18px;
-    height: 1.5px;
-    background-color: var(--q-primary);
-    opacity: 0.6;
-    z-index: 1;
-  }
+.pricing-panel-table tr:last-child td {
+  border-bottom: none;
 }
 
-.tree-icon-wrapper {
-  width: 20px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-right: 4px;
+/* ── Pricing breakdown tooltip table child selectors ──────────────── */
+.pricing-breakdown-table th {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.65;
+  text-align: left;
+  padding: 0 16px 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-.tree-expand-icon {
-  flex-shrink: 0;
+.pricing-breakdown-table th:last-child {
+  text-align: right;
+  padding-right: 0;
 }
 
-.tree-node-content {
-  position: relative;
-  z-index: 2;
-  min-height: 24px;
+.pricing-breakdown-table td {
+  font-size: 12px;
+  padding: 2px 16px 2px 0;
+  border-bottom: none;
 }
 
-.tree-child-content {
-  padding-left: 44px;
+.pricing-breakdown-table td:last-child {
+  text-align: right;
+  padding-right: 0;
+  font-weight: 500;
 }
 
-.tree-dot-marker {
-  position: absolute;
-  left: 33px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 7px;
-  height: 7px;
-  background-color: var(--q-primary);
-  opacity: 0.7;
-  border: 2px solid var(--q-background);
-  border-radius: 0;
-  z-index: 3;
-  pointer-events: none;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+.pricing-breakdown-table tr:last-child td {
+  border-bottom: none;
 }
 
-.tree-dot-marker.tree-dot-parent {
-  border-radius: 50%;
-}
 </style>

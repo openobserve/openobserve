@@ -1,5 +1,5 @@
 <template>
-  <div ref="chartEl" class="qcbars" data-test="quality-category-bars-chart" />
+  <div ref="chartEl" class="w-full h-full min-h-45" data-test="quality-category-bars-chart" />
 </template>
 
 <script setup lang="ts">
@@ -103,11 +103,3 @@ onBeforeUnmount(() => {
   chart = null;
 });
 </script>
-
-<style lang="scss" scoped>
-.qcbars {
-  width: 100%;
-  height: 100%;
-  min-height: 180px;
-}
-</style>

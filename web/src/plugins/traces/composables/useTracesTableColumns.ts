@@ -65,12 +65,12 @@ const KNOWN_COLUMN_META: Record<
   service_name: {
     header: "Service",
     size: 160,
-    meta: { cellClass: "tw:text-[var(--o2-text-1)]", slot: true },
+    meta: { cellClass: "text-[var(--o2-text-1)]", slot: true },
   },
   operation_name: {
     header: "Operation Name",
     size: 200,
-    meta: { cellClass: "tw:text-[var(--o2-text-1)]", slot: true },
+    meta: { cellClass: "text-[var(--o2-text-1)]", slot: true },
   },
   duration: {
     header: "Duration",
@@ -78,7 +78,7 @@ const KNOWN_COLUMN_META: Record<
     meta: {
       sortable: true,
       slot: true,
-      cellClass: "tw:text-[var(--o2-text-4)]!",
+      cellClass: "text-[var(--o2-text-4)]!",
     },
   },
   spans: {
@@ -87,7 +87,7 @@ const KNOWN_COLUMN_META: Record<
     meta: {
       align: "right",
       slot: false,
-      cellClass: "tw:text-[var(--o2-text-1)]!",
+      cellClass: "text-[var(--o2-text-1)]!",
     },
     accessorFn: (row: any) => row.spans,
   },
@@ -180,7 +180,7 @@ export function useTracesTableColumns() {
         id: timestampCol,
         header: t("traces.timestamp") + ` (${store.state.timezone})`,
         size: 210,
-        meta: { slot: true, sortable: true, class: "tw:capitalize!" },
+        meta: { slot: true, sortable: true, class: "capitalize!" },
         accessorFn: (row: any) =>
           timestampToTimezoneDate(
             (row[timestampCol] ?? row["zo_sql_timestamp"]) / 1000,

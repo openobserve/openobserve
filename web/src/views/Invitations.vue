@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="invitations-page tw:h-full">
+  <div class="invitations-page h-full">
     <InvitationList
       :userEmail="userEmail"
       @invitations-processed="handleInvitationsProcessed"
@@ -46,8 +46,3 @@ const handleInvitationsProcessed = (data: any) => {
 };
 </script>
 
-<style scoped>
-.invitations-page {
-  padding: 0;
-}
-</style>

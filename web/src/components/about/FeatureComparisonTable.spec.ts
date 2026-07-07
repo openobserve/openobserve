@@ -67,7 +67,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const cards = wrapper.findAll(".edition-card");
+    const cards = wrapper.findAll('[data-test="feature-comparison-table-edition-card"]');
     expect(cards).toHaveLength(3);
   });
 
@@ -111,7 +111,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const activeCards = wrapper.findAll(".edition-card--active");
+    const activeCards = wrapper.findAll('[data-test="feature-comparison-table-edition-card"][data-test-active="true"]');
     expect(activeCards).toHaveLength(1);
   });
 
@@ -131,7 +131,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const activeCards = wrapper.findAll(".edition-card--active");
+    const activeCards = wrapper.findAll('[data-test="feature-comparison-table-edition-card"][data-test-active="true"]');
     expect(activeCards).toHaveLength(1);
   });
 
@@ -152,7 +152,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const iconWrapper = wrapper.find(".ec-icon-wrapper");
+    const iconWrapper = wrapper.find('[data-test="feature-comparison-table-icon-wrapper"]');
     expect(iconWrapper.exists()).toBe(true);
     const icon = iconWrapper.findComponent({ name: "OIcon" });
     expect(icon.exists()).toBe(true);
@@ -165,7 +165,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const badge = wrapper.find(".your-plan-badge");
+    const badge = wrapper.find('[data-test="feature-comparison-table-your-plan-badge"]');
     expect(badge.exists()).toBe(true);
     expect(badge.text()).toContain("Your Plan");
   });
@@ -177,7 +177,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const featureItems = wrapper.findAll(".feature-item");
+    const featureItems = wrapper.findAll('[data-test="feature-comparison-table-feature-item"]');
     // 3 edition cards × 1 mock feature (test_feature, not excluded) = 3
     expect(featureItems.length).toBeGreaterThan(0);
   });
@@ -189,7 +189,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const chips = wrapper.findAll(".pillar-chip");
+    const chips = wrapper.findAll('[data-test="feature-comparison-table-pillar-chip"]');
     expect(chips.length).toBeGreaterThan(0);
   });
 
@@ -238,7 +238,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const footerRows = wrapper.findAll(".footer-row");
+    const footerRows = wrapper.findAll('[data-test="feature-comparison-table-footer-row"]');
     // 3 cards × 2 footer rows each (license + support)
     expect(footerRows.length).toBe(6);
   });
@@ -250,7 +250,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const ctaBtns = wrapper.findAll(".cta-btn");
+    const ctaBtns = wrapper.findAll('[data-test="feature-comparison-table-cta-btn"]');
     expect(ctaBtns).toHaveLength(3);
   });
 
@@ -261,7 +261,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const currentBtn = wrapper.find(".cta-btn--current");
+    const currentBtn = wrapper.find('[data-test="feature-comparison-table-cta-btn"][data-test-cta="current"]');
     expect(currentBtn.exists()).toBe(true);
     expect((currentBtn.element as HTMLButtonElement).disabled).toBe(true);
   });
@@ -273,7 +273,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const actionLinks = wrapper.findAll(".cta-btn--action");
+    const actionLinks = wrapper.findAll('[data-test="feature-comparison-table-cta-btn"][data-test-cta="action"]');
     // opensource is current → 2 action links remain
     expect(actionLinks).toHaveLength(2);
     actionLinks.forEach((link) => {

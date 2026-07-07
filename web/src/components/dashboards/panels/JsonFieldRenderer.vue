@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="['json-field-renderer', { 'json-structured': isValidJSON }]"
+    :class="['json-field-renderer', isValidJSON ? 'font-mono text-xs leading-[1.5]' : '']"
     data-test="json-field-renderer"
   >
     <div v-if="parsedData === null || parsedData === undefined">
@@ -26,36 +26,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Array of primitives: ["a", "b", "c"] -> render as lines -->
       <div
         v-if="isArrayOfPrimitives"
-        class="json-array-items"
+        class="flex flex-col"
         data-test="json-array-items"
       >
         <div
           v-for="(item, index) in definedItems"
           :key="index"
-          class="json-array-item"
+          class="py-[2px]"
           data-test="json-array-item"
         >
           <span :style="{ color: getValueColor(item) }">{{ formatValue(item) }}</span>
         </div>
       </div>
       <!-- Array of objects: [{"user": "admin"}, ...] -> render each object -->
-      <div v-else class="json-array-objects" data-test="json-array-objects">
+      <div v-else class="flex flex-col" data-test="json-array-objects">
         <div
           v-for="(item, index) in definedItems"
           :key="index"
-          class="json-object-item"
+          class="py-[2px] break-words"
         >
           <span v-if="typeof item === 'object' && item !== null">
-            <span class="json-brace">{</span>
+            <span class="text-[#9ca3af]">{</span>
             <template v-for="(val, key) in getDefinedEntries(item)" :key="key">
-              <span class="json-key-value">
-                <span class="json-key" :style="{ color: keyColor }" data-test="json-key">{{ key }}</span>
-                <span class="json-colon">: </span>
-                <span class="json-value" :style="{ color: getValueColor(val) }" data-test="json-value">{{ formatValue(val) }}</span>
+              <span class="inline">
+                <span class="font-medium" :style="{ color: keyColor }" data-test="json-key">{{ key }}</span>
+                <span class="text-[#9ca3af]">: </span>
+                <span class="break-words" :style="{ color: getValueColor(val) }" data-test="json-value">{{ formatValue(val) }}</span>
               </span>
-              <span v-if="!isLastDefinedEntry(item, key)" class="json-comma">, </span>
+              <span v-if="!isLastDefinedEntry(item, key)" class="text-[#9ca3af]">, </span>
             </template>
-            <span class="json-brace">}</span>
+            <span class="text-[#9ca3af]">}</span>
           </span>
           <span v-else :style="{ color: getValueColor(item) }">{{ formatValue(item) }}</span>
         </div>
@@ -64,19 +64,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Single object: {"key": "value"} -> render key-value pairs -->
     <div
       v-else-if="typeof parsedData === 'object'"
-      class="json-object"
+      class="break-words"
       data-test="json-object"
     >
-      <span class="json-brace">{</span>
+      <span class="text-[#9ca3af]">{</span>
       <template v-for="(val, key, idx) in definedObjectEntries" :key="key">
-        <span class="json-key-value">
-          <span class="json-key" :style="{ color: keyColor }" data-test="json-key">{{ key }}</span>
-          <span class="json-colon">: </span>
-          <span class="json-value" :style="{ color: getValueColor(val) }" data-test="json-value">{{ formatValue(val) }}</span>
+        <span class="inline">
+          <span class="font-medium" :style="{ color: keyColor }" data-test="json-key">{{ key }}</span>
+          <span class="text-[#9ca3af]">: </span>
+          <span class="break-words" :style="{ color: getValueColor(val) }" data-test="json-value">{{ formatValue(val) }}</span>
         </span>
-        <span v-if="idx < definedObjectKeys.length - 1" class="json-comma">, </span>
+        <span v-if="idx < definedObjectKeys.length - 1" class="text-[#9ca3af]">, </span>
       </template>
-      <span class="json-brace">}</span>
+      <span class="text-[#9ca3af]">}</span>
     </div>
     <!-- Primitive value: only apply JSON coloring if the value was valid JSON -->
     <div v-else>
@@ -225,57 +225,3 @@ const isLastDefinedEntry = (obj: any, currentKey: string): boolean => {
 };
 </script>
 
-<style lang="scss" scoped>
-.json-structured {
-  font-family: monospace;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.json-array-items {
-  display: flex;
-  flex-direction: column;
-}
-
-.json-array-item {
-  padding: 2px 0;
-}
-
-.json-array-objects {
-  display: flex;
-  flex-direction: column;
-}
-
-.json-object-item {
-  padding: 2px 0;
-  word-break: break-word;
-}
-
-.json-object {
-  word-break: break-word;
-}
-
-.json-key-value {
-  display: inline;
-}
-
-.json-key {
-  font-weight: 500;
-}
-
-.json-colon {
-  color: #9ca3af;
-}
-
-.json-comma {
-  color: #9ca3af;
-}
-
-.json-value {
-  word-break: break-word;
-}
-
-.json-brace {
-  color: #9ca3af;
-}
-</style>

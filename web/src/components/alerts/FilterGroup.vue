@@ -1,20 +1,23 @@
-<template>
+﻿<template>
     <!-- Preview Section (only for root level) -->
     <div v-if="depth === 0 && showSqlPreview && previewString"
-         class="tw:mb-2 tw:p-2 tw:rounded tw:border tw:w-full tw:max-h-[3.2em] tw:overflow-y-auto tw:bg-surface-panel tw:border-border-default">
-      <div class="tw:flex tw:items-start tw:gap-1 tw:min-w-0">
-        <span class="tw:font-medium tw:text-xs tw:flex-shrink-0 tw:leading-[1.3] tw:text-text-primary">
+         class="mb-2 p-2 rounded border w-full max-h-[3.2em] overflow-y-auto"
+         :class="store.state.theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-300'">
+      <div class="flex items-start gap-1 min-w-0">
+        <span class="font-medium text-xs flex-shrink-0 leading-[1.3]"
+              :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'">
           Preview:
         </span>
-        <span class="tw:text-[10px] tw:font-mono tw:leading-[1.3] tw:min-w-0 tw:break-words tw:text-text-secondary">
+        <span class="text-[10px] font-mono leading-[1.3] min-w-0 break-words"
+              :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'">
           {{ previewString }}
         </span>
       </div>
     </div>
 
-    <div :class="[`  tw:px-2 tw:mb-2 el-border el-border-radius `,
-        'tw:mt-4',
-        store.state.isAiChatEnabled ? 'tw:w-full' : 'xl:tw:w-fit'
+    <div :class="[`  px-2 mb-2 el-border el-border-radius `,
+        'mt-4',
+        store.state.isAiChatEnabled ? 'w-full' : 'xl:w-fit'
     ]"
     :style="{
         opacity: computedOpacity,
@@ -24,7 +27,7 @@
     >
       <!-- V2: Group-level toggle only for nested groups (depth > 0) -->
       <!-- Root group (depth 0) doesn't need toggle - its logicalOperator is dummy -->
-      <div v-if="depth > 0" class="tw:w-fit tw:relative tw:bottom-3.5">
+      <div v-if="depth > 0" class="w-fit relative bottom-3.5">
         <OToggleGroup
           :model-value="label"
           @update:model-value="toggleLabel($event as string)"
@@ -44,13 +47,13 @@
         </OToggleGroup>
       </div>
       <!-- Spacer for root group to maintain consistent spacing -->
-      <div v-else class="tw:h-[14px]"></div>
+      <div v-else class="h-[14px]"></div>
 
       <!-- Group content -->
 
-      <div v-if="isOpen" class="tw:overflow-x-auto group-container">
+      <div v-if="isOpen" class="overflow-x-auto group-container" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
         <!-- Items in group (V2 uses 'conditions' array) -->
-        <div class="tw:ml-2 tw:whitespace-nowrap " v-for="(item, index) in props.group.conditions" :key="index">
+        <div class="ml-2 whitespace-nowrap " v-for="(item, index) in props.group.conditions" :key="index">
           <FilterGroup
             v-if="isGroup(item)"
             :group="item"
@@ -67,8 +70,8 @@
           />
           <div
             v-else
-            class="tw:flex tw:items-center tw:gap-2  tw:mb-2 "
-            :class="store.state.isAiChatEnabled ? 'tw:pl-0' : 'tw:pl-4'"
+            class="flex items-center gap-2  mb-2 "
+            :class="store.state.isAiChatEnabled ? 'pl-0' : 'pl-4'"
             >
             <FilterCondition
                 :condition="item"
@@ -89,41 +92,41 @@
         </div>
         <!-- Action buttons -->
 
-        <div class="tw:flex tw:justify-start tw:items-center tw:ml-4"
+        <div class="flex justify-start items-center ml-4"
         >
         <OButton
             data-test="alert-conditions-add-condition-btn"
-            class="tw:ml-3"
+            class="ml-3"
             size="sm"
             variant="ghost-primary"
             @click="addCondition(props.group.groupId)"
             >
-            <OIcon class="tw:mr-1 tw:font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
-            <span class="tw:text-[0.75rem] tw:font-bold">Condition</span>
+            <OIcon class="mr-1 font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
+            <span class="text-[0.75rem] font-bold">Condition</span>
             <OTooltip :delay="300" :content="t('alerts.conditions.addConditionTooltip')" />
         </OButton>
         <OButton
             data-test="alert-conditions-add-condition-group-btn"
-            class="tw:ml-1"
+            class="ml-1"
             size="sm"
             variant="ghost-primary"
             @click="addGroup(props.group.groupId)"
             :disabled="depth >= 2"
             >
-            <OIcon class="tw:mr-1 tw:font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
-            <span class="tw:text-[0.75rem] tw:font-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
+            <OIcon class="mr-1 font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
+            <span class="text-[0.75rem] font-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
             <OTooltip v-if="depth < 2" :delay="300" :content="t('alerts.conditions.addConditionGroupTooltip')" />
             <OTooltip v-else :delay="300" :content="t('alerts.conditions.maxDepthReachedTooltip')" />
         </OButton>
         <OButton
             data-test="alert-conditions-reorder-btn"
-            class="tw:ml-1"
+            class="ml-1"
             size="sm"
             variant="ghost-primary"
             @click="reorderItems()"
             >
-            <OIcon class="tw:mr-1 tw:font-bold" size="xs" name="swap-vert" />
-            <span class="tw:text-[0.75rem] tw:font-bold">Reorder</span>
+            <OIcon class="mr-1 font-bold" size="xs" name="swap-vert" />
+            <span class="text-[0.75rem] font-bold">Reorder</span>
             <OTooltip :delay="300" content="Reorder items: Conditions first, then Groups" />
         </OButton>
      </div>
@@ -486,79 +489,39 @@ defineExpose({
 
   </script>
 
-  <style lang="scss">
+  <style>
 
-    .condition-container {
-        overflow-x: auto;
-        max-width: 900px;
+    .group-container.dark-mode-group {
+      scrollbar-color: #818181 var(--o2-primary-background); /* thumb color, track color */
     }
 
+    .group-container.light-mode-group {
+      scrollbar-color: #999 #ffffff;
+    }
 
-    .group-tabs {
-      position: relative;
+    /* For more control using WebKit scrollbar styling */
+    .group-container::-webkit-scrollbar {
+      width: 8px;
+      height: 4px !important;
+    }
 
+    .group-container.dark-mode-group::-webkit-scrollbar-track {
+      background: red;
+    }
+
+    .group-container.dark-mode-group::-webkit-scrollbar-thumb {
+      background-color: #b10000;
       border-radius: 4px;
-      overflow: hidden;
-      bottom: 12px;
-      .q-tab{
-        height: 24px !important;
-        min-height: 24px !important;
-        width: 50px !important;
-        min-width: 50px !important;
-      }
-      .q-tab__label{
-        font-size: 10px !important;
-      }
-    }
-  .group-container {
-    scrollbar-color: var(--o2-text-muted) var(--o2-primary-background);
-  }
-
-/* For more control using WebKit scrollbar styling */
-.group-container::-webkit-scrollbar {
-  width: 8px;
-  height: 4px !important;
-}
-
-.group-container::-webkit-scrollbar-track {
-  background: var(--o2-primary-background);
-}
-
-.group-container::-webkit-scrollbar-thumb {
-  background-color: var(--o2-text-muted);
-  border-radius: 4px;
-}
-
-  .group-tabs {
-      border: 1px solid $border-color;
-      background-color: transparent !important;
-    .q-tab--active {
-      background-color: var(--o2-primary-btn-bg);
-      color: $white;
     }
 
-      .q-tab__indicator {
-        display: none;
-      }
-
-  
-
-    .q-tab--inactive {
-      background-color: var(--o2-inactive-tab-bg);
+    .group-container.light-mode-group::-webkit-scrollbar-track {
+      background: #ffffff;
     }
 
-    .q-tab{
-          &:hover:not(.q-tab--active) {
-    background-color: color-mix(in srgb, var(--o2-tab-bg) 70%, var(--o2-theme-mode) 50%);
-  }
-
-    &:hover.q-tab--active {
-      background-color: var(--o2-primary-btn-bg) !important;
+    .group-container.light-mode-group::-webkit-scrollbar-thumb {
+      background-color: #999;
+      border-radius: 4px;
     }
-      }
-    }
-    
-
 
   </style>
   

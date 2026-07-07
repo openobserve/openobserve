@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:justify-start tw:items-center header-bg tw:bg-surface-panel trace-header-container"
+    class="flex justify-start items-center bg-[color-mix(in_srgb,currentColor_5%,transparent)] h-7.5 top-0 z-1999 sticky rounded-t-lg"
     data-test="trace-header"
     :style="
       isSidebarOpen && {
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <div
-      class="tw:relative tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:px-2 trace-header-left"
+      class="relative flex justify-start items-center flex-nowrap flex px-2"
       :style="{
         width: splitterWidth + 'px',
       }"
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       Operation Name
       <div
-        class="resize-btn tw:bg-[var(--o2-primary)] tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
+        class="bg-(--o2-primary) inline-flex items-center justify-center w-5 h-5 rounded-full absolute -right-2.5 -top-0.5 z-10 cursor-col-resize"
         @mousedown="handleMouseDown"
         data-test="trace-header-resize-btn"
       >
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:relative trace-header-right"
+      class="flex justify-start items-center flex-nowrap flex relative"
       :style="{
         width: `calc(100% - ${splitterWidth}px)`,
       }"
@@ -51,25 +51,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div
-        class="tw:w-1/4 tw:text-xs tw:pl-3"
+        class="w-1/4 text-xs pl-3"
         data-test="trace-header-tic-label-0"
       >
         {{ baseTracePosition.tics?.[0]?.label || "" }}
       </div>
       <div
-        class="tw:w-1/4 tw:text-xs tw:pl-1"
+        class="w-1/4 text-xs pl-1"
         data-test="trace-header-tic-label-1"
       >
         {{ baseTracePosition.tics?.[1]?.label || "" }}
       </div>
       <div
-        class="tw:w-1/4 tw:text-xs tw:pl-1"
+        class="w-1/4 text-xs pl-1"
         data-test="trace-header-tic-label-2"
       >
         {{ baseTracePosition.tics?.[2]?.label || "" }}
       </div>
       <div
-        class="tw:w-1/4 tw:text-xs tw:flex tw:justify-between tw:items-center tw:px-1"
+        class="w-1/4 text-xs flex justify-between items-center px-1"
         data-test="trace-header-tic-label-3"
       >
         <div>{{ baseTracePosition.tics?.[3]?.label || "" }}</div>
@@ -77,10 +77,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-for="(tick, index) in baseTracePosition['tics']"
-        class="trace-tic"
+        class="trace-tic absolute -top-0.75 w-px bg-[#cacaca] z-1 h-6.5"
         :class="{
-          'trace-tic-first': index === 0,
-          'bg-dark-tic': store.state.theme === 'dark',
+          'z-5 hidden': index === 0,
+          'bg-[#3c3c3c]': store.state.theme === 'dark',
         }"
         :key="tick.value + index"
         :style="{
@@ -132,60 +132,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-$toolbarHeight: 50px;
-$traceHeaderHeight: 30px;
-$traceChartHeight: 250px;
-
-.trace-header-container {
-  height: 1.875rem;
-  top: 0;
-  z-index: 1999;
-  position: sticky;
-  border-radius: 0.5rem 0.5rem 0 0;
-}
-
-.trace-header-container.bg-grey-9 {
-  border-color: #3c3c3c;
-}
-
-.spans-container {
-  position: relative;
-}
-
-.collapse-btn {
-  width: 0.625rem;
-  height: 0.625rem;
-}
-
-.trace-tic {
-  position: absolute;
-  top: -0.1875rem;
-  width: 0.0625rem;
-  background-color: #cacaca;
-  z-index: 1;
-  height: 1.625rem;
-}
-
-.trace-tic.bg-dark-tic {
-  background-color: #3c3c3c;
-}
-
-.trace-tic-first {
-  z-index: 5;
-  display: none;
-}
-
-.header-bg {
-  background-color: color-mix(in srgb, currentColor 5%, transparent);
-}
-
-.resize-btn {
-  position: absolute;
-  right: -0.625rem;
-  top: -0.125rem;
-  z-index: 10;
-  cursor: col-resize;
-}
-</style>

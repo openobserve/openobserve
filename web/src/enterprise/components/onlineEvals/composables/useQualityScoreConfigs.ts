@@ -6,11 +6,13 @@
 import { computed, ref, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import type { ScoreConfig } from "@/services/online-evals.service";
-import {
-  dataTypeOf,
-  entityId,
-} from "../utils/evalEntity";
+import { dataTypeOf, entityId } from "../utils/evalEntity";
 import { chooseBucketInterval, type DateWindow } from "./useQualityData";
+import {
+  buildScoresAgentFilterWhere,
+  combineWhere,
+  type AgentFilterSelection,
+} from "../utils/agentFilterSql";
 
 export type ConfigStatus = "healthy" | "noData";
 
@@ -61,7 +63,8 @@ function joinId(config: ScoreConfig): string {
  * `_llm_scores` schema, so it never trips DataFusion's parse-time column
  * check. No per-config unhealthy detection — the table doesn't render an
  * unhealthy column anymore. */
-function buildAggSql(): string {
+function buildAggSql(agentWhere: string | null): string {
+  const where = combineWhere("score_config_id IS NOT NULL", agentWhere);
   return [
     "SELECT",
     "  CAST(score_config_id AS VARCHAR) AS score_config_id,",
@@ -69,25 +72,29 @@ function buildAggSql(): string {
     "  COUNT(DISTINCT span_id) AS unique_spans,",
     "  MAX(_timestamp) AS last_updated_us",
     'FROM "_llm_scores"',
-    "WHERE score_config_id IS NOT NULL",
+    `WHERE ${where}`,
     "GROUP BY score_config_id",
   ].join("\n");
 }
 
-function buildTrendSql(interval: string): string {
+function buildTrendSql(interval: string, agentWhere: string | null): string {
+  const where = combineWhere("score_config_id IS NOT NULL", agentWhere);
   return [
     "SELECT",
     "  CAST(score_config_id AS VARCHAR) AS score_config_id,",
     `  histogram(_timestamp, '${interval}') AS bucket,`,
     "  COUNT(*) AS c",
     'FROM "_llm_scores"',
-    "WHERE score_config_id IS NOT NULL",
+    `WHERE ${where}`,
     "GROUP BY score_config_id, bucket",
     "ORDER BY bucket",
   ].join("\n");
 }
 
-function statusOf(totalScores: number): { status: ConfigStatus; priority: number } {
+function statusOf(totalScores: number): {
+  status: ConfigStatus;
+  priority: number;
+} {
   // No scores in the window — config exists but is dormant. Reported as a
   // distinct status (gray dot, sorted to bottom) so it doesn't get mistaken
   // for a config that actually has scores in this window.
@@ -98,6 +105,7 @@ function statusOf(totalScores: number): { status: ConfigStatus; priority: number
 export function useQualityScoreConfigs(
   scoreConfigs: Ref<ScoreConfig[]>,
   dateWindow: Ref<DateWindow>,
+  agentFilter?: Ref<AgentFilterSelection | null | undefined>,
 ) {
   const { executeQuery } = useLLMStreamQuery();
   const isLoading = ref(false);
@@ -114,8 +122,11 @@ export function useQualityScoreConfigs(
     try {
       const { startUs, endUs } = dateWindow.value;
       const interval = chooseBucketInterval((endUs - startUs) / 1000);
-      const aggSql = buildAggSql();
-      const trendSql = buildTrendSql(interval);
+      const agentWhere = buildScoresAgentFilterWhere(
+        agentFilter?.value ?? null,
+      );
+      const aggSql = buildAggSql(agentWhere);
+      const trendSql = buildTrendSql(interval, agentWhere);
 
       // `runQuery` swallows failures so one bad query doesn't blank the page.
       const runQuery = async <T>(
@@ -133,7 +144,8 @@ export function useQualityScoreConfigs(
       };
 
       const aggHits = (await runQuery<AggRow>(aggSql, "configs.agg")) ?? [];
-      const trendHits = (await runQuery<TrendRow>(trendSql, "configs.trend")) ?? [];
+      const trendHits =
+        (await runQuery<TrendRow>(trendSql, "configs.trend")) ?? [];
 
       const byId: Record<string, AggRow> = {};
       let maxUnique = 0;
@@ -156,7 +168,9 @@ export function useQualityScoreConfigs(
       const hitIds = Object.keys(byId);
       const matched = localIds.filter((l) => byId[l.joinId]);
       const unmatchedLocal = localIds.filter((l) => !byId[l.joinId]);
-      const unmatchedHits = hitIds.filter((h) => !localIds.find((l) => l.joinId === h));
+      const unmatchedHits = hitIds.filter(
+        (h) => !localIds.find((l) => l.joinId === h),
+      );
       console.debug("[Quality:configs.match]", {
         localIds,
         hitIds,
@@ -187,7 +201,8 @@ export function useQualityScoreConfigs(
       const total = toNumber(agg?.total_scores) ?? 0;
       const uniqueSpans = toNumber(agg?.unique_spans) ?? 0;
       const lastUpdatedUs = toNumber(agg?.last_updated_us);
-      const dataType = (dataTypeOf(config) as ScoreConfigRow["dataType"]) || "unknown";
+      const dataType =
+        (dataTypeOf(config) as ScoreConfigRow["dataType"]) || "unknown";
       const { status, priority } = statusOf(total);
 
       return {
@@ -199,7 +214,8 @@ export function useQualityScoreConfigs(
         totalScores: total,
         uniqueSpans,
         coveragePct: denom > 0 ? (uniqueSpans / denom) * 100 : null,
-        lastUpdatedMs: lastUpdatedUs != null ? Math.round(lastUpdatedUs / 1000) : null,
+        lastUpdatedMs:
+          lastUpdatedUs != null ? Math.round(lastUpdatedUs / 1000) : null,
         status,
         statusPriority: priority,
         trendSparkline: trendByConfig.value[lookup] ?? [],
@@ -207,7 +223,8 @@ export function useQualityScoreConfigs(
     });
 
     out.sort((a, b) => {
-      if (a.statusPriority !== b.statusPriority) return a.statusPriority - b.statusPriority;
+      if (a.statusPriority !== b.statusPriority)
+        return a.statusPriority - b.statusPriority;
       if (a.totalScores !== b.totalScores) return b.totalScores - a.totalScores;
       return a.name.localeCompare(b.name);
     });

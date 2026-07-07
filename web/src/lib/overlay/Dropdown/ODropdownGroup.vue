@@ -10,13 +10,16 @@ defineSlots<DropdownGroupSlots>();
 <template>
   <DropdownMenuGroup>
     <DropdownMenuLabel
-      v-if="props.label"
+      v-if="props.label || $slots['label-action']"
       :class="[
-        'tw:px-3 tw:py-1 tw:text-xs tw:font-semibold',
-        'tw:text-dropdown-label tw:select-none',
+        'flex items-center px-3 py-1 text-xs font-semibold',
+        'text-dropdown-label select-none',
       ]"
     >
-      {{ props.label }}
+      <span>{{ props.label }}</span>
+      <span v-if="$slots['label-action']" class="ml-auto flex items-center">
+        <slot name="label-action" />
+      </span>
     </DropdownMenuLabel>
     <slot />
   </DropdownMenuGroup>

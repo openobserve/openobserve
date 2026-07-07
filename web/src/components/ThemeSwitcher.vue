@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButton variant="ghost" size="icon-panel" data-test="navbar-theme-toggle-btn" @click="toggleDarkMode">
-    <OIcon :name="darkMode ? 'dark-mode' : 'light-mode'" size="sm" class="tw:size-5!" />
+    <OIcon :name="darkMode ? 'dark-mode' : 'light-mode'" size="sm" class="size-5!" />
     <OTooltip side="top" align="center" :content="tooltipText" />
   </OButton>
 </template>
@@ -101,25 +101,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.light-mode {
-  background-color: #ffffff;
-  color: #000000;
-}
-
-.dark-mode {
-  background-color: #36383a;
-  color: #ffffff;
-}
-
-.round-button {
-  border: none;
-  border-radius: 50%;
-  box-shadow: none;
-  transition: box-shadow 0.3s ease;
-}
-
-.round-button:hover {
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-</style>

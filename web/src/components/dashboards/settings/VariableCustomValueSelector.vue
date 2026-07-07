@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="variableItem?.options || []"
       labelKey="label"
       valueKey="value"
-      class="textbox tw:flex tw:flex-col no-case o2-custom-select-dashboard"
+      class="textbox flex flex-col no-case o2-custom-select-dashboard"
       :loading="variableItem.isLoading"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
@@ -67,15 +67,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.o2-custom-select-dashboard {
-  max-width: 40rem;
-}
-
-:deep(.q-field__native) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-</style>

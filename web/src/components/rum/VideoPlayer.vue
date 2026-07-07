@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,41 +15,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="player-container tw:h-full tw:p-2 tw:flex tw:flex-col">
+  <div class="player-container h-full p-2 flex flex-col">
     <div
       v-if="isLoading"
-      class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:w-full tw:flex-1 tw:min-h-0"
+      class="pb-4 flex items-center justify-center text-center w-full flex-1 min-h-0"
     >
       <div>
         <OSpinner
           size="md"
-          class="tw:mx-auto tw:block"
+          class="mx-auto block"
           data-test="video-player-loading-indicator"
         />
-        <div class="tw:text-center tw:w-full">
+        <div class="text-center w-full">
           {{ t("rum.loadingSessions") }}
         </div>
       </div>
     </div>
     <div
       ref="playerContainerRef"
-      class="tw:flex tw:items-center tw:justify-center tw:flex-1 tw:min-h-0"
+      class="flex items-center justify-center flex-1 min-h-0"
     >
       <div
         ref="playerRef"
         id="player"
-        class="player tw:flex tw:items-center tw:cursor-pointer"
+        class="player h-full flex items-center cursor-pointer"
         @click="togglePlay"
       />
     </div>
-    <div class="tw:w-full tw:p-2 tw:pt-3 controls-container">
+    <div class="w-full p-2 pt-3 controls-container">
       <div
         ref="playbackBarRef"
-        class="playback_bar tw:mt-2 tw:mb-3 tw:relative tw:cursor-pointer"
+        data-test="video-player-playback-bar"
+        class="w-full h-[0.3125rem] bg-[#ebebeb] mt-2 mb-3 relative cursor-pointer"
         @click="handlePlaybackBarClick"
       >
         <div
-          class="progressTime progress-fill tw:absolute"
+          class="bg-(--o2-primary-btn-bg)! absolute"
           :style="{
             width: playerState.progressWidth + 'px',
             left: 0,
@@ -59,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
         />
         <div
-          class="progressTime progress-fill tw:absolute"
+          class="bg-(--o2-primary-btn-bg)! absolute"
           :style="{
             width: '2px',
             left: playerState.progressWidth - 2 + 'px',
@@ -72,7 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="event in events as any[]"
           :key="event.id"
-          class="progressTime tw:absolute tw:cursor-pointer"
+          data-test="video-player-event-marker"
+          class="absolute cursor-pointer"
           :class="getEventMarkerClass(event)"
           :style="{
             width:
@@ -91,13 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="getEventTooltip(event)"
         />
       </div>
-      <div class="controls tw:flex tw:justify-between tw:items-center">
-        <div class="tw:flex tw:items-center">
+      <div class="controls flex justify-between items-center">
+        <div class="flex items-center">
           <div>
             <OIcon
               name="replay-10"
               size="md"
-              class="tw:mr-2 tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+              class="mr-2 cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('backward')"
             />
             <OIcon
@@ -107,31 +109,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'play-circle-filled'
               "
               size="lg"
-              class="tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+              class="cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--o2-primary-btn-bg)]"
               @click="togglePlay"
             />
             <OIcon
               name="forward-10"
               size="md"
-              class="tw:ml-2 tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+              class="ml-2 cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('forward')"
             />
           </div>
-          <div class="tw:flex tw:ml-4 tw:items-center">
+          <div class="flex ml-4 items-center">
             <div>{{ playerState.time }}</div>
-            <div class="tw:px-1">/</div>
+            <div class="px-1">/</div>
             <div>{{ playerState.duration }}</div>
           </div>
         </div>
-        <div class="tw:flex tw:items-center">
+        <div class="flex items-center">
           <OSwitch
-            class="tw:mr-3 tw:whitespace-nowrap"
+            class="mr-3 whitespace-nowrap"
             v-model="playerState.skipInactivity"
             :label="t('rum.skipInactivity')"
             @update:model-value="toggleSkipInactive"
           />
           <OSelect
-            class="speed-selector"
             v-model="playerState.speed"
             :options="speedOptions"
             :searchable="false"
@@ -476,12 +477,12 @@ const updatePlayerState = () => {
 
 const getEventMarkerClass = (event: any) => {
   if (event.frustration_types && event.frustration_types.length > 0) {
-    return "bg-frustration-marker";
+    return "bg-[#fb923c]! shadow-[0_0_4px_rgba(251,146,60,0.6)]";
   }
   if (event.type === "error") {
-    return "bg-event-error";
+    return "bg-[#ef4444]!";
   }
-  return "bg-event-default";
+  return "bg-[#14b8a6]!";
 };
 
 const getEventTooltip = (event: any) => {
@@ -645,46 +646,3 @@ defineExpose({
 });
 </script>
 
-<style scoped lang="scss">
-.player {
-  height: 100%;
-}
-
-.playback_bar {
-  width: 100%;
-  height: 0.3125rem;
-  background-color: #ebebeb;
-}
-
-.bg-frustration-marker {
-  background-color: #fb923c !important;
-  box-shadow: 0 0 4px rgba(251, 146, 60, 0.6);
-}
-
-.bg-event-error {
-  background-color: #ef4444 !important;
-}
-
-.bg-event-default {
-  background-color: #14b8a6 !important;
-}
-
-.progress-fill {
-  background-color: var(--o2-primary-btn-bg) !important;
-}
-</style>
-
-<style lang="scss">
-.speed-selector {
-  .q-field__control {
-    padding: 0 0.5rem !important;
-  }
-
-  .q-field__marginal,
-  .q-field__native,
-  .q-field__control {
-    min-height: 1.875rem !important;
-    height: 1.875rem !important;
-  }
-}
-</style>

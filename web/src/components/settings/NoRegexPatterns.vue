@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
     <div
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-2"
+      class="flex flex-col items-center justify-center gap-2"
       style="font-size: 1.5rem"
     >
       <img
@@ -25,10 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 125px; margin: 0 auto 1rem"
         alt=""
       />
-      <span class="title-text">{{ t("regex_patterns.no_data") }}</span>
-        <span class="subtitle-text">Import patterns from your Library or <span class="create-new-text" @click="createNewRegexPattern">Create New</span></span>
-        <div class="import-button-container" style="font-size: 1rem">
-            <OButton variant="outline" size="xs" class="tw:mt-2" @click="importRegexPattern">
+      <span data-test="no-regex-patterns-title" class="font-semibold text-base leading-5 text-left tracking-[-0.6%]">{{ t("regex_patterns.no_data") }}</span>
+        <span data-test="no-regex-patterns-subtitle" class="text-sm leading-5 text-left tracking-[-0.6%]">Import patterns from your Library or <span data-test="no-regex-patterns-create-new" class="text-base leading-6 text-left text-[#5960b2] font-bold cursor-pointer" @click="createNewRegexPattern">Create New</span></span>
+        <div style="font-size: 1rem">
+            <OButton variant="outline" size="xs" class="mt-2" @click="importRegexPattern">
               {{ t("regex_patterns.import_title") }}
             </OButton>
         </div>    
@@ -61,36 +61,3 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     },
   });
   </script>
-
-  <style scoped>
-  .title-text {
-    font-weight: 600;
-    font-size: 16px;
-    line-height: 20px;
-    text-align: left;
-    letter-spacing: -0.6%;
-  }
-  .subtitle-text {
-    font-size: 14px;
-    line-height: 20px;
-    letter-spacing: -0.6%;
-    text-align: left;
-  }
-  .import-button-text{
-    font-size: 16px;
-    line-height: 24px;
-    letter-spacing: 0%;
-    text-align: left;
-    color: #5960b2;
-    font-weight: 600;
-  }
-  .create-new-text{
-    font-size: 16px;
-    line-height: 24px;
-    letter-spacing: 0%;
-    text-align: left;
-    color: #5960b2;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  </style>

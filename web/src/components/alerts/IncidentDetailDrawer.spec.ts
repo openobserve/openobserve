@@ -50,6 +50,7 @@ vi.mock("@/services/service_streams", () => ({
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
+import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
 import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
 import serviceStreamsApi, { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { nextTick } from "vue";
@@ -595,25 +596,24 @@ describe("IncidentDetailDrawer.vue", () => {
     });
   });
 
-  describe("Utility Functions - Status Variants", () => {
-    beforeEach(async () => {
-      wrapper = await createWrapper();
+  describe("Utility Functions - Status Variants (registry incidentStatus)", () => {
+    it("open → error-soft", () => {
+      expect(resolveBadge("incidentStatus", "open").variant).toBe("error-soft");
     });
-
-    it("should return correct variant for open status", () => {
-      expect(wrapper.vm.getStatusVariant("open")).toBe("error-soft");
+    it("acknowledged → warning-soft", () => {
+      expect(resolveBadge("incidentStatus", "acknowledged").variant).toBe("warning-soft");
     });
-
-    it("should return correct variant for acknowledged status", () => {
-      expect(wrapper.vm.getStatusVariant("acknowledged")).toBe("warning-soft");
+    it("resolved → success-soft", () => {
+      expect(resolveBadge("incidentStatus", "resolved").variant).toBe("success-soft");
     });
-
-    it("should return correct variant for resolved status", () => {
-      expect(wrapper.vm.getStatusVariant("resolved")).toBe("success-soft");
+    it("unknown → default-soft (fallback)", () => {
+      expect(resolveBadge("incidentStatus", "unknown").variant).toBe("default-soft");
     });
-
-    it("should return default-soft for unknown status", () => {
-      expect(wrapper.vm.getStatusVariant("unknown")).toBe("default-soft");
+    it("severity P1–P4 → error/orange/amber/blue-soft", () => {
+      expect(resolveBadge("severity", "P1").variant).toBe("error-soft");
+      expect(resolveBadge("severity", "P2").variant).toBe("orange-soft");
+      expect(resolveBadge("severity", "P3").variant).toBe("amber-soft");
+      expect(resolveBadge("severity", "P4").variant).toBe("blue-soft");
     });
   });
 
@@ -692,23 +692,23 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "This is **bold** text";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw:font-semibold">bold</strong>');
+      expect(formatted).toContain('<strong class="font-semibold">bold</strong>');
     });
 
     it("should format h2 headers", () => {
       const content = "## Header 2";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain("tw:font-bold");
-      expect(formatted).toContain("tw:text-lg");
-      expect(formatted).toContain("tw:text-blue-600");
+      expect(formatted).toContain("font-bold");
+      expect(formatted).toContain("text-lg");
+      expect(formatted).toContain("text-blue-600");
     });
 
     it("should format h3 headers", () => {
       const content = "### Header 3";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain("tw:font-semibold");
+      expect(formatted).toContain("font-semibold");
     });
 
     it("should format unordered lists", () => {
@@ -732,8 +732,8 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "## Root Cause\n\n**Issue**: High CPU\n\n- Check process\n- Review logs";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw:font-semibold">Issue</strong>');
-      expect(formatted).toContain("tw:font-bold");
+      expect(formatted).toContain('<strong class="font-semibold">Issue</strong>');
+      expect(formatted).toContain("font-bold");
       expect(formatted).toContain("rca-ul");
     });
   });

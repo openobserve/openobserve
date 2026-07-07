@@ -15,38 +15,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full">
+  <div class="flex flex-col h-full">
     <div
-      class="tw:flex tw:justify-start tw:items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)] tw:bg-surface-panel"
+      class="flex justify-start items-center pl-3 pr-2 h-[2rem] border-b border-solid border-b-[var(--o2-border-color)] bg-surface-panel"
       data-test="trace-details-sidebar-header"
     >
       <div
         :title="span.operation_name"
         :style="{ width: 'calc(100% - 24px)' }"
-        class="tw:pb-0 tw:pl-[0.25rem] tw:truncate tw:flex tw:items-center"
+        class="pb-0 pl-[0.25rem] truncate flex items-center"
         data-test="trace-details-sidebar-header-operation-name"
       >
         <!-- Status Code Badge -->
         <span
           v-if="hasSpanError"
-          class="tw:inline-flex tw:items-center"
+          class="inline-flex items-center"
           data-test="trace-details-sidebar-header-toolbar-status-code"
         >
           <OIcon
             name="error"
             size="sm"
-            class="tw:mr-1 tw:text-[var(--o2-status-error-text)]!"
+            class="mr-1 text-[var(--o2-status-error-text)]!"
           />
         </span>
         <!-- Observation Type Badge (for LLM spans) -->
-        <OBadge
+        <OTag
           v-if="isLLMSpan"
-          :variant="getObservationTypeVariant(span.gen_ai_operation_name)"
-          class="tw:mr-1 observation-type-badge"
+          type="observationType"
+          :value="span.gen_ai_operation_name"
+          class="mr-1 normal-case!"
           data-test="trace-details-sidebar-observation-badge"
-        >{{ span.gen_ai_operation_name?.charAt(0) + span.gen_ai_operation_name?.slice(1).toLowerCase() }}</OBadge>
+        >{{ span.gen_ai_operation_name?.charAt(0) + span.gen_ai_operation_name?.slice(1).toLowerCase() }}</OTag>
 
-        <span class="tw:truncate">{{ span.operation_name }}</span>
+        <span class="truncate">{{ span.operation_name }}</span>
       </div>
 
       <OButton
@@ -59,26 +60,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
     <div
-      class="trace-details-toolbar-container"
+      class="trace-details-toolbar-container bg-[rgba(248,249,250,0.5)] whitespace-nowrap"
       data-test="trace-details-sidebar-header-toolbar"
     >
       <!-- Row 1: Trace Details -->
       <div
-        class="tw:flex tw:items-center tw:justify-between tw:p-1"
+        class="flex items-center justify-between p-1"
         style="overflow-x: auto; flex-wrap: nowrap"
       >
-        <div class="tw:flex tw:items-center" style="flex-wrap: nowrap">
+        <div class="flex items-center" style="flex-wrap: nowrap">
           <!-- Service Badge -->
-          <OBadge
-            size="sm"
-            class="toolbar-chip service-chip tw:mr-[0.325rem]"
+          <OTag
+            type="metricChip"
+            class="toolbar-chip service-chip mr-[0.325rem]"
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
           >
             <template #icon>
               <img
                 :src="serviceIconUrl"
-                class="tw:w-[0.875rem] tw:h-[0.875rem] tw:shrink-0"
+                class="w-[0.875rem] h-[0.875rem] shrink-0"
                 aria-hidden="true"
                 alt=""
               />
@@ -90,65 +91,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ span.service_name }}
             </span>
-          </OBadge>
+          </OTag>
 
           <!-- Duration Badge -->
-          <OBadge
-            size="sm"
-            class="toolbar-chip duration-chip tw:mr-[0.325rem]"
+          <OTag
+            type="metricChip"
+            class="toolbar-chip duration-chip mr-[0.325rem]"
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
             <template #icon><OIcon name="schedule" size="xs" /></template>
             <span class="chip-label">Duration</span>
             <span class="chip-value">{{ getDuration }}</span>
-          </OBadge>
+          </OTag>
 
           <!-- TTFT Badge -->
-          <OBadge
+          <OTag
             v-if="getTTFT"
-            size="sm"
-            class="toolbar-chip ttft-chip tw:mr-[0.325rem]"
+            type="metricChip"
+            class="toolbar-chip ttft-chip mr-[0.325rem]"
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
             <template #icon><OIcon name="speed" size="xs" /></template>
             <span class="chip-label">TTFT</span>
             <span class="chip-value">{{ getTTFT }}</span>
-          </OBadge>
+          </OTag>
 
           <!-- Start Time Badge -->
-          <OBadge
-            size="sm"
-            class="toolbar-chip time-chip tw:mr-[0.325rem]"
+          <OTag
+            type="metricChip"
+            class="toolbar-chip time-chip mr-[0.325rem]"
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
             <template #icon><OIcon name="access-time" size="xs" /></template>
             <span class="chip-label">Start</span>
             <span class="chip-value">{{ getStartTime }}</span>
-          </OBadge>
+          </OTag>
 
           <!-- Resend Count Badge -->
-          <OBadge
+          <OTag
             v-if="spanHttpResendCount"
-            size="sm"
-            class="toolbar-chip resend-chip tw:mr-[0.325rem]"
+            type="metricChip"
+            class="toolbar-chip resend-chip mr-[0.325rem]"
             :title="`Request resent ${spanHttpResendCount} time(s)`"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
             <template #icon><OIcon name="replay" size="xs" /></template>
             <span class="chip-label">Resends</span>
             <span class="chip-value">{{ spanHttpResendCount }}</span>
-          </OBadge>
+          </OTag>
         </div>
 
-        <div class="tw:flex tw:items-center">
+        <div class="flex items-center">
           <!-- Span ID Badge -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             clickable
-            class="toolbar-chip span-id-chip tw:mr-[0.325rem]"
+            class="toolbar-chip span-id-chip mr-[0.325rem]"
             :title="`Span ID: ${span.span_id}`"
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
@@ -158,22 +159,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="content-copy"
               size="xs"
-              class="tw:ml-1 copy-icon"
+              class="ml-1 copy-icon"
               data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
             />
-          </OBadge>
+          </OTag>
 
           <!-- View Logs Button -->
-          <span v-if="parentMode === 'standalone'" class="tw:shrink-0">
+          <span v-if="parentMode === 'standalone'" class="shrink-0">
             <!-- Single button with wrapper for tooltip functionality -->
             <span
-              class="tw:inline-block"
+              class="inline-block"
               tabindex="0"
             >
               <OButton
                 variant="outline"
                 size="xs"
-                class="tw:h-full tw:text-[0.75rem]!"
+                class="h-full text-[0.75rem]!"
                 :disabled="isViewLogsDisabled"
                 :loading="config.isEnterprise === 'true' && correlationLoading"
                 @click.stop="viewSpanLogs"
@@ -190,74 +191,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Row 2: LLM Metrics (conditional) -->
       <div
         v-if="isLLMSpan && llmMetrics && span.gen_ai_response_model"
-        class="tw:flex tw:items-center tw:justify-between tw:p-1 llm-metrics-row"
+        class="flex items-center justify-between p-1 llm-metrics-row"
         style="
           overflow-x: auto;
           flex-wrap: nowrap;
           border-top: 1px solid #e9ecef;
         "
       >
-        <div class="tw:flex tw:items-center" style="flex-wrap: nowrap">
+        <div class="flex items-center" style="flex-wrap: nowrap">
           <!-- Model Chip -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             icon="psychology"
             class="llm-chip model-chip"
             :title="span.gen_ai_response_model"
           >
-            <span class="chip-value tw:font-bold">{{ span.gen_ai_response_model }}</span>
-          </OBadge>
+            <span class="chip-value font-bold">{{ span.gen_ai_response_model }}</span>
+          </OTag>
 
           <!-- Token Usage Group -->
           <div class="tokens-group">
             <!-- Input Tokens -->
-            <OBadge
-              size="sm"
+            <OTag
+              type="metricChip"
               class="llm-chip token-chip input-token-chip"
               title="Input Tokens"
             >
               <template #icon><OIcon name="arrow-upward" size="xs" /></template>
               <span class="chip-label">In</span>
               <span class="chip-value">{{ llmMetrics.usage.input }}</span>
-            </OBadge>
+            </OTag>
 
             <!-- Output Tokens -->
-            <OBadge
-              size="sm"
+            <OTag
+              type="metricChip"
               class="llm-chip token-chip output-token-chip"
               title="Output Tokens"
             >
               <template #icon><OIcon name="arrow-downward" size="xs" /></template>
               <span class="chip-label">Out</span>
               <span class="chip-value">{{ llmMetrics.usage.output }}</span>
-            </OBadge>
+            </OTag>
           </div>
 
           <!-- Cost Chip -->
-          <OBadge
-            size="sm"
+          <OTag
+            type="metricChip"
             icon="attach-money"
             class="llm-chip cost-chip"
             title="Total Cost"
           >
-            <span class="chip-value tw:font-bold"
+            <span class="chip-value font-bold"
               >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
             >
-          </OBadge>
+          </OTag>
         </div>
 
-        <div class="tw:flex tw:items-center">
+        <div class="flex items-center">
           <!-- Provider Badge -->
-          <OBadge
+          <OTag
             v-if="span.gen_ai_provider_name"
-            variant="primary"
+            type="metricChip"
             class="provider-badge"
-          >{{ span.gen_ai_provider_name }}</OBadge>
+          >{{ span.gen_ai_provider_name }}</OTag>
         </div>
       </div>
     </div>
 
-    <div class="tw:font-bold tw:mx-2 span_details_tabs ">
+    <div class="font-bold mx-2 span_details_tabs ">
       <OTabs
         v-model="activeTab"
         dense
@@ -271,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label="Preview"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-preview"
-                    class="tw:font-normal!"
+                    class="font-normal!"
 
         />
 
@@ -280,29 +281,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('common.attributes')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-attributes"
-          class="tw:font-normal!"
+          class="font-normal!"
         />
         <OTab
           name="error"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-error"
-          class="tw:font-normal! tw:gap-1!"
+          class="font-normal! gap-1!"
         >
           {{ t('common.error') }}
-          <OBadge
+          <OTag
             v-if="hasExceptionEvents.length"
-            variant="error"
-            size="sm"
-            class="tw:font-normal! tw:text-[10px]!  tw:ml-0 tw:text-[var(--o2-error-tag-text)]! tw:bg-[var(--o2-error-tag-bg)]! tw:rounded!"
+            type="countChip"
+            value="error"
+            class="ml-0"
             data-test="trace-details-sidebar-tabs-error-count"
-          >{{ hasExceptionEvents.length }}</OBadge>
+          >{{ hasExceptionEvents.length }}</OTag>
         </OTab>
         <OTab
           v-if="hasDbSpan"
           name="database"
           :label="t('common.db')"
           style="text-transform: capitalize"
-          class="tw:font-normal!"
+          class="font-normal!"
           data-test="trace-details-sidebar-tabs-database"
         />
         <OTab
@@ -310,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('common.events')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-events"
-                    class="tw:font-normal!"
+                    class="font-normal!"
 
         />
         <OTab
@@ -318,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('common.links')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-links"
-          class="tw:font-normal!"
+          class="font-normal!"
 
         />
         <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
@@ -328,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('correlation.correlatedLogs')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-correlated-logs"
-          class="tw:font-normal!"
+          class="font-normal!"
 
         />
         <OTab
@@ -337,35 +338,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('correlation.correlatedMetrics')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-correlated-metrics"
-          class="tw:font-normal!"
+          class="font-normal!"
         />
       </OTabs>
     </div>
-    <OSeparator class="tw:w-full" />
-    <div class="span_details_tab-panels  tw:p-2">
+    <OSeparator class="w-full" />
+    <div class="span_details_tab-panels h-[calc(100%-6rem)] overflow-hidden p-2">
       <OTabPanels v-model="activeTab"
 grow
-class="tw:h-full tw:overflow-y-auto">
+class="h-full overflow-y-auto">
         <!-- LLM Preview Tab Panel -->
         <OTabPanel
           v-if="isLLMSpan"
           name="preview"
-          class="llm-preview-panel tw:p-3"
+          class="llm-preview-panel p-3"
         >
-          <div class="llm-preview-container tw:overflow-x-auto tw:w-full tw:h-full!">
+          <div class="llm-preview-container overflow-hidden overflow-x-auto w-full h-full!">
             <!-- Input and Output Side by Side -->
             <div
-              class="tw:flex io-container tw:w-full! tw:h-full!"
+              class="flex io-container w-full! h-full!"
               :class="{ 'io-container-dark': isDarkMode }"
               ref="ioContainerRef"
             >
               <!-- Input Section -->
-              <div class="tw:w-1/2 io-section tw:pr-[0.5rem]">
+              <div class="w-1/2 io-section pr-[0.5rem]">
                 <div
-                  class="section-label tw:font-bold tw:mb-1 tw:flex tw:items-center tw:justify-between"
+                  class="section-label font-bold mb-1 flex items-center justify-between"
                 >
                   <div>Input</div>
-                  <div class="tw:flex tw:items-center tw:gap-1">
+                  <div class="flex items-center gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
@@ -392,13 +393,13 @@ class="tw:h-full tw:overflow-y-auto">
                 </div>
                 <div class="llm-content-box">
                   <!-- System Instructions (when available) -->
-                  <div v-if="parsedSystemInstructions" class="tw:mb-3">
+                  <div v-if="parsedSystemInstructions" class="mb-3">
                     <OCollapsible
                       v-model="sysInstrOpen"
                       icon="settings"
                       label="System Instructions"
                     >
-                      <div class="tw:p-2 tw:bg-[var(--o2-code-bg)]">
+                      <div class="p-2 bg-[var(--o2-code-bg)]">
                         <LLMContentRenderer
                           :content="JSON.stringify([{ role: 'system', content: parsedSystemInstructions }])"
                           :observation-type="span.gen_ai_operation_name"
@@ -427,12 +428,12 @@ class="tw:h-full tw:overflow-y-auto">
               </div>
 
               <!-- Output Section -->
-              <div class="tw:w-1/2 io-section">
+              <div class="w-1/2 io-section">
                 <div
-                  class="section-label tw:font-bold tw:mb-1 tw:flex tw:items-center tw:justify-between"
+                  class="section-label font-bold mb-1 flex items-center justify-between"
                 >
                   <div>Output</div>
-                  <div class="tw:flex tw:items-center tw:gap-1">
+                  <div class="flex items-center gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
@@ -482,9 +483,9 @@ class="tw:h-full tw:overflow-y-auto">
               v-if="span.llm_request_parameters"
               v-model="modelParamsOpen"
               label="Model Parameters"
-              class="tw:mt-3"
+              class="mt-3"
             >
-              <pre class="model-params-json tw:p-2">{{
+              <pre class="model-params-json p-2">{{
                 formatModelParams(span.llm_request_parameters)
               }}</pre>
             </OCollapsible>
@@ -493,24 +494,24 @@ class="tw:h-full tw:overflow-y-auto">
 
         <OTabPanel
           name="attributes"
-          class="tw:p-0 tw:flex tw:flex-col tw:overflow-hidden"
+          class="p-0 flex flex-col overflow-hidden"
         >
           <!-- View mode toggle toolbar -->
-          <div class="tw:flex tw:items-center tw:justify-start tw:pb-1.5! tw:h-fit!">
-            <OToggleGroup v-model="attributesViewMode" class="tw:rounded!">
+          <div class="flex items-center justify-start pb-1.5! h-fit!">
+            <OToggleGroup v-model="attributesViewMode" class="rounded!">
               <OToggleGroupItem value="json"
 size="xs"
-class="tw:h-5! tw:text-[0.75rem]!">
+class="h-5! text-[0.75rem]!">
                 <template #icon-left
-                  ><OIcon name="data-object" size="xs" class="tw:shrink-0"
+                  ><OIcon name="data-object" size="xs" class="shrink-0"
                 /></template>
                 JSON
               </OToggleGroupItem>
               <OToggleGroupItem value="table"
 size="xs"
-class="tw:h-5! tw:text-[0.75rem]!">
+class="h-5! text-[0.75rem]!">
                 <template #icon-left
-                  ><OIcon name="table-chart" size="xs" class="tw:shrink-0"
+                  ><OIcon name="table-chart" size="xs" class="shrink-0"
                 /></template>
                 Table
               </OToggleGroupItem>
@@ -519,7 +520,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
           <!-- JSON View -->
           <div
             v-if="attributesViewMode === 'json'"
-            class="tw:grow tw:overflow-auto"
+            class="grow overflow-auto"
           >
             <json-preview
               :value="attributesForDisplay"
@@ -527,12 +528,12 @@ class="tw:h-5! tw:text-[0.75rem]!">
               data-test="trace-details-sidebar-attributes-table"
             >
               <template #field-dropdown="{ field, value: fieldValue }">
-                <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+                <ul class="flex flex-col m-0 p-0 list-none">
                   <li
                     v-for="action in filterActions"
                     :key="action.operator"
                     :data-test="`trace-details-sidebar-json-filter-action-${action.operator}`"
-                    class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                    class="flex items-center gap-1 px-1 py-1 cursor-pointer hover:bg-muted/50"
                     @click.stop="
                       $emit('apply-filter-immediately', {
                         field,
@@ -541,17 +542,17 @@ class="tw:h-5! tw:text-[0.75rem]!">
                       })
                     "
                   >
-                    <span class="tw:mr-1 tw:inline-flex tw:shrink-0">
+                    <span class="mr-1 inline-flex shrink-0">
                       <OButton variant="ghost" size="icon-xs-circle">
                         <OIcon
                           color="currentColor"
-                          class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
+                          class="w-[0.7rem]! h-[0.7rem]! pb-[0.185rem]!"
                         >
                           <component :is="action.iconComponent" />
                         </OIcon>
                       </OButton>
                     </span>
-                    <span class="tw:text-[0.85rem]!">{{
+                    <span class="text-[0.85rem]!">{{
                       $t("traces.applyAndSearch")
                     }}</span>
                   </li>
@@ -562,11 +563,11 @@ class="tw:h-5! tw:text-[0.75rem]!">
           <!-- Table View -->
           <div
             v-else
-            class="tw:flex-1 tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)]"
+            class="flex-1 overflow-hidden tab-content-dynamic-height border-1 border-solid border-[var(--o2-border-color)]"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tab-content-with-llm-metrics'
-                : 'tab-content-without-llm-metrics'
+                ? '[height:calc(100vh-312px)]'
+                : '[height:calc(100vh-276px)]'
             "
             data-test="trace-details-sidebar-attributes-tenstack-table"
           >
@@ -584,12 +585,12 @@ class="tw:h-5! tw:text-[0.75rem]!">
               <template #cell-value="{ item }">
                 <AttributeValueCell :field="item.field" :value="item.value">
                   <template #dropdown="{ field, value: fieldValue }">
-                    <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+                    <ul class="flex flex-col m-0 p-0 list-none">
                       <li
                         v-for="action in filterActions"
                         :key="action.operator"
                         :data-test="`trace-details-sidebar-attr-filter-action-${action.operator}`"
-                        class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                        class="flex items-center gap-1 px-1 py-1 cursor-pointer hover:bg-muted/50"
                         @click.stop="
                           $emit('apply-filter-immediately', {
                             field,
@@ -598,17 +599,17 @@ class="tw:h-5! tw:text-[0.75rem]!">
                           })
                         "
                       >
-                        <span class="tw:mr-1 tw:inline-flex tw:shrink-0">
+                        <span class="mr-1 inline-flex shrink-0">
                           <OButton variant="ghost" size="icon-xs-circle">
                             <OIcon
                               color="currentColor"
-                              class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
+                              class="w-[0.7rem]! h-[0.7rem]! pb-[0.185rem]!"
                             >
                               <component :is="action.iconComponent" />
                             </OIcon>
                           </OButton>
                         </span>
-                        <span class="tw:text-[0.85rem]!">{{
+                        <span class="text-[0.85rem]!">{{
                           $t("traces.applyAndSearch")
                         }}</span>
                       </li>
@@ -621,25 +622,25 @@ class="tw:h-5! tw:text-[0.75rem]!">
         </OTabPanel>
         <OTabPanel
           name="events"
-          class="tw:p-0 tw:flex tw:flex-col tw:h-[30.6rem]!"
+          class="p-0 flex flex-col h-[30.6rem]!"
         >
           <template v-if="spanDetails.events.length">
             <!-- Wrap toggle toolbar -->
-            <div class="tw:flex tw:items-center tw:gap-1 tw:pb-[0.325rem] tw:pl-1">
+            <div class="flex items-center gap-1 pb-[0.325rem] pl-1">
               <OSwitch
                 v-model="eventsWrap"
                 :label="t('common.wrap')"
                 size="md"
-                class="tw:gap-1!"
+                class="gap-1!"
               />
             </div>
             <!-- TenstackTable for events -->
             <div
-              class="tw:flex-1 traces-events-table-container tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded"
+              class="flex-1 traces-events-table-container overflow-hidden tab-content-dynamic-height border-1 border-solid border-[var(--o2-border-color)] rounded"
               :class="
                 isLLMSpan && llmMetrics && span.gen_ai_response_model
-                  ? 'tab-content-with-llm-metrics'
-                  : 'tab-content-without-llm-metrics'
+                  ? '[height:calc(100vh-312px)]'
+                  : '[height:calc(100vh-276px)]'
               "
               data-test="trace-details-sidebar-events-table"
             >
@@ -662,8 +663,8 @@ class="tw:h-5! tw:text-[0.75rem]!">
                 <template #expanded-row="{ row }">
                   <json-preview
                     :value="row"
-                    class="tw:py-[0.375rem] tw:pl-[0.375rem]"
-                    copyButtonClass="tw:left-[0.25rem]! tw:w-fit! tw:sticky!"
+                    class="py-[0.375rem] pl-[0.375rem]"
+                    copyButtonClass="left-[0.25rem]! w-fit! sticky!"
                     mode="expanded"
                   />
                 </template>
@@ -672,18 +673,18 @@ class="tw:h-5! tw:text-[0.75rem]!">
           </template>
           <div
             v-else
-            class="tw:w-full tw:text-center tw:flex tw:items-center tw:justify-center tw:pt-4 tw:font-bold tab-content-dynamic-height"
+            class="w-full text-center flex items-center justify-center pt-4 font-bold tab-content-dynamic-height"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tab-content-with-llm-metrics'
-                : 'tab-content-without-llm-metrics'
+                ? '[height:calc(100vh-312px)]'
+                : '[height:calc(100vh-276px)]'
             "
             data-test="trace-details-sidebar-no-events"
           >
             No events present for this span
           </div>
         </OTabPanel>
-        <OTabPanel name="error" class="tw:h-full">
+        <OTabPanel name="error" class="h-full">
           <TraceErrorTab
             :span="span"
             :search-query="searchQuery"
@@ -694,18 +695,18 @@ class="tw:h-5! tw:text-[0.75rem]!">
           />
         </OTabPanel>
 
-        <OTabPanel name="database" class="tw:p-0 tw:h-full">
+        <OTabPanel name="database" class="p-0 h-full">
           <DbSpanDetails :span="span" />
         </OTabPanel>
 
         <OTabPanel name="links">
-          <div v-if="spanLinks.length" class="tw:overflow-auto tw:max-h-[20rem]">
+          <div v-if="spanLinks.length" class="overflow-auto max-h-[20rem]">
             <table
-              class="trace-detail-tab-table tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:w-full"
+              class="trace-detail-tab-table border border-solid border-[var(--o2-border-color)] w-full"
               data-test="trace-details-sidebar-links-table"
             >
               <thead
-                class="thead-sticky tw:text-left tw:bg-[var(--o2-hover-accent)]"
+                class="thead-sticky text-left bg-(--color-surface-accent)"
               >
                 <tr>
                   <th
@@ -723,17 +724,19 @@ class="tw:h-5! tw:text-[0.75rem]!">
                   v-for="(row, index) in spanLinks"
                   :data-test="`trace-event-detail-link-${index}`"
                   :key="'expand_' + index"
+                  tabindex="0"
                   @click="openReferenceTrace('span', row)"
+                  @keydown="onLinkRowKeydown($event, row)"
                   style="cursor: pointer"
-                  class="pointer"
+                  class="pointer focus-visible:outline-none focus-visible:bg-(--color-surface-accent)"
                 >
                   <td
                     v-for="column in linkColumns"
                     :key="index + '-' + column.name"
-                    class="field_list"
+                    class="p-0 mb-0.5 relative overflow-visible cursor-default"
                     style="cursor: pointer"
                   >
-                    <div class="tw:flex tw:flex tw:items-center tw:flex-nowrap">
+                    <div class="flex flex items-center flex-nowrap">
                       {{ column.prop(row) }}
                     </div>
                   </td>
@@ -743,11 +746,11 @@ class="tw:h-5! tw:text-[0.75rem]!">
           </div>
           <div
             v-else
-            class="tw:w-full tw:flex tw:items-center tw:justify-center tw:text-center tw:pt-4 tw:font-bold tab-content-dynamic-height"
+            class="w-full flex items-center justify-center text-center pt-4 font-bold tab-content-dynamic-height"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tab-content-with-llm-metrics'
-                : 'tab-content-without-llm-metrics'
+                ? '[height:calc(100vh-312px)]'
+                : '[height:calc(100vh-276px)]'
             "
             data-test="trace-details-sidebar-no-links"
           >
@@ -758,7 +761,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
         <!-- Correlated Logs Tab Panel -->
         <OTabPanel
           name="correlated-logs"
-          class="tw:p-0 full-height traces-correlated-logs-container"
+          class="p-0 full-height traces-correlated-logs-container"
         >
           <CorrelatedLogsTable
             v-if="correlationProps"
@@ -782,26 +785,26 @@ class="tw:h-5! tw:text-[0.75rem]!">
           <!-- Loading/Empty state when no data -->
           <div
             v-else
-            class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
+            class="flex items-center justify-center py-20 tab-content-dynamic-height"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tab-content-with-llm-metrics'
-                : 'tab-content-without-llm-metrics'
+                ? '[height:calc(100vh-312px)]'
+                : '[height:calc(100vh-276px)]'
             "
           >
-            <div class="tw:text-center">
+            <div class="text-center">
               <OSpinner
                 v-if="correlationLoading"
                 size="lg"
-                class="tw:mb-4"
+                class="mb-4"
               />
               <div
                 v-else-if="correlationError"
-                class="tw:text-[0.875rem] tw:font-bold"
+                class="text-[0.875rem] font-bold"
               >
                 {{ correlationError }}
               </div>
-              <div v-else class="tw:text-base tw:text-gray-500">
+              <div v-else class="text-base text-gray-500">
                 {{ t("correlation.clickToLoadLogs") }}
               </div>
             </div>
@@ -811,7 +814,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
         <!-- Correlated Metrics Tab Panel -->
         <OTabPanel
           name="correlated-metrics"
-          class="tw:p-0 full-height traces-correlated-metrics-container"
+          class="p-0 full-height traces-correlated-metrics-container"
         >
           <TelemetryCorrelationDashboard
             v-if="correlationProps"
@@ -840,26 +843,26 @@ class="tw:h-5! tw:text-[0.75rem]!">
           <!-- Loading/Empty state when no data -->
           <div
             v-else
-            class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
+            class="flex items-center justify-center py-20 tab-content-dynamic-height"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? 'tab-content-with-llm-metrics'
-                : 'tab-content-without-llm-metrics'
+                ? '[height:calc(100vh-312px)]'
+                : '[height:calc(100vh-276px)]'
             "
           >
-            <div class="tw:text-center">
+            <div class="text-center">
               <OSpinner
                 v-if="correlationLoading"
                 size="lg"
-                class="tw:mb-4"
+                class="mb-4"
               />
               <div
                 v-else-if="correlationError"
-                class="tw:text-[0.875rem] tw:font-bold"
+                class="text-[0.875rem] font-bold"
               >
                 {{ correlationError }}
               </div>
-              <div v-else class="tw:text-base tw:text-gray-500">
+              <div v-else class="text-base text-gray-500">
                 {{ t("correlation.clickToLoadMetrics") }}
               </div>
             </div>
@@ -935,9 +938,8 @@ import TraceErrorTab from "./components/TraceErrorTab.vue";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
 import {
@@ -1017,7 +1019,7 @@ export default defineComponent({
     TraceErrorTab,
     OSpinner,
     OSwitch,
-    OBadge,
+    OTag,
   },
   emits: [
     "close",
@@ -1200,9 +1202,9 @@ export default defineComponent({
         size: 200,
         meta: {
           headerClass:
-            "tw:border-b tw:border-r tw:border-b-[var(--o2-border-color)]",
+            "border-b border-r border-b-[var(--o2-border-color)]",
           cellClass:
-            "tw:border-r tw:border-b-[var(--o2-border-color)] tw:text-[var(--o2-json-key)]",
+            "border-r border-b-[var(--o2-border-color)] text-[var(--o2-json-key)]",
         },
       },
       {
@@ -1212,8 +1214,8 @@ export default defineComponent({
         size: 400,
         meta: {
           slot: true,
-          headerClass: "tw:border-b tw:border-b-[var(--o2-border-color)]",
-          cellClass: "tw:border-b-[var(--o2-border-color)] tw:p-0!",
+          headerClass: "border-b border-b-[var(--o2-border-color)]",
+          cellClass: "border-b-[var(--o2-border-color)] p-0!",
         },
       },
     ];
@@ -1242,14 +1244,14 @@ export default defineComponent({
         label: "Field",
         field: "field",
         align: "left" as const,
-        headerClasses: "tw:text-left!",
+        headerClasses: "text-left!",
       },
       {
         name: "value",
         label: "Value",
         field: "value",
         align: "left" as const,
-        headerClasses: "tw:text-left!",
+        headerClasses: "text-left!",
       },
     ];
 
@@ -1394,8 +1396,8 @@ export default defineComponent({
             ),
           meta: {
             headerClass:
-              "tw:border-b tw:border-r tw:border-b-[var(--o2-border-color)]",
-            cellClass: "tw:border-r tw:border-b-[var(--o2-border-color)]",
+              "border-b border-r border-b-[var(--o2-border-color)]",
+            cellClass: "border-r border-b-[var(--o2-border-color)]",
           },
         });
         allKeys.delete(tsCol);
@@ -1422,8 +1424,8 @@ export default defineComponent({
           },
           meta: {
             headerClass:
-              "tw:border-b tw:border-r tw:border-b-[var(--o2-border-color)]",
-            cellClass: "tw:border-r tw:border-b-[var(--o2-border-color)]",
+              "border-b border-r border-b-[var(--o2-border-color)]",
+            cellClass: "border-r border-b-[var(--o2-border-color)]",
           },
         });
       });
@@ -1603,6 +1605,24 @@ export default defineComponent({
         });
 
         emit("open-trace");
+      }
+    };
+
+    // Keyboard access for clickable span-link rows: Enter/Space activate, arrows move focus.
+    const onLinkRowKeydown = (event: KeyboardEvent, row: any) => {
+      if (event.target !== event.currentTarget) return;
+      const currentRow = event.currentTarget as HTMLElement;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openReferenceTrace("span", row);
+      } else if (event.key === "ArrowDown") {
+        event.preventDefault();
+        const next = currentRow.nextElementSibling as HTMLElement | null;
+        if (next?.matches("tr[tabindex]")) next.focus();
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        const prev = currentRow.previousElementSibling as HTMLElement | null;
+        if (prev?.matches("tr[tabindex]")) prev.focus();
       }
     };
 
@@ -2085,6 +2105,7 @@ export default defineComponent({
       copySpanId,
       copyAttributesToClipboard,
       openReferenceTrace,
+      onLinkRowKeydown,
       spanLinks,
       linkColumns,
       getTagRows,
@@ -2109,25 +2130,6 @@ export default defineComponent({
       copyContent,
       formatModelParams,
       getObservationTypeColor,
-      getObservationTypeVariant: (type: string | null | undefined): BadgeVariant => {
-        const color = getObservationTypeColor(type);
-        const map: Record<string, BadgeVariant> = {
-          green: "success",
-          blue: "primary",
-          purple: "primary",
-          orange: "warning",
-          indigo: "primary",
-          cyan: "primary",
-          teal: "primary",
-          pink: "primary",
-          "deep-purple": "primary",
-          "light-blue": "primary",
-          red: "error",
-          grey: "default",
-          amber: "warning",
-        };
-        return map[color] || "default";
-      },
       hasContent,
       sysInstrOpen,
       modelParamsOpen,
@@ -2146,174 +2148,156 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.attributes-view-toggle {
-  :deep(.q-btn) {
-    padding: 0.25rem 0.5rem;
-  }
+<style>
+.attributes-view-toggle .q-btn {
+  padding: 0.25rem 0.5rem;
 }
 
-:deep(.span_details_tab-panels .o-tab-panel) {
+.span_details_tab-panels .o-tab-panel {
   height: 100%;
 }
 
-:deep(.traces-correlated-metrics-container) {
-  .q-splitter--vertical .q-splitter__separator {
-    height: 100% !important;
-  }
-
-  .q-card {
-    box-shadow: none !important;
-    border: 1px solid var(--o2-border) !important;
-  }
-
-  .card-container {
-    box-shadow: none !important;
-  }
-
-  .dimension-sidebar {
-    padding-left: 0.25rem;
-  }
-
-  .dimension-sidebar-search-container {
-    padding: 0.375rem 0.2rem !important;
-  }
+.traces-correlated-metrics-container .q-splitter--vertical .q-splitter__separator {
+  height: 100% !important;
 }
 
-:deep(.traces-correlated-logs-container) {
-  .logs-table-container .container {
-    height: 100% !important;
-  }
+.traces-correlated-metrics-container .q-card {
+  box-shadow: none !important;
+  border: 1px solid var(--o2-border) !important;
 }
 
-:deep(.traces-events-table-container) {
-  .table-container {
-    border-radius: 0 !important;
-  }
+.traces-correlated-metrics-container .card-container {
+  box-shadow: none !important;
 }
 
-.trace-detail-tab-table {
-  table {
-    border-collapse: separate;
-    border-spacing: 0;
-    width: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(0.625rem);
-    border-radius: 0.5rem;
-    border: 0.125rem solid rgba(255, 255, 255, 0.3);
-    overflow: hidden;
-  }
-
-  th,
-  td {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    border-right: 1px solid rgba(255, 255, 255, 0.15);
-    text-align: left;
-    padding: 8px !important;
-    font-size: 13px;
-    word-break: break-word;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    min-height: 24px;
-    height: auto;
-    max-width: 600px;
-  }
-
-  /* Add proper column sizing */
-  th:first-child,
-  td:first-child {
-    width: 200px;
-    min-width: 200px;
-  }
-
-  th:nth-child(2),
-  td:nth-child(2) {
-    width: auto;
-    min-width: 100px;
-  }
-  td span {
-    display: inline-block;
-    width: 100%;
-    word-break: break-word;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    white-space: pre-wrap;
-  }
-
-  th:last-child,
-  td:last-child {
-    border-right: none;
-  }
-
-  tr:last-child td {
-    border-bottom: none;
-  }
-
-  tbody tr:first-child td:first-child {
-    border-top-left-radius: 0.5rem;
-  }
-
-  tbody tr:first-child td:last-child {
-    border-top-right-radius: 0.5rem;
-  }
-
-  tbody tr:last-child td:first-child {
-    border-bottom-left-radius: 0.5rem;
-  }
-
-  tbody tr:last-child td:last-child {
-    border-bottom-right-radius: 0.5rem;
-  }
+.traces-correlated-metrics-container .dimension-sidebar {
+  padding-left: 0.25rem;
 }
 
+.traces-correlated-metrics-container .dimension-sidebar-search-container {
+  padding: 0.375rem 0.2rem !important;
+}
+
+.traces-correlated-logs-container .logs-table-container .container {
+  height: 100% !important;
+}
+
+.traces-events-table-container .table-container {
+  border-radius: 0 !important;
+}
+
+.trace-detail-tab-table table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(0.625rem);
+  border-radius: 0.5rem;
+  border: 0.125rem solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+
+.trace-detail-tab-table th,
+.trace-detail-tab-table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid rgba(255, 255, 255, 0.15);
+  text-align: left;
+  padding: 8px !important;
+  font-size: 13px;
+  word-break: break-word;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-height: 24px;
+  height: auto;
+  max-width: 600px;
+}
+
+/* Add proper column sizing */
+.trace-detail-tab-table th:first-child,
+.trace-detail-tab-table td:first-child {
+  width: 200px;
+  min-width: 200px;
+}
+
+.trace-detail-tab-table th:nth-child(2),
+.trace-detail-tab-table td:nth-child(2) {
+  width: auto;
+  min-width: 100px;
+}
+
+.trace-detail-tab-table td span {
+  display: inline-block;
+  width: 100%;
+  word-break: break-word;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.trace-detail-tab-table th:last-child,
+.trace-detail-tab-table td:last-child {
+  border-right: none;
+}
+
+.trace-detail-tab-table tr:last-child td {
+  border-bottom: none;
+}
+
+.trace-detail-tab-table tbody tr:first-child td:first-child {
+  border-top-left-radius: 0.5rem;
+}
+
+.trace-detail-tab-table tbody tr:first-child td:last-child {
+  border-top-right-radius: 0.5rem;
+}
+
+.trace-detail-tab-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 0.5rem;
+}
+
+.trace-detail-tab-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 0.5rem;
+}
 
 .trace-detail-tab-table table.q-table {
   background: rgba(240, 240, 245, 0.8);
   backdrop-filter: blur(0.625rem);
   border: 0.125rem solid rgba(100, 100, 120, 0.5);
 }
-.attr-text {
-  font-size: 12px;
-  font-family: monospace;
+
+.table-header .table-head-chip {
+  padding: 0px;
+}
+
+.table-header .table-head-chip .q-table th.sortable {
+  cursor: pointer;
+  text-transform: capitalize;
+  font-weight: bold;
+}
+
+.table-header.isClosable {
+  padding-right: 26px;
+  position: relative;
+}
+
+.table-header.isClosable .q-table-col-close {
+  transform: translateX(26px);
+  position: absolute;
+  margin-top: 2px;
+  color: grey;
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
+}
+
+.table-header .q-table th.sortable {
+  cursor: pointer;
+  text-transform: capitalize;
+  font-weight: bold;
+}
+
+.table-header .log_json_content {
   white-space: pre-wrap;
-  word-break: break-word;
 }
-.table-header {
-  // text-transform: capitalize;
 
-  .table-head-chip {
-    padding: 0px;
-
-    .q-table th.sortable {
-      cursor: pointer;
-      text-transform: capitalize;
-      font-weight: bold;
-    }
-  }
-
-  &.isClosable {
-    padding-right: 26px;
-    position: relative;
-
-    .q-table-col-close {
-      transform: translateX(26px);
-      position: absolute;
-      margin-top: 2px;
-      color: grey;
-      transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
-    }
-  }
-
-  .q-table th.sortable {
-    cursor: pointer;
-    text-transform: capitalize;
-    font-weight: bold;
-  }
-
-  .log_json_content {
-    white-space: pre-wrap;
-  }
-}
 .q-table__top {
   padding-left: 0;
   padding-top: 0;
@@ -2341,39 +2325,32 @@ export default defineComponent({
 .q-td {
   overflow: hidden;
   min-width: 100px;
-
-  .expanded {
-    margin: 0;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    word-break: break-all;
-  }
 }
 
-// Cell with max-height and scroll
-.cell-with-max-height {
-  vertical-align: top;
-
-  .cell-content {
-    max-height: 200px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    display: block;
-    word-break: break-word;
-    word-wrap: break-word;
-    white-space: pre-wrap;
-  }
+.q-td .expanded {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-all;
 }
 
-// Hide filter action buttons until the row is hovered
-.filter-cell {
-  .filter-actions {
-    visibility: hidden;
-  }
+/* Hide filter action buttons until the row is hovered */
+.filter-cell .filter-actions {
+  visibility: hidden;
+}
 
-  &:hover .filter-actions {
-    visibility: visible;
-  }
+.filter-cell:hover .filter-actions {
+  visibility: visible;
+}
+
+.cell-with-max-height .cell-content {
+  max-height: 200px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: block;
+  word-break: break-word;
+  word-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .thead-sticky tr > *,
@@ -2391,547 +2368,428 @@ export default defineComponent({
   bottom: 0;
 }
 
-.field_list {
-  padding: 0px;
-  margin-bottom: 0.125rem;
-  position: relative;
-  overflow: visible;
-  cursor: default;
-}
-.span_details_tab-panels {
-  height: calc(100% - 6rem);
-  overflow: hidden;
-}
-
-.header_bg {
+/* Trace Details Toolbar - Modern Styling */
+.trace-details-toolbar-container .toolbar-chip {
+  font-size: 11px;
+  height: 22px;
+  padding: 0 6px;
+  background: white;
+  border: 1px solid #dee2e6;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-// LLM-specific styles
-// Observation Type Badge
-.observation-type-badge {
-  text-transform: none !important;
+.trace-details-toolbar-container .toolbar-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-// Trace Details Toolbar - Modern Styling
-.trace-details-toolbar-container {
-  background: rgba(248, 249, 250, 0.5);
-  // border-bottom: 1px solid #e9ecef;
-  white-space: nowrap;
-
-  .toolbar-chip {
-    font-size: 11px;
-    height: 22px;
-    padding: 0 6px;
-    background: white;
-    border: 1px solid #dee2e6;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    .chip-label {
-      color: #6c757d;
-      font-size: 10px;
-      font-weight: 500;
-      margin-right: 3px;
-    }
-
-    .chip-value {
-      color: #212529;
-      font-weight: 600;
-      font-size: 10px;
-    }
-
-    &.service-chip {
-      border-left: 3px solid #0d6efd;
+.trace-details-toolbar-container .toolbar-chip .chip-label {
+  color: #6c757d;
+  font-size: 10px;
+  font-weight: 500;
+  margin-right: 3px;
 }
 
-    &.duration-chip {
-      border-left: 3px solid #6610f2;
+.trace-details-toolbar-container .toolbar-chip .chip-value {
+  color: #212529;
+  font-weight: 600;
+  font-size: 10px;
 }
 
-    &.ttft-chip {
-      border-left: 3px solid #6f42c1;
+.trace-details-toolbar-container .toolbar-chip.service-chip {
+  border-left: 3px solid #0d6efd;
 }
 
-    &.time-chip {
-      border-left: 3px solid #d63384;
+.trace-details-toolbar-container .toolbar-chip.duration-chip {
+  border-left: 3px solid #6610f2;
 }
 
-    &.span-id-chip {
-      border-left: 3px solid #20c997;
-      cursor: pointer;
-.copy-icon {
-        opacity: 0.6;
-        transition: opacity 0.2s;
-      }
-
-      &:hover .copy-icon {
-        opacity: 1;
-      }
-    }
-  }
-
-  .view-logs-btn {
-    height: 24px;
-    font-size: 10px;
-    font-weight: 600;
-    padding: 0 10px;
-    border-radius: 4px;
-    text-transform: none;
-    flex-shrink: 0;
-  }
-
-  // Scrollbar styling for horizontal scroll
-  > div::-webkit-scrollbar {
-    height: 4px;
-  }
-
-  > div::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  > div::-webkit-scrollbar-thumb {
-    background: #cbd5e0;
-    border-radius: 2px;
-  }
-
-  > div::-webkit-scrollbar-thumb:hover {
-    background: #a0aec0;
-  }
+.trace-details-toolbar-container .toolbar-chip.ttft-chip {
+  border-left: 3px solid #6f42c1;
 }
 
-// LLM Chips - Modern Styling (now integrated into toolbar)
-.trace-details-toolbar-container {
-  .llm-chip {
-    font-size: 10px;
-    height: 20px;
-    padding: 0 6px;
-    background: white;
-    border: 1px solid #dee2e6;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-    }
-
-    .chip-value {
-      font-size: 10px;
-      font-weight: 500;
-    }
-
-    &.model-chip {
-      border-left: 3px solid #ab47bc;
-.chip-value {
-        color: #4a148c;
-        font-weight: 600;
-      }
-    }
-
-    &.token-chip {
-      min-width: 60px;
-      justify-content: center;
-
-      .chip-label {
-        font-size: 9px;
-        font-weight: 500;
-        margin-right: 2px;
-      }
-
-      &.input-token-chip {
-        border-left: 3px solid #42a5f5;
-
-        .OIcon,
-        .chip-label,
-        .chip-value {
-          color: #1565c0;
-        }
-      }
-
-      &.output-token-chip {
-        border-left: 3px solid #66bb6a;
-
-        .OIcon,
-        .chip-label,
-        .chip-value {
-          color: #2e7d32;
-        }
-      }
-    }
-
-    &.cost-chip {
-      border-left: 3px solid #ef6c00;
-.chip-value {
-        color: #e65100;
-        font-weight: 600;
-      }
-    }
-  }
-
-  .tokens-group {
-    display: inline-flex;
-    gap: 3px;
-    flex-shrink: 0;
-  }
-
-  .provider-badge {
-    font-size: 10px;
-    font-weight: 600;
-    padding: 3px 8px;
-    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
-    border-radius: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    flex-shrink: 0;
-  }
-
-  .llm-metrics-row {
-    // Scrollbar styling for horizontal scroll
-    &::-webkit-scrollbar {
-      height: 4px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: #cbd5e0;
-      border-radius: 2px;
-    }
-
-    &::-webkit-scrollbar-thumb:hover {
-      background: #a0aec0;
-    }
-  }
+.trace-details-toolbar-container .toolbar-chip.time-chip {
+  border-left: 3px solid #d63384;
 }
 
-// Dark Mode Styles
-body.body--dark {
-  .trace-details-toolbar-container {
-    background: rgba(45, 55, 72, 0.5);
-    border-bottom-color: #4a5568;
-
-    .llm-metrics-row {
-      border-top-color: #4a5568 !important;
-    }
-
-    .toolbar-chip {
-      background: #1a202c;
-      border-color: #4a5568;
-      color: #e2e8f0;
-
-      .chip-label {
-        color: #a0aec0;
-      }
-
-      .chip-value {
-        color: #e2e8f0;
-      }
-
-      &:hover {
-        background: #2d3748;
-      }
-    }
-  }
-
-  .trace-details-toolbar-container {
-    .llm-chip {
-      background: #1a202c;
-      border-color: #4a5568;
-
-      .chip-value {
-        color: #e2e8f0;
-      }
-
-      &.model-chip {
-        border-left: 3px solid #ab47bc;
-.chip-value {
-          color: #e9d8fd;
-        }
-      }
-
-      &.token-chip {
-        &.input-token-chip {
-          border-left: 3px solid #42a5f5;
-
-          .OIcon,
-          .chip-label,
-          .chip-value {
-            color: #90cdf4;
-          }
-        }
-
-        &.output-token-chip {
-          border-left: 3px solid #66bb6a;
-
-          .OIcon,
-          .chip-label,
-          .chip-value {
-            color: #9ae6b4;
-          }
-        }
-      }
-
-      &.cost-chip {
-        border-left: 3px solid #ef6c00;
-.chip-value {
-          color: #fed7aa;
-        }
-      }
-    }
-
-    .provider-badge {
-      background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
-    }
-  }
+.trace-details-toolbar-container .toolbar-chip.span-id-chip {
+  border-left: 3px solid #20c997;
+  cursor: pointer;
 }
 
-.llm-preview-container {
-  overflow: hidden; // Prevent scroll at panel level
+.trace-details-toolbar-container .toolbar-chip.span-id-chip .copy-icon {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
 
-  .section-label {
-    color: var(--o2-text-primary);
-    font-size: 14px;
-    margin-bottom: 0.5rem;
-  }
+.trace-details-toolbar-container .toolbar-chip.span-id-chip:hover .copy-icon {
+  opacity: 1;
+}
 
-  .io-section {
-    flex: 0 0 calc(50% - 0.4rem); // Fixed 50% width minus half the gap
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
+.trace-details-toolbar-container .view-logs-btn {
+  height: 24px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 10px;
+  border-radius: 4px;
+  text-transform: none;
+  flex-shrink: 0;
+}
 
-  .llm-content-box {
-    flex: 1; // Take all available space
-    height: 100%; // Take full height of parent
-    max-height: calc(
-      100% - 1.625rem
-    ); // Container height minus label/button height (with 2-row toolbar)
-    border: 1px solid var(--o2-border-color);
-    border-radius: 4px;
-    padding: 0.75rem;
-    overflow-y: auto; // Enable scroll inside the box
-    overflow-x: hidden;
-    background-color: var(--o2-code-bg);
+/* Scrollbar styling for horizontal scroll */
+.trace-details-toolbar-container > div::-webkit-scrollbar {
+  height: 4px;
+}
 
-    // Enhance hover visibility for code/text content (exclude VueJsonPretty)
-    ::v-deep {
-      .plain-text-content {
-        &:hover {
-          background-color: rgba(0, 0, 0, 0.04) !important;
-        }
-      }
+.trace-details-toolbar-container > div::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-      // Don't apply hover to VueJsonPretty elements
-      .vjs-tree {
-        * {
-          &:hover {
-            background-color: transparent !important;
-          }
-        }
-      }
-    }
-  }
+.trace-details-toolbar-container > div::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 2px;
+}
 
-  // No data message styling
-  .no-data-message {
-    color: var(--o2-text-secondary);
-    font-style: italic;
-    text-align: center;
-    padding: 2rem;
-    font-size: 14px;
-  }
+.trace-details-toolbar-container > div::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}
 
-  // Fullscreen styles for the entire IO container (both Input and Output side by side)
-  .io-container:fullscreen {
-    background-color: #f5f5f5;
-    padding: 0.75rem;
-    height: 100vh; // Full viewport height in fullscreen
-    max-height: 100vh;
-    display: flex;
-    gap: 0.5rem;
-    align-items: stretch;
+/* LLM Chips - Modern Styling (now integrated into toolbar) */
+.trace-details-toolbar-container .llm-chip {
+  font-size: 10px;
+  height: 20px;
+  padding: 0 6px;
+  background: white;
+  border: 1px solid #dee2e6;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
 
-    .io-section {
-      flex: 1; // Equal split in fullscreen
-      display: flex;
-      flex-direction: column;
+.trace-details-toolbar-container .llm-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
 
-      .section-label {
-        background: #f5f5f5;
-        border-radius: 4px;
-      }
+.trace-details-toolbar-container .llm-chip .chip-value {
+  font-size: 10px;
+  font-weight: 500;
+}
 
-      .llm-content-box {
-        height: calc(100vh - 80px); // Full height minus header in fullscreen
-        max-height: unset; // Remove max-height constraint in fullscreen
-        min-height: unset;
-      }
-    }
-  }
+.trace-details-toolbar-container .llm-chip.model-chip {
+  border-left: 3px solid #ab47bc;
+}
 
-  // Dark mode fullscreen
-  .io-container-dark:fullscreen {
-    background: #1e1e1e; // Dark background for dark mode
+.trace-details-toolbar-container .llm-chip.model-chip .chip-value {
+  color: #4a148c;
+  font-weight: 600;
+}
 
-    .io-section .section-label {
-      background: #1e1e1e;
-      color: #e0e0e0; // Ensure text is visible in dark mode
-    }
-  }
+.trace-details-toolbar-container .llm-chip.token-chip {
+  min-width: 60px;
+  justify-content: center;
+}
 
-  // Dark mode hover visibility
-  .io-container-dark .llm-content-box {
-    ::v-deep {
-      .plain-text-content {
-        &:hover {
-          background-color: rgba(255, 255, 255, 0.05) !important;
-        }
-      }
+.trace-details-toolbar-container .llm-chip.token-chip .chip-label {
+  font-size: 9px;
+  font-weight: 500;
+  margin-right: 2px;
+}
 
-      // Don't apply hover to VueJsonPretty elements in dark mode
-      .vjs-tree {
-        * {
-          &:hover {
-            background-color: transparent !important;
-          }
-        }
-      }
-    }
-  }
+.trace-details-toolbar-container .llm-chip.token-chip.input-token-chip {
+  border-left: 3px solid #42a5f5;
+}
 
-  .model-params-json {
-    background-color: var(--o2-code-bg);
-    padding: 1rem;
-    border-radius: 4px;
-    overflow-x: auto;
-    font-family: monospace;
-    font-size: 12px;
-    margin: 0;
-  }
+.trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .OIcon,
+.trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-label,
+.trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-value {
+  color: #1565c0;
+}
+
+.trace-details-toolbar-container .llm-chip.token-chip.output-token-chip {
+  border-left: 3px solid #66bb6a;
+}
+
+.trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .OIcon,
+.trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-label,
+.trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-value {
+  color: #2e7d32;
+}
+
+.trace-details-toolbar-container .llm-chip.cost-chip {
+  border-left: 3px solid #ef6c00;
+}
+
+.trace-details-toolbar-container .llm-chip.cost-chip .chip-value {
+  color: #e65100;
+  font-weight: 600;
+}
+
+.trace-details-toolbar-container .tokens-group {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.trace-details-toolbar-container .provider-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+/* Scrollbar styling for horizontal scroll in llm-metrics-row */
+.trace-details-toolbar-container .llm-metrics-row::-webkit-scrollbar {
+  height: 4px;
+}
+
+.trace-details-toolbar-container .llm-metrics-row::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.trace-details-toolbar-container .llm-metrics-row::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 2px;
+}
+
+.trace-details-toolbar-container .llm-metrics-row::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}
+
+/* Dark Mode Styles */
+body.body--dark .trace-details-toolbar-container {
+  background: rgba(45, 55, 72, 0.5);
+  border-bottom-color: #4a5568;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-metrics-row {
+  border-top-color: #4a5568 !important;
+}
+
+body.body--dark .trace-details-toolbar-container .toolbar-chip {
+  background: #1a202c;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+body.body--dark .trace-details-toolbar-container .toolbar-chip .chip-label {
+  color: #a0aec0;
+}
+
+body.body--dark .trace-details-toolbar-container .toolbar-chip .chip-value {
+  color: #e2e8f0;
+}
+
+body.body--dark .trace-details-toolbar-container .toolbar-chip:hover {
+  background: #2d3748;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip {
+  background: #1a202c;
+  border-color: #4a5568;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip .chip-value {
+  color: #e2e8f0;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.model-chip {
+  border-left: 3px solid #ab47bc;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.model-chip .chip-value {
+  color: #e9d8fd;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip {
+  border-left: 3px solid #42a5f5;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .OIcon,
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-label,
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-value {
+  color: #90cdf4;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip {
+  border-left: 3px solid #66bb6a;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .OIcon,
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-label,
+body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-value {
+  color: #9ae6b4;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.cost-chip {
+  border-left: 3px solid #ef6c00;
+}
+
+body.body--dark .trace-details-toolbar-container .llm-chip.cost-chip .chip-value {
+  color: #fed7aa;
+}
+
+body.body--dark .trace-details-toolbar-container .provider-badge {
+  background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
+}
+
+.llm-preview-container .section-label {
+  color: var(--o2-text-primary);
+  font-size: 14px;
+  margin-bottom: 0.5rem;
+}
+
+.llm-preview-container .io-section {
+  flex: 0 0 calc(50% - 0.4rem);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.llm-preview-container .llm-content-box {
+  flex: 1;
+  height: 100%;
+  max-height: calc(100% - 1.625rem);
+  border: 1px solid var(--o2-border-color);
+  border-radius: 4px;
+  padding: 0.75rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-color: var(--o2-code-bg);
+}
+
+.llm-preview-container .llm-content-box .plain-text-content:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+.llm-preview-container .llm-content-box .vjs-tree *:hover {
+  background-color: transparent !important;
+}
+
+.llm-preview-container .no-data-message {
+  color: var(--o2-text-secondary);
+  font-style: italic;
+  text-align: center;
+  padding: 2rem;
+  font-size: 14px;
+}
+
+.llm-preview-container .io-container:fullscreen {
+  background-color: #f5f5f5;
+  padding: 0.75rem;
+  height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.llm-preview-container .io-container:fullscreen .io-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.llm-preview-container .io-container:fullscreen .io-section .section-label {
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.llm-preview-container .io-container:fullscreen .io-section .llm-content-box {
+  height: calc(100vh - 80px);
+  max-height: unset;
+  min-height: unset;
+}
+
+.llm-preview-container .io-container-dark:fullscreen {
+  background: #1e1e1e;
+}
+
+.llm-preview-container .io-container-dark:fullscreen .io-section .section-label {
+  background: #1e1e1e;
+  color: var(--o2-border);
+}
+
+.llm-preview-container .io-container-dark .llm-content-box .plain-text-content:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.llm-preview-container .io-container-dark .llm-content-box .vjs-tree *:hover {
+  background-color: transparent !important;
+}
+
+.llm-preview-container .model-params-json {
+  background-color: var(--o2-code-bg);
+  padding: 1rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: monospace;
+  font-size: 12px;
+  margin: 0;
 }
 </style>
 
-<style lang="scss">
-.span_details_tabs {
-  .q-tab__indicator {
-    display: none;
-  }
-  .q-tab--active {
-    border-bottom: 1px solid var(--q-primary);
-  }
+<style>
+.span_details_tabs .q-tab__indicator {
+  display: none;
 }
 
-.span_details_tab-panels {
-  .q-tab-panel {
-    padding: 8px 8px 8px 8px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    height: 100%;
-  }
+.span_details_tabs .q-tab--active {
+  border-bottom: 1px solid var(--q-primary);
 }
 
-.view-span-logs-btn {
-  .q-btn__content {
-    display: flex;
-    align-items: center;
-    font-size: 12px;
+.span_details_tab-panels .q-tab-panel {
+  padding: 8px 8px 8px 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
 }
+
+.view-span-logs-btn .q-btn__content {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
 }
+
 .highlight {
   background-color: yellow; /* Adjust background color as desired */
 }
 </style>
 
-<style lang="scss">
-// Dark theme support for glassmorphic tables
-.body--dark {
-  .trace-detail-tab-table {
-    table {
-      // background: rgba(255, 255, 255, 0.05);
-      // border: 0.125rem solid rgba(255, 255, 255, 0.3);
-    }
-
-    th,
-    td {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      border-right: 1px solid rgba(255, 255, 255, 0.15);
-    }
-  }
+<style>
+/* Dark theme support for glassmorphic tables */
+.body--dark .trace-detail-tab-table table {
+  /* background: rgba(255, 255, 255, 0.05); */
+  /* border: 0.125rem solid rgba(255, 255, 255, 0.3); */
 }
 
-// Light theme support for glassmorphic tables
-.body--light {
-  .trace-detail-tab-table {
-    table {
-      // background: rgba(240, 240, 245, 0.8);
-      // border: 0.125rem solid rgba(100, 100, 120, 0.5);
-    }
-
-    th,
-    td {
-      border-bottom: 1px solid rgba(100, 100, 120, 0.2);
-      border-right: 1px solid rgba(100, 100, 120, 0.3);
-    }
-  }
-}
-.tab-content-with-llm-metrics {
-  height: calc(100vh - 312px);
-}
-.tab-content-without-llm-metrics {
-  height: calc(100vh - 276px);
+.body--dark .trace-detail-tab-table th,
+.body--dark .trace-detail-tab-table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-// Attributes tab with header button
-.attributes-header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-height: 32px;
-}
-.copy-clipboard-button {
-  min-width: 40px !important;
+/* Light theme support for glassmorphic tables */
+.body--light .trace-detail-tab-table table {
+  /* background: rgba(240, 240, 245, 0.8); */
+  /* border: 0.125rem solid rgba(100, 100, 120, 0.5); */
 }
 
-.tab-content-dynamic-height-with-header {
-  &.tab-content-with-llm-metrics {
-    height: calc(100vh - 348px); // 312px + 36px for button header
-  }
-
-  &.tab-content-without-llm-metrics {
-    height: calc(100vh - 312px); // 276px + 36px for button header
-  }
+.body--light .trace-detail-tab-table th,
+.body--light .trace-detail-tab-table td {
+  border-bottom: 1px solid rgba(100, 100, 120, 0.2);
+  border-right: 1px solid rgba(100, 100, 120, 0.3);
 }
 
-.copy-attributes-btn {
-  opacity: 0.7;
-  transition: all 0.2s;
-  background: var(--o2-hover-accent) !important;
-  border: 1px solid var(--o2-border-color);
-
-  &:hover {
-    opacity: 1;
-  }
+.trace-detail-tab-table th {
+  background-color: #f5f5f5 !important;
 }
 
-.trace-detail-tab-table {
-  th {
-    background-color: #f5f5f5 !important;
-  }
-}
-
-.body--dark {
-  .trace-detail-tab-table {
-    th {
-      background-color: #424242 !important;
-    }
-  }
+.body--dark .trace-detail-tab-table th {
+  background-color: #424242 !important;
 }
 </style>

@@ -28,28 +28,28 @@
         <div>
         <div
           v-if="loadingState"
-          class="tw:flex tw:items-center tw:justify-center tw:h-full tw:w-full tw:py-10"
+          class="flex items-center justify-center h-full w-full py-10"
         >
           <OSpinner size="md" data-test="enrichment-schema-loading-indicator" />
         </div>
-        <div v-else class="indexDetailsContainer" style="height: 100vh">
+        <div v-else class="indexDetailsContainer p-5 w-full" style="height: 100vh">
           <div
-            class="titleContainer tw:flex tw:flex-col tw:items-flex-start tw:gap-5"
+            class="titleContainer flex flex-col items-flex-start gap-5 bg-[#00000005] border border-[var(--o2-border-input)] rounded-[5px] p-4"
           >
             <div
               data-test="stream-details-container"
-              class="stream_details_container tw:flex tw:justify-between tw:gap-5 tw:flex-wrap"
+              class="stream_details_container flex justify-between gap-5 flex-wrap"
             >
               <div data-test="schema-stream-title-text">
                 {{ t("alerts.stream_name") }}
-                <span class="title tw:pl-1" > {{ schemaData.name }}</span>
+                <span class="title pl-1 mb-4 font-bold" > {{ schemaData.name }}</span>
               </div>
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
                 data-test="schema-stream-title-text"
               >
                 {{ t("logStream.docsCount") }}
-                <span class="title tw:pl-1">
+                <span class="title pl-1 mb-4 font-bold">
                   {{
                     parseInt(schemaData.stats.doc_num).toLocaleString("en-US")
                   }}
@@ -57,7 +57,7 @@
               </div>
               <div data-test="schema-stream-title-text">
                 {{ t("logStream.storageSize") }}
-                <span class="title tw:pl-1">
+                <span class="title pl-1 mb-4 font-bold">
                   {{ formatSizeFromMB(schemaData.stats.storage_size) }}</span
                 >
               </div>
@@ -66,14 +66,17 @@
                 data-test="schema-stream-title-text"
               >
                 {{ t("logStream.compressedSize") }}
-                <span class="title tw:pl-1">
+                <span class="title pl-1 mb-4 font-bold">
                   {{ formatSizeFromMB(schemaData.stats.compressed_size) }}</span
                 >
               </div>
             </div>
           </div>
-          <div class="tw:flex tw:items-center tw:justify-between tw:gap-4 tw:mt-4">
-            <div class="tw:text-sm display-total-fields">
+          <div class="flex items-center justify-between gap-4 mt-4">
+            <div
+              data-test="enrichment-schema-total-fields"
+              class="text-sm w-28.75 h-7.5 rounded-sm flex items-center justify-center bg-(--o2-theme-color) text-white"
+            >
                 All Fields ({{ schemaData.schema.length }})
             </div>
                 <OSearchInput
@@ -93,7 +96,7 @@
                   : 'light-theme-table'
               "
               style="margin-bottom: 30px"
-              class="tw:mt-4"
+              class="mt-4"
             >
               <OTable
                 data-test="schema-log-stream-field-mapping-table"
@@ -163,7 +166,7 @@
         type: Boolean,
         default: false,
         },
-         
+
         selectedEnrichmentTable: {
         type: String,
         default: '',
@@ -245,46 +248,3 @@
     },
     });
     </script>
-
-<style lang="scss" scoped>
-.q-card__section--vert {
-  padding: 8px 16px;
-}
-.indexDetailsContainer {
-  padding: 1.25rem;
-  width: 100%;
-
-  .title {
-    margin-bottom: 1rem;
-    font-weight: 700;
-  }
-
-  .titleContainer {
-    background-color: #00000005;
-    border: 1px solid $input-field-border-color;
-    border-radius: 5px;
-    padding: 1rem;
-  }
-
-  .q-table {
-    border: 1px solid $input-field-border-color;
-
-  }
-  .display-total-fields{
-    width: 115px;
-    height: 30px;
-    border-radius: 3px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: $primary;
-    color: white;
-  }
-
-
-}
-
-
-
-
-</style>

@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,12 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="source-maps-container card-container tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
+    class="source-maps-container card-container flex flex-col h-full overflow-hidden"
   >
     <!-- Filters Section -->
-    <div class="filters-section tw:p-3">
-      <div class="tw:flex tw:justify-between tw:items-end">
-      <div class="tw:flex tw:gap-4 tw:items-end">
+    <div class="p-3 bg-(--q-background)">
+      <div class="flex justify-between items-end">
+      <div class="flex gap-4 items-end">
           <!-- Version Filter -->
           <OSelect
             v-model="filters.version"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator />
 
     <!-- Source Maps List -->
-    <div class="source-maps-list tw:flex-1 tw:min-h-0">
+    <div class="source-maps-list flex-1 min-h-0">
       <!-- Source Maps Table (OTable handles loading skeleton) -->
         <OTable
           :data="groupedSourceMaps"
@@ -96,30 +96,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expansion="single"
           expand-on-row-click
           v-model:expanded-ids="expandedIds"
-          class="tw:w-full"
+          class="w-full"
         >
           <template #expansion="{ row }">
-            <div class="expanded-details tw:p-3">
-              <div class="tw:text-sm tw:font-medium tw:mb-2">
+            <div class="p-3 bg-(--q-background) border-t border-(--q-border-color,var(--o2-border))">
+              <div class="text-sm font-medium mb-2">
                 Source Map Files ({{ row.files.length }})
               </div>
               <ul
-                class="tw:rounded tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md"
+                class="flex flex-col divide-y divide-border border rounded-md"
                 style="max-height: 400px; overflow-y: auto;"
               >
                 <li
                   v-for="(file, index) in row.files"
                   :key="index"
                   data-test="source-maps-file-item"
-                  class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
+                  class="flex items-center gap-2 px-3 py-2"
                 >
-                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                    <span class="tw:block tw:text-xs tw:text-muted-foreground">Source File</span>
-                    <span class="text-code tw:text-sm">{{ file.source_file_name }}</span>
+                  <div class="flex flex-col flex-1 min-w-0">
+                    <span class="block text-xs text-muted-foreground">Source File</span>
+                    <span class="font-[SF_Mono,Monaco,Inconsolata,'Fira_Code','Droid_Sans_Mono',monospace] break-all text-sm">{{ file.source_file_name }}</span>
                   </div>
-                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                    <span class="tw:block tw:text-xs tw:text-muted-foreground">Source Map File</span>
-                    <span class="text-code tw:text-sm">{{ file.source_map_file_name }}</span>
+                  <div class="flex flex-col flex-1 min-w-0">
+                    <span class="block text-xs text-muted-foreground">Source Map File</span>
+                    <span class="font-[SF_Mono,Monaco,Inconsolata,'Fira_Code','Droid_Sans_Mono',monospace] break-all text-sm">{{ file.source_map_file_name }}</span>
                   </div>
                 </li>
               </ul>
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-uploaded_at="{ row }">
-            <div class="tw:cursor-pointer">{{ formatTimestamp(row.uploaded_at) }}</div>
+            <div class="cursor-pointer hover:bg-black/3 dark:hover:bg-white/5">{{ formatTimestamp(row.uploaded_at) }}</div>
           </template>
 
           <template #cell-actions="{ row }">
@@ -501,39 +501,3 @@ onMounted(async () => {
   fetchSourceMaps();
 });
 </script>
-
-<style lang="scss" scoped>
-.source-maps-container {
-  height: 100%;
-  overflow-y: auto;
-}
-
-.filters-section {
-  background-color: var(--q-background);
-}
-
-.text-code {
-  font-family: "SF Mono", "Monaco", "Inconsolata", "Fira Code", "Droid Sans Mono", monospace;
-  font-size: 12px;
-  word-break: break-all;
-}
-
-.cursor-pointer {
-  cursor: pointer;
-
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-  }
-}
-
-:deep(.q-dark) {
-  .cursor-pointer:hover {
-    background-color: rgba(255, 255, 255, 0.05);
-  }
-}
-
-.expanded-details {
-  background-color: var(--q-background);
-  border-top: 1px solid var(--q-border-color, #e0e0e0);
-}
-</style>

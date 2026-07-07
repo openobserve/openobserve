@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md error-404-page">
-    <div class="error-404-content">
-      <div class="error-404-illustration">
+  <div class="rounded-md flex items-center justify-center min-h-[inherit] bg-(--o2-primary-background)">
+    <div class="flex flex-col items-center text-center max-w-md p-8">
+      <div class="mb-8">
         <svg
           width="200"
           height="200"
@@ -25,25 +25,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <circle cx="100" cy="100" r="90" class="error-404-circle" />
+          <circle cx="100" cy="100" r="90" class="fill-none stroke-(--o2-border) stroke-2" />
           <text
             x="100"
             y="115"
             text-anchor="middle"
-            class="error-404-number"
+            class="text-[3.5rem] font-bold fill-(--o2-primary-color) font-[inherit]"
           >
             404
           </text>
         </svg>
       </div>
 
-      <h1 class="error-404-title">Page not found</h1>
+      <h1 class="text-2xl font-semibold text-(--o2-text-primary) m-0 mb-3">Page not found</h1>
 
-      <p class="error-404-description">
+      <p class="text-[0.9375rem] text-(--o2-text-secondary) m-0 mb-8 leading-normal">
         The page you're looking for doesn't exist or has been moved.
       </p>
 
-      <div class="error-404-actions">
+      <div class="flex gap-3 mb-8">
         <OButton
           data-test="error-404-go-home-btn"
           variant="primary"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t('common.goBack') }}</OButton>
       </div>
 
-      <p class="error-404-redirect">
+      <p class="text-[0.8125rem] text-(--o2-text-secondary) opacity-70 m-0">
         {{ t('common.redirectingHome', { countdown }) }}
       </p>
     </div>
@@ -98,74 +98,3 @@ onUnmounted(() => {
   clearInterval(timer);
 });
 </script>
-
-<style lang="scss" scoped>
-.error-404-page {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: inherit;
-  background: var(--o2-primary-background);
-}
-
-.error-404-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  max-width: 28rem;
-  padding: 2rem;
-}
-
-.error-404-illustration {
-  margin-bottom: 2rem;
-}
-
-.error-404-circle {
-  fill: none;
-  stroke: var(--o2-border);
-  stroke-width: 2;
-}
-
-.error-404-number {
-  font-size: 3.5rem;
-  font-weight: 700;
-  fill: var(--o2-primary-color);
-  font-family: inherit;
-}
-
-.error-404-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--o2-text-primary);
-  margin: 0 0 0.75rem;
-}
-
-.error-404-description {
-  font-size: 0.9375rem;
-  color: var(--o2-text-secondary);
-  margin: 0 0 2rem;
-  line-height: 1.5;
-}
-
-.error-404-actions {
-  display: flex;
-  gap: 0.75rem;
-  margin-bottom: 2rem;
-}
-
-.error-404-home-btn {
-  padding: 0.5rem 1.5rem;
-}
-
-.error-404-back-btn {
-  padding: 0.5rem 1.5rem;
-}
-
-.error-404-redirect {
-  font-size: 0.8125rem;
-  color: var(--o2-text-secondary);
-  opacity: 0.7;
-  margin: 0;
-}
-</style>

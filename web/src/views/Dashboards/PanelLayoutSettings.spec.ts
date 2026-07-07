@@ -410,7 +410,7 @@ describe("PanelLayoutSettings.vue", () => {
       });
     });
 
-    it("should apply dark mode class when theme is dark", async () => {
+    it("should not hardcode a background on the content area in dark mode", async () => {
       store.state.theme = "dark";
 
       wrapper = shallowMount(PanelLayoutSettings, {
@@ -423,15 +423,25 @@ describe("PanelLayoutSettings.vue", () => {
 
       await nextTick();
 
+      // The content area is theme-agnostic — its background now comes from the
+      // dialog surface, not a hardcoded class. It must not force a light bg
+      // (which previously showed a lighter band in dark mode).
       const contentDiv = wrapper.find('[data-test="panel-layout-settings-content"]');
       expect(contentDiv.exists()).toBe(true);
-      expect(contentDiv.attributes("class")).toContain("dark-mode");
+      expect(contentDiv.attributes("class")).toContain("p-0");
+      expect(contentDiv.attributes("class")).not.toContain("bg-white");
+      expect(contentDiv.attributes("class")).not.toContain(
+        "bg-(--o2-primary-background)",
+      );
     });
 
-    it("should apply light mode class when theme is light", () => {
+    it("should keep the content area theme-agnostic in light mode", () => {
       const contentDiv = wrapper.find('[data-test="panel-layout-settings-content"]');
       expect(contentDiv.exists()).toBe(true);
-      expect(contentDiv.attributes("class")).not.toContain("dark-mode");
+      expect(contentDiv.attributes("class")).toContain("p-0");
+      expect(contentDiv.attributes("class")).not.toContain(
+        "bg-(--o2-primary-background)",
+      );
     });
 
     it("should expose panel layout title via ODrawer prop", () => {

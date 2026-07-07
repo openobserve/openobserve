@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OInput
         v-model.trim="name"
         :label="t('common.name') + ' *'"
-        class="showLabelOnTop tw:mt-2"
+        class="showLabelOnTop mt-2"
         maxlength="100"
         data-test="add-role-rolename-input-btn"
         :error="showNameError"
@@ -37,6 +37,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :help-text="!showNameError ? t('iam.nameHelpText') : undefined"
         @update:model-value="showNameError = !!name && !isValidRoleName"
       />
+
+      <div data-test="add-role-start-from-section" class="mt-4">
+        <div class="mb-1 text-sm font-medium">
+          {{ t("iam.role.startFrom.label") }}
+        </div>
+        <ORadioGroup v-model="startFrom" orientation="vertical">
+          <ORadio
+            v-for="option in startFromOptions"
+            :key="option.value"
+            :val="option.value"
+            :label="option.label"
+            :data-test="`add-role-start-from-${option.value}-radio`"
+          />
+        </ORadioGroup>
+      </div>
     </div>
   </ODialog>
 </template>
@@ -45,6 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { createRole, updateRole } from "@/services/iam";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -73,10 +90,23 @@ const { track } = useReo();
 
 const name = ref(props.role?.name || "");
 
+// "Start from" preset: "custom" = empty role (default), "readonly" = seed
+// read-only permissions (AllowList + AllowGet) once the user lands on EditRole.
+const startFrom = ref<"custom" | "readonly">("custom");
+
+const startFromOptions = computed(() => [
+  { label: t("iam.role.startFrom.custom"), value: "custom" },
+  { label: t("iam.role.startFrom.readonly"), value: "readonly" },
+]);
+
 const store = useStore();
 
 
 const isValidRoleName = computed(() => {
+  // Keep in sync with the backend, which strips everything except
+  // [a-zA-Z0-9_] via format_role_name_only() (jwt.rs). Hyphens are NOT
+  // allowed here: the backend would silently rewrite "my-role" → "my_role",
+  // so we block them in the UI rather than store a name the user didn't type.
   const roleNameRegex = /^[a-zA-Z0-9_]+$/;
   return roleNameRegex.test(name.value);
 });
@@ -88,13 +118,16 @@ watch(
   (isOpen) => {
     if (isOpen) {
       name.value = props.role?.name || "";
+      startFrom.value = "custom";
       showNameError.value = false;
     }
   }
 );
 
 const nameErrorMessage = computed(() =>
-  !name.value ? t('common.nameRequired') : t('iam.nameHelpText')
+  !name.value
+    ? t("iam.role.name.required")
+    : t("iam.role.name.invalidChars")
 );
 
 const saveRole = () => {
@@ -102,7 +135,7 @@ const saveRole = () => {
   createRole(name.value, store.state.selectedOrganization.identifier)
     .then(() => {
       emits("update:open", false);
-      emits("added:role");
+      emits("added:role", { role_name: name.value, startFrom: startFrom.value });
       toast({
         message: `Role "${name.value}" Created Successfully!`,
         variant: "success",

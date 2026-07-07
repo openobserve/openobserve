@@ -15,27 +15,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="edit-group-section" class="tw:flex tw:flex-col tw:h-full">
+  <div data-test="edit-group-section" class="flex flex-col h-full">
     <!-- Sub-page header: the listing's icon becomes a Back button (→ Groups). -->
     <AppPageHeader
       :title="groupDetails.group_name"
       :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     />
     <div
       data-test="edit-group-section-title"
-      class="tw:px-2.5 tw:pt-2.5 tw:pb-[0.625rem] tw:flex-shrink-0"
+      class="px-2.5 pt-2.5 pb-[0.625rem] flex-shrink-0"
     >
-    <div class="card-container tw:py-3">
+    <div class="card-container py-3">
     <AppTabs
       data-test="edit-group-tabs"
       :tabs="tabs"
       :active-tab="activeTab"
+      :dirty-title="t('iam.editGroup.unsavedDot.title')"
       @update:active-tab="updateActiveTab"
     />
     </div>
     </div>
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+    <div class="flex-1 min-h-0 overflow-hidden">
       <GroupUsers
         v-show="activeTab === 'users'"
         :groupUsers="groupDetails.users"
@@ -56,16 +57,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-show="activeTab === 'serviceAccounts'"
         :groupUsers="groupDetails.users"
         :activeTab="activeTab"
-        :added-users="addedUsers"
-        :removed-users="removedUsers"
+        :added-users="addedServiceAccounts"
+        :removed-users="removedServiceAccounts"
       />
     </div>
     <div
       data-test="edit-group-footer"
-    class="tw:flex tw:justify-end tw:w-full tw:flex-shrink-0"
+    class="flex justify-end w-full flex-shrink-0"
       style="z-index: 2"
     >
-      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2 tw:border-t tw:border-border-default">
+      <div class="card-container w-full py-2 px-3 justify-end flex gap-2 border-t border-border-default">
       <OButton
         data-test="edit-group-cancel-btn"
         variant="outline"
@@ -84,6 +85,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       </div>
     </div>
+    <ConfirmDialog
+      :title="t('iam.editGroup.leaveConfirm.title')"
+      :message="t('iam.editGroup.leaveConfirm.message')"
+      @update:ok="onLeaveConfirm(true)"
+      @update:cancel="onLeaveConfirm(false)"
+      v-model="leaveConfirm.show"
+    />
   </div>
 </template>
 
@@ -96,12 +104,13 @@ import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
 import { getGroup, updateGroup } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import GroupServiceAccounts from "./GroupServiceAccounts.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 onBeforeMount(() => {
@@ -131,17 +140,67 @@ const removedUsers = ref(new Set());
 const addedRoles = ref(new Set());
 const removedRoles = ref(new Set());
 
+// Service-account membership is staged separately from users so the Users and
+// Service Accounts tabs track dirty state independently (they're sent together
+// as users in the save payload, since the backend treats both as principals).
+const addedServiceAccounts = ref(new Set());
+const removedServiceAccounts = ref(new Set());
+
+// Per-tab unsaved-changes flags. Each tab tracks only its own pending changes.
+const isRolesDirty = computed(
+  () => addedRoles.value.size > 0 || removedRoles.value.size > 0,
+);
+
+const isUsersDirty = computed(
+  () => addedUsers.value.size > 0 || removedUsers.value.size > 0,
+);
+
+const isServiceAccountsDirty = computed(
+  () =>
+    addedServiceAccounts.value.size > 0 ||
+    removedServiceAccounts.value.size > 0,
+);
+
+const isAnyDirty = computed(
+  () =>
+    isRolesDirty.value || isUsersDirty.value || isServiceAccountsDirty.value,
+);
+
+// Route-leave guard: warn before discarding unsaved role/membership changes.
+// The pending navigation is held until the user resolves the dialog.
+const leaveConfirm = ref<{
+  show: boolean;
+  resolve: ((proceed: boolean) => void) | null;
+}>({ show: false, resolve: null });
+
+const onLeaveConfirm = (proceed: boolean) => {
+  leaveConfirm.value.show = false;
+  leaveConfirm.value.resolve?.(proceed);
+  leaveConfirm.value.resolve = null;
+};
+
+onBeforeRouteLeave(() => {
+  if (!isAnyDirty.value) return true;
+
+  return new Promise<boolean>((resolve) => {
+    leaveConfirm.value.resolve = resolve;
+    leaveConfirm.value.show = true;
+  });
+});
+
 const tabs = computed(() => {
   const baseTabs = [
     {
       value: "roles",
       label: "Roles",
       icon: "shield",
+      dirty: isRolesDirty.value,
     },
     {
       value: "users",
       label: "Users",
       icon: "group",
+      dirty: isUsersDirty.value,
     },
   ];
 
@@ -150,6 +209,7 @@ const tabs = computed(() => {
       value: "serviceAccounts",
       label: "Service Accounts",
       icon: "smart-toy",
+      dirty: isServiceAccountsDirty.value,
     });
   }
 
@@ -162,7 +222,6 @@ const getGroupDetails = () => {
 
   getGroup(groupName, store.state.selectedOrganization.identifier)
     .then((res) => {
-      console.log(res,'res in get group')
       groupDetails.value = {
         ...res.data,
         group_name: res.data.name,
@@ -190,9 +249,15 @@ const updateActiveTab = (tab: string) => {
 };
 
 const saveGroupChanges = () => {
+  // Users and service accounts are both sent as users; merge the two staging
+  // sets (dedup via Set) for the request payload.
   const payload = {
-    add_users: Array.from(addedUsers.value) as string[],
-    remove_users: Array.from(removedUsers.value) as string[],
+    add_users: Array.from(
+      new Set([...addedUsers.value, ...addedServiceAccounts.value]),
+    ) as string[],
+    remove_users: Array.from(
+      new Set([...removedUsers.value, ...removedServiceAccounts.value]),
+    ) as string[],
     add_roles: Array.from(addedRoles.value) as string[],
     remove_roles: Array.from(removedRoles.value) as string[],
   };
@@ -237,18 +302,28 @@ const saveGroupChanges = () => {
 
       removedRoles.value = new Set([]);
 
-      // Reset Users
+      // Reset Users + Service Accounts (both stored in groupDetails.users)
       groupDetails.value.users = groupDetails.value.users.filter(
-        (user) => !removedUsers.value.has(user)
+        (user) =>
+          !removedUsers.value.has(user) &&
+          !removedServiceAccounts.value.has(user)
       );
 
       addedUsers.value.forEach((value: any) => {
         groupDetails.value.users.push(value as string);
       });
 
+      addedServiceAccounts.value.forEach((value: any) => {
+        groupDetails.value.users.push(value as string);
+      });
+
       addedUsers.value = new Set([]);
 
       removedUsers.value = new Set([]);
+
+      addedServiceAccounts.value = new Set([]);
+
+      removedServiceAccounts.value = new Set([]);
     })
     .catch((err) => {
       if(err.response.status != 403){
@@ -271,5 +346,3 @@ const cancelEditGroup = () => {
   );
 };
 </script>
-
-<style scoped></style>

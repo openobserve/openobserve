@@ -46,7 +46,6 @@ vi.mock("@/services/http.ts", () => ({
         }
 
         if (error?.response?.status === 401) {
-          console.log("Mock 401: Unauthorized - Logging out user...");
           sessionStorage.clear(); // Simulate logout
           return Promise.reject({
             response: { status: 401, data: "Unauthorized" },
@@ -54,7 +53,6 @@ vi.mock("@/services/http.ts", () => ({
         }
 
         if (error?.response?.status === 403) {
-          console.log("Mock 403: Forbidden - Showing notification...");
           toast({
             message: "Unauthorized Access: Please contact your administrator.",
             timeout: 0,

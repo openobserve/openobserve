@@ -16,16 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="variablesData.values?.length > 0"
-    class="tw:flex tw:flex-wrap tw:mt-1 tw:ml-1"
+    class="flex flex-wrap mt-1 ml-1"
   >
     <div
       v-for="(item, index) in variablesData.values"
       :key="item.name + index"
       :data-test="`dashboard-variable-${item.name}-container`"
     >
-      <div v-if="item.type == 'query_values'" class="tw:max-w-[40rem] tw:min-w-37.5">
+      <div v-if="item.type == 'query_values'" class="max-w-[40rem] min-w-37.5">
         <VariableQueryValueSelector
-          class="tw:mr-4 tw:mt-1"
+          class="mr-4 mt-1"
           v-show="!item.hideOnDashboard"
           v-model="item.value"
           :variableItem="item"
@@ -35,10 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
-      <div v-else-if="item.type == 'constant'" class="tw:max-w-[40rem] tw:min-w-37.5">
+      <div v-else-if="item.type == 'constant'" class="max-w-[40rem] min-w-37.5">
         <OInput
           v-show="!item.hideOnDashboard"
-          class="tw:mr-4 tw:mt-1"
+          class="mr-4 mt-1"
           style="max-width: 150px !important"
           v-model="item.value"
           :label="item.label || item.name"
@@ -48,10 +48,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onVariablesValueUpdated(index)"
         />
       </div>
-      <div v-else-if="item.type == 'textbox'" class="tw:max-w-[40rem] tw:min-w-37.5">
+      <div v-else-if="item.type == 'textbox'" class="max-w-[40rem] min-w-37.5">
         <OInput
           v-show="!item.hideOnDashboard"
-          class="tw:mr-4 tw:mt-1"
+          class="mr-4 mt-1"
           style="max-width: 150px !important"
           :debounce="1000"
           v-model="item.value"
@@ -61,19 +61,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onVariablesValueUpdated(index)"
         />
       </div>
-      <div v-else-if="item.type == 'custom'" class="tw:max-w-[40rem] tw:min-w-37.5">
+      <div v-else-if="item.type == 'custom'" class="max-w-[40rem] min-w-37.5">
         <VariableCustomValueSelector
           v-show="!item.hideOnDashboard"
-          class="tw:mr-4 tw:mt-1"
+          class="mr-4 mt-1"
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
-      <div v-else-if="item.type == 'dynamic_filters'" class="tw:max-w-max">
+      <div v-else-if="item.type == 'dynamic_filters'" class="max-w-max">
         <VariableAdHocValueSelector
-          class="tw:mr-4 tw:mt-1"
+          class="mr-4 mt-1"
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <!-- Add Variable Button -->
-    <div v-if="showAddVariableButton" class="tw:ml-1 tw:mt-2">
+    <div v-if="showAddVariableButton" class="ml-1 mt-1">
       <OButton
         variant="outline"
         size="sm"

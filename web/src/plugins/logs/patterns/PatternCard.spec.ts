@@ -49,7 +49,6 @@ describe("PatternCard", () => {
   const OBadgeStub = {
     name: "OBadge",
     props: ["size"],
-    // Vue 3 auto-merges parent class onto root element, so wildcard-chip etc. appear naturally
     template: '<span data-test-stub="o-badge"><slot /></span>',
   };
   const OTooltipStub = {
@@ -217,14 +216,14 @@ describe("PatternCard", () => {
   });
 
   describe("Hover Effect", () => {
-    it("should have table-row-hover class for hover effect", () => {
+    it("should have hover transition class for hover effect", () => {
       const card = wrapper.find('[data-test="pattern-card-0"]');
-      expect(card.classes()).toContain("table-row-hover");
+      expect(card.classes()).toContain("transition-colors");
     });
 
     it("should have cursor-pointer class", () => {
       const card = wrapper.find('[data-test="pattern-card-0"]');
-      expect(card.classes()).toContain("tw:cursor-pointer");
+      expect(card.classes()).toContain("cursor-pointer");
     });
 
     it("should have hover background color class", () => {
@@ -238,39 +237,39 @@ describe("PatternCard", () => {
       const card = wrapper.find('[data-test="pattern-card-0"]');
       // Check that the component has the hover styles applied
       expect(card.exists()).toBe(true);
-      // The actual transition is defined in scoped SCSS
-      // We verify the element exists and has the class
-      expect(card.classes()).toContain("table-row-hover");
+      // The transition is defined via Tailwind utility classes.
+      expect(card.classes()).toContain("transition-colors");
+      expect(card.classes()).toContain("duration-150");
     });
   });
 
   describe("wrap prop", () => {
-    it("should apply tw:flex-nowrap class on template when wrap is false (default)", () => {
+    it("should apply flex-nowrap class on template when wrap is false (default)", () => {
       const template = wrapper.find('[data-test="pattern-card-0-template"]');
-      expect(template.classes()).toContain("tw:flex-nowrap");
-      expect(template.classes()).toContain("tw:overflow-hidden");
-      expect(template.classes()).not.toContain("tw:flex-wrap");
+      expect(template.classes()).toContain("flex-nowrap");
+      expect(template.classes()).toContain("overflow-hidden");
+      expect(template.classes()).not.toContain("flex-wrap");
     });
 
-    it("should apply tw:break-all class on template when wrap is true", async () => {
+    it("should apply break-all class on template when wrap is true", async () => {
       await wrapper.setProps({ wrap: true });
       const template = wrapper.find('[data-test="pattern-card-0-template"]');
-      // tw:flex-wrap removed in commit eb9f1f80f2; flex layout moves to the false branch
-      expect(template.classes()).toContain("tw:break-all");
-      expect(template.classes()).not.toContain("tw:flex-nowrap");
+      // flex-wrap removed in commit eb9f1f80f2; flex layout moves to the false branch
+      expect(template.classes()).toContain("break-all");
+      expect(template.classes()).not.toContain("flex-nowrap");
     });
 
-    it("should revert to tw:flex-nowrap when wrap is toggled back to false", async () => {
+    it("should revert to flex-nowrap when wrap is toggled back to false", async () => {
       await wrapper.setProps({ wrap: true });
       await wrapper.setProps({ wrap: false });
       const template = wrapper.find('[data-test="pattern-card-0-template"]');
-      expect(template.classes()).toContain("tw:flex-nowrap");
+      expect(template.classes()).toContain("flex-nowrap");
     });
   });
 
   describe("Wildcard chip hover interactions", () => {
     it("should render wildcard chips for each wildcard in the template", () => {
-      const chips = wrapper.findAll(".wildcard-chip");
+      const chips = wrapper.findAll('[data-test="pattern-card-wildcard-chip"]');
       expect(chips.length).toBeGreaterThan(0);
     });
 

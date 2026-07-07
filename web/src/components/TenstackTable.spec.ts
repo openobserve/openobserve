@@ -694,21 +694,21 @@ describe("TenstackTable", () => {
       wrapper = mountTable();
       const resizer = wrapper.find(".resizer");
       expect(resizer.exists()).toBe(true);
-      expect(resizer.classes()).toContain("tw:bg-[var(--o2-border-color)]!");
+      expect(resizer.classes()).toContain("bg-[var(--o2-border-color)]!");
     });
 
     it("should not carry a transparent background class on the resizer", () => {
       wrapper = mountTable();
       const resizer = wrapper.find(".resizer");
       expect(resizer.exists()).toBe(true);
-      expect(resizer.classes()).not.toContain("tw:bg-transparent");
+      expect(resizer.classes()).not.toContain("bg-transparent");
     });
 
     it("should not carry a hover-only background class on the resizer", () => {
       wrapper = mountTable();
       const resizer = wrapper.find(".resizer");
       expect(resizer.exists()).toBe(true);
-      expect(resizer.classes()).not.toContain("tw:hover:bg-[var(--o2-border-color)]");
+      expect(resizer.classes()).not.toContain("hover:bg-[var(--o2-border-color)]");
     });
   });
 
@@ -895,7 +895,7 @@ describe("TenstackTable", () => {
         useVirtualScroll: false,
         enableCellCopy: true,
       });
-      const copyBtns = wrapper.findAll(".copy-btn");
+      const copyBtns = wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"]');
       expect(copyBtns.length).toBeGreaterThan(0);
     });
 
@@ -909,7 +909,7 @@ describe("TenstackTable", () => {
         useVirtualScroll: false,
         enableCellCopy: false,
       });
-      const copyBtns = wrapper.findAll(".copy-btn");
+      const copyBtns = wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"]');
       expect(copyBtns.length).toBe(0);
     });
   });
@@ -953,16 +953,16 @@ describe("TenstackTable", () => {
     });
   });
 
-  // ── tbody tw:relative class ───────────────────────────────────────────────
-  describe("tbody tw:relative class", () => {
-    it("should have tw:relative on tbody when useVirtualScroll=true and showPagination=false", () => {
+  // ── tbody relative class ───────────────────────────────────────────────
+  describe("tbody relative class", () => {
+    it("should have relative on tbody when useVirtualScroll=true and showPagination=false", () => {
       wrapper = mountTable();
       expect(
         wrapper.find('[data-test="o2-table-body"]').classes(),
-      ).toContain("tw:relative");
+      ).toContain("relative");
     });
 
-    it("should not have tw:relative on tbody when useVirtualScroll=false", () => {
+    it("should not have relative on tbody when useVirtualScroll=false", () => {
       wrapper = mountTable({
         columns: [{ name: "name", label: "NAME", field: "name" }],
         rows: [],
@@ -970,14 +970,14 @@ describe("TenstackTable", () => {
       });
       expect(
         wrapper.find('[data-test="o2-table-body"]').classes(),
-      ).not.toContain("tw:relative");
+      ).not.toContain("relative");
     });
 
-    it("should not have tw:relative on tbody when showPagination=true", () => {
+    it("should not have relative on tbody when showPagination=true", () => {
       wrapper = mountTable({ showPagination: true });
       expect(
         wrapper.find('[data-test="o2-table-body"]').classes(),
-      ).not.toContain("tw:relative");
+      ).not.toContain("relative");
     });
   });
 
@@ -1042,7 +1042,7 @@ describe("TenstackTable", () => {
         useVirtualScroll: false,
         pivotHeaderLevels: oneLevel,
       });
-      const valueHeaders = wrapper.findAll(".pivot-value-header");
+      const valueHeaders = wrapper.findAll('[data-test-pivot-type="value"]');
       expect(valueHeaders.length).toBe(2);
       expect(wrapper.text()).toContain("Jan");
       expect(wrapper.text()).toContain("Feb");
@@ -1056,7 +1056,7 @@ describe("TenstackTable", () => {
         pivotHeaderLevels: twoLevels,
       });
       expect(wrapper.text()).toContain("H1");
-      const groupHeaders = wrapper.findAll(".pivot-group-header");
+      const groupHeaders = wrapper.findAll('[data-test-pivot-type="group"]');
       expect(groupHeaders.length).toBeGreaterThan(0);
     });
 
@@ -1444,9 +1444,9 @@ describe("TenstackTable", () => {
       });
       await flushPromises();
 
-      const copyBtn = wrapper.find(".copy-btn");
+      const copyBtn = wrapper.find('[data-test="dashboard-table-cell-copy-btn"]');
       expect(copyBtn.exists()).toBe(true);
-      await wrapper.find(".copy-btn button").trigger("click");
+      await wrapper.find('[data-test="dashboard-table-cell-copy-btn"] button').trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
@@ -1472,7 +1472,7 @@ describe("TenstackTable", () => {
       });
       await flushPromises();
 
-      await wrapper.find(".copy-btn button").trigger("click");
+      await wrapper.find('[data-test="dashboard-table-cell-copy-btn"] button').trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledOnce();
@@ -1499,9 +1499,9 @@ describe("TenstackTable", () => {
       });
       await flushPromises();
 
-      const copyBtn = wrapper.find(".copy-btn");
+      const copyBtn = wrapper.find('[data-test="dashboard-table-cell-copy-btn"]');
       expect(copyBtn.exists()).toBe(true);
-      await wrapper.find(".copy-btn button").trigger("click");
+      await wrapper.find('[data-test="dashboard-table-cell-copy-btn"] button').trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
@@ -1521,7 +1521,7 @@ describe("TenstackTable", () => {
       });
       await flushPromises();
 
-      await wrapper.find(".copy-btn button").trigger("click");
+      await wrapper.find('[data-test="dashboard-table-cell-copy-btn"] button').trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith("plain-text", {
@@ -1547,7 +1547,7 @@ describe("TenstackTable", () => {
       });
       await flushPromises();
 
-      await wrapper.find(".copy-btn button").trigger("click");
+      await wrapper.find('[data-test="dashboard-table-cell-copy-btn"] button').trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
@@ -1603,9 +1603,9 @@ describe("TenstackTable", () => {
       await flushPromises();
 
       // Two copy buttons: index 0 = "region" cell, index 1 = "ts" cell.
-      const copyBtns = wrapper.findAll(".copy-btn");
+      const copyBtns = wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"]');
       expect(copyBtns.length).toBeGreaterThanOrEqual(2);
-      await wrapper.findAll(".copy-btn button")[1].trigger("click");
+      await wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"] button')[1].trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
@@ -1639,8 +1639,8 @@ describe("TenstackTable", () => {
       });
       await flushPromises();
 
-      const copyBtns = wrapper.findAll(".copy-btn");
-      await wrapper.findAll(".copy-btn button")[1].trigger("click");
+      const copyBtns = wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"]');
+      await wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"] button')[1].trigger("click");
       await flushPromises();
 
       const copiedValue = mockCopyToClipboard.mock.calls[0][0] as string;
@@ -1682,9 +1682,9 @@ describe("TenstackTable", () => {
       // Right-aligned column renders copy button on the LEFT side of the cell.
       // The button for the right-aligned "ts" column is last in the list
       // (region is index 0, ts right-aligned is index 1).
-      const copyBtns = wrapper.findAll(".copy-btn");
+      const copyBtns = wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"]');
       expect(copyBtns.length).toBeGreaterThanOrEqual(2);
-      await wrapper.findAll(".copy-btn button")[1].trigger("click");
+      await wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"] button')[1].trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {

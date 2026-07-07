@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full">
+  <div class="w-full h-full">
     <!-- Toolbar: refresh -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:px-2 tw:py-2 tw:gap-2">
+    <div class="flex items-center justify-end px-2 py-2 gap-2">
       <OButton
         variant="outline"
         size="sm"
@@ -42,19 +42,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       filter-mode="client"
       :default-columns="false"
       :show-global-filter="false"
-      class="tw:h-full"
+      class="h-full"
     >
       <!-- Status column -->
       <template #cell-status="{ row }">
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <OBadge :variant="statusColor(row)" dot data-test="anomaly-detection-status-badge">
+        <div class="flex items-center gap-2">
+          <OTag
+            type="anomalyStatus"
+            :value="row.enabled ? row.status : 'disabled'"
+            data-test="anomaly-detection-status-badge"
+          >
             {{ statusLabel(row) }}
             <OSpinner
               v-if="row.status === 'training'"
               size="xs"
-              class="tw:ml-1"
+              class="ml-1"
             />
-          </OBadge>
+          </OTag>
           <OTooltip v-if="row.status === 'failed'" :content="row.last_error || t('alerts.anomalyStatus.failed')" />
         </div>
       </template>
@@ -64,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="row.detection_window_seconds">
           {{ formatSeconds(row.detection_window_seconds) }}
         </span>
-        <span v-else class="tw:text-text-primary">—</span>
+        <span v-else class="text-text-primary">—</span>
       </template>
 
       <!-- Last Triggered At column -->
@@ -84,22 +88,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Actions column -->
       <template #cell-actions="{ row }">
-        <div class="tw:flex tw:items-center tw:justify-center tw:gap-1">
+        <div class="flex items-center justify-center gap-1">
           <!-- Edit -->
           <OButton
           icon-left="edit"
           variant="ghost"
           size="icon-sm"
           :title="t('alerts.edit')"
+          data-row-action="edit"
           @click="editConfig(row)"
           />
-          <!-- Pause / Resume — tw:hidden while training or failed -->
+          <!-- Pause / Resume — hidden while training or failed -->
           <OButton
             v-if="row.status !== 'training' && row.status !== 'failed'"
           :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-          variant="ghost"
+          :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
           size="icon-sm"
           :title="row.enabled ? 'Pause' : 'Resume'"
+          :data-row-action="row.enabled ? 'pause' : 'resume'"
           @click="toggleEnabled(row)"
           />
           <!-- Stop Training — only shown while training -->
@@ -110,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           title="Stop Training"
           :loading="cancellingId === row.anomaly_id"
+          data-row-action="pause"
           @click="confirmCancelTraining(row)"
           />
           <!-- Retrain / Retry -->
@@ -119,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-sm"
             :title="row.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining')"
             :loading="retrainingId === row.anomaly_id"
+            data-row-action="resume"
             @click="confirmRetrain(row)"
           >
             <OIcon name="brain-circuit" size="sm" />
@@ -129,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-destructive"
           size="icon-sm"
           :title="t('alerts.delete')"
+          data-row-action="delete"
           @click="confirmDelete(row)"
           />
         </div>
@@ -194,14 +203,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Error detail for failed state -->
       <template v-if="pendingRetrainRow?.status === 'failed' && pendingRetrainRow?.last_error">
-        <div class="tw:text-sm tw:mb-2">
+        <div class="text-sm mb-2">
           Training failed for <strong>{{ pendingRetrainRow?.name }}</strong> with the following error:
         </div>
         <pre
-          class="tw:text-xs tw:whitespace-pre-wrap tw:break-all tw:rounded tw:p-2 tw:mb-2"
+          class="text-xs whitespace-pre-wrap break-all rounded p-2 mb-2"
           style="background: rgba(0,0,0,0.06); max-height: 120px; overflow-y: auto"
         >{{ pendingRetrainRow.last_error }}</pre>
-        <div class="tw:text-sm">Fix the issue above, then retry training.</div>
+        <div class="text-sm">Fix the issue above, then retry training.</div>
       </template>
       <template v-else-if="pendingRetrainRow?.status === 'failed'">
         <p>Training failed for <strong>{{ pendingRetrainRow?.name }}</strong>. Retry training now?</p>
@@ -212,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <strong>{{ pendingRetrainRow?.name }}</strong>?
           The existing model will be replaced once training completes.
         </p>
-        <div v-if="pendingRetrainRow?.training_completed_at" class="tw:text-xs tw:text-gray-400">
+        <div v-if="pendingRetrainRow?.training_completed_at" class="text-xs text-gray-400">
           Last trained: {{ formatTimestamp(pendingRetrainRow.training_completed_at) }}
         </div>
       </template>
@@ -231,18 +240,17 @@ import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OBadge, OButton, ODialog, OEmptyState, OIcon, OSpinner, OTable, OTimeCell, OTooltip },
+  components: { OTag, OButton, ODialog, OEmptyState, OIcon, OSpinner, OTable, OTimeCell, OTooltip },
 
   props: {
     org_identifier: {
@@ -286,17 +294,6 @@ export default defineComponent({
     const displayConfigs = computed(() =>
       configs.value.map((c, i) => ({ ...c, "#": i + 1 }))
     );
-
-    const statusColor = (row: any): BadgeVariant => {
-      if (!row.enabled) return "default";
-      switch (row.status) {
-        case "ready":     return "success";
-        case "training":  return "primary";
-        case "failed":    return "error";
-        case "waiting":   return "default";
-        default:          return "default";
-      }
-    };
 
     const statusLabel = (row: any) => {
       if (!row.enabled) return t("alerts.anomalyStatus.disabled");
@@ -444,7 +441,6 @@ export default defineComponent({
       cancellingId,
       confirmCancelTraining,
       cancelTraining,
-      statusColor,
       statusLabel,
       formatTimestamp,
       formatSeconds,

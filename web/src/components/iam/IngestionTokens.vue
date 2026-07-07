@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+  <div class="rounded-md p-0 h-full flex flex-col">
     <!-- Standard section header: title + description + Create action. -->
     <AppPageHeader
       icon="key"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #title>
-        <span class="tw:inline-flex tw:items-center tw:gap-1.5">
+        <span class="inline-flex items-center gap-1.5">
           <span data-test="ingestion-tokens-title-text">{{ t('ingestion.tokenManagementTitle') }}</span>
           <!-- Full explanation lives in this info tooltip; the subtitle below is a
                truncated preview so neither overruns the Create action button. -->
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="info-outline"
               size="sm"
-              class="tw:text-text-secondary tw:cursor-help"
+              class="text-text-secondary cursor-help"
               data-test="ingestion-tokens-info-icon"
             />
             <OTooltip :content="t('ingestion.orgLevelExplanation')" max-width="360px"/>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <!-- Short summary subtitle; the full explanation is in the title info tooltip. -->
       <template #subtitle>
-        <span class="tw:truncate tw:min-w-0 tw:leading-normal">{{ t('ingestion.orgLevelSummary') }}</span>
+        <span class="truncate min-w-0 leading-normal">{{ t('ingestion.orgLevelSummary') }}</span>
       </template>
       <template #actions>
         <OButton
@@ -53,8 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </AppPageHeader>
 
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="card-container h-full">
         <OTable
           :frame="false"
           :data="tokens"
@@ -70,11 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filter-mode="client"
         >
           <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+            <div class="flex items-center gap-2 w-full">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('ingestion.searchToken', 'Search tokens')"
-                class="tw:flex-1"
+                class="flex-1"
+                data-test="ingestion-tokens-search-input"
               />
             </div>
           </template>
@@ -89,11 +90,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-name="{ row }">
-            <span class="tw:font-medium">{{ row.name }}</span>
+            <span class="font-medium">{{ row.name }}</span>
           </template>
 
+          <!-- Copy yields a ready-to-paste "Basic base64(name:token)" credential
+               (OCodeCell copies exactly what it shows), so no manual email +
+               base64 step is needed. -->
           <template #cell-token="{ row }">
-            <OCodeCell :value="row.token" />
+            <OCodeCell :value="toBasicAuth(row.name, row.token)" />
           </template>
 
           <template #cell-created_by="{ row }">
@@ -104,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               :data-test="`ingestion-token-${row.name}-toggle`"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-              :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+              :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
               size="icon-sm"
               :title="row.enabled ? t('common.disable') : t('common.enable')"
               :disabled="loading"
@@ -118,7 +122,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Create token dialog -->
     <ODialog
       v-model:open="showCreateForm"
-      :persistent="true"
       size="sm"
       :title="t('ingestion.createTokenTitle')"
       :primary-button-label="t('common.create')"
@@ -136,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OInput
         v-model="newTokenDescription"
         :label="t('ingestion.tokenDescriptionLabel')"
-        class="tw:mt-4"
+        class="mt-4"
       />
     </ODialog>
 
@@ -149,22 +152,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :secondary-button-label="t('common.close')"
       @click:secondary="showRevealedDialog = false"
     >
+      <!-- Primary: the ready-to-paste Authorization credential. -->
+      <div class="mb-1 text-xs font-medium text-text-primary">
+        {{ t('ingestion.authHeaderLabel') }}
+      </div>
       <div
-        class="tw:p-2.5 tw:border tw:border-dashed tw:rounded tw:border-gray-400 tw:mb-4"
-        :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'tw:bg-gray-100'"
+        class="p-2.5 border border-dashed rounded border-gray-400 mb-1"
+        :class="store.state.theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'"
       >
         <code
-          class="tw:break-all tw:font-mono tw:text-sm"
-        >{{ revealedToken?.token }}</code>
+          class="break-all font-mono text-sm"
+        >{{ revealedBasicAuth }}</code>
       </div>
-      <div class="tw:flex tw:justify-end tw:gap-2">
+      <div class="mb-3 text-xs text-text-secondary">
+        {{ t('ingestion.authHeaderHelp') }}
+      </div>
+      <div class="flex justify-end gap-2">
         <OButton
           variant="outline"
           size="sm-action"
           icon="content-copy"
           @click="copyToken(revealedToken?.token || '')"
         >
-          {{ t('ingestion.copyTokenBtn') }}
+          {{ t('ingestion.copyRawTokenBtn') }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          icon="content-copy"
+          @click="copyToken(revealedBasicAuth)"
+        >
+          {{ t('ingestion.copyAuthHeaderBtn') }}
         </OButton>
       </div>
     </ODialog>
@@ -172,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, defineComponent, onBeforeMount } from "vue";
+import { ref, computed, defineComponent, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -188,7 +206,10 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import { getBasicAuth } from "@/utils/auth";
 import organizationsService from "@/services/organizations";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 interface Token {
@@ -217,6 +238,13 @@ export default defineComponent({
     const newTokenDescription = ref("");
     const revealedToken = ref<{ name: string; token: string } | null>(null);
 
+    // Ready-to-paste "Basic base64(name:token)" for the just-created token.
+    const revealedBasicAuth = computed(() =>
+      revealedToken.value
+        ? getBasicAuth(revealedToken.value.name, revealedToken.value.token)
+        : "",
+    );
+
     const columns: OTableColumnDef<Token>[] = [
       {
         id: "name",
@@ -227,16 +255,16 @@ export default defineComponent({
         hideable: true,
         size: COL.name,
         minSize: 160,
-        meta: { align: "left", cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!', flex: true },
+        meta: { align: "left", cellClass: 'pl-4!', headerClass: 'pl-4!', flex: true },
       },
       {
         id: "token",
-        header: t("serviceAccounts.token"),
+        header: t("ingestion.tokenAuthHeader"),
         accessorKey: "token",
         sortable: false,
         resizable: true,
         hideable: true,
-        // Wide enough for the truncated token (code max-w 280) + gap + copy btn.
+        // Wide enough for the truncated credential + gap + copy btn.
         size: 340,
         meta: { align: "left" },
       },
@@ -343,6 +371,14 @@ export default defineComponent({
       }
     };
 
+    // Build a ready-to-paste Authorization value: "Basic base64(name:token)".
+    // The username part is the TOKEN NAME (not a user email): org ingestion
+    // tokens are org-scoped and the backend ignores the username, so using the
+    // token name keeps the credential person-independent (never goes stale when
+    // a user leaves) and gives meaningful ingestion-log attribution.
+    const toBasicAuth = (name: string, token: string) =>
+      getBasicAuth(name, token);
+
     const copyToken = (token: string) => {
       copyToClipboard(token);
     };
@@ -350,6 +386,24 @@ export default defineComponent({
     onBeforeMount(() => {
       fetchTokens();
     });
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "ingestionTokensAdd",
+        handler: () => { if (!isInputFocused()) showCreateForm.value = true; },
+      },
+      {
+        id: "ingestionTokensRefresh",
+        handler: () => { if (!isInputFocused()) fetchTokens(); },
+      },
+      {
+        id: "ingestionTokensFocusSearch",
+        handler: () => {
+          focusSearchInput("ingestion-tokens-search-input");
+        },
+      },
+    ]);
 
     return {
       store,
@@ -363,10 +417,12 @@ export default defineComponent({
       newTokenName,
       newTokenDescription,
       revealedToken,
+      revealedBasicAuth,
       fetchTokens,
       createToken,
       toggleEnabled,
       copyToken,
+      toBasicAuth,
     };
   },
 });

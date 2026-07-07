@@ -4,20 +4,21 @@
       v-model="backgroundType"
       :options="colorModeOptions"
       :label="t('dashboard.colorMode')"
-      class="tw:flex-1"
+      class="flex-1"
       data-test="dashboard-config-color-mode"
     />
 
     <div v-if="backgroundType === 'single'">
       <div
         data-test="dashboard-config-color-input-wrapper"
-        class="color-input-wrapper"
+        class="h-6.25 w-6.25 overflow-hidden rounded-full inline-flex items-center relative"
         style="margin-top: 36px; margin-left: 5px"
       >
         <input
           data-test="dashboard-config-color-input"
           type="color"
           v-model="backgroundColor"
+          class="absolute h-[4em] w-[4em] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden border-0 m-0 p-0"
         />
       </div>
     </div>
@@ -99,28 +100,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.color-input-wrapper {
-  height: 25px;
-  width: 25px;
-  overflow: hidden;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  position: relative;
-}
-
-.color-input-wrapper input[type="color"] {
-  position: absolute;
-  height: 4em;
-  width: 4em;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  overflow: hidden;
-  border: none;
-  margin: 0;
-  padding: 0;
-}
-</style>

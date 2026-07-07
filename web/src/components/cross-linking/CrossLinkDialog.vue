@@ -12,8 +12,8 @@
     </template>
         <div>
           <!-- Name -->
-          <div class="tw:mb-3">
-            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.name") }} *</label>
+          <div class="mb-3">
+            <label class="block text-sm font-semibold mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.name") }} *</label>
             <OInput
               v-model="form.name"
               :placeholder="t('crossLinks.namePlaceholder')"
@@ -25,8 +25,8 @@
           </div>
 
           <!-- URL Template -->
-          <div class="tw:mb-3">
-            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.urlTemplate") }} *</label>
+          <div class="mb-3">
+            <label class="block text-sm font-semibold mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.urlTemplate") }} *</label>
             <OInput
               v-model="form.url"
               :placeholder="t('crossLinks.urlPlaceholder')"
@@ -35,42 +35,41 @@
               @update:model-value="urlError = ''"
               data-test="cross-link-url-input"
             />
-            <div class="tw:text-xs tw:mt-1" style="color: var(--o2-text-muted)">
+            <div class="text-xs mt-1" style="color: var(--o2-text-muted)">
               {{ t("crossLinks.urlHint") }}
             </div>
           </div>
 
           <!-- Fields -->
-          <div class="tw:mb-2">
-            <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.fields") }} *</label>
-            <div class="tw:text-xs tw:mb-2" style="color: var(--o2-text-muted)">
+          <div class="mb-2">
+            <label class="block text-sm font-semibold mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.fields") }} *</label>
+            <div class="text-xs mb-2" style="color: var(--o2-text-muted)">
               {{ t("crossLinks.fieldsHint") }}
             </div>
-            <div v-if="form.fields.length > 0" class="tw:flex tw:flex-wrap tw:gap-1 tw:mb-2">
-              <OBadge
+            <div v-if="form.fields.length > 0" class="flex flex-wrap gap-1 mb-2">
+              <OTag
                 v-for="(field, idx) in form.fields"
                 :key="idx"
-                variant="default"
-                size="sm"
-                class="tw:max-w-[250px]"
+                type="selectionChip"
+                class="max-w-[250px]"
                 :data-test="`cross-link-field-chip-${idx}`"
               >
-                <span class="tw:truncate tw:text-xs" :title="field.name">{{ field.name }}</span>
+                <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>
                 <template #trailing>
                   <button
                     type="button"
                     :aria-label="`Remove ${field.name}`"
                     :data-test="`cross-link-field-chip-remove-${idx}`"
-                    class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+                    class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
                     @click="form.fields.splice(idx, 1)"
                   >
                     <OIcon name="close" size="xs" />
                   </button>
                 </template>
-              </OBadge>
+              </OTag>
             </div>
             <div
-              class="tw:flex tw:gap-2 tw:items-center"
+              class="flex gap-2 items-center"
               @keydown="onFieldKeydown"
             >
               <!--
@@ -84,7 +83,7 @@
                 v-if="availableFields.length > 0"
                 ref="fieldComboboxRef"
                 v-model="newFieldName"
-                class="tw:flex-1"
+                class="flex-1"
                 :items="availableFieldOptions"
                 :placeholder="t('crossLinks.fieldInputPlaceholder')"
                 @select="onFieldSelect"
@@ -93,7 +92,7 @@
               <OInput
                 v-else
                 v-model="newFieldName"
-                class="tw:flex-1"
+                class="flex-1"
                 :placeholder="t('crossLinks.fieldInputPlaceholder')"
                 data-test="cross-link-field-input"
               />
@@ -118,7 +117,7 @@ import { useI18n } from "vue-i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
@@ -131,7 +130,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
-  components: { CrossLinkUserGuide, OBadge, OButton, OCombobox, ODialog, OIcon, OInput },
+  components: { CrossLinkUserGuide, OTag, OButton, OCombobox, ODialog, OIcon, OInput },
   props: {
     modelValue: {
       type: Boolean,

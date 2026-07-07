@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md relative-position">
+  <div data-test="performance-error-dashboard" class="rounded-md relative-position">
     <div
-      class="performance-error-dashboard"
-      :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
+      class="min-h-0! max-h-[calc(100vh-200px)] overflow-y-auto"
+      :class="isLoading.length ? 'invisible' : 'visible'"
     >
       <div class="performance-dashboard">
         <RenderDashboardCharts
@@ -37,11 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-show="isLoading.length"
-      class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:absolute tw:w-full tw:h-[calc(100vh-15.625rem)] tw:top-0"
+      class="pb-4 flex items-center justify-center text-center absolute w-full h-[calc(100vh-15.625rem)] top-0"
     >
       <div>
-        <OSpinner size="md" class="tw:mx-auto tw:block" />
-        <div class="tw:text-center tw:w-full">Loading Dashboard</div>
+        <OSpinner size="md" class="mx-auto block" />
+        <div class="text-center w-full">Loading Dashboard</div>
       </div>
     </div>
   </div>
@@ -190,30 +190,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.performance_title {
-  font-size: 24px;
-}
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-
-.view-error-table {
-  margin-top: 4px;
-  border: 1px solid rgba(194, 194, 194, 0.4784313725) !important;
-  border-radius: 4px;
-  min-height: 200px;
-}
-
-.performance-error-dashboard {
-  min-height: auto !important;
-  max-height: calc(100vh - 200px);
-  overflow-y: auto;
-}
-</style>
-
-<style lang="scss"></style>

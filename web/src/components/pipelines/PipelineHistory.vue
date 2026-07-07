@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="pipeline-history-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="flex flex-col h-full min-h-0"
   >
     <!-- Controls live in the shell header (Functions.vue #o2-page-actions),
          next to the "Pipelines › History" breadcrumb — no bespoke 2nd header.
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           t(`pipeline.searchHistory`) || 'Select or search pipeline...'
         "
         data-test="pipeline-history-search-select"
-        class="tw:min-w-[250px]"
+        class="min-w-[250px]"
         clearable
       >
         <template #empty>
@@ -67,10 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('common.refresh') || 'Refresh'" side="top" />
       </OButton>
     </Teleport>
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+    <div class="flex-1 min-h-0 overflow-hidden">
       <div
         data-test="pipeline-history-table"
-        class="pipeline-history-table card-container tw:h-full"
+        class="pipeline-history-table card-container h-full"
       >
         <OTable
           :frame="false"
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :default-columns="false"
           row-key="id"
           width="100%"
-          class="tw:w-full tw:h-full"
+          class="w-full h-full"
           pagination="server"
           :current-page="pagination.page"
           :page-size="pagination.rowsPerPage"
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-history-status-badge"
               :data-test-status="(row.status || '').toLowerCase()"
             >
-              <OTag :value="row.status" />
+              <OTag type="queryStatus" :value="row.status" />
             </span>
           </template>
 
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="row.is_realtime ? 'Real-time' : 'Scheduled'">
               <OIcon
                 :name="row.is_realtime ? 'check-circle' : 'schedule'"
-                :class="row.is_realtime ? 'tw:text-[var(--o2-positive)]' : 'tw:text-gray-500'"
+                :class="row.is_realtime ? 'text-[var(--o2-positive)]' : 'text-gray-500'"
                 size="md"
               />
             </OTooltip>
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="row.is_silenced ? 'Silenced' : 'Not Silenced'">
               <OIcon
                 :name="row.is_silenced ? 'volume-off' : 'volume-up'"
-                :class="row.is_silenced ? 'tw:text-gray-500' : 'tw:text-[var(--o2-positive)]'"
+                :class="row.is_silenced ? 'text-gray-500' : 'text-[var(--o2-positive)]'"
                 size="md"
               />
             </OTooltip>
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 row.is_partial !== undefined
               "
               :name="row.is_partial ? 'warning' : 'check-circle'"
-              :class="row.is_partial ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-positive)]'"
+              :class="row.is_partial ? 'text-[var(--o2-warning)]' : 'text-[var(--o2-positive)]'"
               size="xs"
             >
               <OTooltip
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom="{ totalRows }">
             <div
-              class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4 tw:py-2"
+              class="flex items-center font-bold text-[14px] mr-4 py-2"
             >
               {{ totalRows }} {{ t("pipeline.header") }}
             </div>
@@ -238,44 +238,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="detailsDialog = false"
     >
       <div class="scroll" style="max-height: 70vh" v-if="selectedRow">
-        <div class="tw:gap-2">
+        <div class="gap-2">
           <!-- Basic Information -->
-          <div class="detail-section">
-            <div class="tw:flex tw:gap-3">
-              <div class="tw:w-1/2">
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
+          <div class="py-1">
+            <div class="flex gap-3">
+              <div class="w-1/2">
+                <div class="text-xs text-gray-400 mb-1">
                   Pipeline Name
                 </div>
-                <div class="tw:text-sm text-weight-medium">
+                <div class="text-sm text-weight-medium">
                   {{ selectedRow.pipeline_name }}
                 </div>
               </div>
-              <div class="tw:w-1/2">
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Status</div>
-                <OBadge
-                  :variant="getStatusVariant(selectedRow.status)"
-                  size="sm"
-                >
-                  {{ selectedRow.status }}
-                </OBadge>
+              <div class="w-1/2">
+                <div class="text-xs text-gray-400 mb-1">Status</div>
+                <OTag type="queryStatus" :value="selectedRow.status" />
               </div>
             </div>
           </div>
 
-          <OSeparator class="tw:my-2" />
+          <OSeparator class="my-2" />
 
           <!-- Time Information -->
-          <div class="detail-section">
-            <div class="tw:flex tw:gap-3">
-              <div class="tw:w-1/2">
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Timestamp</div>
-                <div class="tw:text-sm">
+          <div class="py-1">
+            <div class="flex gap-3">
+              <div class="w-1/2">
+                <div class="text-xs text-gray-400 mb-1">Timestamp</div>
+                <div class="text-sm">
                   {{ formatDate(selectedRow.timestamp) }}
                 </div>
               </div>
-              <div class="tw:w-1/2">
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Duration</div>
-                <div class="tw:text-sm">
+              <div class="w-1/2">
+                <div class="text-xs text-gray-400 mb-1">Duration</div>
+                <div class="text-sm">
                   {{
                     formatDuration(
                       selectedRow.end_time - selectedRow.start_time,
@@ -286,32 +281,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <OSeparator class="tw:my-2" />
+          <OSeparator class="my-2" />
 
           <!-- Pipeline Configuration -->
-          <div class="detail-section">
-            <div class="tw:flex tw:gap-3">
-              <div class="tw:w-1/2">
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Type</div>
-                <div class="tw:text-sm">
+          <div class="py-1">
+            <div class="flex gap-3">
+              <div class="w-1/2">
+                <div class="text-xs text-gray-400 mb-1">Type</div>
+                <div class="text-sm">
                   <OIcon
                     :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
-                    class="tw:mr-1"
+                    class="mr-1"
                     size="xs"
                   />
                   {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
                 </div>
               </div>
-              <div class="tw:w-1/2">
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Silenced</div>
-                <div class="tw:text-sm">
+              <div class="w-1/2">
+                <div class="text-xs text-gray-400 mb-1">Silenced</div>
+                <div class="text-sm">
                   <OIcon
                     v-if="selectedRow.is_silenced"
                     name="volume-off"
                     size="xs"
-                    class="tw:mr-1"
+                    class="mr-1"
                   />
-                  <OIcon v-else name="volume-up" size="xs" class="tw:mr-1" />
+                  <OIcon v-else name="volume-up" size="xs" class="mr-1" />
                   {{ selectedRow.is_silenced ? "Yes" : "No" }}
                 </div>
               </div>
@@ -329,47 +324,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 selectedRow.is_partial !== undefined)
             "
           >
-            <OSeparator class="tw:my-2" />
-            <div class="detail-section">
-              <div class="tw:flex tw:gap-3">
-                <div v-if="selectedRow.evaluation_took_in_secs" class="tw:w-1/3">
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
+            <OSeparator class="my-2" />
+            <div class="py-1">
+              <div class="flex gap-3">
+                <div v-if="selectedRow.evaluation_took_in_secs" class="w-1/3">
+                  <div class="text-xs text-gray-400 mb-1">
                     Evaluation Time
                   </div>
-                  <div class="tw:text-sm">
+                  <div class="text-sm">
                     {{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s
                   </div>
                 </div>
-                <div v-if="selectedRow.query_took" class="tw:w-1/3">
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Query Time</div>
-                  <div class="tw:text-sm">
+                <div v-if="selectedRow.query_took" class="w-1/3">
+                  <div class="text-xs text-gray-400 mb-1">Query Time</div>
+                  <div class="text-sm">
                     {{ (selectedRow.query_took / 1000).toFixed(2) }}ms
                   </div>
                 </div>
-                <div v-if="selectedRow.retries > 0" class="tw:w-1/3">
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Retries</div>
-                  <div class="tw:text-sm">{{ selectedRow.retries }}</div>
+                <div v-if="selectedRow.retries > 0" class="w-1/3">
+                  <div class="text-xs text-gray-400 mb-1">Retries</div>
+                  <div class="text-sm">{{ selectedRow.retries }}</div>
                 </div>
-                <div v-if="selectedRow.delay_in_secs" class="tw:w-1/3">
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Delay</div>
-                  <div class="tw:text-sm">{{ selectedRow.delay_in_secs }}s</div>
+                <div v-if="selectedRow.delay_in_secs" class="w-1/3">
+                  <div class="text-xs text-gray-400 mb-1">Delay</div>
+                  <div class="text-sm">{{ selectedRow.delay_in_secs }}s</div>
                 </div>
                 <div
                   v-if="
                     selectedRow.is_partial !== null &&
                     selectedRow.is_partial !== undefined
                   "
-                  class="tw:w-1/3"
+                  class="w-1/3"
                 >
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
+                  <div class="text-xs text-gray-400 mb-1">
                     Result Status
                   </div>
-                  <div class="tw:text-sm">
+                  <div class="text-sm">
                     <OIcon
                       :name="
                         selectedRow.is_partial ? 'warning' : 'check-circle'
                       "
-                      :class="['tw:mr-1', selectedRow.is_partial ? 'tw:text-[var(--o2-warning)]' : 'tw:text-[var(--o2-positive)]']"
+                      :class="['mr-1', selectedRow.is_partial ? 'text-[var(--o2-warning)]' : 'text-[var(--o2-positive)]']"
                       size="xs"
                     />
                     {{ selectedRow.is_partial ? "Partial" : "Complete" }}
@@ -381,10 +376,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Source Node (if available) -->
           <template v-if="selectedRow.source_node">
-            <OSeparator class="tw:my-2" />
-            <div class="detail-section">
-              <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Source Node</div>
-              <div class="tw:text-sm text-mono">
+            <OSeparator class="my-2" />
+            <div class="py-1">
+              <div class="text-xs text-gray-400 mb-1">Source Node</div>
+              <div class="text-sm font-mono text-[13px]">
                 {{ selectedRow.source_node }}
               </div>
             </div>
@@ -392,17 +387,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Error Details (if available) -->
           <template v-if="selectedRow.error">
-            <OSeparator class="tw:my-2" />
-            <div class="detail-section">
-              <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
-                <OIcon name="error" size="xs" class="tw:mr-1" />
+            <OSeparator class="my-2" />
+            <div class="py-1">
+              <div class="text-xs text-gray-400 mb-1">
+                <OIcon name="error" size="xs" class="mr-1" />
                 Error Details
               </div>
               <div
-                class="tw:rounded tw:border tw:border-solid tw:border-negative/30 tw:p-2 tw:mt-2 tw:bg-red-500/5"
+                class="rounded border border-solid border-negative/30 p-2 mt-2 bg-red-500/5"
               >
                 <pre
-                  class="tw:text-sm"
+                  class="text-sm"
                   style="
                     white-space: pre-wrap;
                     word-break: break-word;
@@ -418,17 +413,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Success Response (if available) -->
           <template v-if="selectedRow.success_response">
-            <OSeparator class="tw:my-2" />
-            <div class="detail-section">
-              <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
-                <OIcon name="check-circle" size="xs" class="tw:mr-1" />
+            <OSeparator class="my-2" />
+            <div class="py-1">
+              <div class="text-xs text-gray-400 mb-1">
+                <OIcon name="check-circle" size="xs" class="mr-1" />
                 Response
               </div>
               <div
-                class="tw:rounded tw:border tw:border-solid tw:border-positive/30 tw:p-2 tw:mt-2 tw:bg-green-500/5"
+                class="rounded border border-solid border-positive/30 p-2 mt-2 bg-green-500/5"
               >
                 <pre
-                  class="tw:text-sm"
+                  class="text-sm"
                   style="
                     white-space: pre-wrap;
                     word-break: break-word;
@@ -461,11 +456,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
-        <OIcon name="error" size="md" class="error-icon" />
+        <OIcon name="error" size="md" class="text-[#ef4444]" />
       </template>
-      <div class="tw:mb-4">
-        <div class="section-label tw:mb-2">Error Summary</div>
-        <div class="error-summary-box">
+      <div class="mb-4">
+        <div class="text-[13px] font-semibold tracking-[0.02em] opacity-80 mb-2">Error Summary</div>
+        <div class="p-4 rounded-lg font-mono text-[13px] leading-[1.6] whitespace-pre-wrap wrap-break-word bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] text-[#dc2626]">
           {{ errorMessage?.error }}
         </div>
       </div>
@@ -483,7 +478,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -839,25 +833,6 @@ const formatDuration = (microseconds: number) => {
   return `${seconds}s`;
 };
 
-const getStatusVariant = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "success":
-    case "ok":
-    case "completed":
-      return "success-outline";
-    case "error":
-    case "failed":
-      return "error-outline";
-    case "warning":
-      return "warning-outline";
-    case "pending":
-    case "running":
-      return "primary-outline";
-    default:
-      return "default-outline";
-  }
-};
-
 const showDetailsDialog = (row: any) => {
   selectedRow.value = row;
   detailsDialog.value = true;
@@ -892,111 +867,3 @@ watch(
   },
 );
 </script>
-
-<style scoped lang="scss">
-.pipeline-details-dialog {
-  :deep(.q-dialog__inner) {
-    padding: 24px;
-  }
-
-  .detail-section {
-    padding: 4px 0;
-  }
-
-  .text-mono {
-    font-family: "Courier New", monospace;
-    font-size: 13px;
-  }
-
-  .bg-negative-1 {
-    background-color: rgba(255, 0, 0, 0.05);
-  }
-
-  .bg-positive-1 {
-    background-color: rgba(0, 128, 0, 0.05);
-  }
-
-  pre {
-    max-height: 200px;
-    overflow-y: auto;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: #f1f1f1;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: #888;
-      border-radius: 3px;
-    }
-
-    &::-webkit-scrollbar-thumb:hover {
-      background: #555;
-    }
-  }
-}
-.pipeline-error-header {
-  padding: 20px 24px 16px;
-
-  .error-icon {
-    color: #ef4444;
-  }
-
-  .pipeline-name {
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-
-  .error-timestamp {
-    display: flex;
-    align-items: center;
-    font-size: 13px;
-    opacity: 0.7;
-    margin-left: 36px;
-  }
-
-  .close-btn {
-    opacity: 0.6;
-    transition: opacity 0.2s;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-
-.pipeline-error-content {
-  padding: 20px 24px;
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.section-label {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  opacity: 0.8;
-}
-
-.error-summary-box {
-  padding: 16px;
-  border-radius: 8px;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: #dc2626;
-}
-.pipeline-error-actions {
-  padding: 16px 24px;
-  justify-content: flex-end;
-}
-</style>

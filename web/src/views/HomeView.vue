@@ -15,8 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="tw:rounded-md home-page"
-    :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view' : ''"
+    class="rounded-md overflow-hidden min-h-0 h-full flex flex-col"
     data-test="home-page"
   >
     <!-- No card-container here: the page already renders inside MainLayout's
@@ -28,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          a padded root insets the header and makes it read as a floating bar.
          Padding is reintroduced on the body wrapper below the header instead. -->
     <div
-      class="tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
+      class="h-full overflow-hidden flex flex-col min-h-0"
     >
       <!-- Top-level page header: module icon + "Home" title, with the home tabs
            rendered as a full-width strip below (tabsBelow). The header owns its
@@ -41,9 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="t('home.subtitle')"
         icon="home"
         :tabs-below="tabOrder.length > 1"
-        class="tw:shrink-0 tw:px-4"
+        class="shrink-0 px-4"
         :class="
-          tabOrder.length > 1 ? '' : 'tw:border-b tw:border-border-default'
+          tabOrder.length > 1 ? '' : 'border-b border-border-default'
         "
       >
         <template v-if="tabOrder.length > 1" #tabs>
@@ -67,9 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Body: padded wrapper that holds the active tab panel. Padding lives
            here (not on the root) so the header above stays full-bleed. -->
-      <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:pt-px tw:px-2.5 tw:pb-2.5">
+      <div class="flex-1 min-h-0 flex flex-col pt-px px-2.5 pb-2.5">
         <!-- O2 AI Assistant tab -->
-        <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">
+        <div v-if="activeHomeTab === 'ai'" class="home-ai-panel flex-1 min-h-0 flex flex-row overflow-hidden">
           <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
           <O2AIChat
             ref="homeChat"
@@ -83,13 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              already provides the border; avoids a double-bordered card). -->
         <div
           v-if="activeHomeTab === 'overview'"
-          class="home-tab-panel"
+          class="flex-1 min-h-0 overflow-hidden"
         >
           <OverviewTab />
         </div>
 
         <!-- Usage tab -->
-        <div v-if="activeHomeTab === 'usage'" class="home-tab-panel home-tab-panel--usage">
+        <div v-if="activeHomeTab === 'usage'" class="flex-1 min-h-0 overflow-hidden -mr-2.5">
           <UsageTab />
         </div>
       </div>
@@ -266,7 +265,7 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
+<style>
 /*
  * HomeView Styles — Tab bar and page layout only.
  * Usage-tab-specific styles live in UsageTab.vue.
@@ -274,30 +273,8 @@ export default defineComponent({
 
 /* Home tab bar now uses the shared OTabs component (see template). */
 
-.home-tab-panel {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* Usage tab: cancel the body wrapper's right padding so the scroll container
-   reaches the content-card's right edge and its scrollbar sits flush there
-   (instead of floating ~10px inset). The wrapper is overflow:visible, so this
-   negative margin isn't clipped. The inner gap is restored by UsageTab's
-   `.usage-scroll` padding-right. */
-.home-tab-panel--usage {
-  margin-right: -0.625rem;
-}
-
-/* AI assistant tab — side-by-side layout */
-.home-ai-panel {
-  display: flex;
-  flex-direction: row;
-  overflow: hidden;
-}
-
 /* Chat fills remaining width and height */
-.home-ai-panel :deep(.chat-container) {
+.home-ai-panel .chat-container {
   flex: 1;
   height: 100%;
   box-shadow: none;
@@ -308,8 +285,8 @@ export default defineComponent({
 
 /* Allow the input's gradient glow + shadow to spill outside the container.
    messages-container has its own overflow-y, so the page itself won't grow. */
-.home-ai-panel :deep(.chat-content-wrapper),
-.home-ai-panel :deep(.chat-content) {
+.home-ai-panel .chat-content-wrapper,
+.home-ai-panel .chat-content {
   overflow: visible;
 }
 
@@ -319,21 +296,21 @@ export default defineComponent({
    to their content height and push the input bar off the bottom. min-height:0
    lets them shrink within their flex columns so the message list scrolls and
    the input stays pinned at the bottom. */
-.home-ai-panel :deep(.chat-content),
-.home-ai-panel :deep(.messages-container) {
+.home-ai-panel .chat-content,
+.home-ai-panel .messages-container {
   min-height: 0;
 }
 
 /* Hide the entire chat header + its separator — sidebar owns this UI */
-.home-ai-panel :deep(.chat-header),
-.home-ai-panel :deep(.chat-content-wrapper > [role="separator"]) {
+.home-ai-panel .chat-header,
+.home-ai-panel .chat-content-wrapper > [role="separator"] {
   display: none;
 }
 
 /* Gradient border on the prompt input — home tab only.
    Uses the dual-background trick: bg color for padding-box, gradient for border-box.
    2px border for stronger presence + layered shadows for depth. */
-.home-ai-panel :deep(.unified-input-box) {
+.home-ai-panel .unified-input-box {
   position: relative;
   border: 2px solid transparent !important;
   background:
@@ -349,11 +326,11 @@ export default defineComponent({
     0 18px 44px -10px rgba(123, 97, 255, 0.3) !important;
 }
 
-.home-ai-panel :deep(.unified-input-box.light-mode) {
+.home-ai-panel .unified-input-box {
   --o2-ai-input-bg: #ffffff;
 }
 
-.home-ai-panel :deep(.unified-input-box.dark-mode) {
+.dark .home-ai-panel .unified-input-box {
   --o2-ai-input-bg: #191919;
   box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.45),
@@ -362,7 +339,7 @@ export default defineComponent({
 }
 
 /* Soft ambient glow behind the input */
-.home-ai-panel :deep(.unified-input-box)::before {
+.home-ai-panel .unified-input-box::before {
   content: "";
   position: absolute;
   inset: -10px;
@@ -375,33 +352,22 @@ export default defineComponent({
 }
 
 /* Stronger glow + shadow on focus, no harsh ring */
-.home-ai-panel :deep(.unified-input-box:focus-within) {
+.home-ai-panel .unified-input-box:focus-within {
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
     0 6px 16px -2px rgba(15, 23, 42, 0.1),
     0 16px 40px -8px rgba(123, 97, 255, 0.32) !important;
 }
 
-.home-ai-panel :deep(.unified-input-box.dark-mode:focus-within) {
+.dark .home-ai-panel .unified-input-box:focus-within {
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.4),
     0 6px 20px -2px rgba(0, 0, 0, 0.55),
     0 18px 44px -8px rgba(123, 97, 255, 0.42) !important;
 }
 
-.home-ai-panel :deep(.unified-input-box:focus-within)::before {
+.home-ai-panel .unified-input-box:focus-within::before {
   opacity: 0.4;
 }
 
-.home-page {
-  overflow: hidden;
-  min-height: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.ai-enabled-home-view {
-  height: 100%;
-}
 </style>

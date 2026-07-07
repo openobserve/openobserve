@@ -1,11 +1,11 @@
-<template>
-    <div class="filter-condition-row tw:flex tw:items-start tw:gap-1 tw:flex-no-wrap">
+﻿<template>
+    <div class="flex items-start gap-1 flex-no-wrap">
       <!-- V2: Fixed-width left column for alignment -->
       <!-- All conditions have the same width for the operator/label section -->
-      <div class="tw:flex tw:items-center tw:justify-center tw:mt-1 tw:min-w-[60px]">
+      <div class="flex items-center justify-center mt-1 min-w-[60px]">
         <!-- First condition in root group -->
         <template v-if="index === 0 && depth === 0">
-          <span class="tw:text-sm">if</span>
+          <span class="text-sm">if</span>
         </template>
 
         <!-- First condition in nested groups: empty space for alignment -->
@@ -16,7 +16,7 @@
         <!-- Other conditions: show operator + toggle button -->
         <template v-else>
           <span
-            class="tw:text-sm tw:font-medium tw:min-w-[30px] tw:lowercase"
+            class="text-sm font-medium min-w-[30px] lowercase"
             data-test="alert-conditions-operator-label"
             :data-test-label="computedLabel"
           >
@@ -27,7 +27,7 @@
             data-test="alert-conditions-toggle-operator-btn"
             variant="ghost"
             size="icon-circle-sm"
-            class="tw:h-[26px] tw:flex-shrink-0 operator-toggle-btn"
+            class="h-[26px] flex-shrink-0 text-(--o2-primary-btn-bg)! hover:bg-[rgba(var(--o2-primary-btn-bg-rgb),0.1)]!"
             @click="toggleOperator"
           >
             <OIcon name="restart-alt" size="sm" />
@@ -35,7 +35,7 @@
           </OButton>
         </template>
       </div>
-        <div class="tw:ml-0">
+        <div class="ml-0">
           <OSelect
             v-model="condition.column"
             :options="filteredFields"
@@ -57,12 +57,12 @@
           />
           <OTooltip v-if="condition.column && store.state.isAiChatEnabled" :content="condition.column" />
         </div>
-        <div class="tw:ml-0">
+        <div class="ml-0">
           <OSelect
             v-model="condition.operator"
             :options="triggerOperators"
             :dropdownStyle="{ textTransform: 'capitalize' }"
-            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[70px]' : computedInputWidth)]"
+            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-[70px]' : computedInputWidth)]"
             :error="!!operatorError"
             :searchable="false"
             :error-message="operatorError"
@@ -72,13 +72,13 @@
           />
           <OTooltip v-if="condition.operator && store.state.isAiChatEnabled" :content="condition.operator" />
         </div>
-        <div class="tw:ml-0">
+        <div class="ml-0">
           <OInput
             v-model="condition.value"
             :placeholder="t('common.value')"
             :error="!!valueError"
             :error-message="valueError"
-            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[110px]' : computedValueWidth)]"
+            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-[110px]' : computedValueWidth)]"
             data-test="alert-conditions-value-input"
             @update:model-value="() => { valueError = ''; emits('input:update', 'conditions', condition) }"
             @blur="validateValue"
@@ -87,7 +87,7 @@
         </div>
     </div>
   </template>
-  
+
   <script setup lang="ts">
   import OButton from '@/lib/core/Button/OButton.vue';
   import OSelect from '@/lib/forms/Select/OSelect.vue';
@@ -232,12 +232,12 @@ const toggleOperator = () => {
 
 const computedInputWidth = computed(() => {
   // If custom width is provided, use it; otherwise use default responsive width
-  return props.inputWidth || (store.state.isAiChatEnabled ? '' : 'xl:tw:min-w-[200px] lg:tw:min-w-[90px] lg:tw:w-fit');
+  return props.inputWidth || (store.state.isAiChatEnabled ? '' : 'xl:min-w-[200px] lg:min-w-[90px] lg:w-fit');
 });
 
 const computedValueWidth = computed(() => {
   // If custom width is provided, use it; otherwise use default responsive width
-  return props.inputWidth || (store.state.isAiChatEnabled ? 'tw:w-[110px]' : 'xl:tw:min-w-[200px] lg:tw:w-fit lg:tw:min-w-[80px]');
+  return props.inputWidth || (store.state.isAiChatEnabled ? 'w-[110px]' : 'xl:min-w-[200px] lg:w-fit lg:min-w-[80px]');
 });
 
 
@@ -253,18 +253,3 @@ const filterColumns = (val: string) => {
 };
 
   </script>
-
-  <style scoped lang="scss">
-.operator-toggle-btn {
-  color: var(--o2-primary-btn-bg) !important;
-}
-
-.operator-toggle-btn:hover {
-  background-color: rgba(var(--o2-primary-btn-bg-rgb), 0.1) !important;
-}
-
-.filter-condition-row:has(.q-field--error) {
-  padding-bottom: 20px;
-}
-</style>
-  

@@ -391,7 +391,7 @@ describe("PrebuiltDestinationSelector", () => {
       const cards = getAllCards(wrapper);
 
       cards.forEach((card) => {
-        const icon = card.find(".card-icon");
+        const icon = card.find('[data-test="destination-type-icon"]');
         expect(icon.exists()).toBe(true);
       });
     });

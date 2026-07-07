@@ -22,40 +22,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('search.queryPlan')"
     @update:open="(v) => !v && onClose()"
   >
-    <div class="query-plan-content tw:h-full tw:p-0">
+    <div class="overflow-hidden h-full p-0">
       <OSplitter
         v-model="splitterPosition"
         :horizontal="false"
         separator-class="query-plan-splitter"
-        class="tw:h-full"
+        class="h-full"
       >
         <!-- Left Pane: SQL Query -->
         <template #before>
-          <section class="sql-query-pane tw:h-full">
-            <header class="pane-header">
-              <div class="tw:flex tw:items-center tw:gap-2">
-                <OIcon name="code" size="sm" class="pane-header__icon" />
-                <h3 class="pane-header__title">SQL Query</h3>
+          <section class="flex flex-col overflow-hidden bg-(--o2-card-background) h-full">
+            <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-(--o2-card-bg) border-b border-solid border-(--o2-border-color)">
+              <div class="flex items-center gap-2">
+                <OIcon name="code" size="sm" class="text-(--o2-text-secondary)" />
+                <h3 class="text-(length:--text-sm) font-(--font-semibold) text-(--o2-text-heading) m-0 tracking-[0.01em]">SQL Query</h3>
               </div>
             </header>
-            <div class="sql-query-content">
-              <pre class="sql-query-text"><code>{{ sqlQuery }}</code></pre>
+            <div class="flex-1 overflow-y-auto p-4">
+              <pre class="sql-query-text [font-family:var(--font-mono)] text-[0.8125rem] leading-[1.6] m-0 py-3.5 px-4 whitespace-pre-wrap wrap-break-word bg-(--o2-code-bg) border border-solid border-(--o2-border-color) rounded-md text-(--o2-text-code) min-h-full box-border"><code class="[font-family:inherit] text-inherit bg-transparent p-0">{{ sqlQuery }}</code></pre>
             </div>
           </section>
         </template>
 
         <!-- Right Pane: Explain/Analyze Results -->
         <template #after>
-          <section class="explain-results-pane tw:h-full">
-            <header class="pane-header">
-              <h3 class="pane-header__title">
+          <section class="flex flex-col overflow-hidden bg-(--o2-card-background) h-full">
+            <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-(--o2-card-bg) border-b border-solid border-(--o2-border-color)">
+              <h3 class="text-(length:--text-sm) font-(--font-semibold) text-(--o2-text-heading) m-0 tracking-[0.01em]">
                 {{
                   showAnalyzeResults
                     ? t("search.analyzeResults")
                     : t("search.explainResults")
                 }}
               </h3>
-              <div class="tw:flex-1" />
+              <div class="flex-1" />
               <OButton
                 v-if="!isAnalyzing && !showAnalyzeResults"
                 variant="primary"
@@ -68,10 +68,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </header>
 
-            <div v-if="loading" class="state-container">
-              <div class="tw:text-center">
+            <div v-if="loading" class="flex-1 flex items-center justify-center p-6">
+              <div class="text-center">
                 <OSpinner variant="dots" size="lg" />
-                <div class="tw:mt-3 state-container__label">
+                <div class="mt-3 text-(--o2-text-secondary) text-(length:--text-sm)">
                   {{
                     isAnalyzing
                       ? t("search.runningAnalyze")
@@ -81,29 +81,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div v-else-if="error" class="tw:p-4">
+            <div v-else-if="error" class="p-4">
               <OBanner variant="error" icon="error" :content="error" />
             </div>
 
             <!-- EXPLAIN ANALYZE view -->
-            <div v-else-if="showAnalyzeResults" class="plan-container">
+            <div v-else-if="showAnalyzeResults" class="flex-1 overflow-y-auto flex flex-col p-4 gap-3">
               <MetricsSummaryCard
                 v-if="summaryMetrics"
                 :metrics="summaryMetrics"
-                class="tw:mb-3"
+                class="mb-3"
               />
 
-              <div class="plan-surface">
-                <div class="plan-surface__header">
-                  <span class="plan-surface__title">{{ t("search.executionPlan") }}</span>
+              <div class="plan-surface flex-1 flex flex-col bg-(--o2-card-bg) border border-solid border-(--o2-border-color) rounded-lg overflow-hidden">
+                <div class="px-4 py-2.5 border-b border-solid border-(--o2-border-color) bg-(--o2-card-background)">
+                  <span class="text-(length:--text-xs) font-(--font-semibold) tracking-[0.06em] uppercase text-(--o2-text-label)">{{ t("search.executionPlan") }}</span>
                 </div>
-                <div class="plan-scroll-area">
+                <div class="flex-1 overflow-y-auto py-3 px-4">
                   <QueryPlanTree
                     v-if="planTree"
                     :tree="planTree"
                     :is-analyze="true"
                   />
-                  <div v-else class="plan-empty">
+                  <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-(--o2-text-muted)">
                     {{ t("search.noAnalyzePlanFound") }}
                   </div>
                 </div>
@@ -111,9 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- EXPLAIN view (tabs for logical/physical) -->
-            <div v-else class="plan-container">
-              <div class="plan-surface">
-                <div class="plan-surface__tabs">
+            <div v-else class="flex-1 overflow-y-auto flex flex-col p-4 gap-3">
+              <div class="plan-surface flex-1 flex flex-col bg-(--o2-card-bg) border border-solid border-(--o2-border-color) rounded-lg overflow-hidden">
+                <div class="border-b border-solid border-(--o2-border-color) px-2">
                   <OTabs v-model="activeTab" dense align="left">
                     <OTab name="logical" :label="t('search.logicalPlan')" />
                     <OTab name="physical" :label="t('search.physicalPlan')" />
@@ -122,26 +122,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <OTabPanels v-model="activeTab" animated>
                   <OTabPanel name="logical">
-                    <div class="plan-scroll-area">
+                    <div class="flex-1 overflow-y-auto py-3 px-4">
                       <QueryPlanTree
                         v-if="logicalPlanTree"
                         :tree="logicalPlanTree"
                         :is-analyze="false"
                       />
-                      <div v-else class="plan-empty">
+                      <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-(--o2-text-muted)">
                         {{ t("search.noLogicalPlan") }}
                       </div>
                     </div>
                   </OTabPanel>
 
                   <OTabPanel name="physical">
-                    <div class="plan-scroll-area">
+                    <div class="flex-1 overflow-y-auto py-3 px-4">
                       <QueryPlanTree
                         v-if="physicalPlanTree"
                         :tree="physicalPlanTree"
                         :is-analyze="false"
                       />
-                      <div v-else class="plan-empty">
+                      <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-(--o2-text-muted)">
                         {{ t("search.noPhysicalPlan") }}
                       </div>
                     </div>
@@ -622,169 +622,40 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.query-plan-content {
-  overflow: hidden;
+<style>
+.plan-surface .o-tab-panels {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.sql-query-pane,
-.explain-results-pane {
+.plan-surface .o-tab-panel {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background-color: var(--o2-card-background);
 }
 
-.pane-header {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  height: 2.75rem;
-  padding: 0 1rem;
-  background-color: var(--o2-card-bg);
-  border-bottom: 1px solid var(--o2-border-color);
-
-  &__icon {
-    color: var(--o2-text-secondary);
-  }
-
-  &__title {
-    font-size: var(--text-sm);
-    font-weight: var(--font-semibold);
-    color: var(--o2-text-heading);
-    margin: 0;
-    letter-spacing: 0.01em;
-  }
-}
-
-.sql-query-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 1rem;
-}
-
-.sql-query-text {
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  margin: 0;
-  padding: 0.875rem 1rem;
-  white-space: pre-wrap;
-  word-break: break-word;
-  background-color: var(--o2-code-bg);
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  color: var(--o2-text-code);
-  min-height: 100%;
-  box-sizing: border-box;
-
-  code {
-    font-family: inherit;
-    color: inherit;
-    background: transparent;
-    padding: 0;
-  }
-}
-
-.plan-container {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  padding: 1rem;
-  gap: 0.75rem;
-}
-
-.plan-surface {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.5rem;
-  overflow: hidden;
-
-  // Make OTabPanels and OTabPanel fill the remaining surface height
-  :deep(.o-tab-panels) {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  :deep(.o-tab-panel) {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  &__header {
-    padding: 0.625rem 1rem;
-    border-bottom: 1px solid var(--o2-border-color);
-    background-color: var(--o2-card-background);
-  }
-
-  &__title {
-    font-size: var(--text-xs);
-    font-weight: var(--font-semibold);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--o2-text-label);
-  }
-
-  &__tabs {
-    border-bottom: 1px solid var(--o2-border-color);
-    padding: 0 0.5rem;
-  }
-}
-
-.plan-scroll-area {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.75rem 1rem;
-}
-
-.plan-empty {
-  padding: 1.5rem 1rem;
-  text-align: center;
-  font-size: var(--text-sm);
-  color: var(--o2-text-muted);
-}
-
-.state-container {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-
-  &__label {
-    color: var(--o2-text-secondary);
-    font-size: var(--text-sm);
-  }
-}
-
-:deep(.query-plan-splitter) {
+.query-plan-splitter {
   position: relative;
+}
 
-  &::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background-color: var(--o2-border-color);
-    transform: translateX(-50%);
-    transition: background-color 0.2s ease, width 0.2s ease;
-  }
+.query-plan-splitter::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--o2-border-color);
+  transform: translateX(-50%);
+  transition: background-color 0.2s ease, width 0.2s ease;
+}
 
-  &:hover::before {
-    background-color: var(--o2-primary-color);
-    width: 2px;
-  }
+.query-plan-splitter:hover::before {
+  background-color: var(--o2-primary-color);
+  width: 2px;
 }
 </style>

@@ -1481,29 +1481,6 @@ describe("ServicesCatalog", () => {
   // Status badge classes per row
   // -----------------------------------------------------------------------
   describe("status badges", () => {
-    it("should apply correct badge class for healthy status", () => {
-      expect(wrapper?.vm?.statusBadgeClass("healthy")).toBe(
-        "o2-status-badge--success",
-      );
-    });
-
-    it("should apply correct badge class for degraded status", () => {
-      expect(wrapper?.vm?.statusBadgeClass("degraded")).toBe(
-        "o2-status-badge--degraded",
-      );
-    });
-
-    it("should apply correct badge class for warning status", () => {
-      expect(wrapper?.vm?.statusBadgeClass("warning")).toBe(
-        "o2-status-badge--warning",
-      );
-    });
-
-    it("should apply correct badge class for critical status", () => {
-      expect(wrapper?.vm?.statusBadgeClass("critical")).toBe(
-        "o2-status-badge--error",
-      );
-    });
 
     it("should derive correct status from error rate", async () => {
       // Load services with known error rates and verify the derived status
@@ -1599,7 +1576,7 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      expect(wrapper.vm.errorRateClass(15)).toContain("tw:text-red-500");
+      expect(wrapper.vm.errorRateClass(15)).toContain("text-red-500");
     });
 
     it("should return correct class for warning error rate (5-10%)", async () => {
@@ -1614,7 +1591,7 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      expect(wrapper.vm.errorRateClass(7)).toContain("tw:text-orange-500");
+      expect(wrapper.vm.errorRateClass(7)).toContain("text-orange-500");
     });
 
     it("should return correct class for degraded error rate (1-5%)", async () => {
@@ -1629,7 +1606,7 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      expect(wrapper.vm.errorRateClass(2)).toContain("tw:text-yellow-500");
+      expect(wrapper.vm.errorRateClass(2)).toContain("text-yellow-500");
     });
 
     it("should return empty string for healthy error rate (<=1%)", async () => {

@@ -36,10 +36,11 @@ jobs:
     # Only run on the main repo, not forks.
     if: github.repository == 'openobserve/openobserve'
 
-    # Required for OIDC authentication with AWS and pushing the commit back.
+    # Required for OIDC authentication with AWS and opening the translations PR.
     permissions:
       id-token: write
       contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -111,21 +112,34 @@ jobs:
             echo "No translation changes detected"
           fi
 
-      - name: Commit and push translation updates
+      # `main` is a protected branch, so a direct `git push` from GITHUB_TOKEN is
+      # rejected (this is why earlier runs failed on the push step). Open a PR
+      # with the generated translations instead. Requires the repo setting
+      # "Allow GitHub Actions to create and approve pull requests" to be enabled
+      # (Settings → Actions → General → Workflow permissions).
+      - name: Create pull request with translation updates
         if: steps.check_changes.outputs.changes == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/update-translations
+          delete-branch: true
+          add-paths: |
+            web/src/locales/languages/*.json
+            scripts/translations/.translation_state.json
+          commit-message: |
+            chore: update translations from en.json
 
-          git add web/src/locales/languages/*.json scripts/translations/.translation_state.json
+            Auto-generated translation updates from English source file.
 
-          git commit -m "chore: update translations from en.json
+            🤖 Generated with automated translation workflow
+          title: "chore: update translations from en.json"
+          body: |
+            Auto-generated translation updates from the English source file
+            (`web/src/locales/languages/en.json`).
 
-          Auto-generated translation updates from English source file.
-
-          🤖 Generated with automated translation workflow"
-
-          git push
+            🤖 Generated with automated translation workflow
+          labels: translations
 
       - name: Summary
         if: always()
@@ -135,7 +149,7 @@ jobs:
             exit 0
           fi
           if [ "${{ steps.check_changes.outputs.changes }}" == "true" ]; then
-            echo "✅ Translations updated and committed."
+            echo "✅ Translations updated — pull request created/updated (branch: chore/update-translations)."
           else
             echo "ℹ️  No new or modified keys — translations already up to date."
           fi

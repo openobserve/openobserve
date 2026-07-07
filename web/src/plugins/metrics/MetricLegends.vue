@@ -11,19 +11,19 @@
         <span>{{ t("search.legendLabel") }}</span>
       </OButton>
     </template>
-    <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'" class="tw:px-2 tw:pt-1.5 tw:pb-1">
+    <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'" class="px-2 pt-1.5 pb-1">
       <div class="metric-legends-title">
         <div class="label">{{ t("search.legendLabel") }}</div>
       </div>
-      <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
+      <div class="border-t my-1 border-dropdown-separator" />
       <div class="legends">
-        <div class="legend-grid">
+        <div class="grid grid-cols-2 gap-2.5">
           <div
             v-for="(icon, metric) in metricsIconMapping"
             :key="metric"
             :data-test="`metrics-legends-item-${metric}`"
           >
-            <OIcon :name="icon" size="md" class="tw:mr-1" />
+            <OIcon :name="icon" size="md" class="mr-1" />
             <span>{{ metric }}</span>
           </div>
         </div>
@@ -65,14 +65,8 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.legend-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr); /* Two columns */
-  gap: 10px; /* Space between items */
-}
-
+<style>
 .q-btn:before {
-  border: 0px solid #d5d5d5;
+  border: 0px solid var(--o2-border-input);
 }
 </style>

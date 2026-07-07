@@ -77,7 +77,7 @@ describe("EvalEmptyState — base rendering", () => {
 describe("EvalEmptyState — chips", () => {
   it("renders nothing in the chips area when chips array is empty", () => {
     const wrapper = makeWrapper({ chips: [] });
-    expect(wrapper.find(".ev-empty__chips").exists()).toBe(false);
+    expect(wrapper.find('[data-test="eval-empty-state-chips"]').exists()).toBe(false);
   });
 
   it("renders one span per chip with the label", () => {
@@ -88,7 +88,7 @@ describe("EvalEmptyState — chips", () => {
         { icon: "tune", label: "Sampling" },
       ],
     });
-    const chips = wrapper.findAll(".ev-empty__chip");
+    const chips = wrapper.findAll('[data-test="eval-empty-state-chip"]');
     expect(chips).toHaveLength(3);
     expect(chips[0].text()).toContain("Streams");
     expect(chips[1].text()).toContain("Scorers");
@@ -99,7 +99,7 @@ describe("EvalEmptyState — chips", () => {
     const wrapper = makeWrapper({
       chips: [{ label: "OpenAI" }, { label: "Anthropic" }],
     });
-    const chipsWithIcons = wrapper.findAll(".ev-empty__chip .o-icon");
+    const chipsWithIcons = wrapper.findAll('[data-test="eval-empty-state-chip"] .o-icon');
     expect(chipsWithIcons).toHaveLength(0);
   });
 
@@ -107,29 +107,29 @@ describe("EvalEmptyState — chips", () => {
     const wrapper = makeWrapper({
       chips: [{ icon: "stream", label: "Streams" }],
     });
-    expect(wrapper.find('.ev-empty__chip [data-icon="stream"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="eval-empty-state-chip"] [data-icon="stream"]').exists()).toBe(true);
   });
 });
 
 describe("EvalEmptyState — theme", () => {
-  it("applies the --dark modifier class when store theme is dark", () => {
+  it("applies the dark theme chip styling when store theme is dark", () => {
+    const wrapper = makeWrapper({ chips: [{ label: "OpenAI" }] }, "dark");
+    expect(wrapper.find('[data-test="eval-empty-state-chip"]').classes()).toContain(
+      "bg-[rgba(255,255,255,0.06)]",
+    );
+  });
+
+  it("does not apply dark theme chip styling when theme is light", () => {
+    const wrapper = makeWrapper({ chips: [{ label: "OpenAI" }] }, "light");
+    expect(wrapper.find('[data-test="eval-empty-state-chip"]').classes()).not.toContain(
+      "bg-[rgba(255,255,255,0.06)]",
+    );
+  });
+
+  it("applies dark border styling on the icon ring when theme is dark", () => {
     const wrapper = makeWrapper({}, "dark");
-    expect(wrapper.find(".ev-empty").classes()).toContain("ev-empty--dark");
-  });
-
-  it("does not apply --dark modifier when theme is light", () => {
-    const wrapper = makeWrapper({}, "light");
-    expect(wrapper.find(".ev-empty").classes()).not.toContain("ev-empty--dark");
-  });
-
-  it("applies --dark on chips when theme is dark", () => {
-    const wrapper = makeWrapper(
-      { chips: [{ label: "OpenAI" }] },
-      "dark",
-    );
-    expect(wrapper.find(".ev-empty__chip").classes()).toContain(
-      "ev-empty__chip--dark",
-    );
+    expect(wrapper.find('[data-test="test-empty-state"]').exists()).toBe(true);
+    expect(wrapper.html()).toContain("bg-[rgba(66,133,244,0.18)]");
   });
 });
 
@@ -147,7 +147,7 @@ describe("EvalEmptyState — events", () => {
     const wrapper = makeWrapper({
       chips: [{ label: "OpenAI" }],
     });
-    await wrapper.find(".ev-empty__chip").trigger("click");
+    await wrapper.find('[data-test="eval-empty-state-chip"]').trigger("click");
     expect(wrapper.emitted("create")).toBeUndefined();
   });
 });

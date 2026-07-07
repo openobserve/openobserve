@@ -15,57 +15,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="tw:flex tw:flex-col card-wrapper">
-    <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
+  <OCard class="flex flex-col shadow-none border border-(--o2-border-color) bg-(--o2-card-bg) rounded-lg w-full h-full dark:bg-[var(--o2-card-background)] dark:border-[var(--o2-border)]">
+    <div class="flex items-center justify-between px-3 py-2">
       <div>
-        <h3 class="card-title tw:pt-2">{{ t("billing.proPlanLabel") }}</h3>
-        <p class="card-subtitle tw:mt-2">
+        <h3 class="pt-2 text-base font-semibold leading-6 text-(--o2-text-heading) m-0">{{ t("billing.proPlanLabel") }}</h3>
+        <p class="mt-2 text-sm font-normal leading-4.5 text-(--o2-text-secondary) m-0">
           {{ t("billing.proPlanSubtitle") }}
         </p>
       </div>
-      <OBadge
+      <OTag
         v-if="planType == planName"
-        variant="primary-soft"
-        class="tw:mt-2 tw:text-xs tw:px-2 tw:py-3"
-      >
-        {{ t("billing.subscribed") }}
-      </OBadge>
+        type="billingTag"
+        value="subscribed"
+        class="mt-2"
+      />
     </div>
 
-    <OSeparator class="tw:my-2" />
+    <OSeparator class="my-2" />
 
-    <div class="tw:px-3 tw:py-2">
-      <h4 class="feature-title">{{ t("billing.features") }}</h4>
-      <p class="feature-subtitle tw:mb-3 tw:mt-1">
+    <div class="px-3 py-2">
+      <h4 class="text-[0.8125rem] font-semibold leading-[0.983rem] text-(--o2-text-heading) m-0">{{ t("billing.features") }}</h4>
+      <p class="mb-3 mt-1 text-[0.8125rem] font-normal leading-4.5 text-(--o2-text-secondary) m-0">
         {{ t("billing.included") }}
       </p>
 
       <div
         v-if="pricingError && !features?.length"
-        class="tw:flex tw:items-center tw:mb-2 tw:text-red-500"
+        class="flex items-center mb-2 text-red-500"
       >
-        <OIcon name="warning" size="sm" class="tw:mr-2" />
-        <span class="feature-description"
+        <OIcon name="warning" size="sm" class="mr-2" />
+        <span class="text-[0.938rem] leading-5.5 text-(--o2-text-body)"
           >Failed to load pricing details. Please refresh the page.</span
         >
       </div>
       <div
         v-for="(feature, index) in features"
         :key="index"
-        class="tw:flex tw:items-center tw:justify-between tw:mb-2"
+        class="flex items-center justify-between mb-2"
       >
-        <div class="tw:flex tw:items-center">
+        <div class="flex items-center">
           <OIcon
             v-if="feature.is_parent"
             name="check-circle"
             size="md"
-            class="tw:mr-2 tw:text-green-500 check-icon"
+            class="mr-2 text-green-500 check-icon"
           />
-          <div class="feature-description" :class="{ 'tw:ml-6': !feature.is_parent }">{{ feature.name }}</div>
+          <div class="text-[0.938rem] leading-5.5 text-(--o2-text-body)" :class="{ 'ml-6': !feature.is_parent }">{{ feature.name }}</div>
         </div>
         <div
           v-if="feature.price !== ''"
-          class="tw:mx-2"
+          class="mx-2"
           style="
             flex: 1;
             border-top: 1px dotted #454f5b;
@@ -73,56 +72,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             opacity: 0.4;
           "
         ></div>
-        <div class="feature-description tw:font-bold">{{ feature.price }}</div>
+        <div class="text-[0.938rem] leading-5.5 text-(--o2-text-body) font-bold">{{ feature.price }}</div>
       </div>
     </div>
 
     <OSeparator />
 
-    <p class="feature-note tw:px-3 tw:pt-2">
+    <p class="px-3 pt-2 text-[0.8125rem] font-normal leading-4.5 text-(--o2-text-secondary) m-0">
       {{ t("billing.unlimitedNote") }}<br />
       {{ t("billing.paymentNote") }}
     </p>
 
-    <div class="tw:flex tw:justify-between tw:p-3">
+    <div class="flex justify-between p-3">
       <!-- AWS Marketplace billing - show managed externally message -->
-      <div v-if="billingProvider === 'aws'" class="tw:w-full tw:text-center">
-        <OBadge
-          variant="success-soft"
-          class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1"
+      <div v-if="billingProvider === 'aws'" class="w-full text-center">
+        <OTag
+          type="billingManagement"
+          value="aws"
+          class="inline-flex items-center gap-1"
         >
-          <OIcon name="check-circle" size="xs" />
-          Managed via AWS Marketplace
-        </OBadge>
-        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
+          <template #icon>
+            <OIcon name="check-circle" size="xs" />
+          </template>
+        </OTag>
+        <div class="text-xs text-gray-400 mt-2">
           Billing is handled through your AWS account
         </div>
       </div>
       <div
         v-else-if="billingProvider === 'azure'"
-        class="tw:w-full tw:text-center"
+        class="w-full text-center"
       >
-        <OBadge
-          variant="success-soft"
-          class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1"
+        <OTag
+          type="billingManagement"
+          value="azure"
+          class="inline-flex items-center gap-1"
         >
-          <OIcon name="check-circle" size="xs" />
-          Managed via Azure Marketplace
-        </OBadge>
-        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
+          <template #icon>
+            <OIcon name="check-circle" size="xs" />
+          </template>
+        </OTag>
+        <div class="text-xs text-gray-400 mt-2">
           Billing is handled through your Azure account
         </div>
       </div>
       <!-- External contract - billed offline, no Stripe portal to open -->
       <div
         v-else-if="subscriptionType === 'external-contract'"
-        class="tw:w-full tw:text-center"
+        class="w-full text-center"
       >
-        <OBadge variant="default" class="tw:px-3 tw:py-2 tw:inline-flex tw:items-center tw:gap-1">
-          <OIcon name="description" size="xs" />
-          Managed via contract
-        </OBadge>
-        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
+        <OTag
+          type="billingManagement"
+          value="contract"
+          class="inline-flex items-center gap-1"
+        >
+          <template #icon>
+            <OIcon name="description" size="xs" />
+          </template>
+        </OTag>
+        <div class="text-xs text-gray-400 mt-2">
           Billing is handled through your contract — contact your account
           manager for changes
         </div>
@@ -154,14 +162,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 
 export default defineComponent({
   name: "proPlan",
-  components: { OSeparator, OButton, OBadge, OIcon, OCard },
+  components: { OSeparator, OButton, OTag, OIcon, OCard },
   props: [
     "planType",
     "billingProvider",
@@ -202,75 +210,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.full-width {
-  width: 100%;
-}
-
-.card-wrapper {
-  box-shadow: none;
-  border: 1px solid var(--o2-border-color);
-  background: var(--o2-card-bg);
-  border-radius: 0.5rem;
-  width: 100%;
-  height: 100%;
-}
-
-:deep(.card-wrapper) {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.5rem;
-}
-
-.body--dark .card-wrapper {
-  background: var(--o2-card-background);
-  border-color: var(--o2-border);
-}
-
-.card-title {
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.5rem;
-  color: var(--o2-text-heading);
-  margin: 0;
-}
-
-.card-subtitle {
-  font-size: 0.875rem;
-  font-weight: 400;
-  line-height: 1.125rem;
-  color: var(--o2-text-secondary);
-  margin: 0;
-}
-
-.feature-title {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  line-height: 0.983rem;
-  color: var(--o2-text-heading);
-  margin: 0;
-}
-
-.feature-subtitle {
-  font-size: 0.8125rem;
-  font-weight: 400;
-  line-height: 1.125rem;
-  color: var(--o2-text-secondary);
-  margin: 0;
-}
-
-.feature-description {
-  font-size: 0.938rem;
-  line-height: 1.375rem;
-  color: var(--o2-text-body);
-}
-
-.feature-note {
-  font-size: 0.8125rem;
-  font-weight: 400;
-  line-height: 1.125rem;
-  color: var(--o2-text-secondary);
-  margin: 0;
-}
-</style>

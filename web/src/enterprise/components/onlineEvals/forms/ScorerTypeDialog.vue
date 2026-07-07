@@ -1,16 +1,16 @@
-<template>
+﻿<template>
   <div
-    class="scorer-type-scrim"
+    class="fixed inset-0 bg-black/32 z-6000 flex items-center justify-center animate-[scorer-type-scrim-in_0.15s_ease-out]"
     role="dialog"
     aria-modal="true"
     @click.self="$emit('close')"
   >
-    <div class="scorer-type-dialog">
-      <header class="scorer-type-dialog__header">
-        <h2 class="scorer-type-dialog__title">{{ t("onlineEvals.scorerTypeDialog.title") }}</h2>
+    <div class="w-[min(820px,calc(100vw-48px))] bg-card-bg border border-dialog-header-border rounded-lg shadow-(--o2-shadow-lg,0_8px_24px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.08)) px-5.5 pt-5 pb-6 animate-[scorer-type-pop-in_0.18s_ease-out]">
+      <header class="flex items-center gap-3 pb-3 border-b border-dialog-header-border mb-4">
+        <h2 class="flex-1 m-0 text-base font-semibold text-text-primary">{{ t("onlineEvals.scorerTypeDialog.title") }}</h2>
         <button
           type="button"
-          class="scorer-type-dialog__close"
+          class="inline-flex items-center justify-center w-7 h-7 p-0 text-(--color-text-secondary,var(--o2-text-secondary)) bg-transparent border-0 rounded-md cursor-pointer transition-[background,color] duration-150 hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)] hover:text-(--color-primary-600,#3F7994)"
           :aria-label="t('onlineEvals.buttons.cancel')"
           data-test="scorer-type-close-btn"
           @click="$emit('close')"
@@ -32,25 +32,25 @@
         </button>
       </header>
 
-      <p class="scorer-type-dialog__intro">{{ t("onlineEvals.scorerTypeDialog.intro") }}</p>
+      <p class="m-0 mb-4 text-text-secondary text-[13px] leading-normal">{{ t("onlineEvals.scorerTypeDialog.intro") }}</p>
 
-      <div class="scorer-type-dialog__cards">
+      <div class="grid grid-cols-3 max-[720px]:grid-cols-1 gap-3">
         <button
           type="button"
-          class="scorer-type-card"
+          class="scorer-type-card relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--o2-border)) rounded-lg bg-(--color-card-bg) text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
           data-test="scorer-type-llm-judge"
           @click="$emit('select', 'llm_judge')"
         >
-          <div class="scorer-type-card__icon">
+          <div class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600,#3F7994)">
             <OIcon name="smart-toy" size="md" />
           </div>
-          <div class="scorer-type-card__title">
+          <div class="text-sm font-semibold text-(--color-text-primary,currentColor)">
             {{ t("onlineEvals.scorerTypeDialog.llmJudgeTitle") }}
           </div>
-          <div class="scorer-type-card__desc">
+          <div class="flex-1 text-xs leading-normal text-(--color-text-secondary,var(--o2-text-secondary))">
             {{ t("onlineEvals.scorerTypeDialog.llmJudgeDescription") }}
           </div>
-          <div class="scorer-type-card__cta">
+          <div class="inline-flex items-center gap-1 mt-auto text-xs font-semibold text-(--color-primary-600,#3F7994)">
             {{ t("onlineEvals.scorerTypeDialog.llmJudgeCta") }}
             <OIcon name="chevron-right" size="xs" />
           </div>
@@ -58,20 +58,20 @@
 
         <button
           type="button"
-          class="scorer-type-card"
+          class="scorer-type-card relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--o2-border)) rounded-lg bg-(--color-card-bg) text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
           data-test="scorer-type-remote"
           @click="$emit('select', 'remote')"
         >
-          <div class="scorer-type-card__icon">
+          <div class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600,#3F7994)">
             <OIcon name="cloud" size="md" />
           </div>
-          <div class="scorer-type-card__title">
+          <div class="text-sm font-semibold text-(--color-text-primary,currentColor)">
             {{ t("onlineEvals.scorerTypeDialog.remoteTitle") }}
           </div>
-          <div class="scorer-type-card__desc">
+          <div class="flex-1 text-xs leading-normal text-(--color-text-secondary,var(--o2-text-secondary))">
             {{ t("onlineEvals.scorerTypeDialog.remoteDescription") }}
           </div>
-          <div class="scorer-type-card__cta">
+          <div class="inline-flex items-center gap-1 mt-auto text-xs font-semibold text-(--color-primary-600,#3F7994)">
             {{ t("onlineEvals.scorerTypeDialog.remoteCta") }}
             <OIcon name="chevron-right" size="xs" />
           </div>
@@ -79,23 +79,23 @@
 
         <button
           type="button"
-          class="scorer-type-card scorer-type-card--disabled"
+          class="scorer-type-card scorer-type-card--disabled relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--o2-border)) rounded-lg bg-(--color-card-bg) text-(--color-text-primary,currentColor) text-left cursor-not-allowed opacity-60 transition-[border-color,background,box-shadow] duration-[120ms]"
           data-test="scorer-type-code"
           disabled
         >
-          <span class="scorer-type-card__badge">
+          <span class="absolute top-3 right-3 py-[2px] px-2 rounded text-[11px] font-semibold leading-normal bg-[color-mix(in_srgb,var(--o2-status-warning-text)_14%,transparent)] text-(--o2-status-warning-text)">
             {{ t("onlineEvals.scorerTypeDialog.comingSoonBadge") }}
           </span>
-          <div class="scorer-type-card__icon">
+          <div class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600,#3F7994)">
             <OIcon name="code" size="md" />
           </div>
-          <div class="scorer-type-card__title">
+          <div class="text-sm font-semibold text-(--color-text-primary,currentColor)">
             {{ t("onlineEvals.scorerTypeDialog.codeTitle") }}
           </div>
-          <div class="scorer-type-card__desc">
+          <div class="flex-1 text-xs leading-normal text-(--color-text-secondary,var(--o2-text-secondary))">
             {{ t("onlineEvals.scorerTypeDialog.codeDescription") }}
           </div>
-          <div class="scorer-type-card__cta scorer-type-card__cta--muted">
+          <div class="inline-flex items-center gap-1 mt-auto text-xs font-semibold text-(--color-text-secondary,var(--o2-text-secondary))">
             {{ t("onlineEvals.scorerTypeDialog.codeCta") }}
           </div>
         </button>
@@ -117,153 +117,11 @@ defineEmits<{
 const { t } = useI18n();
 </script>
 
-<style lang="scss" scoped>
-.scorer-type-scrim {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.32);
-  z-index: 6000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: scorer-type-scrim-in 0.15s ease-out;
-}
-
-.scorer-type-dialog {
-  width: min(820px, calc(100vw - 48px));
-  background: var(--color-card-bg);
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 8px;
-  box-shadow: var(--o2-shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08));
-  padding: 20px 22px 24px;
-  animation: scorer-type-pop-in 0.18s ease-out;
-}
-
-.scorer-type-dialog__header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  margin-bottom: 16px;
-}
-
-.scorer-type-dialog__title {
-  flex: 1;
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-}
-
-.scorer-type-dialog__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.scorer-type-dialog__close:hover {
-  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
-  color: var(--color-primary-600, #3F7994);
-}
-
-.scorer-type-dialog__intro {
-  margin: 0 0 16px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.scorer-type-dialog__cards {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.scorer-type-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  min-height: 180px;
-  padding: 16px 16px 14px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 8px;
-  background: var(--color-card-bg);
-  color: var(--color-text-primary, currentColor);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.12s, background 0.12s, box-shadow 0.15s;
-}
-
+<style>
 .scorer-type-card:hover:not(.scorer-type-card--disabled) {
   border-color: var(--color-primary-600, #3F7994);
   background: color-mix(in srgb, var(--color-primary-600) 4%, var(--color-card-bg));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-600) 12%, transparent);
-}
-
-.scorer-type-card--disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.scorer-type-card__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-primary-600) 10%, transparent);
-  color: var(--color-primary-600, #3F7994);
-}
-
-.scorer-type-card__title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-}
-
-.scorer-type-card__desc {
-  flex: 1;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.scorer-type-card__cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: auto;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-primary-600, #3F7994);
-}
-
-.scorer-type-card__cta--muted {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.scorer-type-card__badge {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font: 600 11px/1.5 inherit;
-  background: color-mix(in srgb, var(--o2-status-warning-text) 14%, transparent);
-  color: var(--o2-status-warning-text);
 }
 
 @keyframes scorer-type-scrim-in {
@@ -274,11 +132,5 @@ const { t } = useI18n();
 @keyframes scorer-type-pop-in {
   from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
-}
-
-@media (max-width: 720px) {
-  .scorer-type-dialog__cards {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

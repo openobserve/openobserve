@@ -1,21 +1,21 @@
 <template>
   <div
-    class="qkpi-skel"
+    class="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-[10px]"
     :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
   >
     <div
       v-for="n in count"
       :key="n"
-      class="qkpi-skel__tile"
+      class="pt-3 px-3.5 pb-2.5 bg-(--tile-bg) border border-(--tile-border) rounded-md flex flex-col gap-2 min-h-24"
       :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
       data-test="quality-kpi-skeleton"
     >
       <SkeletonBox width="55%" height="11px" rounded />
-      <div class="qkpi-skel__row">
+      <div class="flex items-baseline justify-between gap-2">
         <SkeletonBox width="50%" height="22px" rounded />
         <SkeletonBox width="22%" height="11px" rounded />
       </div>
-      <div class="qkpi-skel__spark">
+      <div class="flex items-end gap-[3px] h-[28px] mt-auto">
         <SkeletonBox
           v-for="bar in 14"
           :key="bar"
@@ -37,13 +37,7 @@ withDefaults(defineProps<{ count?: number }>(), { count: 5 });
 const store = useStore();
 </script>
 
-<style lang="scss" scoped>
-.qkpi-skel {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-}
-
+<style>
 .dark-tile-content {
   --tile-bg: #2b2c2d;
   --tile-border: #444444;
@@ -54,43 +48,14 @@ const store = useStore();
   --tile-border: #e7eaee;
 }
 
-.qkpi-skel__tile {
-  padding: 12px 14px 10px;
-  background: var(--tile-bg);
-  border: 1px solid var(--tile-border);
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 96px;
-}
-
-.qkpi-skel__row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.qkpi-skel__spark {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 28px;
-  margin-top: auto;
-}
-
-/* Wave overrides — same recipe as LLMInsightsSkeleton.
-   The shared SkeletonBox component's default gradient is theme-agnostic; the
-   :deep() override pierces its scoped style so it animates correctly. */
-:deep(.skeleton-box) {
+.skeleton-box {
   position: relative;
   overflow: hidden;
   background-size: 200% 100%;
   animation: qkpi-skel-wave 1.5s ease-in-out infinite;
 }
 
-.light-tile-content :deep(.skeleton-box) {
+.light-tile-content .skeleton-box {
   background: linear-gradient(
     90deg,
     rgba(0, 0, 0, 0.04),
@@ -99,7 +64,7 @@ const store = useStore();
   );
 }
 
-.dark-tile-content :deep(.skeleton-box) {
+.dark-tile-content .skeleton-box {
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0.04),

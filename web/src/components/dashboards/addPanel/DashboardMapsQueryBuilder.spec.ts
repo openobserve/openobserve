@@ -831,7 +831,7 @@ describe("DashboardMapsQueryBuilder", () => {
       wrapper = createWrapper();
 
       const nameContainer = wrapper.find('[data-test="dashboard-name-layout"]');
-      expect(nameContainer.classes()).toContain("drop-target");
+      expect(nameContainer.classes()).toContain("bg-[rgba(0,0,0,0.042)]");
     });
 
     it("should apply drop-entered class when drag area matches", () => {
@@ -842,7 +842,9 @@ describe("DashboardMapsQueryBuilder", () => {
       wrapper = createWrapper();
 
       const nameContainer = wrapper.find('[data-test="dashboard-name-layout"]');
-      expect(nameContainer.classes()).toContain("drop-entered");
+      expect(nameContainer.classes()).toContain(
+        "bg-[var(--color-field-list-row-hover-bg)]",
+      );
     });
 
     it("should not apply drop-entered class when drag area doesn't match", () => {
@@ -854,7 +856,9 @@ describe("DashboardMapsQueryBuilder", () => {
       wrapper = createWrapper();
 
       const nameContainer = wrapper.find('[data-test="dashboard-name-layout"]');
-      expect(nameContainer.classes()).not.toContain("drop-entered");
+      expect(nameContainer.classes()).not.toContain(
+        "bg-[var(--color-field-list-row-hover-bg)]",
+      );
     });
   });
 

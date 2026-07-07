@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
     </template>
 
-      <div class="tw:overflow-hidden tw:h-full">
+      <div class="overflow-hidden h-full">
         <router-view
           :title="tabs"
           :currOrgIdentifier="currOrgIdentifier"
@@ -209,30 +209,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.ingestionPage {
-  padding: 1.5rem 0 0;
-  .head {
-    padding-bottom: 1rem;
-  }
-  
-}
-</style>
-<style lang="scss">
-.ingestionPage {
-  .o-tab-panel {
-    padding: 0 !important;
-    .tab_content {
-      .o-tab__label {
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-      }
-    }
-  }
-
-  .OIcon > img {
-    height: auto !important;
-  }
-}
-</style>

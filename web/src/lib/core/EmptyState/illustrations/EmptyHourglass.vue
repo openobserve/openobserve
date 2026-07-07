@@ -56,9 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <path d="M96 150 L144 150 L120 128 Z" fill="var(--color-warning-400)" />
 
     <!-- falling grains -->
-    <circle class="es-grain es-grain-a" cx="120" cy="96" r="2.4" fill="var(--color-warning-500)" />
-    <circle class="es-grain es-grain-b" cx="120" cy="96" r="2" fill="var(--color-warning-500)" />
-    <circle class="es-grain es-grain-c" cx="120" cy="96" r="2.4" fill="var(--color-warning-600)" />
+    <circle class="es-grain es-grain-a [transform-box:view-box] [animation:es-grain_1.5s_linear_infinite]" cx="120" cy="96" r="2.4" fill="var(--color-warning-500)" />
+    <circle class="es-grain es-grain-b [transform-box:view-box] [animation:es-grain_1.5s_linear_infinite] [animation-delay:-0.5s]" cx="120" cy="96" r="2" fill="var(--color-warning-500)" />
+    <circle class="es-grain es-grain-c [transform-box:view-box] [animation:es-grain_1.5s_linear_infinite] [animation-delay:-1s]" cx="120" cy="96" r="2.4" fill="var(--color-warning-600)" />
   </svg>
 </template>
 
@@ -69,22 +69,7 @@ withDefaults(
 );
 </script>
 
-<style scoped>
-.es-grain {
-  transform-box: view-box;
-}
-.es-grain-a {
-  animation: es-grain 1.5s linear infinite;
-}
-.es-grain-b {
-  animation: es-grain 1.5s linear infinite;
-  animation-delay: -0.5s;
-}
-.es-grain-c {
-  animation: es-grain 1.5s linear infinite;
-  animation-delay: -1s;
-}
-
+<style>
 @keyframes es-grain {
   0% {
     transform: translateY(0);

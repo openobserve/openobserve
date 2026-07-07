@@ -70,13 +70,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-else-if="panelSchema.type == 'html'"
-          class="tw:flex tw:flex-col column"
+          class="flex flex-col column"
           style="width: 100%; height: 100%; flex: 1"
         >
           <HTMLRenderer
             :htmlContent="panelSchema.htmlContent"
             style="width: 100%; height: 100%"
-            class="tw:flex tw:flex-col"
+            class="flex flex-col"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -84,13 +84,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else-if="panelSchema.type == 'markdown'"
-          class="tw:flex tw:flex-col column"
+          class="flex flex-col column"
           style="width: 100%; height: 100%; flex: 1"
         >
           <MarkdownRenderer
             :markdownContent="panelSchema.markdownContent"
             style="width: 100%; height: 100%"
-            class="tw:flex tw:flex-col"
+            class="flex flex-col"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="panelSchema.type == 'custom_chart'"
           :data="panelData"
           style="width: 100%; height: 100%"
-          class="tw:flex tw:flex-col"
+          class="flex flex-col"
           @error="errorDetail = $event"
         />
         <ChartRenderer
@@ -159,14 +159,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="noData"
         :backdrop="false"
         data-test="no-data"
-        class="noData"
+        class="noData absolute! inset-0 w-full h-full !min-h-0 !p-2 [container-type:size]"
       />
       <div
         v-if="
           errorDetail?.message &&
           !panelSchema?.error_config?.custom_error_handeling
         "
-        class="errorMessage"
+        class="absolute top-[20%] w-full h-[80%] overflow-hidden text-center text-ellipsis"
         data-test="panel-schema-renderer-error-message"
       >
         <OIcon size="md" name="warning" />
@@ -185,13 +185,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !panelSchema?.error_config?.default_data_on_error &&
           panelSchema?.error_config?.custom_error_message
         "
-        class="customErrorMessage"
+        class="absolute top-[20%] w-full h-[80%] overflow-hidden text-center text-ellipsis"
         data-test="panel-schema-renderer-custom-error-message"
       >
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
       <div
-        class="tw:flex"
+        class="flex"
         style="position: absolute; top: 0px; width: 100%; z-index: 999"
       >
         <LoadingProgress
@@ -199,10 +199,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loadingProgressPercentage="loadingProgressPercentage"
         />
       </div>
+
       <div
-        class="crosslink-drilldown-menu"
+        class="absolute z-9999999 min-w-50 py-1 px-0 hidden whitespace-nowrap top-0 left-0 rounded border border-(--o2-border) shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
         :class="{
-          'crosslink-drilldown-menu--dark': store.state.theme === 'dark',
+          'group/menu bg-[#2c2c2c] border-[#404040] shadow-[0_2px_8px_rgba(0,0,0,0.4)] crosslink-drilldown-menu--dark': store.state.theme === 'dark',
+          'bg-white': store.state.theme !== 'dark',
         }"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
@@ -220,16 +222,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
           <div
-            class="crosslink-drilldown-menu-item"
+            class="flex items-center py-2 px-4 cursor-pointer transition-colors duration-200 text-sm text-[#333] hover:bg-[#f5f5f5] active:bg-(--o2-border) group-[.crosslink-drilldown-menu--dark]/menu:text-[var(--o2-border)] group-[.crosslink-drilldown-menu--dark]/menu:hover:bg-[#383838] group-[.crosslink-drilldown-menu--dark]/menu:active:bg-[#444444]"
             :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >
             <OIcon
               size="xs"
-              class="tw:mr-2"
+              class="mr-2"
               :name="drilldown._isCrossLink ? 'open-in-new' : 'link'"
             />
-            <span>{{ drilldown.name }}</span>
+            <span class="select-none">{{ drilldown.name }}</span>
           </div>
         </template>
       </div>
@@ -248,11 +250,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           overflow-wrap: break-word;
           z-index: 9999999;
         "
-        class="annotation-popup-bg"
+        :class="store.state.theme === 'dark' ? 'bg-(--o2-bg-card-dark,#1a1a1a)' : 'bg-white'"
         ref="annotationPopupRef"
       >
         <div
-          class="tw:px-2 tw:py-1"
+          class="px-2 py-1"
           style="
             display: flex;
             flex-direction: row;
@@ -353,9 +355,10 @@ const MarkdownRenderer = defineAsyncComponent(() => {
 const AddAnnotation = defineAsyncComponent(() => {
   return import("./addPanel/AddAnnotation.vue");
 });
-const CustomChartRenderer = defineAsyncComponent(() => {
-  return import("./panels/CustomChartRenderer.vue");
-});
+// Statically imported by several route-level components, so it cannot be
+// code-split into its own chunk — import it statically to avoid the mixed
+// dynamic/static import build warning.
+import CustomChartRenderer from "./panels/CustomChartRenderer.vue";
 
 const AlertContextMenu = defineAsyncComponent(() => {
   return import("./AlertContextMenu.vue");
@@ -432,6 +435,11 @@ export default defineComponent({
     },
     allowAnnotationsAdd: {
       default: false,
+      required: false,
+      type: Boolean,
+    },
+    allowAnnotationsAPI: {
+      default: true,
       required: false,
       type: Boolean,
     },
@@ -639,6 +647,7 @@ export default defineComponent({
       folderId,
       reportId,
       allowAnnotationsAdd,
+      allowAnnotationsAPI,
       allowAlertCreation,
       runId,
       tabId,
@@ -683,6 +692,7 @@ export default defineComponent({
       folderName,
       shouldRefreshWithoutCache,
       regionClusterParams,
+      allowAnnotationsAPI,
     );
 
     const {
@@ -1581,7 +1591,7 @@ export default defineComponent({
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {
-        return "tw:overflow-auto";
+        return "overflow-auto";
       }
 
       return "";
@@ -1662,7 +1672,6 @@ export default defineComponent({
             ? filteredData.value
             : data.value;
         console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
-        console.log(chartData);
         console.groupEnd();
       },
       loadingProgressPercentage,
@@ -1679,112 +1688,15 @@ export default defineComponent({
   },
 });
 </script>
-
 <style lang="scss" scoped>
-// Cross-link drilldown popup — matches AlertContextMenu.vue exactly
-.crosslink-drilldown-menu {
-  position: absolute;
-  z-index: 9999999;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
-  padding: 4px 0;
-  display: none;
-  white-space: nowrap;
-  top: 0;
-  left: 0;
-}
-
-.crosslink-drilldown-menu-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 16px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  font-size: 14px;
-  color: #333;
-
-  &:hover {
-    background-color: #f5f5f5;
-  }
-
-  &:active {
-    background-color: #e0e0e0;
-  }
-
-  span {
-    user-select: none;
-  }
-}
-
-.crosslink-drilldown-menu--dark {
-  background: #2c2c2c;
-  border-color: #404040;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-
-.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item {
-  color: #e0e0e0;
-}
-
-.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item:hover {
-  background-color: #383838;
-}
-
-.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item:active {
-  background-color: #444444;
-}
-
-.drilldown-item:hover {
-  background-color: rgba(202, 201, 201, 0.908);
-}
-
-.errorMessage {
-  position: absolute;
-  top: 20%;
-  width: 100%;
-  height: 80%;
-  overflow: hidden;
-  text-align: center;
-  // color: rgba(255, 0, 0, 0.8);
-  text-overflow: ellipsis;
-}
-
-.customErrorMessage {
-  position: absolute;
-  top: 20%;
-  width: 100%;
-  height: 80%;
-  overflow: hidden;
-  text-align: center;
-  text-overflow: ellipsis;
-}
-
-.noData {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  // Override the inline empty-state's intrinsic min-height/padding so the
-  // content centers within the actual panel box (top/bottom/left/right)
-  // instead of being pushed down by a fixed 160px min-height.
-  min-height: 0 !important;
-  padding: 0.5rem !important;
-  // Establish a size container so we can react to very short panels.
-  container-type: size;
-}
-
-// When the panel is too short to comfortably fit the icon, hide it and
-// show just the centered "No Data" message.
+// When the panel is too short to comfortably fit the icon, hide it and show
+// just the centered "No Data" message. Kept as scoped CSS because this is a
+// container query targeting a deep descendant rendered by OEmptyState — it
+// cannot be expressed as an inline Tailwind utility. The container itself and
+// its min-height/padding overrides are applied inline on the OEmptyState above.
 @container (max-height: 5rem) {
   .noData :deep(.o2-empty-state__inline-icon) {
     display: none;
   }
-}
-
-.annotation-popup-bg {
-  background: var(--color-surface-panel);
 }
 </style>

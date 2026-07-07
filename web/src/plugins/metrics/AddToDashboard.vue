@@ -11,7 +11,7 @@
     @click:secondary="$emit('update:open', false)"
   >
     <OForm id="add-to-dashboard-form" :schema="addToDashboardSchema" :default-values="addToDashboardDefaults()" @submit="onSubmit">
-    <div class="add-dashboard-form-card-section tw:flex tw:flex-col tw:gap-4">
+    <div class="add-dashboard-form-card-section flex flex-col gap-4">
       <!-- select folder or create new folder and select -->
       <select-folder-dropdown @folder-selected="updateActiveFolderId" />
 
@@ -223,11 +223,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss">
-.add-dashboard-form-card-section {
-  .add-folder-btn {
-    margin-top: 36px !important;
-  }
-}
-</style>

@@ -26,22 +26,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
   <span
     v-if="!displayValue"
     data-test="span-status-code-badge-empty"
-    class="tw:text-[var(--o2-status-neutral-text)]"
+    class="text-[var(--o2-status-neutral-text)]"
   >
     —
   </span>
-  <span
+  <OTag
     v-else
     data-test="span-status-code-badge"
-    class="tw:rounded tw:py-[0.125rem] tw:px-[0.5rem] tw:inline-flex tw:items-center tw:w-fit tw:font-mono tw:text-[0.75rem] tw:font-semibold tw:tabular-nums"
-    :class="tierClass"
-  >
-    {{ displayValue }}
-  </span>
+    :type="badgeType"
+    :value="badgeValue"
+    :label="displayValue"
+    :dot="false"
+    class="font-mono tabular-nums"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { httpStatusBucket, grpcStatusKey } from "@/lib/core/Badge/badgeGroups";
 
 const props = defineProps<{
   /** HTTP status code (e.g. 200, 404, 500) */
@@ -77,41 +80,13 @@ const displayValue = computed(() => {
   return null;
 });
 
-const tierClass = computed(() => {
-  if (source.value === "grpc") {
-    return grpcNum.value === 0
-      ? "o2-status-badge--success"
-      : "o2-status-badge--error";
-  }
-  const n = httpNum.value;
-  if (!n) return "o2-status-badge--neutral";
-  if (n >= 200 && n < 300) return "o2-status-badge--success";
-  if (n >= 300 && n < 400) return "o2-status-badge--info";
-  if (n >= 400 && n < 500) return "o2-status-badge--warning";
-  if (n >= 500 && n < 600) return "o2-status-badge--error";
-  return "o2-status-badge--neutral";
+const badgeType = computed(() =>
+  source.value === "grpc" ? "spanStatus" : "httpStatus",
+);
+
+const badgeValue = computed(() => {
+  if (source.value === "http") return httpStatusBucket(props.code);
+  if (source.value === "grpc") return grpcStatusKey(props.grpcCode);
+  return "";
 });
 </script>
-
-<style scoped>
-.o2-status-badge--success {
-  color: var(--o2-status-success-text);
-  background: var(--o2-status-success-bg);
-}
-.o2-status-badge--info {
-  color: var(--o2-status-info-text);
-  background: var(--o2-status-info-bg);
-}
-.o2-status-badge--warning {
-  color: var(--o2-status-warning-text);
-  background: var(--o2-status-warning-bg);
-}
-.o2-status-badge--error {
-  color: var(--o2-status-error-text);
-  background: var(--o2-status-error-bg);
-}
-.o2-status-badge--neutral {
-  color: var(--o2-status-neutral-text);
-  background: var(--o2-status-neutral-bg);
-}
-</style>

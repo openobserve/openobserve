@@ -95,11 +95,11 @@ describe("ShortUrl", () => {
 
   it("should render loading container with correct CSS classes", () => {
     const container = wrapper.find('[data-test="loading-container"]');
-    expect(container.classes()).toContain("tw:h-[100vh]");
-    expect(container.classes()).toContain("tw:flex");
-    expect(container.classes()).toContain("tw:flex-col");
-    expect(container.classes()).toContain("tw:items-center");
-    expect(container.classes()).toContain("tw:justify-center");
+    expect(container.classes()).toContain("h-[100vh]");
+    expect(container.classes()).toContain("flex");
+    expect(container.classes()).toContain("flex-col");
+    expect(container.classes()).toContain("items-center");
+    expect(container.classes()).toContain("justify-center");
   });
 
   it("should render spinner with correct data-test attribute", () => {
@@ -121,7 +121,9 @@ describe("ShortUrl", () => {
   });
 
   it("should render message with correct CSS class", () => {
-    expect(wrapper.find('[data-test="message"]').classes()).toContain("message");
+    const message = wrapper.find('[data-test="message"]');
+    expect(message.classes()).toContain("text-base");
+    expect(message.classes()).toContain("text-[#666]");
   });
 
   // Props Tests

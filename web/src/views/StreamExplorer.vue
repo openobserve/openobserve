@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:rounded-md">
+  <div class="rounded-md">
     <SearchBar
       ref="searchBarRef"
       :query-data="queryData"
@@ -10,10 +10,10 @@
       :is-loading="isLoading"
       @change:date-time="updateDateTime"
     />
-    <div class="stream-data-table">
+    <div class="h-[calc(100vh-197px)]">
       <OTable
         data-test="stream-explorer-results-table"
-        class="tw:h-full"
+        class="h-full"
         :data="rows"
         :columns="tableColumns"
         row-key="_rowKey"
@@ -242,9 +242,3 @@ const updateDateTime = (value: IDateTime) => {
   }
 };
 </script>
-
-<style scoped lang="scss">
-.stream-data-table {
-  height: calc(100vh - (140px + 57px));
-}
-</style>

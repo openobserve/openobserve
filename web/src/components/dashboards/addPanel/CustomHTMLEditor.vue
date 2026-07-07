@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="dashboard-custom-html-editor-container"
-    class="html-editor card-container"
+    class="card-container"
     style="width: 100%; height: 100%; overflow: hidden"
   >
     <div
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #before>
           <div
             data-test="dashboard-custom-html-editor-flex-col"
-            class="tw:flex tw:flex-col"
+            class="flex flex-col"
             style="height: 100%; display: flex; flex-direction: column;"
           >
             <CodeQueryEditor
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #separator>
-          <div class="splitter-vertical splitter-enabled"></div>
+          <div class="w-1 h-full bg-(--o2-border,#e5e7eb) transition-colors hover:bg-orange-500"></div>
         </template>
         <template #after>
           <HTMLRenderer
@@ -117,29 +117,7 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.html-editor {
-  display: flex;
-  height: 100%;
-}
-
-.splitter {
-  height: 4px;
-  width: 100%;
-}
-.splitter-vertical {
-  width: 4px;
-  height: 100%;
-}
-.splitter-enabled {
-  background-color: var(--o2-border, #e5e7eb);
-  transition: background-color 0.3s;
-}
-
-.splitter-enabled:hover {
-  background-color: orange;
-}
-
+<style>
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
 }

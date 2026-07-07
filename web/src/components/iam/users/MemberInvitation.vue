@@ -15,16 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
+  <div class="rounded-md p-0" style="min-height: inherit">
     <div
-      class="tw:flex tw:items-center tw:gap-3"
+      class="flex items-center gap-3"
       v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
     >
       <div style="position: relative">
         <OInput
           v-model="userEmail"
           :placeholder="t('user.inviteByEmail')"
-          class="tw:w-56"
+          class="w-56"
         />
         <OTooltip :content="t('user.inviteByEmail')" side="top" max-width="16rem" />
       </div>
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="primary"
         size="xs"
-        class="tw:!h-8"
+        class="!h-8"
         :disabled="userEmail == ''"
         @click="inviteUser()"
       >
@@ -183,19 +183,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.invite-user {
-  background: $input-bg;
-  border-radius: 4px;
-
-  .separator {
-    width: 1px;
-  }
-}
-
-.inputHint {
-  font-size: 11px;
-  color: $light-text;
-}
-</style>

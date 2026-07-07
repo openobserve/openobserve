@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:rounded-md tw:p-0 o2-custom-bg"
+  <div class="rounded-md p-0 o2-custom-bg"
     style="height: calc(100vh - 48px); min-height: inherit"
   >
     <AppPageHeader
@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label: t('alert_templates.header'),
         onClick: () => emit('cancel:hideform'),
       }"
-      class="card-container tw:px-3 tw:border-b tw:border-border-default"
+      class="card-container px-3 border-b border-border-default"
     >
       <template #title>
         <span data-test="add-template-title">
@@ -44,9 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="height: calc(100vh - 106px)"
     >
       <template v-slot:before>
-        <div class="card-container tw:h-full tw:flex tw:flex-col">
-          <div class="tw:p-3 tw:overflow-auto">
-            <div class="tw:w-full tw:pb-2 tw:pt-2 o2-input">
+        <div class="card-container h-full flex flex-col">
+          <div class="p-3 overflow-auto">
+            <div class="w-full pb-2 pt-2 o2-input">
             <OInput
               data-test="add-template-name-input"
               v-model="formData.name"
@@ -59,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="nameError = ''"
             />
           </div>
-          <div class="tw:w-full tw:pb-3">
-            <div class="app-tabs-container tw:w-fit">
+          <div class="w-full pb-3">
+            <div class="app-tabs-container w-fit">
               <app-tabs
                 class="tabs-selection-container"
                 :tabs="tabs"
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div v-if="formData.type === 'email'" class="tw:w-full tw:pt-1 o2-input">
+          <div v-if="formData.type === 'email'" class="w-full pt-1 o2-input">
             <OInput
               data-test="add-template-email-title-input"
               v-model="formData.title"
@@ -79,9 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="titleError = ''"
             />
           </div>
-          <div class="tw:w-full tw:py-3 ">
+          <div class="w-full py-3 ">
             <div
-              class="tw:pb-2 tw:font-bold"
+              class="pb-2 font-bold"
               data-test="add-template-body-input-title"
             >
               {{ t("alert_templates.body") + " *" }}
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="template-body-editor"
                 ref="queryEditorRef"
                 editor-id="template-body-editor"
-                class="monaco-editor tw:mb-3"
+                class="w-full min-h-[310px]! rounded-[5px] border border-(--o2-border-color) resize-y overflow-auto mb-3"
                 language="markdown"
                 v-model:query="formData.body"
               />
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="template-body-editor"
                 ref="queryEditorRef"
                 editor-id="template-body-editor"
-                class="monaco-editor tw:mb-3"
+                class="w-full min-h-[310px]! rounded-[5px] border border-(--o2-border-color) resize-y overflow-auto mb-3"
                 language="json"
                 v-model:query="formData.body"
               />
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:py-4 tw:w-full tw:bg-[var(--q-card-background)] tw:border-t tw:border-border-default"
+            class="flex justify-end gap-2 px-4 py-4 w-full bg-[var(--q-card-background)] border-t border-border-default"
           >
             <OButton
               v-close-popup
@@ -129,13 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="tw:px-2 tw:pt-2 tw:h-full tw:overflow-auto card-container tw:border-l tw:border-border-default"
+          class="px-2 pt-2 h-full overflow-auto card-container border-l border-border-default"
         >
-          <div class="tw:font-bold tw:py-2 tw:px-1 tw:text-sm tw:font-medium">
+          <div class="font-bold py-2 px-1 text-sm font-medium">
             {{ t("alert_templates.variable_guide_header") }}
           </div>
-          <OSeparator class="tw:-ml-2 tw:mr-2" />
-          <div class="tw:py-3 tw:px-1">
+          <OSeparator class="-ml-2 mr-2" />
+          <div class="py-3 px-1">
             <div>org_name, stream_type, stream_name</div>
             <div>alert_name, alert_type</div>
             <div>alert_period, alert_operator, alert_threshold</div>
@@ -149,21 +149,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div><b>All of the stream fields are variables.</b></div>
             <div>{rows:N} {var:N} used to limit rows or string length.</div>
           </div>
-          <div class="tw:pb-3 tw:px-1">
-            <div class="tw:font-bold text-body-1 tw:pb-2">
+          <div class="pb-3 px-1">
+            <div class="font-bold text-body-1 pb-2">
               {{ t("alert_templates.variable_usage_examples") }}:
             </div>
             <div
               v-for="(template, index) in sampleTemplates"
-              class="tw:pb-3"
+              class="pb-3"
               :key="template.name"
               :data-test="`add-template-sample-template-${index}`"
             >
-              <div class="tw:flex tw:justify-between tw:items-center">
-                <div class="tw:pb-1">{{ template.name }}</div>
+              <div class="flex justify-between items-center">
+                <div class="pb-1">{{ template.name }}</div>
                 <OIcon
                   data-test="add-template-sample-template-copy-btn"
-                  class="tw:cursor-pointer"
+                  class="cursor-pointer"
                   name="content-copy"
                   size="xs"
                   @click="copyTemplateBody(template.body)"
@@ -171,9 +171,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 data-test="add-template-sample-template-text"
-                class="add-template tw:px-2 tw:rounded"
+                class="bg-black/[0.07] px-2 rounded"
               >
-                <pre class="example-template-body tw:my-0">
+                <pre class="text-[10px] my-0">
                     {{ template.body }}
                   </pre
                 >
@@ -435,22 +435,3 @@ const copyTemplateBody = (text: any) => {
   });
 };
 </script>
-<style lang="scss" scoped>
-.monaco-editor {
-  width: 100%;
-  min-height: 310px !important;
-  border-radius: 5px;
-  border: 1px solid var(--o2-border-color);
-  // padding-bottom: 14px;
-  resize: vertical;
-  overflow: auto;
-}
-
-.example-template-body {
-  font-size: 10px;
-}
-
-.add-template {
-  background: rgba(0, 0, 0, 0.07);
-}
-</style>

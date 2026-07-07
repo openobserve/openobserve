@@ -1,17 +1,17 @@
 <template>
-  <div class="job-filter">
-    <div class="job-filter__head">
-      <span class="job-filter__title">{{ t("onlineEvals.job.filter.title") }}</span>
-      <span class="job-filter__hint">{{ t("onlineEvals.job.filter.hint") }}</span>
+  <div class="mb-4">
+    <div class="flex flex-col gap-0.5 mb-2">
+      <span class="text-xs font-semibold text-text-primary">{{ t("onlineEvals.job.filter.title") }}</span>
+      <span class="text-[11.5px] text-text-secondary">{{ t("onlineEvals.job.filter.hint") }}</span>
     </div>
-    <div class="job-filter__group">
+    <div class="job-filter__group min-w-0">
       <FilterGroup
         :group="group"
         :depth="0"
         :stream-fields="streamFields"
         :stream-fields-map="streamFieldsMap"
         :show-sql-preview="true"
-        condition-input-width="tw:w-[220px]"
+        condition-input-width="w-[150px]"
         :allow-custom-columns="true"
         module="alerts"
         @add-condition="handleUpdate"
@@ -66,42 +66,22 @@ function handleInputUpdate() {
 }
 </script>
 
-<style lang="scss" scoped>
-.job-filter {
-  margin-bottom: 16px;
-}
-
-.job-filter__head {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 8px;
-}
-
-.job-filter__title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-}
-
-.job-filter__hint {
-  font-size: 11.5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.job-filter__group {
-  min-width: 0;
-}
-
-.job-filter__group :deep(.el-border) {
+<style>
+.job-filter__group  .el-border {
   width: 100%;
   max-width: 100%;
-  margin-top: 0 !important;
   margin-left: 0 !important;
   border-color: var(--color-dialog-header-border, var(--o2-border));
 }
 
-.job-filter__group :deep(.group-container) {
+/* Only the root group sits flush under the label. Nested groups keep their
+   top margin so the upward-shifted AND/OR toggle isn't clipped by the
+   parent .group-container (overflow-x-auto also clips vertically). */
+.job-filter__group > .el-border {
+  margin-top: 0 !important;
+}
+
+.job-filter__group .group-container {
   width: 100%;
 }
 </style>

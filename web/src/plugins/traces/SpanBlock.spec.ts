@@ -290,7 +290,7 @@ describe("SpanBlock", () => {
       const spanBlock = newWrapper.find(
         '[data-test="span-block-select-trigger"]',
       );
-      expect(spanBlock.classes()).toContain("defocus");
+      expect(spanBlock.classes()).toContain("opacity-30");
     });
 
     it("Should not show border when span is not selected", async () => {

@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="search-bar-component tw:h-full tw:flex tw:flex-col" id="searchBarComponent">
-    <div class="tw:flex tw:m-0! tw:p-[0.375rem] tw:items-center tw:justify-between tw:w-full tw:border-b tw:border-border-default">
-      <div ref="toolbarLeftRef" class="tw:flex tw:flex-row tw:items-center tw:gap-[0.375rem] tw:flex-1 tw:min-w-0 tw:overflow-hidden">
+  <div class="search-bar-component pb-px h-full flex flex-col" id="searchBarComponent">
+    <div class="flex m-0! p-[0.375rem] items-center justify-between w-full border-b border-border-default">
+      <div ref="toolbarLeftRef" class="flex flex-row items-center gap-[0.375rem] flex-1 min-w-0 overflow-hidden">
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
           :model-value="searchObj.meta.searchMode"
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tooltip="shouldHideToggleText ? t('traces.spansTab') : undefined"
           >
             <template #icon-left
-              ><OIcon name="layers" size="sm" class="tw:shrink-0"
+              ><OIcon name="layers" size="sm" class="shrink-0"
             /></template>
             <span v-if="!shouldHideToggleText">{{ t('traces.spansTab') }}</span>
           </OToggleGroupItem>
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tooltip="shouldHideToggleText ? t('traces.tracesTab') : undefined"
           >
             <template #icon-left
-              ><OIcon name="account-tree" size="sm" class="tw:shrink-0"
+              ><OIcon name="account-tree" size="sm" class="shrink-0"
             /></template>
             <span v-if="!shouldHideToggleText">{{ t('traces.tracesTab') }}</span>
           </OToggleGroupItem>
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tooltip="shouldHideToggleText ? t('traces.serviceGraphTab') : undefined"
           >
             <template #icon-left
-              ><OIcon name="share" size="sm" class="tw:shrink-0"
+              ><OIcon name="share" size="sm" class="shrink-0"
             /></template>
             <span v-if="!shouldHideToggleText">{{ t('traces.serviceGraphTab') }}</span>
           </OToggleGroupItem>
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tooltip="shouldHideToggleText ? t('traces.servicesCatalog.tabLabel') : undefined"
           >
             <template #icon-left
-              ><OIcon name="menu-book" size="sm" class="tw:shrink-0"
+              ><OIcon name="menu-book" size="sm" class="shrink-0"
             /></template>
             <span v-if="!shouldHideToggleText">{{ t("traces.servicesCatalog.tabLabel") }}</span>
           </OToggleGroupItem>
@@ -85,21 +85,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="resetFilters"
           >
             <template #icon-left>
-              <OIcon name="restart-alt" size="sm" class="tw:shrink-0" />
+              <OIcon name="restart-alt" size="sm" class="shrink-0" />
             </template>
             <span v-if="!shouldHideResetText">{{ t("common.reset") }}</span>
           </OButton>
 
           <div
-            class="toolbar-toggle-container element-box-shadow"
+            class="py-1 px-[0.375rem] flex items-center justify-center border border-(--color-button-outline-border) rounded-md transition-all duration-200 cursor-pointer hover:bg-(--color-button-outline-hover-bg)"
           >
             <OSwitch
               data-test="traces-search-bar-show-metrics-toggle-btn"
               v-model="searchObj.meta.showHistogram"
-              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:pr-1"
+              class="o2-toggle-button-xs flex items-center justify-center pr-1"
               size="lg"
             />
-            <OIcon name="bar-chart" size="sm" class="tw:shrink-0" />
+            <OIcon name="bar-chart" size="sm" class="shrink-0" />
             <OTooltip :content="t('traces.RedMetrics')" />
           </div>
 
@@ -129,13 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdown>
       </div>
       <!-- Right toolbar — persistent wrapper so toolbarRightRef is always observable -->
-      <div ref="toolbarRightRef" class="tw:flex-shrink-0 tw:flex tw:items-center">
+      <div ref="toolbarRightRef" class="flex-shrink-0 flex items-center">
       <div
         v-if="
           searchObj.meta.searchMode !== 'service-graph' &&
           searchObj.meta.searchMode !== 'services-catalog'
         "
-        class="tw:flex tw:items-center tw:gap-[0.375rem]"
+        class="flex items-center gap-[0.375rem]"
       >
         <date-time
           ref="dateTimeRef"
@@ -154,18 +154,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :queryRangeRestrictionMsg="
             searchObj.data.datetime.queryRangeRestrictionMsg
           "
-          class="tw:h-[2rem]"
+          class="h-[2rem]"
           @on:date-change="updateDateTime"
           @on:timezone-change="updateTimezone"
         />
-        <div class="search-time">
-          <div class="tw:flex tw:items-center">
+        <div>
+          <div class="flex items-center">
             <OButton
               v-if="config.isEnterprise == 'true' && isLoading"
               variant="ghost"
               data-test="traces-search-bar-cancel-btn"
               :title="t('search.cancel')"
-              class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
+              class="p-0 h-[1.875rem]! [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] text-(--text-xs) font-(--font-medium)! leading-4! px-1! py-0! w-[5.875rem]! whitespace-normal break-words text-center bg-(--o2-cancel-query-bg)! text-(--o2-primary-btn-text)! element-box-shadow ![border-radius:0.375rem_0_0_0.375rem]"
               @click="cancelQueryData"
               >{{ t("search.cancel") }}</OButton
             >
@@ -175,11 +175,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
               :title="t('search.runQuery')"
-              class="tw:p-0 tw:h-[1.875rem]! element-box-shadow o2-run-query-button o2-color-primary"
+              class="p-0 h-[1.875rem]! element-box-shadow [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)] text-(--text-xs) font-(--font-medium)! leading-4! px-1! py-0! w-[5.875rem]! whitespace-normal break-words text-center bg-(--o2-primary-btn-bg)! text-(--o2-primary-btn-text)!"
               :class="
                 store.state.zoConfig.auto_query_enabled
-                  ? 'search-button-enterprise-border-radius'
-                  : 'search-button-normal-border-radius'
+                  ? '![border-radius:0.375rem_0_0_0.375rem]'
+                  : 'rounded-md'
               "
               @click="searchData"
               :loading="isLoading"
@@ -199,11 +199,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 name="autorenew"
                 size="xs"
-                class="tw:mr-1"
+                class="mr-1"
               />
               {{ t("search.runQuery") }}
             </OButton>
-            <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" vertical />
+            <OSeparator class="h-[1.875rem]! w-[1px]" vertical />
             <ODropdown
               v-if="store.state.zoConfig.auto_query_enabled"
               side="bottom"
@@ -216,9 +216,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="isLoading"
                   :class="[
                     config.isEnterprise == 'true' && isLoading
-                      ? 'o2-color-cancel'
-                      : 'o2-color-primary',
-                    'search-button-dropdown-enterprise-border-radius',
+                      ? 'bg-(--o2-cancel-query-bg)! text-(--o2-primary-btn-text)!'
+                      : 'bg-(--o2-primary-btn-bg)! text-(--o2-primary-btn-text)! hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
+                    '![border-radius:0_0.375rem_0.375rem_0]',
                   ]"
                 >
                   <OIcon name="arrow-drop-down" size="sm" />
@@ -234,18 +234,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
                     "
                     size="sm"
-                    :class="searchObj.meta.liveMode ? 'tw:text-[var(--o2-primary)]' : ''"
+                    :class="searchObj.meta.liveMode ? 'text-[var(--o2-primary)]' : ''"
                   />
                 </template>
                 <span>
-                  <div class="tw:font-medium tw:text-[12px]">
+                  <div class="font-medium text-[12px]">
                     {{
                       searchObj.meta.liveMode
                         ? t("search.turnOffLiveMode")
                         : t("search.turnOnLiveMode")
                     }}
                   </div>
-                  <div class="tw:text-[11px] tw:text-muted-foreground">
+                  <div class="text-[11px] text-muted-foreground">
                     {{ t("search.liveModeTooltip") }}
                   </div>
                 </span>
@@ -267,15 +267,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :url="tracesShareURL"
           variant="outline"
           size="icon-toolbar"
+          shortcut-id="tracesCopyUrl"
         />
       </div>
 
       <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
       <div
         v-if="searchObj.meta.searchMode === 'service-graph'"
-        class="tw:ml-auto"
+        class="ml-auto"
       >
-        <div class="tw:flex tw:items-center tw:gap-[0.5rem]">
+        <div class="flex items-center gap-[0.5rem]">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -286,14 +287,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="service-graph-date-time-picker"
-            class="tw:h-[2rem]!"
+            class="h-[2rem]!"
             @on:date-change="updateDateTime"
           />
           <OButton
             data-test="service-graph-refresh-btn"
             variant="outline"
             size="icon-toolbar"
-            class="tw:min-w-[1.875rem]!"
+            class="min-w-[1.875rem]!"
             @click="$emit('service-graph-refresh')"
           >
             <OIcon name="refresh" size="sm" />
@@ -319,14 +320,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             >
               <template #icon-left
-                ><OIcon name="share" size="sm" class="tw:shrink-0" /></template>
+                ><OIcon name="share" size="sm" class="shrink-0" /></template>
               {{ t('traces.graphView') }}
             </OToggleGroupItem>
           </OToggleGroup>
           <OSelect
             v-model="searchObj.meta.serviceGraphLayoutType"
             :options="serviceGraphLayoutOptions"
-            class="tw:w-[7.5rem] tw:min-h-[2rem]! tw:h-[2rem]!"
+            class="w-[7.5rem] min-h-[2rem]! h-[2rem]!"
             :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
             @update:model-value="onServiceGraphLayoutChange"
           />
@@ -336,9 +337,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Services Catalog right toolbar: DateTime, Refresh -->
       <div
         v-if="searchObj.meta.searchMode === 'services-catalog'"
-        class="tw:ml-auto"
+        class="ml-auto"
       >
-        <div class="tw:flex tw:items-center tw:gap-[0.5rem]">
+        <div class="flex items-center gap-[0.5rem]">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -350,14 +351,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="services-catalog-date-time-picker"
-            class="tw:h-[2rem]!"
+            class="h-[2rem]!"
             @on:date-change="updateDateTime"
           />
           <OButton
             data-test="services-catalog-refresh-btn"
             variant="outline"
             size="icon-toolbar"
-            class="tw:mr-[0.375rem]"
+            class="mr-[0.375rem]"
             @click="$emit('services-catalog-refresh')"
           >
             <OIcon name="refresh" size="sm" />
@@ -374,23 +375,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         searchObj.meta.searchMode !== 'services-catalog' &&
         searchObj.meta.showQuery
       "
-      class="tw:flex tw:flex-1 tw:min-h-0 tw:border-b tw:border-border-default"
+      class="flex flex-1 min-h-0 border-b border-border-default"
     >
       <div
-        class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full tw:w-full tw:relative"
+        class="flex flex-col overflow-hidden h-full w-full relative"
       >
         <code-query-editor
           ref="queryEditorRef"
           editor-id="traces-query-editor"
-          class="monaco-editor"
           v-model:query="searchObj.data.editorValue"
           :keywords="effectiveKeywords"
-          :class="
-            searchObj.data.editorValue == '' &&
-            searchObj.meta.queryEditorPlaceholderFlag
-              ? 'empty-query'
-              : ''
-          "
           language="sql"
           @update:query="updateQueryValue"
           @run-query="searchData"
@@ -402,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.editorValue == '' &&
             searchObj.meta.queryEditorPlaceholderFlag
           "
-          class="query-editor-placeholder-overlay"
+          class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
         >
           <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
         </div>
@@ -1051,252 +1045,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.more-menu-icon-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 0.375rem;
-  background: var(--o2-section-header-bg);
-  color: var(--o2-text-secondary);
-  flex-shrink: 0;
-}
-
-.search-bar-component {
-  padding-bottom: 1px;
-
-  .q-toggle__inner {
-    font-size: 30px;
-  }
-
-  .q-toggle__label {
-    font-size: 12px;
-  }
-
-  .casesensitive-btn {
-    padding: 8px;
-    margin-left: -6px;
-    background-color: #d5d5d5;
-    border-radius: 0px 3px 3px 0px;
-  }
-  .search-field .q-field {
-    &__control {
-      border-radius: 3px 0px 0px 3px !important;
-    }
-    &__native {
-      font-weight: 600;
-    }
-  }
-  .search-time {
-    // width: 120px;
-    .q-btn-group {
-      border-radius: 3px;
-
-      .q-btn {
-        min-height: auto;
-      }
-    }
-  }
-  .search-dropdown {
-    padding: 0px;
-    .block {
-      color: $dark-page;
-      font-weight: 600;
-      font-size: 12px;
-    }
-    .q-btn-dropdown__arrow-container {
-      color: $light-text2;
-    }
-  }
-  .refresh-rate-dropdown-container {
-    width: 220px;
-    * .q-btn {
-      font-size: 12px !important;
-      padding-left: 8px;
-      padding-right: 8px;
-    }
-  }
-
-  .flex-start {
-    justify-content: flex-start;
-    align-items: flex-start;
-    display: flex;
-  }
-
-  .resultsOverChart {
-    margin-bottom: 0.75rem;
-    font-size: 0.875rem;
-    color: $dark-page;
-    font-weight: 700;
-  }
-
-  .ddlWrapper {
-    position: relative;
-    z-index: 10;
-
-    .listWrapper {
-      box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-      transition: height 0.25s ease;
-      height: calc(100vh - 146px);
-      background-color: white;
-      position: absolute;
-      top: 2.75rem;
-      width: 100%;
-      left: 0;
-
-      &:empty {
-        height: 0;
-      }
-
-      & {
-        border-radius: 3px;
-      }
-    }
-  }
-  .fields_autocomplete {
-    max-height: 250px;
-  }
-
-  .search-button {
-    min-width: 96px;
-    line-height: 29px;
-    font-weight: bold;
-    text-transform: initial;
-    font-size: 11px;
-    color: white;
-    padding: 0px 5px;
-
-    .q-btn__content {
-      background: $secondary;
-      border-radius: 3px 3px 3px 3px;
-      padding: 0px 5px;
-}
-  }
-
-  .download-logs-btn {
-    height: 30px;
-  }
-
-  .app-tabs-container {
-    :deep(.o2-tabs) {
-      height: 100%;
-
-      .o2-tab {
-        height: 100%;
-        padding-top: 0;
-        padding-bottom: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.8125rem;
-      }
-    }
-  }
-
-  .reset-filters {
-    width: 30px;
-    height: 30px;
-}
-}
-
-.o2-run-query-button {
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium) !important;
-  line-height: 1rem !important;
-  padding: 0 0.25rem !important;
-  width: 5.875rem !important;
-  white-space: normal;
-  word-break: break-word;
-  text-align: center;
-  transition:
-    box-shadow 0.3s ease,
-    opacity 0.2s ease;
-}
-
-.o2-color-primary {
-  background-color: var(--o2-primary-btn-bg);
-  color: var(--o2-primary-btn-text);
-
-  &:hover {
-    opacity: 0.9;
-    box-shadow: 0 0 0.5rem
-      color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
-  }
-}
-
-.search-button-enterprise-border-radius {
-  border-radius: 0.375rem 0 0 0.375rem !important;
-}
-
-.search-button-normal-border-radius {
-  border-radius: 0.375rem;
-}
-
-.search-button-dropdown-enterprise-border-radius {
-  border-radius: 0 0.375rem 0.375rem 0 !important;
-}
-
-.o2-color-cancel {
-  background-color: var(--o2-cancel-query-bg);
-  color: var(--o2-primary-btn-text);
-}
-
-.toolbar-toggle-container {
-  padding: 0.25rem 0.375rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0.0625rem solid var(--color-button-outline-border);
-  border-radius: 0.375rem;
-  transition: all 0.2s ease;
-  cursor: pointer;
-
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
-}
-
-:global(.body--dark) .toolbar-toggle-container {
-  border: 0.0625rem solid var(--color-button-outline-border);
-}
-
-.query-editor-placeholder-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-start;
-  /* Align with Monaco's text start in CodeQueryEditor: host padding-left
-     (0.5rem) + line-number gutter (lineNumbersMinChars: 2 @ 14px ≈ 1.05rem) +
-     lineDecorationsWidth (10px ≈ 0.625rem) ≈ 2.15rem. top 0.1875rem matches the
-     editor's padding.top (3px) so it sits on line 1 next to the gutter number.
-     Keep in sync with those editor options. */
-  padding: 0.1875rem 0.5rem 0 2.15rem;
-  pointer-events: none;
-  z-index: 1;
-  user-select: none;
-
-  .query-editor-placeholder-typewriter {
-    /* Mirror Monaco's rendered text so the placeholder reads as the future
-       typed query, not a different (proportional) font on a different baseline:
-       same monospace family and same ~21px (1.5 × 14px) line height. */
-    font-family: monospace;
-    font-size: var(--text-base);
-    line-height: 1.3125rem;
-    color: #a0aec0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-
-:global(.body--dark) .query-editor-placeholder-overlay {
-  .query-editor-placeholder-typewriter {
-    color: #718096;
-  }
-}
-</style>

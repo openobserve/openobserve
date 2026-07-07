@@ -26,7 +26,7 @@ use config::{
             StreamType, TimeRange,
         },
     },
-    utils::time::{BASE_TIME, day_micros, get_ymdh_from_micros, hour_micros},
+    utils::time::{BASE_TIME, HourFormat, day_micros, get_ymdh_from_micros, hour_micros},
 };
 use infra::{
     cluster::{get_node_by_uuid, get_node_from_consistent_hash},
@@ -94,6 +94,17 @@ pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
                 } else {
                     data_lifecycle_end
                 };
+
+                // quick check with the cached stream stats, if the stream has no data older than
+                // the retention boundary we can skip it without any db call.
+                let retention_end_micros = stream_data_retention_end.timestamp_micros();
+                let retention_day_start =
+                    retention_end_micros - retention_end_micros % day_micros(1);
+                let stats =
+                    infra::cache::stats::get_stream_stats(&org_id, &stream_name, stream_type);
+                if stats.doc_time_min > 0 && stats.doc_time_min >= retention_day_start {
+                    continue;
+                }
 
                 let extended_retention_days = &stream_settings.extended_retention_days;
                 // creates jobs to delete data
@@ -296,8 +307,8 @@ pub async fn generate_retention_job(
             created_at_micros
         } else {
             // check the min_date again maybe there is no data in this range
-            let start_date = get_ymdh_from_micros(time_range.start);
-            let end_date = get_ymdh_from_micros(time_range.end);
+            let start_date = get_ymdh_from_micros(time_range.start, HourFormat::Real);
+            let end_date = get_ymdh_from_micros(time_range.end, HourFormat::Real);
             let min_date = infra::file_list::get_min_date(
                 org_id,
                 stream_type,
@@ -467,8 +478,8 @@ pub async fn delete_by_date(
         org_id,
         stream_type,
         stream_name,
-        get_ymdh_from_micros(time_range.0),
-        get_ymdh_from_micros(time_range.1),
+        get_ymdh_from_micros(time_range.0, HourFormat::Real),
+        get_ymdh_from_micros(time_range.1, HourFormat::Real),
     );
     delete_from_file_list(org_id, stream_type, stream_name, time_range)
         .await

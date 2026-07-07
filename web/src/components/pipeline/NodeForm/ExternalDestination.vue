@@ -30,14 +30,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="handleCancel"
     @click:neutral="openDeleteDialog"
   >
-    <div class="tw:w-full tw:pt-3 tw:pb-3 tw:px-3 tw:flex tw:flex-col tw:gap-4">
+    <div class="w-full pt-3 pb-3 px-3 flex flex-col gap-4">
       <OSwitch
         data-test="create-stream-toggle"
         :label="'Create new Destination'"
         v-model="createNewDestination"
       />
 
-      <div v-if="createNewDestination" class="tw:w-full">
+      <div v-if="createNewDestination" class="w-full">
         <!-- Create New Destination Form -->
         <CreateDestinationForm
           @created="handleDestinationCreated"
@@ -52,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="selectedDestination"
           :label="'Destination *'"
           :options="getFormattedDestinations"
-          class="destination-method-select"
           tabindex="0"
         />
       </template>
@@ -223,20 +222,3 @@ defineExpose({
   handleCancel,
 });
 </script>
-
-<style lang="scss" scoped>
-.destination-method-select {
-  .q-field__native > :first-child {
-    text-transform: uppercase !important;
-  }
-}
-
-.truncate-url {
-  display: inline-block;
-  max-width: calc(40vw - 200px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: bottom;
-}
-</style>

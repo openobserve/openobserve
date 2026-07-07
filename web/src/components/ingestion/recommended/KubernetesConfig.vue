@@ -1,22 +1,22 @@
 ﻿<!-- eslint-disable no-useless-escape -->
 <template>
-  <div class="tw:p-1 kubernetes-config-section tw:pb-lg">
+  <div class="p-1 kubernetes-config-section pb-lg">
     <!-- Quick Install Section -->
-    <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
-      <div class="tw:flex tw:items-start tw:gap-3">
-        <OIcon name="rocket-launch" size="xl" class="tw:text-[var(--q-primary)]" />
-        <div class="tw:flex-1">
-          <h6 class="tw:text-xl! tw:font-bold tw:m-0 tw:mb-2!">Quick Install (Recommended)</h6>
-          <p class="tw:text-sm tw:mt-0 tw:mb-6!" :class="descriptionClass">
+    <div class="mb-6 p-4 rounded-lg" :class="quickInstallBgClass">
+      <div class="flex items-start gap-3">
+        <OIcon name="rocket-launch" size="xl" class="text-[var(--q-primary)]" />
+        <div class="flex-1">
+          <h6 class="text-xl! font-bold m-0 mb-2!">Quick Install (Recommended)</h6>
+          <p class="text-sm mt-0 mb-6!" :class="descriptionClass">
             Install OpenObserve collector with a single command. Just set your cluster name and run.
           </p>
 
-          <div class="tw:mb-3">
+          <div class="mb-3">
               <OInput
               v-model="clusterName"
               label="Cluster Name"
               placeholder="e.g., production, staging, dev"
-              class="tw:max-w-md"
+              class="max-w-md"
               data-test="kubernetes-cluster-name-input"
             >
               <template #icon-left>
@@ -25,7 +25,7 @@
             </OInput>
           </div>
 
-          <div v-if="config.isCloud != 'true'" class="tw:mb-3">
+          <div v-if="config.isCloud != 'true'" class="mb-3">
             <OTabs v-model="installType" dense>
               <OTab name="external" label="External Endpoint" />
               <OTab name="internal" label="Internal Endpoint">
@@ -34,17 +34,17 @@
             </OTabs>
           </div>
 
-          <ContentCopy class="tw:mt-3" :content="quickInstallCmd" :key="`${clusterName}-${installType}`" />
+          <ContentCopy class="mt-3" :content="quickInstallCmd" :key="`${clusterName}-${installType}`" />
 
-          <div class="tw:mt-2 tw:text-xs" :class="hintClass">
-            <OIcon name="info" size="sm" class="tw:mr-1" />
+          <div class="mt-2 text-xs" :class="hintClass">
+            <OIcon name="info" size="sm" class="mr-1" />
             This installs cert-manager, OpenTelemetry operator, and OpenObserve collector automatically
           </div>
         </div>
       </div>
     </div>
 
-    <OSeparator class="tw:mb-6" />
+    <OSeparator class="mb-6" />
 
     <!-- Advanced/Manual Install Section -->
     <OCollapsible
@@ -53,45 +53,45 @@
       caption="For custom configurations or step-by-step installation"
       data-test="kubernetes-advanced-install-toggle"
     >
-      <div class="tw:mt-4">
-        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">Install cert-manager</div>
+      <div class="mt-4">
+        <div class="text-base font-medium pl-1 mt-3">Install cert-manager</div>
         <ContentCopy
-          class="tw:mt-2"
+          class="mt-2"
           content="kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.0/cert-manager.yaml"
         />
 
-        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">
+        <div class="text-base font-medium pl-1 mt-3">
           Wait for 2 minutes after installing cert-manger for the webhook to be
           ready.
         </div>
 
-        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">Update helm repo</div>
-        <ContentCopy class="tw:mt-2" :content="helmUpdateCmd" />
+        <div class="text-base font-medium pl-1 mt-3">Update helm repo</div>
+        <ContentCopy class="mt-2" :content="helmUpdateCmd" />
 
-        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">
+        <div class="text-base font-medium pl-1 mt-3">
           Install Prometheus operator CRDs(Required by Opentelemetry operator)
         </div>
-        <ContentCopy class="tw:mt-2" :content="crdCommand" />
+        <ContentCopy class="mt-2" :content="crdCommand" />
 
-        <div class="tw:text-base tw:font-medium tw:pl-1 q:mt-md">
+        <div class="text-base font-medium pl-1 q:mt-md">
           Install OpenTelemetry operator
         </div>
         <ContentCopy
-          class="tw:mt-2"
+          class="mt-2"
           content="kubectl apply -f https://raw.githubusercontent.com/openobserve/openobserve-helm-chart/refs/heads/main/opentelemetry-operator.yaml"
         />
 
-        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">Create namespace</div>
+        <div class="text-base font-medium pl-1 mt-3">Create namespace</div>
         <ContentCopy
-          class="tw:mt-2"
+          class="mt-2"
           content="kubectl create ns openobserve-collector"
         />
 
-        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">
+        <div class="text-base font-medium pl-1 mt-3">
           Install OpenObserve collector
         </div>
         <div v-if="config.isCloud == 'true'">
-          <ContentCopy class="tw:mt-2" :content="collectorCmd" />
+          <ContentCopy class="mt-2" :content="collectorCmd" />
         </div>
         <div v-else>
           <OTabs v-model="tab" horizontalalign="left">
@@ -118,7 +118,7 @@
             transition-next="jump-up"
           >
             <OTabPanel name="internal" data-test="kubernetes-tab-panels-this">
-              <ContentCopy class="tw:mt-2" :content="collectorCmdThisCluster" />
+              <ContentCopy class="mt-2" :content="collectorCmdThisCluster" />
               <pre>
 Format of the URL is: http://&lt;helm-release-name&gt;-openobserve-router.&lt;namespace&gt;.svc.cluster.local
 Make changes accordingly to the above URL.
@@ -126,7 +126,7 @@ Make changes accordingly to the above URL.
             </OTabPanel>
 
             <OTabPanel name="external" data-test="kubernetes-tab-panels-default">
-              <ContentCopy class="tw:mt-2" :content="collectorCmd" />
+              <ContentCopy class="mt-2" :content="collectorCmd" />
             </OTabPanel>
           </OTabPanels>
         </div>
@@ -135,9 +135,9 @@ Make changes accordingly to the above URL.
 
     <br />
     <hr />
-    <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3 tw:mb-4">
+    <div class="text-base font-medium pl-1 mt-3 mb-4">
       Once you have installed the OpenObserve collector, it will:
-      <ul class="tw:list-disc tw:ml-5">
+      <ul class="list-disc ml-5">
         <li>Collect metrics from your Kubernetes cluster</li>
         <li>Collect events from your Kubernetes cluster</li>
         <li>Collect logs from your Kubernetes cluster</li>
@@ -146,7 +146,7 @@ Make changes accordingly to the above URL.
           that are written in following languages using OpenTelemetry
           auto-instrumentation. It can be done by setting the following to the
           pod/namespace annotations:
-          <ul class="tw:list-disc tw:ml-5">
+          <ul class="list-disc ml-5">
             <li>
               <b>Java:</b> instrumentation.opentelemetry.io/inject-java:
               "openobserve-collector/openobserve-java"
@@ -165,7 +165,7 @@ Make changes accordingly to the above URL.
             </li>
             <li>
               <b>Go (Uses eBPF):</b>
-              <ul class="tw:list-disc tw:ml-5">
+              <ul class="list-disc ml-5">
                 <li>
                   instrumentation.opentelemetry.io/inject-go:
                   "openobserve-collector/openobserve-go"
@@ -182,13 +182,13 @@ Make changes accordingly to the above URL.
       You can refer and install
       <a
         href="https://github.com/openobserve/hotcommerce"
-        class="hover:tw:underline text-primary"
+        class="hover:underline text-primary"
         >HOT commerce</a
       >
       app as an example to understand how this works in practice. Refer to
       <a
         href="https://github.com/open-telemetry/opentelemetry-operator"
-        class="hover:tw:underline text-primary"
+        class="hover:underline text-primary"
         >OpenTelemetry operator</a
       >
       for further documentation.
@@ -251,16 +251,16 @@ const accessKey = computed(() => {
 // Computed class for styling based on theme
 const quickInstallBgClass = computed(() => {
   return store.state.theme === 'dark'
-    ? 'tw:bg-gray-800 tw:border tw:border-gray-700'
-    : 'tw:bg-blue-50 tw:border tw:border-blue-200';
+    ? 'bg-gray-800 border border-gray-700'
+    : 'bg-blue-50 border border-blue-200';
 });
 
 const descriptionClass = computed(() => {
-  return store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700';
+  return store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700';
 });
 
 const hintClass = computed(() => {
-  return store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600';
+  return store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-600';
 });
 
 // Quick install command
@@ -326,4 +326,3 @@ helm repo update`;
 });
 </script>
 
-<style scoped lang="scss"></style>

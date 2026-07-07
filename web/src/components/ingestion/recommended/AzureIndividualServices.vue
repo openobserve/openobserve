@@ -15,22 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="azure-integration-grid">
-    <div class="tw:mb-4">
+  <div class="w-full">
+    <div class="mb-4">
       <OSearchInput
         v-model="searchQuery"
         placeholder="Search Azure services..."
         clearable
-        class="tw:max-w-md"
+        class="max-w-md"
         data-test="azure-integration-search"
       />
     </div>
 
-    <div class="tw:mb-6">
+    <div class="mb-6">
       <OTabs
         v-model="activeCategory"
         dense
-        class="tw:text-gray-400"
+        class="text-gray-400"
         data-test="azure-integration-category-tabs"
       >
         <OTab name="all" label="All Services" />
@@ -44,17 +44,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="filteredIntegrations.length === 0"
-      class="tw:text-center tw:py-12 empty-state"
+      class="text-center py-12 text-[#666] dark:text-[#999]"
     >
-      <OIcon name="search-off" class="tw:mb-2" style="width: 3rem; height: 3rem;" />
-      <div class="tw:text-base">No integrations found matching your search</div>
+      <OIcon name="search-off" class="mb-2" style="width: 3rem; height: 3rem;" />
+      <div class="text-base">No integrations found matching your search</div>
     </div>
 
-    <div class="tw:flex tw:gap-3" v-else>
+    <div class="flex gap-3" v-else>
       <div
         v-for="integration in filteredIntegrations"
         :key="integration.id"
-        class="tw:w-full col-sm-6 col-md-4 col-lg-3"
+        class="w-full col-sm-6 col-md-4 col-lg-3"
       >
         <AzureIntegrationTile :integration="integration" />
       </div>
@@ -118,19 +118,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.azure-integration-grid {
-  width: 100%;
-
-  .empty-state {
-    .body--light & {
-      color: #666;
-    }
-
-    .body--dark & {
-      color: #999;
-    }
-  }
-}
-</style>

@@ -30,12 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
         @click="scheduledPipelineRef?.toggleAIChat()"
         data-test="menu-link-ai-item"
-        class="ai-hover-btn"
-        :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+        class="bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! transition-[background,box-shadow] duration-300 hover:bg-[linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]"
+        :class="store.state.isAiChatEnabled ? 'ai-btn-active bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]!' : ''"
       >
-        <img :src="scheduledPipelineRef?.getBtnLogo" class="header-icon ai-icon" />
+        <img :src="scheduledPipelineRef?.getBtnLogo" class="header-icon ai-icon opacity-70 transition-[transform] duration-[0.6s] ease-[ease]" :class="store.state.isAiChatEnabled ? 'opacity-100!' : ''" />
       </OButton>
-      <div class="tw:flex tw:items-center app-tabs-container">
+      <div class="flex items-center app-tabs-container">
         <AppTabs
           data-test="scheduled-pipeline-tabs"
           :tabs="scheduledPipelineRef?.tabOptions ?? []"
@@ -71,20 +71,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="scheduledPipelineRef?.handleFullScreen()"
       >
         <template #icon-left>
-          <OIcon name="open-in-full" size="sm" v-if="!scheduledPipelineRef?.isFullscreen" class="tw:size-3.5 tw:shrink-0" />
-          <OIcon name="close-fullscreen" size="sm" v-else class="tw:size-3.5 tw:shrink-0" />
+          <OIcon name="open-in-full" size="sm" v-if="!scheduledPipelineRef?.isFullscreen" class="size-3.5 shrink-0" />
+          <OIcon name="close-fullscreen" size="sm" v-else class="size-3.5 shrink-0" />
         </template>
       </OButton>
     </template>
     <div
       data-test="add-stream-query-routing-section"
-      class="tw:w-full stream-routing-section"
+      class="w-full h-full stream-routing-section"
       :class="[
-        store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white',
+        store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white',
         { 'fullscreen-mode': isFullscreenMode },
       ]"
     >
-    <div class="stream-routing-container">
+    <div class="w-full h-full rounded-lg stream-routing-container">
       <scheduled-pipeline
         ref="scheduledPipelineRef"
         :columns="filteredColumns"
@@ -581,9 +581,9 @@ const validateSqlQuery = async () => {
 
   query.query.start_time = query.query.start_time + 895000000;
 
-  //before assigning the sql , we need to check if the sql does limit is applied or not 
-  //if yes we need to change the limit to 100 because for validating we dont need to send the original limit 
-  //if no we can directly assign the sql to the query 
+  //before assigning the sql , we need to check if the sql does limit is applied or not
+  //if yes we need to change the limit to 100 because for validating we dont need to send the original limit
+  //if no we can directly assign the sql to the query
   //we dont need to change the actual query instead of we need to change the query that we are sending for validation purpose
 
   query.query.sql = normalizeLimit(streamRoute.value.query_condition.sql,100);
@@ -648,14 +648,14 @@ const updateDelay = (val: any) => {
 //if there is no limit in the sql query then it will return the sql query as is
 const normalizeLimit = (sql: string, maxLimit = 100): string => {
   try {
-    // regex will detect the LIMIT and OFFSET in the sql query 
+    // regex will detect the LIMIT and OFFSET in the sql query
     // it will capture multiple LIMIT and OFFSET in the sql query
     const regex = /\bLIMIT\s+(\d+)(\s+OFFSET\s+\d+)?/gi;
      //here we will test if the sql query has LIMIT and OFFSET
     //if it has LIMIT then we will replace the LIMIT with the normalized limit
     //if it has no LIMIT then we will return the sql query as is
     //if it has LIMIT but no OFFSET then we will return the sql query with the normalized
-    //we have moved to match instead of test because sometimes it fails when there are multiple limit with in the same query 
+    //we have moved to match instead of test because sometimes it fails when there are multiple limit with in the same query
     //due to last index effects
     if (sql.match(regex)) {
       return sql.replace(regex, (match, limit, offset) => {
@@ -673,64 +673,3 @@ const normalizeLimit = (sql: string, maxLimit = 100): string => {
 };
 
 </script>
-
-<style scoped>
-.stream-routing-title {
-  font-size: 20px;
-}
-.stream-routing-container {
-  width: 100%;
-  height: 100%;
-  border-radius: 8px;
-  /* box-shadow: 0px 0px 10px 0px #d2d1d1; */
-}
-
-.stream-routing-section {
-  height: 100%;
-  width: 100% !important;
-}
-
-/* ── AI button — mirrors MainLayout.vue ─────────────────────────── */
-.ai-hover-btn {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
-  ) !important;
-  transition: background 0.3s ease, box-shadow 0.3s ease;
-}
-
-.ai-hover-btn:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
-}
-
-.ai-btn-active {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
-  ) !important;
-
-  .header-icon {
-    opacity: 1 !important;
-  }
-}
-
-.ai-btn-active:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-}
-
-.header-icon {
-  opacity: 0.7;
-}
-
-.ai-icon {
-  transition: transform 0.6s ease;
-}
-
-.ai-hover-btn:hover .ai-icon {
-  transform: rotate(180deg);
-  filter: brightness(0) invert(1);
-}
-</style>

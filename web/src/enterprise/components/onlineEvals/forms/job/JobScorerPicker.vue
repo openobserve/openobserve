@@ -1,8 +1,8 @@
 <template>
-  <div class="job-scorer-picker">
-    <div class="job-scorer-picker__head">
-      <span class="job-scorer-picker__title">{{ t("onlineEvals.job.scorerPicker.title") }}</span>
-      <span class="job-scorer-picker__hint">{{ t("onlineEvals.job.scorerPicker.hint") }}</span>
+  <div class="mb-4">
+    <div class="flex flex-col gap-0.5 mb-2">
+      <span class="text-xs font-semibold text-text-primary">{{ t("onlineEvals.job.scorerPicker.title") }}</span>
+      <span class="text-[11.5px] text-text-secondary">{{ t("onlineEvals.job.scorerPicker.hint") }}</span>
     </div>
     <OSelect
       :model-value="modelValue"
@@ -16,7 +16,10 @@
       data-test="job-form-scorer-select"
       @update:model-value="onChange"
     />
-    <div v-if="!scorers.length" class="job-scorer-picker__empty">
+    <div
+      v-if="!scorers.length"
+      class="mt-2 py-3 px-3.5 border border-dashed border-dialog-header-border rounded-[6px] text-center text-text-secondary text-xs"
+    >
       {{ t("onlineEvals.job.scorerPicker.empty") }}
     </div>
   </div>
@@ -54,37 +57,3 @@ function onChange(value: unknown) {
   }
 }
 </script>
-
-<style lang="scss" scoped>
-.job-scorer-picker {
-  margin-bottom: 16px;
-}
-
-.job-scorer-picker__head {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 8px;
-}
-
-.job-scorer-picker__title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-}
-
-.job-scorer-picker__hint {
-  font-size: 11.5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.job-scorer-picker__empty {
-  margin-top: 8px;
-  padding: 12px 14px;
-  border: 1px dashed var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  text-align: center;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-}
-</style>

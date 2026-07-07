@@ -1,17 +1,17 @@
 <template>
   <div
     v-if="shouldShowJoins"
-    class="joins-container"
+    class="w-full"
     data-test="dashboard-joins-container"
   >
-    <div class="joins-header">
-      <div class="layout-name">{{ t("panel.joins") }}</div>
-      <span class="layout-separator">:</span>
-      <div class="joins-list" data-test="dashboard-filter-layout">
+    <div class="flex flex-row pl-3">
+      <div class="text-sm whitespace-nowrap min-w-32.5 flex items-center">{{ t("panel.joins") }}</div>
+      <span class="flex items-center mx-0.5">:</span>
+      <div class="m-1.25 flex flex-row items-center flex-wrap gap-2" data-test="dashboard-filter-layout">
         <div
           v-for="(joinObj, index) in currentJoins"
           :key="index"
-          class="join-item"
+          class="flex flex-row mr-2 my-1"
         >
           <OButtonGroup class="axis-field" radius="sm">
             <ODropdown>
@@ -22,28 +22,28 @@
                   :data-test="`dashboard-join-item-${index}`"
                   icon-right="arrow-drop-down"
                 >
-                  <div class="join-btn-content">
+                  <div class="flex items-center gap-1.5">
                     <LeftJoinTypeSvg
                       v-if="joinObj?.joinType === 'left'"
                       :shouldFill="true"
-                      class="join-type-icon"
+                      class="h-5 w-5 shrink-0 filter-[brightness(0)_invert(1)]"
                     />
                     <InnerJoinTypeSvg
                       v-else-if="joinObj?.joinType === 'inner'"
                       :shouldFill="true"
-                      class="join-type-icon"
+                      class="h-5 w-5 shrink-0 filter-[brightness(0)_invert(1)]"
                     />
                     <RightJoinTypeSvg
                       v-else-if="joinObj?.joinType === 'right'"
                       :shouldFill="true"
-                      class="join-type-icon"
+                      class="h-5 w-5 shrink-0 filter-[brightness(0)_invert(1)]"
                     />
-                    <span class="join-stream-label">{{ joinObj?.stream }}</span>
+                    <span class="leading-none">{{ joinObj?.stream }}</span>
                   </div>
                 </OButton>
               </template>
               <div
-                class="tw:p-4"
+                class="p-4"
                 :data-test="`dashboard-join-menu-${index}`"
               >
                 <AddJoinPopUp
@@ -360,63 +360,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.joins-container {
-  width: 100%;
-}
-
-.joins-header {
-  display: flex;
-  flex-direction: row;
-  padding-left: 0.75rem;
-}
-
-.layout-name {
-  font-size: 14px;
-  white-space: nowrap;
-  min-width: 130px;
-  display: flex;
-  align-items: center;
-}
-
-.layout-separator {
-  display: flex;
-  align-items: center;
-  margin-left: 2px;
-  margin-right: 2px;
-}
-
-.joins-list {
-  margin: 5px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.join-item {
-  display: flex;
-  flex-direction: row;
-  margin-right: 8px;
-  margin-top: 4px;
-  margin-bottom: 4px;
-}
-
-.join-btn-content {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.join-type-icon {
-  height: 20px;
-  width: 20px;
-  flex-shrink: 0;
-  filter: brightness(0) invert(1);
-}
-
-.join-stream-label {
-  line-height: 1;
-}
-</style>
