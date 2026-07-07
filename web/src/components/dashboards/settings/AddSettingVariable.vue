@@ -120,7 +120,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ></div>
             </div>
             <div v-if="variableData.type == 'query_values'">
-              <div class="flex gap-x-4 items-end">
+              <!-- items-start (not items-end): a per-field validation error adds a
+                   line at the bottom of that select. Bottom-aligning would shove the
+                   error-free sibling down to stay flush; top-aligning keeps both
+                   inputs aligned and lets the error hang below. -->
+              <div class="flex gap-x-4 items-start">
                 <OFormSelect
                   name="query_data.stream_type"
                   :label="t('dashboard.selectStreamType')"
