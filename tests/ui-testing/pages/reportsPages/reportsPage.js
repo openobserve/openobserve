@@ -22,14 +22,14 @@ export class ReportsPage {
     this.saveButton = page.locator('[data-test="add-report-save-btn"]');
 
     // ── Report Format section (CSV media type feature) ─────────────────────
+    // v0.80.0 uses a raw Quasar q-select (not OSelect), so options are rendered
+    // as role="option" q-items and there is no data-test-selected-value/data-test-value
+    // stamping. Match the section wrapper for the trigger + text, and options by role+label.
     this.reportFormatSection = page.locator('[data-test="add-report-format-section"]');
     this.reportTypeSelect = page.locator('[data-test="add-report-type-select"]');
-    this.reportTypeTrigger = page.locator('[data-test="add-report-type-select"] [data-test-selected-value]');
-    this.reportTypePopover = page.locator('[data-test="add-report-type-select-popover"]');
-    // OSelect always stamps data-test-value on options (unconditional), but
-    // data-test-concatenated attrs are only emitted when OSelect receives a
-    // direct data-test prop. This instance lacks it — match by value only.
-    this.reportTypeOption = (value) => page.locator(`[data-test-value="${value}"]`).first();
+    this.reportTypeTrigger = page.locator('[data-test="add-report-type-select"] .q-field__control');
+    this.reportTypeLabelMap = { csv: 'CSV (Data)', pdf: 'PDF (default)', png: 'PNG (Image)' };
+    this.reportTypeOption = (value) => page.getByRole('option', { name: this.reportTypeLabelMap[value] || value, exact: true });
     this.attachmentTypeSelect = page.locator('[data-test="add-report-attachment-type-select"]');
     this.customDimensionsSection = page.locator('[data-test="add-report-custom-dimensions-section"]');
     this.pngNoteBanner = page.locator('[data-test="add-report-png-note"]');
@@ -369,11 +369,8 @@ async notAvailableReport(reportName) {
   // ── Report Format section helpers (CSV media type feature) ──────────────
 
   async selectReportType(value) {
-    // Open the report type dropdown by clicking the trigger.
-    // NOTE: This OSelect lacks a direct `data-test` prop (the attribute is on
-    // the parent <div> instead), so the popover and option children do NOT have
-    // data-test-concatenated attributes. We locate options by data-test-value
-    // instead, which OSelect always renders unconditionally.
+    // v0.80.0 renders a raw Quasar q-select. Open the dropdown by clicking the
+    // .q-field__control inside the section, then click the option by role+label.
     await this.reportTypeTrigger.waitFor({ state: 'visible', timeout: 10000 });
     await this.reportTypeTrigger.click();
     const opt = this.reportTypeOption(value);
@@ -427,9 +424,8 @@ async notAvailableReport(reportName) {
   }
 
   async expectReportTypeOptionSelected(value) {
-    const labelMap = { csv: 'CSV (Data)', pdf: 'PDF (default)', png: 'PNG (Image)' };
-    const expectedLabel = labelMap[value] || value;
-    await expect(this.reportTypeTrigger).toContainText(expectedLabel, { timeout: 10000 });
+    const expectedLabel = this.reportTypeLabelMap[value] || value;
+    await expect(this.reportTypeSelect).toContainText(expectedLabel, { timeout: 10000 });
   }
 
 }
