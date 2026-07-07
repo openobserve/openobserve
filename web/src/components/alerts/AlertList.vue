@@ -444,56 +444,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #empty>
-                  <div
-                    v-if="!templates.length || !destinations.length"
-                    class="w-full flex flex-col justify-center items-center text-center"
-                  >
-                    <div style="width: 600px" class="mt-6">
-                      <template v-if="!templates.length">
-                        <div
-                          class="text-sm"
-                          data-test="alert-list-create-template-text"
-                        >
-                          {{ t('alerts.noTemplatesMsg') }}
-                        </div>
-                        <OButton
-                          data-test="alert-list-create-template-btn"
-                          class="mt-3"
-                          variant="primary"
-                          size="sm"
-                          @click="routeTo('alertTemplates')"
-                        >{{ t('alerts.createTemplateBtn') }}</OButton>
-                      </template>
-                      <template v-if="!destinations.length && templates.length">
-                        <div
-                          class="text-sm"
-                          data-test="alert-list-create-destination-text"
-                        >
-                          {{ t('alerts.noDestinationsMsg') }}
-                        </div>
-                        <OButton
-                          data-test="alert-list-create-destination-btn"
-                          class="mt-3"
-                          variant="primary"
-                          size="sm"
-                          @click="routeTo('alertDestinations')"
-                        >{{ t('alerts.createDestinationBtn') }}</OButton>
-                      </template>
-                    </div>
-                  </div>
-                  <template v-else>
-                    <OEmptyState
-                      size="hero"
-                      preset="no-alerts"
-                      :filtered="!!(filterQuery || searchQuery)"
-                      @action="
-                        (id) =>
-                          id === 'clear-filters'
-                            ? ((filterQuery = ''), (searchQuery = ''))
-                            : showAddUpdateFn({})
-                      "
-                    />
-                  </template>
+                  <OEmptyState
+                    v-if="!templates.length"
+                    size="hero"
+                    preset="no-alert-templates"
+                    :description="t('alerts.noTemplatesMsg')"
+                    data-test="alert-list-create-template-text"
+                    @action="routeTo('alertTemplates')"
+                  />
+                  <OEmptyState
+                    v-else-if="!destinations.length"
+                    size="hero"
+                    preset="no-alert-destinations"
+                    :description="t('alerts.noDestinationsMsg')"
+                    data-test="alert-list-create-destination-text"
+                    @action="routeTo('alertDestinations')"
+                  />
+                  <OEmptyState
+                    v-else
+                    size="hero"
+                    preset="no-alerts"
+                    :filtered="!!(filterQuery || searchQuery)"
+                    @action="
+                      (id) =>
+                        id === 'clear-filters'
+                          ? ((filterQuery = ''), (searchQuery = ''))
+                          : showAddUpdateFn({})
+                    "
+                  />
                 </template>
 
                 <template #bottom>

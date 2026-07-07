@@ -96,6 +96,7 @@ const onCopy = () => {
   <div
     class="o2-code-block"
     :class="[isDark ? 'o2-dark' : 'o2-light', chrome ? `o2-chrome-${chrome}` : '']"
+    :data-test="dataTest"
   >
     <div class="o2-code-toolbar">
       <span v-if="chrome === 'terminal'" class="o2-code-head">

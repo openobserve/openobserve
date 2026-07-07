@@ -427,7 +427,10 @@ describe("MarkdownRenderer", () => {
       expect(container.attributes('style')).toContain('width: 100%');
       expect(container.attributes('style')).toContain('height: 100%');
       expect(container.attributes('style')).toContain('overflow: auto');
-      expect(container.attributes('style')).toContain('padding: 1%');
+      // default padding lives on the content div via tailwind utilities
+      expect(wrapper.find('[data-test="markdown-renderer"]').classes()).toEqual(
+        expect.arrayContaining(['px-2', 'py-1']),
+      );
     });
 
     it("should maintain responsive design classes", () => {
