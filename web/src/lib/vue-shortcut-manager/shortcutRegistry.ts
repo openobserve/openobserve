@@ -99,10 +99,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.alertIncidents",
     ],
   },
-  {
-    titleKey: "shortcuts.modules.streams",
-    pages: ["shortcuts.pages.streams", "shortcuts.pages.streamExplorer"],
-  },
+  { titleKey: "shortcuts.modules.streams", pages: ["shortcuts.pages.streams"] },
   {
     titleKey: "shortcuts.modules.pipelines",
     pages: [
@@ -658,14 +655,6 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     ],
   },
 
-  // ── Stream Explorer ─────────────────────────────────────────────────────
-  {
-    pageKey: "shortcuts.pages.streamExplorer",
-    scope: "stream-explorer",
-    shortcuts: [
-      { id: "streamExplorerRefresh", key: "r", descriptionKey: "shortcuts.actions.streamExplorerRefresh" },
-    ],
-  },
 ];
 
 // ---------------------------------------------------------------------------

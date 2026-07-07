@@ -6118,8 +6118,7 @@
       "orgManagement": "Organization Management",
       "rumErrors": "RUM — Error Tracking",
       "rumSessions": "RUM — Sessions",
-      "sourceMaps": "RUM — Source Maps",
-      "streamExplorer": "Stream Explorer"
+      "sourceMaps": "RUM — Source Maps"
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
@@ -6222,8 +6221,7 @@
       "orgManagementRefresh": "Refresh list",
       "rumErrorsRefresh": "Refresh list",
       "rumSessionsRefresh": "Refresh list",
-      "sourceMapsRefresh": "Refresh list",
-      "streamExplorerRefresh": "Refresh list"
+      "sourceMapsRefresh": "Refresh list"
     }
   }
 }
