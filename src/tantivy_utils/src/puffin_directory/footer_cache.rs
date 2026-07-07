@@ -241,7 +241,9 @@ pub fn build_footer_cache<D: Directory>(directory: Arc<D>) -> tantivy::Result<by
             continue;
         }
         for reader in searcher.segment_readers() {
-            reader.fast_fields().dynamic_column_handles(field_entry.name())?;
+            reader
+                .fast_fields()
+                .dynamic_column_handles(field_entry.name())?;
         }
     }
 
