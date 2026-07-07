@@ -40,7 +40,7 @@ const props = defineProps<{
   getStatusBarColor?: (row: any) => string | undefined;
   /** Enable click-to-copy on cell values */
   enableCellCopy?: boolean;
-  /** Per-cell tw:inline style function */
+  /** Per-cell inline style function */
   getCellStyle?: (params: {
     columnId: string;
     row: any;

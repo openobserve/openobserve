@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       :class="[
-        'tw:prose tw:prose-sm tw:max-w-none',
-        store.state?.theme === 'dark' && 'tw:prose-invert',
+        'prose prose-sm max-w-none',
+        store.state?.theme === 'dark' && 'prose-invert',
       ]"
       v-html="sanitizedContent"
       data-test="html-renderer"

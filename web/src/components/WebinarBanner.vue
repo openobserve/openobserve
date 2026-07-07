@@ -15,17 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Header variant: tw:w-full top bar above the toolbar -->
+  <!-- Header variant: w-full top bar above the toolbar -->
   <div
     v-if="webinarData && !isExpired && !isDismissed && variant === 'header'"
-    class="webinar-top-bar tw:w-full tw:bg-amber-400 tw:text-[#1a1a1a]"
+    class="webinar-top-bar w-full bg-amber-400 text-[#1a1a1a]"
     data-test="webinar-header-banner"
     role="banner"
   >
-    <div class="webinar-top-bar-content tw:flex tw:items-center tw:justify-center tw:gap-2 tw:py-[0.2rem] tw:px-4 tw:flex-wrap tw:relative">
-      <span class="webinar-top-bar-text tw:text-[0.8125rem] tw:font-bold tw:text-[#1a1a1a] tw:text-center">
+    <div class="webinar-top-bar-content flex items-center justify-center gap-2 py-[0.2rem] px-4 flex-wrap relative">
+      <span class="webinar-top-bar-text text-[0.8125rem] font-bold text-[#1a1a1a] text-center">
         <strong>{{ webinarData.tag }}:</strong> {{ webinarData.title }}
-        <span v-if="webinarData.date" class="webinar-top-bar-date tw:font-medium">
+        <span v-if="webinarData.date" class="webinar-top-bar-date font-medium">
           {{ formattedDate }}
         </span>
       </span>
@@ -35,13 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :href="webinarData.primaryButton.link"
         target="_blank"
         rel="noopener noreferrer"
-        class="webinar-top-bar-link tw:text-[0.8125rem] tw:font-bold tw:text-[#1e3a8a] tw:underline tw:whitespace-nowrap tw:hover:text-[#1e40af]"
+        class="webinar-top-bar-link text-[0.8125rem] font-bold text-[#1e3a8a] underline whitespace-nowrap hover:text-[#1e40af]"
         data-test="webinar-top-bar-register-link"
       >
         {{ webinarData.primaryButton.text }}
       </a>
 
-      <span class="webinar-top-bar-sep tw:text-[#374151] tw:font-normal tw:opacity-60 tw:select-none" aria-hidden="true">|</span>
+      <span class="webinar-top-bar-sep text-[#374151] font-normal opacity-60 select-none" aria-hidden="true">|</span>
 
       <OButton
         variant="webinar-dismiss"
@@ -57,27 +57,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Home variant: larger banner -->
   <div
     v-else-if="webinarData && !isExpired && variant === 'home'"
-    class="webinar-home-banner tw:mb-3 tw:relative tw:overflow-hidden tw:rounded-[0.625rem] tw:border tw:border-[color-mix(in_srgb,var(--q-secondary)_35%,transparent)] tw:bg-[linear-gradient(120deg,color-mix(in_srgb,var(--q-secondary)_14%,var(--o2-primary-background))_0%,var(--o2-primary-background)_55%,color-mix(in_srgb,var(--q-secondary)_7%,var(--o2-primary-background))_100%)]"
+    class="webinar-home-banner mb-3 relative overflow-hidden rounded-[0.625rem] border border-[color-mix(in_srgb,var(--q-secondary)_35%,transparent)] bg-[linear-gradient(120deg,color-mix(in_srgb,var(--q-secondary)_14%,var(--o2-primary-background))_0%,var(--o2-primary-background)_55%,color-mix(in_srgb,var(--q-secondary)_7%,var(--o2-primary-background))_100%)]"
     data-test="webinar-home-banner"
   >
     <!-- Decorative blobs -->
-    <div class="tw:absolute tw:rounded-full tw:pointer-events-none tw:opacity-[0.18] tw:bg-(--q-secondary) tw:blur-[2.5rem] tw:w-[10rem] tw:h-[10rem] tw:top-[-3rem] tw:left-[-2rem]" aria-hidden="true" />
-    <div class="tw:absolute tw:rounded-full tw:pointer-events-none tw:opacity-[0.18] tw:bg-(--q-secondary) tw:blur-[2.5rem] tw:w-[8rem] tw:h-[8rem] tw:bottom-[-2.5rem] tw:right-[6rem]" aria-hidden="true" />
+    <div class="absolute rounded-full pointer-events-none opacity-[0.18] bg-(--q-secondary) blur-[2.5rem] w-[10rem] h-[10rem] top-[-3rem] left-[-2rem]" aria-hidden="true" />
+    <div class="absolute rounded-full pointer-events-none opacity-[0.18] bg-(--q-secondary) blur-[2.5rem] w-[8rem] h-[8rem] bottom-[-2.5rem] right-[6rem]" aria-hidden="true" />
 
     <!-- Content row -->
-    <div class="webinar-home-content tw:relative tw:z-[1] tw:flex tw:items-center tw:justify-between tw:flex-wrap tw:gap-3 tw:p-4 tw:pr-[1.375rem]">
-      <div class="webinar-home-left tw:flex tw:flex-col tw:gap-[0.3rem]">
+    <div class="webinar-home-content relative z-[1] flex items-center justify-between flex-wrap gap-3 p-4 pr-[1.375rem]">
+      <div class="webinar-home-left flex flex-col gap-[0.3rem]">
         <!-- Live badge -->
-        <div class="webinar-home-badge tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.7rem] tw:font-bold tw:uppercase tw:tracking-[0.06em] tw:text-[var(--q-secondary)]">
-          <span class="webinar-home-badge-dot tw:w-[0.5rem] tw:h-[0.5rem] tw:rounded-full tw:bg-(--q-secondary) tw:shrink-0 tw:[animation:badge-pulse_1.8s_ease-in-out_infinite]" />
+        <div class="webinar-home-badge inline-flex items-center gap-[0.375rem] text-[0.7rem] font-bold uppercase tracking-[0.06em] text-[var(--q-secondary)]">
+          <span class="webinar-home-badge-dot w-[0.5rem] h-[0.5rem] rounded-full bg-(--q-secondary) shrink-0 [animation:badge-pulse_1.8s_ease-in-out_infinite]" />
           {{ webinarData.tag }}
         </div>
 
-        <div class="webinar-home-title tw:text-base tw:font-bold tw:text-[var(--o2-text-primary)] tw:leading-[1.35] tw:max-w-[36rem]">{{ webinarData.title }}</div>
+        <div class="webinar-home-title text-base font-bold text-[var(--o2-text-primary)] leading-[1.35] max-w-[36rem]">{{ webinarData.title }}</div>
 
-        <div v-if="webinarData.date" class="webinar-home-meta tw:flex tw:items-center tw:gap-[0.3rem] tw:text-[0.8125rem] tw:leading-none tw:text-[var(--o2-text-secondary)]">
+        <div v-if="webinarData.date" class="webinar-home-meta flex items-center gap-[0.3rem] text-[0.8125rem] leading-none text-[var(--o2-text-secondary)]">
           <OIcon name="schedule" size="xs" />
-          <span class="tw:[line-height:1]">{{ formattedDate }}</span>
+          <span class="[line-height:1]">{{ formattedDate }}</span>
         </div>
       </div>
 
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="webinar-home-register-btn"
       >
         {{ webinarData.primaryButton.text }}
-        <OIcon name="arrow-forward" size="sm" class="tw:ml-2" />
+        <OIcon name="arrow-forward" size="sm" class="ml-2" />
       </OButton>
     </div>
   </div>

@@ -14,23 +14,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full">
+  <div class="flex flex-col h-full">
     <!-- Loading skeleton -->
     <div
       v-if="loading"
       data-test="stream-llm-eval-loading"
-      class="tw:flex tw:justify-center tw:items-center tw:p-8"
+      class="flex justify-center items-center p-8"
     >
       <OSpinner size="md" />
     </div>
 
     <template v-else>
       <div
-        class="tw:flex-1 tw:overflow-y-auto tw:rounded-lg tw:border tw:border-solid tw:py-2 tw:m-4"
+        class="flex-1 overflow-y-auto rounded-lg border border-solid py-2 m-4"
         :class="
           store.state.theme === 'dark'
-            ? 'tw:border-[#374151] tw:bg-(--o2-primary-background)'
-            : 'tw:border-[#e5e7eb] tw:bg-white'
+            ? 'border-[#374151] bg-(--o2-primary-background)'
+            : 'border-[#e5e7eb] bg-white'
         "
       >
         <OForm
@@ -39,30 +39,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
         >
           <!-- Enable toggle row -->
           <div
-            class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:text-[0.8125rem] tw:border-b tw:border-b-solid"
+            class="flex items-center justify-between px-4 py-2 text-[0.8125rem] border-b border-b-solid"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:border-b-[#4b5563]'
-                : 'tw:border-b-[#e5e7eb]'
+                ? 'border-b-[#4b5563]'
+                : 'border-b-[#e5e7eb]'
             "
           >
-            <div class="tw:flex tw:flex-col tw:gap-0.5 tw:flex-1 tw:pr-4">
+            <div class="flex flex-col gap-0.5 flex-1 pr-4">
               <span
-                class="tw:text-[0.8125rem] tw:font-semibold"
+                class="text-[0.8125rem] font-semibold"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-[#e5e7eb]'
-                    : 'tw:text-[#374151]'
+                    ? 'text-[#e5e7eb]'
+                    : 'text-[#374151]'
                 "
               >
                 {{ t("pipeline.llmEvaluation") }}
               </span>
               <small
-                class="tw:block tw:text-xs tw:italic tw:mt-1"
+                class="block text-xs italic mt-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-[#9ca3af]'
-                    : 'tw:text-[#6b7280]'
+                    ? 'text-[#9ca3af]'
+                    : 'text-[#6b7280]'
                 "
               >
                 {{ t("pipeline.llmEvaluationEnableHelp") }}
@@ -78,13 +78,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           <!-- Config fields — visible when enabled -->
           <template v-if="enabled">
             <!-- LLM Span Identifier -->
-            <div class="tw:pt-3 tw:px-4 tw:pb-1">
+            <div class="pt-3 px-4 pb-1">
               <label
-                class="tw:block tw:text-[0.8125rem] tw:font-semibold tw:mb-1"
+                class="block text-[0.8125rem] font-semibold mb-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-[#e5e7eb]'
-                    : 'tw:text-[#374151]'
+                    ? 'text-[#e5e7eb]'
+                    : 'text-[#374151]'
                 "
               >
                 {{ t("pipeline.llmSpanIdentifier") }}
@@ -95,16 +95,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 searchable
                 labelKey="label"
                 valueKey="value"
-                class="tw:w-full"
+                class="w-full"
                 data-test="stream-llm-eval-span-identifier"
                 @update:model-value="markDirty"
               />
               <small
-                class="tw:block tw:text-xs tw:italic tw:mt-1"
+                class="block text-xs italic mt-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-[#9ca3af]'
-                    : 'tw:text-[#6b7280]'
+                    ? 'text-[#9ca3af]'
+                    : 'text-[#6b7280]'
                 "
               >
                 {{ t("pipeline.llmSpanIdentifierFieldHelp") }}
@@ -112,24 +112,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             </div>
 
             <!-- Evaluation Template Selection -->
-            <div class="tw:pt-3 tw:px-4 tw:pb-1">
+            <div class="pt-3 px-4 pb-1">
               <label
-                class="tw:block tw:text-[0.8125rem] tw:font-semibold tw:mb-1"
+                class="block text-[0.8125rem] font-semibold mb-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-[#e5e7eb]'
-                    : 'tw:text-[#374151]'
+                    ? 'text-[#e5e7eb]'
+                    : 'text-[#374151]'
                 "
               >
                 {{ t("pipeline.evaluationTemplate") }}
               </label>
-              <div class="tw:flex tw:items-center tw:gap-2">
+              <div class="flex items-center gap-2">
                 <OFormSelect
                   name="selectedTemplate"
                   :options="availableTemplates"
                   labelKey="name"
                   valueKey="id"
-                  class="tw:w-full tw:flex-1"
+                  class="w-full flex-1"
                   data-test="stream-llm-eval-template-select"
                   @update:model-value="markDirty"
                 />
@@ -144,11 +144,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 />
               </div>
               <small
-                class="tw:block tw:text-xs tw:italic tw:mt-1"
+                class="block text-xs italic mt-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-[#9ca3af]'
-                    : 'tw:text-[#6b7280]'
+                    ? 'text-[#9ca3af]'
+                    : 'text-[#6b7280]'
                 "
               >
                 {{ t("pipeline.evaluationTemplateHelp") }}
@@ -157,19 +157,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
             <!-- Sampling toggle row -->
             <div
-              class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:text-[0.8125rem] tw:border-b tw:border-b-solid"
+              class="flex items-center justify-between px-4 py-2 text-[0.8125rem] border-b border-b-solid"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:border-b-[#4b5563]'
-                  : 'tw:border-b-[#e5e7eb]'
+                  ? 'border-b-[#4b5563]'
+                  : 'border-b-[#e5e7eb]'
               "
             >
               <span
-                class="tw:text-[0.8125rem] tw:font-semibold"
+                class="text-[0.8125rem] font-semibold"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-[#e5e7eb]'
-                    : 'tw:text-[#374151]'
+                    ? 'text-[#e5e7eb]'
+                    : 'text-[#374151]'
                 "
               >
                 {{ t("pipeline.samplingLabel") }}
@@ -184,15 +184,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             <!-- Sampling rate slider -->
             <div
               v-if="enableSampling"
-              class="tw:pt-3 tw:px-4 tw:pb-1"
+              class="pt-3 px-4 pb-1"
             >
-              <div class="tw:mb-1">
+              <div class="mb-1">
                 <span
-                  class="tw:text-xs"
+                  class="text-xs"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:text-[#e5e7eb]'
-                      : 'tw:text-[#374151]'
+                      ? 'text-[#e5e7eb]'
+                      : 'text-[#374151]'
                   "
                 >
                   {{
@@ -211,11 +211,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 @update:model-value="markDirty"
               />
               <small
-                class="tw:block tw:text-xs tw:italic tw:mt-1"
+                class="block text-xs italic mt-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-[#9ca3af]'
-                    : 'tw:text-[#6b7280]'
+                    ? 'text-[#9ca3af]'
+                    : 'text-[#6b7280]'
                 "
               >
                 {{ t("pipeline.llmEvaluationSamplingHelp") }}
@@ -223,29 +223,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             </div>
 
             <!-- Output stream name -->
-            <div class="tw:pt-3 tw:px-4 tw:pb-1">
+            <div class="pt-3 px-4 pb-1">
               <label
-                class="tw:block tw:text-[0.8125rem] tw:font-semibold tw:mb-1"
+                class="block text-[0.8125rem] font-semibold mb-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-[#e5e7eb]'
-                    : 'tw:text-[#374151]'
+                    ? 'text-[#e5e7eb]'
+                    : 'text-[#374151]'
                 "
               >
                 {{ t("pipeline.llmEvaluationOutputStreamName") }}
               </label>
               <OFormInput
                 name="outputStream"
-                class="tw:w-full"
+                class="w-full"
                 data-test="stream-llm-eval-output-stream"
                 @update:model-value="markDirty"
               />
               <small
-                class="tw:block tw:text-xs tw:italic tw:mt-1"
+                class="block text-xs italic mt-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-[#9ca3af]'
-                    : 'tw:text-[#6b7280]'
+                    ? 'text-[#9ca3af]'
+                    : 'text-[#6b7280]'
                 "
               >
                 {{ t("pipeline.llmEvaluationOutputStreamHelp") }}
@@ -257,11 +257,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           <div
             v-else
             data-test="stream-llm-eval-info-banner"
-            class="tw:mx-4 tw:my-3 tw:p-3 tw:rounded tw:border tw:border-solid tw:text-xs"
+            class="mx-4 my-3 p-3 rounded border border-solid text-xs"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:text-[#fcd34d] tw:border-[#92400e] tw:bg-[rgba(146,64,14,0.15)]'
-                : 'tw:text-[#92400e] tw:border-[#fde68a] tw:bg-[#fffbeb]'
+                ? 'text-[#fcd34d] border-[#92400e] bg-[rgba(146,64,14,0.15)]'
+                : 'text-[#92400e] border-[#fde68a] bg-[#fffbeb]'
             "
           >
             {{ t("pipeline.llmEvaluationRemoveWarning") }}

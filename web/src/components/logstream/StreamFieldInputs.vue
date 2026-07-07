@@ -1,6 +1,6 @@
 <template>
   <div data-test="add-stream-fields-section">
-    <div v-if="showHeader" data-test="alert-conditions-text" class="tw:text-[var(--o2-text-label)] tw:text-sm">
+    <div v-if="showHeader" data-test="alert-conditions-text" class="text-[var(--o2-text-label)] text-sm">
       {{ t("logStream.fields") }}
     </div>
     <template v-if="!formRows.length">
@@ -9,7 +9,7 @@
         variant="outline"
         size="sm-action"
         icon-left="add"
-        class="tw:mt-2"
+        class="mt-2"
         @click="addRow"
       >
         {{ t("logStream.addField") }}
@@ -26,10 +26,10 @@
       <div
         v-for="(row, index) in formRows as any[]"
         :key="index"
-        class="tw:flex tw:flex-wrap tw:items-start tw:gap-2 tw:mt-2"
+        class="flex flex-wrap items-start gap-2 mt-2"
         :data-test="`add-stream-field-row-${index}`"
       >
-        <div data-test="add-stream-field-name-input" class="tw:flex-1 tw:min-w-[160px]">
+        <div data-test="add-stream-field-name-input" class="flex-1 min-w-[160px]">
           <OFormInput
             :data-test="`add-stream-field-name-input-${index}`"
             :name="`${formFieldName}[${index}].name`"
@@ -42,7 +42,7 @@
         <div
           v-if="visibleInputs.index_type"
           data-test="add-stream-field-index-type-select"
-          class="tw:min-w-[140px]"
+          class="min-w-[140px]"
         >
           <OFormSelect
             :name="`${formFieldName}[${index}].index_type`"
@@ -54,7 +54,7 @@
         </div>
         <div
           v-if="visibleInputs.data_type"
-          class="tw:min-w-[100px]"
+          class="min-w-[100px]"
         >
           <OFormSelect
             data-test="add-stream-field-data-type-select"
@@ -67,7 +67,7 @@
             :placeholder="t('logStream.dataType') + ' *'"
           />
         </div>
-        <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
+        <div class="flex items-center gap-1 shrink-0">
           <OButton
             data-test="add-stream-add-field-btn"
             v-if="index === formRows.length - 1"

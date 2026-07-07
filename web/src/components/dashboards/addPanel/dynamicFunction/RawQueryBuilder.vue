@@ -2,7 +2,7 @@
   <div style="width: 100%" data-test="dashboard-raw-query-builder">
     <div class="query-section" data-test="dashboard-raw-query-section">
       <div class="query-label" data-test="dashboard-raw-query-title">Query</div>
-      <div class="query-label tw:text-xs" data-test="dashboard-raw-query-instruction">
+      <div class="query-label text-xs" data-test="dashboard-raw-query-instruction">
         Write a SQL query for complex actions.
       </div>
 
@@ -10,7 +10,7 @@
         v-model="fields.rawQuery"
         :rows="6"
         data-test="dashboard-raw-query-textarea"
-        class="tw:mt-0.5"
+        class="mt-0.5"
       />
     </div>
   </div>

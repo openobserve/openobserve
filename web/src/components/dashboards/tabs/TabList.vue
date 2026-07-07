@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop
         :data-test="`dashboard-tab-${tab.tabId}`"
       >
-        <div class="tw:w-full tw:flex tw:justify-between tw:flex-nowrap">
+        <div class="w-full flex justify-between flex-nowrap">
           <span
             style="
               white-space: nowrap;
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-show="isHovered"
       variant="ghost"
       size="icon"
-      class="tw:ml-1"
+      class="ml-1"
       @click="
         () => {
           showAddTabDialog = true;

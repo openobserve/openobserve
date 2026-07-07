@@ -28,23 +28,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Child mode (app convention): OTooltip attaches to its trigger sibling
        (the slotted chip). Wrapper is `display:contents` so it adds no box. -->
-  <span class="tw:contents">
+  <span class="contents">
     <slot />
-    <OTooltip :side="side" :delay="delay" max-width="260px" content-class="tw:p-0!">
+    <OTooltip :side="side" :delay="delay" max-width="260px" content-class="p-0!">
       <template #content>
         <div
-          class="tw:w-[252px] tw:py-[11px] tw:px-3 tw:text-xs tw:text-[var(--o2-text-primary)]"
+          class="w-[252px] py-[11px] px-3 text-xs text-[var(--o2-text-primary)]"
           :data-test="`turn-preview-${index + 1}`"
         >
           <!-- Header: Turn N · time · status -->
-          <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-            <span class="tw:text-[12.5px] tw:font-bold">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-[12.5px] font-bold">
               {{ t('traces.sessionDetail.turnLabel') }} {{ index + 1 }}
             </span>
-            <span class="tw:text-[10px] tw:text-[var(--o2-text-muted)]">{{ timeLabel }}</span>
+            <span class="text-[10px] text-[var(--o2-text-muted)]">{{ timeLabel }}</span>
             <OBadge
               size="sm"
-              class="tw:ml-auto"
+              class="ml-auto"
               :variant="turn.status === 'error' ? 'error-soft' : 'success-soft'"
             >
               {{ turn.status === 'error' ? t('traces.sessionDetail.statusError') : t('traces.sessionDetail.statusOk') }}
@@ -52,34 +52,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- User message preview -->
-          <div class="tw:mb-[9px] tw:leading-[1.5]">
+          <div class="mb-[9px] leading-[1.5]">
             <span
-              class="tw:block tw:text-[9.5px] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:text-[var(--o2-text-muted)] tw:mb-0.5"
+              class="block text-[9.5px] font-bold uppercase tracking-[0.05em] text-[var(--o2-text-muted)] mb-0.5"
             >
               {{ t('traces.sessionDetail.roles.user') }}
             </span>
-            <span class="tw:line-clamp-2">{{ userText }}</span>
+            <span class="line-clamp-2">{{ userText }}</span>
           </div>
 
           <!-- Stats grid: Cost · Latency · Tokens · Cache -->
           <div
-            class="tw:grid tw:grid-cols-2 tw:gap-x-3 tw:gap-y-[7px] tw:border-t tw:border-[var(--o2-border-color)] tw:pt-[9px]"
+            class="grid grid-cols-2 gap-x-3 gap-y-[7px] border-t border-[var(--o2-border-color)] pt-[9px]"
           >
-            <div class="tw:flex tw:items-center tw:justify-between tw:text-[11px]">
-              <span class="tw:text-[var(--o2-text-muted)]">{{ t('traces.sessionDetail.stats.cost') }}</span>
-              <span class="tw:font-[650]">{{ costLabel }}</span>
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="text-[var(--o2-text-muted)]">{{ t('traces.sessionDetail.stats.cost') }}</span>
+              <span class="font-[650]">{{ costLabel }}</span>
             </div>
-            <div class="tw:flex tw:items-center tw:justify-between tw:text-[11px]">
-              <span class="tw:text-[var(--o2-text-muted)]">{{ t('traces.sessionDetail.kpi.duration') }}</span>
-              <span class="tw:font-[650]">{{ latencyLabel }}</span>
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="text-[var(--o2-text-muted)]">{{ t('traces.sessionDetail.kpi.duration') }}</span>
+              <span class="font-[650]">{{ latencyLabel }}</span>
             </div>
-            <div class="tw:flex tw:items-center tw:justify-between tw:text-[11px]">
-              <span class="tw:text-[var(--o2-text-muted)]">{{ t('traces.sessionDetail.kpi.tokens') }}</span>
-              <span class="tw:font-[650]">{{ tokensLabel }}</span>
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="text-[var(--o2-text-muted)]">{{ t('traces.sessionDetail.kpi.tokens') }}</span>
+              <span class="font-[650]">{{ tokensLabel }}</span>
             </div>
-            <div class="tw:flex tw:items-center tw:justify-between tw:text-[11px]">
-              <span class="tw:text-[var(--o2-text-muted)]">{{ t('traces.sessionDetail.stats.cache') }}</span>
-              <span class="tw:font-[650]">{{ cachePct }}%</span>
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="text-[var(--o2-text-muted)]">{{ t('traces.sessionDetail.stats.cache') }}</span>
+              <span class="font-[650]">{{ cachePct }}%</span>
             </div>
           </div>
         </div>

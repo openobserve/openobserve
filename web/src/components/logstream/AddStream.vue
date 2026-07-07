@@ -27,12 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="emits('update:open', $event)"
     @click:secondary="emits('update:open', false)"
   >
-    <div class="tw:w-full">
+    <div class="w-full">
       <OForm
         id="add-stream-form"
         :form="addStreamForm"
       >
-        <div class="tw:mt-2">
+        <div class="mt-2">
           <OFormInput
             data-test="add-stream-name-input"
             name="name"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="tw:mt-2">
+        <div class="mt-2">
           <OFormSelect
             data-test="add-stream-type-input"
             name="stream_type"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="tw:mt-2">
+        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="mt-2">
           <OFormInput
             data-test="add-stream-data-retention"
             name="dataRetentionDays"
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <StreamFieldInputs
-          class="tw:mt-4"
+          class="mt-4"
           form-field-name="fields"
         />
       </OForm>
@@ -77,12 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODialog>
 
   <!-- Inline form for pipeline usage (no drawer wrapper) -->
-    <div v-else class="tw:p-4 tw:w-full">
+    <div v-else class="p-4 w-full">
       <OForm
         :form="addStreamForm"
         v-slot="{ isSubmitting }"
       >
-        <div class="tw:mt-2">
+        <div class="mt-2">
           <OFormInput
             data-test="add-stream-name-input"
             name="name"
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="tw:mt-2">
+        <div class="mt-2">
           <OFormSelect
             data-test="add-stream-type-input"
             name="stream_type"
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="tw:mt-2">
+        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="mt-2">
           <OFormInput
             data-test="add-stream-data-retention"
             name="dataRetentionDays"
@@ -119,11 +119,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <StreamFieldInputs
-          class="tw:mt-4"
+          class="mt-4"
           form-field-name="fields"
         />
 
-        <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
+        <div class="flex justify-start mt-6 gap-2">
           <OButton
             data-test="add-stream-cancel-btn"
             variant="outline"

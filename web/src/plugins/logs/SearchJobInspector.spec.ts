@@ -350,15 +350,15 @@ describe("SearchJobInspector — getResponseTimeLabel", () => {
   it("uses green color class in dark theme for ultra-fast/fast", () => {
     store.commit("appTheme", "dark");
     const wrapper = mountComponent();
-    expect(wrapper.vm.getResponseTimeLabel(10).colorClass).toBe("tw:text-green-400");
-    expect(wrapper.vm.getResponseTimeLabel(100).colorClass).toBe("tw:text-green-400");
+    expect(wrapper.vm.getResponseTimeLabel(10).colorClass).toBe("text-green-400");
+    expect(wrapper.vm.getResponseTimeLabel(100).colorClass).toBe("text-green-400");
   });
 
   it("uses green color class in light theme for ultra-fast/fast", () => {
     store.commit("appTheme", "light");
     const wrapper = mountComponent();
-    expect(wrapper.vm.getResponseTimeLabel(10).colorClass).toBe("tw:text-green-600");
-    expect(wrapper.vm.getResponseTimeLabel(100).colorClass).toBe("tw:text-green-600");
+    expect(wrapper.vm.getResponseTimeLabel(10).colorClass).toBe("text-green-600");
+    expect(wrapper.vm.getResponseTimeLabel(100).colorClass).toBe("text-green-600");
     store.commit("appTheme", "dark"); // restore
   });
 });

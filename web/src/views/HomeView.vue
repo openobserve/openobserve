@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="tw:rounded-md tw:overflow-hidden tw:min-h-0 tw:h-full tw:flex tw:flex-col"
+    class="rounded-md overflow-hidden min-h-0 h-full flex flex-col"
     data-test="home-page"
   >
     <!-- No card-container here: the page already renders inside MainLayout's
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          a padded root insets the header and makes it read as a floating bar.
          Padding is reintroduced on the body wrapper below the header instead. -->
     <div
-      class="tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
+      class="h-full overflow-hidden flex flex-col min-h-0"
     >
       <!-- Top-level page header: module icon + "Home" title, with the home tabs
            rendered as a full-width strip below (tabsBelow). The header owns its
@@ -40,9 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="t('home.subtitle')"
         icon="home"
         :tabs-below="tabOrder.length > 1"
-        class="tw:shrink-0 tw:px-4"
+        class="shrink-0 px-4"
         :class="
-          tabOrder.length > 1 ? '' : 'tw:border-b tw:border-border-default'
+          tabOrder.length > 1 ? '' : 'border-b border-border-default'
         "
       >
         <template v-if="tabOrder.length > 1" #tabs>
@@ -66,9 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Body: padded wrapper that holds the active tab panel. Padding lives
            here (not on the root) so the header above stays full-bleed. -->
-      <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:pt-px tw:px-2.5 tw:pb-2.5">
+      <div class="flex-1 min-h-0 flex flex-col pt-px px-2.5 pb-2.5">
         <!-- O2 AI Assistant tab -->
-        <div v-if="activeHomeTab === 'ai'" class="home-ai-panel tw:flex-1 tw:min-h-0 tw:flex tw:flex-row tw:overflow-hidden">
+        <div v-if="activeHomeTab === 'ai'" class="home-ai-panel flex-1 min-h-0 flex flex-row overflow-hidden">
           <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
           <O2AIChat
             ref="homeChat"
@@ -82,13 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              already provides the border; avoids a double-bordered card). -->
         <div
           v-if="activeHomeTab === 'overview'"
-          class="tw:flex-1 tw:min-h-0 tw:overflow-hidden"
+          class="flex-1 min-h-0 overflow-hidden"
         >
           <OverviewTab />
         </div>
 
         <!-- Usage tab -->
-        <div v-if="activeHomeTab === 'usage'" class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:-mr-2.5">
+        <div v-if="activeHomeTab === 'usage'" class="flex-1 min-h-0 overflow-hidden -mr-2.5">
           <UsageTab />
         </div>
       </div>

@@ -15,7 +15,7 @@
     @click:neutral="handleDeleteWithConfirm"
   >
     <OForm id="add-annotation-form" :schema="addAnnotationSchema" :default-values="addAnnotationDefaults" @submit="saveAnnotation">
-    <div class="tw:flex tw:flex-col">
+    <div class="flex flex-col">
         <OFormInput
           name="title"
           label="Title"
@@ -36,10 +36,10 @@
             multiple
             style="min-width: 150px"
             label="Select Panels"
-            class="textbox tw:flex tw:flex-col no-case showLabelOnTop"
+            class="textbox flex flex-col no-case showLabelOnTop"
             data-test="dashboard-add-annotation-panels-select"
           />
-        <div class="tw:text-xs tw:mt-3">
+        <div class="text-xs mt-3">
           Timestamp: {{ annotationDateString }}
         </div>
     </div>

@@ -16,21 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:py-2 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+    class="py-2 px-4 border-b border-solid border-[var(--o2-border-color)]"
   >
-    <div class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap">
-      <span class="tw:text-xs tw:font-semibold tw:opacity-70">
+    <div class="flex items-center gap-3 flex-wrap">
+      <span class="text-xs font-semibold opacity-70">
         {{ filterLabelComputed }}:
       </span>
       <div
         v-for="(value, key) in dimensions"
         :key="key"
-        class="tw:flex tw:items-center tw:gap-2"
+        class="flex items-center gap-2"
       >
         <span
-          class="tw:text-xs tw:font-semibold"
+          class="text-xs font-semibold"
           :class="
-            unstableDimensionKeys.has(key) ? 'tw:opacity-60' : 'tw:opacity-100'
+            unstableDimensionKeys.has(key) ? 'opacity-60' : 'opacity-100'
           "
         >
           {{ key }}:
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm-action"
         :disabled="!hasPendingChanges"
         @click="handleApply"
-        class="tw:ml-2"
+        class="ml-2"
         data-test="apply-dimension-filters"
       >
         {{ applyLabelComputed }}

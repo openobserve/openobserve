@@ -16,40 +16,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-alert-conditions tw:w-full tw:rounded-lg tw:mx-auto tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]"
+    class="step-alert-conditions w-full rounded-lg mx-auto bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <!-- Section header -->
     <div
-      class="tw:flex tw:items-center tw:py-2.5 tw:px-3"
-      :class="store.state.theme === 'dark' ? 'tw:border-b tw:border-[#343434]' : 'tw:border-b tw:border-[#eeeeee]'"
+      class="flex items-center py-2.5 px-3"
+      :class="store.state.theme === 'dark' ? 'border-b border-[#343434]' : 'border-b border-[#eeeeee]'"
     >
-      <div class="tw:w-0.75 tw:h-4 tw:rounded-xs tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
+      <div class="w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--q-primary)]" />
       <span
-        class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-[var(--color-text-primary)]"
+        class="text-[13px] font-semibold tracking-[0.01em] text-[var(--color-text-primary)]"
       >{{
         t("alerts.alertSettings.sectionTitle")
       }}</span>
     </div>
-    <div class="tw:px-3 tw:py-2">
+    <div class="px-3 py-2">
       <div>
         <!-- For Real-Time Alerts -->
         <template v-if="isRealTime === 'true'">
           <!-- Silence Notification (Cooldown) -->
-          <div class="tw:flex tw:justify-start tw:items-start tw:pb-3 tw:mb-4">
+          <div class="flex justify-start items-start pb-3 mb-4">
             <div
-              class="tw:font-semibold tw:flex tw:items-center"
+              class="font-semibold flex items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.cooldownTooltip')"
                   side="right"
                 />
             </div>
             <div>
-              <div class="tw:flex tw:items-center tw:mr-2" style="width: fit-content">
+              <div class="flex items-center mr-2" style="width: fit-content">
                 <div
                   style="width: 87px; margin-left: 0 !important"
                   class="silence-notification-input"
@@ -72,9 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     font-size: 13px;
                   "
                   :class="
-                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
+                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
                   "
-                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   formData.trigger_condition.silence === null ||
                   formData.trigger_condition.silence === ''
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -95,21 +95,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destinations -->
-          <div class="tw:flex tw:items-start tw:pb-4 tw:mb-4">
+          <div class="flex items-start pb-4 mb-4">
             <div
               style="width: 190px; height: 28px"
-              class="tw:flex tw:items-center tw:font-semibold"
+              class="flex items-center font-semibold"
             >
               <span>{{ t("alerts.destination") }} *</span>
             </div>
-            <div class="tw:flex tw:flex-col">
-              <div class="tw:flex tw:items-center">
+            <div class="flex flex-col">
+              <div class="flex items-center">
                 <OSelect
                   v-model="localDestinations"
                   :options="formattedDestinations"
                   data-test="alert-destinations-select"
                   multiple
-                  class="tw:min-w-[180px] tw:max-w-[300px]"
+                  class="min-w-[180px] max-w-[300px]"
                   @update:model-value="emitDestinationsUpdate"
                 >
                   <template #empty>{{
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OSelect>
                 <OButton
                   data-test="alert-settings-refresh-destinations-btn"
-                  class="tw:ml-1"
+                  class="ml-1"
                   variant="ghost"
                   size="icon-circle-sm"
                   :title="t('alerts.alertSettings.refreshDestinations')"
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="create-destination-btn"
                   variant="outline"
                   size="sm"
-                  class="tw:ml-2"
+                  class="ml-2"
                   @click="routeToCreateDestination"
                   >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
                 >
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   destinationsTouched &&
                   (!localDestinations || localDestinations.length === 0)
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -152,13 +152,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Scheduled Alerts -->
         <template v-else>
           <!-- Period -->
-          <div class="tw:flex tw:items-start tw:mr-2 tw:mb-4!">
+          <div class="flex items-start mr-2 mb-4!">
             <div
-              class="tw:font-semibold tw:flex tw:items-center"
+              class="font-semibold flex items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.period") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.periodTooltip')"
                   side="right"
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div
                 ref="periodFieldRef"
-                class="tw:flex tw:items-center tw:mr-2"
+                class="flex items-center mr-2"
                 style="width: fit-content"
               >
                 <div
@@ -192,16 +192,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     font-size: 13px;
                   "
                   :class="
-                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
+                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
                   "
-                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
               </div>
               <div
                 v-if="!Number(formData.trigger_condition.period)"
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -210,13 +210,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-          <div class="tw:flex tw:items-start tw:mr-2 tw:mb-4!">
+          <div class="flex items-start mr-2 mb-4!">
             <div
-              class="tw:font-semibold tw:flex tw:items-center"
+              class="font-semibold flex items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.cooldownTooltip')"
                   side="right"
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div
                 ref="silenceFieldRef"
-                class="tw:flex tw:items-center tw:mr-2"
+                class="flex items-center mr-2"
                 style="width: fit-content"
               >
                 <div style="width: 87px; margin-left: 0 !important">
@@ -246,9 +246,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     font-size: 13px;
                   "
                   :class="
-                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
+                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
                   "
-                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -260,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   formData.trigger_condition.silence === null ||
                   formData.trigger_condition.silence === ''
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -269,20 +269,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destinations -->
-          <div class="tw:flex tw:items-start tw:mr-2 tw:mb-4!">
+          <div class="flex items-start mr-2 mb-4!">
             <div
-              class="tw:font-semibold tw:flex tw:items-center"
+              class="font-semibold flex items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.destination") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.destinationsTooltip')"
                   side="right"
                 />
             </div>
             <div>
-              <div class="tw:flex tw:items-center">
+              <div class="flex items-center">
                 <OSelect
                   ref="destinationsFieldRef"
                   v-model="localDestinations"
@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-destinations-select"
                   multiple
                   :error="destinationError"
-                  class="tw:min-w-[180px] tw:max-w-[300px]"
+                  class="min-w-[180px] max-w-[300px]"
                   @update:model-value="
                     destinationError = false;
                     emitDestinationsUpdate();
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OSelect>
                 <OButton
                   data-test="alert-settings-refresh-destinations-btn"
-                  class="tw:ml-1"
+                  class="ml-1"
                   variant="ghost"
                   size="icon-circle-sm"
                   :title="t('alerts.alertSettings.refreshDestinations')"
@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="create-destination-btn"
                   variant="outline"
                   size="sm"
-                  class="tw:ml-2"
+                  class="ml-2"
                   @click="routeToCreateDestination"
                   >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
                 >
@@ -324,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   destinationsTouched &&
                   (!localDestinations || localDestinations.length === 0)
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -334,13 +334,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- Creates Incident toggle — shown for all alert types -->
-        <div class="tw:flex tw:items-start tw:mb-4!">
+        <div class="flex items-start mb-4!">
           <div
-            class="tw:font-semibold tw:flex tw:items-center"
+            class="font-semibold flex items-center"
             style="width: 190px; height: 28px"
           >
             {{ t("alerts.alertSettings.createsIncident") }}
-            <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+            <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
               <OTooltip
                 :content="t('alerts.alertSettings.createsIncidentTooltip')"
                 side="right"
