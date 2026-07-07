@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="add-regex-pattern-drawer"
   >
     <template #header-right>
-      <div class="tw:flex tw:items-center tw:gap-2">
+      <div class="flex items-center gap-2">
         <OButton
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
           variant="ghost"
@@ -50,20 +50,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="fullscreen"
             size="xs"
-            :class="isFullScreen ? 'tw:text-[var(--o2-primary)]' : ''"
+            :class="isFullScreen ? 'text-[var(--o2-primary)]' : ''"
           />
         </OButton>
       </div>
     </template>
     <!-- form inputs starts here -->
-    <div class="tw:flex tw:w-[100%] tw:h-full">
+    <div class="flex w-[100%] h-full">
       <div
         :class="
           store.state.isAiChatEnabled
             ? isFullScreen
-              ? 'tw:w-[75%] tw:pl-2'
-              : 'tw:w-[65%] tw:pl-2'
-            : 'tw:w-[100%] tw:px-3'
+              ? 'w-[75%] pl-2'
+              : 'w-[65%] pl-2'
+            : 'w-[100%] px-3'
         "
       >
         <OForm
@@ -72,9 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :schema="addRegexPatternSchema"
           :default-values="addRegexPatternDefaults"
           @submit="saveRegexPattern"
-          class="tw:flex tw:flex-col tw:gap-4 tw:mt-2"
+          class="flex flex-col gap-4 mt-2"
         >
-          <div class="tw:flex tw:flex-col tw:gap-y-3">
+          <div class="flex flex-col gap-y-3">
             <OFormInput
               name="name"
               :readonly="isEdit"
@@ -89,13 +89,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :readonly="isEdit"
               :disabled="isEdit"
               :label="t('regex_patterns.description')"
-              class="tw:pb-3"
+              class="pb-3"
               data-test="add-regex-pattern-description-input"
               placeholder="Describe your pattern to help users understand"
             />
+            <OBanner
+              variant="info"
+              icon="info"
+              dense
+              data-test="add-regex-pattern-lookaround-note"
+            >
+              <div class="text-[12px] font-normal leading-[18px]">
+                {{ t("regex_patterns.unsupported_lookaround_note") }}
+                {{ t("regex_patterns.unsupported_lookaround_example") }}
+                <code
+                  class="font-mono text-[12px] px-[4px] py-[1px] rounded-[4px] bg-[var(--color-banner-info-border)]"
+                  >(?=openobserve)\w+</code
+                >
+                <OIcon
+                  name="arrow-right-alt"
+                  size="xs"
+                  class="inline-block align-middle mx-1"
+                />
+                <code
+                  class="font-mono text-[12px] px-[4px] py-[1px] rounded-[4px] bg-[var(--color-banner-info-border)]"
+                  >openobserve\w*</code
+                >
+              </div>
+            </OBanner>
             <div class="regex-pattern-input-container">
-              <div class="tw:flex tw:items-center tw:justify-between">
-                <span class="regex-pattern-input-label"> Regex Pattern </span>
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold leading-5.25"> Regex Pattern </span>
                 <OButton
                   v-if="
                     config.isEnterprise == 'true' &&
@@ -107,35 +131,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <img
                     :src="goToAILogo"
-                    class="tw:w-[20px] tw:h-[20px] tw:mr-1"
+                    class="w-[20px] h-[20px] mr-1"
                   />
                   <span
-                    class="tw:text-[#5960B2] tw:text-sm tw:flex tw:items-center tw:gap-1"
+                    class="text-[#5960B2] text-sm flex items-center gap-1"
                   >
                     Try O2 Assistant to write expressions
                   </span>
                   <OIcon
                     size="sm"
                     name="arrow-right-alt"
-                    class="tw:text-[#5960B2] tw:w-[20px] tw:h-[20px] tw:ml-1"
+                    class="text-[#5960B2] w-[20px] h-[20px] ml-1"
                   />
                 </OButton>
               </div>
               <div class="regex-pattern-input">
                 <div
-                  class="tw:py-[2px] tw:h-[24px]"
+                  class="py-[2px] h-[24px]"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:bg-gray-500'
-                      : 'tw:bg-gray-200 '
+                      ? 'bg-gray-500'
+                      : 'bg-gray-200 '
                   "
                 >
                   <div
-                    class="tw:text-[12px] tw:font-[500] tw:px-2"
+                    class="text-[12px] font-[500] px-2"
                     :class="[
                       store.state.theme === 'dark'
-                        ? 'tw:text-[#ffffff]'
-                        : 'tw:text-[#6B7280]',
+                        ? 'text-[#ffffff]'
+                        : 'text-[#6B7280]',
                     ]"
                   >
                     Write Pattern
@@ -145,11 +169,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="pattern"
                   data-test="add-regex-pattern-input"
                   class="regex-pattern-input"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'dark-mode-regex-pattern-input'
-                      : 'light-mode-regex-pattern-input'
-                  "
                   tabindex="0"
                   style="width: 100%; resize: none"
                   placeholder="Eg. \d....\d "
@@ -157,10 +176,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <OSeparator class="tw:my-2" />
+            <OSeparator class="my-2" />
             <div>
-              <div class="tw:flex tw:items-center tw:justify-between">
-                <span class="regex-pattern-test-string-label">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold leading-5.25">
                   Test Regex Pattern
                 </span>
                 <OButton
@@ -173,17 +192,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </div>
             </div>
-            <div class="regex-pattern-test-string-container tw:mb-2">
+            <div class="regex-pattern-test-string-container mb-2">
               <FullViewContainer
                 name="query"
                 v-model:is-expanded="expandState.regexTestString"
                 label="Input string"
-                class="tw:mt-1 tw:py-md tw:h-[24px]"
+                class="mt-1 py-md h-[24px]"
                 :labelClass="
                   store.state.theme === 'dark'
-                    ? 'dark-test-string-container-label'
-                    : 'light-test-string-container-label'
-                "
+                    ? 'text-white font-medium text-xs leading-[21px]'
+                    : 'text-[#6b7280] font-medium text-xs leading-[21px] -ml-1'"
               >
                 <template #right> </template>
               </FullViewContainer>
@@ -198,8 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     store.state.theme === 'dark'
                       ? 'dark-mode-regex-test-string-input'
-                      : 'light-mode-regex-test-string-input'
-                  "
+                      : 'light-mode-regex-test-string-input bg-white! border-l! border-l-[#e6e6e6]! border-r! border-r-[#e6e6e6]! border-b! border-b-[#e6e6e6]!'"
                   tabindex="0"
                   style="width: 100%; resize: none"
                   placeholder="Eg. 1234567890"
@@ -212,12 +229,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="output"
                 v-model:is-expanded="expandState.outputString"
                 label="Output"
-                class="tw:mt-1 tw:py-md tw:h-[24px]"
+                class="mt-1 py-md h-[24px]"
                 :labelClass="
                   store.state.theme === 'dark'
-                    ? 'dark-test-string-container-label'
-                    : 'light-test-string-container-label'
-                "
+                    ? 'text-white font-medium text-xs leading-[21px]'
+                    : 'text-[#6b7280] font-medium text-xs leading-[21px] -ml-1'"
               >
               </FullViewContainer>
               <div v-if="expandState.outputString" class="regex-pattern-input">
@@ -230,8 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     store.state.theme === 'dark'
                       ? 'dark-mode-regex-test-string-input'
-                      : 'light-mode-regex-test-string-input'
-                  "
+                      : 'light-mode-regex-test-string-input bg-white! border-l! border-l-[#e6e6e6]! border-r! border-r-[#e6e6e6]! border-b! border-b-[#e6e6e6]!'"
                   tabindex="0"
                   style="width: 100%; resize: none"
                   placeholder="Output String"
@@ -239,11 +254,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-else
-                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[111px]"
+                  class="flex flex-col items-center justify-center h-[111px]"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'dark-mode-regex-no-output'
-                      : 'light-mode-regex-no-output'
+                      ? 'bg-(--o2-primary-background)! border-l-2! border-r-2! border-b-2! border-(--o2-primary-background)!'
+                      : 'bg-white! border-l! border-r! border-b! border-[#e6e6e6]!'
                   "
                 >
                   <div v-if="!testLoading && outputStringValue.length === 0">
@@ -252,16 +267,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="md"
                       :class="
                         store.state.theme === 'dark'
-                          ? 'tw:text-[#ffffff]'
-                          : 'tw:text-[#A8A8A8]'
+                          ? 'text-[#ffffff]'
+                          : 'text-[#A8A8A8]'
                       "
                     />
                     <span
-                      class="tw:text-[12px] tw:font-[400] tw:text-center"
+                      class="text-[12px] font-[400] text-center"
                       :class="
                         store.state.theme === 'dark'
-                          ? 'tw:text-[#ffffff]'
-                          : 'tw:text-[#4B5563]'
+                          ? 'text-[#ffffff]'
+                          : 'text-[#4B5563]'
                       "
                     >
                       Please click Test Input to see the results
@@ -269,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div v-else-if="testLoading">
                     <span
-                      class="tw:flex tw:items-center tw:justify-center tw:h-[111px]"
+                      class="flex items-center justify-center h-[111px]"
                     >
                       <OSpinner size="sm" />
                     </span>
@@ -281,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="tw:ml-2"
+        class="ml-2"
         v-if="store.state.isAiChatEnabled"
         style="
           width: 35%;
@@ -330,6 +345,7 @@ import { useRouter } from "vue-router";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import {
   makeAddRegexPatternSchema,
   type AddRegexPatternForm,
@@ -355,6 +371,7 @@ export default defineComponent({
   emit: ["close", "update:list", "update:open"],
   components: {
     OSeparator,
+    OBanner,
     FullViewContainer,
     O2AIChat,
     OButton,
@@ -611,151 +628,22 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.add-regex-pattern-container {
-  width: 600px !important;
-}
-.add-regex-pattern-o2ai-enabled {
-  width: calc(100vw - 500px) !important;
-}
-.add-regex-pattern-title {
-  font-weight: 400;
-  font-size: 18px;
-  text-align: left;
-}
-.add-regex-pattern-light {
-  .add-regex-pattern-title {
-    color: #000000;
-  }
-}
-
-.add-regex-pattern-name-input .q-field__control {
-  display: flex;
-  align-items: center;
-  height: 44px;
-}
-.add-regex-pattern-description-input .q-field__control {
-  display: flex;
-  align-items: center;
-  height: 65px;
-}
-.regex-pattern-input-container {
-  border: 0px 1px 1px 1px solid #e6e6e6;
-}
-.regex-pattern-test-string-container {
-  border: 0px 1px 1px 1px solid #e6e6e6;
-}
-
-.dark-mode-regex-pattern-input .q-field__control {
-  background-color: #181a1b !important;
-  border-left: 1px solid #212121 !important;
-  border-right: 1px solid #212121 !important;
-  border-bottom: 1px solid #212121 !important;
-}
-.light-mode-regex-pattern-input .q-field__control {
-  background-color: #ffffff !important;
-  border-left: 1px solid #e6e6e6 !important;
-  border-right: 1px solid #e6e6e6 !important;
-  border-bottom: 1px solid #e6e6e6 !important;
-}
+<style>
 .regex-pattern-input > div > div > div > textarea {
   height: 200px !important;
   resize: none !important;
   padding-left: 0.5rem !important;
 }
 
-.dark-mode-regex-test-string-input .q-field__control {
-  background-color: #181a1b !important;
-  border-left: 2px solid #212121 !important;
-  border-right: 2px solid #212121 !important;
-  border-bottom: 2px solid #212121 !important;
-}
-.light-mode-regex-test-string-input {
-  background-color: #ffffff !important;
-  border-left: 1px solid #e6e6e6 !important;
-  border-right: 1px solid #e6e6e6 !important;
-  border-bottom: 1px solid #e6e6e6 !important;
-}
 .regex-test-string-input > div > div > div > textarea {
   resize: none !important;
   padding-left: 0.5rem !important;
 }
-.is-pattern-valid > div > div {
-  .q-field__native {
-    color: green !important;
-  }
-}
-</style>
 
-<style lang="scss">
-.regex-pattern-test-string-editor {
-  .lines-content {
-    padding-left: 12px !important;
-  }
-}
-.light-mode-regex-test-string-input {
-  .monaco-editor-background {
-    background-color: #ffffff !important;
-  }
-}
-.dark-mode-regex-test-string-input {
-  .monaco-editor-background {
-    background-color: #181a1b !important;
-  }
-}
-.regex-pattern-input-label {
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 21px;
-}
-.add-regex-pattern-dark {
-  .regex-pattern-input-label {
-    color: #ffffff;
-  }
-}
-.add-regex-pattern-light {
-  .regex-pattern-input-label {
-    color: #6b7280;
-  }
-}
-.regex-pattern-test-string-label {
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 21px;
-}
-.add-regex-pattern-dark {
-  .regex-pattern-test-string-label {
-    color: #ffffff;
-  }
-}
-.add-regex-pattern-light {
-  .regex-pattern-test-string-label {
-    color: #6b7280;
-  }
-}
-.dark-test-string-container-label {
-  color: #ffffff;
-  font-weight: 500;
-  font-size: 12px;
-  line-height: 21px;
-}
-.light-test-string-container-label {
-  color: #6b7280;
-  font-weight: 500;
-  font-size: 12px;
-  line-height: 21px;
-  margin-left: -4px;
-}
-.dark-mode-regex-no-output {
-  background-color: #181a1b !important;
-  border-left: 2px solid #212121 !important;
-  border-right: 2px solid #212121 !important;
-  border-bottom: 2px solid #212121 !important;
-}
-.light-mode-regex-no-output {
+.light-mode-regex-test-string-input .monaco-editor-background {
   background-color: #ffffff !important;
-  border-left: 1px solid #e6e6e6 !important;
-  border-right: 1px solid #e6e6e6 !important;
-  border-bottom: 1px solid #e6e6e6 !important;
+}
+.dark-mode-regex-test-string-input .monaco-editor-background {
+  background-color: var(--o2-primary-background) !important;
 }
 </style>

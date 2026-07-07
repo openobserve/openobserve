@@ -15,21 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="aws-quick-setup">
-    <div class="setup-card">
+  <div>
+    <div class="setup-card max-w-225 mx-auto">
       <!-- Header -->
-      <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
-        <div class="tw:flex tw:items-start tw:gap-3">
+      <div class="mb-6 p-4 rounded-lg" :class="quickInstallBgClass">
+        <div class="flex items-start gap-3">
           <OIcon
             name="rocket-launch"
             size="xl"
-            class="tw:text-[var(--q-primary)]"
+            class="text-[var(--q-primary)]"
           />
           <div>
-            <h6 class="tw:text-xl! tw:font-bold tw:m-0 tw:mb-2!">
+            <h6 class="text-xl! font-bold m-0 mb-2!">
               Complete AWS Integration
             </h6>
-            <p class="tw:text-sm tw:mt-0 tw:mb-0" :class="descriptionClass">
+            <p class="text-sm mt-0 mb-0" :class="descriptionClass">
               Deploy all selected AWS services in one click using a single
               CloudFormation stack.
             </p>
@@ -38,8 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Deployment Mode Toggle -->
-      <div class="tw:mb-6">
-        <div class="step-label tw:mb-3">Deployment mode</div>
+      <div class="mb-6">
+        <div class="mb-3 font-semibold text-[0.9rem]" :class="stepLabelClass">Deployment mode</div>
         <OToggleGroup
           v-model="deploymentMode"
           data-test="aws-deployment-mode-toggle"
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >Multi-Region (StackSets)</OToggleGroupItem
           >
         </OToggleGroup>
-        <div class="tw:mt-2 tw:text-xs mode-hint">
+        <div class="mt-2 text-xs" :class="hintTextClass">
           <span v-if="deploymentMode === 'single'">
             Deploys a CloudFormation stack in one AWS region. Parameters are
             pre-filled automatically.
@@ -63,23 +63,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Step: Services -->
-      <div class="tw:mb-6">
+      <div class="mb-6">
         <div
-          class="tw:flex tw:items-center tw:justify-between tw:cursor-pointer region-collapsible-header tw:py-2 tw:px-3 tw:rounded"
+          class="flex items-center justify-between cursor-pointer py-2 px-3 rounded"
+          :class="collapsibleHeaderClass"
           @click="showServices = !showServices"
         >
-          <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="flex items-center gap-2">
             <OIcon
               :name="showServices ? 'expand-less' : 'expand-more'" size="sm"
               color="primary"
             />
-            <div class="step-label">Select services to monitor</div>
-            <OBadge variant="primary" size="sm">
+            <div class="font-semibold text-[0.9rem]" :class="stepLabelClass">Select services to monitor</div>
+            <OTag type="countChip" value="accent">
               {{ enabledServices.length }} /
               {{ QUICK_SETUP_SERVICES.length }} selected
-            </OBadge>
+            </OTag>
           </div>
-          <div class="tw:flex tw:gap-2" @click.stop>
+          <div class="flex gap-2" @click.stop>
             <OButton variant="ghost-primary" size="xs" @click="selectAll"
               >Select all</OButton
             >
@@ -90,12 +91,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
-          :class="showServices ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+          class="grid transition-[grid-template-rows] duration-300 ease-in-out"
+          :class="showServices ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
         >
-          <div class="tw:overflow-hidden tw:min-h-0">
-            <div class="tw:mt-3">
-              <div class="tw:grid tw:grid-cols-4 tw:gap-x-4 tw:gap-y-2">
+          <div class="overflow-hidden min-h-0">
+            <div class="mt-3">
+              <div class="grid grid-cols-4 gap-x-4 gap-y-2">
                 <div
                   v-for="service in QUICK_SETUP_SERVICES"
                   :key="service.flag"
@@ -113,8 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Single Region: region picker -->
-      <div v-if="deploymentMode === 'single'" class="tw:mb-6">
-        <div class="step-label tw:mb-3">Deployment region</div>
+      <div v-if="deploymentMode === 'single'" class="mb-6">
+        <div class="mb-3 font-semibold text-[0.9rem]" :class="stepLabelClass">Deployment region</div>
         <OSelect
           v-model="selectedRegion"
           :options="AWS_REGIONS"
@@ -127,10 +128,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- StackSets: admin + target regions -->
       <template v-else>
-        <div class="tw:mb-6">
-          <div class="step-label tw:mb-3">
+        <div class="mb-6">
+          <div class="mb-3 font-semibold text-[0.9rem]" :class="stepLabelClass">
             Admin region
-            <span class="tw:font-normal tw:text-xs region-hint"
+            <span class="font-normal text-xs text-[#888]"
               >(where the StackSet is managed)</span
             >
           </div>
@@ -144,30 +145,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="tw:mb-6">
+        <div class="mb-6">
           <div
-            class="tw:flex tw:items-center tw:justify-between tw:cursor-pointer region-collapsible-header tw:py-2 tw:px-3 tw:rounded"
+            class="flex items-center justify-between cursor-pointer py-2 px-3 rounded"
+          :class="collapsibleHeaderClass"
             @click="showTargetRegions = !showTargetRegions"
           >
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="flex items-center gap-2">
               <OIcon
                 :name="showTargetRegions ? 'expand-less' : 'expand-more'" size="sm"
                 color="primary"
               />
-              <div class="step-label">
+              <div class="font-semibold text-[0.9rem]" :class="stepLabelClass">
                 Target regions
-                <span class="tw:font-normal tw:text-xs region-hint"
+                <span class="font-normal text-xs text-[#888]"
                   >(where stacks will be deployed)</span
                 >
               </div>
-              <OBadge
+              <OTag
                 v-if="targetRegions.length > 0"
-                variant="primary"
-                size="sm"
-                >{{ targetRegions.length }} selected</OBadge
+                type="countChip"
+                value="accent"
+                >{{ targetRegions.length }} selected</OTag
               >
             </div>
-            <div class="tw:flex tw:gap-2" @click.stop>
+            <div class="flex gap-2" @click.stop>
               <OButton
                 variant="ghost-primary"
                 size="xs"
@@ -184,12 +186,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div
-            class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
-            :class="showTargetRegions ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+            class="grid transition-[grid-template-rows] duration-300 ease-in-out"
+            :class="showTargetRegions ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
           >
-            <div class="tw:overflow-hidden tw:min-h-0">
-              <div class="tw:mt-3">
-                <div class="tw:grid tw:grid-cols-3 tw:gap-x-4 tw:gap-y-2">
+            <div class="overflow-hidden min-h-0">
+              <div class="mt-3">
+                <div class="grid grid-cols-3 gap-x-4 gap-y-2">
                   <div
                     v-for="region in AWS_REGIONS"
                     :key="region.value"
@@ -206,8 +208,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="tw:mb-6">
-          <div class="step-label tw:mb-3">Deployment model</div>
+        <div class="mb-6">
+          <div class="mb-3 font-semibold text-[0.9rem]" :class="stepLabelClass">Deployment model</div>
           <OToggleGroup
             v-model="stackSetModel"
             data-test="aws-stackset-model-toggle"
@@ -217,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >Service-managed (AWS Organizations)</OToggleGroupItem
             >
           </OToggleGroup>
-          <div class="tw:mt-2 tw:text-xs mode-hint">
+          <div class="mt-2 text-xs" :class="hintTextClass">
             <span v-if="stackSetModel === 'self'">
               Requires
               <code>AWSCloudFormationStackSetAdministrationRole</code> and
@@ -233,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Launch -->
-      <div class="tw:flex tw:items-center tw:gap-3 tw:mb-6">
+      <div class="flex items-center gap-3 mb-6">
         <OButton
           variant="primary"
           size="sm"
@@ -259,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <span
           v-if="enabledServices.length === 0"
-          class="tw:text-sm tw:text-red-500"
+          class="text-sm text-red-500"
         >
           Select at least one service
         </span>
@@ -267,11 +269,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="
             deploymentMode === 'stackset' && targetRegions.length === 0
           "
-          class="tw:text-sm tw:text-red-500"
+          class="text-sm text-red-500"
         >
           Select at least one target region
         </span>
-        <span v-else class="tw:text-sm detail-value">
+        <span v-else class="text-sm" :class="hintTextClass">
           {{ enabledServices.length }} service{{
             enabledServices.length > 1 ? "s" : ""
           }}
@@ -286,15 +288,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- StackSets Parameter Helper -->
       <div
-        class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
-        :class="(showParamHelper && deploymentMode === 'stackset') ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+        class="grid transition-[grid-template-rows] duration-300 ease-in-out"
+        :class="(showParamHelper && deploymentMode === 'stackset') ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
       >
-        <div class="tw:overflow-hidden tw:min-h-0">
+        <div class="overflow-hidden min-h-0">
         <div>
-          <OSeparator class="tw:mb-4" />
-          <div class="param-helper">
-            <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
-              <div class="tw:font-semibold step-label">
+          <OSeparator class="mb-4" />
+          <div class="rounded-lg p-4" :class="paramHelperClass">
+            <div class="flex items-center justify-between mb-3">
+              <div class="font-semibold text-[0.9rem]" :class="stepLabelClass">
                 Parameters to enter in the AWS wizard
               </div>
               <OButton
@@ -305,19 +307,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="close" size="sm" />
               </OButton>
             </div>
-            <p class="tw:text-xs tw:mb-3 mode-hint">
+            <p class="text-xs mb-3" :class="hintTextClass">
               The StackSets console doesn't support URL pre-fill. Enter these
               values as you go through the wizard.
             </p>
-            <div class="param-table">
+            <div class="flex flex-col gap-[6px]">
               <div
                 v-for="param in stackSetParams"
                 :key="param.key"
-                class="param-row"
+                class="flex items-center gap-3 py-[6px] px-[10px] rounded text-[0.8rem] font-mono"
+                :class="paramRowClass"
               >
-                <div class="param-key">{{ param.key }}</div>
-                <div class="param-value">
-                  <span class="param-val-text">{{ param.value }}</span>
+                <div class="min-w-[240px] font-semibold shrink-0" :class="paramKeyClass">{{ param.key }}</div>
+                <div class="flex items-center gap-1 flex-1 overflow-hidden">
+                  <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1" :class="paramValTextClass">{{ param.value }}</span>
                   <OButton
                     variant="ghost"
                     size="icon-xs-circle"
@@ -329,17 +332,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="tw:mt-3">
-              <div class="tw:font-semibold tw:text-xs tw:mb-1 step-label">
+            <div class="mt-3">
+              <div class="font-semibold text-xs mb-1" :class="stepLabelClass">
                 Target regions to enter in "Deployment targets":
               </div>
-              <div class="tw:flex tw:flex-wrap tw:gap-1 tw:mt-1">
-                <OBadge
+              <div class="flex flex-wrap gap-1 mt-1">
+                <OTag
                   v-for="r in targetRegions"
                   :key="r"
-                  variant="primary"
-                  size="sm"
-                  >{{ r }}</OBadge
+                  type="fieldTag"
+                  value="primarysm"
+                  >{{ r }}</OTag
                 >
               </div>
             </div>
@@ -364,7 +367,7 @@ import {
 } from "@/utils/awsIntegrations";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -380,7 +383,7 @@ export default defineComponent({
   name: "AWSQuickSetup",
   components: { OSeparator, OToggleGroup, OToggleGroupItem, OButton, OSelect, OTooltip, OCheckbox,
     OIcon,
-    OBadge,
+    OTag,
 },
   setup() {
     const store = useStore();
@@ -398,13 +401,35 @@ export default defineComponent({
 
     const quickInstallBgClass = computed(() => {
       return store.state.theme === 'dark'
-        ? 'tw:bg-gray-800 tw:border tw:border-gray-700'
-        : 'tw:bg-blue-50 tw:border tw:border-blue-200';
+        ? 'bg-gray-800 border border-gray-700'
+        : 'bg-blue-50 border border-blue-200';
     });
 
     const descriptionClass = computed(() => {
-      return store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700';
+      return store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700';
     });
+
+    // dark: variants do not generate CSS in this setup, so dark-mode colors
+    // are resolved here against store.state.theme (same pattern as quickInstallBgClass).
+    const isDark = computed(() => store.state.theme === 'dark');
+    const stepLabelClass = computed(() =>
+      isDark.value ? 'text-[#d0d0d0]' : 'text-[#333]');
+    const hintTextClass = computed(() =>
+      isDark.value ? 'text-[#b0b0b0]' : 'text-[#666]');
+    const collapsibleHeaderClass = computed(() =>
+      isDark.value
+        ? 'bg-[rgba(255,255,255,0.06)] border border-[#404040] hover:bg-[rgba(255,255,255,0.09)]'
+        : 'bg-[#f0f4ff] border border-[#d0d9f0] hover:bg-[#e8eeff]');
+    const paramHelperClass = computed(() =>
+      isDark.value ? 'bg-[rgba(255,255,255,0.05)]' : 'bg-[#f5f5f5]');
+    const paramRowClass = computed(() =>
+      isDark.value
+        ? 'bg-[rgba(255,255,255,0.03)] border border-[#404040]'
+        : 'bg-white border border-(--o2-border)');
+    const paramKeyClass = computed(() =>
+      isDark.value ? 'text-[#ccc]' : 'text-[#333]');
+    const paramValTextClass = computed(() =>
+      isDark.value ? 'text-[#aaa]' : 'text-[#555]');
 
     let endpoint: any = null;
     try {
@@ -571,6 +596,13 @@ export default defineComponent({
     return {
       quickInstallBgClass,
       descriptionClass,
+      stepLabelClass,
+      hintTextClass,
+      collapsibleHeaderClass,
+      paramHelperClass,
+      paramRowClass,
+      paramKeyClass,
+      paramValTextClass,
       deploymentMode,
       stackSetModel,
       selectedRegion,
@@ -591,134 +623,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.aws-quick-setup {
-  .setup-card {
-    max-width: 900px;
-    margin: 0 auto;
-  }
-
-  .step-label {
-    font-weight: 600;
-    font-size: 0.9rem;
-  }
-
-  .param-helper {
-    border-radius: 8px;
-    padding: 16px;
-  }
-
-  .param-table {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .param-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 6px 10px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    font-family: monospace;
-  }
-
-  .param-key {
-    min-width: 240px;
-    font-weight: 600;
-    flex-shrink: 0;
-  }
-
-  .param-value {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex: 1;
-    overflow: hidden;
-  }
-
-  .param-val-text {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-  }
-
-  // Light mode defaults (body--light OR no .dark class)
-  .title {
-    color: #1a1a1a;
-  }
-  .description,
-  .detail-value,
-  .mode-hint {
-    color: #666;
-  }
-  .step-label {
-    color: #333;
-  }
-  .region-hint {
-    color: #888;
-  }
-  .param-helper {
-    background: #f5f5f5;
-  }
-  .param-row {
-    background: #fff;
-    border: 1px solid #e0e0e0;
-  }
-  .param-key {
-    color: #333;
-  }
-  .param-val-text {
-    color: #555;
-  }
-  .region-collapsible-header {
-    background: #f0f4ff;
-    border: 1px solid #d0d9f0;
-    &:hover {
-      background: #e8eeff;
-    }
-  }
-
-  // Dark mode overrides (both .dark class system and legacy body--dark)
-  .dark &,
-  body.body--dark & {
-    .title {
-      color: #e0e0e0;
-    }
-    .description,
-    .detail-value,
-    .mode-hint {
-      color: #b0b0b0;
-    }
-    .step-label {
-      color: #d0d0d0;
-    }
-    .region-hint {
-      color: #888;
-    }
-    .param-helper {
-      background: rgba(255, 255, 255, 0.05);
-    }
-    .param-row {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid #404040;
-    }
-    .param-key {
-      color: #ccc;
-    }
-    .param-val-text {
-      color: #aaa;
-    }
-    .region-collapsible-header {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid #404040;
-      &:hover {
-        background: rgba(255, 255, 255, 0.09);
-      }
-    }
-  }
-}
-</style>

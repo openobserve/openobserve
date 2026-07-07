@@ -32,8 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="add-function-node-routing-section"
-      class="tw:flex tw:flex-col tw:h-full"
-      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+      class="flex flex-col h-full"
+      :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
     >
 
 
@@ -41,15 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSpinner
         v-if="loading"
         size="md"
-        class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
+        class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
         data-test="associate-function-loading-indicator"
       />
     </div>
     <div
       v-else
-      class="stream-routing-container tw:w-full tw:pt-3 tw:pb-3 tw:flex tw:flex-col tw:gap-4 tw:flex-1 tw:min-h-0"
+      data-test="associate-function-routing-container"
+      class="stream-routing-container w-full pt-3 pb-3 flex flex-col gap-4 flex-1 min-h-0"
     >
-      <div class="tw:flex tw:items-center tw:gap-3 tw:px-(--spacing-dialog-header-px)">
+      <div class="flex items-center gap-3 px-(--spacing-dialog-header-px)">
         <OSwitch
           data-test="create-function-toggle"
           :label="isUpdating ? 'Edit function' : 'Create new function'"
@@ -57,20 +58,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="createNewFunction"
-          class="tw:text-sm tw:text-gray-600"
+          class="text-sm text-gray-600"
         >
           ({{ t("alerts.newFunctionAssociationMsg") }})
         </div>
       </div>
-      <div class="tw:flex tw:flex-col tw:gap-4" :class="[!createNewFunction ? 'tw:px-3' : 'tw:flex-1 tw:min-h-0']">
+      <div class="flex flex-col gap-4" :class="[!createNewFunction ? 'px-3' : 'flex-1 min-h-0']">
         <!-- Select-existing branch — form-owned fields inside <OForm>. -->
         <OForm
           v-if="!createNewFunction"
           id="associate-function-form"
           :form="form"
-          class="tw:flex tw:flex-col tw:gap-4"
+          class="flex flex-col gap-4"
         >
-          <div class="tw:w-full">
+          <div class="w-full">
             <OFormSelect
               name="selectedFunction"
               :options="props.functions"
@@ -89,16 +90,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               selectedFunction &&
               pipelineObj.functions[selectedFunction]
             "
+            data-test="associate-function-definition-section"
             class="function-definition-section"
           >
             <OCard class="function-definition-card">
               <OCardSection role="header" class="function-definition-header">
-                <div class="tw:text-base text-weight-medium text-primary">
+                <div class="text-base text-weight-medium text-primary">
                   {{ t("function.function_definition") }}
                 </div>
               </OCardSection>
               <OSeparator />
-              <OCardSection class="tw:p-0 function-definition-content">
+              <OCardSection class="p-0 function-definition-content">
                 <div class="function-code-container">
                   <pre class="function-code">{{
                     pipelineObj.functions[selectedFunction]?.function ||
@@ -109,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OCard>
           </div>
 
-          <div class="tw:w-full tw:flex tw:flex-col tw:gap-3">
+          <div class="w-full flex flex-col gap-3">
             <OFormSwitch
               data-test="associate-function-after-flattening-toggle"
               name="afterFlattening"
@@ -117,27 +119,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <!-- Info note explaining RAF/RBF -->
-            <div class="note-container tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2">
-              <div class="tw:text-sm tw:text-gray-800">
+            <div class="note-container rounded-md p-3 flex flex-col gap-2">
+              <div class="text-sm text-gray-800">
                 Function Execution Guidelines:
               </div>
-              <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800">
-                <div class="tw:flex tw:items-start tw:gap-2">
+              <div class="flex flex-col gap-1 text-sm text-gray-800">
+                <div class="flex items-start gap-2">
                   <OIcon
                     name="info"
                     size="sm"
-                    class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500"
+                    class="shrink-0 mt-0.5 text-amber-500"
                   />
                   <span>
                     <span class="highlight">RBF (Run Before Flattening):</span>
                     Function executes before data structure is flattened
                   </span>
                 </div>
-                <div class="tw:flex tw:items-start tw:gap-2">
+                <div class="flex items-start gap-2">
                   <OIcon
                     name="info"
                     size="sm"
-                    class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500"
+                    class="shrink-0 mt-0.5 text-amber-500"
                   />
                   <span>
                     <span class="highlight">RAF (Run After Flattening):</span>
@@ -149,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OForm>
 
-        <div v-if="createNewFunction" class="pipeline-add-function tw:w-full tw:flex-1 tw:min-h-0">
+        <div v-if="createNewFunction" class="pipeline-add-function w-full flex-1 min-h-0">
           <AddFunction
             ref="addFunctionRef"
             :is-updated="isUpdating"

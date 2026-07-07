@@ -1,4 +1,4 @@
-<!-- right 2026 OpenObserve Inc.
+﻿<!-- right 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,43 +15,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md search-job-inspector tw:p-0">
-    <div class="tw:w-full tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+  <div class="rounded-md p-0 bg-(--q-background)">
+    <div class="w-full flex flex-col h-full overflow-hidden">
       <!-- Header Card -->
-      <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem] tw:mx-2.5 tw:shrink-0">
-        <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center">
-          <div class="tw:flex tw:items-center tw:gap-3">
-            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="inspector-title">
+      <div class="card-container mb-[0.625rem] mt-[0.325rem] mx-2.5 shrink-0">
+        <div class="flex justify-between w-full py-3 px-4 items-center">
+          <div class="flex items-center gap-3">
+            <div class="text-xl tracking-[0.005em] font-[600]" data-test="inspector-title">
               Search Job Inspector
             </div>
             <div
               v-if="profileData && !hasNoData"
               :class="[
-                'tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded-md tw:border',
+                'flex items-center gap-1.5 px-2 py-1 rounded-md border',
                 store.state.theme === 'dark'
-                  ? 'tw:bg-gray-800/50 tw:border-gray-600'
-                  : 'tw:bg-gray-50 tw:border-gray-200'
+                  ? 'bg-gray-800/50 border-gray-600'
+                  : 'bg-gray-50 border-gray-200'
               ]"
             >
-              <svg class="tw:w-[14px] tw:h-[14px] tw:opacity-70" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg class="w-[14px] h-[14px] opacity-70" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="3" y="6" width="18" height="14" rx="2" :stroke="store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'" stroke-width="2"/>
                 <path d="M3 10h18M8 3v4M16 3v4" :stroke="store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'" stroke-width="2" stroke-linecap="round"/>
               </svg>
-              <div class="tw:flex tw:items-center tw:gap-1.5">
+              <div class="flex items-center gap-1.5">
                 <span
                   :class="[
-                    'tw:text-[10px] tw:font-small tw:px-1.5 tw:py-0.5 tw:rounded',
+                    'text-[10px] font-small px-1.5 py-0.5 rounded',
                     store.state.theme === 'dark'
-                      ? 'tw:text-gray-300 tw:bg-gray-700/50'
-                      : 'tw:text-gray-600 tw:bg-gray-100'
+                      ? 'text-gray-300 bg-gray-700/50'
+                      : 'text-gray-600 bg-gray-100'
                   ]"
                 >
                   {{ store.state.timezone || 'UTC' }}
                 </span>
                 <div
                   :class="[
-                    'tw:text-xs tw:font-semibold',
-                    store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-800'
+                    'text-xs font-semibold',
+                    store.state.theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
                   ]"
                 >
                   {{ formatTimeRange(profileData.start_time, profileData.end_time) }}
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-          <div class="tw:flex tw:items-center">
+          <div class="flex items-center">
             <OButton
               icon-left="close"
               variant="ghost"
@@ -74,38 +74,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Summary Stats Card -->
-      <div v-if="!loading" class="tw:mb-[0.625rem] tw:mx-2.5 tw:shrink-0">
-        <div class="tw:grid tw:gap-3" style="grid-template-columns: 1fr 1fr 1fr 1.6fr 0.9fr;">
+      <div v-if="!loading" class="mb-[0.625rem] mx-2.5 shrink-0">
+        <div class="grid gap-3" style="grid-template-columns: 1fr 1fr 1fr 1.6fr 0.9fr;">
           <!-- Results Returned -->
           <div class="stat-tile">
             <div
-              class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:justify-between"
-              :class="store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
+              class="rounded-lg p-3 border shadow-sm h-28 flex flex-col justify-between"
+              :class="store.state.theme === 'dark' ? 'bg-[#181A1B] border-gray-700' : 'bg-white border-gray-200'"
             >
-              <div class="tw:flex tw:justify-between tw:items-start">
+              <div class="flex justify-between items-start">
                 <div
-                  class="tw:text-base tw:font-small"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                  class="text-base font-small"
+                  :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
                 >
                   Results
                 </div>
                 <div
-                  class="tw:w-10 tw:h-10 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border"
+                  class="w-10 h-10 rounded-lg flex items-center justify-center border"
                   style="background: rgba(57, 126, 246, 0.2); border-color: rgba(57, 126, 246, 0.35);"
                 >
-                  <img src="@/assets/images/home/records.svg" alt="Results Icon" class="tw:h-6 tw:w-6" />
+                  <img src="@/assets/images/home/records.svg" alt="Results Icon" class="h-6 w-6" />
                 </div>
               </div>
-              <div class="tw:flex tw:flex-col tw:gap-1">
+              <div class="flex flex-col gap-1">
                 <div
-                  class="tw:text-2xl tw:font-bold"
-                  :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
+                  class="text-2xl font-bold"
+                  :class="store.state.theme === 'dark' ? 'text-white' : 'text-gray-900'"
                 >
                   {{ hasNoData ? 'NA' : (profileData?.data_records || 0).toLocaleString() }}
                 </div>
                 <div
-                  class="tw:text-[10px]"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
+                  class="text-[10px]"
+                  :class="store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400'"
                 >
                   Returned from query
                 </div>
@@ -116,33 +116,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Events Scanned -->
           <div class="stat-tile">
             <div
-              class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:justify-between"
-              :class="store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
+              class="rounded-lg p-3 border shadow-sm h-28 flex flex-col justify-between"
+              :class="store.state.theme === 'dark' ? 'bg-[#181A1B] border-gray-700' : 'bg-white border-gray-200'"
             >
-              <div class="tw:flex tw:justify-between tw:items-start">
+              <div class="flex justify-between items-start">
                 <div
-                  class="tw:text-base tw:font-small"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                  class="text-base font-small"
+                  :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
                 >
                   Scanned Events
                 </div>
                 <div
-                  class="tw:w-10 tw:h-10 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border"
+                  class="w-10 h-10 rounded-lg flex items-center justify-center border"
                   style="background: rgba(57, 126, 246, 0.2); border-color: rgba(57, 126, 246, 0.35);"
                 >
-                  <img src="@/assets/images/home/streams.svg" alt="Events Icon" class="tw:h-6 tw:w-6" />
+                  <img src="@/assets/images/home/streams.svg" alt="Events Icon" class="h-6 w-6" />
                 </div>
               </div>
-              <div class="tw:flex tw:flex-col tw:gap-1">
+              <div class="flex flex-col gap-1">
                 <div
-                  class="tw:text-2xl tw:font-bold"
-                  :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
+                  class="text-2xl font-bold"
+                  :class="store.state.theme === 'dark' ? 'text-white' : 'text-gray-900'"
                 >
                   {{ hasNoData ? 'NA' : (profileData?.scan_records || 0).toLocaleString() }}
                 </div>
                 <div
-                  class="tw:text-[10px]"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
+                  class="text-[10px]"
+                  :class="store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400'"
                 >
                   Scanned events for this query
                 </div>
@@ -153,36 +153,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Time Taken -->
           <div class="stat-tile">
             <div
-              class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:justify-between"
-              :class="store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
+              class="rounded-lg p-3 border shadow-sm h-28 flex flex-col justify-between"
+              :class="store.state.theme === 'dark' ? 'bg-[#181A1B] border-gray-700' : 'bg-white border-gray-200'"
             >
-              <div class="tw:flex tw:justify-between tw:items-start">
+              <div class="flex justify-between items-start">
                 <div
-                  class="tw:text-base tw:font-small"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                  class="text-base font-small"
+                  :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
                 >
                   Time Taken
                 </div>
                 <div
-                  class="tw:w-10 tw:h-10 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border"
+                  class="w-10 h-10 rounded-lg flex items-center justify-center border"
                   style="background: rgba(34, 197, 94, 0.2); border-color: rgba(34, 197, 94, 0.35);"
                 >
-                  <svg class="tw:h-6 tw:w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="12" cy="12" r="9" :stroke="store.state.theme === 'dark' ? '#10B981' : '#059669'" stroke-width="2"/>
                     <path d="M12 6v6l4 2" :stroke="store.state.theme === 'dark' ? '#10B981' : '#059669'" stroke-width="2" stroke-linecap="round"/>
                   </svg>
                 </div>
               </div>
-              <div class="tw:flex tw:flex-col tw:gap-1">
+              <div class="flex flex-col gap-1">
                 <div
-                  class="tw:text-2xl tw:font-bold"
-                  :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
+                  class="text-2xl font-bold"
+                  :class="store.state.theme === 'dark' ? 'text-white' : 'text-gray-900'"
                 >
                   {{ hasNoData ? 'NA' : formatDuration(profileData?.time_taken || profileData?.total_duration) }}
                 </div>
                 <div
-                  class="tw:text-[10px]"
-                  :class="hasNoData ? (store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400') : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).colorClass"
+                  class="text-[10px]"
+                  :class="hasNoData ? (store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400') : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).colorClass"
                 >
                   {{ hasNoData ? 'No data' : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).text }}
                 </div>
@@ -193,30 +193,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Trace ID -->
           <div class="stat-tile">
             <div
-              class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:justify-between"
-              :class="store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
+              class="rounded-lg p-3 border shadow-sm h-28 flex flex-col justify-between"
+              :class="store.state.theme === 'dark' ? 'bg-[#181A1B] border-gray-700' : 'bg-white border-gray-200'"
             >
-              <div class="tw:flex tw:justify-between tw:items-start">
+              <div class="flex justify-between items-start">
                 <div
-                  class="tw:text-base tw:font-small"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                  class="text-base font-small"
+                  :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
                 >
                   Trace ID
                 </div>
                 <div
-                  class="tw:w-10 tw:h-10 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border"
+                  class="w-10 h-10 rounded-lg flex items-center justify-center border"
                   style="background: rgba(242, 220, 245, 0.25); border-color: rgba(242, 220, 245, 0.45);"
                 >
-                  <svg class="tw:h-6 tw:w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M7 8h10M7 12h10M7 16h6" :stroke="store.state.theme === 'dark' ? '#E9D5FD' : '#A855F7'" stroke-width="2" stroke-linecap="round"/>
                     <rect x="3" y="4" width="18" height="16" rx="2" :stroke="store.state.theme === 'dark' ? '#E9D5FD' : '#A855F7'" stroke-width="2"/>
                   </svg>
                 </div>
               </div>
-              <div class="tw:flex tw:flex-col tw:gap-1">
+              <div class="flex flex-col gap-1">
                 <div
-                  class="tw:text-sm tw:font-mono tw:truncate tw:font-semibold tw:leading-tight tw:overflow-hidden"
-                  :class="hasNoData ? (store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500') : (store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600')"
+                  class="text-sm font-mono truncate font-semibold leading-tight overflow-hidden"
+                  :class="hasNoData ? (store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500') : (store.state.theme === 'dark' ? 'text-blue-400' : 'text-blue-600')"
                 >
                   {{ hasNoData ? 'NA' : traceId }}
                   <OTooltip v-if="!hasNoData" :content="traceId" />
@@ -228,24 +228,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- View Query -->
           <div class="stat-tile">
             <div
-              class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:items-center tw:justify-center tw:transition-all"
+              class="rounded-lg p-3 border shadow-sm h-28 flex flex-col items-center justify-center transition-all"
               :class="[
-                store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200',
-                hasNoData ? 'tw:opacity-50 tw:cursor-not-allowed' : 'tw:cursor-pointer hover:tw:border-primary hover:tw:shadow-lg'
+                store.state.theme === 'dark' ? 'bg-[#181A1B] border-gray-700' : 'bg-white border-gray-200',
+                hasNoData ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary hover:shadow-lg'
               ]"
               @click="!hasNoData && (showSqlDialog = true)"
             >
               <div
-                class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border tw:mb-2"
+                class="w-12 h-12 rounded-lg flex items-center justify-center border mb-2"
                 style="background: rgba(245, 235, 147, 0.25); border-color: rgba(245, 235, 147, 0.45);"
               >
-                <svg class="tw:h-7 tw:w-7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" :stroke="store.state.theme === 'dark' ? '#FDE68A' : '#CA8A04'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </div>
               <div
-                class="tw:text-sm tw:font-semibold"
-                :class="store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600'"
+                class="text-sm font-semibold"
+                :class="store.state.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'"
               >
                 View Query
               </div>
@@ -260,13 +260,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="error"
         icon="error"
         :content="errorMessage"
-        class="tw:mb-[0.625rem] tw:shrink-0"
+        class="mb-[0.625rem] shrink-0"
         data-test="inspector-error-banner"
       />
 
       <!-- Profile Data Table (OTable handles loading skeleton) -->
-      <div v-if="loading || (profileData && profileData.events)" class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-        <div class="card-container tw:h-full">
+      <div v-if="loading || (profileData && profileData.events)" class="w-full flex-1 min-h-0 overflow-hidden">
+        <div class="card-container h-full">
           <OTable
             :data="hierarchicalEvents"
             :columns="columns"
@@ -281,23 +281,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :persist-columns="true"
             table-id="logs-search-job-inspector"
             style="width: 100%;"
-            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+            class="o2-table o2-row-md o2-table-header-sticky"
             data-test="inspector-events-table"
           >
             <template #cell-index="{ row }">
-              <span class="tree-index-text">{{ row.index }}</span>
+              <span class="inline-block">{{ row.index }}</span>
             </template>
 
             <template #cell-duration="{ row }">
-              <div class="duration-cell">
+              <div class="flex items-center gap-2 min-w-[150px]">
                 <div
-                  class="duration-bar"
+                  class="h-5 rounded-[3px] min-w-[4px] transition-[width] duration-300 ease-in-out"
                   :style="{
                     width: calculateBarWidth(row.duration) + '%',
                     backgroundColor: getDurationColor(row.duration),
                   }"
                 ></div>
-                <span class="duration-text">{{ formatDuration(row.duration) }}</span>
+                <span class="text-[13px] whitespace-nowrap min-w-[50px]">{{ formatDuration(row.duration) }}</span>
               </div>
             </template>
 
@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-desc="{ row }">
-              <span class="tw:text-xs" :title="row.desc || '-'">{{ row.desc || '-' }}</span>
+              <span class="text-xs" :title="row.desc || '-'">{{ row.desc || '-' }}</span>
             </template>
 
             <template #empty>
@@ -325,8 +325,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-sm"
           :class="[
-                'tw:border',
-                copiedSql ? 'tw:text-green-600 tw:border-green-400' : 'tw:border-gray-300'
+                'border',
+                copiedSql ? 'text-green-600 border-green-400' : 'border-gray-300'
               ]"
           @click="copySql"
           data-test="inspector-copy-sql-btn"
@@ -336,23 +336,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="copiedSql ? 'Copied!' : 'SQL'" />
         </OButton>
       </template>
-      <div :class="['sql-query-container', store.state.theme === 'dark' ? 'sql-query-container--dark' : '']">
-        <pre class="sql-query" data-test="inspector-sql-query-content">{{ profileData?.sql || 'No SQL query available' }}</pre>
+      <div
+        class="rounded p-4 max-h-[calc(100vh-150px)] overflow-auto"
+        :class="store.state.theme === 'dark' ? 'bg-[#1e1e1e]' : 'bg-[#f5f5f5]'"
+      >
+        <pre
+          class="font-mono text-[13px] leading-[1.6] m-0 whitespace-pre-wrap break-words"
+          data-test="inspector-sql-query-content"
+        >{{ profileData?.sql || 'No SQL query available' }}</pre>
       </div>
     </ODrawer>
 
     <!-- Trace ID Dialog -->
     <ODialog data-test="search-job-inspector-trace-id-dialog" v-model:open="showTraceIdDialog" size="sm" title="Full Trace ID">
-      <div class="tw:flex tw:items-center tw:gap-3">
-        <div class="tw:flex-1 tw:font-mono tw:text-sm tw:break-all tw:p-3 tw:rounded tw:border"
-             :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-gray-700 tw:text-blue-400' : 'tw:bg-gray-50 tw:border-gray-200 tw:text-blue-600'">
+      <div class="flex items-center gap-3">
+        <div class="flex-1 font-mono text-sm break-all p-3 rounded border"
+             :class="store.state.theme === 'dark' ? 'bg-gray-800 border-gray-700 text-blue-400' : 'bg-gray-50 border-gray-200 text-blue-600'">
           {{ traceId }}
         </div>
         <OButton
           variant="primary"
           size="sm-action"
           @click="copyTraceId"
-        ><OIcon name="content-copy" size="sm"  class="tw:mr-1" /></OButton>
+        ><OIcon name="content-copy" size="sm"  class="mr-1" /></OButton>
       </div>
     </ODialog>
   </div>
@@ -628,32 +634,32 @@ export default defineComponent({
     };
 
     const getResponseTimeLabel = (ms: number | undefined) => {
-      if (!ms) return { text: "No data", colorClass: "tw:text-gray-400" };
+      if (!ms) return { text: "No data", colorClass: "text-gray-400" };
 
       if (ms < 50) {
         return {
           text: "Ultra-fast response",
-          colorClass: store.state.theme === 'dark' ? 'tw:text-green-400' : 'tw:text-green-600'
+          colorClass: store.state.theme === 'dark' ? 'text-green-400' : 'text-green-600'
         };
       } else if (ms < 200) {
         return {
           text: "Fast response",
-          colorClass: store.state.theme === 'dark' ? 'tw:text-green-400' : 'tw:text-green-600'
+          colorClass: store.state.theme === 'dark' ? 'text-green-400' : 'text-green-600'
         };
       } else if (ms < 500) {
         return {
           text: "Good response",
-          colorClass: store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600'
+          colorClass: store.state.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
         };
       } else if (ms < 1000) {
         return {
           text: "Moderate response",
-          colorClass: store.state.theme === 'dark' ? 'tw:text-yellow-400' : 'tw:text-yellow-600'
+          colorClass: store.state.theme === 'dark' ? 'text-yellow-400' : 'text-yellow-600'
         };
       } else {
         return {
           text: "Slow response",
-          colorClass: store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-600'
+          colorClass: store.state.theme === 'dark' ? 'text-red-400' : 'text-red-600'
         };
       }
     };
@@ -736,85 +742,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.search-job-inspector {
-  background-color: var(--q-background);
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.stat-label {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  opacity: 0.7;
-}
-
-.stat-value {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 2;
-  color: var(--q-primary);
-}
-
-.stat-value-small {
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.4;
-}
-
-.duration-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 150px;
-}
-
-.duration-bar {
-  height: 20px;
-  border-radius: 3px;
-  min-width: 4px;
-  transition: width 0.3s ease;
-}
-
-.duration-text {
-  font-size: 13px;
-  white-space: nowrap;
-  min-width: 50px;
-}
-
-.sql-query-container {
-  background-color: #f5f5f5;
-  border-radius: 4px;
-  padding: 16px;
-  max-height: calc(100vh - 150px);
-  overflow: auto;
-}
-
-.sql-query-container--dark {
-  background-color: #1e1e1e;
-}
-
-.sql-query {
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.trace-id {
-  word-break: break-all;
-}
-
-// Index text — consistent spacing
-.tree-index-text {
-  display: inline-block;
-}
-</style>

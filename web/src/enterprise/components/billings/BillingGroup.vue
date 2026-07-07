@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:px-6 tw:pt-4 tw:h-full tw:flex tw:flex-col tw:overflow-hidden"
+    class="px-6 pt-4 h-full flex flex-col overflow-hidden"
     data-test="organization-group-page"
   >
-    <div v-if="loading" class="tw:flex tw:justify-center tw:py-10">
+    <div v-if="loading" class="flex justify-center py-10">
       <OSpinner size="md" />
     </div>
 
@@ -27,31 +27,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- SUPER / PAYER ORG VIEW -->
       <div
         v-if="role === 'super'"
-        class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden"
+        class="flex flex-col flex-1 min-h-0 overflow-hidden"
         data-test="org-group-super-view"
       >
         <!-- Stat cards -->
         <div
-          class="tw:flex tw:gap-4 tw:mb-5 tw:shrink-0"
+          class="flex gap-4 mb-5 shrink-0"
           data-test="org-group-stats"
         >
-          <div class="feature-card tw:flex-1">
-            <div class="stat-card-title">
+          <div class="feature-card flex-1">
+            <div class="text-[15px] font-semibold leading-5 opacity-85 whitespace-nowrap">
               {{ t("billing.billingGroup.statTotal") }}
             </div>
-            <div class="stat-card-value">{{ totalCount }}</div>
+            <div class="text-[24px] font-semibold leading-[1.2] mt-[6px]">{{ totalCount }}</div>
           </div>
-          <div class="feature-card tw:flex-1">
-            <div class="stat-card-title">
+          <div class="feature-card flex-1">
+            <div class="text-[15px] font-semibold leading-5 opacity-85 whitespace-nowrap">
               {{ t("billing.billingGroup.statActive") }}
             </div>
-            <div class="stat-card-value tw:text-green-600">{{ activeCount }}</div>
+            <div class="text-[24px] font-semibold leading-[1.2] mt-[6px] text-green-600">{{ activeCount }}</div>
           </div>
-          <div class="feature-card tw:flex-1">
-            <div class="stat-card-title">
+          <div class="feature-card flex-1">
+            <div class="text-[15px] font-semibold leading-5 opacity-85 whitespace-nowrap">
               {{ t("billing.billingGroup.statPending") }}
             </div>
-            <div class="stat-card-value tw:text-amber-500">
+            <div class="text-[24px] font-semibold leading-[1.2] mt-[6px] text-amber-500">
               {{ pendingCount }}
             </div>
           </div>
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Status filter + view usage -->
         <div
-          class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:mb-3 tw:shrink-0"
+          class="flex items-center justify-between gap-2 mb-3 shrink-0"
         >
           <AppTabs
             :tabs="superFilterTabs"
@@ -74,13 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("billing.billingGroup.viewUsage") }}
             <template #icon-right>
-              <OIcon name="arrow-forward" size="sm" class="tw:ml-1" />
+              <OIcon name="arrow-forward" size="sm" class="ml-1" />
             </template>
           </OButton>
         </div>
 
         <!-- Child orgs table (children only) -->
-        <div class="tw:flex-1 tw:min-h-0">
+        <div class="flex-1 min-h-0">
           <OTable
             :data="filteredSuperRows"
             :columns="superColumns"
@@ -93,14 +93,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="org-group-members-table"
           >
             <template #empty>
-              <div class="tw:py-4 tw:text-center">
+              <div class="py-4 text-center">
                 {{ t("billing.billingGroup.noMembers") }}
               </div>
             </template>
             <template #cell-status="{ row }">
-              <OBadge :variant="statusVariant(row.status)">
-                {{ statusLabel(row.status) }}
-              </OBadge>
+              <OTag type="billingGroupMemberStatus" :value="row.status" />
+            </template>
+            <template #cell-invited_by="{ row }">
+              <OUserCell :value="row.invited_by" />
+            </template>
+            <template #cell-accepted_by="{ row }">
+              <OUserCell :value="row.accepted_by" />
             </template>
           </OTable>
         </div>
@@ -109,72 +113,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- CHILD ORG VIEW -->
       <div
         v-else-if="role === 'child'"
-        class="tw:flex-1 tw:min-h-0 tw:overflow-auto tw:flex tw:flex-col tw:justify-center"
+        class="flex-1 min-h-0 overflow-auto flex flex-col justify-center"
         data-test="org-group-child-view"
       >
-        <div class="og-hero">
+        <div class="flex items-center justify-between gap-[56px] py-[48px] px-[40px] flex-wrap">
           <!-- Left: headline + CTA -->
-          <div class="og-hero__left">
-            <div class="og-hero__eyebrow">
+          <div class="flex-1 min-w-[280px] max-w-[480px]">
+            <div class="inline-flex items-center gap-[6px] text-[0.72rem] font-semibold tracking-[0.4px] text-(--color-primary-600) bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] py-1 px-[10px] rounded-full mb-5">
               <OIcon name="verified" size="xs" />
               {{ t("billing.billingGroup.statusActive") }}
             </div>
-            <div class="og-hero__headline">
+            <div class="text-[2.4rem] font-bold leading-[1.2] tracking-[-0.6px] mb-4">
               {{ t("billing.billingGroup.childHeadline") }}
-              <span class="og-hero__brand">
+              <span class="text-(--color-tabs-active-text) cursor-pointer inline-block max-w-full overflow-hidden text-ellipsis whitespace-nowrap align-bottom">
                 {{ payerName }}
                 <OTooltip side="bottom">
                   <template #content>
-                    <div v-if="membership?.payer_org_name" class="tw:break-all">
+                    <div v-if="membership?.payer_org_name" class="break-all">
                       {{ membership.payer_org_name }}
                     </div>
-                    <div class="tw:text-xs tw:opacity-70 tw:break-all">
+                    <div class="text-xs opacity-70 break-all">
                       {{ membership?.payer_org_id }}
                     </div>
                   </template>
                 </OTooltip>
               </span>
             </div>
-            <div class="og-hero__sub">
+            <div class="text-[0.95rem] leading-[1.7] opacity-70 mb-8 max-w-[420px]">
               {{ t("billing.billingGroup.childHeroSub") }}
             </div>
             <OButton
               variant="primary"
-              class="og-hero__cta"
+              class="h-[44px] px-6 font-semibold"
               data-test="org-group-child-view-usage-btn"
               @click="goToUsage"
             >
               {{ t("billing.billingGroup.viewUsage") }}
               <template #icon-right>
-                <OIcon name="arrow-forward" size="sm" class="tw:ml-1" />
+                <OIcon name="arrow-forward" size="sm" class="ml-1" />
               </template>
             </OButton>
           </div>
 
           <!-- Right: membership facts -->
-          <div class="og-hero__right" data-test="org-group-child-details">
-            <div class="og-feature">
-              <div class="og-feature__icon">
+          <div class="w-[340px] shrink-0 flex flex-col gap-[14px]" data-test="org-group-child-details">
+            <div class="og-feature flex items-start gap-4 p-[18px_20px] rounded-2xl bg-(--tile-bg) border border-(--o2-border-color,rgba(0,0,0,0.08)) transition-all duration-200 hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] hover:-translate-y-px">
+              <div class="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600)">
                 <OIcon name="person-add" />
               </div>
-              <div class="og-feature__content">
-                <div class="og-feature__title">
+              <div class="flex-1 min-w-0">
+                <div class="text-[0.78rem] font-semibold opacity-60 mb-1">
                   {{ t("billing.billingGroup.invitedBy") }}
                 </div>
-                <div class="og-feature__desc tw:truncate">
+                <div class="text-[0.95rem] font-semibold truncate">
                   {{ membership?.created_by }}
                 </div>
               </div>
             </div>
-            <div class="og-feature">
-              <div class="og-feature__icon">
+            <div class="og-feature flex items-start gap-4 p-[18px_20px] rounded-2xl bg-(--tile-bg) border border-(--o2-border-color,rgba(0,0,0,0.08)) transition-all duration-200 hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] hover:-translate-y-px">
+              <div class="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600)">
                 <OIcon name="how-to-reg" />
               </div>
-              <div class="og-feature__content">
-                <div class="og-feature__title">
+              <div class="flex-1 min-w-0">
+                <div class="text-[0.78rem] font-semibold opacity-60 mb-1">
                   {{ t("billing.billingGroup.acceptedBy") }}
                 </div>
-                <div class="og-feature__desc tw:truncate">
+                <div class="text-[0.95rem] font-semibold truncate">
                   {{
                     membership?.accepted_by ||
                     t("billing.billingGroup.addedOnCreation")
@@ -182,15 +186,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="og-feature">
-              <div class="og-feature__icon">
+            <div class="og-feature flex items-start gap-4 p-[18px_20px] rounded-2xl bg-(--tile-bg) border border-(--o2-border-color,rgba(0,0,0,0.08)) transition-all duration-200 hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] hover:-translate-y-px">
+              <div class="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600)">
                 <OIcon name="schedule" />
               </div>
-              <div class="og-feature__content">
-                <div class="og-feature__title">
+              <div class="flex-1 min-w-0">
+                <div class="text-[0.78rem] font-semibold opacity-60 mb-1">
                   {{ t("billing.billingGroup.memberSince") }}
                 </div>
-                <div class="og-feature__desc">
+                <div class="text-[0.95rem] font-semibold">
                   {{ formatDate(membership?.created_at) }}
                 </div>
               </div>
@@ -202,13 +206,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- STANDALONE ORG VIEW — has pending invites: invites table -->
       <div
         v-else-if="receivedInvites.length > 0"
-        class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0"
+        class="flex flex-col flex-1 min-h-0"
         data-test="org-group-standalone-invites-view"
       >
-        <p class="tw:mb-3 tw:shrink-0">
+        <p class="mb-3 shrink-0">
           {{ t("billing.billingGroup.invitesPanelHint") }}
         </p>
-        <div class="tw:flex-1 tw:min-h-0">
+        <div class="flex-1 min-h-0">
           <OTable
             :data="receivedInvites"
             :columns="inviteColumns"
@@ -217,11 +221,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size="10"
             :page-size-options="[10, 20, 50, 100]"
             :default-columns="false"
-            class="tw:h-full"
+            class="h-full"
             data-test="org-group-invites-table"
           >
+            <template #cell-inviter_id="{ row }">
+              <OUserCell :value="row.inviter_id" />
+            </template>
             <template #cell-actions="{ row }">
-              <div class="tw:flex tw:justify-end tw:pr-3 tw:gap-2">
+              <div class="flex justify-end pr-3 gap-2">
                 <OButton
                   variant="primary"
                   size="sm"
@@ -249,27 +256,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- STANDALONE ORG VIEW — no invites: polished empty state -->
       <div
         v-else
-        class="tw:flex-1 tw:min-h-0 tw:overflow-auto tw:flex tw:flex-col"
+        class="flex-1 min-h-0 overflow-auto flex flex-col"
         data-test="org-group-standalone-view"
       >
         <div
-          class="og-empty"
+          class="flex flex-col items-center justify-center text-center min-h-full py-[48px] px-6"
           data-test="org-group-standalone-invite"
         >
-          <div class="og-empty__icon-outer">
-            <div class="og-empty__icon-inner">
-              <OIcon name="group-add" size="lg" class="og-empty__icon" />
+          <div class="w-[100px] h-[100px] rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] flex items-center justify-center mb-[28px]">
+            <div class="w-[68px] h-[68px] rounded-full bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] flex items-center justify-center">
+              <OIcon name="group-add" size="lg" class="text-(--color-primary-600) opacity-85" />
             </div>
           </div>
 
-          <div class="og-empty__title">
+          <div class="text-[1.2rem] font-bold tracking-[-0.2px] mb-[10px]">
             {{
               allowedForBillingGroup
                 ? t("billing.billingGroup.emptyTitle")
                 : t("billing.billingGroup.notEnabledTitle")
             }}
           </div>
-          <div class="og-empty__desc">
+          <div class="text-[0.88rem] leading-[1.65] opacity-65 max-w-[420px] mb-6">
             {{
               allowedForBillingGroup
                 ? t("billing.billingGroup.inviteTabPrompt")
@@ -278,12 +285,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <template v-if="allowedForBillingGroup">
-            <div class="og-empty__chips">
-              <span class="og-empty__chip">
+            <div class="flex items-center gap-2 flex-wrap justify-center mb-8">
+              <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--o2-border-color,rgba(0,0,0,0.1)) rounded-full py-1 px-3">
                 <OIcon name="receipt-long" size="xs" />
                 {{ t("billing.billingGroup.chipConsolidatedBill") }}
               </span>
-              <span class="og-empty__chip">
+              <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--o2-border-color,rgba(0,0,0,0.1)) rounded-full py-1 px-3">
                 <OIcon name="groups" size="xs" />
                 {{ t("billing.billingGroup.chipLinkOrgs") }}
               </span>
@@ -291,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OButton
               variant="primary"
-              class="og-empty__btn"
+              class="h-[40px] px-6 font-semibold"
               data-test="org-group-standalone-invite-btn-empty"
               @click="showInviteDialog = true"
             >
@@ -314,10 +321,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="sendInvite"
       @click:secondary="showInviteDialog = false"
     >
-      <div class="tw:p-4">
+      <div class="p-4">
         <OInput
           v-model="inviteOrgId"
-          class="showLabelOnTop tw:mt-4"
+          class="showLabelOnTop mt-4"
           :label="t('billing.billingGroup.inviteOrgIdLabel')"
           :placeholder="t('billing.billingGroup.inviteOrgIdPlaceholder')"
           data-test="org-group-invite-input"
@@ -342,12 +349,13 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import BillingService from "@/services/billings";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -382,7 +390,7 @@ interface BillingGroupInvite {
 
 export default defineComponent({
   name: "BillingGroup",
-  components: { OBadge, OButton, OIcon, OInput, OSpinner, OTable, ODrawer, OTooltip, AppTabs },
+  components: { OTag, OButton, OIcon, OInput, OSpinner, OTable, OUserCell, ODrawer, OTooltip, AppTabs },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -540,14 +548,6 @@ export default defineComponent({
       { label: t("billing.billingGroup.statusActive"), value: "Active" },
       { label: t("billing.billingGroup.statusPending"), value: "Pending" },
     ]);
-
-    const statusVariant = (status: string): "success" | "warning" =>
-      status === "Active" ? "success" : "warning";
-
-    const statusLabel = (status: string) =>
-      status === "Active"
-        ? t("billing.billingGroup.statusActive")
-        : t("billing.billingGroup.statusPending");
 
     const inviteColumns = computed<OTableColumnDef[]>(() => [
       {
@@ -765,8 +765,6 @@ export default defineComponent({
       activeCount,
       pendingCount,
       totalCount,
-      statusVariant,
-      statusLabel,
       goToUsage,
       receivedInvites,
       inviteColumns,
@@ -780,195 +778,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.og-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  min-height: 100%;
-  padding: 48px 24px;
-
-  &__icon-outer {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    border: 1px dashed color-mix(in srgb, var(--color-primary-600) 30%, transparent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 28px;
-  }
-  &__icon-inner {
-    width: 68px;
-    height: 68px;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--color-primary-600) 10%, transparent);
-    border: 1.5px solid color-mix(in srgb, var(--color-primary-600) 24%, transparent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  &__icon {
-    color: var(--color-primary-600);
-    opacity: 0.85;
-  }
-  &__title {
-    font-size: 1.2rem;
-    font-weight: 700;
-    letter-spacing: -0.2px;
-    margin-bottom: 10px;
-  }
-  &__desc {
-    font-size: 0.88rem;
-    line-height: 1.65;
-    opacity: 0.65;
-    max-width: 420px;
-    margin-bottom: 24px;
-  }
-  &__chips {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-bottom: 32px;
-  }
-  &__chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    opacity: 0.85;
-    background: color-mix(in srgb, currentColor 6%, transparent);
-    border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.1));
-    border-radius: 20px;
-    padding: 4px 12px;
-  }
-  &__btn {
-    height: 40px;
-    padding: 0 24px;
-    font-weight: 600;
-  }
-}
-.stat-card-title {
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 20px;
-  opacity: 0.85;
-  white-space: nowrap;
-}
-.stat-card-value {
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 1.2;
-  margin-top: 6px;
-}
-.og-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 56px;
-  padding: 48px 40px;
-  flex-wrap: wrap;
-
-  &__left {
-    flex: 1;
-    min-width: 280px;
-    max-width: 480px;
-  }
-  &__eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.4px;
-    color: var(--color-primary-600);
-    background: color-mix(in srgb, var(--color-primary-600) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--color-primary-600) 25%, transparent);
-    padding: 4px 10px;
-    border-radius: 20px;
-    margin-bottom: 20px;
-  }
-  &__headline {
-    font-size: 2.4rem;
-    font-weight: 700;
-    line-height: 1.2;
-    letter-spacing: -0.6px;
-    margin-bottom: 16px;
-  }
-  &__brand {
-    color: var(--color-tabs-active-text);
-    cursor: pointer;
-    display: inline-block;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    vertical-align: bottom;
-  }
-  &__sub {
-    font-size: 0.95rem;
-    line-height: 1.7;
-    opacity: 0.7;
-    margin-bottom: 32px;
-    max-width: 420px;
-  }
-  &__right {
-    width: 340px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-}
-.og-hero__cta {
-  height: 44px;
-  padding: 0 24px;
-  font-weight: 600;
-}
-.og-feature {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 18px 20px;
-  border-radius: 16px;
-  background: var(--tile-bg);
-  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-
-  &:hover {
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
-    transform: translateY(-1px);
-  }
-  &__icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: color-mix(in srgb, var(--color-primary-600) 10%, transparent);
-    color: var(--color-primary-600);
-  }
-  &__content {
-    flex: 1;
-    min-width: 0;
-  }
-  &__title {
-    font-size: 0.78rem;
-    font-weight: 600;
-    opacity: 0.6;
-    margin-bottom: 4px;
-  }
-  &__desc {
-    font-size: 0.95rem;
-    font-weight: 600;
-  }
-}
-</style>

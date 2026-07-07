@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md tw:p-0" style="min-height: inherit; height: calc(100vh - 88px);">
+  <div class="rounded-md p-0" style="min-height: inherit; height: calc(100vh - 88px);">
     <div v-if="!showAddDialog">
       <!-- Standard section header: title + actions only. Search moved into the
            table toolbar below. -->
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('aiToolset.header')"
         icon="smart-toy"
         :subtitle="'Configure AI tool integrations'"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="shrink-0 px-4 border-b border-border-default"
       >
         <template #actions>
           <OButton
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </AppPageHeader>
 
       <!-- Table -->
-      <div class="card-container tw:mt-2.5 tw:overflow-hidden">
+      <div class="card-container mt-2.5 overflow-hidden">
       <OTable
         :frame="false"
         :data="visibleRows"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar>
           <OSearchInput
             v-model="filterQuery"
-            class="tw:w-64 no-border o2-search-input"
+            class="w-64 no-border o2-search-input"
             :placeholder="t('aiToolset.search')"
           />
         </template>
@@ -65,21 +65,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="hero"
             preset="no-ai-toolsets"
             :filtered="!!filterQuery"
-            :hide-action="!filterQuery"
-            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            @action="(id) => id === 'clear-filters' ? (filterQuery = '') : addToolset()"
           />
         </template>
 
         <template #cell-kind="{ row }">
-          <OBadge
-            :variant="kindBadgeVariant(row.kind)"
-            size="sm"
-          >{{ row.kind.toUpperCase() }}</OBadge>
+          <OTag type="aiToolsetKind" :value="row.kind" />
         </template>
 
         <template #cell-actions="{ row }">
           <OButton
             :data-test="`ai-toolset-${row.name}-edit`"
+            data-row-action="edit"
             variant="ghost"
             size="icon-sm"
             :title="t('common.edit')"
@@ -88,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OButton
             :data-test="`ai-toolset-${row.name}-delete`"
+            data-row-action="delete"
             variant="ghost-destructive"
             size="icon-sm"
             :title="t('common.delete')"
@@ -130,7 +128,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -140,14 +138,6 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import aiToolsetsService from "@/services/ai_toolsets";
-// Distinct variants so each kind reads visually different (mcp=blue, cli=green,
-// skill=amber/warning, generic=neutral). Previously skill/mcp both rendered blue.
-const KIND_VARIANTS: Record<string, string> = {
-  mcp: "primary",
-  cli: "success",
-  skill: "warning",
-  generic: "default",
-};
 
 export default defineComponent({
   name: "PageAiToolsets",
@@ -157,7 +147,7 @@ export default defineComponent({
     ConfirmDialog,
     AddAiToolset,
     OButton,
-    OBadge,
+    OTag,
     OSearchInput,
     OTable,
 },
@@ -344,11 +334,6 @@ export default defineComponent({
         });
     };
 
-    // -----------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------
-    const kindBadgeVariant = (kind: string) => KIND_VARIANTS[kind] ?? "default";
-
     return {
       t,
       store,
@@ -367,17 +352,8 @@ export default defineComponent({
       confirmDeleteToolset,
       cancelDelete,
       deleteToolset,
-      kindBadgeVariant,
     };
   },
 });
 </script>
 
-<style lang="scss" scoped>
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-</style>

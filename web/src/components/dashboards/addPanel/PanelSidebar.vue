@@ -16,49 +16,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="sidebar tw:bg-surface-panel"
-    :class="{ open: isOpen }"
+    class="bg-surface-panel relative h-full min-h-0 flex flex-col"
+    :class="isOpen ? 'w-75' : 'w-12.5'"
     data-test="panel-sidebar-root"
   >
     <div
       v-if="!isOpen"
-      class="sidebar-header-collapsed"
+      class="flex flex-col items-center justify-start w-12.5 h-full overflow-y-auto cursor-pointer"
       data-test="panel-sidebar-header-collapsed"
       @click="toggleSidebar"
     >
-      <!-- <div class="collapsed-icon">+</div> -->
+      <!-- <div class="mt-[10px] text-[20px]">+</div> -->
       <OIcon
         name="expand-all" size="sm"
-        class="collapsed-icon rotate-90"
+        class="mt-[10px] text-[20px] rotate-90"
         data-test="dashboard-sidebar"
       />
       <div
-        class="collapsed-title"
+        class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold"
         data-test="panel-sidebar-collapsed-title"
       >{{ title }}</div>
     </div>
     <div
       v-else
-      class="sidebar-header-expanded"
+      class="flex items-center justify-between h-[60px] px-[10px] shrink-0"
       data-test="panel-sidebar-header-expanded"
     >
       <div
-        class="expanded-title"
+        class="font-bold"
         data-test="panel-sidebar-expanded-title"
       >{{ title }}</div>
       <OButton
         variant="outline"
         size="icon-xs-sq"
-        class="tw:rotate-90"
+        class="rotate-90"
         @click="toggleSidebar"
         data-test="dashboard-sidebar-collapse-btn"
         icon-left="unfold-less"
       >
       </OButton>
     </div>
-    <OSeparator class="tw:-mt-px tw:shrink-0" data-test="panel-sidebar-separator" />
+    <OSeparator class="-mt-px shrink-0" data-test="panel-sidebar-separator" />
     <div
-      class="sidebar-content scroll"
+      class="scroll"
+      style="height: calc(100vh - 176px); overflow-y: auto;"
       data-test="panel-sidebar-content"
       v-if="isOpen"
       @scroll.passive="onSidebarScroll"
@@ -119,63 +120,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.sidebar {
-  position: relative;
-  width: 50px;
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar.open {
-  width: 300px;
-}
-
-.sidebar-header-collapsed {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  width: 50px;
-  height: 100%;
-  overflow-y: auto;
-  cursor: pointer;
-}
-
-.sidebar-header-expanded {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 60px;
-  padding: 0 10px;
-  flex-shrink: 0;
-}
-
-.collapsed-icon {
-  margin-top: 10px;
-  font-size: 20px;
-}
-
-.collapsed-title {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-weight: bold;
-}
-
-.expanded-title {
-  font-weight: bold;
-}
-
-.collapse-button {
-  height: 30px;
-  width: 30px;
-  padding: 0px 0px;
-}
-
-.sidebar-content {
-  height: calc(100vh - 176px);
-  overflow-y: auto;
-}
-</style>

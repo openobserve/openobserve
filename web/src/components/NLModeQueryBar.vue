@@ -1,5 +1,5 @@
 <template>
-  <div class="nl-mode-query-bar tw:w-full">
+  <div class="w-full flex flex-col gap-2">
     <!-- Compact Layout: Editor only (toggle/button provided by parent) -->
     <template v-if="layout === 'editor-only'">
       <CodeQueryEditor
@@ -21,22 +21,23 @@
     <!-- Full Layout: Toggle + Editor + Button -->
     <template v-else>
       <!-- NL Mode Toggle Bar -->
-      <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+      <div class="flex items-center gap-2 mb-2">
         <!-- NL Mode Toggle (always visible when AI enabled and enterprise) -->
         <div
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-          class="toolbar-toggle-container element-box-shadow"
+          class="flex items-center gap-2 py-1 px-2 rounded element-box-shadow"
+          style="background-color: var(--q-dark-page)"
         >
           <OSwitch
             :data-test="`${dataTestPrefix}-nlp-mode-toggle`"
             v-model="nlpMode"
           />
-          <img :src="nlpIcon" alt="NL Mode" class="toolbar-icon" />
+          <img :src="nlpIcon" alt="NL Mode" class="w-5 h-5" />
           <OTooltip :content="t('nlMode.toggle')" side="top" />
         </div>
 
         <!-- Action Buttons (always present) -->
-        <div class="tw:flex tw:gap-2 tw:ml-auto">
+        <div class="flex gap-2 ml-auto">
           <!-- Main Action Button: Run Query / Ask AI -->
           <OButton
             :data-test="`${dataTestPrefix}-action-btn`"
@@ -51,20 +52,20 @@
             <OIcon
               v-if="showIcon"
               :name="isAIMode ? 'auto-awesome' : 'search'" size="sm"
-              class="tw:mr-1"
+              class="mr-1"
             />
             {{ isAIMode ? aiButtonLabel : normalButtonLabel }}
           </OButton>
 
           <!-- Dropdown (optional - for enterprise features) -->
           <template v-if="showDropdown">
-            <OSeparator class="tw:h-[29px] tw:w-[1px]" />
+            <OSeparator class="h-7.25 w-px" />
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
                   variant="ghost"
                   size="icon-xs"
-                  class="tw:h-[29px] search-button-dropdown"
+                  class="h-7.25 search-button-dropdown"
                   :class="dropdownClasses"
                 >
                   <OIcon name="arrow-drop-down" size="sm" />
@@ -85,7 +86,7 @@
               <!-- AI Mode: Custom actions (slot) -->
               <template v-else>
                 <slot name="dropdown-actions">
-                  <div class="tw:min-w-[140px] tw:p-2 tw:text-xs tw:text-center tw:text-dropdown-item-text">
+                  <div class="min-w-35 p-2 text-xs text-center text-dropdown-item-text">
                     {{ t('nlMode.noAdditionalOptions') }}
                   </div>
                 </slot>
@@ -96,17 +97,17 @@
       </div>
 
       <!-- Query Editor with AI Input Bar -->
-      <div class="tw:w-full">
+      <div class="w-full">
         <!-- AI Input Bar (shown in NL Mode) -->
         <div
           v-if="isAIMode"
-          class="ai-input-bar tw:p-3"
+          class="p-3 bg-[linear-gradient(135deg,rgba(139,92,246,0.05)_0%,rgba(236,72,153,0.05)_100%)] border-b border-(--o2-border-color)"
         >
           <!-- Show streaming status with spinner -->
-          <div v-if="isGenerating" class="ai-bar-streaming tw:flex tw:items-center tw:gap-2">
-            <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+          <div v-if="isGenerating" class="ai-bar-streaming flex items-center gap-2 bg-white rounded-lg py-2 px-3 text-(--q-primary)">
+            <img :src="nlpIcon" alt="AI" class="w-5 h-5" />
             <OSpinner variant="dots" size="xs" />
-            <span class="tw:text-sm">{{ aiStatusText || t('search.analyzingQuery') }}</span>
+            <span class="text-sm text-[#666]">{{ aiStatusText || t('search.analyzingQuery') }}</span>
           </div>
           <!-- Normal input when not generating -->
           <OInput
@@ -118,7 +119,7 @@
             @keydown.enter="handleAIInputEnter"
           >
             <template v-slot:icon-left>
-              <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+              <img :src="nlpIcon" alt="AI" class="w-5 h-5" />
             </template>
           </OInput>
         </div>
@@ -234,15 +235,15 @@ const isAIMode = computed(() => nlpMode.value || isNaturalLanguageDetected.value
 // Computed: Button classes
 const buttonClasses = computed(() => {
   const classes = [
-    'tw:p-0',
-    `tw:h-[${props.height}]`,
+    'p-0',
+    `h-[${props.height}]`,
     'element-box-shadow',
   ];
 
   if (isAIMode.value) {
-    classes.push('o2-ai-generate-button');
+    classes.push('bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! text-white! border-none! text-[0.6875rem]! font-semibold! leading-[1rem]! transition-all! duration-300! ease-[ease]! shadow-[0_0.25rem_0.9375rem_0_rgba(139,92,246,0.3)]! px-3! w-[92px]! hover:shadow-[0_0.375rem_1.25rem_0_rgba(139,92,246,0.5)]! hover:-translate-y-px active:translate-y-0');
   } else {
-    classes.push('o2-run-query-button', 'o2-color-primary');
+    classes.push('w-[92px]!', 'o2-color-primary');
   }
 
   if (props.borderRadius === 'enterprise') {
@@ -305,7 +306,6 @@ const handleAIInputEnter = async () => {
 
   // Check if user wants to execute the query instead of generating a new one
   if (currentQuery && currentQuery.trim() && isExecutionIntent(naturalLanguage)) {
-    console.log('[NLModeQueryBar] Execution intent detected, running query instead of generating');
     aiInputText.value = ''; // Clear input
     emit('run-query'); // Trigger query execution
     return;
@@ -313,7 +313,6 @@ const handleAIInputEnter = async () => {
 
   // Call the CodeQueryEditor's handleGenerateSQL method directly
   if (editorRef.value && typeof editorRef.value.handleGenerateSQL === 'function') {
-    console.log('[NLModeQueryBar] Generating query from natural language:', naturalLanguage);
     try {
       aiStatusText.value = t('search.generatingQuery');
       await editorRef.value.handleGenerateSQL(naturalLanguage);
@@ -346,7 +345,6 @@ const handleButtonClick = async () => {
 
     // Check if user wants to execute the query instead of generating a new one
     if (currentQuery && currentQuery.trim() && isExecutionIntent(naturalLanguage)) {
-      console.log('[NLModeQueryBar] Execution intent detected, running query instead of generating');
       aiInputText.value = ''; // Clear input
       emit('run-query'); // Trigger query execution
       return;
@@ -359,7 +357,6 @@ const handleButtonClick = async () => {
 
     // Call the CodeQueryEditor's handleGenerateSQL method directly
     if (editorRef.value && typeof editorRef.value.handleGenerateSQL === 'function') {
-      console.log('[NLModeQueryBar] Generating query from natural language:', naturalLanguage);
       try {
         aiStatusText.value = t('search.generatingQuery');
         await editorRef.value.handleGenerateSQL(naturalLanguage);
@@ -390,7 +387,6 @@ const handleGenerationEnd = () => {
 };
 
 const handleGenerationSuccess = ({ type, message }: any) => {
-  console.log('[NLModeQueryBar] Generation success:', { type, message });
 
   // Show success message in AI status
   aiStatusText.value = '✓ ' + t('search.queryGeneratedSuccess');
@@ -429,99 +425,3 @@ defineExpose({
 });
 </script>
 
-<style scoped>
-.nl-mode-query-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.toolbar-toggle-container {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  background-color: var(--q-dark-page);
-}
-
-.toolbar-icon {
-  width: 20px;
-  height: 20px;
-}
-
-/* AI Generate Button Styling (matches O2 AI Assistant - purple gradient) */
-.o2-ai-generate-button {
-  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
-  color: white !important;
-  border: none !important;
-  font-size: 0.6875rem !important; /* 11px */
-  font-weight: 600 !important;
-  line-height: 1rem !important; /* 16px */
-  transition: all 0.3s ease !important;
-  box-shadow: 0 0.25rem 0.9375rem 0 rgba(139, 92, 246, 0.3) !important; /* 0 4px 15px */
-  padding: 0 0.75rem !important; /* 0 12px */
-  width: 92px !important; /* Fixed width to prevent layout shift */
-}
-
-.o2-ai-generate-button:hover {
-  box-shadow: 0 0.375rem 1.25rem 0 rgba(139, 92, 246, 0.5) !important; /* 0 6px 20px */
-  transform: translateY(-1px);
-}
-
-.o2-ai-generate-button:active {
-  transform: translateY(0);
-}
-
-/* Run Query Button - Fixed width to match AI button and prevent layout shift */
-.o2-run-query-button {
-  width: 92px !important; /* Same as AI button */
-}
-
-/* AI Input Bar Styling (matches logs page) */
-.ai-input-bar {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
-  border-bottom: 1px solid var(--o2-border-color);
-}
-
-.ai-input-field :deep(.q-field__control) {
-  background: white;
-  border-radius: 8px;
-  padding: 4px 8px;
-}
-
-/* Remove focus border */
-.ai-input-field :deep(.q-field__control::before),
-.ai-input-field :deep(.q-field__control::after) {
-  border: none !important;
-}
-
-.ai-input-field :deep(.q-field__prepend) {
-  padding-right: 8px;
-}
-
-/* Streaming status display (matches O2 AI assistant style) */
-.ai-bar-streaming {
-  background: white;
-  border-radius: 8px;
-  padding: 8px 12px;
-  color: var(--q-primary);
-}
-
-.ai-bar-streaming span {
-  color: #666;
-}
-
-/* Dark mode styling */
-.q-dark .ai-input-field :deep(.q-field__control) {
-  background: var(--q-dark);
-}
-
-.q-dark .ai-bar-streaming {
-  background: var(--q-dark);
-}
-
-.q-dark .ai-bar-streaming span {
-  color: #ccc;
-}
-</style>

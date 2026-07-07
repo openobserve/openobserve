@@ -1,14 +1,18 @@
 <template>
-  <div class="label-filter-editor">
-    <div style="display: flex; flex-direction: row" class="tw:pl-2">
-      <div class="layout-name">{{ t("panel.labelFilters") }}</div>
-      <span class="layout-separator">:</span>
-      <div class="axis-container scroll tw:flex">
+  <div data-test="promql-labelfilter-editor">
+    <div style="display: flex; flex-direction: row" class="pl-2">
+      <div
+        data-test="promql-labelfilter-editor-label"
+        class="text-sm whitespace-nowrap flex items-center min-w-21.5"
+      >{{ t("panel.labelFilters") }}</div>
+      <span class="flex items-center ml-0.5 mr-0.5">:</span>
+      <div class="m-0.5 flex gap-2 flex-wrap items-center scroll">
         <!-- Label Filter Items -->
         <div
           v-for="(label, index) in props.labels"
           :key="index"
-          class="label-filter-item"
+          data-test="promql-labelfilter-item"
+          class="flex items-center"
         >
           <OButtonGroup class="axis-field" radius="sm">
             <ODropdown>
@@ -16,7 +20,7 @@
                 <OButton
                   variant="primary"
                   size="chip"
-                  class="tw:!text-[12px]"
+                  class="!text-[12px]"
                   :data-test="`promql-label-filter-${index}`"
                 >
                   {{ computedLabel(label) }}
@@ -24,7 +28,7 @@
                 </OButton>
               </template>
               <div
-                class="label-filter-editor-dropdown tw:p-4"
+                class="p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
                 :data-test="`promql-label-filter-${index}-menu`"
               >
                 <div style="width: 350px">
@@ -33,13 +37,13 @@
                     v-model="label.label"
                     :options="availableLabelOptions"
                     label="Label"
-                    class="label-filter-label-select showLabelOnTop tw:normal-case! tw:mb-2"
+                    class="label-filter-label-select showLabelOnTop normal-case! mb-2"
                     searchable
                     clearable
                     data-test="promql-label-select"
                   >
                     <template #empty>
-                      <span class="tw:text-text-secondary tw:px-3 tw:py-2">{{
+                      <span class="text-text-secondary px-3 py-2">{{
                         loadingLabels
                           ? "Loading labels..."
                           : "No labels found"
@@ -52,7 +56,7 @@
                     v-model="label.op"
                     :options="operatorOptions"
                     label="Operator"
-                    class="label-filter-operator-select showLabelOnTop tw:mb-2"
+                    class="label-filter-operator-select showLabelOnTop mb-2"
                     data-test="promql-operator-select"
                   />
 
@@ -70,7 +74,7 @@
                     data-test="promql-value-select"
                   >
                     <template #empty>
-                      <span class="tw:text-text-secondary tw:px-3 tw:py-2">{{
+                      <span class="text-text-secondary px-3 py-2">{{
                         !label.label
                           ? 'Select a label first'
                           : 'No values found'
@@ -250,39 +254,3 @@ const getOperatorHint = (op: string): string => {
   }
 };
 </script>
-
-<style scoped lang="scss">
-.layout-name {
-  font-size: 14px;
-  white-space: nowrap;
-  min-width: 86px;
-  display: flex;
-  align-items: center;
-}
-
-.layout-separator {
-  display: flex;
-  align-items: center;
-  margin-left: 2px;
-  margin-right: 2px;
-}
-
-.axis-container {
-  margin: 2px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.label-filter-item {
-  display: flex;
-  align-items: center;
-}
-
-.label-filter-editor-dropdown {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
-}
-</style>

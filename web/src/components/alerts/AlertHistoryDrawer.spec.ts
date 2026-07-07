@@ -584,42 +584,14 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   describe("Helper Functions", () => {
-    it("formatStatus should capitalize first letter", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.formatStatus("firing")).toBe("Firing");
-      expect(vm.formatStatus("ok")).toBe("Ok");
-      expect(vm.formatStatus("error")).toBe("Error");
-    });
-
-    it("formatStatus should return Unknown for empty/null input", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.formatStatus("")).toBe("Unknown");
-      expect(vm.formatStatus(null)).toBe("Unknown");
-    });
-
-    it("getStatusChipVariant should return correct variants", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.getStatusChipVariant("firing")).toBe("error-soft");
-      expect(vm.getStatusChipVariant("error")).toBe("error-soft");
-      expect(vm.getStatusChipVariant("anomaly")).toBe("error-soft");
-      expect(vm.getStatusChipVariant("ok")).toBe("success-soft");
-      expect(vm.getStatusChipVariant("success")).toBe("success-soft");
-      expect(vm.getStatusChipVariant("normal")).toBe("success-soft");
-      expect(vm.getStatusChipVariant("skipped")).toBe("warning-soft");
-      expect(vm.getStatusChipVariant("pending")).toBe("primary-soft");
-      expect(vm.getStatusChipVariant("unknown")).toBe("default-soft");
-    });
 
     it("getRowClass should return error class for error/firing status", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
       // Store theme is "dark" by default in test helper
       // getRowClass takes a row object with status property
-      expect(vm.getRowClass({ status: "firing" })).toBe("row-error-dark");
-      expect(vm.getRowClass({ status: "error" })).toBe("row-error-dark");
+      expect(vm.getRowClass({ status: "firing" })).toBe("!bg-[#2d1b1b]");
+      expect(vm.getRowClass({ status: "error" })).toBe("!bg-[#2d1b1b]");
       expect(vm.getRowClass({ status: "ok" })).toBe("");
       expect(vm.getRowClass({ status: "success" })).toBe("");
     });

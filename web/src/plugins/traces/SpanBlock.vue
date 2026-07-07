@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex wrap tw:justify-start tw:items-center"
+    class="flex wrap justify-start items-center"
     :class="[
-      defocusSpan ? 'defocus' : '',
-      store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white',
+      defocusSpan ? 'opacity-30' : '',
+      store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white',
     ]"
     :style="{
       zIndex: 2,
@@ -28,8 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="span-block-container"
   >
     <div
-      class="tw:flex tw:justify-between tw:items-end tw:cursor-pointer span-block relative-position"
-      :class="[store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white']"
+      class="flex justify-between items-end cursor-pointer span-block relative-position"
+      :class="[store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white']"
       :style="{
         height: spanDimensions.height + 'px',
         width: '100%',
@@ -45,8 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           width: '100%',
           overflow: 'hidden',
         }"
-        class="tw:cursor-pointer tw:flex tw:items-center tw:flex-nowrap position-relative"
-        :class="defocusSpan ? 'defocus' : ''"
+        class="cursor-pointer flex items-center flex-nowrap position-relative"
+        :class="defocusSpan ? 'opacity-30' : ''"
         @click="selectSpan(span.spanId)"
         data-test="span-block-select-trigger"
       >
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             left: leftPosition + '%',
             position: 'relative',
           }"
-          class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap"
+          class="flex justify-start items-center flex-nowrap"
           ref="spanMarkerRef"
           data-test="span-marker"
         >
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             transition: 'all 0.5s ease',
             zIndex: 1,
           }"
-          class="tw:text-xs tw:flex tw:items-center"
+          class="text-xs flex items-center"
           data-test="span-block-duration"
         >
           <div>
@@ -315,33 +315,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.defocus {
-  opacity: 0.3;
-}
-
-.collapse-btn {
-  opacity: 0.6;
-}
-
-.collapse-container {
-  border: 1px solid #ececec;
-}
-
-.light-grey {
-  background-color: #ececec;
-}
-
-.view-span-logs {
-  visibility: hidden;
-}
-
-.span-block-overlay {
-  &:hover {
-    .view-span-logs {
-      visibility: visible;
-    }
-  }
-}
-</style>

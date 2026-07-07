@@ -15,67 +15,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="tw:flex tw:flex-col card-wrapper">
-    <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
+  <OCard class="flex flex-col shadow-none border border-(--o2-border-color) bg-(--o2-card-bg) rounded-lg w-full h-full dark:bg-(--o2-card-background) dark:border-(--o2-border)">
+    <div class="flex items-center justify-between px-3 py-2">
       <div>
-        <h3 class="card-title tw:pt-2">
+        <h3 class="pt-2 text-base font-semibold leading-6 text-(--o2-text-heading) m-0">
           {{ t("billing.enterpriseLabel") }}
         </h3>
-        <p class="card-subtitle tw:mt-2">
+        <p class="mt-2 text-sm font-normal leading-[1.125rem] text-(--o2-text-secondary) m-0">
           {{ t("billing.enterpriseSubtitle") }}
         </p>
       </div>
-      <OBadge
-        variant="primary-soft"
-        class="tw:mt-2 tw:text-xs tw:px-2 tw:py-3"
-      >
-        {{ t("billing.discountTag") }}
-      </OBadge>
+      <OTag
+        type="billingTag"
+        value="discount"
+        class="mt-2"
+      />
     </div>
 
-    <OSeparator class="tw:my-2" />
+    <OSeparator class="my-2" />
 
-    <div class="tw:px-3 tw:pt-2 tw:h-[550px]">
-      <h4 class="feature-title">{{ t("billing.features") }}</h4>
-      <p class="feature-subtitle tw:mb-3 tw:mt-1">
+    <div class="px-3 pt-2 h-[550px]">
+      <h4 class="text-[0.8125rem] font-semibold leading-[0.983rem] text-(--o2-text-heading) m-0">{{ t("billing.features") }}</h4>
+      <p class="mb-3 mt-1 text-[0.8125rem] font-normal leading-[1.125rem] text-(--o2-text-secondary) m-0">
         {{ t("billing.included") }}
       </p>
 
       <div
         v-if="pricingError && !features?.length"
-        class="tw:flex tw:items-center tw:mb-2 tw:text-red-500"
+        class="flex items-center mb-2 text-red-500"
       >
-        <OIcon name="warning" size="sm" class="tw:mr-2" />
-        <span class="feature-description"
+        <OIcon name="warning" size="sm" class="mr-2" />
+        <span class="text-[0.938rem] leading-[1.375rem] text-(--o2-text-body)"
           >Failed to load pricing details. Please refresh the page.</span
         >
       </div>
       <div
         v-for="(feature, index) in features"
         :key="index"
-        class="tw:flex tw:items-center tw:justify-between tw:mb-2"
+        class="flex items-center justify-between mb-2"
       >
-        <div class="tw:flex tw:items-center">
+        <div class="flex items-center">
           <OIcon
             v-if="feature.is_parent"
             name="check-circle"
             size="md"
-            class="tw:mr-2 tw:text-green-500 check-icon"
+            class="mr-2 text-green-500 check-icon"
           />
-          <div class="feature-description" :class="{ 'tw:ml-6': !feature.is_parent }">{{ feature.name }}</div>
+          <div class="text-[0.938rem] leading-[1.375rem] text-(--o2-text-body)" :class="{ 'ml-6': !feature.is_parent }">{{ feature.name }}</div>
         </div>
-        <div class="feature-description tw:font-bold">{{ feature.price }}</div>
+        <div class="text-[0.938rem] leading-[1.375rem] text-(--o2-text-body) font-bold">{{ feature.price }}</div>
       </div>
     </div>
 
     <OSeparator />
 
-    <p class="feature-note tw:px-3 tw:pt-2">
+    <p class="px-3 pt-2 text-[0.8125rem] font-normal leading-[1.125rem] text-(--o2-text-secondary) m-0">
       {{ t("billing.enterpriseNote") }}
     </p>
 
-    <div class="tw:flex tw:justify-between tw:p-3 tw:mt-[18px]">
-      <OButton variant="primary" size="sm-action" class="tw:w-full" @click="contactSales">
+    <div class="flex justify-between p-3 mt-[18px]">
+      <OButton variant="primary" size="sm-action" class="w-full" @click="contactSales">
         {{ t("billing.contactLabel") }}
       </OButton>
     </div>
@@ -87,14 +86,14 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { siteURL } from "@/constants/config";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 
 export default defineComponent({
   name: "enterprisePlan",
-  components: { OSeparator, OButton, OBadge, OIcon, OCard },
+  components: { OSeparator, OButton, OTag, OIcon, OCard },
   props: ["features", "pricingError"],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -110,75 +109,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.full-width {
-  width: 100%;
-}
-
-.card-wrapper {
-  box-shadow: none;
-  border: 1px solid var(--o2-border-color);
-  background: var(--o2-card-bg);
-  border-radius: 0.5rem;
-  width: 100%;
-  height: 100%;
-}
-
-:deep(.card-wrapper) {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.5rem;
-}
-
-.body--dark .card-wrapper {
-  background: var(--o2-card-background);
-  border-color: var(--o2-border);
-}
-
-.card-title {
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.5rem;
-  color: var(--o2-text-heading);
-  margin: 0;
-}
-
-.card-subtitle {
-  font-size: 0.875rem;
-  font-weight: 400;
-  line-height: 1.125rem;
-  color: var(--o2-text-secondary);
-  margin: 0;
-}
-
-.feature-title {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  line-height: 0.983rem;
-  color: var(--o2-text-heading);
-  margin: 0;
-}
-
-.feature-subtitle {
-  font-size: 0.8125rem;
-  font-weight: 400;
-  line-height: 1.125rem;
-  color: var(--o2-text-secondary);
-  margin: 0;
-}
-
-.feature-description {
-  font-size: 0.938rem;
-  line-height: 1.375rem;
-  color: var(--o2-text-body);
-}
-
-.feature-note {
-  font-size: 0.8125rem;
-  font-weight: 400;
-  line-height: 1.125rem;
-  color: var(--o2-text-secondary);
-  margin: 0;
-}
-</style>

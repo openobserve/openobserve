@@ -32,17 +32,20 @@ test.describe("IAM Organization form validation", () => {
         testLogger.info('Navigated to IAM Organizations tab');
     });
 
-    test("should disable submit button when organization name is empty", {
+    test("should keep submit enabled and block empty organization name on submit", {
         tag: ['@iamFormValidation', '@smoke', '@P0']
     }, async ({ page }) => {
-        testLogger.info('Testing submit button disabled state for empty org name');
+        testLogger.info('Testing submit gating for empty org name');
 
         await pm.iamFormValidation.openOrganizationForm();
         await expect(pm.iamFormValidation.getOrgDialogLocator()).toBeVisible();
-        // Submit is disabled: :primaryButtonDisabled="(!organizationData.name || !isValidOrgName)"
-        await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeDisabled();
+        // R3 (Zod migration): Save stays enabled; the schema gates the submit,
+        // not the button. Submitting an empty name reveals the inline error.
+        await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.getOrgSubmitBtnLocator().click();
+        await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
 
-        testLogger.info('Submit button correctly disabled for empty name');
+        testLogger.info('Empty org name correctly blocked on submit');
     });
 
     test("should show error when organization name contains invalid characters", {
@@ -51,14 +54,15 @@ test.describe("IAM Organization form validation", () => {
         testLogger.info('Testing org name invalid character error');
 
         await pm.iamFormValidation.openOrganizationForm();
-        // Type an invalid name — error appears on input change (not on submit)
+        // R3 (Zod migration): errors are revealed on SUBMIT (revalidateLogic),
+        // not on input; Save stays enabled and the schema gates the submit.
         await pm.iamFormValidation.fillOrgName('org@name!');
+        await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.submitOrgForm();
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toContainText(
             'Use alphanumeric characters, space and underscore only.'
         );
-        // Submit button still disabled
-        await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeDisabled();
 
         testLogger.info('Invalid org name error correctly shown');
     });
@@ -70,12 +74,13 @@ test.describe("IAM Organization form validation", () => {
 
         await pm.iamFormValidation.openOrganizationForm();
         await pm.iamFormValidation.fillOrgName('bad@name!');
+        await pm.iamFormValidation.submitOrgForm(); // reveal the error (submit-then-change)
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toContainText('Use alphanumeric characters, space and underscore only.');
 
+        // After the first submit, errors revalidate live on change → fixing clears it.
         await pm.iamFormValidation.fillOrgName('valid_name');
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).not.toBeVisible();
-        // Submit should now be enabled
         await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeEnabled();
 
         testLogger.info('Org name error correctly cleared on fix');
@@ -105,6 +110,7 @@ test.describe("IAM Organization form validation", () => {
 
         await pm.iamFormValidation.openOrganizationForm();
         await pm.iamFormValidation.fillOrgName('bad@name!');
+        await pm.iamFormValidation.submitOrgForm(); // reveal the error (submit-then-change)
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toContainText('Use alphanumeric characters, space and underscore only.');
 
@@ -137,16 +143,19 @@ test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {
         testLogger.info('Navigated to IAM Groups tab');
     });
 
-    test("should disable submit button when group name is empty", {
+    test("should keep submit enabled and block empty group name on submit", {
         tag: ['@iamFormValidation', '@smoke', '@P0']
     }, async ({ page }) => {
-        testLogger.info('Testing submit button disabled for empty group name');
+        testLogger.info('Testing submit gating for empty group name');
 
         await pm.iamFormValidation.openGroupForm();
         await expect(pm.iamFormValidation.getGroupDialogLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeDisabled();
+        // R3: Save stays enabled; submitting an empty name reveals the required error.
+        await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.submitGroupForm();
+        await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toBeVisible();
 
-        testLogger.info('Group submit button correctly disabled for empty name');
+        testLogger.info('Empty group name correctly blocked on submit');
     });
 
     test("should show error when group name contains invalid characters", {
@@ -156,11 +165,12 @@ test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {
 
         await pm.iamFormValidation.openGroupForm();
         await pm.iamFormValidation.fillGroupName('group with spaces');
+        await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.submitGroupForm(); // reveal the error
         await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toContainText(
             "Use alphanumeric and '_' characters only, without spaces."
         );
-        await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeDisabled();
 
         testLogger.info('Group invalid name error correctly shown');
     });
@@ -172,9 +182,10 @@ test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {
 
         await pm.iamFormValidation.openGroupForm();
         await pm.iamFormValidation.fillGroupName('group@name!');
+        await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.submitGroupForm(); // reveal the error
         await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toContainText("Use alphanumeric and '_' characters only, without spaces.");
-        await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeDisabled();
+        await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toContainText("Use letters, numbers and underscores only, without spaces.");
 
         testLogger.info('Group special-char error correctly shown');
     });
@@ -218,16 +229,19 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
         testLogger.info('Navigated to IAM Roles tab');
     });
 
-    test("should disable submit button when role name is empty", {
+    test("should keep submit enabled and block empty role name on submit", {
         tag: ['@iamFormValidation', '@smoke', '@P0']
     }, async ({ page }) => {
-        testLogger.info('Testing submit button disabled for empty role name');
+        testLogger.info('Testing submit gating for empty role name');
 
         await pm.iamFormValidation.openRoleForm();
         await expect(pm.iamFormValidation.getRoleDialogLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getRoleSubmitBtnLocator()).toBeDisabled();
+        // R3: Save stays enabled; submitting an empty name reveals the required error.
+        await expect(pm.iamFormValidation.getRoleSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.submitRoleForm();
+        await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toBeVisible();
 
-        testLogger.info('Role submit button correctly disabled for empty name');
+        testLogger.info('Empty role name correctly blocked on submit');
     });
 
     test("should show error when role name contains invalid characters", {
@@ -237,11 +251,12 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
 
         await pm.iamFormValidation.openRoleForm();
         await pm.iamFormValidation.fillRoleName('role with spaces');
+        await expect(pm.iamFormValidation.getRoleSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.submitRoleForm(); // reveal the error
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toContainText(
             "Use alphanumeric and '_' characters only, without spaces."
         );
-        await expect(pm.iamFormValidation.getRoleSubmitBtnLocator()).toBeDisabled();
 
         testLogger.info('Role invalid name error correctly shown');
     });
@@ -253,9 +268,11 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
 
         await pm.iamFormValidation.openRoleForm();
         await pm.iamFormValidation.fillRoleName('bad role name!');
+        await pm.iamFormValidation.submitRoleForm(); // reveal the error (submit-then-change)
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toContainText("Use alphanumeric and '_' characters only, without spaces.");
 
+        // After the first submit, errors revalidate live on change → fixing clears it.
         await pm.iamFormValidation.fillRoleName('valid_role_name');
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).not.toBeVisible();
         await expect(pm.iamFormValidation.getRoleSubmitBtnLocator()).toBeEnabled();

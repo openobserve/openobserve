@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <PageLayout
     :key="store.state.selectedOrganization.identifier"
     :main-panel="false"
-    :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+    :header-class="'shrink-0 px-4 border-b border-border-default'"
   >
     <!-- ── Page header (row 1) ──────────────────────────────────────
          The breadcrumb path now lives in the top chrome bar (published
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AppPageHeader
         :title="t('dashboard.header')"
         icon="dashboard"
-        subtitle="Create, organize, and share dashboards across folders"
+        :subtitle="t('dashboard.subtitle')"
       >
       <template #actions>
         <!-- import dashboard button with dropdown -->
@@ -49,10 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="importDashboard"
             data-test="dashboard-import-custom"
           >
-            <div class="tw:flex tw:flex-col">
-              <span>Custom</span>
-              <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
-                >Import from JSON file or URL</span
+            <div class="flex flex-col">
+              <span>{{ t('dashboard.importCustom') }}</span>
+              <span class="text-xs text-dropdown-item-text opacity-60"
+                >{{ t('dashboard.importCustomDesc') }}</span
               >
             </div>
           </ODropdownItem>
@@ -60,10 +60,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="showAddDashboardFromGitHub = true"
             data-test="dashboard-import-templates"
           >
-            <div class="tw:flex tw:flex-col">
-              <span>Templates</span>
-              <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
-                >Browse and import from gallery</span
+            <div class="flex flex-col">
+              <span>{{ t('dashboard.importTemplates') }}</span>
+              <span class="text-xs text-dropdown-item-text opacity-60"
+                >{{ t('dashboard.importTemplatesDesc') }}</span
               >
             </div>
           </ODropdownItem>
@@ -83,10 +83,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Folder rail + table — matches the Alerts/Reports layout. -->
-    <div class="tw:flex-1 tw:flex tw:min-h-0">
+    <div class="flex-1 flex min-h-0">
       <!-- Left: shared folder list (same component as Alerts/Reports) -->
-      <div class="tw:shrink-0 tw:h-full" :style="{ width: 230 + 'px' }">
-        <div class="tw:h-full">
+      <div class="shrink-0 h-full" :style="{ width: 230 + 'px' }">
+        <div class="h-full">
           <FolderList
             type="dashboards"
             @update:activeFolderId="updateActiveFolderId"
@@ -94,8 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- Right: dashboards table -->
-      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
-        <div class="tw:h-full card-container">
+      <div class="flex-1 min-w-0 h-full">
+        <div class="h-full card-container">
           <OTable
             ref="oTableRef"
             :data="dashboards"
@@ -120,8 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Toolbar inside the table frame: scoped search (fills the bar) + refresh -->
             <template #toolbar>
-              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-                <div class="tw:flex-1 tw:min-w-0">
+              <div class="flex items-center gap-2 w-full">
+                <div class="flex-1 min-w-0">
                   <OInput
                     v-model="dynamicQueryModel"
                     :placeholder="
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :clearable="searchAcrossFolders"
                     @clear="clearSearchHistory"
                     data-test="dashboard-search"
-                    class="tw:w-full"
+                    class="w-full"
                   >
                     <template #icon-left>
                       <OIcon name="search" size="sm" />
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OToggleGroup
                         :model-value="searchAcrossFolders ? 'all' : 'this'"
                         type="single"
-                        class="tw:self-center tw:mr-1"
+                        class="self-center mr-1"
                         @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                       >
                         <OToggleGroupItem
@@ -149,15 +149,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           size="xs"
                           icon-left="folder-outline"
                           data-test="dashboard-search-scope-current"
-                          title="Search only this folder"
-                        >This folder</OToggleGroupItem>
+                          :title="t('dashboard.searchThisFolderTitle')"
+                        >{{ t('dashboard.searchThisFolder') }}</OToggleGroupItem>
                         <OToggleGroupItem
                           value="all"
                           size="xs"
                           icon-left="search"
                           data-test="dashboard-search-across-folders-toggle"
-                          title="Search across all folders"
-                        >All folders</OToggleGroupItem>
+                          :title="t('dashboard.searchAllFoldersTitle')"
+                        >{{ t('dashboard.searchAllFolders') }}</OToggleGroupItem>
                       </OToggleGroup>
                     </template>
                   </OInput>
@@ -171,14 +171,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-sm"
                 icon-left="refresh"
                 :loading="loading"
-                title="Reload dashboards"
                 data-test="dashboard-list-refresh"
                 @click="getDashboards"
-              />
+              >
+                <OTooltip side="bottom" :content="t('dashboard.reloadDashboards')" shortcut-id="dashboardsListRefresh" />
+              </OButton>
             </template>
             <template #cell-name="{ row, value }">
               <span
-                class="tw:text-text-primary"
+                class="text-text-primary"
                 :data-test="`dashboard-name-cell-${value}`"
                 :title="value"
                 >{{ value }}</span
@@ -186,47 +187,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-identifier="{ value }">
               <span
-                class="tw:font-mono tw:text-xs tw:text-text-primary"
+                class="font-mono text-xs text-text-primary"
                 :title="value"
                 >{{ value }}</span
               >
             </template>
             <template #cell-description="{ value }">
               <span
-                class="tw:text-text-primary"
+                class="text-text-primary"
                 :title="value"
                 >{{ value || "—" }}</span
               >
             </template>
             <template #cell-owner="{ value }">
-              <span
-                v-if="value"
-                class="tw:flex tw:items-center tw:gap-2 tw:min-w-0"
-              >
-                <span
-                  class="tw:text-text-primary tw:truncate tw:flex-1 tw:min-w-0"
-                  :title="value"
-                  >{{ value }}</span
-                >
-              </span>
-              <span v-else class="tw:text-text-primary">—</span>
+              <OUserCell :value="value" />
             </template>
-            <template #cell-created="{ value }">
-              <span class="tw:text-text-primary">{{ value }}</span>
+            <template #cell-created="{ row, value }">
+              <OTimeCell
+                :value="row.created_raw || value"
+                unit="iso"
+                :timezone="store.state.timezone"
+              />
             </template>
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="tw:inline-flex tw:items-center tw:gap-1 tw:max-w-full tw:px-2 tw:py-0.5 tw:rounded-full tw:bg-surface-subtle tw:text-text-primary tw:text-xs tw:leading-5 tw:transition-colors tw:outline-none tw:hover:bg-surface-subtle-hover tw:hover:text-text-primary tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
+                class="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full bg-surface-subtle text-text-primary text-xs leading-5 transition-colors outline-none hover:bg-surface-subtle-hover hover:text-text-primary focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
-                <span class="tw:truncate">{{ row.folder }}</span>
+                <span class="truncate">{{ row.folder }}</span>
               </button>
             </template>
             <template #cell-actions="{ row }">
               <span
-                class="row-actions tw:flex tw:items-center tw:justify-center tw:gap-0.5"
+                class="row-actions flex items-center justify-center gap-0.5"
               >
                 <OButton
                   v-if="row.actions == 'true'"
@@ -244,6 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-xs-sq"
                   data-test="dashboard-duplicate"
+                  data-row-action="duplicate"
                   @click.stop="duplicateDashboard(row.id, row.folder_id)"
                 />
                 <OButton
@@ -253,6 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost-destructive"
                   size="icon-xs-sq"
                   data-test="dashboard-delete"
+                  data-row-action="delete"
                   @click.stop="showDeleteDialogFn({ row })"
                 />
               </span>
@@ -276,24 +273,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #bottom>
               <div
-                class="tw:flex tw:w-full tw:justify-between tw:items-center tw:py-1"
+                class="flex w-full justify-between items-center py-1"
               >
                 <div
-                  class="o2-table-footer-title tw:flex tw:items-center tw:gap-2 tw:shrink-0"
+                  class="o2-table-footer-title flex items-center gap-2 shrink-0"
                 >
-                  <span class="tw:text-text-primary">{{
+                  <span class="text-text-primary">{{
                     resultTotal || 0
                   }}</span>
-                  <span class="tw:text-text-secondary">{{
+                  <span class="text-text-secondary">{{
                     t("dashboard.header")
                   }}</span>
                 </div>
                 <div
                   v-if="selectedIds.length > 0"
-                  class="bulk-action-bar tw:flex tw:items-center tw:gap-2"
+                  class="bulk-action-bar flex items-center gap-2"
                 >
                   <span
-                    class="tw:text-sm tw:text-text-primary tw:mr-1"
+                    class="text-sm text-text-primary mr-1"
                     >{{ selectedIds.length }} selected</span
                   >
                   <OButton
@@ -303,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="moveMultipleDashboards"
                     icon-left="drive-file-move"
                   >
-                    Move
+                    {{ t('common.move') }}
                   </OButton>
                   <OButton
                     variant="outline"
@@ -312,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-list-export-dashboards-btn"
                     @click="multipleExportDashboard"
                   >
-                    Export
+                    {{ t('common.export') }}
                   </OButton>
                   <OButton
                     variant="outline-destructive"
@@ -321,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-list-delete-dashboards-btn"
                     @click="openBulkDeleteDialog"
                   >
-                    Delete
+                    {{ t('common.delete') }}
                   </OButton>
                 </div>
               </div>
@@ -390,9 +387,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- delete dashboard dialog -->
           <ConfirmDialog
-            title="Delete dashboard"
+            :title="t('dashboard.deleteDashboardConfirmTitle')"
             data-test="dashboard-confirm-dialog"
-            message="Are you sure you want to delete the dashboard?"
+            :message="t('dashboard.deleteDashboardConfirmMsg')"
             @update:ok="deleteDashboard"
             @update:cancel="confirmDeleteDialog = false"
             v-model="confirmDeleteDialog"
@@ -400,9 +397,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- delete folder dialog -->
           <ConfirmDialog
-            title="Delete Folder"
+            :title="t('dashboard.deleteFolder')"
             data-test="dashboard-confirm-delete-folder-dialog"
-            message="Are you sure you want to delete this Folder?"
+            :message="t('dashboard.deleteFolderMessage')"
             @update:ok="deleteFolder"
             @update:cancel="confirmDeleteFolderDialog = false"
             v-model="confirmDeleteFolderDialog"
@@ -410,9 +407,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- bulk delete dashboards dialog -->
           <ConfirmDialog
-            title="Delete Dashboards"
+            :title="t('dashboard.deleteDashboardsConfirmTitle')"
             data-test="dashboard-confirm-bulk-delete-dialog"
-            :message="`Are you sure you want to delete ${selectedIds.length} dashboard(s)?`"
+            :message="t('dashboard.deleteDashboardsConfirmMsg', { count: selectedIds.length })"
             @update:ok="bulkDeleteDashboards"
             @update:cancel="confirmBulkDelete = false"
             v-model="confirmBulkDelete"
@@ -451,6 +448,8 @@ import { formatDate } from "@/utils/date";
 
 import dashboardService from "../../services/dashboards";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -477,6 +476,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -493,6 +494,8 @@ const AddDashboardFromGitHub = defineAsyncComponent(() => {
 export default defineComponent({
   name: "Dashboards",
   components: {
+    OUserCell,
+    OTimeCell,
     PageLayout,
     AppPageHeader,
     OEmptyState,
@@ -935,6 +938,7 @@ export default defineComponent({
       identifier: folderInfo ? board.dashboard.dashboardId : board.dashboardId,
       description: folderInfo ? board.dashboard.description : board.description,
       owner: folderInfo ? board.dashboard.owner : board.owner,
+      created_raw: folderInfo ? board.dashboard.created : board.created,
       created: formatDate(
         folderInfo ? board.dashboard.created : board.created,
         "YYYY-MM-DDTHH:mm:ss",
@@ -1272,6 +1276,29 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
+
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "dashboardsListAdd",
+        handler: () => { if (!isInputFocused()) addDashboard(); },
+      },
+      {
+        id: "dashboardsListImport",
+        handler: () => { if (!isInputFocused()) importDashboard(); },
+      },
+      {
+        id: "dashboardsListRefresh",
+        handler: () => { if (!isInputFocused()) getDashboards(); },
+      },
+      {
+        id: "dashboardsListFocusSearch",
+        handler: () => {
+          focusSearchInput("dashboard-search");
+        },
+      },
+    ]);
     return {
       t,
       oTableRef,

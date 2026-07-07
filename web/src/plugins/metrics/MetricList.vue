@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:flex-col index-menu"
+    class="flex flex-col w-full index-menu"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <OSelect
@@ -36,14 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template #empty>
-        <li class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
-          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">{{ t("search.noResult") }}</div>
+        <li class="flex items-center gap-2 px-3 py-2">
+          <div class="flex flex-col flex-1 min-w-0">{{ t("search.noResult") }}</div>
         </li>
       </template>
     </OSelect>
-    <div class="metric-list">
+    <div class="metric-list h-[calc(100vh-98px)] w-full overflow-x-hidden overflow-y-auto">
       <div
-        class="metrics-label-table tw:mt-1"
+        class="metrics-label-table mt-1 w-full"
         data-test="log-search-index-list-fields-table"
       >
         <OTable
@@ -52,47 +52,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="name"
           pagination="none"
           :show-global-filter="false"
-          class="field-table"
+          class="field-table w-full"
         >
           <template #cell-name="{ row }">
-            <div class="field_list">
+            <div class="p-0 mb-0.5 relative overflow-visible cursor-default group hover:shadow-[0px_4px_15px_rgba(0,0,0,0.17)] dark:hover:shadow-[0px_4px_15px_rgb(255,255,255,0.1)]">
               <!-- TODO OK : Repeated code make separate component to display field  -->
               <template
                 v-if="
                   row.name === store.state.zoConfig.timestamp_column
                 "
               >
-                <OFieldLabel :field="row" class="tw:pl-4" />
+                <OFieldLabel :field="row" class="pl-4" />
               </template>
               <template v-else>
                 <OCollapsible
                   variant="sidebar"
-                  class="metric-expansion-item"
                   :model-value="openMetricRows[row.name] === true"
                   @update:model-value="(v) => { openMetricRows[row.name] = v; if (v) openFilterCreator(null, row); }"
                 >
                   <template #trigger>
-                    <div class="tw:flex tw:items-center tw:min-w-0">
-                      <OFieldLabel :field="row" class="tw:flex-1 tw:min-w-0" />
-                      <div class="field_overlay">
+                    <div class="flex items-center min-w-0">
+                      <OFieldLabel :field="row" class="flex-1 min-w-0" />
+                      <div class="absolute h-full right-0 top-0 z-[5] bg-[#e8e8e8] px-[6px] invisible flex items-center group-hover:visible group-hover:opacity-100 dark:group-hover:bg-[#3f4143]">
                         <OButton
                           icon-left="add"
                           :data-test="`metrics-list-add-${row.name}-label-btn`"
                           variant="ghost"
                           size="icon-xs"
-                          class="tw:mr-0"
+                          class="mr-0"
                           @click.stop="addValueToEditor(row.name, '', '=')"
                         />
                       </div>
                     </div>
                   </template>
-                  <div class="tw:pl-3 tw:pr-1 tw:py-1">
+                  <div class="pl-3 pr-1 py-1">
                       <div class="filter-values-container">
                         <div
                           v-show="
                             metricLabelValues[row.name]?.isLoading
                           "
-                          class="tw:pl-3 tw:py-1"
+                          class="pl-3 py-1"
                           style="height: 60px"
                         >
                           <OInnerLoading
@@ -109,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ?.length &&
                             !metricLabelValues[row.name]?.isLoading
                           "
-                          class="tw:pl-3 tw:py-1 tw:text-sm tw:font-medium"
+                          class="pl-3 py-1 text-sm font-medium"
                         >
                           No values found
                         </div>
@@ -119,33 +118,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :key="value.key + value.count"
                         >
                           <ul>
-                            <label class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50 tw:pr-0">
+                            <label class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 pr-0">
                               <div
-                                class="tw:flex tw:flex wrap tw:justify-between"
+                                class="flex flex wrap justify-between"
                                 style="width: calc(100% - 46px)"
                                 :class="
                                   store.state.theme === 'dark'
-                                    ? 'tw:text-gray-300'
-                                    : 'tw:text-gray-500'
+                                    ? 'text-gray-300'
+                                    : 'text-gray-500'
                                 "
                               >
                                 <div
                                   :title="value.key"
-                                  class="tw:truncate tw:pr-1"
+                                  class="truncate pr-1"
                                   style="width: calc(100% - 50px)"
                                 >
                                   {{ value.key }}
                                 </div>
                                 <div
                                   :title="value.count?.toString()"
-                                  class="tw:truncate tw:text-right tw:pr-2"
+                                  class="truncate text-right pr-2"
                                   style="width: 50px"
                                 >
                                   {{ value.count }}
                                 </div>
                               </div>
                               <div
-                                class="tw:flex tw:flex"
+                                class="flex flex"
                                 :class="
                                   store.state.theme === 'dark'
                                     ? 'text-white'
@@ -153,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 "
                               >
                                 <OButton
-                                  class="tw:mr-1"
+                                  class="mr-1"
                                   size="icon-xs"
                                   variant="ghost"
                                   title="Include Term"
@@ -165,10 +164,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     )
                                   "
                                 >
-                                  <EqualIcon class="tw:size-3" />
+                                  <EqualIcon class="size-3" />
                                 </OButton>
                                 <OButton
-                                  class="tw:mr-1"
+                                  class="mr-1"
                                   size="icon-xs"
                                   variant="ghost"
                                   title="Exclude Term"
@@ -180,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     )
                                   "
                                 >
-                                  <NotEqualIcon class="tw:size-3" />
+                                  <NotEqualIcon class="size-3" />
                                 </OButton>
                               </div>
                             </label>
@@ -500,240 +499,37 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.index-menu {
+<style>
+.index-menu .metrics-label-table table {
+  display: table;
+  table-layout: fixed !important;
+}
+
+.index-menu .metrics-label-table thead {
+  display: none;
+}
+
+.index-menu .metrics-label-table tr {
+  margin-bottom: 1px;
+}
+
+.index-menu .metrics-label-table tbody,
+.index-menu .metrics-label-table tr,
+.index-menu .metrics-label-table td {
   width: 100%;
-
-  .metric-list {
-    height: calc(100vh - 98px);
-    width: 100%;
-    overflow-x: hidden;
-    overflow-y: auto;
-    .metric-container {
-      width: 100%;
-
-      &:hover {
-        background-color: color-mix(in srgb, currentColor 15%, transparent);
-      }
-
-      &.selected {
-        background-color: rgba(89, 96, 178, 0.3);
-      }
-    }
-  }
+  display: block;
+  height: fit-content;
+  overflow: hidden;
 }
 
-.q-field--dense .q-field__before,
-.q-field--dense .q-field__prepend {
-  padding: 0px 0px 0px 0px;
+.index-menu .metrics-label-table thead tr,
+.index-menu .metrics-label-table tbody td {
   height: auto;
-  line-height: auto;
-}
-.q-field__native,
-.q-field__input {
-  padding: 0px 0px 0px 0px;
 }
 
-.q-field--dense .q-field__label {
-  top: 5px;
-}
-.q-field--dense .q-field__control,
-.q-field--dense .q-field__marginal {
-  height: 34px;
-}
-</style>
-
-<style lang="scss" scoped>
-.index-menu {
+.metrics-label-table table {
   width: 100%;
-
-  .q-field {
-    &__control {
-      height: 35px;
-      padding: 0px 5px;
-      min-height: auto !important;
-
-      &-container {
-        padding-top: 0px !important;
-      }
-    }
-
-    &__native :first-of-type {
-      padding-top: 0.25rem;
-    }
-  }
-
-  .metrics-label-table {
-    width: 100%;
-
-    :deep(table) {
-      display: table;
-      table-layout: fixed !important;
-    }
-
-    :deep(thead) {
-      display: none;
-    }
-
-    :deep(tr) {
-      margin-bottom: 1px;
-    }
-
-    :deep(tbody),
-    :deep(tr),
-    :deep(td) {
-      width: 100%;
-      display: block;
-      height: fit-content;
-      overflow: hidden;
-    }
-
-    :deep(.q-table__control),
-    label.q-field {
-      width: 100%;
-    }
-
-    :deep(thead tr),
-    :deep(tbody td) {
-      height: auto;
-    }
-  }
-
-  .field-table {
-    width: 100%;
-  }
-
-  .field_list {
-    padding: 0px;
-    margin-bottom: 0.125rem;
-    position: relative;
-    overflow: visible;
-    cursor: default;
-
-    .field-container {
-      height: 25px;
-    }
-
-    .field_overlay {
-      position: absolute;
-      height: 100%;
-      right: 0;
-      top: 0;
-      z-index: 5;
-      background-color: #e8e8e8;
-      padding: 0 6px;
-      visibility: hidden;
-      display: flex;
-      align-items: center;
+  table-layout: fixed;
 }
 
-    &.selected {
-      .field_overlay {
-        background-color: rgba(89, 96, 178, 0.3);
-
-        .field_icons {
-          opacity: 0;
-        }
-      }
-    }
-
-    &:hover {
-      .field-container {
-        background-color: #e8e8e8;
-      }
-    }
-  }
-}
-
-.q-field--dense .q-field__before,
-.q-field--dense .q-field__prepend {
-  padding: 0px 0px 0px 0px;
-  height: auto;
-  line-height: auto;
-}
-
-.q-field__native,
-.q-field__input {
-  padding: 0px 0px 0px 0px;
-}
-
-.q-field--dense .q-field__label {
-  top: 5px;
-}
-
-.q-field--dense .q-field__control,
-.q-field--dense .q-field__marginal {
-  height: 34px;
-}
-</style>
-
-<style lang="scss">
-.metrics-label-table {
-  table {
-    width: 100%;
-    table-layout: fixed;
-
-    .metric-expansion-item {
-      &:hover {
-        .field_overlay {
-          visibility: visible;
-}
-      }
-
-    }
-
-    .field-container {
-      &:hover {
-        .field_overlay {
-          visibility: visible;
-}
-      }
-    }
-
-    .field_list {
-      &.selected {
-        .metric-expansion-item {
-          background-color: rgba(89, 96, 178, 0.3);
-        }
-
-        .field_overlay {
-          background-color: #ffffff;
-        }
-      }
-    }
-  }
-}
-
-.theme-dark {
-  .field_list {
-    &:hover {
-      box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
-
-      .field_overlay {
-        background-color: #3f4143;
-        opacity: 1;
-      }
-    }
-  }
-}
-
-.theme-light {
-  .field_list {
-    &:hover {
-      box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
-
-      .field_overlay {
-        background-color: #e8e8e8;
-        opacity: 1;
-      }
-    }
-  }
-}
-</style>
-
-<style lang="scss">
-.metric-explore-metric-icon {
-  min-width: 28px !important;
-  padding-right: 8px !important;
-}
 </style>

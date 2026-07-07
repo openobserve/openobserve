@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -24,14 +24,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-cy="syntax-guide-button"
           variant="ghost"
           size="sm"
-          class="tw:w-full! tw:justify-start! tw:px-3! tw:py-1.5! tw:h-auto! tw:rounded-md! tw:gap-2! tw:font-normal!"
+          class="w-full! justify-start! px-3! py-1.5! h-auto! rounded-md! gap-2! font-normal!"
         >
           <template #icon-left>
-            <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-7 tw:h-7 tw:rounded-md tw:bg-[var(--o2-section-header-bg)] tw:text-[var(--o2-text-secondary)] tw:shrink-0">
+            <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-[var(--o2-section-header-bg)] text-[var(--o2-text-secondary)] shrink-0">
               <OIcon name="help" size="sm" />
             </span>
           </template>
           {{ t('search.syntaxGuideLabel') }}
+        </OButton>
+        <!-- Toolbar style: outline button matching sibling toolbar buttons (e.g. Reset) -->
+        <OButton
+          v-else-if="toolbar"
+          data-cy="syntax-guide-button"
+          variant="outline"
+          size="xs"
+          :class="[sqlmode ? 'sql-mode' : 'normal-mode']"
+        >
+          <OIcon name="help" size="sm" />
+          <span v-if="label">{{ label }}</span>
+          <OTooltip :content="t('search.syntaxGuideLabel')" />
         </OButton>
         <!-- Default style: compact inline button for toolbar use -->
         <OButton
@@ -40,14 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="sm"
           :class="[
-            noBorder ? 'syntax-guide-no-border' : 'tw:ml-1',
+            noBorder ? 'display-none!' : 'ml-1',
             sqlmode ? 'sql-mode' : 'normal-mode',
+            noBorder ? 'border-0! bg-transparent! p-0! m-0! w-full justify-start hover:bg-transparent!' : '',
           ]"
-          class="tw:h-4.5!"
+          class="h-4.5!"
         >
           <OIcon name="help" size="sm" />
           <span v-if="label">{{ label }}</span>
-          <span v-else-if="!noBorder" class="tw:ml-1">Syntax Guide</span>
+          <span v-else-if="!noBorder" class="ml-1">Syntax Guide</span>
           <OTooltip :content="t('search.syntaxGuideLabel')" />
         </OButton>
       </div>
@@ -57,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="syntax-guide-title">
           <div class="label">{{ t("search.syntaxGuideLabel") }}</div>
         </div>
-        <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
+        <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
           <div class="syntax-section">
             <div class="syntax-guide-text">
@@ -112,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="hover:tw:underline text-primary"
+                    class="hover:underline text-primary"
                     >click here</a
                   >.
                 </li>
@@ -125,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="syntax-guide-title">
           <div class="label">Syntax Guide: SQL Mode</div>
         </div>
-        <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
+        <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
           <div class="syntax-section">
             <div class="syntax-guide-text">
@@ -200,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="hover:tw:underline text-primary"
+                    class="hover:underline text-primary"
                     >click here</a
                   >.
                 </li>
@@ -240,6 +253,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    toolbar: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: { OButton, OTooltip, OIcon, ODropdown },
   setup() {
@@ -252,31 +269,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-@import "@/styles/logs/syntax-guide.scss";
-
-.syntax-guide-no-border {
-  border: none !important;
-  background: transparent !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  width: 100%;
-  justify-content: flex-start;
-
-  :deep(.q-btn__content) {
-    padding: 0 !important;
-    gap: 0;
-    justify-content: flex-start;
-    width: 100%;
-}
-
-  &:hover {
-    background: transparent !important;
-  }
-
-  &:before {
-    display: none !important;
-  }
-}
-</style>

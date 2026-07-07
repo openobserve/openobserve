@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="traces-metrics-dashboard" class="traces-metrics-dashboard tw:w-full">
+  <div data-test="traces-metrics-dashboard" class="traces-metrics-dashboard w-full overflow-hidden">
     <!-- Charts Section -->
     <transition name="slide-fade">
       <div
         v-if="show"
-        class="charts-wrapper tw:py-0! tw:min-h-[8.5rem] tw:h-[10rem]"
+        class="charts-wrapper py-0! min-h-[8.5rem] h-[10rem] overflow-hidden will-change-[transform,opacity]"
       >
-        <div class="charts-container">
+        <div class="dark:border-[rgba(255,255,255,0.1)] dark:hover:shadow-[0_2px_8px_rgba(255,255,255,0.08)]">
           <RenderDashboardCharts
             v-if="show"
             ref="dashboardChartsRef"
@@ -55,11 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showAnalysisDashboard"
       :streamName="streamName"
       streamType="traces"
-      :timeRange="originalTimeRangeBeforeSelection || timeRange"
+      :timeRange="originalTimeRangeBeforeSelection || effectiveTimeRange"
       :rateFilter="analysisRateFilter"
       :durationFilter="analysisDurationFilter"
       :errorFilter="analysisErrorFilter"
-      :baseFilter="filter"
+      :baseFilter="effectiveFilter"
       :streamFields="streamFields"
       :analysisType="defaultAnalysisTab"
       :availableAnalysisTypes="['volume', 'error', 'duration']"
@@ -76,6 +76,7 @@ import {
   onBeforeUnmount,
   computed,
   defineAsyncComponent,
+  nextTick,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -107,8 +108,6 @@ export interface TimeRange {
 
 const props = defineProps<{
   streamName: string;
-  timeRange: TimeRange;
-  filter?: string;
   show?: boolean;
   streamFields?: any[];
 }>();
@@ -123,14 +122,26 @@ const store = useStore();
 const { searchObj } = useTraces();
 const { t } = useI18n();
 
+
+// Read filter and timeRange directly from the shared composable rather than via props.
+// The props go stale during synchronous call chains (e.g., auto_query_enabled
+// triggers searchData → getQueryData → getDashboardData → loadDashboard before
+// Vue has re-rendered SearchResult and propagated the new prop). Reading from the
+// composable — the same object buildSearch() reads — guarantees the latest value.
+const effectiveFilter = computed(() => searchObj.data.editorValue);
+const effectiveTimeRange = computed<TimeRange>(() => ({
+  startTime: searchObj.data.datetime.startTime,
+  endTime: searchObj.data.datetime.endTime,
+}));
+
 const autoRefreshEnabled = ref(false);
 const autoRefreshIntervalId = ref<number | null>(null);
 const error = ref<string | null>(null);
 const dashboardChartsRef = ref<any>(null);
 const currentTimeObj = ref({
   __global: {
-    start_time: new Date(props.timeRange.startTime),
-    end_time: new Date(props.timeRange.endTime),
+    start_time: new Date(effectiveTimeRange.value.startTime),
+    end_time: new Date(effectiveTimeRange.value.endTime),
   },
 });
 
@@ -218,15 +229,15 @@ const getBaseFilters = () => {
   // Add user-provided filters from query editor, parsing any human-readable
   // duration values (e.g. '1.50ms') back to raw microseconds for SQL,
   // and span_kind labels (e.g. 'Server') back to numeric OTEL keys (e.g. '2').
-  if (props.filter?.trim().length) {
+  if (effectiveFilter.value?.trim().length) {
     const parsed = parseDurationWhereClause(
-      props.filter.trim(),
+      effectiveFilter.value.trim(),
       sqlParser.value,
       searchObj.data.stream.selectedStream.value,
     );
     baseFilters.push(
       parseSpanKindWhereClause(
-        typeof parsed === "string" ? parsed : props.filter.trim(),
+        typeof parsed === "string" ? parsed : effectiveFilter.value.trim(),
         sqlParser.value,
         searchObj.data.stream.selectedStream.value,
       ),
@@ -242,8 +253,8 @@ const loadDashboard = async () => {
 
     currentTimeObj.value = {
       __global: {
-        start_time: new Date(props.timeRange.startTime),
-        end_time: new Date(props.timeRange.endTime),
+        start_time: new Date(effectiveTimeRange.value.startTime),
+        end_time: new Date(effectiveTimeRange.value.endTime),
       },
     };
 
@@ -259,11 +270,11 @@ const loadDashboard = async () => {
       // Special handling for "Errors" panel - always filter by error status
       if (panel.title === "Errors") {
         const errorFilters = ["span_status = 'ERROR'"];
-        if (props.filter?.trim().length) {
+        if (effectiveFilter.value?.trim().length) {
           // Parse human-readable duration values back to raw µs for SQL,
           // and span_kind labels back to numeric OTEL keys.
           const parsedFilter = parseDurationWhereClause(
-            props.filter.trim(),
+            effectiveFilter.value.trim(),
             sqlParser.value,
             searchObj.data.stream.selectedStream.value,
           );
@@ -271,7 +282,7 @@ const loadDashboard = async () => {
             parseSpanKindWhereClause(
               typeof parsedFilter === "string"
                 ? parsedFilter
-                : props.filter.trim(),
+                : effectiveFilter.value.trim(),
               sqlParser.value,
               searchObj.data.stream.selectedStream.value,
             ),
@@ -401,7 +412,7 @@ const emitFiltersToQueryEditor = () => {
   emit("filters-updated", filters);
 };
 
-const onDataZoom = ({
+const onDataZoom = async ({
   start,
   end,
   start1,
@@ -420,11 +431,16 @@ const onDataZoom = ({
     // Store the original time range BEFORE selection for volume analysis baseline
     // This must be done before emit() which triggers the parent to update the datetime control
     originalTimeRangeBeforeSelection.value = {
-      startTime: props.timeRange.startTime,
-      endTime: props.timeRange.endTime,
+      startTime: effectiveTimeRange.value.startTime,
+      endTime: effectiveTimeRange.value.endTime,
     };
 
     searchObj.meta.metricsRangeFilters.clear();
+
+    // All panels emit time-range-selected to update global datetime control
+    emit("time-range-selected", { start, end });
+
+    await nextTick();
 
     // For Rate and Errors panels: use placeholder values to indicate time-based selection
     // Volume/Error analysis will use the time range, not Y-axis values
@@ -444,9 +460,6 @@ const onDataZoom = ({
 
       createRangeFilter(data, start1, end1, timeStartMicros, timeEndMicros);
     }
-
-    // All panels emit time-range-selected to update global datetime control
-    emit("time-range-selected", { start, end });
   }
 };
 
@@ -711,20 +724,16 @@ defineExpose({
 });
 </script>
 
-<style lang="scss" scoped>
-.traces-metrics-dashboard {
-  overflow: hidden;
-
-  :deep(.card-container) {
-    box-shadow: none;
-
-    :first-child {
-      padding: 0 0.0625rem !important;
-    }
-  }
+<style>
+.traces-metrics-dashboard .card-container {
+  box-shadow: none;
 }
 
-// Slide fade transition
+.traces-metrics-dashboard .card-container :first-child {
+  padding: 0 0.0625rem !important;
+}
+
+/* Slide fade transition */
 .slide-fade-enter-active,
 .slide-fade-leave-active {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -754,25 +763,9 @@ defineExpose({
   max-height: 0;
 }
 
-// Charts wrapper
-.charts-wrapper {
-  overflow: hidden;
-  will-change: transform, opacity;
-
-  :deep(.render-dashboard-charts-container){
-    padding-left: 0.2rem;
-    padding-right: 0.2rem;
-  }
+.charts-wrapper .render-dashboard-charts-container {
+  padding-left: 0.2rem;
+  padding-right: 0.2rem;
 }
 
-// Dark mode support
-body.body--dark {
-  .charts-container {
-    border-color: rgba(255, 255, 255, 0.1);
-
-    &:hover {
-      box-shadow: 0 2px 8px rgba(255, 255, 255, 0.08);
-    }
-  }
-}
 </style>

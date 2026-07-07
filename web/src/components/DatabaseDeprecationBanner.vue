@@ -16,23 +16,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="feature-card tw:mb-3"
+    class="feature-card mb-3"
     :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
     v-if="showDeprecationWarning"
     role="region"
     aria-label="MySQL deprecation warning"
+    data-test="database-deprecation-banner-message"
   >
-    <div class="tw:flex tw:items-center">
-      <div class="tw:flex tw:flex-col">
-        <span class="deprecation-message">
+    <div class="flex items-center">
+      <div class="flex flex-col">
+        <span
+          class="text-base font-semibold leading-6 text-[var(--o2-text-primary)]"
+          data-test="database-deprecation-banner-title"
+        >
           ⚠️ MySQL support is DEPRECATED and will be removed in future.
         </span>
         <br />
-        <span class="deprecation-subtitle">
+        <span
+          class="text-sm font-normal leading-5 text-[var(--o2-text-secondary)]"
+          data-test="database-deprecation-banner-subtitle"
+        >
           Please migrate to PostgreSQL to ensure continued support.
         </span>
       </div>
-      <div class="col-auto tw:ml-2">
+      <div class="col-auto ml-2">
         <OButton variant="ghost" size="icon-sm" icon-left="close" @click="dismissWarning" />
       </div>
     </div>
@@ -106,18 +113,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.deprecation-message {
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 24px;
-  color: var(--o2-text-primary);
-}
-
-.deprecation-subtitle {
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 20px;
-  color: var(--o2-text-secondary);
-}
-</style>

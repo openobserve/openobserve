@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <div
-      class="sql-bar tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-x-3"
+      class="sql-bar flex flex-row items-center justify-between gap-x-3 h-10"
       :style="{
         backgroundColor:
           store.state.theme === 'dark'
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.stop
     >
       <div
-        class="tw:flex tw:flex-row tw:items-center tw:flex-1 tw:min-w-0"
+        class="flex flex-row items-center flex-1 min-w-0"
         data-test="dashboard-query-data"
       >
         <div
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="editingQueryIndex === index"
                 @click.stop
-                class="tw:inline-block query-tab-name-input-wrap"
+                class="inline-block w-22.5 min-w-12.5 max-w-40"
               >
                 <OInput
                   ref="renameInputRef"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-else
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
-                class="query-tab-name-text"
+                class="cursor-pointer select-none whitespace-nowrap"
                 style="font-size: 12px"
                 :title="'Double-click to rename'"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    trigger is scoped to JUST the icon, not the entire OTab. -->
               <span
                 v-if="promqlMode || dashboardPanelData.data.queries.length > 1"
-                class="tw:inline-flex tw:items-center tw:relative"
+                class="inline-flex items-center relative"
               >
                 <OIcon
                   :name="
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'visibility-off'
                       : 'visibility'
                   "
-                  class="tw:ml-1 dashboard-query-visibility-icon"
+                  class="ml-1 opacity-[0.7] transition-all duration-150 hover:opacity-100 hover:bg-[var(--o2-hover-gray)] hover:rounded-full"
                   @click.stop="toggleQueryVisibility(index)"
                   @mousedown.stop.prevent
                   @pointerdown.stop.prevent
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 name="close"
                 size="sm"
-                class="dashboard-query-remove-icon"
+                class="opacity-60 transition-all duration-150 hover:opacity-100 hover:bg-[var(--o2-hover-gray)] hover:rounded-full"
                 @click.stop.prevent="removeTab(index)"
                 @mousedown.stop.prevent
                 @pointerdown.stop.prevent
@@ -138,17 +138,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- D5: Warning for restricted chart types with multiple queries.
              Outlined soft-background chip (warning-soft variant + ring),
              height-aligned (h-8) with the toolbar's size="sm" buttons. -->
-        <OBadge
+        <OTag
           v-if="multiQueryWarning"
-          variant="warning-soft"
-          size="sm"
-          icon="info-outline"
-          class="dashboard-multi-query-warning tw:h-8 tw:mr-2 tw:ring-1 tw:ring-inset tw:ring-current"
+          type="warningNote"
+          class="dashboard-multi-query-warning h-8 mr-2"
         >
           {{ multiQueryWarning }}
-        </OBadge>
+        </OTag>
       </div>
-      <div class="tw:flex tw:items-center tw:gap-3 tw:shrink-0">
+      <div class="flex items-center gap-3 shrink-0">
         <OSwitch
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
@@ -173,16 +171,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <div
-    class="tw:flex tw:flex-col tw:flex-1"
+    class="flex flex-col flex-1"
     :style="
       !dashboardPanelData.layout.showQueryBar ? 'height: 0px; flex: none;' : ''
     "
     style="overflow: hidden"
     data-test="dashboard-query"
   >
-      <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
-      <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
-        <div class="tw:flex" style="height: 100%">
+      <div class="flex flex-col" style="width: 100%; height: 100%">
+      <div class="flex flex-col" style="width: 100%; height: 100%">
+        <div class="flex" style="height: 100%">
           <OSplitter
             style="width: 100%; height: 100%"
             v-model="splitterModel"
@@ -197,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
           >
             <template #separator>
-              <div class="tw:w-1 tw:h-full tw:bg-(--o2-border) tw:transition-colors hover:tw:bg-[orange]"></div>
+              <div class="w-1 h-full bg-(--o2-border) transition-colors hover:bg-[orange]"></div>
             </template>
             <template #before>
               <UnifiedQueryEditor
@@ -264,13 +262,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].vrlFunctionQuery && functionEditorPlaceholderFlag"
-                    class="query-editor-placeholder-overlay"
+                    class="absolute top-0 left-0 right-0 bottom-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
                   >
-                    <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
+                    <span class="font-mono text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] dark:text-[#718096] whitespace-nowrap overflow-hidden text-ellipsis">{{ vrlPlaceholder }}</span>
                   </div>
                 </div>
                 <div style="flex-shrink: 0; width: 100%">
-                  <div style="display: flex;" class="tw:items-center">
+                  <div style="display: flex;" class="items-center">
                     <OSelect
                       v-model="selectedFunction"
                       :label="t('dashboard.useSavedFunction')"
@@ -281,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       valueKey="function"
                       @search="onFunctionSearch"
                       @update:model-value="onFunctionSelect"
-                      class="tw:flex-1"
+                      class="flex-1"
                     />
                     <OButton
                       variant="ghost"
@@ -303,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OSplitter>
         </div>
       </div>
-      <div style="color: red; z-index: 100000" class="tw:mx-2 col-auto">
+      <div style="color: red; z-index: 100000" class="mx-2 col-auto">
         {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}
       </div>
     </div>
@@ -348,7 +346,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
@@ -365,7 +363,7 @@ export default defineComponent({
     OIcon,
     OSplitter,
     OInput,
-    OBadge,
+    OTag,
   },
   emits: ["searchdata", "run-query"],
   methods: {
@@ -972,109 +970,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<!-- removed scope due to VRL background image issue-->
-<style lang="scss">
-.sql-bar {
-  height: 40px;
-}
-
-.dashboard-query-remove-icon {
-  opacity: 0.6;
-  transition: opacity 0.15s, background-color 0.15s;
-
-  &:hover {
-    opacity: 1;
-    background-color: var(--o2-hover-gray);
-    border-radius: 50%;
-  }
-}
-
-.dashboard-query-visibility-icon {
-  opacity: 0.7;
-  transition: opacity 0.15s, background-color 0.15s;
-
-  &:hover {
-    opacity: 1;
-    background-color: var(--o2-hover-gray);
-    border-radius: 50%;
-  }
-}
-
-.query-tab-name-text {
-  cursor: default;
-  user-select: none;
-  white-space: nowrap;
-}
-
-.query-tab-name-input-wrap {
-  width: 90px;
-  min-width: 50px;
-  max-width: 160px;
-}
-
-
-// .query-tabs-container {
-//   width: 100%;
-//   display: flex;
-//   flex-direction: row;
-//   justify-content: flex-start;
-//   align-items: center;
-// }
-
-// .query-tab {
-//   display: flex;
-//   flex-direction: row;
-//   align-items: center;
-//   margin-right: 10px;
-//   padding: 5px;
-
-//   &:hover {
-//         background-color: #eaeaeaa5;
-//     }
-// }
-
-// .tab-label {
-//   margin-right: 5px;
-// }
-
-// .remove-button {
-//   cursor: pointer;
-//   display: flex;
-//   align-items: center;
-//   justify-content: center;
-//   width: 20px;
-//   height: 20px;
-// }
-
-// .query-tab.active {
-//     border-bottom: 3px solid #000;
-// }
-
-.query-editor-placeholder-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-start;
-  padding: 0.1875rem 0.5rem 0 2.15rem;
-  pointer-events: none;
-  z-index: 1;
-  user-select: none;
-
-  .query-editor-placeholder-typewriter {
-    font-family: monospace;
-    font-size: var(--text-base);
-    line-height: 1.3125rem;
-    color: #a0aec0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-:global(.body--dark) .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
-  color: #718096;
-}
-</style>

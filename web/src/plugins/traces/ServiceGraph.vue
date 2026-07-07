@@ -1,18 +1,18 @@
 <template>
-  <OCard class="tw:h-full tw:flex tw:flex-col">
+  <OCard class="h-full flex flex-col">
     <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
-    <div class="tw:flex tw:items-center tw:gap-2 tw:p-[0.375rem] tw:pb-0">
+    <div class="flex items-center gap-2 p-[0.375rem] pb-0">
       <!-- Stream selector -->
       <div
         data-test="service-graph-stream-selector"
-        class="tw:w-[11rem] tw:flex-shrink-0"
+        class="w-[11rem] flex-shrink-0"
       >
         <OSelect
           :model-value="streamFilter"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+          class="w-[auto] flex-shrink-0 rounded"
           :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
         />
@@ -22,7 +22,7 @@
       <div data-test="service-graph-search-input">
         <OSearchInput
           v-model="searchFilter"
-          class="tw:w-[14rem]!"
+          class="w-[14rem]!"
           placeholder="Search Services"
           :debounce="300"
           @update:model-value="applyFilters"
@@ -30,74 +30,74 @@
         />
       </div>
       <!-- Spacer -->
-      <div class="tw:flex-1" />
+      <div class="flex-1" />
       <!-- Legends (horizontal) -->
       <div
         data-test="service-graph-legends"
-        class="tw:flex tw:flex-row tw:items-center tw:gap-3 tw:p-[0.325rem] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
+        class="flex flex-row items-center gap-3 p-[0.325rem] rounded border border-[var(--o2-border-color)]!"
       >
         <div
           data-test="sg-legend"
-          class="tw:flex tw:flex-row tw:items-center tw:gap-3 tw:min-w-0"
+          class="flex flex-row items-center gap-3 min-w-0"
         >
           <!-- Border Color -->
           <div
-            class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
+            class="mb-0! whitespace-nowrap text-(--o2-text-4)! font-bold text-xs"
           >
             Border Color
-            <span class="sg-legend-subtitle">| Errors</span>
+            <span class="font-normal opacity-55">| Errors</span>
           </div>
-          <div class="tw:flex! tw:flex-row tw:gap-2">
+          <div class="flex! flex-row gap-2">
             <div
-              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+              class="flex flex-row items-center gap-1.5 flex-none"
             >
-              <div class="sg-legend-dot" style="border-color: #52c41a"></div>
-              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+              <div class="w-3 h-3 rounded-full border-2 border-solid bg-transparent" style="border-color: #52c41a"></div>
+              <div class="flex flex-row items-baseline gap-1">
                 <div
-                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                  class="text-left text-(--o2-text-2)! text-[11px] font-semibold"
                 >
                   Healthy
                 </div>
-                <div class="sg-legend-color-value tw:text-left">&lt; 1%</div>
+                <div class="text-left text-[10px] opacity-55">&lt; 1%</div>
               </div>
             </div>
             <div
-              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+              class="flex flex-row items-center gap-1.5 flex-none"
             >
-              <div class="sg-legend-dot" style="border-color: #faad14"></div>
-              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+              <div class="w-3 h-3 rounded-full border-2 border-solid bg-transparent" style="border-color: #faad14"></div>
+              <div class="flex flex-row items-baseline gap-1">
                 <div
-                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                  class="text-left text-(--o2-text-2)! text-[11px] font-semibold"
                 >
                   Degraded
                 </div>
-                <div class="sg-legend-color-value tw:text-left">1 – 5%</div>
+                <div class="text-left text-[10px] opacity-55">1 – 5%</div>
               </div>
             </div>
             <div
-              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+              class="flex flex-row items-center gap-1.5 flex-none"
             >
-              <div class="sg-legend-dot" style="border-color: #fa8c16"></div>
-              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+              <div class="w-3 h-3 rounded-full border-2 border-solid bg-transparent" style="border-color: #fa8c16"></div>
+              <div class="flex flex-row items-baseline gap-1">
                 <div
-                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                  class="text-left text-(--o2-text-2)! text-[11px] font-semibold"
                 >
                   Warning
                 </div>
-                <div class="sg-legend-color-value tw:text-left">5 – 10%</div>
+                <div class="text-left text-[10px] opacity-55">5 – 10%</div>
               </div>
             </div>
             <div
-              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+              class="flex flex-row items-center gap-1.5 flex-none"
             >
-              <div class="sg-legend-dot" style="border-color: #f5222d"></div>
-              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+              <div class="w-3 h-3 rounded-full border-2 border-solid bg-transparent" style="border-color: #f5222d"></div>
+              <div class="flex flex-row items-baseline gap-1">
                 <div
-                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                  class="text-left text-(--o2-text-2)! text-[11px] font-semibold"
                 >
                   Critical
                 </div>
-                <div class="sg-legend-color-value tw:text-left">&gt; 10%</div>
+                <div class="text-left text-[10px] opacity-55">&gt; 10%</div>
               </div>
             </div>
           </div>
@@ -105,41 +105,41 @@
         <OSeparator
           vertical
           v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
-          class="tw:self-stretch tw:mx-1"
+          class="self-stretch mx-1"
         />
         <div
           v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
           data-test="sg-node-size-info"
-          class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:min-w-0"
+          class="flex flex-row items-center gap-2 min-w-0"
         >
           <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
           <div
-            class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
+            class="mb-0! whitespace-nowrap text-(--o2-text-4)! font-bold text-xs"
           >
             Node Size
-            <span class="sg-legend-subtitle">| Requests</span>
+            <span class="font-normal opacity-55">| Requests</span>
           </div>
-          <div class="sg-legend-row sg-legend-sizes tw:py-0!">
+          <div class="flex items-center gap-1 py-0!">
             <div
-              class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
+              class="flex flex-row items-center gap-1.5"
             >
               <div
-                class="sg-legend-circle"
+                class="rounded-full border-2 border-solid bg-transparent shrink-0"
                 style="width: 16px; height: 16px; border-color: #52c41a"
               ></div>
-              <span class="sg-legend-label tw:text-[var(--o2-text-2)]!"
+              <span class="text-[11px] text-(--o2-text-2)!"
                 >Low</span
               >
             </div>
-            <div class="sg-legend-size-dots tw:mb-0">···</div>
+            <div class="opacity-35 text-[16px] tracking-[2px] mb-0">···</div>
             <div
-              class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
+              class="flex flex-row items-center gap-1.5"
             >
               <div
-                class="sg-legend-circle"
+                class="rounded-full border-2 border-solid bg-transparent shrink-0"
                 style="width: 28px; height: 28px; border-color: #52c41a"
               ></div>
-              <span class="sg-legend-label tw:text-[var(--o2-text-2)]!"
+              <span class="text-[11px] text-(--o2-text-2)!"
                 >High</span
               >
             </div>
@@ -148,38 +148,38 @@
       </div>
     </div>
     <OCardSection
-      class="tw:flex-1 tw:min-h-0  service-graph-container"
+      class="flex-1 min-h-0 relative overflow-hidden service-graph-container"
     >
       <!-- Graph Visualization -->
-      <OCard class="graph-card tw:h-full">
-        <OCardSection class="tw:p-0 tw:h-full" style="height: 100%">
+      <OCard class="rounded-lg shadow-sm h-full">
+        <OCardSection class="p-0 h-full" style="height: 100%">
           <div
             data-test="service-graph-container"
-            class="graph-container tw:h-full tw:bg-[var(--o2-bg)]"
+            class="graph-container h-full w-full rounded overflow-hidden bg-[var(--o2-bg)]"
             style="position: relative"
           >
-            <div v-if="loading" class="tw:flex tw:items-center tw:justify-center tw:h-full">
-              <div class="tw:text-center tw:flex tw:flex-col tw:items-center">
+            <div v-if="loading" class="flex items-center justify-center h-full">
+              <div class="text-center flex flex-col items-center">
                 <OSpinner size="xl" />
-                <div class="tw:text-base tw:font-medium tw:mt-3 tw:text-gray-400">
+                <div class="text-base font-medium mt-3 text-gray-400">
                   Loading service graph...
                 </div>
               </div>
             </div>
             <div
               v-else-if="error"
-              class="tw:flex flex-center tw:h-full tw:items-center tw:justify-center tw:p-[0.675rem]"
+              class="flex flex-center h-full items-center justify-center p-[0.675rem]"
             >
               <div>
                 <OIcon name="error-outline" style="width: 4em; height: 4em;" />
-                <div class="tw:text-xl tw:font-semibold tw:mt-3 tw:text-[var(--o2-text-primary)]">
+                <div class="text-xl font-semibold mt-3 text-[var(--o2-text-primary)]">
                   {{ error }}
                 </div>
                 <OButton
                   variant="outline"
                   size="sm-action"
                   @click="loadServiceGraph"
-                  class="tw:mt-4"
+                  class="mt-4"
                   icon-left="refresh"
                 >
                   Retry
@@ -188,14 +188,18 @@
             </div>
             <div
               v-else-if="!graphData.nodes.length"
-              class="tw:flex tw:h-full tw:items-center tw:justify-center"
+              class="flex h-full items-center justify-center"
             >
-              <ServiceGraphNoDataState @widen-range="$emit('widen-range', $event)" />
+              <ServiceGraphNoDataState
+                @jump-to-stream-data="
+                  (from, to) => $emit('jump-to-stream-data', from, to)
+                "
+              />
             </div>
             <div
               v-else
               ref="graphContainerRef"
-              class="tw:h-full graph-with-panel-container"
+              class="h-full relative overflow-hidden"
             >
               <ChartRenderer
                 ref="chartRendererRef"
@@ -203,7 +207,7 @@
                 :data="chartData"
                 :key="chartKey"
                 render-type="svg"
-                class="tw:h-full"
+                class="h-full"
                 @click="handleNodeClick"
               />
 
@@ -236,8 +240,8 @@
     @click:secondary="showSettings = false"
     @click:primary="resetSettings"
   >
-    <div class="tw:gap-3">
-      <div class="tw:text-xs tw:text-gray-400">
+    <div class="gap-3">
+      <div class="text-xs text-gray-400">
         Stream-based topology - all data persisted to storage
         <OTooltip content="Service graph uses stream-only architecture with zero in-memory state" />
       </div>
@@ -306,7 +310,7 @@ export default defineComponent({
     OCardSection,
     ServiceGraphNoDataState,
   },
-  emits: ["view-traces", "request:stream-change", "widen-range"],
+  emits: ["view-traces", "request:stream-change", "jump-to-stream-data"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
@@ -1450,8 +1454,6 @@ export default defineComponent({
             params.data.name,
           );
         }
-      } else {
-        console.log("[ServiceGraph] Click not on a node or edge, ignoring");
       }
     };
 
@@ -1499,216 +1501,16 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.stat-card {
-  transition: all 0.3s ease;
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
-}
-
-.graph-card {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.graph-container {
-  position: relative;
-  width: 100%;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.sg-info-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 10;
-  transition: transform 0.2s ease;
-}
-
-.sg-info-btn:hover {
-  transform: scale(1.1);
-}
-
-:global(.sg-legend-tooltip),
-:global(.sg-legend-tooltip.q-tooltip) {
-  padding: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  color: inherit !important;
-}
-
-:global(.sg-legend) {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 14px 16px;
-  min-width: 260px;
-  color: #374151;
-  font-size: 12px;
-}
-
-:global(.body--dark .sg-legend) {
-  background: #1f2937;
-  border-color: #374151;
-  color: #e5e7eb;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-}
-
-:global(.sg-legend-title) {
-  font-weight: 700;
-  font-size: 12px;
-  margin-bottom: 10px;
-  color: inherit;
-}
-
-:global(.sg-legend-subtitle) {
-  font-weight: 400;
-  opacity: 0.55;
-}
-
-:global(.sg-legend-divider) {
-  border-top: 1px solid #e5e7eb;
-  margin: 12px 0;
-}
-
-:global(.body--dark .sg-legend-divider) {
-  border-color: #374151;
-}
-
-:global(.sg-legend-sizes) {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 0 6px;
-}
-
-:global(.sg-legend-size-item) {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-}
-
-:global(.sg-legend-circle) {
-  border-radius: 50%;
-  border-width: 2px;
-  border-style: solid;
-  background: transparent;
-  flex-shrink: 0;
-}
-
-:global(.sg-legend-size-dots) {
-  opacity: 0.35;
-  font-size: 16px;
-  letter-spacing: 2px;
-}
-
-:global(.sg-legend-label) {
-  font-size: 11px;
-}
-
-:global(.sg-legend-color-row) {
-  display: flex;
-  gap: 12px;
-}
-
-:global(.sg-legend-color-item) {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-}
-
-:global(.sg-legend-dot) {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border-width: 2px;
-  border-style: solid;
-  background: transparent;
-}
-
-:global(.sg-legend-color-label) {
-  font-size: 11px;
-  font-weight: 600;
-  text-align: center;
-  color: inherit;
-}
-
-:global(.sg-legend-color-value) {
-  font-size: 10px;
-  opacity: 0.55;
-  text-align: center;
-}
-
-:global(.sg-legend--floating) {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 16px;
-  min-width: unset;
-  padding: 10px 16px;
-}
-
-:global(.sg-legend--floating .sg-legend-title) {
-  margin-bottom: 0;
-  white-space: nowrap;
-}
-
-:global(.sg-legend--floating .sg-legend-color-row) {
-  gap: 16px;
-}
-
-:global(.sg-legend--floating .sg-legend-color-item) {
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-  flex: unset;
-}
-
-:global(.sg-legend--floating .sg-legend-color-item > div) {
-  display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 4px;
-}
-
-:global(.sg-legend--floating .sg-legend-color-label),
-:global(.sg-legend--floating .sg-legend-color-value) {
-  text-align: left;
-}
-
+<!-- Flowing edge animation — non-scoped so it reaches inside ECharts SVG output -->
+<style>
 .service-graph-container {
-  position: relative;
-  overflow: hidden;
   background: #0f1419 !important;
 }
 
 .body--light .service-graph-container {
-  background: #ffffff !important; // White background for light mode
+  background: #ffffff !important;
 }
 
-.graph-with-panel-container {
-  position: relative;
-  overflow: hidden;
-}
-
-code {
-  background: #f0f0f0;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-family: "Courier New", monospace;
-  font-size: 0.9em;
-}
-</style>
-
-<!-- Flowing edge animation — non-scoped so it reaches inside ECharts SVG output -->
-<style lang="scss">
 @keyframes sg-edge-flow {
   from {
     stroke-dashoffset: 14;
@@ -1721,7 +1523,7 @@ code {
 /*
  * Target dashed edge paths rendered by ECharts graph series.
  * ECharts SVG mode may set stroke-dasharray as an HTML attribute OR inside
- * an tw:inline style depending on the version — we cover both.
+ * an inline style depending on the version — we cover both.
  */
 .graph-container svg path[stroke-dasharray],
 .graph-container svg path[style*="stroke-dasharray"] {

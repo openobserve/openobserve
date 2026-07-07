@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <img :src="scheduledPipelineRef?.getBtnLogo" class="header-icon ai-icon" />
       </OButton>
-      <div class="tw:flex tw:items-center app-tabs-container">
+      <div class="flex items-center app-tabs-container">
         <AppTabs
           data-test="scheduled-pipeline-tabs"
           :tabs="scheduledPipelineRef?.tabOptions ?? []"
@@ -71,16 +71,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="scheduledPipelineRef?.handleFullScreen()"
       >
         <template #icon-left>
-          <OIcon name="open-in-full" size="sm" v-if="!scheduledPipelineRef?.isFullscreen" class="tw:size-3.5 tw:shrink-0" />
-          <OIcon name="close-fullscreen" size="sm" v-else class="tw:size-3.5 tw:shrink-0" />
+          <OIcon name="open-in-full" size="sm" v-if="!scheduledPipelineRef?.isFullscreen" class="size-3.5 shrink-0" />
+          <OIcon name="close-fullscreen" size="sm" v-else class="size-3.5 shrink-0" />
         </template>
       </OButton>
     </template>
     <div
       data-test="add-stream-query-routing-section"
-      class="tw:w-full stream-routing-section"
+      class="w-full stream-routing-section"
       :class="[
-        store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white',
+        store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white',
         { 'fullscreen-mode': isFullscreenMode },
       ]"
     >

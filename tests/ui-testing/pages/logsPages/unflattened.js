@@ -25,7 +25,10 @@ class UnflattenedPage {
         this.dateTimeButton = page.locator('[data-test="date-time-btn"]');
         this.relativeTab = page.locator('[data-test="date-time-relative-tab"]');
         this.logTableRowExpandMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
-        this.logSourceColumn = page.locator('[data-test="log-table-column-0-source"]');
+        // FTS default-column feature: first cell may be the generic "source"
+        // column OR an FTS column (body/message/log). Target whichever first-row
+        // cell is rendered; a click bubbles to the row handler that opens detail.
+        this.logSourceColumn = page.locator('[data-test^="log-table-column-0-"]').first();
         this.o2IdText = page.locator('[data-test="log-detail-json-content"] [data-test="log-expand-detail-key-_o2_id"]');
         this.unflattenedTab = page.locator('[data-test="log-detail-json-content"] [data-test="tab-unflattened"]');
         this.closeDialog = page.locator('[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]');
@@ -227,10 +230,13 @@ class UnflattenedPage {
      * never scans the rest of the table.
      */
     async openLogRowDetail(rowIndex) {
-        // Clicking the source <td> bubbles up to the <tr> @click handler
+        // Clicking any cell in the row bubbles up to the <tr> @click handler
         // (handleDataRowClick → emits click:dataRow → openLogDetails in
-        // SearchResult.vue), which opens the side detail drawer.
-        const sourceCell = this.page.locator(`[data-test="log-table-column-${rowIndex}-source"]`);
+        // SearchResult.vue), which opens the side detail drawer. With the FTS
+        // default-column feature the first cell may be the generic "source"
+        // column OR an FTS column (body/message/log), so target whichever
+        // first cell of this row is rendered rather than "source" only.
+        const sourceCell = this.page.locator(`[data-test^="log-table-column-${rowIndex}-"]`).first();
         await sourceCell.waitFor({ state: 'visible', timeout: 15000 });
         await sourceCell.click();
         // Wait for the detail drawer to be open — deterministic on drawer state.

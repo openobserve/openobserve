@@ -28,12 +28,16 @@ pub const SHORT_URL_KEY: &str = "/short_urls/";
 const SHORT_URL_GC_INTERVAL: i64 = 1; // days
 const SHORT_URL_CACHE_LIMIT: i64 = 10_000; // records
 
-pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
+pub async fn get(short_id: &str, org_id: &str) -> Result<String, anyhow::Error> {
+    // Check cache first; re-validate org_id ownership (legacy rows have empty org_id).
     if let Some(v) = SHORT_URLS.get(short_id) {
-        return Ok(v.original_url.to_string());
+        if v.org_id.is_empty() || v.org_id == org_id {
+            return Ok(v.original_url.to_string());
+        }
+        return Err(anyhow!("Short URL not found"));
     }
 
-    let val = short_urls::get(short_id)
+    let val = short_urls::get(short_id, org_id)
         .await
         .map_err(|_| anyhow!("Short URL not found in db"))?;
     let original_url = val.original_url.clone();
@@ -42,7 +46,7 @@ pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
 }
 
 pub async fn set(short_id: &str, entry: short_urls::ShortUrlRecord) -> Result<(), anyhow::Error> {
-    if let Err(e) = short_urls::add(short_id, &entry.original_url).await {
+    if let Err(e) = short_urls::add(short_id, &entry.original_url, &entry.org_id).await {
         log::error!("Failed to add short URL to DB : {e}");
         return Err(e).context("Failed to add short URL to DB");
     }
@@ -82,7 +86,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value = match short_urls::get(item_key).await {
+                // Load with empty org_id so the lookup succeeds regardless of tenant.
+                let item_value = match short_urls::get(item_key, "").await {
                     Ok(val) => val,
                     Err(e) => {
                         log::error!("Error getting value: {e}");

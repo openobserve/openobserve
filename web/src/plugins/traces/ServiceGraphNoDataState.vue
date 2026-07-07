@@ -16,40 +16,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   ServiceGraphNoDataState — empty state for the service graph panel.
-  Shows the service-graph illustration + a "widen time range" action card.
-  Emits `widen-range` with the suggested period string so the parent can
-  update the global datetime and re-fetch.
+
+  Uses the hero size so the illustration and copy match the other traces empty
+  states. No widen-range action (the panel aggregates across the window, so
+  widening wouldn't reliably surface data), but when the stream has data outside
+  the current window we offer a precise "jump to latest data" action, consistent
+  with the traces search "no events" state.
 -->
 <template>
-  <OEmptyState preset="no-service-graph" size="block" :hide-action="true">
+  <OEmptyState
+    v-if="jumpTarget"
+    preset="no-service-graph"
+    size="hero"
+  >
     <template #actions>
       <EmptyStateActionCard
         icon="schedule"
-        :label="t('traces.noEvents.expandRange')"
-        :sublabel="expandRangeSublabel"
-        data-test="service-graph-empty-expand-range-card"
-        class="tw:w-full"
-        @click="onWidenRange"
+        :label="t('traces.noEvents.jumpToData')"
+        :sublabel="jumpTargetSublabel"
+        data-test="service-graph-no-data-jump-to-data-card"
+        @click="emit('jump-to-stream-data', jumpTarget.from, jumpTarget.to)"
       />
     </template>
   </OEmptyState>
+  <OEmptyState
+    v-else
+    preset="no-service-graph"
+    size="hero"
+    :hide-action="true"
+  />
 </template>
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
-import useTraces from "@/composables/useTraces";
-import useWidenRange from "@/composables/useWidenRange";
+import useJumpToLatestData from "@/composables/useJumpToLatestData";
 
 const { t } = useI18n();
-const emit = defineEmits<{ "widen-range": [period: string] }>();
-const { searchObj } = useTraces();
-const { suggestedPeriod, expandRangeSublabel } = useWidenRange(
-  () => searchObj.data?.datetime?.type ?? "",
-  () => searchObj.data?.datetime?.relativeTimePeriod ?? "",
-  { absoluteExpandDesc: t("traces.noEvents.expandRangeDescAbsolute") },
-);
+const { jumpTarget, jumpTargetSublabel } = useJumpToLatestData();
 
-const onWidenRange = () => emit("widen-range", suggestedPeriod.value);
+const emit = defineEmits<{
+  "jump-to-stream-data": [fromUs: number, toUs: number];
+}>();
 </script>

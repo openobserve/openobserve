@@ -96,6 +96,12 @@ vi.mock("./colorPalette", () => ({
   getSeriesColor: vi.fn(() => "#ff0000"),
   getSQLMinMaxValue: vi.fn(() => [0, 100]),
   getColorPalette: vi.fn(() => ["#ff0000", "#00ff00", "#0000ff"]),
+  getSeriesHash: vi.fn(() => 0),
+  getAreaGradientColor: vi.fn(() => ({ type: "linear", colorStops: [] })),
+  getGridLineStyle: vi.fn(() => ({ type: "dashed", width: 1, color: "rgba(0,0,0,0.08)" })),
+  getAreaStyleOverride: vi.fn((_type, base) =>
+    base ? { areaStyle: { ...base, color: { type: "linear", colorStops: [] } } } : {},
+  ),
 }));
 
 vi.mock("@/utils/zincutils", () => ({
@@ -2619,6 +2625,42 @@ describe("convertSQLData", () => {
         expect(result.options.series).toBeDefined();
         expect(result.options.yAxis).toBeDefined();
         expect(typeof result.options.yAxis.axisLabel.formatter).toBe('function');
+      });
+
+      it("shows the y-axis name on wide panels and hides it on panels too narrow to fit it", async () => {
+        const schema = {
+          ...mockPanelSchema,
+          queries: [{
+            ...mockPanelSchema.queries[0],
+            fields: {
+              ...mockPanelSchema.queries[0].fields,
+              y: [{ alias: "value", label: "Data (Bytes)" }],
+            },
+          }],
+        };
+        const searchData = [[
+          { timestamp: "2023-01-01", value: 10 },
+          { timestamp: "2023-01-02", value: 20 }
+        ]];
+        const convert = (offsetWidth: number) =>
+          convertSQLData(
+            schema,
+            searchData,
+            mockStore,
+            { value: { offsetWidth, offsetHeight: 400 } },
+            mockHoveredSeriesState,
+            mockResultMetaData,
+            mockMetadata,
+            mockChartPanelStyle,
+            mockAnnotations
+          );
+
+        const wide = await convert(800);
+        expect(wide.options.yAxis.name).toBe("Data (Bytes)");
+
+        // narrower than widest tick label + ~110px of name/margin/plot space
+        const narrow = await convert(120);
+        expect(narrow.options.yAxis.name).toBe("");
       });
 
       it("should handle horizontal bar charts (h-bar and h-stacked)", async () => {

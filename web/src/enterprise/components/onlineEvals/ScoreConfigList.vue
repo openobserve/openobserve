@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <EvalListShell
     data-test="score-config"
     :show-empty="false"
@@ -22,13 +22,13 @@
         :persist-columns="true"
         table-id="score-config-list"
         width="100%"
-        class="tw:w-full tw:h-full"
+        class="w-full h-full"
         @row-click="(row: any) => $emit('view', row)"
       >
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="tw:flex-1 tw:min-w-0"
+            class="flex-1 min-w-0"
             :placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
             data-test="score-config-list-search-input"
             clearable
@@ -40,17 +40,21 @@
             :placeholder="t('onlineEvals.scoreConfig.allTypes')"
             size="md"
             width="sm"
-            class="tw:shrink-0"
+            class="shrink-0"
             data-test="score-config-list-type-filter"
           />
         </template>
 
         <template #empty>
-          <div class="tw:flex tw:items-center tw:justify-center tw:py-8">
+          <div class="flex items-center justify-center py-8">
             <OEmptyState
               size="hero"
               preset="no-score-configs"
               :filtered="hasFilters"
+              :actions="[
+                { id: 'create', icon: 'add', titleKey: 'emptyState.noScoreConfigs.action', descriptionKey: 'emptyState.noScoreConfigs.actionDesc' },
+                { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noScoreConfigs.import', descriptionKey: 'emptyState.noScoreConfigs.importDesc' },
+              ]"
               data-test="score-config-empty-state"
               @action="onEmptyAction"
             />
@@ -58,28 +62,25 @@
         </template>
 
         <template #cell-type="{ row }">
-          <OBadge :variant="dataTypeBadgeVariant(dataTypeOf(row))" size="sm">
-            {{ dataTypeOf(row) }}
-          </OBadge>
+          <OTag type="evalDataType" :value="dataTypeOf(row)" />
         </template>
 
         <template #cell-rangeValues="{ row }">
-          <span class="sc-mono-cell">{{ rangeOrValues(row) }}</span>
+          <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs">{{ rangeOrValues(row) }}</span>
         </template>
 
         <template #cell-healthy="{ row }">
-          <span class="sc-mono-cell tw:font-semibold">{{ healthyDisplay(row) }}</span>
+          <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs font-semibold">{{ healthyDisplay(row) }}</span>
         </template>
 
         <template #cell-version="{ row }">
-          <span class="sc-version-cell">
-            <span class="sc-version-cell__dot" />v{{ row.version }}
-            <span class="sc-version-cell__muted">({{ t("onlineEvals.scoreConfig.active") }})</span>
+          <span class="inline-flex items-center gap-1.5 font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs">
+            <span class="w-1.5 h-1.5 rounded-full bg-(--o2-status-success-text) inline-block" />v{{ row.version }}
           </span>
         </template>
 
         <template #cell-usedBy="{ row }">
-          <span class="sc-mono-cell">{{ usedByText(row) }}</span>
+          <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs">{{ usedByText(row) }}</span>
         </template>
 
         <template #cell-created="{ row }">
@@ -87,14 +88,14 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="o2-table-footer-title tw:text-primary">
+          <span class="o2-table-footer-title text-primary">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scoreConfig.listTitle") }}
           </span>
           <OButton
             v-if="selectedIds.length > 0"
             variant="outline"
             size="sm"
-            class="tw:ml-3"
+            class="ml-3"
             icon-left="download"
             data-test="score-config-bulk-export-btn"
             @click="handleBulkExport"
@@ -104,9 +105,10 @@
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center actions-container">
+          <div class="flex items-center actions-container">
             <OButton
               :data-test="`score-config-list-${row.name}-edit-btn`"
+              data-row-action="edit"
               variant="ghost"
               size="icon-sm"
               :title="t('onlineEvals.actions.edit')"
@@ -123,6 +125,7 @@
             />
             <OButton
               :data-test="`score-config-list-${row.name}-delete-btn`"
+              data-row-action="delete"
               variant="ghost-destructive"
               size="icon-sm"
               :title="t('onlineEvals.actions.delete')"
@@ -140,7 +143,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -187,16 +190,6 @@ function handleBulkExport() {
   emit("export-bulk", ids);
 }
 
-// Map a score-config data type to a neutral design-system OBadge soft variant
-// (numeric → blue, categorical → purple, boolean → teal). Data types are just
-// labels, so use neutral palette colors rather than semantic success/warning
-// variants that would imply a good/bad meaning.
-function dataTypeBadgeVariant(type: DataType | string) {
-  if (type === "categorical") return "purple-soft" as const;
-  if (type === "boolean") return "teal-soft" as const;
-  return "blue-soft" as const; // numeric
-}
-
 const typeOptions = computed(() => [
   { label: t("onlineEvals.scoreConfig.allTypes"), value: null },
   { label: t("onlineEvals.scoreConfig.dataTypes.numeric"), value: "numeric" },
@@ -219,16 +212,21 @@ const columns = computed(() => [
     accessorKey: "name",
     sortable: true,
     size: COL.name,
+    minSize: 160,
     // `flex` (not `autoWidth`): fills leftover width on load AND stays
     // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
-    meta: { align: "left", flex: true },
+    meta: { align: "left" },
+
   },
   {
     id: "type",
     header: t("onlineEvals.scoreConfig.columns.type"),
     accessorFn: (row: ScoreConfig) => dataTypeOf(row),
     sortable: true,
-    size: COL.type,
+    // Type values are short ("numeric" / "categorical" / "boolean"), so the
+    // shared COL.type (180) is wider than needed — trim it back so the flex
+    // `name` column reclaims the width (matching the Scorers table).
+    size: 120,
     meta: { align: "left" },
   },
   {
@@ -236,7 +234,9 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.rangeValues"),
     accessorFn: (row: ScoreConfig) => rangeOrValues(row),
     sortable: false,
-    size: COL.description,
+    // Slightly narrower than COL.description (300) — the range/values text is
+    // compact, and the freed width goes to the flex `name` column.
+    size: 160,
     meta: { align: "left" },
   },
   {
@@ -253,7 +253,7 @@ const columns = computed(() => [
     accessorKey: "version",
     sortable: true,
     size: COL.version,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "usedBy",
@@ -261,7 +261,7 @@ const columns = computed(() => [
     accessorFn: (row: ScoreConfig) => usedByCount(row),
     sortable: true,
     size: COL.count,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "created",
@@ -304,6 +304,7 @@ const hasFilters = computed(
 
 function onEmptyAction(id?: string) {
   if (id === "create") emit("create");
+  else if (id === "import") emit("import-custom");
   else if (id === "clear-filters") {
     emit("update:search", "");
     typeFilter.value = null;
@@ -368,30 +369,11 @@ function formatDateShort(value: number) {
   if (!value) return "—";
   return formatDate(value, "YYYY-MM-DD HH:mm:ss");
 }
+
+function dtypeChipClass(dataType: string): string {
+  if (dataType === 'numeric') return 'bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)] text-(--o2-status-info-text)';
+  if (dataType === 'categorical') return 'bg-[color-mix(in_srgb,var(--o2-status-warning-text)_14%,transparent)] text-(--o2-status-warning-text)';
+  if (dataType === 'boolean') return 'bg-[color-mix(in_srgb,var(--o2-status-success-text)_14%,transparent)] text-(--o2-status-success-text)';
+  return '';
+}
 </script>
-
-<style lang="scss">
-.sc-mono-cell {
-  font-size: 12px;
-}
-
-.sc-version-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-}
-
-.sc-version-cell__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 99px;
-  background: var(--o2-status-success-text);
-  display: inline-block;
-}
-
-.sc-version-cell__muted {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-weight: 400;
-}
-</style>

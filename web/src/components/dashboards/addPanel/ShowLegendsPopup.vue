@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-show-legends-dialog"
   >
     <template #header-right>
-      <div class="tw:flex tw:items-center">
-        <span class="legend-count tw:mr-3" style="font-size: 14px" data-test="dashboard-show-legends-count">
+      <div class="flex items-center">
+        <span class="legend-count mr-3" style="font-size: 14px" data-test="dashboard-show-legends-count">
           {{ t("dashboard.totalLegends", { count: legends.length }) }}
         </span>
         <OButton
@@ -43,32 +43,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Legends List -->
     <div
-      class="show-legends-popup"
       data-test="dashboard-show-legends-popup"
     >
-      <div class="legends-content scroll">
-        <div v-if="legends.length === 0" class="no-legends tw:p-3 tw:text-center">
+      <div class="scroll max-h-[400px] overflow-y-auto py-[3px]">
+        <div v-if="legends.length === 0" class="p-3 text-center min-h-[100px] flex items-center justify-center">
           {{ t("dashboard.noLegendsAvailable") }}
         </div>
-        <div v-else class="legends-list">
+        <div v-else class="flex flex-col">
           <div
             v-for="(legend, index) in legends"
             :key="index"
-            class="legend-item tw:px-2 tw:py-1"
+            class="legend-item px-2 py-1 last:border-b-0"
             :data-test="`dashboard-legend-item-${index}`"
           >
-            <div class="tw:flex tw:items-center legend-row">
+            <div class="flex items-center flex-nowrap w-full">
               <div
-                class="legend-color-box"
+                class="w-5 h-3 rounded-sm mr-[10px] shrink-0"
                 :style="{ backgroundColor: legend.color || '#5960b2' }"
               ></div>
-              <div class="legend-text" data-test="dashboard-legend-item-text">
+              <div class="break-all overflow-wrap-anywhere whitespace-normal leading-[1.4] text-xs" data-test="dashboard-legend-item-text">
                 {{ legend.name }}
               </div>
               <OButton
                 variant="ghost"
                 size="icon"
-                class="tw:ml-1"
+                class="ml-1"
                 data-test="dashboard-legend-copy-btn"
                 :data-copied="isLegendCopied(index) ? 'true' : undefined"
                 @click.stop="copyLegend(legend.name, index)"
@@ -276,68 +275,14 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.show-legends-popup {
-  .header {
-    background-color: var(--q-background);
-    border-bottom: 2px solid var(--o2-border-color);
-    z-index: 10;
-  }
+<style>
+.legend-item [data-test="dashboard-legend-copy-btn"] {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  flex-shrink: 0;
+}
 
-  .legends-content {
-    max-height: 400px;
-    overflow-y: auto;
-    padding: 3px 0;
-  }
-
-  .legends-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0px;
-  }
-
-  .legend-item {
-    &:last-child {
-      border-bottom: none;
-    }
-
-    .legend-row {
-      flex-wrap: nowrap;
-      width: 100%;
-    }
-
-    .legend-color-box {
-      width: 20px;
-      height: 12px;
-      border-radius: 2px;
-      margin-right: 10px;
-      flex-shrink: 0;
-    }
-
-    .legend-text {
-      word-break: break-all;
-      overflow-wrap: anywhere;
-      white-space: normal;
-      line-height: 1.4;
-      font-size: 12px;
-    }
-
-    [data-test="dashboard-legend-copy-btn"] {
-      opacity: 0;
-      transition: opacity 0.2s ease-in-out;
-      flex-shrink: 0;
-    }
-
-    &:hover [data-test="dashboard-legend-copy-btn"] {
-      opacity: 1;
-    }
-  }
-
-  .no-legends {
-    min-height: 100px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+.legend-item:hover [data-test="dashboard-legend-copy-btn"] {
+  opacity: 1;
 }
 </style>

@@ -19,21 +19,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="alert-list-page"
-    class="tw:flex tw:flex-col tw:h-full"
+    class="flex flex-col h-full"
   >
     <PageLayout
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       :main-panel="false"
-      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+      :header-class="'shrink-0 px-4 border-b border-border-default'"
     >
       <!-- Row 1: standard header — title + actions only (Import/Add). The alert
            type toggle, search and folder scope moved into the table toolbar. -->
       <template #header>
-        <AppPageHeader :title="t('alerts.header')" :subtitle="'Alert rules and notification channels'" icon="shield-alert-outline">
+        <AppPageHeader :title="t('alerts.header')" :subtitle="t('alerts.subtitle')" icon="shield-alert-outline">
           <template #actions>
             <!-- Import button -->
             <OButton
-              :class="isCompactToolbar ? 'compact-icon-btn' : ''"
+              :class="isCompactToolbar ? 'py-0! px-2! min-w-0!' : ''"
               variant="outline"
               size="sm"
               @click="importAlert"
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="upload-file"
             >
               <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
-              <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" />
+              <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" shortcut-id="alertsImport" />
             </OButton>
             <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
             <OButton
@@ -70,11 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       data-test="alert-list-splitter"
-      class="tw:flex-1 tw:flex tw:min-h-0"
+      class="flex-1 flex min-h-0"
     >
       <!-- Left: FolderList -->
-      <div class="tw:shrink-0 tw:h-full" :style="{ width: 230 + 'px' }">
-        <div class="tw:h-full">
+      <div class="shrink-0 h-full" :style="{ width: 230 + 'px' }">
+        <div class="h-full">
           <FolderList
             type="alerts"
             @update:activeFolderId="updateActiveFolderId"
@@ -82,8 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- Right: Table -->
-      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
-        <div class="tw:h-full card-container">
+      <div class="flex-1 min-w-0 h-full">
+        <div class="h-full card-container">
               <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
               <OTable
                 :frame="false"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
                 <template #toolbar>
-                  <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                  <div class="flex items-center gap-2 w-full">
                     <OToggleGroup
                       :model-value="activeTab"
                       @update:model-value="(v) => { activeTab = v; filterAlertsByTab(); }"
@@ -130,14 +130,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.anomalyDetection") }}
                       </OToggleGroupItem>
                     </OToggleGroup>
-                    <div class="tw:flex-1 tw:min-w-0">
+                    <div class="flex-1 min-w-0">
                       <OInput
                         v-model="dynamicQueryModel"
                         :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
                         :clearable="searchAcrossFolders"
                         @clear="clearSearchHistory"
                         data-test="alert-list-search-input"
-                        class="tw:w-full"
+                        class="w-full"
                       >
                         <template #icon-left>
                           <OIcon name="search" size="sm" />
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OToggleGroup
                             :model-value="searchAcrossFolders ? 'all' : 'this'"
                             type="single"
-                            class="tw:self-center tw:mr-1"
+                            class="self-center mr-1"
                             @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                           >
                             <OToggleGroupItem
@@ -155,14 +155,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               icon-left="folder-outline"
                               data-test="alert-list-search-scope-current"
                               title="Search only this folder"
-                            >This folder</OToggleGroupItem>
+                            >{{ t('alerts.searchThisFolder') }}</OToggleGroupItem>
                             <OToggleGroupItem
                               value="all"
                               size="xs"
                               icon-left="search"
                               data-test="alert-list-search-across-folders-toggle"
                               title="Search across all folders"
-                            >All folders</OToggleGroupItem>
+                            >{{ t('alerts.searchAllFolders') }}</OToggleGroupItem>
                           </OToggleGroup>
                         </template>
                       </OInput>
@@ -175,91 +175,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     icon-left="refresh"
                     :loading="loading"
-                    title="Reload alerts"
                     data-test="alert-list-refresh-btn"
                     @click="refreshAlerts"
-                  />
+                  >
+                    <OTooltip side="bottom" content="Reload alerts" shortcut-id="alertsRefresh" />
+                  </OButton>
                 </template>
 
 
                 <template #cell-name="{ row }">
-                  <div class="tw:flex tw:items-center tw:gap-1.5 tw:min-w-0 tw:overflow-hidden">
+                  <div class="flex items-center gap-1.5 min-w-0 overflow-hidden">
                     <OIcon
                       v-if="row.is_real_time === 'anomaly'"
                       name="query-stats"
                       size="sm"
-                      class="tw:text-blue-600 tw:shrink-0"
+                      class="text-blue-600 shrink-0"
                     />
                     <OIcon
                       v-else-if="row.is_real_time"
                       name="bolt"
                       size="sm"
-                      class="tw:text-orange-500 tw:shrink-0"
+                      class="text-orange-500 shrink-0"
                     />
                     <OIcon
                       v-else
                       name="schedule"
                       size="sm"
-                      class="tw:text-gray-400 tw:shrink-0"
+                      class="text-gray-400 shrink-0"
                     />
-                    <span class="tw:truncate">{{ row.name || "--" }}</span>
+                    <span class="truncate">{{ row.name || "--" }}</span>
                   </div>
                   <OTooltip
                     v-if="row.name"
                     :content="row.name"
-                    content-class="alert-name-tooltip"
+                    content-class="max-w-[400px] whitespace-normal break-words text-xs"
                   />
                 </template>
 
                 <template #cell-owner="{ row }">
-                  {{ computedOwner(row.owner) }}
-                  <OTooltip
-                    v-if="row.owner?.length > 15"
-                    :content="row.owner"
-                    content-class="alert-name-tooltip"
-                  />
+                  <OUserCell :value="row.owner" />
                 </template>
 
                 <template #cell-last_triggered_at="{ row }">
-                  <span v-if="row.last_triggered_at">{{ row.last_triggered_at }}</span>
-                  <span v-else class="tw:block">--</span>
+                  <OTimeCell
+                    :value="row.last_triggered_at"
+                    unit="iso"
+                    mode="absolute"
+                    :timezone="store.state.timezone"
+                    empty-label="Never"
+                  />
                 </template>
 
                 <template #cell-last_satisfied_at="{ row }">
-                  <span v-if="row.last_satisfied_at">{{ row.last_satisfied_at }}</span>
-                  <span v-else class="tw:block">--</span>
+                  <OTimeCell
+                    :value="row.last_satisfied_at"
+                    unit="iso"
+                    mode="absolute"
+                    :timezone="store.state.timezone"
+                    empty-label="Never"
+                  />
                 </template>
 
                 <template #cell-last_trained_at="{ row }">
-                  <span v-if="row.last_trained_at">{{ row.last_trained_at }}</span>
-                  <span v-else class="tw:block">--</span>
+                  <OTimeCell
+                    :value="row.last_trained_at"
+                    unit="iso"
+                    mode="absolute"
+                    :timezone="store.state.timezone"
+                    empty-label="—"
+                  />
                 </template>
 
                 <template #cell-status="{ row }">
-                  <template v-if="row.status && row.status !== '--'">
-                    <OBadge
-                      :variant="
-                        row.status === 'failed'
-                          ? 'error'
-                          : row.status === 'active'
-                            ? 'success'
-                            : row.status === 'training'
-                              ? 'warning'
-                              : row.status === 'disabled'
-                                ? 'default'
-                                : 'success'
-                      "
-                      class="tw:capitalize tw:cursor-default"
-                    >
-                      {{ row.status }}
-                      <OTooltip
-                        v-if="row.status === 'failed' && row.last_error"
-                        :max-width="'400px'"
-                        :content="row.last_error"
-                      />
-                    </OBadge>
-                  </template>
-                  <span v-else class="tw:block">--</span>
+                  <span
+                    v-if="row.status && row.status !== '--'"
+                    class="relative inline-flex"
+                  >
+                    <OTag type="alertStatus" :value="row.status" />
+                    <OTooltip
+                      v-if="row.status === 'failed' && row.last_error"
+                      :max-width="'400px'"
+                      :content="row.last_error"
+                    />
+                  </span>
+                  <span v-else class="text-text-primary">—</span>
                 </template>
 
                 <template #cell-period="{ row }">
@@ -296,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #cell-actions="{ row }">
-                  <div class="tw:flex tw:items-center actions-container">
+                  <div class="flex items-center actions-container">
                     <div
                       data-test="alert-list-loading-alert"
                       v-if="alertStateLoadingMap[row.uuid]"
@@ -305,40 +304,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         width: 33.14px;
                         height: auto;
                       "
-                      class="tw:flex tw:justify-center tw:items-center tw:ml-1"
+                      class="flex justify-center items-center ml-1"
                       :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
                     >
                       <OSpinner size="xs" />
                     </div>
                     <OButton
                       v-else
+                      :data-row-action="row.enabled ? 'pause' : 'resume'"
                       :data-test="`alert-list-${row.name}-pause-start-alert`"
-                      class="tw:ml-1"
-                      :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+                      class="ml-1"
+                      :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                       size="icon-sm"
                       :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                      :title="
-                        row.enabled
-                          ? t('alerts.pause')
-                          : t('alerts.start')
-                      "
                       @click.stop="toggleAlertState(row)"
-                    />
+                    >
+                      <OTooltip
+                        side="bottom"
+                        :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                        :shortcut-id="row.enabled ? 'alertsRowPause' : undefined"
+                      />
+                    </OButton>
                     <OButton
+                      data-row-action="edit"
                       :data-test="`alert-list-${row.name}-update-alert`"
                       variant="ghost"
                       size="icon-sm"
                       icon-left="edit"
-                      :title="t('alerts.edit')"
                       @click.stop="editAlert(row)"
-                    />
+                    >
+                      <OTooltip side="bottom" :content="t('alerts.edit')" shortcut-id="alertsRowEdit" />
+                    </OButton>
                     <OButton
-                      :title="t('alerts.clone')"
+                      data-row-action="duplicate"
                       variant="ghost"
                       size="icon-sm"
                       icon-left="content-copy"
                       @click.stop="duplicateAlert(row)"
                       :data-test="`alert-list-${row.name}-clone-alert`"
+                    >
+                      <OTooltip side="bottom" :content="t('alerts.clone')" shortcut-id="alertsRowDuplicate" />
+                    </OButton>
+                    <!-- Hidden proxies so the row-hover shortcuts work for
+                         actions that live in the more-menu dropdown (which is
+                         teleported out of the row DOM): x = export, Del = delete. -->
+                    <button
+                      type="button"
+                      data-row-action="export"
+                      class="hidden"
+                      tabindex="-1"
+                      aria-hidden="true"
+                      @click.stop="exportAlert(row)"
+                    />
+                    <button
+                      type="button"
+                      data-row-action="delete"
+                      class="hidden"
+                      tabindex="-1"
+                      aria-hidden="true"
+                      @click.stop="showDeleteDialogFn({ row })"
                     />
                     <ODropdown>
                       <template #trigger>
@@ -350,7 +374,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :data-test="`alert-list-${row.name}-more-options`"
                         />
                       </template>
-                      <ODropdownItem @select="moveAlertToAnotherFolder(row)">
+                      <ODropdownItem
+                        :data-test="`alert-list-${row.name}-move-alert`"
+                        @select="moveAlertToAnotherFolder(row)"
+                      >
                         <template #icon-left>
                           <OIcon name="drive-file-move" size="sm" />
                         </template>
@@ -358,7 +385,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </ODropdownItem>
                       <ODropdownSeparator />
                       <ODropdownItem
+                        :data-test="`alert-list-${row.name}-delete-alert`"
                         variant="destructive"
+                        shortcut-id="alertsRowDelete"
                         @select="showDeleteDialogFn({ row })"
                       >
                         <template #icon-left>
@@ -367,7 +396,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.delete") }}
                       </ODropdownItem>
                       <ODropdownSeparator />
-                      <ODropdownItem @select="exportAlert(row)">
+                      <ODropdownItem
+                        :data-test="`alert-list-${row.name}-export-alert`"
+                        shortcut-id="alertsRowExport"
+                        @select="exportAlert(row)"
+                      >
                         <template #icon-left>
                           <OIcon size="sm" name="download" />
                         </template>
@@ -411,66 +444,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #empty>
-                  <div
-                    v-if="!templates.length || !destinations.length"
-                    class="tw:w-full tw:flex tw:flex-col tw:justify-center tw:items-center tw:text-center"
-                  >
-                    <div style="width: 600px" class="tw:mt-6">
-                      <template v-if="!templates.length">
-                        <div
-                          class="tw:text-sm"
-                          data-test="alert-list-create-template-text"
-                        >
-                          It looks like you haven't created any Templates yet.
-                          To create an Alert, you'll need to have at least one
-                          Destination and one Template in place
-                        </div>
-                        <OButton
-                          data-test="alert-list-create-template-btn"
-                          class="tw:mt-3"
-                          variant="primary"
-                          size="sm"
-                          @click="routeTo('alertTemplates')"
-                        >Create Template</OButton>
-                      </template>
-                      <template v-if="!destinations.length && templates.length">
-                        <div
-                          class="tw:text-sm"
-                          data-test="alert-list-create-destination-text"
-                        >
-                          It looks like you haven't created any Destinations
-                          yet. To create an Alert, you'll need to have at least
-                          one Destination and one Template in place
-                        </div>
-                        <OButton
-                          data-test="alert-list-create-destination-btn"
-                          class="tw:mt-3"
-                          variant="primary"
-                          size="sm"
-                          @click="routeTo('alertDestinations')"
-                        >Create Destination</OButton>
-                      </template>
-                    </div>
-                  </div>
-                  <template v-else>
-                    <OEmptyState
-                      size="hero"
-                      preset="no-alerts"
-                      :filtered="!!(filterQuery || searchQuery)"
-                      @action="
-                        (id) =>
-                          id === 'clear-filters'
-                            ? ((filterQuery = ''), (searchQuery = ''))
-                            : showAddUpdateFn({})
-                      "
-                    />
-                  </template>
+                  <OEmptyState
+                    v-if="!templates.length"
+                    size="hero"
+                    preset="no-alert-templates"
+                    :description="t('alerts.noTemplatesMsg')"
+                    data-test="alert-list-create-template-text"
+                    @action="routeTo('alertTemplates')"
+                  />
+                  <OEmptyState
+                    v-else-if="!destinations.length"
+                    size="hero"
+                    preset="no-alert-destinations"
+                    :description="t('alerts.noDestinationsMsg')"
+                    data-test="alert-list-create-destination-text"
+                    @action="routeTo('alertDestinations')"
+                  />
+                  <OEmptyState
+                    v-else
+                    size="hero"
+                    preset="no-alerts"
+                    :filtered="!!(filterQuery || searchQuery)"
+                    @action="
+                      (id) =>
+                        id === 'clear-filters'
+                          ? ((filterQuery = ''), (searchQuery = ''))
+                          : showAddUpdateFn({})
+                    "
+                  />
                 </template>
 
                 <template #bottom>
-                  <div class="bottom-btn tw:h-[48px]">
+                  <div class="flex w-full justify-between items-center h-[48px]">
                     <div
-                      class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md"
+                      class="o2-table-footer-title flex items-center w-[200px] mr-md"
                     >
                       {{ resultTotal }} {{ t("alerts.header") }}
                     </div>
@@ -480,55 +487,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-list-move-across-folders-btn"
                       variant="outline"
                       size="sm"
-                      class="tw:mr-2"
+                      class="mr-2"
                       @click="moveMultipleAlerts"
                     >
                       <OIcon name="drive-file-move" size="sm" />
-                      <span class="tw:ml-2">Move</span>
+                      <span class="ml-2">Move</span>
                     </OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-export-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="tw:mr-2"
+                      class="mr-2"
                       @click="multipleExportAlert"
                     >
                       <OIcon name="download" size="sm" />
-                      <span class="tw:ml-2">Export</span>
+                      <span class="ml-2">Export</span>
                     </OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-pause-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="tw:mr-2"
+                      class="mr-2"
                       @click="bulkToggleAlerts('pause')"
                     >
-                      <OIcon name="pause" size="sm" />
-                      <span class="tw:ml-2">Pause</span>
+                      <OIcon name="pause" size="sm" class="text-button-ghost-destructive-text" />
+                      <span class="ml-2">Pause</span>
                     </OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="tw:mr-2"
+                      class="mr-2"
                       @click="bulkToggleAlerts('resume')"
                     >
-                      <OIcon name="play-arrow" size="sm" />
-                      <span class="tw:ml-2">Resume</span>
+                      <OIcon name="play-arrow" size="sm" class="text-button-ghost-success-text" />
+                      <span class="ml-2">Resume</span>
                     </OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-delete-alerts-btn"
                       variant="outline-destructive"
                       size="sm"
-                      class="tw:mr-2"
+                      class="mr-2"
                       @click="openBulkDeleteDialog"
                     >
                       <OIcon name="delete" size="sm" />
-                      <span class="tw:ml-2">Delete</span>
+                      <span class="ml-2">Delete</span>
                     </OButton>
                   </div>
                 </template>
@@ -605,7 +612,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label="Stream Type"
             :options="streamTypes"
             @update:model-value="updateStreams()"
-            class="tw:mt-1"
+            class="mt-1"
           />
           <OSelect
             data-test="to-be-clone-stream-name"
@@ -615,9 +622,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="indexOptions"
             searchable
             @update:model-value="updateStreamName"
-            class="tw:mt-1 tw:mb-2"
+            class="mt-1 mb-2"
           />
-          <div class="tw:mb-4">
+          <div class="mb-4">
             <SelectFolderDropDown
               :type="'alerts'"
               @folder-selected="updateFolderIdToBeCloned"
@@ -714,13 +721,17 @@ import ODropdownSeparator from '@/lib/overlay/Dropdown/ODropdownSeparator.vue';
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
 // import alertList from "./alerts";
 
@@ -753,9 +764,11 @@ export default defineComponent({
     ODropdownItem,
     ODropdownSeparator,
     OSpinner,
-    OBadge,
     OSelect,
     OTable,
+    OTimeCell,
+    OUserCell,
+    OTag,
   },
   emits: [
     "update:changeRecordPerPage",
@@ -934,10 +947,13 @@ export default defineComponent({
     // Show anomaly detection only when the backend is an enterprise or cloud build.
     // The frontend build flag alone is not sufficient — an enterprise UI can be
     // pointed at an OSS backend which does not have the feature.
+    // The backend can also disable it at runtime via O2_ANOMALY_DETECTION_DISABLED,
+    // surfaced as anomaly_detection_enabled in the config API response.
     const isAnomalyDetectionEnabled = computed(
       () =>
         store.state.zoConfig.build_type !== "opensource" &&
-        config.isEnterprise === "true",
+        config.isEnterprise === "true" &&
+        store.state.zoConfig.anomaly_detection_enabled === true,
     );
 
     // Initialize activeTab from URL query parameter, default to "all".
@@ -999,7 +1015,7 @@ export default defineComponent({
           sortable: true,
           hideable: true,
           size: 280,
-          minSize: 160,
+          minSize: 320,
           // Flex: fills the leftover width on load, freezes on first resize.
           meta: { align: "left", flex: true },
         },
@@ -1025,8 +1041,8 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: COL.frequency,
-                meta: { align: "center" },
+                size: 150,
+                meta: { align: "left" },
               } as OTableColumnDef,
             ]
           : []),
@@ -1054,7 +1070,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.date,
+          size: COL.dateAbsolute,
           meta: { align: "left" },
         },
         {
@@ -1065,7 +1081,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.date,
+          size: COL.dateAbsolute,
           meta: { align: "left" },
         },
         // Anomaly Detection columns — shown on anomalyDetection and all tabs
@@ -1074,18 +1090,18 @@ export default defineComponent({
               {
                 id: "last_trained_at",
                 accessorKey: "last_trained_at",
-                header: "Last Trained At",
+                header: t("alerts.lastTrainedAt"),
                 cell: " ",
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: COL.date,
+                size: COL.dateAbsolute,
                 meta: { align: "left" },
               } as OTableColumnDef,
               {
                 id: "status",
                 accessorKey: "status",
-                header: "Status",
+                header: t("alerts.status"),
                 cell: " ",
                 sortable: true,
                 resizable: true,
@@ -1116,7 +1132,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: COL.folder,
-          meta: { align: "center" },
+          meta: { align: "left" },
         } as OTableColumnDef);
       }
 
@@ -2627,6 +2643,51 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
+    // ── Keyboard shortcuts ──────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "alertsCreate",
+        handler: () => {
+          if (isInputFocused()) return;
+          // Mirror the Add button so the URL updates (action=add / route push),
+          // otherwise "go back"/discard can't return to the list.
+          if (!destinations.value.length || !templates.value.length) return;
+          if (activeTab.value === "anomalyDetection") {
+            router.push({
+              name: "addAnomalyDetection",
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+                folder: activeFolderId.value,
+                tab: activeTab.value,
+              },
+            });
+          } else {
+            showAddUpdateFn({});
+          }
+        },
+      },
+      {
+        id: "alertsImport",
+        handler: () => {
+          if (isInputFocused()) return;
+          importAlert();
+        },
+      },
+      {
+        id: "alertsRefresh",
+        handler: () => {
+          if (isInputFocused()) return;
+          refreshAlerts();
+        },
+      },
+      {
+        id: "alertsFocusSearch",
+        handler: () => {
+          focusSearchInput("alert-list-search-input");
+        },
+      },
+    ]);
+
     return {
       t,
       store,
@@ -2736,136 +2797,13 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.view-mode-tabs-container {
-  margin-right: 24px;
-
-  // Customize app-tabs for view mode switching
-  ::v-deep .app-tabs {
-    .o-tabs {
-      min-height: 36px;
-    }
-
-    .o-tab {
-      padding: 0 20px;
-      min-height: 36px;
-      text-transform: none;
-      font-weight: 600;
-
-      &__icon {
-        font-size: 18px;
-        margin-right: 8px;
-      }
-    }
-  }
-}
-
-.bottom-btn {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.move-btn {
-  width: calc(14vw);
-}
-
-.export-btn {
-  width: calc(14vw);
-}
-
-.clone-alert-popup {
-  width: 400px;
-}
-.expand-content {
-  padding: 0 3rem;
-  max-height: 100vh; /* Set a fixed height for the container */
-  overflow: hidden; /* Hide overflow by default */
-}
-
-.scroll-content {
-  width: 100%;
-  overflow-y: auto;
-  padding: 0.625rem;
-  border: 1px solid var(--o2-border-color);
-  height: 100%;
-  max-height: 200px;
-  text-wrap: normal;
-  background-color: var(--o2-muted-background);
-  color: var(--o2-text-primary);
-}
-.expanded-sql {
-  border-left: 3px solid var(--o2-primary-color);
-}
-.alert-name-tooltip {
-  max-width: 400px;
-  white-space: normal;
-  word-wrap: break-word;
-  font-size: 12px;
-}
-
+<style>
 @media (max-width: 1440px) {
   .app-tabs-container .o2-tab {
     padding-left: 0.75rem !important;
     padding-right: 0.75rem !important;
     min-width: auto !important;
   }
-}
-</style>
-
-<style lang="scss" scoped>
-.dark-theme {
-  background-color: $dark-page;
-
-  .alerts-list-tabs {
-    height: fit-content;
-
-    :deep(.rum-tabs) {
-      border: 1px solid #464646;
-    }
-
-    :deep(.rum-tab) {
-      &:hover {
-        background: var(--o2-hover-gray);
-      }
-
-      &.active {
-        background: var(--o2-primary-color);
-        color: var(--o2-primary-foreground) !important;
-      }
-    }
-  }
-}
-
-.alerts-list-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid var(--o2-border-color);
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: var(--o2-hover-gray);
-    }
-
-    &.active {
-      background: var(--o2-primary-color);
-      color: var(--o2-primary-foreground) !important;
-    }
-  }
-}
-.compact-icon-btn {
-  padding: 0 0.5rem !important;
-  min-width: 0 !important;
 }
 
 </style>

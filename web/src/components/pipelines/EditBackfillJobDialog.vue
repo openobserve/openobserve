@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-if="timerangeError"
-              class="tw:text-xs text-red-600 tw:mt-1"
+              class="text-xs text-red-600 mt-1"
             >
               {{ timerangeError }}
             </div>
@@ -49,16 +49,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Advanced Options -->
           <OCollapsible
-            class="tw:mt-2"
+            class="mt-2"
             v-model="showAdvanced"
             icon="settings"
             label="Advanced Options"
             data-test="advanced-options-expansion"
           >
-            <div class="tw:p-3 tw:space-y-2 tw:mt-2">
+            <div class="p-3 space-y-2 mt-2">
               <!-- Chunk Period -->
               <div>
-                <div class="tw:text-xs tw:mb-1">
+                <div class="text-xs mb-1">
                   Chunk Period (minutes)
                   <OIcon name="info-outline" size="sm" />
                     <OTooltip content="Size of each processing chunk in minutes. Default: 60" />
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Delay Between Chunks -->
               <div>
-                <div class="tw:text-xs tw:mb-1">
+                <div class="text-xs mb-1">
                   Delay Between Chunks (seconds)
                   <OIcon name="info-outline" size="sm" />
                     <OTooltip content="Delay between processing chunks in seconds. Default: 5" />
@@ -97,9 +97,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="deleteBeforeBackfill"
                   class="tw-mt-2 tw-p-3 tw-bg-orange-100 tw-rounded tw-border tw-border-orange-300"
                 >
-                  <div class="tw:flex tw:items-start">
-                    <OIcon name="warning" size="sm" class="tw:mr-2 tw-mt-0.5" />
-                    <div class="tw:text-xs text-orange-800">
+                  <div class="flex items-start">
+                    <OIcon name="warning" size="sm" class="mr-2 tw-mt-0.5" />
+                    <div class="text-xs text-orange-800">
                       <div class="tw-font-semibold tw-mb-1">Warning: Irreversible Data Deletion</div>
                       <div class="tw-mb-2">
                         This will permanently delete all data in the destination stream for the specified time
@@ -118,8 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OCollapsible>
 
       <!-- Error Message -->
-      <div v-if="errorMessage" class="tw:text-red-500">
-        <OIcon name="error" size="sm" class="tw:mr-2" />
+      <div v-if="errorMessage" class="text-red-500">
+        <OIcon name="error" size="sm" class="mr-2" />
         {{ errorMessage }}
       </div>
           </OForm>

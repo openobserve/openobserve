@@ -333,16 +333,18 @@ describe("SyntaxGuide.vue", () => {
   it("should apply syntax-guide-no-border class when noBorder is true", () => {
     wrapper = createWrapper({ noBorder: true });
     const button = wrapper.findComponent({ name: "OButton" });
-    expect(button.classes()).toContain("syntax-guide-no-border");
-    // q-pa-xs was removed in OButton migration
+    // noBorder now toggles Tailwind utility classes instead of a scoped class
+    expect(button.classes()).toContain("border-0!");
+    expect(button.classes()).not.toContain("ml-1");
   });
 
   // Test 32: noBorder false keeps standard spacing classes
   it("should not have syntax-guide-no-border class when noBorder is false", () => {
     wrapper = createWrapper({ noBorder: false });
     const button = wrapper.findComponent({ name: "OButton" });
-    // q-pa-xs was removed in OButton migration
-    expect(button.classes()).not.toContain("syntax-guide-no-border");
+    // noBorder false keeps the standard inline margin utility
+    expect(button.classes()).not.toContain("border-0!");
+    expect(button.classes()).toContain("ml-1");
   });
 
   // Test 33: label prop renders on button when noBorder is false

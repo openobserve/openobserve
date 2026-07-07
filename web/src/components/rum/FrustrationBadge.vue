@@ -15,23 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:inline-flex tw:items-center tw:justify-center" data-test="frustration-badge-container">
-    <OBadge
+  <div class="inline-flex items-center justify-center" data-test="frustration-badge-container">
+    <OTag
       v-if="count > 0"
-      :variant="severityVariant"
-      size="sm"
+      type="frustrationSeverity"
+      :value="severity"
       :data-test="`frustration-badge-${severity}`"
       :title="tooltipText"
       data-test-tooltip="frustration-badge-tooltip"
-    >{{ count }}</OBadge>
-    <span v-else class="tw:text-gray-400" data-test="frustration-badge-none">—</span>
+    >{{ count }}</OTag>
+    <span v-else class="text-gray-400" data-test="frustration-badge-none">—</span>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 interface Props {
   count: number;
@@ -53,15 +52,6 @@ const severity = computed(() => {
   if (props.count <= SEVERITY_THRESHOLDS.LOW) return "low";
   if (props.count <= SEVERITY_THRESHOLDS.MEDIUM) return "medium";
   return "high";
-});
-
-const severityVariant = computed((): BadgeVariant => {
-  switch (severity.value) {
-    case "low":    return "warning-soft";
-    case "medium": return "warning";
-    case "high":   return "error-soft";
-    default:       return "default";
-  }
 });
 
 const tooltipText = computed(() => {

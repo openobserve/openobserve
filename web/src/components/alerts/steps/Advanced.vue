@@ -16,39 +16,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-advanced"
+    class="step-advanced w-full"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div class="step-content card-container">
+    <div
+      class="step-content rounded-lg bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
+    >
       <!-- Section header -->
-      <div class="section-header">
-        <div class="section-header-accent" />
-        <span class="section-header-title">{{
+      <div
+        class="section-header flex items-center py-[10px] px-3"
+        :class="store.state.theme === 'dark' ? 'border-b border-[#343434]' : 'border-b border-[#eeeeee]'"
+      >
+        <div class="section-header-accent w-[3px] h-4 rounded-[2px] mr-2 shrink-0 bg-[var(--q-primary)]" />
+        <span
+          class="section-header-title text-[13px] font-semibold text-[var(--color-text-primary)]"
+        >{{
           t("alerts.additional_settings") || "Additional Settings"
         }}</span>
       </div>
 
-      <div class="tw:px-3 tw:py-3 tw:flex tw:flex-col tw:gap-4">
+      <div class="px-3 py-3 flex flex-col gap-4">
         <!-- Template Override -->
         <div>
-          <div class="subsection-label tw:mb-2">
+          <div
+            class="subsection-label flex items-center text-xs font-semibold mb-2"
+            :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : 'text-[#6b7280]'"
+          >
             <span>{{ t("alerts.template") }}</span>
             <OButton
-              style="color: #a0a0a0"
-              variant="ghost"
-              size="icon-sm"
+              data-test="advanced-template-info-btn"
+              variant="ghost-primary"
+              size="xs"
+              class="gap-1 font-medium"
+              @click="openHelp('template')"
             >
-              <OIcon name="info-outline" size="sm" />
-              <OTooltip :content="t('alerts.alertSettings.templateTooltip')" />
+              <OIcon name="help" size="xs" />
+              <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
             </OButton>
           </div>
-          <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="flex items-center gap-2">
             <OSelect
               v-model="localTemplate"
               :options="formattedTemplates"
               clearable
               :placeholder="t('alerts.advanced.selectTemplate')"
-              class="tw:min-w-[240px] tw:max-w-[300px]"
+              class="min-w-[240px] max-w-[300px]"
               data-test="advanced-template-override-select"
               @update:model-value="emitTemplateUpdate"
             >
@@ -67,15 +79,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Context Variables -->
         <div>
-          <div class="subsection-label tw:mb-2">
+          <div
+            class="subsection-label flex items-center text-xs font-semibold mb-2"
+            :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : 'text-[#6b7280]'"
+          >
             <span>{{ t("alerts.additionalVariables") }}</span>
             <OButton
-              style="color: #a0a0a0"
-              variant="ghost"
-              size="icon-sm"
+              data-test="advanced-variables-info-btn"
+              variant="ghost-primary"
+              size="xs"
+              class="gap-1 font-medium"
+              @click="openHelp('variables')"
             >
-              <OIcon name="info-outline" size="sm" />
-              <OTooltip :content="t('alerts.advanced.variablesTooltip')" />
+              <OIcon name="help" size="xs" />
+              <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
             </OButton>
           </div>
           <template v-if="!localVariables.length">
@@ -92,21 +109,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(variable, index) in localVariables"
               :key="variable.id"
-              class="tw:flex tw:items-center tw:gap-2 tw:mb-2"
+              class="flex items-center gap-2 mb-2"
               :data-test="`alert-variables-${index + 1}`"
             >
               <OInput
                 data-test="alert-variables-key-input"
                 v-model="variable.key"
                 :placeholder="t('common.name')"
-                class="tw:min-w-[140px]"
+                class="min-w-[140px]"
                 @update:model-value="emitUpdate"
               />
               <OInput
                 data-test="alert-variables-value-input"
                 v-model="variable.value"
                 :placeholder="t('common.value')"
-                class="tw:min-w-[200px]"
+                class="min-w-[200px]"
                 @update:model-value="emitUpdate"
               />
               <OButton
@@ -132,7 +149,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Description -->
         <div>
-          <div class="subsection-label tw:mb-2">
+          <div
+            class="subsection-label flex items-center text-xs font-semibold mb-2"
+            :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : 'text-[#6b7280]'"
+          >
             <span>{{ t("alerts.description") }}</span>
           </div>
           <OTextarea
@@ -145,21 +165,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Row Template -->
         <div>
-          <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
-            <div class="subsection-label">
+          <div class="flex items-center justify-between mb-2">
+            <div
+              class="subsection-label flex items-center text-xs font-semibold"
+              :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : 'text-[#6b7280]'"
+            >
               <span>{{ t("alerts.row") }}</span>
               <OButton
                 data-test="add-alert-row-input-info-btn"
-                style="color: #a0a0a0"
-                variant="ghost"
-                size="icon-sm"
+                variant="ghost-primary"
+                size="xs"
+                class="gap-1 font-medium"
+                @click="openHelp('rowTemplate')"
               >
-                <OIcon name="info-outline" size="sm" />
-                <OTooltip :content="t('alerts.advanced.rowTemplateTooltip')" />
+                <OIcon name="help" size="xs" />
+                <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
               </OButton>
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2">
-              <span class="tw:text-xs tw:opacity-60">{{
+            <div class="flex items-center gap-2">
+              <span class="text-xs opacity-60">{{
                 t("alerts.advanced.templateType")
               }}</span>
               <OToggleGroup
@@ -188,6 +212,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    <AlertSettingsHelpDrawer
+      v-model:open="helpDrawerOpen"
+      :topic="helpTopic"
+      :templates="templates"
+      :current-template="localTemplate || ''"
+      :selected-destinations="selectedDestinations"
+      :destinations="destinations"
+      :context-attributes="localVariables"
+      :row-template="localRowTemplate"
+      :row-template-type="localRowTemplateType"
+      :facts="previewFacts"
+      :extra="previewExtra"
+      @apply:template="onApplyTemplate"
+    />
   </div>
 </template>
 
@@ -208,8 +246,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import AlertSettingsHelpDrawer from "@/components/alerts/AlertSettingsHelpDrawer.vue";
 
 export interface Variable {
   id: string;
@@ -219,7 +257,7 @@ export interface Variable {
 
 export default defineComponent({
   name: "Step6Advanced",
-  components: { OToggleGroup, OToggleGroupItem, OButton, OIcon, OInput, OTextarea, OSelect, OTooltip },
+  components: { OToggleGroup, OToggleGroupItem, OButton, OIcon, OInput, OTextarea, OSelect, AlertSettingsHelpDrawer },
   props: {
     template: {
       type: String,
@@ -244,6 +282,34 @@ export default defineComponent({
     rowTemplateType: {
       type: String,
       default: "String",
+    },
+    destinations: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
+    selectedDestinations: {
+      type: Array as PropType<string[]>,
+      default: () => [],
+    },
+    alertName: {
+      type: String,
+      default: "",
+    },
+    streamName: {
+      type: String,
+      default: "",
+    },
+    streamType: {
+      type: String,
+      default: "",
+    },
+    triggerCondition: {
+      type: Object as PropType<any>,
+      default: () => ({}),
+    },
+    streamFields: {
+      type: Array as PropType<any[]>,
+      default: () => [],
     },
   },
   emits: [
@@ -348,6 +414,46 @@ export default defineComponent({
       emit("update:rowTemplateType", localRowTemplateType.value);
     };
 
+    const helpDrawerOpen = ref(false);
+    const helpTopic = ref<"template" | "variables" | "rowTemplate">("template");
+    const openHelp = (topic: "template" | "variables" | "rowTemplate") => {
+      helpTopic.value = topic;
+      helpDrawerOpen.value = true;
+    };
+
+    // Facts the preview can render truthfully from data the form already
+    // holds — surfaced as "your data" (live) rather than chipped. Runtime-only
+    // values (count, trigger time, rows) stay sample/opaque.
+    const previewFacts = computed(() => ({
+      alert_name: props.alertName,
+      stream_name: props.streamName,
+      stream_type: props.streamType,
+      alert_operator: props.triggerCondition?.operator,
+      alert_threshold: props.triggerCondition?.threshold,
+      alert_period: props.triggerCondition?.period,
+    }));
+
+    // The user's typed context variables ({key} -> value) are real data → live.
+    // Stream field NAMES are known but their runtime values are not, so they
+    // are passed through and the composable keeps them opaque (not faked).
+    const previewExtra = computed(() => ({
+      contextVariables: localVariables.value.reduce(
+        (acc: Record<string, string>, v: Variable) => {
+          if (v.key) acc[v.key] = v.value;
+          return acc;
+        },
+        {},
+      ),
+      streamFields: (props.streamFields || [])
+        .map((c: any) => (typeof c === "string" ? c : c?.value))
+        .filter((name: any): name is string => !!name),
+    }));
+
+    const onApplyTemplate = (name: string) => {
+      localTemplate.value = name;
+      emitTemplateUpdate();
+    };
+
     return {
       t,
       store,
@@ -363,80 +469,13 @@ export default defineComponent({
       addVariable,
       removeVariable,
       emitUpdate,
+      helpDrawerOpen,
+      helpTopic,
+      openHelp,
+      previewFacts,
+      previewExtra,
+      onApplyTemplate,
     };
   },
 });
 </script>
-
-<style scoped lang="scss">
-.step-advanced {
-  width: 100%;
-
-  .step-content {
-    border-radius: 8px;
-  }
-
-  &.dark-mode {
-    .step-content {
-      background-color: #212121;
-      border: 1px solid #343434;
-    }
-    .section-header {
-      border-bottom: 1px solid #343434;
-    }
-    .section-header-title {
-      color: #e0e0e0;
-    }
-    .section-header-accent {
-      background: var(--q-primary);
-    }
-    .subsection-label {
-      color: #9ca3af;
-    }
-  }
-
-  &.light-mode {
-    .step-content {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
-    }
-    .section-header {
-      border-bottom: 1px solid #eeeeee;
-    }
-    .section-header-title {
-      color: #374151;
-    }
-    .section-header-accent {
-      background: var(--q-primary);
-    }
-    .subsection-label {
-      color: #6b7280;
-    }
-  }
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
-}
-.section-header-accent {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-.section-header-title {
-  font-size: 13px;
-  font-weight: 600;
-}
-.subsection-label {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-
-</style>

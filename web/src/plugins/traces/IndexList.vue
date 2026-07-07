@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col index-menu tw:p-[0.375rem]! tw:bg-surface-panel!">
+  <div class="flex flex-col w-full index-menu p-1.5! bg-surface-panel!">
     <OSelect
       data-test="log-search-index-list-select-stream"
       :model-value="searchObj.data.stream.selectedStream?.value ?? null"
@@ -30,11 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onStreamChange"
     >
         <template #empty>
-          <div class="tw:p-2">{{ t("search.noResult") }}</div>
+          <div class="p-2">{{ t("search.noResult") }}</div>
         </template>
     </OSelect>
     <div
-      class="index-table tw:h-[calc(100%-2rem)]!"
+      class="index-table h-[calc(100%-2rem)]! w-full"
       data-test="log-search-index-list-fields-table"
     >
       <GroupedFieldList
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-if="field.name === 'duration'" #body>
                   <div
                     v-if="durationPercentilesLoading"
-                    class="tw:flex tw:justify-center tw:py-[0.5rem]"
+                    class="flex justify-center py-[0.5rem]"
                   >
                     <OSpinner size="xs" />
                   </div>
@@ -95,36 +95,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="p in PERCENTILE_LABELS"
                       :key="p.key"
-                      class="tw:flex tw:items-center tw:justify-between tw:py-[0.15rem] tw:pl-[0.5rem]"
+                      class="flex items-center justify-between py-[0.15rem] pl-[0.5rem]"
                     >
-                      <span class="tw:text-[0.75rem] tw:w-[2rem] tw:shrink-0">{{ p.label }}</span>
-                      <span class="tw:text-[0.75rem] tw:flex-1 tw:text-right tw:pr-[0.25rem]">
+                      <span class="text-[0.75rem] w-[2rem] shrink-0">{{ p.label }}</span>
+                      <span class="text-[0.75rem] flex-1 text-right pr-[0.25rem]">
                         {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
                       </span>
-                      <div class="tw:flex tw:w-[3rem]">
+                      <div class="flex w-[3rem]">
                         <OButton
                           v-if="p.key !== 'max'"
                           variant="ghost"
                           size="icon-xs-circle"
                           :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
                           @click.stop="addSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
-                          class="o2-custom-button-hover tw:ml-[0.25rem]! tw:border! tw:border-[var(--o2-border-color)]!"
+                          class="o2-custom-button-hover ml-[0.25rem]! border! border-[var(--o2-border-color)]!"
                         >
-                          <OIcon name="arrow-forward-ios" size="sm" class="tw:h-[0.5rem]! tw:w-[0.5rem]!" />
+                          <OIcon name="arrow-forward-ios" size="sm" class="h-[0.5rem]! w-[0.5rem]!" />
                         </OButton>
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
                           :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
                           @click.stop="addSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
-                          class="o2-custom-button-hover tw:mr-[0.625rem]! tw:border! tw:border-[var(--o2-border-color)]! tw:ml-auto!"
+                          class="o2-custom-button-hover mr-[0.625rem]! border! border-[var(--o2-border-color)]! ml-auto!"
                         >
-                          <OIcon name="arrow-back-ios" size="sm" class="tw:h-[0.5rem]! tw:w-[0.5rem]!" />
+                          <OIcon name="arrow-back-ios" size="sm" class="h-[0.5rem]! w-[0.5rem]!" />
                         </OButton>
                       </div>
                     </div>
                   </template>
-                  <div v-else class="tw:pl-3 tw:py-1 tw:text-sm tw:font-medium">
+                  <div v-else class="pl-3 py-1 text-sm font-medium">
                     {{ durationPercentileErrMsg || "No values found" }}
                   </div>
                 </template>
@@ -150,10 +150,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #loading>
           <div
-            class="tw:flex tw:items-center tw:justify-center tw:w-full tw:pt-[2rem]"
+            class="flex items-center justify-center w-full pt-[2rem]"
           >
             <div
-              class="tw:text-sm tw:font-medium text-weight-bold tw:w-fit tw:mx-auto tw:my-0 tw:flex-col tw:justify-items-center"
+              class="text-sm font-medium text-weight-bold w-fit mx-auto my-0 flex-col justify-items-center"
             >
               <OSpinner size="sm" />
               {{ t("traces.loadingStream") }}
@@ -620,181 +620,95 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.index-menu {
+<style>
+
+.index-menu .index-table table {
+  display: table;
+  table-layout: fixed !important;
+}
+
+.index-menu .index-table thead {
+  display: none;
+}
+
+.index-menu .index-table tr {
+  margin-bottom: 1px;
+}
+
+.index-menu .index-table tbody,
+.index-menu .index-table tr,
+.index-menu .index-table td {
   width: 100%;
-
-  .q-field {
-    &__control {
-      height: 35px;
-      padding: 0px 5px;
-      min-height: auto !important;
-
-      &-container {
-        padding-top: 0px !important;
-      }
-    }
-    &__native :first-of-type {
-      padding-top: 0.25rem;
-    }
-  }
-
-  .index-table {
-    width: 100%;
-
-    :deep(table) {
-      display: table;
-      table-layout: fixed !important;
-    }
-
-    :deep(thead) {
-      display: none;
-    }
-
-    :deep(tr) {
-      margin-bottom: 1px;
-    }
-
-    :deep(tbody),
-    :deep(tr),
-    :deep(td) {
-      width: 100%;
-      display: block;
-      height: fit-content;
-      overflow: hidden;
-    }
-
-    :deep(.q-table__control),
-    label.q-field {
-      width: 100%;
-    }
-
-    :deep(thead tr),
-    :deep(tbody td) {
-      height: auto;
-    }
-  }
-
-  .field_list {
-    padding: 0px;
-    margin-bottom: 0.125rem;
-    position: relative;
-    overflow: visible;
-    cursor: default;
-
-    &.field-group-header {
-      font-weight: 600;
-      font-size: 0.75rem;
-      padding: 0.25rem 0.325rem;
-    }
-
-    .field_label {
-      pointer-events: none;
-      font-size: 0.825rem;
-      position: relative;
-      display: inline;
-      z-index: 2;
-      left: 0;
-      // text-transform: capitalize;
-    }
-
-    .field-container {
-      height: 25px;
-    }
-
-    .field_overlay {
-      position: absolute;
-      height: 100%;
-      right: 0;
-      top: 0;
-      z-index: 5;
-      padding: 0 6px;
-      visibility: hidden;
-      display: flex;
-      align-items: center;
+  display: block;
+  height: fit-content;
+  overflow: hidden;
 }
 
-    &.selected {
-      .field_overlay {
-        background-color: var(--o2-hover-accent);
 
-        .field_icons {
-          opacity: 0;
-        }
-      }
-    }
-    // &:hover {
-    //   .field-container {
-    //     background-color: #e8e8e8;
-    //   }
-    //   body.body--dark {
-    //     .field-container {
-    //       background-color: #424242;
-    //     }
-    //   }
-    // }
-  }
-}
-
-.q-field--dense .q-field__before,
-.q-field--dense .q-field__prepend {
-  padding: 0px 0px 0px 0px;
+.index-menu .index-table thead tr,
+.index-menu .index-table tbody td {
   height: auto;
-  line-height: auto;
-}
-.q-field__native,
-.q-field__input {
-  padding: 0px 0px 0px 0px;
 }
 
-.q-field--dense .q-field__label {
-  top: 5px;
+.index-menu .field_list {
+  padding: 0px;
+  margin-bottom: 0.125rem;
+  position: relative;
+  overflow: visible;
+  cursor: default;
 }
-.q-field--dense .q-field__control,
-.q-field--dense .q-field__marginal {
-  height: 34px;
+
+.index-menu .field_list.field-group-header {
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.325rem;
 }
-</style>
 
-<style lang="scss">
-.index-table {
-  table {
-    width: 100%;
-    table-layout: fixed;
-
-    .q-expansion-item {
-      .q-item-type {
-        &:hover {
-          .field_overlay {
-            visibility: visible;
+.index-menu .field_list .field_label {
+  pointer-events: none;
+  font-size: 0.825rem;
+  position: relative;
+  display: inline;
+  z-index: 2;
+  left: 0;
 }
-        }
-      }
-      .field-expansion-icon {
-        img {
-          width: 12px;
-          height: 12px;
-        }
-      }
-    }
 
-    .field-container {
-      &:hover {
-        .field_overlay {
-          visibility: visible;
+.index-menu .field_list .field-container {
+  height: 25px;
 }
-      }
-    }
 
-    .field_list {
-      &.selected {
-        background-color: var(--o2-hover-accent);
+.index-menu .field_list .field_overlay {
+  position: absolute;
+  height: 100%;
+  right: 0;
+  top: 0;
+  z-index: 5;
+  padding: 0 6px;
+  visibility: hidden;
+  display: flex;
+  align-items: center;
+}
 
-        .field_overlay {
-          // background-color: #ffffff;
-        }
-      }
-    }
-  }
+.index-menu .field_list.selected .field_overlay {
+  background-color: var(--color-interactive-hover-bg);
+}
+
+.index-menu .field_list.selected .field_overlay .field_icons {
+  opacity: 0;
+}
+
+
+.index-table table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+
+.index-table table .field-container:hover .field_overlay {
+  visibility: visible;
+}
+
+.index-table table .field_list.selected {
+  background-color: var(--color-interactive-hover-bg);
 }
 </style>

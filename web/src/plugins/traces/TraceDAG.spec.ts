@@ -161,7 +161,7 @@ describe("TraceDAG", () => {
 
     it("should show loading state initially before data resolves", () => {
       wrapper = mountDAG();
-      expect(wrapper.find(".loading-container").exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-trace-dag-loading-container"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Loading trace DAG");
     });
 
@@ -188,14 +188,14 @@ describe("TraceDAG", () => {
       await flushPromises();
 
       expect(wrapper.vm.isLoading).toBe(false);
-      expect(wrapper.find(".loading-container").exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-trace-dag-loading-container"]').exists()).toBe(false);
     });
 
     it("should render DAG wrapper when data is present", async () => {
       wrapper = mountDAG();
       await flushPromises();
 
-      expect(wrapper.find(".dag-wrapper").exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-trace-dag-wrapper"]').exists()).toBe(true);
     });
   });
 
@@ -209,7 +209,7 @@ describe("TraceDAG", () => {
       await flushPromises();
 
       expect(wrapper.vm.error).toBe("Network error");
-      expect(wrapper.find(".error-message").exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-trace-dag-error-message"]').exists()).toBe(true);
     });
 
     it("should use response data message when API returns structured error", async () => {
@@ -276,7 +276,7 @@ describe("TraceDAG", () => {
       wrapper = mountDAG();
       await flushPromises();
 
-      expect(wrapper.find(".empty-container").exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-trace-dag-empty-container"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("No DAG data available");
     });
 
@@ -287,7 +287,7 @@ describe("TraceDAG", () => {
       wrapper = mountDAG();
       await flushPromises();
 
-      expect(wrapper.find(".empty-container").exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-trace-dag-empty-container"]').exists()).toBe(true);
     });
   });
 
@@ -699,99 +699,116 @@ describe("TraceDAG", () => {
       expect(wrapper.vm.getObservationTypeClass(null)).toBe("");
     });
 
-    it("should return node-llm-default for an unknown observation type", () => {
+    const nodeStyle = {
+      default: "border-[#9e9e9e] bg-[#fafafa] dark:border-[#9e9e9e] dark:bg-[#262626]",
+      generation: "border-[#4caf50] bg-[#e8f5e9] dark:border-[#66bb6a] dark:bg-[#1a2e1a]",
+      embedding: "border-[#2196f3] bg-[#e3f2fd] dark:border-[#64b5f6] dark:bg-[#1a2a3a]",
+      agent: "border-[#9c27b0] bg-[#f3e5f5] dark:border-[#ce93d8] dark:bg-[#2a1a2e]",
+      tool: "border-[#ff9800] bg-[#fff3e0] dark:border-[#ffb74d] dark:bg-[#2e2218]",
+      chain: "border-[#3f51b5] bg-[#e8eaf6] dark:border-[#7986cb] dark:bg-[#1a1a2e]",
+      retriever: "border-[#00bcd4] bg-[#e0f7fa] dark:border-[#4dd0e1] dark:bg-[#1a2a2e]",
+      task: "border-[#009688] bg-[#e0f2f1] dark:border-[#4db6ac] dark:bg-[#1a2e2a]",
+      evaluator: "border-[#e91e63] bg-[#fce4ec] dark:border-[#f48fb1] dark:bg-[#2e1a22]",
+      workflow: "border-[#673ab7] bg-[#ede7f6] dark:border-[#b39ddb] dark:bg-[#221a2e]",
+      rerank: "border-[#03a9f4] bg-[#e1f5fe] dark:border-[#4fc3f7] dark:bg-[#1a2a3a]",
+      guardrail: "border-[#f44336] bg-[#ffebee] dark:border-[#ef5350] dark:bg-[#2e1a1a]",
+      span: "border-[#9e9e9e] bg-[#f5f5f5] dark:border-[#9e9e9e] dark:bg-[#262626]",
+      event: "border-[#ffc107] bg-[#fff8e1] dark:border-[#ffd54f] dark:bg-[#2e2a18]",
+    };
+
+    it("should return the default node style for an unknown observation type", () => {
       expect(wrapper.vm.getObservationTypeClass("totally_unknown")).toBe(
-        "node-llm-default",
+        nodeStyle.default,
       );
     });
 
     // OTEL spec values → generation
     it.each(["chat", "text_completion", "generate_content"])(
-      "should map '%s' to node-llm-generation",
+      "should map '%s' to the generation node style",
       (input) => {
         expect(wrapper.vm.getObservationTypeClass(input)).toBe(
-          "node-llm-generation",
+          nodeStyle.generation,
         );
       },
     );
 
-    it("should map 'embeddings' to node-llm-embedding", () => {
+    it("should map 'embeddings' to the embedding node style", () => {
       expect(wrapper.vm.getObservationTypeClass("embeddings")).toBe(
-        "node-llm-embedding",
+        nodeStyle.embedding,
       );
     });
 
     it.each(["invoke_agent", "create_agent"])(
-      "should map '%s' to node-llm-agent",
+      "should map '%s' to the agent node style",
       (input) => {
         expect(wrapper.vm.getObservationTypeClass(input)).toBe(
-          "node-llm-agent",
+          nodeStyle.agent,
         );
       },
     );
 
-    it("should map 'execute_tool' to node-llm-tool", () => {
+    it("should map 'execute_tool' to the tool node style", () => {
       expect(wrapper.vm.getObservationTypeClass("execute_tool")).toBe(
-        "node-llm-tool",
+        nodeStyle.tool,
       );
     });
 
-    it("should map 'invoke_workflow' to node-llm-workflow", () => {
+    it("should map 'invoke_workflow' to the workflow node style", () => {
       expect(wrapper.vm.getObservationTypeClass("invoke_workflow")).toBe(
-        "node-llm-workflow",
+        nodeStyle.workflow,
       );
     });
 
-    it("should map 'retrieval' to node-llm-retriever", () => {
+    it("should map 'retrieval' to the retriever node style", () => {
       expect(wrapper.vm.getObservationTypeClass("retrieval")).toBe(
-        "node-llm-retriever",
+        nodeStyle.retriever,
       );
     });
 
-    it("should map 'chain' to node-llm-chain", () => {
+    it("should map 'chain' to the chain node style", () => {
       expect(wrapper.vm.getObservationTypeClass("chain")).toBe(
-        "node-llm-chain",
+        nodeStyle.chain,
       );
     });
 
-    it("should map 'task' to node-llm-task", () => {
-      expect(wrapper.vm.getObservationTypeClass("task")).toBe("node-llm-task");
+    it("should map 'task' to the task node style", () => {
+      expect(wrapper.vm.getObservationTypeClass("task")).toBe(nodeStyle.task);
     });
 
-    it("should map 'evaluator' to node-llm-evaluator", () => {
+    it("should map 'evaluator' to the evaluator node style", () => {
       expect(wrapper.vm.getObservationTypeClass("evaluator")).toBe(
-        "node-llm-evaluator",
+        nodeStyle.evaluator,
       );
     });
 
-    it("should map 'rerank' to node-llm-rerank", () => {
+    it("should map 'rerank' to the rerank node style", () => {
       expect(wrapper.vm.getObservationTypeClass("rerank")).toBe(
-        "node-llm-rerank",
+        nodeStyle.rerank,
       );
     });
 
-    it("should map 'guardrail' to node-llm-guardrail", () => {
+    it("should map 'guardrail' to the guardrail node style", () => {
       expect(wrapper.vm.getObservationTypeClass("guardrail")).toBe(
-        "node-llm-guardrail",
+        nodeStyle.guardrail,
       );
     });
 
-    it("should map 'span' to node-llm-span", () => {
-      expect(wrapper.vm.getObservationTypeClass("span")).toBe("node-llm-span");
+    it("should map 'span' to the span node style", () => {
+      expect(wrapper.vm.getObservationTypeClass("span")).toBe(nodeStyle.span);
     });
 
-    it("should map 'event' to node-llm-event", () => {
+    it("should map 'event' to the event node style", () => {
       expect(wrapper.vm.getObservationTypeClass("event")).toBe(
-        "node-llm-event",
+        nodeStyle.event,
       );
     });
 
     it("should be case-insensitive for known types", () => {
       expect(wrapper.vm.getObservationTypeClass("CHAT")).toBe(
-        "node-llm-generation",
+        nodeStyle.generation,
       );
       expect(wrapper.vm.getObservationTypeClass("Execute_Tool")).toBe(
-        "node-llm-tool",
+        nodeStyle.tool,
       );
     });
   });
@@ -807,29 +824,29 @@ describe("TraceDAG", () => {
       expect(wrapper.vm.getObservationTypeTextClass(null)).toBe("");
     });
 
-    it("should return node-llm-text-default for an unknown observation type", () => {
+    it("should return the default text style for an unknown observation type", () => {
       expect(wrapper.vm.getObservationTypeTextClass("unknown")).toBe(
-        "node-llm-text-default",
+        "text-[#757575] dark:text-[#bdbdbd]",
       );
     });
 
     it.each([
-      ["chat", "node-llm-text-generation"],
-      ["text_completion", "node-llm-text-generation"],
-      ["generate_content", "node-llm-text-generation"],
-      ["embeddings", "node-llm-text-embedding"],
-      ["invoke_agent", "node-llm-text-agent"],
-      ["create_agent", "node-llm-text-agent"],
-      ["execute_tool", "node-llm-text-tool"],
-      ["invoke_workflow", "node-llm-text-workflow"],
-      ["retrieval", "node-llm-text-retriever"],
-      ["chain", "node-llm-text-chain"],
-      ["task", "node-llm-text-task"],
-      ["evaluator", "node-llm-text-evaluator"],
-      ["rerank", "node-llm-text-rerank"],
-      ["guardrail", "node-llm-text-guardrail"],
-      ["span", "node-llm-text-span"],
-      ["event", "node-llm-text-event"],
+      ["chat", "text-[#388e3c] dark:text-[#81c784]"],
+      ["text_completion", "text-[#388e3c] dark:text-[#81c784]"],
+      ["generate_content", "text-[#388e3c] dark:text-[#81c784]"],
+      ["embeddings", "text-[#1976d2] dark:text-[#90caf9]"],
+      ["invoke_agent", "text-[#7b1fa2] dark:text-[#ce93d8]"],
+      ["create_agent", "text-[#7b1fa2] dark:text-[#ce93d8]"],
+      ["execute_tool", "text-[#e65100] dark:text-[#ffcc80]"],
+      ["invoke_workflow", "text-[#4527a0] dark:text-[#b39ddb]"],
+      ["retrieval", "text-[#00838f] dark:text-[#80deea]"],
+      ["chain", "text-[#283593] dark:text-[#9fa8da]"],
+      ["task", "text-[#00796b] dark:text-[#80cbc4]"],
+      ["evaluator", "text-[#c2185b] dark:text-[#f48fb1]"],
+      ["rerank", "text-[#0277bd] dark:text-[#81d4fa]"],
+      ["guardrail", "text-[#c62828] dark:text-[#ef9a9a]"],
+      ["span", "text-[#616161] dark:text-[#bdbdbd]"],
+      ["event", "text-[#f57f17] dark:text-[#ffe082]"],
     ])(
       "should map '%s' to '%s'",
       (input, expected) => {

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc. -->
+﻿<!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
   <div
@@ -6,16 +6,16 @@
     :class="[
       'o-splitter',
       horizontal ? 'o-splitter--horizontal' : 'o-splitter--vertical',
-      'tw:flex',
-      horizontal ? 'tw:flex-col' : 'tw:flex-row'
+      'flex relative',
+      horizontal ? 'flex-col' : 'flex-row'
     ]"
   >
     <!-- Before slot -->
     <div
       :class="[
         'o-splitter__before',
-        'tw:overflow-hidden',
-        horizontal ? 'tw:w-full' : 'tw:h-full',
+        'overflow-hidden shrink-0 relative',
+        horizontal ? 'w-full' : 'h-full',
         beforeClass
       ]"
       :style="beforeStyle"
@@ -28,13 +28,12 @@
       v-if="separator !== false"
       :class="[
         horizontal ? 'o-splitter__separator--horizontal' : 'o-splitter__separator--vertical',
-        'tw:select-none',
-        'tw:transition-colors',
-        'hover:tw:bg-[var(--o2-border-input)]',
-        'tw:relative',
-        'tw:z-10',
-        disable ? 'tw:cursor-default! tw:opacity-50' : '',
-        horizontal ? 'tw:h-px tw:w-full tw:cursor-row-resize' : 'tw:h-full tw:cursor-col-resize',
+        'select-none',
+        'relative',
+        'z-10',
+        'focus:outline-2 focus:outline-(--o2-primary-color) focus:-outline-offset-2',
+        disable ? 'cursor-default! opacity-50' : '',
+        horizontal ? 'h-px w-full cursor-row-resize' : 'h-full cursor-col-resize',
         separatorClass
       ]"
       :style="[separatorStyle]"
@@ -55,8 +54,8 @@
     <div
       :class="[
         'o-splitter__after',
-        'tw:overflow-hidden tw:flex-1 tw:relative tw:z-0',
-        horizontal ? 'tw:w-full' : 'tw:h-full'
+        'overflow-hidden flex-1 relative z-0 shrink-0',
+        horizontal ? 'w-full' : 'h-full'
       ]"
     >
       <slot name="after" />
@@ -168,29 +167,3 @@ watch(() => props.modelValue, (newValue) => {
   currentValue.value = newValue
 }, { immediate: true })
 </script>
-
-<style scoped>
-.o-splitter {
-  position: relative;
-}
-
-.o-splitter__separator {
-  flex-shrink: 0;
-}
-
-.o-splitter__separator:focus {
-  outline: 2px solid var(--o2-primary-color);
-  outline-offset: -2px;
-}
-
-.o-splitter__before,
-.o-splitter__after {
-  flex-shrink: 0;
-  position: relative;
-}
-
-/* Global styles for body when resizing */
-:global(.no-select) {
-  user-select: none !important;
-}
-</style>

@@ -15,28 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:m-3 tw:mt-1 azure-config-page">
+  <div class="m-3 mt-1 max-w-[860px]">
     <!-- Header -->
-    <div class="tw:flex tw:items-start tw:gap-4 tw:mb-6">
+    <div class="flex items-start gap-4 mb-6">
       <OIcon
         name="cloud"
         size="xl"
-        class="tw:flex-shrink-0"
+        class="flex-shrink-0"
       />
       <div>
-        <h5 class="tw:text-lg tw:font-bold tw:m-0 tw:mb-1 title">
+        <div class="text-sm font-medium m-0 mb-1" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#1a1a1a]'">
           Azure Activity Logs
-        </h5>
-        <p class="tw:text-sm tw:m-0 page-description">
+        </div>
+        <div class="text-sm m-0" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
           Stream Azure subscription activity logs to OpenObserve via Event Hub.
           The ARM template sets up the Event Hub infrastructure — you then
           configure Azure to export logs to it.
-        </p>
+        </div>
       </div>
     </div>
 
     <!-- Step 1 -->
-    <div class="step-card tw:mb-4 tw:p-4 tw:rounded">
+    <div
+      class="mb-4 p-4 rounded border-l-[3px] border-l-solid"
+      :class="store.state.theme === 'dark' ? 'bg-[rgba(255,255,255,0.04)] border-l-[#404040]' : 'bg-[#fafafa] border-l-[#e0e0e0]'"
+    >
       <div
         style="
           display: grid;
@@ -45,15 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align-items: start;
         "
       >
-        <div class="step-number">1</div>
+        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-[0.85rem] shrink-0 bg-[#1976d2] text-white">1</div>
         <div>
-          <div class="tw:font-semibold tw:mb-1 step-title">
+          <div class="font-semibold mb-1" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#1a1a1a]'">
             Deploy ARM Template
           </div>
-          <p class="tw:text-sm tw:m-0 tw:mb-3 step-desc">
+          <div class="text-sm m-0 mb-3" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
             Creates an Event Hub namespace, Event Hub, and all required
             resources in your Azure subscription.
-          </p>
+          </div>
           <OButton
             variant="primary"
             size="sm"
@@ -70,7 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Step 2 -->
-    <div class="step-card tw:mb-4 tw:p-4 tw:rounded">
+    <div
+      class="mb-4 p-4 rounded border-l-[3px] border-l-solid"
+      :class="store.state.theme === 'dark' ? 'bg-[rgba(255,255,255,0.04)] border-l-[#404040]' : 'bg-[#fafafa] border-l-[#e0e0e0]'"
+    >
       <div
         style="
           display: grid;
@@ -79,25 +85,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align-items: start;
         "
       >
-        <div class="step-number">2</div>
+        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-[0.85rem] shrink-0 bg-[#1976d2] text-white">2</div>
         <div>
-          <div class="tw:font-semibold tw:mb-1 step-title">
+          <div class="font-semibold mb-1" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#1a1a1a]'">
             Configure Diagnostic Settings
           </div>
-          <p class="tw:text-sm tw:mb-3 step-desc">
+          <div class="text-sm mb-3" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
             After the ARM deployment completes, route Activity Logs to the Event
             Hub that was created.
-          </p>
+          </div>
 
           <!-- Portal / CLI toggle -->
-          <OToggleGroup v-model="step2Mode" class="tw:mb-4">
+          <OToggleGroup v-model="step2Mode" class="mb-4">
             <OToggleGroupItem value="portal">Azure Portal</OToggleGroupItem>
             <OToggleGroupItem value="cli">Azure CLI</OToggleGroupItem>
           </OToggleGroup>
 
           <!-- Portal instructions -->
           <div v-if="step2Mode === 'portal'">
-            <ol class="tw:text-sm tw:pl-4 tw:space-y-1 step-desc">
+            <ol class="text-sm pl-4 space-y-1" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
               <li>
                 Go to
                 <strong
@@ -125,12 +131,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- CLI: inputs + generated curl command -->
           <div v-else>
             <!-- Categories -->
-            <div class="tw:mb-4">
-              <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
-                <div class="tw:text-xs tw:font-semibold section-label">
+            <div class="mb-4">
+              <div class="flex items-center justify-between mb-2">
+                <div class="text-xs font-semibold" :class="store.state.theme === 'dark' ? 'text-[#d0d0d0]' : 'text-[#333]'">
                   Log categories to enable
                 </div>
-                <div class="tw:flex tw:gap-2">
+                <div class="flex gap-2">
                   <OButton
                     variant="ghost-primary"
                     size="xs"
@@ -174,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <div>
-                <div class="tw:text-xs tw:mb-1 section-label">
+                <div class="text-xs mb-1" :class="store.state.theme === 'dark' ? 'text-[#d0d0d0]' : 'text-[#333]'">
                   Resource Group
                 </div>
                 <OInput
@@ -185,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div>
-                <div class="tw:text-xs tw:mb-1 section-label">
+                <div class="text-xs mb-1" :class="store.state.theme === 'dark' ? 'text-[#d0d0d0]' : 'text-[#333]'">
                   Deployment Name
                 </div>
                 <OInput
@@ -199,14 +205,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               v-if="enabledCategories.length === 0"
-              class="tw:text-sm tw:text-red-500 tw:mb-3"
+              class="text-sm text-red-500 mb-3"
             >
               Select at least one log category above.
             </div>
             <div v-else>
-              <p class="tw:text-xs tw:mb-2 step-desc">
+              <div class="text-xs mb-2" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
                 Run this command after your ARM deployment completes:
-              </p>
+              </div>
               <CopyContent
                 :content="curlCommand"
                 data-test="azure-curl-command"
@@ -218,8 +224,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Manual Configuration -->
-    <div class="tw:mt-6">
-      <div class="tw:font-semibold tw:text-sm tw:mb-2 section-label">
+    <div class="mt-6">
+      <div class="font-semibold text-sm mb-2" :class="store.state.theme === 'dark' ? 'text-[#d0d0d0]' : 'text-[#333]'">
         Manual Configuration (for reference)
       </div>
       <CopyContent :content="manualContent" />
@@ -341,6 +347,7 @@ export default defineComponent({
     };
 
     return {
+      store,
       LOG_CATEGORIES,
       step2Mode,
       enabledCategories,
@@ -353,73 +360,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.azure-config-page {
-  max-width: 860px;
-
-  .step-card {
-    border-left: 3px solid;
-  }
-
-  .step-number {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 0.85rem;
-    flex-shrink: 0;
-  }
-
-  .body--light & {
-    .title {
-      color: #1a1a1a;
-    }
-    .page-description,
-    .step-desc {
-      color: #666;
-    }
-    .section-label {
-      color: #333;
-    }
-    .step-card {
-      background: #fafafa;
-      border-color: #e0e0e0;
-    }
-    .step-title {
-      color: #1a1a1a;
-    }
-    .step-number {
-      background: #1976d2;
-      color: #fff;
-    }
-  }
-
-  .body--dark & {
-    .title {
-      color: #e0e0e0;
-    }
-    .page-description,
-    .step-desc {
-      color: #b0b0b0;
-    }
-    .section-label {
-      color: #d0d0d0;
-    }
-    .step-card {
-      background: rgba(255, 255, 255, 0.04);
-      border-color: #404040;
-    }
-    .step-title {
-      color: #e0e0e0;
-    }
-    .step-number {
-      background: #1976d2;
-      color: #fff;
-    }
-  }
-}
-</style>

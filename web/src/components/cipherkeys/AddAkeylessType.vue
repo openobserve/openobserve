@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="add-cipher-key-akeyless-baseurl-input"
       v-model="formData.key.store.akeyless.base_url"
       :label="t('cipherKey.baseURL') + ' *'"
-      class="showLabelOnTop tw:w-full"
+      class="showLabelOnTop w-full"
       :error="!!baseUrlError"
       :error-message="baseUrlError"
       @update:model-value="baseUrlError = ''"
@@ -31,25 +31,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-cipher-key-akeyless-access-id-input"
         v-model="formData.key.store.akeyless.access_id"
         :label="t('cipherKey.accessId') + ' *'"
-        class="showLabelOnTop tw:w-full"
+        class="showLabelOnTop w-full"
         :error="!!accessIdError"
         :error-message="accessIdError"
         @update:model-value="accessIdError = ''"
       />
-      <OButton data-test="add-cipher-key-akeyless-access-id-input-cancel" variant="outline" size="sm-action" class="tw:mt-2" v-if="formData.isUpdate && formData.key.store.akeyless.access_id != ''" @click="isUpdateAccessID = false">{{ t('common.cancel') }}</OButton>
+      <OButton data-test="add-cipher-key-akeyless-access-id-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="formData.isUpdate && formData.key.store.akeyless.access_id != ''" @click="isUpdateAccessID = false">{{ t('common.cancel') }}</OButton>
     </div>
     <div v-else>
-      <label class="tw:flex q-field tw:mb-3">
+      <label class="flex q-field mb-3">
         <b>{{ t('cipherKey.accessId') }}</b>
       </label>
-      <pre class="pre-text">{{ formData.key.store.akeyless.access_id }}</pre>
+      <pre class="[text-wrap:auto] break-words border border-(--o2-border-input) p-[5px] mb-[5px]">{{ formData.key.store.akeyless.access_id }}</pre>
       <OButton data-test="add-cipher-key-akeyless-access-id-input-update" variant="primary" size="sm-action" @click="isUpdateAccessID = true">{{ t('common.update') }}</OButton>
     </div>
     <OSelect
       data-test="add-cipher-key-auth-method-input"
       v-model="formData.key.store.akeyless.auth.type"
       :label="t('cipherKey.authenticationType') + ' *'"
-      class="showLabelOnTop tw:w-full"
+      class="showLabelOnTop w-full"
       :options="authenticationTypeOptions"
       labelKey="label"
       valueKey="value"
@@ -58,10 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="authTypeError = ''"
     />
     <fieldset
-      class="q-fieldset tw:p-3 tw:w-full"
+      class="q-fieldset p-3 w-full border border-[lightgray] rounded relative"
       v-if="formData.key.store.akeyless.auth.type != ''"
     >
-      <legend class="q-caption tw:px-2">
+      <legend class="q-caption px-2 text-xs text-(--q-color-dark) ml-2 py-0 px-1">
         {{ getAuthenticationTypeLabel(formData.key.store.akeyless.auth.type) }}
         Configuration
       </legend>
@@ -71,18 +71,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-cipher-key-akeyless-access-key-input"
             v-model="formData.key.store.akeyless.auth.access_key"
             :label="t('cipherKey.accessKey') + ' *'"
-            class="showLabelOnTop tw:w-full"
+            class="showLabelOnTop w-full"
             :error="!!accessKeyError"
             :error-message="accessKeyError"
             @update:model-value="accessKeyError = ''"
           />
-          <OButton data-test="add-cipher-key-akeyless-access-key-input-cancel" variant="outline" size="sm-action" class="tw:mt-2" v-if="formData.isUpdate && formData.key.store.akeyless.auth.access_key != ''" @click="isUpdateAccessKey = false">{{ t('common.cancel') }}</OButton>
+          <OButton data-test="add-cipher-key-akeyless-access-key-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="formData.isUpdate && formData.key.store.akeyless.auth.access_key != ''" @click="isUpdateAccessKey = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
-          <label class="tw:flex q-field tw:mb-3">
+          <label class="flex q-field mb-3">
             <b>{{ t('cipherKey.accessKey') }}</b>
           </label>
-          <pre class="pre-text">{{ formData.key.store.akeyless.auth.access_key }}</pre>
+          <pre class="[text-wrap:auto] break-words border border-(--o2-border-input) p-[5px] mb-[5px]">{{ formData.key.store.akeyless.auth.access_key }}</pre>
           <OButton data-test="add-cipher-key-akeyless-access-key-input-update" variant="primary" size="sm-action" @click="isUpdateAccessKey = true">{{ t('common.update') }}</OButton>
         </div>
       </div>
@@ -92,18 +92,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-cipher-key-akeyless-ldap-username-input"
             v-model="formData.key.store.akeyless.auth.ldap.username"
             :label="t('cipherKey.ldapUsername') + ' *'"
-            class="showLabelOnTop tw:w-full"
+            class="showLabelOnTop w-full"
             :error="!!ldapUsernameError"
             :error-message="ldapUsernameError"
             @update:model-value="ldapUsernameError = ''"
           />
-          <OButton data-test="add-cipher-key-akeyless-ldap-username-input-cancel" variant="outline" size="sm-action" class="tw:mt-2" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.username != ''" @click="isUpdateLDAPUsername = false">{{ t('common.cancel') }}</OButton>
+          <OButton data-test="add-cipher-key-akeyless-ldap-username-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.username != ''" @click="isUpdateLDAPUsername = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
-          <label class="tw:flex q-field tw:mb-3">
+          <label class="flex q-field mb-3">
             <b>{{ t('cipherKey.ldapUsername') }}</b>
           </label>
-          <pre class="pre-text">{{ formData.key.store.akeyless.auth.ldap.username }}</pre>
+          <pre class="[text-wrap:auto] break-words border border-(--o2-border-input) p-[5px] mb-[5px]">{{ formData.key.store.akeyless.auth.ldap.username }}</pre>
           <OButton data-test="add-cipher-key-akeyless-ldap-username-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPUsername = true">{{ t('common.update') }}</OButton>
         </div>
         <div v-if="!formData.isUpdate || isUpdateLDAPPass || formData.key.store.akeyless.auth.ldap.password == ''">
@@ -111,20 +111,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-cipher-key-akeyless-ldap-password-input"
             v-model="formData.key.store.akeyless.auth.ldap.password"
             :label="t('cipherKey.ldapPassword') + ' *'"
-            class="showLabelOnTop tw:w-full"
+            class="showLabelOnTop w-full"
             type="password"
             autocomplete="new-password"
             :error="!!ldapPasswordError"
             :error-message="ldapPasswordError"
             @update:model-value="ldapPasswordError = ''"
           />
-          <OButton data-test="add-cipher-key-akeyless-ldap-password-input-cancel" variant="outline" size="sm-action" class="tw:mt-2" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.password != ''" @click="isUpdateLDAPPass = false">{{ t('common.cancel') }}</OButton>
+          <OButton data-test="add-cipher-key-akeyless-ldap-password-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.password != ''" @click="isUpdateLDAPPass = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
-          <label class="tw:flex q-field tw:mb-3">
+          <label class="flex q-field mb-3">
             <b>{{ t('cipherKey.ldapPassword') }}</b>
           </label>
-          <pre class="pre-text">{{ formData.key.store.akeyless.auth.ldap.password }}</pre>
+          <pre class="[text-wrap:auto] break-words border border-(--o2-border-input) p-[5px] mb-[5px]">{{ formData.key.store.akeyless.auth.ldap.password }}</pre>
           <OButton data-test="add-cipher-key-akeyless-ldap-password-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPPass = true">{{ t('common.update') }}</OButton>
         </div>
       </div>
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="add-cipher-key-secret-type-input"
       v-model="formData.key.store.akeyless.store.type"
       :label="t('cipherKey.secretType') + ' *'"
-      class="showLabelOnTop tw:w-full"
+      class="showLabelOnTop w-full"
       :options="secretTypeOptions"
       labelKey="label"
       valueKey="value"
@@ -142,10 +142,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="secretTypeError = ''"
     />
     <fieldset
-      class="q-fieldset tw:p-3 tw:w-full"
+      class="q-fieldset p-3 w-full border border-[lightgray] rounded relative"
       v-if="formData.key.store.akeyless.store.type != ''"
     >
-      <legend class="q-caption tw:px-2">
+      <legend class="q-caption px-2 text-xs text-(--q-color-dark) ml-2 py-0 px-1">
         {{ getSecretOptionLabel(formData.key.store.akeyless.store.type) }}
         Configuration
       </legend>
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-cipher-key-akeyless-static-secret-name-input"
           v-model="formData.key.store.akeyless.store.static_secret"
           :label="t('cipherKey.staticSecretName') + ' *'"
-          class="showLabelOnTop tw:w-full"
+          class="showLabelOnTop w-full"
           :error="!!staticSecretError"
           :error-message="staticSecretError"
           @update:model-value="staticSecretError = ''"
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-cipher-key-akeyless-dfc-name-input"
           v-model="formData.key.store.akeyless.store.dfc.name"
           :label="t('cipherKey.dfcName') + ' *'"
-          class="showLabelOnTop tw:w-full"
+          class="showLabelOnTop w-full"
           :error="!!dfcNameError"
           :error-message="dfcNameError"
           @update:model-value="dfcNameError = ''"
@@ -174,13 +174,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-cipher-key-akeyless-dfc-iv-input"
           v-model="formData.key.store.akeyless.store.dfc.iv"
           :label="t('cipherKey.dfcIV')"
-          class="showLabelOnTop tw:w-full"
+          class="showLabelOnTop w-full"
         />
         <OTextarea
           data-test="add-cipher-key-akeyless-dfc-encrypted-data-input"
           v-model="formData.key.store.akeyless.store.dfc.encrypted_data"
           :label="t('cipherKey.dfcEncryptedData') + ' *'"
-          class="showLabelOnTop tw:w-full"
+          class="showLabelOnTop w-full"
           :error="!!dfcEncryptedDataError"
           :error-message="dfcEncryptedDataError"
           @update:model-value="dfcEncryptedDataError = ''"
@@ -378,37 +378,10 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.cipher-keys-add-akeyless-type {
-  // Small consistent gap between every top-level field (inputs, selects,
-  // fieldsets) so they don't render flush against each other.
-  > * + * {
-    margin-top: 0.5rem;
-  }
-
-  .q-field--labeled.showLabelOnTop .q-field__bottom {
-    padding: 0px;
-  }
-
-  .q-fieldset {
-    border: 1px solid lightgray;
-    border-radius: 4px;
-    position: relative;
-  }
-
-  legend {
-    font-size: 12px;
-    color: var(--q-color-dark);
-    margin-left: 8px;
-    padding: 0 4px;
-  }
-
-  .pre-text {
-    text-wrap: auto;
-    word-wrap: break-word;
-    border: 1px solid #E1E1E1;
-    padding: 5px;
-    margin-bottom: 5px;
-  }
+<style>
+/* Small consistent gap between every top-level field (inputs, selects,
+   fieldsets) so they don't render flush against each other. */
+.cipher-keys-add-akeyless-type > * + * {
+  margin-top: 0.5rem;
 }
 </style>

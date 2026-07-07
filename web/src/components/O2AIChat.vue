@@ -1,6 +1,6 @@
-<template>
+﻿<template>
   <div
-    class="chat-container tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:rounded-md"
+    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-md text-[var(--q-primary-text)] bg-[var(--o2-card-bg-solid)] [box-shadow:0_0_5px_1px_var(--o2-hover-shadow)]"
     :class="[
       { 'chat-open': isOpen },
       store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
@@ -8,7 +8,7 @@
   >
     <div
       v-if="isOpen"
-      class="chat-content-wrapper tw:flex tw:flex-col tw:h-full tw:bg-transparent"
+      class="chat-content-wrapper flex flex-col h-full bg-transparent"
       :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
     >
       <div
@@ -16,11 +16,11 @@
         :style="{ height: headerHeight ? headerHeight + 'px' : '' }"
       >
         <div
-          class="chat-title tw:flex tw:justify-between tw:items-center tw:w-full"
+          class="chat-title flex justify-between items-center w-full"
         >
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <div class="tw:inline-flex tw:w-6 tw:h-6 tw:rounded-full tw:overflow-hidden">
-              <img :src="o2AiTitleLogo" class="tw:w-full tw:h-full tw:object-cover" />
+          <div class="flex items-center gap-2">
+            <div class="inline-flex w-6 h-6 rounded-full overflow-hidden">
+              <img :src="o2AiTitleLogo" class="w-full h-full object-cover" />
             </div>
 
             <ODropdown @update:open="(v) => v && loadHistory()">
@@ -30,9 +30,9 @@
                   size="sm"
                   class="chat-title-dropdown"
                 >
-                  <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-[220px]">
+                  <div class="flex items-center gap-2 max-w-[220px]">
                     <span
-                      class="chat-title-text tw:text-[14px] tw:font-medium tw:truncate tw:block"
+                      class="chat-title-text text-[14px] font-medium truncate block"
                     >
                       {{ displayedTitle || "New Chat" }}
                       <OTooltip
@@ -46,22 +46,22 @@
                     <OIcon
                       name="arrow-drop-down"
                       size="md"
-                      class="tw:flex-shrink-0"
+                      class="flex-shrink-0"
                     />
                   </div>
                 </OButton>
               </template>
               <!-- History menu with search -->
-              <div class="history-menu-container">
-                <div class="search-history-bar-sticky">
+              <div class="history-menu-container relative max-h-[450px] flex flex-col w-[300px]">
+                <div class="search-history-bar-sticky sticky top-0 z-[2] bg-[var(--q-page-background)] p-2 border-b border-[var(--color-separator)] shrink-0">
                   <OSearchInput
                     v-model="historySearchTerm"
                     placeholder="Search chat history"
-                    class="tw:mt-1"
+                    class="mt-1"
                   />
                 </div>
                 <div
-                  class="history-list-container"
+                  class="history-list-container flex-1 overflow-y-auto overflow-x-hidden max-h-[350px]"
                   style="
                     min-width: 200px;
                     width: 300px;
@@ -72,24 +72,24 @@
                   <ODropdownItem
                     v-for="chat in filteredChatHistory"
                     :key="chat.id"
-                    class="history-item"
+                    class="history-item relative group"
                     @select="loadChat(chat.id)"
                   >
                     <div
-                      class="tw:flex tw:items-center tw:justify-between tw:w-full"
+                      class="flex items-center justify-between w-full"
                     >
-                      <div class="tw:flex-1 tw:overflow-hidden">
-                        <div class="tw:text-[13px] tw:truncate">
+                      <div class="flex-1 overflow-hidden">
+                        <div class="text-[13px] truncate">
                           {{ chat.title }}
                         </div>
-                        <div class="tw:text-[11px] tw:text-gray-500">
+                        <div class="text-[11px] text-gray-500">
                           {{ formatTime(chat.timestamp) }}
                         </div>
                       </div>
                       <OButton
                         variant="ghost"
                         size="icon-xs-circle"
-                        class="delete-history-btn"
+                        class="delete-history-btn opacity-0 transition-opacity duration-200 group-hover:opacity-100"
                         @click.stop="deleteChat(chat.id)"
                       >
                         <OIcon name="delete" size="sm" />
@@ -99,7 +99,7 @@
                   </ODropdownItem>
                   <div
                     v-if="filteredChatHistory.length === 0"
-                    class="tw:text-center tw:text-gray-500 tw:p-2"
+                    class="text-center text-gray-500 p-2"
                   >
                     No matching chats found
                   </div>
@@ -108,12 +108,12 @@
                 <!-- Clear all conversations button -->
                 <div
                   v-if="filteredChatHistory.length > 0"
-                  class="clear-all-container"
+                  class="clear-all-container bg-[var(--q-page-background)] p-2 border-t border-[var(--color-separator)] shrink-0"
                 >
                   <ODropdownSeparator />
                   <OButton
                     variant="ghost"
-                    class="clear-all-btn"
+                    class="clear-all-btn w-full text-[var(--q-negative)] text-[13px] hover:bg-[rgba(var(--q-negative-rgb),0.1)]"
                     @click.stop="clearAllConversations"
                   >
                     <template #icon-left>
@@ -126,7 +126,7 @@
             </ODropdown>
           </div>
 
-          <div class="tw:flex tw:items-center tw:gap-1 chat-header-actions">
+          <div class="flex items-center gap-1 chat-header-actions">
             <!-- Edit title button -->
             <OButton
               v-if="currentChatId"
@@ -164,23 +164,23 @@
           </div>
         </div>
       </div>
-      <OSeparator class="tw:bg-[#DBDBDB]" />
+      <OSeparator class="bg-[#DBDBDB]" />
 
       <!-- History Panel -->
       <ODrawer data-test="o2-ai-chat-history-drawer" v-model:open="showHistory" size="sm" title="Chat History">
-        <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border">
+        <ul class="flex flex-col divide-y divide-border">
           <li
             v-for="chat in chatHistory"
             :key="chat.id"
             :data-test="`o2-ai-chat-history-item-${chat.id}`"
-            class="tw:flex tw:flex-col tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+            class="flex flex-col px-3 py-2 cursor-pointer hover:bg-muted/50"
             @click="loadChat(chat.id)"
           >
-            <span class="tw:text-sm">{{ chat.title }}</span>
-            <span class="tw:block tw:text-xs tw:text-muted-foreground">
+            <span class="text-sm">{{ chat.title }}</span>
+            <span class="block text-xs text-muted-foreground">
               {{ new Date(chat.timestamp).toLocaleString() }}
             </span>
-            <span class="tw:block tw:text-xs tw:text-muted-foreground">
+            <span class="block text-xs text-muted-foreground">
               Model: {{ chat.model }}
             </span>
           </li>
@@ -232,7 +232,7 @@
         size="lg"
         :title="previewImage?.filename"
       >
-        <div class="tw:flex tw:justify-center">
+        <div class="flex justify-center">
           <img
             v-if="previewImage"
             :src="
@@ -266,16 +266,16 @@
             <!-- Sidepanel: minimal logo + title (unchanged) -->
             <div
               v-else
-              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:w-full"
+              class="flex flex-col items-center justify-center h-full w-full"
             >
-              <div class="tw:flex tw:flex-col tw:items-center">
+              <div class="flex flex-col items-center">
                 <img :src="o2AiTitleLogo" />
-                <div class="tw:relative tw:inline-block">
+                <div class="relative inline-block">
                   <span
-                    class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center"
+                    class="text-[14px] font-[600] ml-[30px] text-center"
                     >O2 Assistant</span
                   >
-                  <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
+                  <span class="o2-ai-beta-text ml-[8px] relative text-[var(--q-primary)] text-[8px] px-1 rounded-[10px] text-center border border-[var(--q-primary)] uppercase font-semibold [letter-spacing:0.5px] w-[34px]">BETA</span>
                 </div>
               </div>
             </div>
@@ -292,17 +292,17 @@
             <div class="message-content">
               <div
                 v-if="message.role === 'user'"
-                class="tw:inline-flex tw:items-center tw:justify-center tw:w-6 tw:h-6 tw:rounded-full"
+                class="inline-flex items-center justify-center w-6 h-6 rounded-full text-white"
                 :class="
                   store.state.theme == 'dark'
-                    ? 'dark-user-avatar'
-                    : 'light-user-avatar'
+                    ? '[background:linear-gradient(135deg,#4c63d2_0%,#5a67d8_100%)]'
+                    : '[background:linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]'
                 "
               >
                 <OIcon
                   size="sm"
                   name="person"
-                  class='tw:text-white'
+                  class='text-white'
                 />
               </div>
               <div
@@ -313,7 +313,7 @@
                 "
               >
                 <!-- Loading indicator inside message box for empty assistant messages -->
-                <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading">
+                <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading flex items-center gap-[10px] py-2 text-[#6b7280] text-sm">
                   <OSpinner variant="dots" size="sm" />
                   <span>{{ currentAnalyzingMessage }}</span>
                 </div>
@@ -365,11 +365,11 @@
                         :class="
                           block.pendingConfirmation
                             ? block.tool === 'navigation_action'
-                              ? 'tw:text-[var(--o2-primary)]'
-                              : 'tw:text-[var(--o2-warning)]'
+                              ? 'text-[var(--o2-primary)]'
+                              : 'text-[var(--o2-warning)]'
                             : block.success === false
-                              ? 'tw:text-[var(--o2-negative)]'
-                              : 'tw:text-[var(--o2-positive)]'
+                              ? 'text-[var(--o2-negative)]'
+                              : 'text-[var(--o2-positive)]'
                         "
                       />
                       <span class="tool-call-name">
@@ -948,7 +948,7 @@
                             @click="copyToClipboard(textBlock.content)"
                           >
                             <OIcon size="sm" name="content-copy" />
-                            <span class="tw:ml-1">Copy</span>
+                            <span class="ml-1">Copy</span>
                           </OButton>
                         </div>
                         <span class="generated-code-block">
@@ -958,7 +958,7 @@
                           ></code>
                         </span>
                         <div
-                          class="code-block-footer code-block-theme tw:flex tw:items-center tw:justify-between tw:w-full"
+                          class="code-block-footer code-block-theme flex items-center justify-between w-full"
                         >
                           <OButton
                             variant="ghost"
@@ -967,7 +967,7 @@
                             @click="retryGeneration(message)"
                           >
                             <OIcon size="sm" name="refresh" />
-                            <span class="tw:ml-1">Retry</span>
+                            <span class="ml-1">Retry</span>
                           </OButton>
                         </div>
                       </div>
@@ -992,7 +992,7 @@
                       message.images &&
                       message.images.length > 0
                     "
-                    class="message-images tw:flex tw:flex-wrap tw:gap-2 tw:mb-2"
+                    class="message-images flex flex-wrap gap-2 mb-2"
                   >
                     <div
                       v-for="(img, imgIndex) in message.images"
@@ -1002,7 +1002,7 @@
                       <img
                         :src="'data:' + img.mimeType + ';base64,' + img.data"
                         :alt="img.filename"
-                        class="tw:max-w-[200px] tw:max-h-[150px] tw:object-contain tw:rounded tw:border tw:border-gray-300 tw:cursor-pointer"
+                        class="max-w-[200px] max-h-[150px] object-contain rounded-lg border border-gray-300 cursor-pointer [transition:transform_0.2s_ease,box-shadow_0.2s_ease]"
                         @click="openImagePreview(img)"
                       />
                       <OTooltip :content="img.filename" />
@@ -1024,7 +1024,7 @@
                           @click="copyToClipboard(block.content)"
                         >
                           <OIcon size="sm" name="content-copy" />
-                          <span class="tw:ml-1">Copy</span>
+                          <span class="ml-1">Copy</span>
                         </OButton>
                       </div>
                       <span class="generated-code-block">
@@ -1078,6 +1078,26 @@
                     <OTooltip content="Not helpful" />
                   </OButton>
                 </div>
+              </div>
+            </div>
+          </div>
+          <!-- Completed tool calls during streaming - keep progress visible
+               so each step stays on screen instead of flashing away while it
+               sits in pendingToolCalls waiting for the assistant's text. -->
+          <div
+            v-for="(block, pIdx) in pendingToolCalls"
+            v-show="block.type === 'tool_call'"
+            :key="'pending-tc-' + pIdx"
+            class="tool-call-indicator completed"
+            :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+          >
+            <div class="tool-call-content">
+              <OIcon
+                :name="block.success === false ? 'error' : 'check-circle'"
+                size="sm"
+              />
+              <div class="tool-call-info">
+                <span class="tool-call-message">{{ block.message }}</span>
               </div>
             </div>
           </div>
@@ -1160,11 +1180,11 @@
         </div>
 
         <!-- Scroll to bottom button -->
-        <div v-show="showScrollToBottom" class="scroll-to-bottom-container">
+        <div v-show="showScrollToBottom" class="scroll-to-bottom-container absolute bottom-[10px] left-1/2 -translate-x-1/2 z-[1000] pointer-events-none [transition:all_0.3s_ease]">
           <OButton
             variant="ghost"
             size="icon-sm"
-            class="scroll-to-bottom-btn"
+            class="scroll-to-bottom-btn transition-all duration-300 [animation:fadeInUp_0.3s_ease] pointer-events-auto [backdrop-filter:blur(8px)] shadow-[0_2px_8px_rgba(0,0,0,0.2)] border-2! border-[#2563eb]! text-[#2563eb]! bg-[rgba(255,255,255,0.95)]! dark:border-[#8b5cf6]! dark:text-[#8b5cf6]! dark:bg-[rgba(30,30,30,0.9)]! hover:scale-110 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:border-[#1d4ed8]! hover:text-[#1d4ed8]! hover:bg-white! dark:hover:border-[#5a6fd8]! dark:hover:text-[#5a6fd8]! dark:hover:bg-[rgba(40,40,40,0.95)]! active:scale-100"
             @click="scrollToBottomSmooth"
           >
             <OIcon name="arrow-downward" size="sm" />
@@ -1191,7 +1211,7 @@
         </div>
       </div>
 
-      <div class="chat-input-container tw:m-3">
+      <div class="chat-input-container m-3">
         <!-- Confirmation dialog -->
         <O2AIConfirmDialog
           :visible="pendingConfirmation !== null"
@@ -1220,21 +1240,21 @@
           @paste="handlePaste"
         >
           <!-- Image preview strip -->
-          <div v-if="pendingImages.length > 0" class="image-preview-strip">
+          <div v-if="pendingImages.length > 0" class="image-preview-strip flex flex-wrap gap-2 py-2 mb-2">
             <div
               v-for="(img, index) in pendingImages"
               :key="index"
-              class="image-preview-item"
+              class="image-preview-item relative inline-block"
             >
               <img
                 :src="'data:' + img.mimeType + ';base64,' + img.data"
                 :alt="img.filename"
-                class="preview-image"
+                class="preview-image w-16 h-16 object-cover rounded-lg border border-[#d1d5db] [transition:transform_0.2s_ease]"
               />
               <OButton
                 variant="ghost"
                 size="icon-xs-circle"
-                class="image-remove-btn"
+                class="image-remove-btn absolute! top-[-6px]! right-[-6px]! w-5! h-5! min-w-5! min-h-5! p-0! bg-[#ef4444]! z-10"
                 @click.stop="removeImage(index)"
               >
                 <OIcon name="close" size="xs" />
@@ -1260,23 +1280,23 @@
 
           <!-- Bottom bar with buttons -->
           <div class="input-bottom-bar">
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="flex items-center gap-2">
               <!-- Image upload button -->
               <OButton
                 v-if="!isLoading"
                 @click.stop="triggerImageUpload"
                 variant="ghost"
                 size="icon-sm"
-                class="image-upload-btn"
+                class="image-upload-btn opacity-70 transition-opacity duration-200 hover:opacity-100"
               >
                 <OIcon
                   name="image"
                   size="sm"
-                  :class="store.state.theme == 'dark' ? 'tw:text-white' : 'tw:text-gray-600'"
+                  :class="store.state.theme == 'dark' ? 'text-white' : 'text-gray-600'"
                 />
-                <OTooltip content="Attach images (PNG, JPEG, max 2MB)" />
+                <OTooltip :content="t('aiAssistant.attachImageTooltip')" />
               </OButton>
-              <div v-else class="tw:w-8"></div>
+              <div v-else class="w-8"></div>
 
               <!-- Auto navigation toggle button -->
               <OButton
@@ -1284,7 +1304,7 @@
                 @click.stop="isAutoNavigationEnabled = !isAutoNavigationEnabled"
                 variant="ghost"
                 size="sm"
-                class="auto-nav-toggle-btn"
+                class="auto-nav-toggle-btn flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-200 hover:bg-[#f3f4f6] dark:hover:bg-[#374151]"
                 :class="{ 'auto-nav-enabled': isAutoNavigationEnabled }"
               >
                 <OIcon
@@ -1297,22 +1317,22 @@
                   :class="[
                     'auto-nav-icon',
                     !isAutoNavigationEnabled
-                      ? store.state.theme == 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'
+                      ? store.state.theme == 'dark' ? 'text-gray-400' : 'text-gray-600'
                       : ''
                   ]"
                 />
-                <span class="auto-nav-label tw:ml-1">Auto Navigation</span>
+                <span class="auto-nav-label ml-1 text-xs font-medium text-[#6b7280] dark:text-[#9ca3af]">{{ t('aiAssistant.autoNavigation.label') }}</span>
                 <OTooltip
                   :content="
                     isAutoNavigationEnabled
-                      ? 'Auto navigation enabled - O2 Assistant will auto navigate without confirmation'
-                      : 'Auto navigation disabled - O2 Assistant will ask before navigating'
+                      ? t('aiAssistant.autoNavigation.enabledTooltip')
+                      : t('aiAssistant.autoNavigation.disabledTooltip')
                   "
                 />
               </OButton>
             </div>
 
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="flex items-center gap-2">
               <!-- Send button - shown when not loading -->
               <OButton
                 v-if="!isLoading"
@@ -1320,7 +1340,7 @@
                 @click="sendMessage"
                 variant="ai-gradient"
                 size="icon-xs-circle"
-                class="send-button"
+                class="send-button bg-[linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]! [transition:all_0.3s_ease]! shadow-[0_4px_15px_0_rgba(139,92,246,0.3)]!"
               >
                 <OIcon name="send" size="sm" />
               </OButton>
@@ -1331,7 +1351,7 @@
                 @click="cancelCurrentRequest"
                 variant="ghost"
                 size="icon-xs-circle"
-                class="stop-button"
+                class="stop-button bg-[linear-gradient(135deg,#f56565_0%,#e53e3e_100%)]! [transition:all_0.3s_ease]! shadow-[0_4px_15px_0_rgba(245,101,101,0.3)]!"
               >
                 <OIcon name="stop" size="sm" />
               </OButton>
@@ -1997,6 +2017,33 @@ export default defineComponent({
           }
         }
 
+        // Persist any tool calls that completed before the user hit Stop.
+        // During the tool phase (before the assistant streams text) completed
+        // steps sit in pendingToolCalls and aren't attached to a message yet,
+        // so without this they'd vanish on cancel. Runs after the partial-
+        // message cleanup above so the empty-assistant-message pop can't drop
+        // the message we attach them to.
+        if (pendingToolCalls.value.length) {
+          const lastMessage =
+            chatMessages.value[chatMessages.value.length - 1];
+          if (lastMessage && lastMessage.role === "assistant") {
+            if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+            // Tools ran before any text, so place them ahead of it.
+            lastMessage.contentBlocks.unshift(...pendingToolCalls.value);
+          } else {
+            const stoppedNote = "_[Response stopped by user]_";
+            chatMessages.value.push({
+              role: "assistant",
+              content: stoppedNote,
+              contentBlocks: [
+                ...pendingToolCalls.value,
+                { type: "text", text: stoppedNote },
+              ],
+            });
+          }
+          pendingToolCalls.value = [];
+        }
+
         // Reset streaming state
         currentStreamingMessage.value = "";
         currentTextSegment.value = "";
@@ -2218,10 +2265,13 @@ export default defineComponent({
         if (!chatId && resultId) {
           if (isActive()) {
             currentChatId.value = resultId;
-            if (pendingAutoNavigation.value) {
-              autoNavigationPreferences.value.set(resultId, true);
-              saveAutoNavigationPreferences();
-            }
+            // Carry the new-chat preference onto the chat id. Persist the actual
+            // value (ON by default) so an explicit user disable is honored.
+            autoNavigationPreferences.value.set(
+              resultId,
+              pendingAutoNavigation.value,
+            );
+            saveAutoNavigationPreferences();
           } else {
             ctxChatId = resultId;
           }
@@ -2538,6 +2588,30 @@ export default defineComponent({
                       }
                       if (isActive()) activeToolCall.value = null;
                     }
+                    // Flush any tool calls that completed before the assistant
+                    // produced text. With opencode, action-only turns (dashboard/
+                    // alert creation, navigation) finish without any `message`
+                    // event, so these blocks would otherwise stay stranded in
+                    // pendingToolCalls and never render — the user sees progress
+                    // "flash and disappear".
+                    if (pendingToolCalls.value.length) {
+                      let lastMessage = msgs[msgs.length - 1];
+                      if (lastMessage && lastMessage.role === "assistant") {
+                        if (!lastMessage.contentBlocks)
+                          lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(
+                          ...pendingToolCalls.value,
+                        );
+                      } else {
+                        msgs.push({
+                          role: "assistant",
+                          content: "",
+                          contentBlocks: [...pendingToolCalls.value],
+                        });
+                      }
+                      pendingToolCalls.value = [];
+                      if (isActive()) await throttledSaveCtx(true);
+                    }
                     continue;
                   }
 
@@ -2799,7 +2873,7 @@ export default defineComponent({
                     continue;
                   }
 
-                  // Handle message content (type === 'message' or legacy format with just content)
+                  // Handle streamed deltas and full/legacy message content.
                   if (data && typeof data.content === "string") {
                     // Complete any active tool call first (add green checkmark to chat)
                     if (activeToolCall.value) {
@@ -2821,26 +2895,33 @@ export default defineComponent({
                       if (isActive()) activeToolCall.value = null;
                     }
 
-                    // Format code blocks with proper line breaks
-                    let content = data.content;
-                    content = content.replace(
-                      /```(\w*)\s*([^`])/g,
-                      "```$1\n$2",
-                    );
-                    content = content.replace(/([^`])\s*```/g, "$1\n```");
+                    const isMessageDelta = data.type === "message_delta";
 
-                    // Add newline separator if starting a new text segment after tool call
-                    if (streamingMsg && textSegment === "") {
-                      streamingMsg += "\n\n";
+                    // Format code blocks with proper line breaks for full/legacy
+                    // messages. Deltas must be appended exactly as received.
+                    let content = data.content;
+                    if (!isMessageDelta) {
+                      content = content.replace(
+                        /```(\w*)\s*([^`])/g,
+                        "```$1\n$2",
+                      );
+                      content = content.replace(/([^`])\s*```/g, "$1\n```");
                     }
-                    // Add newline between consecutive message events if needed
-                    else if (
-                      streamingMsg &&
-                      !streamingMsg.endsWith("\n") &&
-                      !content.startsWith("\n")
-                    ) {
-                      streamingMsg += "\n\n";
-                      textSegment += "\n\n";
+
+                    if (!isMessageDelta) {
+                      // Add newline separator if starting a new text segment after tool call
+                      if (streamingMsg && textSegment === "") {
+                        streamingMsg += "\n\n";
+                      }
+                      // Add newline between consecutive full/legacy message events if needed
+                      else if (
+                        streamingMsg &&
+                        !streamingMsg.endsWith("\n") &&
+                        !content.startsWith("\n")
+                      ) {
+                        streamingMsg += "\n\n";
+                        textSegment += "\n\n";
+                      }
                     }
 
                     // Accumulate to both total content and current segment
@@ -3207,7 +3288,7 @@ export default defineComponent({
                   continue;
                 }
 
-                // Handle message content
+                // Handle streamed deltas and full/legacy message content.
                 if (data && typeof data.content === "string") {
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
@@ -3228,19 +3309,25 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
-                  let content = data.content;
-                  content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
-                  content = content.replace(/([^`])\s*```/g, "$1\n```");
+                  const isMessageDelta = data.type === "message_delta";
 
-                  if (streamingMsg && textSegment === "") {
-                    streamingMsg += "\n\n";
-                  } else if (
-                    streamingMsg &&
-                    !streamingMsg.endsWith("\n") &&
-                    !content.startsWith("\n")
-                  ) {
-                    streamingMsg += "\n\n";
-                    textSegment += "\n\n";
+                  let content = data.content;
+                  if (!isMessageDelta) {
+                    content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
+                    content = content.replace(/([^`])\s*```/g, "$1\n```");
+                  }
+
+                  if (!isMessageDelta) {
+                    if (streamingMsg && textSegment === "") {
+                      streamingMsg += "\n\n";
+                    } else if (
+                      streamingMsg &&
+                      !streamingMsg.endsWith("\n") &&
+                      !content.startsWith("\n")
+                    ) {
+                      streamingMsg += "\n\n";
+                      textSegment += "\n\n";
+                    }
                   }
 
                   streamingMsg += content;
@@ -3362,11 +3449,13 @@ export default defineComponent({
         if (!currentChatId.value && chatId) {
           currentChatId.value = chatId;
 
-          // Apply pending auto navigation preference to the new chat
-          if (pendingAutoNavigation.value) {
-            autoNavigationPreferences.value.set(chatId, true);
-            saveAutoNavigationPreferences();
-          }
+          // Apply pending auto navigation preference to the new chat. Persist the
+          // actual value (ON by default) so an explicit user disable is honored.
+          autoNavigationPreferences.value.set(
+            chatId,
+            pendingAutoNavigation.value,
+          );
+          saveAutoNavigationPreferences();
         }
       } catch (error) {
         console.error("Error saving chat history:", error);
@@ -3466,8 +3555,11 @@ export default defineComponent({
 
     useShortcuts([
       {
+        id: 'aiChatClose',
         key: 'escape',
         description: 'Close AI chat',
+        // Escape must close the chat even while typing a message in its input.
+        allowInInput: true,
         handler: () => {
           if (store.state.isAiChatEnabled) {
             store.dispatch('setIsAiChatEnabled', false);
@@ -3477,12 +3569,9 @@ export default defineComponent({
         },
       },
       {
+        id: 'aiChatExpand',
         key: 'ctrl+b',
-        description: 'Expand/collapse AI chat',
-        handler: toggleExpand,
-      },
-      {
-        key: 'meta+b',
+        keyForMac: 'meta+b',
         description: 'Expand/collapse AI chat',
         handler: toggleExpand,
       },
@@ -3500,7 +3589,7 @@ export default defineComponent({
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
       resetTitleState(); // Clear AI-generated title for new chat
       resetTypewriterState(); // Clear typewriter animation state for new chat
-      pendingAutoNavigation.value = false; // Reset auto navigation for new chat
+      pendingAutoNavigation.value = true; // Auto navigation is ON by default for new chats
       showScrollToBottom.value = false; // Reset scroll-to-bottom button for new chat
       store.dispatch("setCurrentChatTimestamp", null);
       store.dispatch("setChatUpdated", true);
@@ -5693,927 +5782,652 @@ export default defineComponent({
       closeImagePreview,
       contextReferences,
       handleReferencesUpdate,
+      t,
     };
   },
 });
 </script>
 
-<style lang="scss" scoped>
-.chat-container {
-  width: 100%;
-  height: 100%;
-  color: var(--q-primary-text);
+<style>
+/* =============================================
+   .chat-container and nested rules
+   ============================================= */
+
+
+.chat-container .chat-header {
+  padding: 0px 12px 4px 12px;
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  align-items: end;
+  border-bottom: 1px solid var(--color-separator);
+  flex-shrink: 0;
+  background: var(--q-page-background);
+  z-index: 2;
+}
+
+.chat-container .chat-header .chat-title {
+  font-weight: bold;
+}
+
+.chat-container .chat-header .chat-title-dropdown {
+  padding: 6px 12px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  max-width: 210px;
+  height: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
   overflow: hidden;
-  background-color: var(--o2-card-bg-solid);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
-
-  .chat-content-wrapper {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background: transparent;
-  }
-
-  .chat-header {
-    padding: 0px 12px 4px 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: end;
-    border-bottom: 1px solid var(--color-separator);
-    flex-shrink: 0;
-    background: var(--q-page-background);
-    z-index: 2;
-
-    .chat-title {
-      font-weight: bold;
-    }
-
-    .chat-title-dropdown {
-      padding: 6px 12px;
-      border-radius: 4px;
-      transition: background-color 0.2s;
-      max-width: 210px;
-      height: 32px;
-      min-height: 32px;
-      display: flex;
-      align-items: center;
-      overflow: hidden;
-
-      &:hover {
-        background-color: var(--q-hover-color);
-      }
-
-      span {
-        color: var(--q-primary-text);
-      }
-
-      .chat-title-text {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        max-width: 180px;
-      }
-    }
-  }
-
-  // Chat session title with typewriter animation
-  .chat-session-title {
-    padding: 8px 16px;
-    font-size: 14px;
-    min-height: 32px;
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-    border-bottom: 1px solid var(--color-separator);
-
-    &.light-mode {
-      color: #1a202c;
-      background: linear-gradient(
-        to right,
-        rgba(99, 102, 241, 0.08),
-        transparent
-      );
-    }
-
-    &.dark-mode {
-      color: #e2e8f0;
-      background: linear-gradient(
-        to right,
-        rgba(99, 102, 241, 0.15),
-        transparent
-      );
-    }
-
-    .title-text {
-      font-weight: 600;
-    }
-
-    .typing-cursor {
-      animation: blink 0.7s infinite;
-      margin-left: 2px;
-      font-weight: 400;
-    }
-  }
-
-  @keyframes blink {
-    0%,
-    50% {
-      opacity: 1;
-    }
-    51%,
-    100% {
-      opacity: 0;
-    }
-  }
-
-  .chat-content {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    background: transparent;
-    position: relative;
-  }
-
-  .messages-container {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    background: transparent;
-    max-width: 900px;
-    margin: 0 auto;
-    width: 100%;
-  }
-
-  .welcome-section {
-    padding: 24px;
-    background: linear-gradient(
-      to right,
-      rgba(var(--q-primary-rgb), 0.05),
-      rgba(var(--q-primary-rgb), 0.1)
-    );
-    border-radius: 8px;
-    margin-bottom: 24px;
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &.welcome-section--centered {
-      background: transparent;
-      padding: 0;
-      margin-bottom: 0;
-    }
-  }
-
-  .centered-input-wrap {
-    max-width: 900px;
-    width: calc(100% - 16px);
-    margin-top: 1.25em;
-    font-size: 1rem;
-
-    :deep(.rich-text-input) {
-      font-size: 1rem;
-    }
-  }
-
-  // Fixed analyzing indicator above input
-  .fixed-analyzing-indicator {
-    padding: 12px 16px;
-    margin: 0 16px 8px 16px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: fadeInSlide 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-
-    &.light-mode {
-      background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
-      border: 1px solid #d0d8e8;
-    }
-
-    &.dark-mode {
-      background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
-      border: 1px solid #3a3f55;
-    }
-
-    .analyzing-content {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      max-width: 900px;
-      width: 100%;
-    }
-
-    .analyzing-message {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--q-primary);
-    }
-
-    .tool-call-info {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      flex: 1;
-    }
-
-    .tool-call-context-inline {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-      margin-top: 4px;
-    }
-
-    .context-query-inline {
-      font-size: 12px;
-      padding: 4px 8px;
-      border-radius: 6px;
-      background: rgba(0, 0, 0, 0.05);
-      max-width: 500px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .context-tag-inline {
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 4px;
-      background: rgba(var(--q-primary-rgb), 0.1);
-      color: var(--q-primary);
-      font-weight: 500;
-    }
-  }
-
-  @keyframes fadeInSlide {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .chat-input-container {
-    position: relative;
-    flex-shrink: 0;
-    max-width: 900px;
-    width: calc(100% - 0px);
-    margin: 8px auto;
-    padding: 0 8px;
-  }
-
-  .unified-input-box {
-    display: flex;
-    flex-direction: column;
-    padding: 4px 8px;
-    border-radius: 12px;
-    transition: all 0.2s ease;
-    gap: 12px;
-
-    &.light-mode {
-      background: #ffffff;
-      border: 1px solid #e4e7ec;
-
-      &:focus-within {
-        border: 1px solid transparent;
-        box-shadow: 0 0 0 2px #8b5cf6;
-      }
-    }
-
-    &.dark-mode {
-      background: #191919;
-      border: 1px solid #323232;
-
-      &:focus-within {
-        border: 1px solid transparent;
-        box-shadow: 0 0 0 2px #5a6ec3;
-      }
-    }
-
-    :deep(.rich-text-input-wrapper) {
-      width: 100%;
-      min-height: 40px;
-    }
-
-    :deep(.rich-text-input) {
-      padding: 4px 0;
-    }
-  }
-
-  .input-bottom-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-top: 8px;
-  }
-
-  .auto-nav-toggle-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 8px;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-
-    .auto-nav-label {
-      font-size: 12px;
-      font-weight: 500;
-    }
-
-    &:hover {
-      .light-mode & {
-        background: #f3f4f6;
-      }
-      .dark-mode & {
-        background: #374151;
-      }
-    }
-
-    &.auto-nav-enabled {
-      .auto-nav-icon {
-        color: var(--q-primary) !important;
-      }
-
-      .auto-nav-label {
-        color: var(--q-primary);
-      }
-    }
-
-    .light-mode & .auto-nav-label {
-      color: #6b7280;
-    }
-    .dark-mode & .auto-nav-label {
-      color: #9ca3af;
-    }
-  }
-
-  .light-mode .message {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  }
-  .dark-mode .message {
-    box-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
-  }
-  .message {
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-
-    .message-content {
-      display: flex;
-      align-items: flex-start;
-      gap: 6px;
-      width: 100%;
-    }
-
-    .message-blocks {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      min-width: 0;
-      max-width: 100%;
-      overflow-x: auto;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-    }
-
-    .feedback-buttons {
-      display: flex;
-      align-items: center;
-      gap: 2px;
-      margin-top: 4px;
-
-      > * {
-        opacity: 0.5;
-        transition: opacity 0.2s;
-
-        &:hover {
-          opacity: 1;
-        }
-      }
-
-      &.feedback-active > * {
-        opacity: 1;
-      }
-
-      .feedback-selected {
-        color: var(--o2-primary-color);
-        opacity: 1;
-      }
-    }
-
-    .text-block {
-      width: 100%;
-      overflow-wrap: break-word;
-      max-width: 100%;
-      &:not(:last-child) {
-        margin-bottom: 4px;
-      }
-
-      :deep(pre),
-      :deep(.generated-code-block) {
-        white-space: pre-wrap;
-        word-break: break-word;
-        overflow-wrap: break-word;
-        margin: 0;
-        padding: 0;
-        line-height: 1.4;
-        display: block;
-        max-width: 100%;
-        overflow-x: auto;
-
-        code {
-          padding: 8px;
-          margin: 0;
-          display: block;
-          max-width: 100%;
-        }
-      }
-
-      // Heading styles - appropriately sized for chat interface
-      // Only applies within message-blocks, not globally
-      :deep(h1) {
-        font-size: 1.5rem !important;
-        font-weight: 600 !important;
-        margin: 16px 0 8px 0 !important;
-        line-height: 1.3 !important;
-      }
-      :deep(h2) {
-        font-size: 1.25rem !important;
-        font-weight: 600 !important;
-        margin: 14px 0 7px 0 !important;
-        line-height: 1.3 !important;
-      }
-      :deep(h3) {
-        font-size: 1.125rem !important;
-        font-weight: 600 !important;
-        margin: 12px 0 6px 0 !important;
-        line-height: 1.3 !important;
-      }
-      :deep(h4) {
-        font-size: 1rem !important;
-        font-weight: 600 !important;
-        margin: 10px 0 5px 0 !important;
-        line-height: 1.3 !important;
-      }
-      :deep(h5) {
-        font-size: 0.875rem !important;
-        font-weight: 600 !important;
-        margin: 8px 0 4px 0 !important;
-        line-height: 1.3 !important;
-      }
-      :deep(h6) {
-        font-size: 0.75rem !important;
-        font-weight: 600 !important;
-        margin: 8px 0 4px 0 !important;
-        line-height: 1.3 !important;
-      }
-
-      // Table styling to prevent horizontal overflow
-      :deep(table) {
-        max-width: 100%;
-        width: 100%;
-        table-layout: fixed;
-        border-collapse: collapse;
-        overflow-x: auto;
-        display: block;
-        white-space: nowrap;
-      }
-
-      :deep(table th),
-      :deep(table td) {
-        padding: 8px 12px;
-        border: 1px solid #e2e8f0;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-        text-overflow: ellipsis;
-        overflow: hidden;
-      }
-
-      // Force break long words and URLs
-      :deep(p),
-      :deep(div),
-      :deep(span) {
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-        word-break: break-word;
-        max-width: 100%;
-      }
-
-      // Restore list styling (Tailwind preflight removes it)
-      :deep(ol) {
-        list-style-type: decimal;
-        padding-left: 1.5em;
-        margin: 0.5em 0;
-      }
-
-      :deep(ul) {
-        list-style-type: disc;
-        padding-left: 1.5em;
-        margin: 0.5em 0;
-      }
-
-      :deep(li) {
-        margin: 0.25em 0;
-      }
-    }
-
-    .code-block {
-      border-radius: 4px;
-      overflow: hidden;
-      margin: 0;
-    }
-    // .light-mode .code-block{
-    //   border: 1px solid #eee;
-    // }
-    // .dark-mode .code-block-header{
-    //   border: 1px solid rgba(225, 225, 225, 0.14);
-    // }
-
-    .code-block-header {
-      padding: 4px 8px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .code-type-label {
-      font-size: 12px;
-      font-weight: 600;
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: rgba(var(--q-primary-rgb), 0.1);
-    }
-    .light-mode .code-type-label {
-      color: var(--q-primary);
-    }
-    .dark-mode .code-type-label {
-      color: #e2e2e2;
-    }
-
-    .generated-code-block {
-      white-space: pre-wrap;
-      word-break: break-word;
-      overflow-wrap: break-word;
-      margin: 0;
-      padding: 0;
-      line-height: 1.4;
-      code {
-        padding: 8px;
-        margin: 0;
-        display: block;
-      }
-    }
-
-    .dark-mode .generated-code-block {
-      code {
-        background-color: #181a1b;
-        border: 0.5px solid #e1e1e124;
-        border-top: none;
-      }
-    }
-    .light-mode .generated-code-block {
-      code {
-        background-color: #ffffff;
-        border: 0.5px solid #00000024;
-        border-top: none;
-        color: black;
-      }
-    }
-
-    .code-block-footer {
-      padding: 4px 8px;
-      display: flex;
-    }
-  }
-  .light-mode .message {
-    &.user {
-      background: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
-      border: 1px solid #e0e6ff;
-      border-radius: 12px;
-      color: #2c3e50;
-      margin-left: 40px;
-      width: calc(100% - 40px);
-    }
-
-    &.assistant {
-      background: #ffffff;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      color: var(--q-primary-text);
-      margin-left: 0;
-      width: 100%;
-    }
-  }
-  .dark-mode .message {
-    &.user {
-      background: linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
-      border: 1px solid #3a3d5c;
-      border-radius: 12px;
-      color: #e2e8f0;
-      margin-left: 40px;
-      width: calc(100% - 40px);
-    }
-
-    &.assistant {
-      background: #1a1a1a;
-      border: 1px solid #333333;
-      border-radius: 12px;
-      color: #e2e2e2;
-      margin-left: 0;
-      width: 100%;
-    }
-  }
-
-  ul,
-  ol {
-    pre {
-      white-space: pre-wrap;
-      word-break: break-word;
-      overflow-wrap: break-word;
-      margin: 0;
-      padding: 0;
-      code {
-        background-color: white;
-        color: black;
-      }
-    }
-  }
 }
 
-// Avatar styling for user messages
-.light-user-avatar {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-  color: white;
+.chat-container .chat-header .chat-title-dropdown:hover {
+  background-color: var(--q-hover-color);
 }
 
-.dark-user-avatar {
-  background: linear-gradient(135deg, #4c63d2 0%, #5a67d8 100%) !important;
-  color: white;
+.chat-container .chat-header .chat-title-dropdown span {
+  color: var(--q-primary-text);
 }
 
-// Send button gradient styling
-.send-button {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-  transition: all 0.3s ease !important;
-  box-shadow: 0 4px 15px 0 rgba(139, 92, 246, 0.3) !important;
-
-  &:hover:not(.disabled):not([disabled]):not(:disabled) {
-    background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
-    box-shadow: 0 6px 20px 0 rgba(139, 92, 246, 0.4) !important;
-    transform: translateY(-1px) !important;
-  }
-
-  &:active:not(.disabled):not([disabled]):not(:disabled) {
-    transform: translateY(0) !important;
-    box-shadow: 0 2px 10px 0 rgba(139, 92, 246, 0.3) !important;
-  }
+.chat-container .chat-header .chat-title-dropdown .chat-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
 }
 
-// Stop button gradient styling
-.stop-button {
-  background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%) !important;
-  transition: all 0.3s ease !important;
-  box-shadow: 0 4px 15px 0 rgba(245, 101, 101, 0.3) !important;
-
-  &:hover {
-    background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%) !important;
-    box-shadow: 0 6px 20px 0 rgba(245, 101, 101, 0.4) !important;
-    transform: translateY(-1px) !important;
-  }
-
-  &:active {
-    transform: translateY(0) !important;
-    box-shadow: 0 2px 10px 0 rgba(245, 101, 101, 0.3) !important;
-  }
+.chat-container .chat-session-title {
+  padding: 8px 16px;
+  font-size: 14px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-separator);
 }
 
-// Image upload button styling
-.image-upload-btn {
-  opacity: 0.7;
-  transition: opacity 0.2s ease;
+.chat-container .chat-session-title.light-mode {
+  color: #1a202c;
+  background: linear-gradient(
+    to right,
+    rgba(99, 102, 241, 0.08),
+    transparent
+  );
+}
 
-  &:hover {
+.chat-container .chat-session-title.dark-mode {
+  color: #e2e8f0;
+  background: linear-gradient(
+    to right,
+    rgba(99, 102, 241, 0.15),
+    transparent
+  );
+}
+
+.chat-container .chat-session-title .title-text {
+  font-weight: 600;
+}
+
+.chat-container .chat-session-title .typing-cursor {
+  animation: blink 0.7s infinite;
+  margin-left: 2px;
+  font-weight: 400;
+}
+
+@keyframes blink {
+  0%,
+  50% {
     opacity: 1;
   }
+  51%,
+  100% {
+    opacity: 0;
+  }
 }
 
-// Image preview strip in input area
-.image-preview-strip {
+.chat-container .chat-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  position: relative;
+}
+
+.chat-container .messages-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: transparent;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.chat-container .welcome-section {
+  padding: 24px;
+  background: linear-gradient(
+    to right,
+    rgba(var(--q-primary-rgb), 0.05),
+    rgba(var(--q-primary-rgb), 0.1)
+  );
+  border-radius: 8px;
+  margin-bottom: 24px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-container .welcome-section.welcome-section--centered {
+  background: transparent;
+  padding: 0;
+  margin-bottom: 0;
+}
+
+.chat-container .centered-input-wrap {
+  max-width: 900px;
+  width: calc(100% - 16px);
+  margin-top: 1.25em;
+  font-size: 1rem;
+}
+
+.chat-container .centered-input-wrap .rich-text-input {
+  font-size: 1rem;
+}
+
+.chat-container .fixed-analyzing-indicator {
+  padding: 12px 16px;
+  margin: 0 16px 8px 16px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeInSlide 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.chat-container .fixed-analyzing-indicator.light-mode {
+  background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+  border: 1px solid #d0d8e8;
+}
+
+.chat-container .fixed-analyzing-indicator.dark-mode {
+  background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
+  border: 1px solid #3a3f55;
+}
+
+.chat-container .fixed-analyzing-indicator .analyzing-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 900px;
+  width: 100%;
+}
+
+.chat-container .fixed-analyzing-indicator .analyzing-message {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--q-primary);
+}
+
+.chat-container .fixed-analyzing-indicator .tool-call-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.chat-container .fixed-analyzing-indicator .tool-call-context-inline {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 8px 0;
-  margin-bottom: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
 
-  .image-preview-item {
-    position: relative;
-    display: inline-block;
+.chat-container .fixed-analyzing-indicator .context-query-inline {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  max-width: 500px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-    .preview-image {
-      width: 64px;
-      height: 64px;
-      object-fit: cover;
-      border-radius: 8px;
-      border: 1px solid #d1d5db;
-      transition: transform 0.2s ease;
+.chat-container .fixed-analyzing-indicator .context-tag-inline {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(var(--q-primary-rgb), 0.1);
+  color: var(--q-primary);
+  font-weight: 500;
+}
 
-      &:hover {
-        transform: scale(1.05);
-      }
-    }
-
-    .image-remove-btn {
-      position: absolute !important;
-      top: -6px !important;
-      right: -6px !important;
-      width: 20px !important;
-      height: 20px !important;
-      min-width: 20px !important;
-      min-height: 20px !important;
-      padding: 0 !important;
-      background-color: #ef4444 !important;
-      z-index: 10;
-
-      &:hover {
-        background-color: #dc2626 !important;
-      }
-    }
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-// Images in chat messages
-.message-images {
-  .message-image-item {
-    img {
-      border-radius: 8px;
-      transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease;
-
-      &:hover {
-        transform: scale(1.02);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      }
-    }
-  }
+.chat-container .chat-input-container {
+  position: relative;
+  flex-shrink: 0;
+  max-width: 900px;
+  width: calc(100% - 0px);
+  margin: 8px auto;
+  padding: 0 8px;
 }
 
-// Image preview dialog
-.image-preview-dialog {
-  background: var(--q-dark) !important;
-
-  .q-card__section {
-    background: transparent;
-  }
+.chat-container .unified-input-box {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 8px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  gap: 12px;
 }
 
-.dark-mode .code-block-header {
-  background-color: #3b3b3b;
-  border: 1px 1px 0px 1px solid #e1e1e1;
+.chat-container .unified-input-box.light-mode {
+  background: #ffffff;
+  border: 1px solid #e4e7ec;
 }
-.light-mode .code-block-header {
+
+.chat-container .unified-input-box.light-mode:focus-within {
+  border: 1px solid transparent;
+  box-shadow: 0 0 0 2px #8b5cf6;
+}
+
+.chat-container .unified-input-box.dark-mode {
+  background: #191919;
+  border: 1px solid #323232;
+}
+
+.chat-container .unified-input-box.dark-mode:focus-within {
+  border: 1px solid transparent;
+  box-shadow: 0 0 0 2px #5a6ec3;
+}
+
+.chat-container .unified-input-box .rich-text-input-wrapper {
+  width: 100%;
+  min-height: 40px;
+}
+
+.chat-container .unified-input-box .rich-text-input {
+  padding: 4px 0;
+}
+
+.chat-container .input-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+}
+
+
+.chat-container .auto-nav-toggle-btn.auto-nav-enabled .auto-nav-icon {
+  color: var(--q-primary) !important;
+}
+
+.chat-container .auto-nav-toggle-btn.auto-nav-enabled .auto-nav-label {
+  color: var(--q-primary);
+}
+
+
+.chat-container .message {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.dark .chat-container .message {
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
+}
+
+.chat-container .message {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.chat-container .message .message-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+}
+
+.chat-container .message .message-blocks {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.chat-container .message .feedback-buttons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.chat-container .message .feedback-buttons > * {
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.chat-container .message .feedback-buttons > *:hover {
+  opacity: 1;
+}
+
+.chat-container .message .feedback-buttons.feedback-active > * {
+  opacity: 1;
+}
+
+.chat-container .message .feedback-buttons .feedback-selected {
+  color: var(--o2-primary-color);
+  opacity: 1;
+}
+
+.chat-container .message .text-block {
+  width: 100%;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+.chat-container .message .text-block:not(:last-child) {
+  margin-bottom: 4px;
+}
+
+.chat-container .message .text-block pre,
+.chat-container .message .text-block .generated-code-block {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  margin: 0;
+  padding: 0;
+  line-height: 1.4;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.chat-container .message .text-block pre code,
+.chat-container .message .text-block .generated-code-block code {
+  padding: 8px;
+  margin: 0;
+  display: block;
+  max-width: 100%;
+}
+
+.chat-container .message .text-block h1 {
+  font-size: 1.5rem !important;
+  font-weight: 600 !important;
+  margin: 16px 0 8px 0 !important;
+  line-height: 1.3 !important;
+}
+
+.chat-container .message .text-block h2 {
+  font-size: 1.25rem !important;
+  font-weight: 600 !important;
+  margin: 14px 0 7px 0 !important;
+  line-height: 1.3 !important;
+}
+
+.chat-container .message .text-block h3 {
+  font-size: 1.125rem !important;
+  font-weight: 600 !important;
+  margin: 12px 0 6px 0 !important;
+  line-height: 1.3 !important;
+}
+
+.chat-container .message .text-block h4 {
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  margin: 10px 0 5px 0 !important;
+  line-height: 1.3 !important;
+}
+
+.chat-container .message .text-block h5 {
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  margin: 8px 0 4px 0 !important;
+  line-height: 1.3 !important;
+}
+
+.chat-container .message .text-block h6 {
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  margin: 8px 0 4px 0 !important;
+  line-height: 1.3 !important;
+}
+
+.chat-container .message .text-block table {
+  max-width: 100%;
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  overflow-x: auto;
+  display: block;
+  white-space: nowrap;
+}
+
+.chat-container .message .text-block table th,
+.chat-container .message .text-block table td {
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.chat-container .message .text-block p,
+.chat-container .message .text-block div,
+.chat-container .message .text-block span {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.chat-container .message .text-block ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.chat-container .message .text-block ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.chat-container .message .text-block li {
+  margin: 0.25em 0;
+}
+
+.chat-container .message .code-block {
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 0;
+}
+
+.chat-container .message .code-block-header {
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-container .message .code-type-label {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(var(--q-primary-rgb), 0.1);
+}
+
+.code-type-label {
+  color: var(--q-primary);
+}
+
+.dark .code-type-label {
+  color: #e2e2e2;
+}
+
+.chat-container .message .generated-code-block {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  margin: 0;
+  padding: 0;
+  line-height: 1.4;
+}
+
+.chat-container .message .generated-code-block code {
+  padding: 8px;
+  margin: 0;
+  display: block;
+}
+
+.dark .generated-code-block code {
+  background-color: var(--o2-primary-background);
+  border: 0.5px solid #e1e1e124;
+  border-top: none;
+}
+
+.generated-code-block code {
+  background-color: #ffffff;
+  border: 0.5px solid #00000024;
+  border-top: none;
+  color: black;
+}
+
+.chat-container .message .code-block-footer {
+  padding: 4px 8px;
+  display: flex;
+}
+
+.chat-container .message.user {
+  background: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
+  border: 1px solid #e0e6ff;
+  border-radius: 12px;
+  color: #2c3e50;
+  margin-left: 40px;
+  width: calc(100% - 40px);
+}
+
+.chat-container .message.assistant {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  color: var(--q-primary-text);
+  margin-left: 0;
+  width: 100%;
+}
+
+.dark .chat-container .message.user {
+  background: linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
+  border: 1px solid #3a3d5c;
+  border-radius: 12px;
+  color: #e2e8f0;
+  margin-left: 40px;
+  width: calc(100% - 40px);
+}
+
+.dark .chat-container .message.assistant {
+  background: #1a1a1a;
+  border: 1px solid #333333;
+  border-radius: 12px;
+  color: #e2e2e2;
+  margin-left: 0;
+  width: 100%;
+}
+
+.chat-container ul pre,
+.chat-container ol pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  margin: 0;
+  padding: 0;
+}
+
+.chat-container ul pre code,
+.chat-container ol pre code {
+  background-color: white;
+  color: black;
+}
+
+/* =============================================
+   Top-level rules (outside .chat-container)
+   ============================================= */
+
+
+
+.send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
+  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
+  box-shadow: 0 6px 20px 0 rgba(139, 92, 246, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+.send-button:active:not(.disabled):not([disabled]):not(:disabled) {
+  transform: translateY(0) !important;
+  box-shadow: 0 2px 10px 0 rgba(139, 92, 246, 0.3) !important;
+}
+
+
+.stop-button:hover {
+  background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%) !important;
+  box-shadow: 0 6px 20px 0 rgba(245, 101, 101, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+.stop-button:active {
+  transform: translateY(0) !important;
+  box-shadow: 0 2px 10px 0 rgba(245, 101, 101, 0.3) !important;
+}
+
+
+.preview-image:hover {
+  transform: scale(1.05);
+}
+
+.image-remove-btn:hover {
+  background-color: #dc2626 !important;
+}
+
+.message-images .message-image-item img:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+
+.code-block-header {
   background-color: #ecf0f5;
 }
 
-.model-selector {
-  text-overflow: ellipsis;
-}
-.dark-mode-bottom-bar {
-  .model-selector {
-    background-color: #262626;
-    border: 1px solid #3b3b3b;
-    padding: 0px 4px;
-    border-radius: 4px;
-    padding-left: 4px;
-  }
+.dark .code-block-header {
+  background-color: #3b3b3b;
+  border: 1px 1px 0px 1px solid var(--o2-border-input);
 }
 
-.light-mode-bottom-bar {
-  .model-selector {
-    background-color: #ffffff;
-    border: 1px solid #bdbbbb;
-    padding: 0px 4px;
-    border-radius: 4px;
-    padding-left: 4px;
-  }
-}
-.o2-ai-beta-text {
-  position: relative;
-  color: var(--q-primary);
-  font-size: 8px;
-  padding: 0px 4px;
-  border-radius: 10px;
-  text-align: center;
-  border: 1px solid var(--q-primary);
-  text-transform: uppercase;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  width: 34px;
-}
-
-.history-menu-container {
-  position: relative;
-  max-height: 450px;
-  display: flex;
-  flex-direction: column;
-  width: 300px;
-}
-
-.search-history-bar-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: var(--q-page-background);
-  padding: 8px;
-  border-bottom: 1px solid var(--color-separator);
-  flex-shrink: 0;
-}
-
-.history-list-container {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  max-height: 350px;
-}
-
-.history-item {
-  position: relative;
-
-  .delete-history-btn {
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-
-  &:hover .delete-history-btn {
-    opacity: 1;
-  }
-}
-
-.clear-all-container {
-  background: var(--q-page-background);
-  padding: 8px;
-  border-top: 1px solid var(--color-separator);
-  flex-shrink: 0;
-
-  .clear-all-btn {
-    width: 100%;
-    color: var(--q-negative);
-    font-size: 13px;
-
-    &:hover {
-      background-color: rgba(var(--q-negative-rgb), 0.1);
-    }
-  }
-}
-
-// Scroll to bottom button styling
-.scroll-to-bottom-container {
-  position: absolute;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
-  transition: all 0.3s ease;
-  pointer-events: none;
-}
-
-.scroll-to-bottom-btn {
-  transition: all 0.3s ease;
-  animation: fadeInUp 0.3s ease;
-  pointer-events: auto;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-
-  body.body--light & {
-    border: 2px solid #2563eb !important;
-    color: #2563eb !important;
-    background: rgba(255, 255, 255, 0.95) !important;
-  }
-
-  body.body--dark & {
-    border: 2px solid #8b5cf6 !important;
-    color: #8b5cf6 !important;
-    background: rgba(30, 30, 30, 0.9) !important;
-  }
-
-  &:hover {
-    transform: scale(1.1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-
-    body.body--light & {
-      border: 2px solid #1d4ed8 !important;
-      color: #1d4ed8 !important;
-      background: rgba(255, 255, 255, 1) !important;
-    }
-
-    body.body--dark & {
-      border: 2px solid #5a6fd8 !important;
-      color: #5a6fd8 !important;
-      background: rgba(40, 40, 40, 0.95) !important;
-    }
-  }
-
-  &:active {
-    transform: scale(1);
-  }
-}
-
-// Bounce animation for the arrow icon
 @keyframes bounce {
   0%,
   20%,
@@ -6630,7 +6444,6 @@ export default defineComponent({
   }
 }
 
-// Fade in up animation for button appearance
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -6642,7 +6455,6 @@ export default defineComponent({
   }
 }
 
-// Tool call indicator styling
 .tool-call-indicator {
   display: flex;
   align-items: center;
@@ -6650,113 +6462,125 @@ export default defineComponent({
   border-radius: 12px;
   margin: 8px 0;
   animation: fadeIn 0.3s ease;
+}
 
-  &.light-mode {
-    background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
-    border: 1px solid #d0d8e8;
-  }
+.tool-call-indicator.light-mode {
+  background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+  border: 1px solid #d0d8e8;
+}
 
-  &.dark-mode {
-    background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
-    border: 1px solid #3a3f55;
-  }
+.tool-call-indicator.dark-mode {
+  background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
+  border: 1px solid #3a3f55;
+}
 
-  .tool-call-content {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-  }
+/* Completed step shown live during streaming — more compact and subdued
+ than the active (spinner) indicator so the in-flight step still stands out. */
+.tool-call-indicator.completed {
+    padding: 8px 16px;
+    margin: 4px 0;
 
-  .tool-call-info {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .tool-call-status {
-    font-size: 12px;
-    font-style: italic;
-    opacity: 0.7;
-    margin-bottom: 2px;
-
-    .light-mode & {
-      color: #6b7280;
-    }
-
-    .dark-mode & {
-      color: #9ca3af;
+    .tool-call-message {
+      font-weight: 500;
+      opacity: 0.85;
     }
   }
 
-  .tool-call-message {
-    font-weight: 600;
-    font-size: 14px;
+.tool-call-indicator .tool-call-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
 
-    .light-mode & {
-      color: #4a5568;
-    }
+.tool-call-indicator .tool-call-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
 
-    .dark-mode & {
-      color: #e2e8f0;
-    }
-  }
+.tool-call-indicator .tool-call-status {
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.7;
+  margin-bottom: 2px;
+}
 
-  .tool-call-context {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-  }
+.tool-call-indicator .tool-call-status {
+  color: #6b7280;
+}
 
-  .context-item {
-    width: 100%;
-  }
+.dark .tool-call-indicator .tool-call-status {
+  color: #9ca3af;
+}
 
-  .context-query {
-    display: block;
-    font-family: "Fira Code", "Consolas", monospace;
-    font-size: 12px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    white-space: pre-wrap;
-    word-break: break-all;
-    max-width: 100%;
-    overflow: hidden;
+.tool-call-indicator .tool-call-message {
+  font-weight: 600;
+  font-size: 14px;
+}
 
-    .light-mode & {
-      background: #ffffff;
-      color: #2d3748;
-      border: 1px solid #e2e8f0;
-    }
+.tool-call-indicator .tool-call-message {
+  color: #4a5568;
+}
 
-    .dark-mode & {
-      background: #1a1a1a;
-      color: #a0aec0;
-      border: 1px solid #333;
-    }
-  }
+.dark .tool-call-indicator .tool-call-message {
+  color: #e2e8f0;
+}
 
-  .context-tag {
-    display: inline-flex;
-    align-items: center;
-    font-size: 11px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-weight: 500;
+.tool-call-indicator .tool-call-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
 
-    .light-mode & {
-      background: rgba(139, 92, 246, 0.1);
-      color: #8b5cf6;
-    }
+.tool-call-indicator .context-item {
+  width: 100%;
+}
 
-    .dark-mode & {
-      background: rgba(139, 92, 246, 0.2);
-      color: #a0aec0;
-    }
-  }
+.tool-call-indicator .context-query {
+  display: block;
+  font-family: "Fira Code", "Consolas", monospace;
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.tool-call-indicator .context-query {
+  background: #ffffff;
+  color: #2d3748;
+  border: 1px solid #e2e8f0;
+}
+
+.dark .tool-call-indicator .context-query {
+  background: #1a1a1a;
+  color: #a0aec0;
+  border: 1px solid #333;
+}
+
+.tool-call-indicator .context-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.tool-call-indicator .context-tag {
+  background: rgba(139, 92, 246, 0.1);
+  color: #8b5cf6;
+}
+
+.dark .tool-call-indicator .context-tag {
+  background: rgba(139, 92, 246, 0.2);
+  color: #a0aec0;
 }
 
 @keyframes fadeIn {
@@ -6770,17 +6594,7 @@ export default defineComponent({
   }
 }
 
-// Inline loading indicator (inside message box)
-.inline-loading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  color: #6b7280;
-  font-size: 14px;
-}
 
-// Tool call item - inline in chat flow (interleaved with text)
 .tool-call-item {
   display: flex;
   flex-direction: column;
@@ -6788,230 +6602,229 @@ export default defineComponent({
   border-radius: 6px;
   font-size: 13px;
   margin-bottom: 8px;
-
-  &.has-details {
-    cursor: pointer;
-
-    &:hover {
-      &.light-mode {
-        background: rgba(76, 175, 80, 0.12);
-      }
-      &.dark-mode {
-        background: rgba(76, 175, 80, 0.18);
-      }
-    }
-  }
-
-  &.light-mode {
-    background: rgba(76, 175, 80, 0.08);
-    color: #4a5568;
-  }
-
-  &.dark-mode {
-    background: rgba(76, 175, 80, 0.12);
-    color: #a0aec0;
-  }
-
-  // Error state styling
-  &.error {
-    &.light-mode {
-      background: rgba(244, 67, 54, 0.08);
-    }
-    &.dark-mode {
-      background: rgba(244, 67, 54, 0.12);
-    }
-
-    &.has-details:hover {
-      &.light-mode {
-        background: rgba(244, 67, 54, 0.15);
-      }
-      &.dark-mode {
-        background: rgba(244, 67, 54, 0.22);
-      }
-    }
-  }
-
-  // Timeout state styling
-  &.timeout {
-    &.light-mode {
-      background: rgba(255, 152, 0, 0.08);
-    }
-    &.dark-mode {
-      background: rgba(255, 152, 0, 0.12);
-    }
-
-    &.has-details:hover {
-      &.light-mode {
-        background: rgba(255, 152, 0, 0.15);
-      }
-      &.dark-mode {
-        background: rgba(255, 152, 0, 0.22);
-      }
-    }
-  }
-
-  // Pending confirmation state styling (yellow/amber)
-  &.pending-confirmation {
-    cursor: default;
-
-    &.light-mode {
-      background: rgba(255, 193, 7, 0.12);
-      border: 1px solid rgba(255, 193, 7, 0.3);
-    }
-    &.dark-mode {
-      background: rgba(255, 193, 7, 0.15);
-      border: 1px solid rgba(255, 193, 7, 0.25);
-    }
-  }
-
-  // Pending navigation confirmation styling (blue)
-  &.pending-navigation {
-    cursor: default;
-
-    &.light-mode {
-      background: rgba(25, 118, 210, 0.08);
-      border: 1px solid rgba(25, 118, 210, 0.3);
-    }
-    &.dark-mode {
-      background: rgba(66, 165, 245, 0.12);
-      border: 1px solid rgba(66, 165, 245, 0.25);
-    }
-  }
-
-  .tool-confirmation-inline {
-    margin-top: 12px;
-
-    .confirmation-content {
-      padding: 16px;
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-
-      .light-mode & {
-        background: #fffbeb;
-        border: 1px solid #fde68a;
-      }
-      .dark-mode & {
-        background: rgba(251, 191, 36, 0.15);
-        border: 1px solid rgba(251, 191, 36, 0.3);
-      }
-    }
-  }
-
-  .tool-call-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .tool-call-name {
-    font-weight: 500;
-    flex: 1;
-
-    code {
-      font-family: "Fira Code", "Consolas", monospace;
-      font-size: 12px;
-      padding: 1px 4px;
-      border-radius: 3px;
-
-      .light-mode & {
-        background: rgba(0, 0, 0, 0.06);
-      }
-      .dark-mode & {
-        background: rgba(255, 255, 255, 0.1);
-      }
-    }
-  }
-
-  .expand-icon {
-    opacity: 0.6;
-    transition: transform 0.2s;
-  }
-
-  .navigation-icon {
-    cursor: pointer;
-    margin-left: auto;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-    &:hover {
-      opacity: 1;
-    }
-  }
-
-  .navigation-block {
-    margin: 4px 0;
-    &.light-mode {
-      background: rgba(66, 165, 245, 0.08);
-    }
-    &.dark-mode {
-      background: rgba(66, 165, 245, 0.12);
-    }
-
-    .navigation-block-btn {
-      font-size: 13px;
-    }
-  }
-
-  .tool-call-details {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid rgba(128, 128, 128, 0.2);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-
-    .detail-item {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .detail-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .detail-label {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      opacity: 0.6;
-    }
-
-    .copy-btn {
-      opacity: 0.6;
-      &:hover {
-        opacity: 1;
-      }
-    }
-
-    .detail-value {
-      font-size: 12px;
-      user-select: text;
-
-      &.query-value {
-        font-family: "Fira Code", "Consolas", monospace;
-        padding: 8px;
-        border-radius: 4px;
-        white-space: pre-wrap;
-        word-break: break-all;
-        user-select: text;
-        cursor: text;
-
-        .light-mode & {
-          background: rgba(0, 0, 0, 0.04);
-        }
-        .dark-mode & {
-          background: rgba(255, 255, 255, 0.06);
-        }
-      }
-    }
-  }
 }
 
-// Log entry item - expandable log content display
+.tool-call-item.has-details {
+  cursor: pointer;
+}
+
+.tool-call-item.has-details:hover.light-mode {
+  background: rgba(76, 175, 80, 0.12);
+}
+
+.tool-call-item.has-details:hover.dark-mode {
+  background: rgba(76, 175, 80, 0.18);
+}
+
+.tool-call-item.light-mode {
+  background: rgba(76, 175, 80, 0.08);
+  color: #4a5568;
+}
+
+.tool-call-item.dark-mode {
+  background: rgba(76, 175, 80, 0.12);
+  color: #a0aec0;
+}
+
+.tool-call-item.error.light-mode {
+  background: rgba(244, 67, 54, 0.08);
+}
+
+.tool-call-item.error.dark-mode {
+  background: rgba(244, 67, 54, 0.12);
+}
+
+.tool-call-item.error.has-details:hover.light-mode {
+  background: rgba(244, 67, 54, 0.15);
+}
+
+.tool-call-item.error.has-details:hover.dark-mode {
+  background: rgba(244, 67, 54, 0.22);
+}
+
+.tool-call-item.timeout.light-mode {
+  background: rgba(255, 152, 0, 0.08);
+}
+
+.tool-call-item.timeout.dark-mode {
+  background: rgba(255, 152, 0, 0.12);
+}
+
+.tool-call-item.timeout.has-details:hover.light-mode {
+  background: rgba(255, 152, 0, 0.15);
+}
+
+.tool-call-item.timeout.has-details:hover.dark-mode {
+  background: rgba(255, 152, 0, 0.22);
+}
+
+.tool-call-item.pending-confirmation {
+  cursor: default;
+}
+
+.tool-call-item.pending-confirmation.light-mode {
+  background: rgba(255, 193, 7, 0.12);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.tool-call-item.pending-confirmation.dark-mode {
+  background: rgba(255, 193, 7, 0.15);
+  border: 1px solid rgba(255, 193, 7, 0.25);
+}
+
+.tool-call-item.pending-navigation {
+  cursor: default;
+}
+
+.tool-call-item.pending-navigation.light-mode {
+  background: rgba(25, 118, 210, 0.08);
+  border: 1px solid rgba(25, 118, 210, 0.3);
+}
+
+.tool-call-item.pending-navigation.dark-mode {
+  background: rgba(66, 165, 245, 0.12);
+  border: 1px solid rgba(66, 165, 245, 0.25);
+}
+
+.tool-call-item .tool-confirmation-inline {
+  margin-top: 12px;
+}
+
+.tool-call-item .tool-confirmation-inline .confirmation-content {
+  padding: 16px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tool-call-item .tool-confirmation-inline .confirmation-content {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.dark .tool-call-item .tool-confirmation-inline .confirmation-content {
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.tool-call-item .tool-call-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-call-item .tool-call-name {
+  font-weight: 500;
+  flex: 1;
+}
+
+.tool-call-item .tool-call-name code {
+  font-family: "Fira Code", "Consolas", monospace;
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.tool-call-item .tool-call-name code {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.dark .tool-call-item .tool-call-name code {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tool-call-item .expand-icon {
+  opacity: 0.6;
+  transition: transform 0.2s;
+}
+
+.tool-call-item .navigation-icon {
+  cursor: pointer;
+  margin-left: auto;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.tool-call-item .navigation-icon:hover {
+  opacity: 1;
+}
+
+.tool-call-item .navigation-block {
+  margin: 4px 0;
+}
+
+.tool-call-item .navigation-block.light-mode {
+  background: rgba(66, 165, 245, 0.08);
+}
+
+.tool-call-item .navigation-block.dark-mode {
+  background: rgba(66, 165, 245, 0.12);
+}
+
+.tool-call-item .navigation-block .navigation-block-btn {
+  font-size: 13px;
+}
+
+.tool-call-item .tool-call-details {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(128, 128, 128, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tool-call-item .tool-call-details .detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tool-call-item .tool-call-details .detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tool-call-item .tool-call-details .detail-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.tool-call-item .tool-call-details .copy-btn {
+  opacity: 0.6;
+}
+
+.tool-call-item .tool-call-details .copy-btn:hover {
+  opacity: 1;
+}
+
+.tool-call-item .tool-call-details .detail-value {
+  font-size: 12px;
+  user-select: text;
+}
+
+.tool-call-item .tool-call-details .detail-value.query-value {
+  font-family: "Fira Code", "Consolas", monospace;
+  padding: 8px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+  cursor: text;
+}
+
+.tool-call-item .tool-call-details .detail-value.query-value {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dark .tool-call-item .tool-call-details .detail-value.query-value {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .log-entry-item {
   display: flex;
   flex-direction: column;
@@ -7020,281 +6833,268 @@ export default defineComponent({
   font-size: 12px;
   margin-bottom: 4px;
   cursor: pointer;
-
-  &.light-mode {
-    background: rgba(33, 150, 243, 0.08);
-    color: #4a5568;
-  }
-
-  &.dark-mode {
-    background: #252a31;
-    border: 1px solid #3a4149;
-    color: #e2e8f0;
-  }
-
-  &:hover {
-    &.light-mode {
-      background: rgba(33, 150, 243, 0.12);
-    }
-    &.dark-mode {
-      background: #20242e;
-      border-color: #4a5568;
-    }
-  }
-
-  .log-entry-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .log-entry-info {
-    flex: 1;
-    font-weight: 500;
-    font-size: 12px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .expand-icon {
-    opacity: 0.6;
-    transition: transform 0.2s;
-  }
-
-  .log-entry-details {
-    margin-top: 10px;
-  }
-
-  .log-entry-content {
-    position: relative;
-    border-radius: 6px;
-    border: 1px solid;
-    overflow: hidden;
-
-    .light-mode & {
-      background: #ffffff;
-      border-color: #e4e7ec;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    }
-    .dark-mode & {
-      background: #1e293b;
-      border-color: #475569;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    }
-
-    .copy-btn {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      opacity: 0.6;
-      z-index: 1;
-      background: rgba(128, 128, 128, 0.1);
-      border-radius: 4px;
-      padding: 4px 8px;
-
-      &:hover {
-        opacity: 1;
-        .light-mode & {
-          background: rgba(0, 0, 0, 0.08);
-        }
-        .dark-mode & {
-          background: rgba(255, 255, 255, 0.15);
-        }
-      }
-    }
-
-    .log-entry-code {
-      display: block;
-      font-family: "Monaco", "Menlo", "Courier New", monospace;
-      font-size: 11px;
-      line-height: 1.5;
-      padding: 12px;
-      padding-right: 40px;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      user-select: text;
-      cursor: text;
-      max-height: 300px;
-      overflow-y: auto;
-
-      .light-mode & {
-        background: #f8fafc;
-        color: #1a202c;
-      }
-      .dark-mode & {
-        background: #0d1017;
-        color: #e2e8f0;
-      }
-
-      // JSON syntax highlighting - use :deep() for v-html content
-      :deep(.json-key) {
-        color: #0066cc;
-        font-weight: 600;
-      }
-
-      :deep(.json-string) {
-        color: #22863a;
-      }
-
-      :deep(.json-number) {
-        color: #005cc5;
-      }
-
-      :deep(.json-boolean) {
-        color: #d73a49;
-        font-weight: 600;
-      }
-
-      :deep(.json-null) {
-        color: #6f42c1;
-        font-weight: 600;
-      }
-    }
-  }
 }
 
-// Dark mode JSON syntax highlighting for log entries
-.dark-mode .log-entry-code {
-  :deep(.json-key) {
-    color: #60a5fa;
-  }
-
-  :deep(.json-string) {
-    color: #86efac;
-  }
-
-  :deep(.json-number) {
-    color: #7dd3fc;
-  }
-
-  :deep(.json-boolean) {
-    color: #fca5a5;
-  }
-
-  :deep(.json-null) {
-    color: #c4b5fd;
-  }
+.log-entry-item.light-mode {
+  background: rgba(33, 150, 243, 0.08);
+  color: #4a5568;
 }
 
-.tool-call-item {
-  .tool-response-hits {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    font-size: 12px;
-    font-family: "Fira Code", "Consolas", monospace;
-    padding: 6px 8px;
-    border-radius: 4px;
-    max-height: 200px;
-    overflow-y: auto;
-
-    .light-mode & {
-      background: rgba(0, 0, 0, 0.04);
-    }
-    .dark-mode & {
-      background: rgba(255, 255, 255, 0.06);
-    }
-  }
-
-  .tool-response-hit {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 12px;
-    padding: 2px 0;
-
-    &:not(:last-child) {
-      border-bottom: 1px solid rgba(128, 128, 128, 0.15);
-      padding-bottom: 4px;
-    }
-  }
-
-  .tool-response-list-item {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 4px 0;
-
-    &:not(:last-child) {
-      border-bottom: 1px solid rgba(128, 128, 128, 0.15);
-      padding-bottom: 6px;
-    }
-  }
-
-  .hit-field {
-    word-break: break-all;
-    user-select: text;
-    cursor: text;
-  }
-
-  .hit-key {
-    opacity: 0.6;
-    font-weight: 600;
-  }
-
-  .hit-error {
-    color: #f44336;
-  }
-
-  .tool-response-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 4px;
-  }
-
-  .tool-call-error {
-    font-size: 11px;
-    color: #f44336;
-    font-style: italic;
-    max-width: 250px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .tool-call-error {
-    font-size: 11px;
-    color: #f44336;
-    font-style: italic;
-    max-width: 250px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .tool-call-query {
-    font-family: "Fira Code", "Consolas", monospace;
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    max-width: 250px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-
-    .light-mode & {
-      background: rgba(0, 0, 0, 0.05);
-      color: #666;
-    }
-
-    .dark-mode & {
-      background: rgba(255, 255, 255, 0.08);
-      color: #888;
-    }
-  }
-
-  .tool-error-message {
-    color: #f44336;
-  }
-
-  .tool-suggestion {
-    font-style: italic;
-    opacity: 0.85;
-  }
+.log-entry-item.dark-mode {
+  background: #252a31;
+  border: 1px solid #3a4149;
+  color: #e2e8f0;
 }
 
-// Stream-level error block - inline in chat flow
+.log-entry-item:hover.light-mode {
+  background: rgba(33, 150, 243, 0.12);
+}
+
+.log-entry-item:hover.dark-mode {
+  background: #20242e;
+  border-color: #4a5568;
+}
+
+.log-entry-item .log-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.log-entry-item .log-entry-info {
+  flex: 1;
+  font-weight: 500;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-entry-item .expand-icon {
+  opacity: 0.6;
+  transition: transform 0.2s;
+}
+
+.log-entry-item .log-entry-details {
+  margin-top: 10px;
+}
+
+.log-entry-item .log-entry-content {
+  position: relative;
+  border-radius: 6px;
+  border: 1px solid;
+  overflow: hidden;
+}
+
+.log-entry-item .log-entry-content {
+  background: #ffffff;
+  border-color: #e4e7ec;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.dark .log-entry-item .log-entry-content {
+  background: #1e293b;
+  border-color: #475569;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.log-entry-item .log-entry-content .copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0.6;
+  z-index: 1;
+  background: rgba(128, 128, 128, 0.1);
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+.log-entry-item .log-entry-content .copy-btn:hover {
+  opacity: 1;
+}
+
+.log-entry-item .log-entry-content .copy-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.dark .log-entry-item .log-entry-content .copy-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.log-entry-item .log-entry-content .log-entry-code {
+  display: block;
+  font-family: "Monaco", "Menlo", "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 12px;
+  padding-right: 40px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  user-select: text;
+  cursor: text;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.log-entry-item .log-entry-content .log-entry-code {
+  background: #f8fafc;
+  color: #1a202c;
+}
+
+.dark .log-entry-item .log-entry-content .log-entry-code {
+  background: #0d1017;
+  color: #e2e8f0;
+}
+
+.log-entry-item .log-entry-content .log-entry-code .json-key {
+  color: #0066cc;
+  font-weight: 600;
+}
+
+.log-entry-item .log-entry-content .log-entry-code .json-string {
+  color: #22863a;
+}
+
+.log-entry-item .log-entry-content .log-entry-code .json-number {
+  color: #005cc5;
+}
+
+.log-entry-item .log-entry-content .log-entry-code .json-boolean {
+  color: #d73a49;
+  font-weight: 600;
+}
+
+.log-entry-item .log-entry-content .log-entry-code .json-null {
+  color: #6f42c1;
+  font-weight: 600;
+}
+
+.dark .log-entry-code .json-key {
+  color: #60a5fa;
+}
+
+.dark .log-entry-code .json-string {
+  color: #86efac;
+}
+
+.dark .log-entry-code .json-number {
+  color: #7dd3fc;
+}
+
+.dark .log-entry-code .json-boolean {
+  color: #fca5a5;
+}
+
+.dark .log-entry-code .json-null {
+  color: #c4b5fd;
+}
+
+.tool-call-item .tool-response-hits {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-family: "Fira Code", "Consolas", monospace;
+  padding: 6px 8px;
+  border-radius: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tool-call-item .tool-response-hits {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dark .tool-call-item .tool-response-hits {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tool-call-item .tool-response-hit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 2px 0;
+}
+
+.tool-call-item .tool-response-hit:not(:last-child) {
+  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+  padding-bottom: 4px;
+}
+
+.tool-call-item .tool-response-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+}
+
+.tool-call-item .tool-response-list-item:not(:last-child) {
+  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+  padding-bottom: 6px;
+}
+
+.tool-call-item .hit-field {
+  word-break: break-all;
+  user-select: text;
+  cursor: text;
+}
+
+.tool-call-item .hit-key {
+  opacity: 0.6;
+  font-weight: 600;
+}
+
+.tool-call-item .hit-error {
+  color: #f44336;
+}
+
+.tool-call-item .tool-response-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tool-call-item .tool-call-error {
+  font-size: 11px;
+  color: #f44336;
+  font-style: italic;
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-call-item .tool-call-query {
+  font-family: "Fira Code", "Consolas", monospace;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-call-item .tool-call-query {
+  background: rgba(0, 0, 0, 0.05);
+  color: #666;
+}
+
+.dark .tool-call-item .tool-call-query {
+  background: rgba(255, 255, 255, 0.08);
+  color: #888;
+}
+
+.tool-call-item .tool-error-message {
+  color: #f44336;
+}
+
+.tool-call-item .tool-suggestion {
+  font-style: italic;
+  opacity: 0.85;
+}
+
 .stream-error-block {
   display: flex;
   flex-direction: column;
@@ -7303,210 +7103,237 @@ export default defineComponent({
   border-left: 3px solid #f44336;
   margin-bottom: 8px;
   font-size: 13px;
-
-  &.light-mode {
-    background: rgba(244, 67, 54, 0.06);
-    color: #4a5568;
-  }
-
-  &.dark-mode {
-    background: rgba(244, 67, 54, 0.1);
-    color: #a0aec0;
-  }
-
-  .stream-error-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .stream-error-message {
-    font-weight: 500;
-    color: #f44336;
-  }
-
-  .stream-error-suggestion {
-    margin-top: 6px;
-    padding-left: 24px;
-    font-style: italic;
-    font-size: 12px;
-    opacity: 0.85;
-  }
-
-  .stream-error-recoverable {
-    margin-top: 4px;
-    padding-left: 24px;
-    font-size: 11px;
-    opacity: 0.7;
-  }
 }
 
-// Theme-based syntax highlighting - both CSS files are loaded, we scope them by theme
-// Hide dark theme in light mode
-.light-mode {
-  // Force light theme colors to take precedence
-  :deep(.hljs) {
-    display: block;
-    overflow-x: auto;
-    padding: 0.5em;
-    color: #24292e;
-    background: #ffffff;
-  }
-  :deep(.hljs-doctag),
-  :deep(.hljs-keyword),
-  :deep(.hljs-meta .hljs-keyword),
-  :deep(.hljs-template-tag),
-  :deep(.hljs-template-variable),
-  :deep(.hljs-type),
-  :deep(.hljs-variable.language_) {
-    color: #d73a49;
-  }
-  :deep(.hljs-title),
-  :deep(.hljs-title.class_),
-  :deep(.hljs-title.class_.inherited__),
-  :deep(.hljs-title.function_) {
-    color: #6f42c1;
-  }
-  :deep(.hljs-attr),
-  :deep(.hljs-attribute),
-  :deep(.hljs-literal),
-  :deep(.hljs-meta),
-  :deep(.hljs-number),
-  :deep(.hljs-operator),
-  :deep(.hljs-variable),
-  :deep(.hljs-selector-attr),
-  :deep(.hljs-selector-class),
-  :deep(.hljs-selector-id) {
-    color: #005cc5;
-  }
-  :deep(.hljs-regexp),
-  :deep(.hljs-string),
-  :deep(.hljs-meta .hljs-string) {
-    color: #032f62;
-  }
-  :deep(.hljs-built_in),
-  :deep(.hljs-symbol) {
-    color: #e36209;
-  }
-  :deep(.hljs-comment),
-  :deep(.hljs-code),
-  :deep(.hljs-formula) {
-    color: #6a737d;
-  }
-  :deep(.hljs-name),
-  :deep(.hljs-quote),
-  :deep(.hljs-selector-tag),
-  :deep(.hljs-selector-pseudo) {
-    color: #22863a;
-  }
-  :deep(.hljs-subst) {
-    color: #24292e;
-  }
-  :deep(.hljs-section) {
-    color: #005cc5;
-    font-weight: bold;
-  }
-  :deep(.hljs-bullet) {
-    color: #735c0f;
-  }
-  :deep(.hljs-emphasis) {
-    color: #24292e;
-    font-style: italic;
-  }
-  :deep(.hljs-strong) {
-    color: #24292e;
-    font-weight: bold;
-  }
-  :deep(.hljs-addition) {
-    color: #22863a;
-    background-color: #f0fff4;
-  }
-  :deep(.hljs-deletion) {
-    color: #b31d28;
-    background-color: #ffeef0;
-  }
+.stream-error-block.light-mode {
+  background: rgba(244, 67, 54, 0.06);
+  color: #4a5568;
 }
-// Force dark theme colors in dark mode
-.dark-mode {
-  :deep(.hljs) {
-    display: block;
-    overflow-x: auto;
-    padding: 0.5em;
-    color: #c9d1d9;
-    background: #0d1117;
-  }
-  :deep(.hljs-doctag),
-  :deep(.hljs-keyword),
-  :deep(.hljs-meta .hljs-keyword),
-  :deep(.hljs-template-tag),
-  :deep(.hljs-template-variable),
-  :deep(.hljs-type),
-  :deep(.hljs-variable.language_) {
-    color: #ff7b72;
-  }
-  :deep(.hljs-title),
-  :deep(.hljs-title.class_),
-  :deep(.hljs-title.class_.inherited__),
-  :deep(.hljs-title.function_) {
-    color: #d2a8ff;
-  }
-  :deep(.hljs-attr),
-  :deep(.hljs-attribute),
-  :deep(.hljs-literal),
-  :deep(.hljs-meta),
-  :deep(.hljs-number),
-  :deep(.hljs-operator),
-  :deep(.hljs-variable),
-  :deep(.hljs-selector-attr),
-  :deep(.hljs-selector-class),
-  :deep(.hljs-selector-id) {
-    color: #79c0ff;
-  }
-  :deep(.hljs-regexp),
-  :deep(.hljs-string),
-  :deep(.hljs-meta .hljs-string) {
-    color: #a5d6ff;
-  }
-  :deep(.hljs-built_in),
-  :deep(.hljs-symbol) {
-    color: #ffa657;
-  }
-  :deep(.hljs-comment),
-  :deep(.hljs-code),
-  :deep(.hljs-formula) {
-    color: #8b949e;
-  }
-  :deep(.hljs-name),
-  :deep(.hljs-quote),
-  :deep(.hljs-selector-tag),
-  :deep(.hljs-selector-pseudo) {
-    color: #7ee787;
-  }
-  :deep(.hljs-subst) {
-    color: #c9d1d9;
-  }
-  :deep(.hljs-section) {
-    color: #1f6feb;
-    font-weight: bold;
-  }
-  :deep(.hljs-bullet) {
-    color: #f2cc60;
-  }
-  :deep(.hljs-emphasis) {
-    color: #c9d1d9;
-    font-style: italic;
-  }
-  :deep(.hljs-strong) {
-    color: #c9d1d9;
-    font-weight: bold;
-  }
-  :deep(.hljs-addition) {
-    color: #aff5b4;
-    background-color: #033a16;
-  }
-  :deep(.hljs-deletion) {
-    color: #ffdcd7;
-    background-color: #67060c;
-  }
+
+.stream-error-block.dark-mode {
+  background: rgba(244, 67, 54, 0.1);
+  color: #a0aec0;
+}
+
+.stream-error-block .stream-error-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stream-error-block .stream-error-message {
+  font-weight: 500;
+  color: #f44336;
+}
+
+.stream-error-block .stream-error-suggestion {
+  margin-top: 6px;
+  padding-left: 24px;
+  font-style: italic;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.stream-error-block .stream-error-recoverable {
+  margin-top: 4px;
+  padding-left: 24px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* =============================================
+   Syntax highlighting — light mode
+   ============================================= */
+.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 0.5em;
+  color: #24292e;
+  background: #ffffff;
+}
+
+.hljs-doctag,
+.hljs-keyword,
+.hljs-meta .hljs-keyword,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-variable.language_ {
+  color: #d73a49;
+}
+
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-title.function_ {
+  color: #6f42c1;
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-literal,
+.hljs-meta,
+.hljs-number,
+.hljs-operator,
+.hljs-variable,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id {
+  color: #005cc5;
+}
+
+.hljs-regexp,
+.hljs-string,
+.hljs-meta .hljs-string {
+  color: #032f62;
+}
+
+.hljs-built_in,
+.hljs-symbol {
+  color: #e36209;
+}
+
+.hljs-comment,
+.hljs-code,
+.hljs-formula {
+  color: #6a737d;
+}
+
+.hljs-name,
+.hljs-quote,
+.hljs-selector-tag,
+.hljs-selector-pseudo {
+  color: #22863a;
+}
+
+.hljs-subst {
+  color: #24292e;
+}
+
+.hljs-section {
+  color: #005cc5;
+  font-weight: bold;
+}
+
+.hljs-bullet {
+  color: #735c0f;
+}
+
+.hljs-emphasis {
+  color: #24292e;
+  font-style: italic;
+}
+
+.hljs-strong {
+  color: #24292e;
+  font-weight: bold;
+}
+
+.hljs-addition {
+  color: #22863a;
+  background-color: #f0fff4;
+}
+
+.hljs-deletion {
+  color: #b31d28;
+  background-color: #ffeef0;
+}
+
+/* =============================================
+   Syntax highlighting — dark mode
+   ============================================= */
+.dark .hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 0.5em;
+  color: #c9d1d9;
+  background: #0d1117;
+}
+
+.dark .hljs-doctag,
+.dark .hljs-keyword,
+.dark .hljs-meta .hljs-keyword,
+.dark .hljs-template-tag,
+.dark .hljs-template-variable,
+.dark .hljs-type,
+.dark .hljs-variable.language_ {
+  color: #ff7b72;
+}
+
+.dark .hljs-title,
+.dark .hljs-title.class_,
+.dark .hljs-title.class_.inherited__,
+.dark .hljs-title.function_ {
+  color: #d2a8ff;
+}
+
+.dark .hljs-attr,
+.dark .hljs-attribute,
+.dark .hljs-literal,
+.dark .hljs-meta,
+.dark .hljs-number,
+.dark .hljs-operator,
+.dark .hljs-variable,
+.dark .hljs-selector-attr,
+.dark .hljs-selector-class,
+.dark .hljs-selector-id {
+  color: #79c0ff;
+}
+
+.dark .hljs-regexp,
+.dark .hljs-string,
+.dark .hljs-meta .hljs-string {
+  color: #a5d6ff;
+}
+
+.dark .hljs-built_in,
+.dark .hljs-symbol {
+  color: #ffa657;
+}
+
+.dark .hljs-comment,
+.dark .hljs-code,
+.dark .hljs-formula {
+  color: #8b949e;
+}
+
+.dark .hljs-name,
+.dark .hljs-quote,
+.dark .hljs-selector-tag,
+.dark .hljs-selector-pseudo {
+  color: #7ee787;
+}
+
+.dark .hljs-subst {
+  color: #c9d1d9;
+}
+
+.dark .hljs-section {
+  color: #1f6feb;
+  font-weight: bold;
+}
+
+.dark .hljs-bullet {
+  color: #f2cc60;
+}
+
+.dark .hljs-emphasis {
+  color: #c9d1d9;
+  font-style: italic;
+}
+
+.dark .hljs-strong {
+  color: #c9d1d9;
+  font-weight: bold;
+}
+
+.dark .hljs-addition {
+  color: #aff5b4;
+  background-color: #033a16;
+}
+
+.dark .hljs-deletion {
+  color: #ffdcd7;
+  background-color: #67060c;
 }
 </style>

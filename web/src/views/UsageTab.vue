@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,14 +14,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="usage-tab tw:h-full">
+  <div class="usage-tab h-full">
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="usage-scroll tw:w-full tw:h-full tw:overflow-y-auto"
+      class="w-full h-full flex flex-col overflow-y-auto [padding-right:0.625rem]"
     >
       <!-- Banners -->
-      <div class="banners-wrapper">
+      <div class="banners-wrapper shrink-0 flex flex-col gap-2">
         <div>
           <TrialPeriod></TrialPeriod>
         </div>
@@ -35,21 +35,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Streams overview section -->
       <div
-        class="feature-card tw:rounded tw:p-4"
-        :class="
-          store.state.theme === 'dark'
-            ? 'dark-stream-container'
-            : 'light-stream-container'
-        "
+        class="rounded p-4 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
         role="region"
         aria-label="Streams overview section"
       >
-        <div class="tw:flex tw:justify-between tw:items-center streams-header">
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <div class="tile-icon icon-bg-blue" aria-hidden="true">
+        <div class="flex justify-between items-center mb-3">
+          <div class="flex items-center gap-2">
+            <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
               <OIcon name="window" size="md" />
             </div>
-            <div class="section-header">{{ t("home.streams") }}</div>
+            <div class="text-(length:--text-lg) font-semibold [line-height:1.4]">{{ t("home.streams") }}</div>
           </div>
           <OButton
             variant="ghost"
@@ -74,47 +69,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     store.state.selectedOrganization?.identifier,
                 },
               }"
-              class="tw:absolute tw:inset-0"
+              class="absolute inset-0"
               aria-label="Navigate to streams page"
             ></router-link>
           </OButton>
         </div>
 
         <!-- Tiles -->
-        <div class="tiles-grid">
-          <div class="tile">
+        <div class="grid [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))] gap-3">
+          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]">
             <div
-              class="tile-content tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'dark-tile-content'
-                  : 'light-tile-content'
-              "
+              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Streams count statistics"
             >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tile-title">{{ t("home.streams") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="streamsIcon" alt="" />
+              <div class="flex flex-col justify-between">
+                <div class="flex justify-between">
+                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.streams") }}</div>
+                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+                    <img :src="streamsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                   </div>
                 </div>
                 <div
                   v-if="false"
-                  class="performance-text"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'positive-increase-dark'
-                      : 'positive-increase-light'
-                  "
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
                 </div>
               </div>
               <div
-                class="data-to-display tw:flex tw:items-end"
+                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-streams-count"
               >
@@ -123,39 +108,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tile">
+          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]">
             <div
-              class="tile-content tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'dark-tile-content'
-                  : 'light-tile-content'
-              "
+              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Events count statistics"
             >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tile-title">{{ t("home.docsCountLbl") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="recordsIcon" alt="" />
+              <div class="flex flex-col justify-between">
+                <div class="flex justify-between">
+                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.docsCountLbl") }}</div>
+                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+                    <img :src="recordsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                   </div>
                 </div>
                 <div
                   v-if="false"
-                  class="performance-text"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'positive-increase-dark'
-                      : 'positive-increase-light'
-                  "
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
                 </div>
               </div>
               <div
-                class="data-to-display tw:flex tw:items-end"
+                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-events-count"
               >
@@ -164,41 +139,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tile">
+          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]">
             <div
-              class="tile-content tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'dark-tile-content'
-                  : 'light-tile-content'
-              "
+              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Ingested data size statistics"
             >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tile-title">
+              <div class="flex flex-col justify-between">
+                <div class="flex justify-between">
+                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">
                     {{ t("home.totalDataIngested") }}
                   </div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="ingestedSizeIcon" alt="" />
+                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+                    <img :src="ingestedSizeIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                   </div>
                 </div>
                 <div
                   v-if="false"
-                  class="performance-text"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'negative-increase-dark'
-                      : 'negative-increase-light'
-                  "
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-error-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-error-text)]"
                 >
                   <OIcon name="arrow-downward" size="xs" /> 2.89% from last
                   week
                 </div>
               </div>
               <div
-                class="data-to-display tw:flex tw:items-end"
+                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-ingested-size"
               >
@@ -207,41 +172,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tile" v-if="config.isCloud == 'false'">
+          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]" v-if="config.isCloud == 'false'">
             <div
-              class="tile-content tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'dark-tile-content'
-                  : 'light-tile-content'
-              "
+              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Compressed data size statistics"
             >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tile-title">
+              <div class="flex flex-col justify-between">
+                <div class="flex justify-between">
+                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">
                     {{ t("home.totalDataCompressed") }}
                   </div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="compressedSizeIcon" alt="" />
+                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+                    <img :src="compressedSizeIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                   </div>
                 </div>
                 <div
                   v-if="false"
-                  class="performance-text"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'positive-increase-dark'
-                      : 'positive-increase-light'
-                  "
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
                 </div>
               </div>
               <div
-                class="data-to-display tw:flex tw:items-end"
+                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-compressed-size"
               >
@@ -250,39 +205,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tile" v-if="config.isCloud == 'false'">
+          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]" v-if="config.isCloud == 'false'">
             <div
-              class="tile-content tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'dark-tile-content'
-                  : 'light-tile-content'
-              "
+              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Index size statistics"
             >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tile-title">{{ t("home.indexSizeLbl") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="indexSizeIcon" alt="" />
+              <div class="flex flex-col justify-between">
+                <div class="flex justify-between">
+                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.indexSizeLbl") }}</div>
+                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+                    <img :src="indexSizeIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                   </div>
                 </div>
                 <div
                   v-if="false"
-                  class="performance-text"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'positive-increase-dark'
-                      : 'positive-increase-light'
-                  "
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 0.00% from last
                   week
                 </div>
               </div>
               <div
-                class="data-to-display tw:flex tw:items-end"
+                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-index-size"
               >
@@ -294,32 +239,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Charts section -->
-      <div class="charts-main-container">
+      <div class="grid [grid-template-columns:minmax(min-content,max-content)_1fr_2fr] gap-3 mt-4 items-stretch flex-1 min-h-0">
         <!-- Functions and Dashboards tiles -->
-        <div class="functions-dashboards-column">
-          <div class="tile-wrapper">
+        <div class="flex flex-col gap-4 w-full">
+          <div class="flex-1 flex min-w-0 w-full">
             <div
-              class="feature-card tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-center tw:flex tw:flex-col tw:justify-between"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'dark-tile-content'
-                  : 'light-tile-content'
-              "
+              class="rounded p-4 w-full bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] text-center flex flex-col justify-between"
               role="article"
               aria-label="Functions count statistics"
             >
-              <div class="tw:flex tw:flex-col tw:justify-between">
+              <div class="flex flex-col justify-between">
                 <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
+                  class="flex items-center gap-2 flex-nowrap w-full"
                 >
                   <div
-                    class="tile-icon icon-bg-orange tw:flex-shrink-0"
+                    class="bg-[rgba(238,95,38,0.2)] border border-[rgba(238,95,38,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg flex-shrink-0"
                     aria-hidden="true"
                   >
-                    <img :src="functionsIcon" alt="" />
+                    <img :src="functionsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                   </div>
                   <div
-                    class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
+                    class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis"
                   >
                     {{ t("home.functionTitle") }}
                   </div>
@@ -332,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'view-button-light'
                     "
                     aria-label="View all functions"
-                    class="tw:flex-shrink-0"
+                    class="flex-shrink-0"
                     :title="t('home.viewButton')"
                     data-test="home-usage-tab-view-functions-btn"
                   >
@@ -347,14 +287,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             store.state.selectedOrganization?.identifier,
                         },
                       }"
-                      class="tw:absolute tw:inset-0"
+                      class="absolute inset-0"
                       aria-label="Navigate to functions page"
                     ></router-link>
                   </OButton>
                 </div>
               </div>
               <div
-                class="data-to-display tw:flex tw:items-end"
+                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-functions-count"
               >
@@ -363,29 +303,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tile-wrapper">
+          <div class="flex-1 flex min-w-0 w-full">
             <div
-              class="feature-card tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-center tw:flex tw:flex-col tw:justify-between"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'dark-tile-content'
-                  : 'light-tile-content'
-              "
+              class="rounded p-4 w-full bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] text-center flex flex-col justify-between"
               role="article"
               aria-label="Dashboards count statistics"
             >
-              <div class="tw:flex tw:flex-col tw:justify-between">
+              <div class="flex flex-col justify-between">
                 <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
+                  class="flex items-center gap-2 flex-nowrap w-full"
                 >
                   <div
-                    class="tile-icon icon-bg-orange tw:flex-shrink-0"
+                    class="bg-[rgba(238,95,38,0.2)] border border-[rgba(238,95,38,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg flex-shrink-0"
                     aria-hidden="true"
                   >
-                    <img :src="dashboardsIcon" alt="" />
+                    <img :src="dashboardsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                   </div>
                   <div
-                    class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
+                    class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis"
                   >
                     {{ t("home.dashboardTitle") }}
                   </div>
@@ -398,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'view-button-light'
                     "
                     aria-label="View all dashboards"
-                    class="tw:flex-shrink-0"
+                    class="flex-shrink-0"
                     :title="t('home.viewButton')"
                     data-test="home-usage-tab-view-dashboards-btn"
                   >
@@ -413,14 +348,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             store.state.selectedOrganization?.identifier,
                         },
                       }"
-                      class="tw:absolute tw:inset-0"
+                      class="absolute inset-0"
                       aria-label="Navigate to dashboards page"
                     ></router-link>
                   </OButton>
                 </div>
               </div>
               <div
-                class="data-to-display tw:flex tw:items-end"
+                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-dashboards-count"
               >
@@ -432,20 +367,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alerts chart -->
         <div
-          class="feature-card first-chart-container tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)]"
-          :class="
-            store.state.theme === 'dark'
-              ? 'chart-container-dark'
-              : 'chart-container-light'
-          "
+          class="rounded p-4 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] flex flex-col min-h-0"
           role="region"
           aria-label="Alerts overview section"
         >
-          <div class="details-container">
-            <div class="tw:flex tw:justify-between tw:items-center">
-              <span class="text-title tw:flex tw:items-center tw:gap-2">
-                <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                  <img :src="alertsIcon" alt="" />
+          <div class="gap-2 mb-3">
+            <div class="flex justify-between items-center">
+              <span class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex items-center gap-2">
+                <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+                  <img :src="alertsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                 </div>
                 {{ t("home.alertTitle") }}
               </span>
@@ -472,18 +402,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  class="tw:absolute tw:inset-0"
+                  class="absolute inset-0"
                   aria-label="Navigate to alerts page"
                 ></router-link>
               </OButton>
             </div>
-            <div class="tw:flex tw:pt-2 home-stat-row">
-              <div class="tw:flex tw:flex-col">
-                <span class="text-subtitle">{{
+            <div class="flex pt-2 gap-[1em]">
+              <div class="flex flex-col">
+                <span class="text-(length:--text-sm) font-normal [line-height:1.4] [letter-spacing:0%]">{{
                   t("home.scheduledAlert")
                 }}</span>
                 <span
-                  class="results-count"
+                  class="text-(length:--text-md) font-semibold [line-height:1.4]"
                   aria-live="polite"
                   data-test="home-usage-tab-scheduled-alerts-count"
                 >{{
@@ -491,10 +421,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</span>
               </div>
               <OSeparator :vertical="true" />
-              <div class="tw:flex tw:flex-col">
-                <span class="text-subtitle">{{ t("home.rtAlert") }}</span>
+              <div class="flex flex-col">
+                <span class="text-(length:--text-sm) font-normal [line-height:1.4] [letter-spacing:0%]">{{ t("home.rtAlert") }}</span>
                 <span
-                  class="results-count"
+                  class="text-(length:--text-md) font-semibold [line-height:1.4]"
                   aria-live="polite"
                   data-test="home-usage-tab-rt-alerts-count"
                 >{{
@@ -504,32 +434,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="custom-first-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)] md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)] tw:w-full"
+            class="custom-first-chart flex-1 min-h-[200px] w-full"
           >
             <CustomChartRenderer
               :key="alertsPanelDataKey"
               :data="alertsPanelData"
-              class="tw:w-full tw:h-full md:tw:h-[calc(100vh-400px)]"
+              class="w-full h-full"
             />
           </div>
         </div>
 
         <!-- Pipelines chart -->
         <div
-          class="feature-card second-chart-container tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)]"
-          :class="
-            store.state.theme === 'dark'
-              ? 'chart-container-dark'
-              : 'chart-container-light'
-          "
+          class="rounded p-4 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] flex flex-col min-h-0"
           role="region"
           aria-label="Pipelines overview section"
         >
-          <div class="details-container">
-            <div class="tw:flex tw:justify-between tw:items-center">
-              <span class="text-title tw:flex tw:items-center tw:gap-2">
-                <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                  <img :src="pipelinesIcon" alt="" />
+          <div class="gap-2 mb-3">
+            <div class="flex justify-between items-center">
+              <span class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex items-center gap-2">
+                <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+                  <img :src="pipelinesIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                 </div>
                 {{ t("home.pipelineTitle") }}
               </span>
@@ -556,18 +481,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  class="tw:absolute tw:inset-0"
+                  class="absolute inset-0"
                   aria-label="Navigate to pipelines page"
                 ></router-link>
               </OButton>
             </div>
-            <div class="tw:flex tw:pt-2 home-stat-row">
-              <div class="tw:flex tw:flex-col">
-                <span class="text-subtitle">
+            <div class="flex pt-2 gap-[1em]">
+              <div class="flex flex-col">
+                <span class="text-(length:--text-sm) font-normal [line-height:1.4] [letter-spacing:0%]">
                   {{ t("home.schedulePipelineTitle") }}</span
                 >
                 <span
-                  class="results-count"
+                  class="text-(length:--text-md) font-semibold [line-height:1.4]"
                   aria-live="polite"
                   data-test="home-usage-tab-scheduled-pipelines-count"
                 >{{
@@ -575,12 +500,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</span>
               </div>
               <OSeparator :vertical="true" />
-              <div class="tw:flex tw:flex-col">
-                <span class="text-subtitle">{{
+              <div class="flex flex-col">
+                <span class="text-(length:--text-sm) font-normal [line-height:1.4] [letter-spacing:0%]">{{
                   t("home.rtPipelineTitle")
                 }}</span>
                 <span
-                  class="results-count"
+                  class="text-(length:--text-md) font-semibold [line-height:1.4]"
                   aria-live="polite"
                   data-test="home-usage-tab-rt-pipelines-count"
                 >{{
@@ -590,12 +515,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="custom-second-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)] md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)]"
+            class="custom-second-chart flex-1 min-h-[200px] w-full"
           >
             <CustomChartRenderer
               :key="pipelinesPanelDataKey"
               :data="pipelinesPanelData"
-              class="tw:w-full tw:h-full"
+              class="w-full h-full"
             />
           </div>
         </div>
@@ -605,7 +530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state when no data ingested -->
     <div
       v-if="no_data_ingest && !isLoadingSummary"
-      class="tw:flex tw:flex-col tw:h-full"
+      class="flex flex-col h-full"
       data-test="home-usage-tab-no-data"
     >
       <TrialPeriod />
@@ -626,6 +551,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import orgService from "@/services/organizations";
+import configService from "@/services/config";
 import config from "@/aws-exports";
 import { formatSizeFromMB, getImageURL } from "@/utils/zincutils";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
@@ -644,15 +570,10 @@ const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 
-const getCssVar = (name: string) =>
-  getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-
 const summary = ref<any>([]);
 const no_data_ingest = ref(false);
 const alertsPanelDataKey = ref(0);
 const pipelinesPanelDataKey = ref(0);
-// Incremented on themeColorChanged to invalidate getCssVar snapshots in computed properties
-const themeVersion = ref(0);
 const isLoadingSummary = ref(false);
 
 // Animated counters
@@ -667,6 +588,9 @@ const animatedScheduledAlerts = ref(0);
 const animatedRtAlerts = ref(0);
 const animatedScheduledPipelines = ref(0);
 const animatedRtPipelines = ref(0);
+
+// Bumped when theme colors change to force re-computation of theme-dependent chart options
+const themeVersion = ref(0);
 
 // Count-up animation using requestAnimationFrame
 const animateValue = (
@@ -857,9 +781,6 @@ const alertsPanelData = computed(() => {
   const failedAlerts = summary.value.failed_alerts || 0;
   const total = healthyAlerts + failedAlerts;
 
-  const textMuted = getCssVar("--o2-text-muted");
-  const textPrimary = getCssVar("--o2-text-primary");
-
   if (total === 0) {
     return {
       chartType: "custom_chart",
@@ -868,9 +789,9 @@ const alertsPanelData = computed(() => {
         left: "center",
         top: "center",
         textStyle: {
-          fontSize: 13,
+          fontSize: 16,
           fontWeight: "normal",
-          color: textMuted,
+          color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
         },
       },
     };
@@ -883,9 +804,9 @@ const alertsPanelData = computed(() => {
       left: "65%",
       top: "50%",
       textStyle: {
-        fontSize: 13,
+        fontSize: 16,
         fontWeight: "normal",
-        color: textPrimary,
+        color: store.state.theme === "dark" ? "#D9D9D9" : "#262626",
       },
     },
     tooltip: {
@@ -896,8 +817,7 @@ const alertsPanelData = computed(() => {
       orient: "vertical",
       left: "65%",
       textStyle: {
-        color: textPrimary,
-        fontSize: 12,
+        color: store.state.theme === "dark" ? "#DCDCDC" : "#232323",
       },
     },
     series: [
@@ -911,8 +831,8 @@ const alertsPanelData = computed(() => {
         label: {
           formatter: "{d}%",
           show: true,
-          fontSize: 12,
-          color: textPrimary,
+          fontSize: 14,
+          color: store.state.theme === "dark" ? "#ffffff" : "#000000",
         },
         labelLine: {
           show: true,
@@ -926,12 +846,14 @@ const alertsPanelData = computed(() => {
           {
             value: healthyAlerts,
             name: "Success Alerts",
-            itemStyle: {},
+            itemStyle: {
+            },
           },
           {
             value: failedAlerts,
             name: "Failed Alerts",
-            itemStyle: {},
+            itemStyle: {
+            },
           },
         ],
       },
@@ -946,14 +868,6 @@ const pipelinesPanelData = computed(() => {
   const warningPipelines = summary.value.warning_pipelines || 0;
   const total = healthyPipelines + failedPipelines + warningPipelines;
 
-  const textMuted = getCssVar("--o2-text-muted");
-  const textPrimary = getCssVar("--o2-text-primary");
-  const textSecondary = getCssVar("--o2-text-secondary");
-  const borderColor = getCssVar("--o2-border-color");
-  const colorSuccess = getCssVar("--o2-positive");
-  const colorError = getCssVar("--o2-negative");
-  const colorWarning = getCssVar("--o2-warning");
-
   if (total === 0) {
     return {
       chartType: "custom_chart",
@@ -962,9 +876,9 @@ const pipelinesPanelData = computed(() => {
         left: "center",
         top: "center",
         textStyle: {
-          fontSize: 13,
+          fontSize: 16,
           fontWeight: "normal",
-          color: textMuted,
+          color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
         },
       },
     };
@@ -979,13 +893,13 @@ const pipelinesPanelData = computed(() => {
       nameLocation: "middle",
       nameGap: 30,
       nameTextStyle: {
-        fontSize: 13,
+        fontSize: 16,
         fontWeight: "normal",
-        color: textSecondary,
+        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
       },
       axisLabel: {
-        fontSize: 12,
-        color: textPrimary,
+        fontSize: 14,
+        color: store.state.theme === "dark" ? "#CCCFD1" : "#2E3133",
       },
     },
     yAxis: {
@@ -1001,17 +915,17 @@ const pipelinesPanelData = computed(() => {
       nameGap: 60,
       nameRotate: 90,
       nameTextStyle: {
-        fontSize: 13,
+        fontSize: 16,
         fontWeight: "normal",
-        color: textSecondary,
+        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
       },
       axisLabel: {
         fontSize: 12,
-        color: textSecondary,
+        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
       },
       splitLine: {
         lineStyle: {
-          color: borderColor,
+          color: store.state.theme === "dark" ? "#444" : "#e0e0e0",
         },
       },
       offset: -20,
@@ -1024,13 +938,13 @@ const pipelinesPanelData = computed(() => {
         label: {
           show: true,
           position: "top",
-          fontSize: 12,
+          fontSize: 14,
           fontWeight: "bold",
-          color: textPrimary,
+          color: store.state.theme === "dark" ? "#CCCFD1" : "#2E3133",
         },
         itemStyle: {
           color: function (params: any) {
-            const colors = [colorSuccess, colorError, colorWarning];
+            const colors = ["#16b26a", "#db373b", "#ffc328"];
             return colors[params.dataIndex];
           },
         },
@@ -1143,8 +1057,22 @@ onMounted(() => {
   ) {
     getSummary(orgId.value);
   }
+  // Refresh config so the UsageReportBanner reflects the latest
+  // last_usage_report_ts each time the Usage tab is opened. UsageTab remounts on
+  // every visit (the home router-view is not kept-alive), and config is otherwise
+  // only fetched at app startup.
+  refreshConfig();
   window.addEventListener("themeColorChanged", onThemeColorChanged);
 });
+
+const refreshConfig = async () => {
+  try {
+    const res: any = await configService.get_config();
+    store.dispatch("setConfig", res.data);
+  } catch (error) {
+    console.log(error);
+  }
+};
 
 onUnmounted(() => {
   window.removeEventListener("themeColorChanged", onThemeColorChanged);
@@ -1160,55 +1088,17 @@ watch(orgId, (newVal, oldVal) => {
 </script>
 
 <style scoped lang="scss">
+
 /*
  * UsageTab Styles
  *
  * Structure:
- * 1. CSS Variables & Theme Mixins - Centralized theming system
- * 2. Global Transitions - Smooth theme switching
- * 3. Layout Components - Containers, grids, tiles
- * 4. Interactive States - Hover, focus, animations
- * 5. Responsive Design - Media queries and accessibility
+ * 1. CSS Variables
+ * 2. Global Transitions
+ * 3. Layout Components
+ * 4. Interactive States
+ * 5. Responsive Design
  */
-
-/* ===== 1. CSS Variables & Theme Mixins ===== */
-
-
-/* dark/light-theme-vars mixins kept for structural class hooks used by JS
-   theme toggling; CSS var overrides are now handled globally via --o2-*. */
-@mixin dark-theme-vars {}
-@mixin light-theme-vars {}
-
-@mixin tile-base {
-  height: 100%;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
-  contain: layout style paint;
-  gap: 0.25rem;
-}
-
-@mixin container-base {
-  border-radius: 0.5rem;
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
-  animation: fadeInUp 0.5s ease-out backwards;
-}
-
-.dark-stream-container,
-.dark-tile-content,
-.chart-container-dark {
-  @include dark-theme-vars;
-}
-
-.light-stream-container,
-.light-tile-content,
-.chart-container-light {
-  @include light-theme-vars;
-}
 
 /* ===== 2. Global Transitions ===== */
 * {
@@ -1226,33 +1116,10 @@ watch(orgId, (newVal, oldVal) => {
 
 /* ===== 3. Layout Components ===== */
 
-/* The scroll container is pulled to the content-card's right edge by its panel
-   (see HomeView `.home-tab-panel--usage`) so the scrollbar sits flush at the
-   edge instead of floating inset. This padding-right restores the gap between
-   the cards and the scrollbar so the content still has breathing room. */
-.usage-scroll {
-  padding-right: 0.625rem;
-}
-
-.banners-wrapper {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-
-  &:has(> div) {
-    margin-bottom: 0.75rem;
-  }
-}
-
-.streams-header {
+.banners-wrapper:has(> div) {
   margin-bottom: 0.75rem;
 }
-.dark-stream-container,
-.light-stream-container {
-  background: var(--o2-card-bg);
-  border: 0.0625rem solid var(--o2-border-color);
-}
+
 .view-button-light {
   cursor: pointer;
   padding: 0;
@@ -1310,33 +1177,6 @@ watch(orgId, (newVal, oldVal) => {
   opacity: 1;
 }
 
-.tiles-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: 0.75rem;
-}
-
-.tile {
-  border-radius: 0.325rem;
-  border: 0.0625rem solid var(--o2-border-color);
-}
-
-.tile:nth-child(1) {
-  animation-delay: 0ms;
-}
-.tile:nth-child(2) {
-  animation-delay: 50ms;
-}
-.tile:nth-child(3) {
-  animation-delay: 100ms;
-}
-.tile:nth-child(4) {
-  animation-delay: 150ms;
-}
-.tile:nth-child(5) {
-  animation-delay: 200ms;
-}
-
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -1348,174 +1188,16 @@ watch(orgId, (newVal, oldVal) => {
   }
 }
 
-.tile-content {
-  @include tile-base;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.section-header {
-  font-size: var(--text-lg);
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.tile-title {
-  font-size: var(--text-base);
-  font-weight: 500;
-  line-height: 1.4;
-  letter-spacing: 0%;
-}
-.performance-text {
-  border-radius: 3.125rem;
-  width: 10rem;
-  padding: 0 0.5rem;
-  display: flex;
-  align-items: center;
-  background-color: var(--o2-status-success-bg);
-  color: var(--o2-status-success-text);
-  font-size: 0.75rem !important;
-}
-.positive-increase-light,
-.positive-increase-dark {
-  background-color: var(--o2-status-success-bg);
-  border: 0.0625rem solid var(--o2-border-color);
-  color: var(--o2-status-success-text);
-}
-.negative-increase-light,
-.negative-increase-dark {
-  background-color: var(--o2-status-error-bg);
-  border: 0.0625rem solid var(--o2-border-color);
-  color: var(--o2-status-error-text);
-}
-.data-to-display {
-  font-size: var(--text-xl);
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.charts-main-container {
-  display: grid;
-  grid-template-columns: minmax(min-content, max-content) 1fr 2fr;
-  gap: 1rem;
-  margin-top: 1rem;
-  align-items: stretch;
-  flex: 1;
-  min-height: 0;
-
-  @media (max-width: 1400px) {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto;
-  }
-
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto;
-  }
-}
-
-.functions-dashboards-column {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  width: 100%;
-
-  @media (max-width: 1400px) {
+@media (max-width: 1400px) {
+  .functions-dashboards-column {
     flex-direction: row;
   }
+}
 
-  @media (max-width: 768px) {
+@media (max-width: 768px) {
+  .functions-dashboards-column {
     flex-direction: column;
   }
-}
-
-.tile-wrapper {
-  flex: 1;
-  display: flex;
-  min-width: 0;
-  width: 100%;
-
-  .feature-card {
-    width: 100%;
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -1000px 0;
-  }
-  100% {
-    background-position: 1000px 0;
-  }
-}
-
-.text-title {
-  font-size: var(--text-base);
-  font-weight: 500;
-  line-height: 1.4;
-  letter-spacing: 0%;
-}
-.text-subtitle {
-  font-size: var(--text-sm);
-  font-weight: 400;
-  line-height: 1.4;
-  letter-spacing: 0%;
-}
-.results-count {
-  font-size: var(--text-md);
-  font-weight: 600;
-  line-height: 1.4;
-}
-.details-container {
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-.charts-main-container {
-  gap: 0.75rem;
-}
-
-.tile-icon {
-  opacity: 0.8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.5rem;
-
-  img {
-    height: 1.5rem;
-  }
-}
-
-.functions-tile-content .tile-icon img,
-.dashboards-tile-content .tile-icon img {
-  height: 1.25rem;
-}
-
-.dark-tile-content .tile-icon img,
-.dark-stream-container .tile-icon img,
-.chart-container-dark .tile-icon img {
-  filter: brightness(1.5);
-}
-
-.tile-icon.icon-bg-blue {
-  background: rgba(57, 126, 246, 0.2);
-  border: 0.0625rem solid rgba(57, 126, 246, 0.35);
-}
-
-.tile-icon.icon-bg-orange {
-  background: rgba(238, 95, 38, 0.2);
-  border: 0.0625rem solid rgba(238, 95, 38, 0.35);
-}
-
-.tile-icon.icon-bg-yellow {
-  background: rgba(245, 235, 147, 0.25);
-  border: 0.0625rem solid rgba(245, 235, 147, 0.45);
-}
-
-.tile-icon.icon-bg-purple {
-  background: rgba(147, 51, 234, 0.25);
-  border: 0.0625rem solid rgba(147, 51, 234, 0.45);
 }
 
 /* ===== 4. Interactive States ===== */
@@ -1537,27 +1219,6 @@ button:focus-visible {
   outline: none;
 }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: 0.75rem;
-  opacity: 0.6;
-}
-
-.empty-state-icon {
-  font-size: 3rem;
-  opacity: 0.5;
-}
-
-.empty-state-text {
-  font-size: 1rem;
-  font-weight: 500;
-  color: inherit;
-}
-
 /* ===== 5. Responsive Design & Accessibility ===== */
 
 @media (prefers-reduced-motion: reduce) {
@@ -1569,27 +1230,5 @@ button:focus-visible {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-
-  .tile-content:hover,
-  .functions-tile-content:hover,
-  .dashboards-tile-content:hover,
-  .chart-container:hover,
-  .streams-container:hover {
-    transform: none;
-  }
-}
-
-.card-container--col {
-  display: flex;
-  flex-direction: column;
-}
-
-.home-stat-row {
-  gap: 1em;
-}
-
-.home-no-data-panel {
-  margin: 0 auto;
-  justify-content: center;
 }
 </style>

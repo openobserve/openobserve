@@ -28,10 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-left>
       <span
         :class="[
-          'tw:font-semibold tw:px-2 tw:py-1 tw:rounded-md tw:inline-block',
+          'font-semibold px-2 py-1 rounded-md inline-block',
           store.state.theme === 'dark'
-            ? 'tw:text-blue-400 tw:bg-blue-900/50'
-            : 'tw:text-blue-600 tw:bg-blue-50'
+            ? 'text-blue-400 bg-blue-900/50'
+            : 'text-blue-600 bg-blue-50'
         ]"
       >
         {{ pipelineName }}
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </template>
 
-    <div class="tw:mx-6 tw:my-3 tw:space-y-3">
+    <div class="mx-6 my-3 space-y-3">
           <!-- Advanced Options + numeric ranges are form-owned. The time range is
                a form-owned field too (OFormDateTimeRange). -->
           <OForm id="create-backfill-form" :form="form">
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-if="timerangeError"
-              class="tw:text-xs text-red-600 tw:mt-1"
+              class="text-xs text-red-600 mt-1"
             >
               {{ timerangeError }}
             </div>
@@ -65,12 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Advanced Options -->
           <div class="collapsible-section card-container" data-test="advanced-options-section">
             <div
-              class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
+              class="section-header flex items-center justify-between px-4 py-3 cursor-pointer"
               @click="showAdvanced = !showAdvanced"
             >
-              <div class="tw:flex tw:items-center tw:gap-2">
+              <div class="flex items-center gap-2">
                 <OIcon name="settings" size="md" />
-                <span class="tw:text-sm tw:font-semibold">Advanced Options</span>
+                <span class="text-sm font-semibold">Advanced Options</span>
               </div>
               <OButton
                 variant="ghost-muted"
@@ -82,18 +82,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div v-show="showAdvanced" class="section-content">
-              <div class="tw:space-y-4">
+              <div class="space-y-4">
               <!-- Chunk Period -->
-              <div class="tw:grid tw:grid-cols-12 tw:gap-4 tw:items-start">
-                <div class="tw:col-span-5">
-                  <div class="tw:text-sm tw:font-medium tw:mb-1">
+              <div class="grid grid-cols-12 gap-4 items-start">
+                <div class="col-span-5">
+                  <div class="text-sm font-medium mb-1">
                     Chunk Period (minutes)
                   </div>
-                  <div :class="['tw:text-xs', store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600']">
+                  <div :class="['text-xs', store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-600']">
                     Size of each processing chunk
                   </div>
                 </div>
-                <div class="tw:col-span-7">
+                <div class="col-span-7">
                   <OFormInput
                     name="chunkPeriodMinutes"
                     type="number"
@@ -109,16 +109,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Delay Between Chunks -->
-              <div class="tw:grid tw:grid-cols-12 tw:gap-4 tw:items-start">
-                <div class="tw:col-span-5">
-                  <div class="tw:text-sm tw:font-medium tw:mb-1">
+              <div class="grid grid-cols-12 gap-4 items-start">
+                <div class="col-span-5">
+                  <div class="text-sm font-medium mb-1">
                     Delay Between Chunks (seconds)
                   </div>
-                  <div :class="['tw:text-xs', store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600']">
+                  <div :class="['text-xs', store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-600']">
                     Wait time between processing chunks
                   </div>
                 </div>
-                <div class="tw:col-span-7">
+                <div class="col-span-7">
                   <OFormInput
                     name="delayBetweenChunks"
                     type="number"
@@ -134,31 +134,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Delete Before Backfill -->
-              <div class="tw:pt-2">
+              <div class="pt-2">
                 <OFormCheckbox
                   name="deleteBeforeBackfill"
                   label="Delete existing data before backfill"
                   data-test="delete-before-backfill-checkbox"
-                  class="tw:font-medium"
+                  class="font-medium"
                 />
                 <div
                   v-if="deleteBeforeBackfill"
                   :class="[
-                    'tw:mt-3 tw:p-4 tw:rounded-lg tw:border',
+                    'mt-3 p-4 rounded-lg border',
                     store.state.theme === 'dark'
-                      ? 'tw:bg-orange-900/20 tw:border-orange-700'
-                      : 'tw:bg-orange-50 tw:border-orange-400'
+                      ? 'bg-orange-900/20 border-orange-700'
+                      : 'bg-orange-50 border-orange-400'
                   ]"
                 >
-                  <div class="tw:flex tw:items-start tw:gap-3">
-                    <OIcon name="warning" size="md" class="tw:mt-0.5 tw:text-orange-500 dark:tw:text-orange-400" />
+                  <div class="flex items-start gap-3">
+                    <OIcon name="warning" size="md" class="mt-0.5 text-orange-500 dark:text-orange-400" />
                     <div>
-                      <div :class="['tw:font-semibold tw:mb-2', store.state.theme === 'dark' ? 'tw:text-orange-200' : 'tw:text-orange-900']">Warning: Irreversible Data Deletion</div>
-                      <div :class="['tw:text-xs tw:mb-3', store.state.theme === 'dark' ? 'tw:text-orange-300' : 'tw:text-orange-800']">
+                      <div :class="['font-semibold mb-2', store.state.theme === 'dark' ? 'text-orange-200' : 'text-orange-900']">Warning: Irreversible Data Deletion</div>
+                      <div :class="['text-xs mb-3', store.state.theme === 'dark' ? 'text-orange-300' : 'text-orange-800']">
                         This will permanently delete all data in the destination stream for the specified time range before running the backfill. This action cannot be undone.
                       </div>
-                      <div :class="['tw:font-semibold tw:text-sm tw:mb-1', store.state.theme === 'dark' ? 'tw:text-orange-200' : 'tw:text-orange-900']">Time Alignment Requirements (UTC):</div>
-                      <ul :class="['tw:text-xs tw:ml-5 tw:space-y-1 tw:list-disc', store.state.theme === 'dark' ? 'tw:text-orange-300' : 'tw:text-orange-800']">
+                      <div :class="['font-semibold text-sm mb-1', store.state.theme === 'dark' ? 'text-orange-200' : 'text-orange-900']">Time Alignment Requirements (UTC):</div>
+                      <ul :class="['text-xs ml-5 space-y-1 list-disc', store.state.theme === 'dark' ? 'text-orange-300' : 'text-orange-800']">
                         <li><strong>Logs</strong> streams: Times must align to hour boundaries in UTC (e.g., 10:00:00, not 10:15:00)</li>
                         <li><strong>Metrics/Traces</strong> streams: Times must align to day boundaries in UTC (e.g., 00:00:00)</li>
                       </ul>
@@ -174,26 +174,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="estimatedInfo"
             :class="[
-              'tw:p-3 tw:rounded-lg tw:border',
+              'p-3 rounded-lg border',
               store.state.theme === 'dark'
-                ? 'tw:bg-blue-900/20 tw:border-blue-700'
-                : 'tw:bg-blue-50 tw:border-blue-200'
+                ? 'bg-blue-900/20 border-blue-700'
+                : 'bg-blue-50 border-blue-200'
             ]"
           >
-            <div :class="store.state.theme === 'dark' ? 'tw:text-blue-200' : 'tw:text-blue-800'">
-              <div class="tw:flex tw:items-center tw:gap-2 tw:font-medium tw:mb-1">
+            <div :class="store.state.theme === 'dark' ? 'text-blue-200' : 'text-blue-800'">
+              <div class="flex items-center gap-2 font-medium mb-1">
                 <OIcon name="schedule" size="sm" />
                 <span>Estimated Processing Time: {{ estimatedInfo.time }}</span>
               </div>
-              <div v-if="estimatedInfo.chunks" class="tw:text-xs tw:ml-6">
+              <div v-if="estimatedInfo.chunks" class="text-xs ml-6">
                 Estimated Chunks: {{ estimatedInfo.chunks }}
               </div>
             </div>
           </div>
 
           <!-- Error Message -->
-          <div v-if="errorMessage" class="tw:text-red-500">
-            <OIcon name="error" size="sm" class="tw:mr-2" />
+          <div v-if="errorMessage" class="text-red-500">
+            <OIcon name="error" size="sm" class="mr-2" />
             {{ errorMessage }}
           </div>
           </OForm>
@@ -211,13 +211,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="showDeleteConfirmation = false"
     @click:primary="confirmDelete"
   >
-    <p class="tw:mb-4">
+    <p class="mb-4">
       You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range.
     </p>
-    <p class="tw:font-semibold tw:text-red-600">
+    <p class="font-semibold text-red-600">
       This action CANNOT be undone or cancelled once the job is created.
     </p>
-    <p class="tw:mt-4">Are you sure you want to proceed?</p>
+    <p class="mt-4">Are you sure you want to proceed?</p>
   </ODialog>
 </template>
 

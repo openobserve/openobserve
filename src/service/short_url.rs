@@ -45,7 +45,7 @@ async fn store_short_url(
     short_id: &str,
     original_url: &str,
 ) -> Result<String, anyhow::Error> {
-    let entry = ShortUrlRecord::new(short_id, original_url);
+    let entry = ShortUrlRecord::new(short_id, original_url, org_id);
     db::short_url::set(short_id, entry).await?;
     Ok(construct_short_url(org_id, short_id))
 }
@@ -64,7 +64,7 @@ fn generate_short_id(original_url: &str, timestamp: Option<i64>) -> String {
 pub async fn shorten(org_id: &str, original_url: &str) -> Result<String, anyhow::Error> {
     let mut short_id = generate_short_id(original_url, None);
 
-    if let Ok(existing_url) = db::short_url::get(&short_id).await
+    if let Ok(existing_url) = db::short_url::get(&short_id, org_id).await
         && existing_url == original_url
     {
         return Ok(construct_short_url(org_id, &short_id));
@@ -90,9 +90,9 @@ pub async fn shorten(org_id: &str, original_url: &str) -> Result<String, anyhow:
     }
 }
 
-/// Retrieves the original URL corresponding to the given short ID
-pub async fn retrieve(short_id: &str) -> Option<String> {
-    db::short_url::get(short_id).await.ok()
+/// Retrieves the original URL corresponding to the given short ID, scoped to org_id.
+pub async fn retrieve(org_id: &str, short_id: &str) -> Option<String> {
+    db::short_url::get(short_id, org_id).await.ok()
 }
 
 #[cfg(test)]
@@ -190,7 +190,9 @@ mod tests {
         let short_url = shorten("default", original_url).await.unwrap();
         let short_id = get_short_id_from_url("default", &short_url).unwrap();
 
-        let retrieved_url = retrieve(&short_id).await.expect("Failed to retrieve URL");
+        let retrieved_url = retrieve("default", &short_id)
+            .await
+            .expect("Failed to retrieve URL");
         assert_eq!(retrieved_url, original_url);
 
         let short_id = get_short_id_from_url("default", &short_url).unwrap();
@@ -200,7 +202,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_retrieve_nonexistent_short_id() {
-        let retrieved_url = retrieve("nonexistent_id").await;
+        let retrieved_url = retrieve("default", "nonexistent_id").await;
         assert!(retrieved_url.is_none());
     }
 

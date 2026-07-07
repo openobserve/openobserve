@@ -1,12 +1,13 @@
 <template>
   <div
-    class="action-scripts-toolbar tw:pb-1.5 tw:w-full tw:flex tw:justify-between tw:items-center"
+    data-test="add-script-toolbar"
+    class="pb-1.5 w-full flex justify-between items-center"
   >
-    <div class="tw:flex tw:items-center">
-      <div class="tw:mr-2 add-script-back-btn">
+    <div class="flex items-center">
+      <div class="mr-2">
         <div
           data-test="add-script-back-btn"
-          class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer"
+          class="flex justify-center items-center cursor-pointer"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -19,16 +20,16 @@
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
       </div>
-      <div class="tw:text-lg tw:w-full add-script-title tw:mr-3">
+      <div class="text-lg w-full mr-3">
         Add Action
       </div>
-      <div class="o2-input">
-        <div class="tw:flex tw:items-center">
+      <div>
+        <div class="flex items-center">
           <OInput
             data-test="add-script-name-input"
             v-model.trim="actionName"
             :label="t('actions.name')"
-            class="tw:p-0 tw:w-full"
+            class="p-0 w-full"
             :readonly="disableName"
             :disabled="disableName"
             :error="!!scriptNameError"
@@ -42,7 +43,7 @@
             v-if="isValidMethodName() !== true && showInputError"
             name="info"
             size="md"
-            class="tw:ml-1 tw:cursor-pointer"
+            class="ml-1 cursor-pointer"
             :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-7'"
           >
             <OTooltip side="right" :content="String(isValidMethodName())" />
@@ -50,14 +51,14 @@
         </div>
       </div>
     </div>
-    <div class="add-script-actions tw:flex tw:items-center tw:gap-2">
+    <div data-test="add-script-actions" class="flex items-center gap-2">
       <OButton
         data-test="add-script-fullscreen-btn"
         v-close-popup="true"
         variant="outline"
         size="sm"
         @click="handleFullScreen"
-        ><OIcon name="fullscreen" size="sm" class="tw:mr-1" />{{
+        ><OIcon name="fullscreen" size="sm" class="mr-1" />{{
           t("common.fullscreen")
         }}</OButton
       >
@@ -153,16 +154,3 @@ const onSave = () => {
 
 defineExpose({ addScriptForm });
 </script>
-<style scoped lang="scss">
-.action-scripts-toolbar {
-  :deep(.q-field__bottom) {
-    display: none;
-  }
-
-  .add-script-actions {
-    :deep(.block) {
-      font-weight: lighter;
-    }
-  }
-}
-</style>

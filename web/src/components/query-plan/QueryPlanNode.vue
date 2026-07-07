@@ -15,48 +15,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="plan-node">
+  <div class="plan-node" data-test="query-plan-node">
     <!-- Node content -->
-    <div class="node-line">
+    <div
+      class="node-line flex items-center gap-0 py-[2px] whitespace-pre"
+    >
       <!-- Parent prefix indentation -->
-      <span v-if="parentPrefix" class="tree-indent">{{ parentPrefix }}</span>
+      <span
+        v-if="parentPrefix"
+        data-test="query-plan-node-tree-indent"
+        class="text-[rgba(0,0,0,0.3)] font-bold select-none whitespace-pre dark:text-[rgba(255,255,255,0.3)]"
+      >{{ parentPrefix }}</span>
 
       <!-- Tree connector -->
-      <span class="tree-connector">{{ connector }}</span>
+      <span
+        data-test="query-plan-node-tree-connector"
+        class="text-[rgba(0,0,0,0.3)] font-bold select-none pr-1 dark:text-[rgba(255,255,255,0.3)]"
+      >{{ connector }}</span>
 
       <!-- Expand/collapse icon for nodes with children -->
       <span
         v-if="node.children.length > 0"
-        class="expand-icon"
+        class="expand-icon cursor-pointer select-none text-(--q-primary) text-[10px] w-4 inline-block text-center hover:opacity-70"
+        data-test="query-plan-node-expand-icon"
         @click="toggleChildrenExpanded"
       >
         {{ childrenExpanded ? '▼' : '▶' }}
       </span>
-      <span v-else class="expand-icon-spacer"></span>
+      <span
+        v-else
+        data-test="query-plan-node-expand-icon-spacer"
+        class="w-4 inline-block"
+      ></span>
 
       <!-- Operator name -->
-      <span class="operator-name">{{ node.name }}</span>
+      <span
+        data-test="query-plan-node-operator-name"
+        class="font-semibold text-[rgba(0,0,0,0.87)] pl-1 dark:text-[rgba(255,255,255,0.87)]"
+      >{{ node.name }}</span>
 
       <!-- Inline details (clickable to expand if truncated) -->
       <span
         v-if="inlineDetails"
-        class="inline-details"
-        :class="{ truncated: !detailsExpanded && hasLongDetails, clickable: hasLongDetails }"
+        class="inline-details text-[rgba(0,0,0,0.7)] font-normal text-xs italic dark:text-[rgba(255,255,255,0.7)]"
+        :class="{
+          'cursor-pointer': hasLongDetails,
+          'whitespace-nowrap overflow-hidden [text-overflow:ellipsis] max-w-[600px] truncated': !detailsExpanded && hasLongDetails,
+          clickable: hasLongDetails,
+        }"
+        data-test="query-plan-node-inline-details"
         @click="hasLongDetails ? toggleDetailsExpanded() : null"
       >
         : {{ inlineDetails }}
       </span>
 
       <!-- Separator between details and metrics -->
-      <span v-if="inlineDetails && (isAnalyze && hasMetrics)" class="separator">·</span>
+      <span
+        v-if="inlineDetails && (isAnalyze && hasMetrics)"
+        data-test="query-plan-node-separator"
+        class="text-[rgba(0,0,0,0.4)] px-2 font-normal select-none dark:text-[rgba(255,255,255,0.4)]"
+      >·</span>
 
       <!-- Metrics (for ANALYZE mode) -->
-      <span v-if="isAnalyze && hasMetrics" class="metrics-inline">
-        <span v-if="node.metrics.output_rows !== undefined" class="metric-badge">
+      <span
+        v-if="isAnalyze && hasMetrics"
+        data-test="query-plan-node-metrics-inline"
+        class="flex gap-2"
+      >
+        <span
+          v-if="node.metrics.output_rows !== undefined"
+          data-test="query-plan-node-metric-badge"
+          class="inline-flex items-center gap-1 py-[2px] px-2 bg-[rgba(var(--q-primary-rgb),0.1)] rounded text-[11px] font-medium text-(--q-primary) whitespace-nowrap dark:bg-[rgba(var(--q-primary-rgb),0.2)]"
+        >
           <OIcon name="format-list-numbered" size="xs" />
           {{ formatNumber(node.metrics.output_rows) }} rows
         </span>
-        <span v-if="node.metrics.elapsed_compute" class="metric-badge">
+        <span
+          v-if="node.metrics.elapsed_compute"
+          data-test="query-plan-node-metric-badge"
+          class="inline-flex items-center gap-1 py-[2px] px-2 bg-[rgba(var(--q-primary-rgb),0.1)] rounded text-[11px] font-medium text-(--q-primary) whitespace-nowrap dark:bg-[rgba(var(--q-primary-rgb),0.2)]"
+        >
           <OIcon name="schedule" size="xs" />
           {{ node.metrics.elapsed_compute }}
         </span>
@@ -64,13 +102,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Expanded full details (shown when details are expanded) -->
-    <div v-if="detailsExpanded && hasLongDetails" class="node-details">
-      <span class="tree-indent">{{ childPrefix }}  </span>
+    <div
+      v-if="detailsExpanded && hasLongDetails"
+      data-test="query-plan-node-details"
+      class="pt-[2px] pb-[2px] text-[rgba(0,0,0,0.7)] text-xs italic whitespace-pre-wrap break-words dark:text-[rgba(255,255,255,0.7)]"
+    >
+      <span
+        class="text-[rgba(0,0,0,0.3)] font-bold select-none whitespace-pre dark:text-[rgba(255,255,255,0.3)]"
+      >{{ childPrefix }}  </span>
       <span>{{ inlineDetails }}</span>
     </div>
 
     <!-- Children -->
-    <div v-if="childrenExpanded && node.children.length > 0" class="children">
+    <div
+      v-if="childrenExpanded && node.children.length > 0"
+      class="children"
+      data-test="query-plan-node-children"
+    >
       <QueryPlanNode
         v-for="(child, index) in node.children"
         :key="index"
@@ -188,170 +236,12 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.plan-node {
-  .node-line {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    padding: 2px 0;
-    white-space: pre;
-
-    .tree-indent {
-      color: rgba(0, 0, 0, 0.3);
-      font-weight: bold;
-      user-select: none;
-      white-space: pre;
-    }
-
-    .tree-connector {
-      color: rgba(0, 0, 0, 0.3);
-      font-weight: bold;
-      user-select: none;
-      padding-right: 4px;
-    }
-
-    .expand-icon {
-      cursor: pointer;
-      user-select: none;
-      color: var(--q-primary);
-      font-size: 10px;
-      width: 16px;
-      display: inline-block;
-      text-align: center;
-
-      &:hover {
-        opacity: 0.7;
-      }
-    }
-
-    .expand-icon-spacer {
-      width: 16px;
-      display: inline-block;
-    }
-
-    .operator-name {
-      font-weight: 600;
-      color: rgba(0, 0, 0, 0.87);
-      padding-left: 4px;
-    }
-
-    .inline-details {
-      color: rgba(0, 0, 0, 0.7);
-      font-weight: 400;
-      font-size: 12px;
-      font-style: italic;
-      padding-left: 0;
-
-      &.clickable {
-        cursor: pointer;
-
-        &:hover {
-          color: rgba(0, 0, 0, 0.9);
-        }
-      }
-
-      &.truncated {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 600px;
-      }
-    }
-
-    .separator {
-      color: rgba(0, 0, 0, 0.4);
-      padding: 0 8px;
-      font-weight: 400;
-      user-select: none;
-    }
-
-    .metrics-inline {
-      display: flex;
-      gap: 8px;
-      margin-left: 0;
-
-      .metric-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 2px 8px;
-        background-color: rgba(var(--q-primary-rgb), 0.1);
-        border-radius: 4px;
-        font-size: 11px;
-        font-weight: 500;
-        color: var(--q-primary);
-        white-space: nowrap;
-      }
-    }
-  }
-
-  .node-details {
-    padding-left: 0;
-    padding-top: 2px;
-    padding-bottom: 2px;
-    color: rgba(0, 0, 0, 0.7);
-    font-size: 12px;
-    font-style: italic;
-    white-space: pre-wrap;
-    word-break: break-word;
-
-    .tree-indent {
-      color: rgba(0, 0, 0, 0.3);
-      font-weight: bold;
-      user-select: none;
-      white-space: pre;
-    }
-  }
-
-  .children {
-    padding-left: 0;
-  }
+<style>
+.plan-node .node-line .inline-details.clickable:hover {
+  color: rgba(0, 0, 0, 0.9);
 }
 
-.body--dark {
-  .plan-node {
-    .node-line {
-      .tree-indent {
-        color: rgba(255, 255, 255, 0.3);
-      }
-
-      .tree-connector {
-        color: rgba(255, 255, 255, 0.3);
-      }
-
-      .operator-name {
-        color: rgba(255, 255, 255, 0.87);
-      }
-
-      .inline-details {
-        color: rgba(255, 255, 255, 0.7);
-        font-style: italic;
-
-        &.clickable:hover {
-          color: rgba(255, 255, 255, 0.9);
-        }
-      }
-
-      .separator {
-        color: rgba(255, 255, 255, 0.4);
-      }
-
-      .metrics-inline {
-        .metric-badge {
-          background-color: rgba(var(--q-primary-rgb), 0.2);
-        }
-      }
-    }
-
-    .node-details {
-      color: rgba(255, 255, 255, 0.7);
-      font-style: italic;
-
-      .tree-indent {
-        color: rgba(255, 255, 255, 0.3);
-      }
-    }
-  }
+.body--dark .plan-node .node-line .inline-details.clickable:hover {
+  color: rgba(255, 255, 255, 0.9);
 }
 </style>

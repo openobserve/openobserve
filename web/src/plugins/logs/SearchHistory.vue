@@ -1,10 +1,10 @@
 ﻿<template>
-  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:min-h-0">
+  <div class="w-full h-full flex flex-col min-h-0">
     <AppPageHeader
       :title="t('search_history.title')"
       icon="history"
       :back="{ onClick: closeSearchHistory }"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
           <OButton
@@ -19,14 +19,14 @@
             <OTooltip :content="t('search.messageWrapContent')" />
           </OButton>
           <div
-            class="warning-text tw:flex tw:items-center tw:px-2 tw:h-[36px] tw:rounded-md"
+            class="text-[#f5a623] border border-[#f5a623] flex items-center px-2 h-[36px] rounded-md"
           >
-            <OIcon name="info" class="tw:mr-1" size="sm" />
+            <OIcon name="info" class="mr-1" size="sm" />
             <div>
               {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
             </div>
           </div>
-          <div>
+          <div class="[&_#date-time-button]:h-9!">
             <date-time
               data-test-name="search-history-date-time"
               ref="searchDateTimeRef"
@@ -49,7 +49,7 @@
           </div>
       </template>
     </AppPageHeader>
-    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+    <div class="card-container flex-1 min-h-0 overflow-hidden">
           <OTable
             :frame="false"
             :data="dataToBeLoaded"
@@ -70,12 +70,21 @@
             width="100%"
             @update:expanded-ids="onExpandedIdsChange"
           >
+            <template #cell-executed_time="{ row }">
+              <OTimeCell
+                :value="row.rawExecutedTime"
+                unit="us"
+                mode="absolute"
+                :timezone="store.state.timezone"
+              />
+            </template>
+
             <template #cell-sql="{ row }">
-              <span>{{ row.sql }}</span>
+              <span class="text-text-primary">{{ row.sql }}</span>
             </template>
 
             <template #expansion="{ row }">
-              <div class="app-tabs-container tw:w-fit tw:my-1">
+              <div class="app-tabs-container w-fit my-1">
                 <app-tabs
                   data-test="expanded-list-tabs"
                   class="tabs-selection-container"
@@ -84,15 +93,15 @@
                 />
               </div>
               <div v-show="activeTab === 'query'">
-                <div class="tw:text-left tw:px-2 tw:mb-2 expanded-content">
-                  <div class="tw:flex tw:items-center tw:py-2 tw:gap-2">
+                <div class="text-left px-2 mb-2 expanded-content">
+                  <div class="flex items-center py-2 gap-2">
                     <strong
                       >SQL Query :
                       <span>
                         <OButton
                           variant="ghost"
                           size="icon"
-                          class="copy-btn-sql tw:ml-2"
+                          class="copy-btn-sql ml-2"
                           @click.stop="
                             copyToClipboard(row.sql, { successMessage: 'SQL Query Copied Successfully!', timeout: 5000 })
                           "
@@ -102,7 +111,7 @@
                     <OButton
                       variant="outline-destructive"
                       size="chip"
-                      class="copy-btn tw:mx-2"
+                      class="copy-btn mx-2"
                       @click.stop="goToLogs(row)"
                     >
                       <template #icon-left
@@ -127,7 +136,7 @@
                       Inspect
                     </OButton>
                   </div>
-                  <div class="tw:flex tw:items-start tw:justify-center">
+                  <div class="flex items-start justify-center">
                     <div class="scrollable-content expanded-sql">
                       <pre style="text-wrap: wrap">{{ row?.sql }}</pre>
                     </div>
@@ -135,16 +144,16 @@
                 </div>
                 <div
                   v-if="row?.function"
-                  class="tw:text-left tw:mb-2 tw:px-2 expanded-content"
+                  class="text-left mb-2 px-2 expanded-content"
                 >
-                  <div class="tw:flex tw:items-center tw:py-2">
+                  <div class="flex items-center py-2">
                     <strong
                       >Function Definition :
                       <span>
                         <OButton
                           variant="ghost"
                           size="icon"
-                          class="copy-btn-function tw:ml-2"
+                          class="copy-btn-function ml-2"
                           @click.stop="
                             copyToClipboard(
                               row.function,
@@ -156,7 +165,7 @@
                     ></strong>
                   </div>
 
-                  <div class="tw:flex tw:items-start tw:justify-center">
+                  <div class="flex items-start justify-center">
                     <div class="scrollable-content expanded-function">
                       <pre style="text-wrap: wrap">{{ row?.function }}</pre>
                     </div>
@@ -168,7 +177,6 @@
                 style="height: 200px"
                 :ref="`QueryEditorRef${row.trace_id + row.sql}`"
                 :editor-id="`search-query-editor${row.trace_id + row.sql}`"
-                class="monaco-editor"
                 :debounceTime="600"
                 v-model:query="moreDetailsToDisplay"
                 language="json"
@@ -177,21 +185,21 @@
             </template>
 
             <template #empty>
-              <div v-if="!isLoading" class="tw:flex tw:w-full">
+              <div v-if="!isLoading" class="flex w-full">
                 <OEmptyState size="hero" preset="no-search-history" />
               </div>
             </template>
 
             <template #bottom>
               <div
-                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+                class="flex items-center justify-between w-full h-[48px]"
               >
                 <div
-                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md"
+                  class="o2-table-footer-title flex items-center w-[100px] mr-md"
                 >
                   {{ resultTotal }} {{ t("search_history.results") }}
                 </div>
-                <div class="tw:ml-auto tw:mr-2">Max Limit : <b>1000</b></div>
+                <div class="ml-auto mr-2">Max Limit : <b>1000</b></div>
               </div>
             </template>
           </OTable>
@@ -225,6 +233,7 @@ import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -252,6 +261,7 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OTable,
+    OTimeCell,
     AppPageHeader,
 },
   props: {
@@ -318,7 +328,7 @@ export default defineComponent({
           header: t("search_history.executed_at"),
           accessorKey: "executed_time",
           sortable: true,
-          size: COL.createdAt,
+          size: COL.dateAbsolute,
           meta: { align: "left" },
         },
         {
@@ -633,6 +643,3 @@ export default defineComponent({
   },
 });
 </script>
-<style lang="scss" scoped>
-@import "@/styles/logs/search-history.scss";
-</style>

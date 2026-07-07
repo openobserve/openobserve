@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:flex tw:flex-col" style="height: calc(100vh - 50px);">
+  <div class="flex flex-col" style="height: calc(100vh - 50px);">
     <!-- Standard page header (AppPageHeader), matching Add Panel / Import Dashboard.
          BaseImport's built-in header is hidden (hide-header) so this single header
          serves all three tabs. The title preserves the existing per-tab text: the
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="headerTitle"
       :back="{ label: t('regex_patterns.title'), onClick: arrowBackFn, dataTest: 'regex-pattern-import-back-btn' }"
-      class="tw:px-4 tw:border-b tw:border-border-default"
+      class="px-4 border-b border-border-default"
     >
       <template #actions>
         <OButton
@@ -67,22 +67,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:active-tab="handleTabChange"
     >
     <template #output-content>
-      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
+      <div class="w-full h-full border-l border-border-default" style="min-width: 400px;">
         <div
           v-if="regexPatternErrorsToDisplay.length > 0"
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-center text-xl font-semibold py-2"
         >
           Error Validations
         </div>
-        <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-        <OSeparator class="tw:mt-4" />
-        <div class="error-report-container">
+        <div v-else class="text-center text-xl font-semibold py-2">Output Messages</div>
+        <OSeparator class="mt-4" />
+        <div class="overflow-auto resize-none" style="height: calc(100vh - 200px)">
               <!-- Regex Pattern Errors Section -->
               <div
-                class="error-section"
+                class="p-2.5 mb-2.5"
                 v-if="regexPatternErrorsToDisplay.length > 0"
               >
-                <div class="error-list">
+                <div>
                   <!-- Iterate through the outer array -->
                   <div
                     v-for="(errorGroup, index) in regexPatternErrorsToDisplay"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="(errorMessage, errorIndex) in errorGroup"
                       :key="errorIndex"
-                      class="error-item"
+                      class="py-1.25 text-sm"
                       :data-test="`regex-pattern-import-error-${index}-${errorIndex}`"
                     >
                       <span
@@ -138,28 +138,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <div class="error-section" v-if="regexPatternCreators.length > 0">
+              <div class="p-2.5 mb-2.5" v-if="regexPatternCreators.length > 0">
                 <div
-                  class="section-title text-primary"
+                  class="text-base mb-2.5 uppercase text-primary"
                   data-test="regex-pattern-import-creation-title"
                 >
                   Regex Pattern Creation
                 </div>
                 <div
-                  class="error-list"
                   v-for="(val, index) in regexPatternCreators"
                   :key="index"
                   :data-test="`regex-pattern-import-creation-${index}`"
                 >
                   <div
                     :class="{
-                      'error-item tw:font-bold': true,
+                      'py-1.25 text-sm font-bold': true,
                       'text-green ': val.success,
                       'text-red': !val.success,
                     }"
                     :data-test="`regex-pattern-import-creation-${index}-message`"
                   >
-                    <pre class="creators-message">{{ val.message }}</pre>
+                    <pre style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; max-width: 100%;">{{ val.message }}</pre>
                   </div>
                 </div>
               </div>
@@ -171,10 +170,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Built-in Patterns Tab (full width, no custom import button handling) -->
     <div
       v-if="activeTab === 'import_built_in_patterns'"
-      class="editor-container-built-in"
+      class="w-full flex-1 min-h-0 overflow-hidden flex flex-col"
     >
-      <div class="card-container tw:pt-2 tw:px-2.5">
-        <div class="app-tabs-container tw:h-[36px] tw:w-fit">
+      <div class="card-container pt-2 px-2.5">
+        <div class="app-tabs-container h-9 w-fit">
           <app-tabs
             data-test="regex-pattern-import-tabs"
             class="tabs-selection-container"
@@ -569,114 +568,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.empty-query .monaco-editor-background {
-  background-image: url("../../assets/images/common/query-editor.png");
-  background-repeat: no-repeat;
-  background-size: 115px;
-}
-
-.empty-function .monaco-editor-background {
-  background-image: url("../../assets/images/common/vrl-function.png");
-  background-repeat: no-repeat;
-  background-size: 170px;
-}
-.editor-container {
-  height: calc(70vh - 20px) !important;
-}
-.editor-container-built-in {
-  width: 100%;
-  flex: 1; /* Fill the space left by the page header instead of a fixed calc() */
-  min-height: 0; /* Allow the inner patterns list to scroll within the flex parent */
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.editor-container-url {
-  .monaco-editor {
-    height: calc(100vh - 270px) !important; /* Total editor height */
-    overflow: auto; /* Allows scrolling if content overflows */
-    resize: none; /* Remove resize behavior */
-  }
-}
-.editor-container-json {
-  .monaco-editor {
-   height: calc(100vh - 310px) !important; /* Total editor height */
-    overflow: auto; /* Allows scrolling if content overflows */
-    resize: none; /* Remove resize behavior */
-  }
-}
-.monaco-editor {
-height: calc(100vh - 315px) !important; /* Total editor height */
-  overflow: auto; /* Allows scrolling if content overflows */
-  resize: none; /* Remove resize behavior */
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  padding-top: 0.3rem;
-}
-.error-report-container {
-  height: calc(100vh - 200px) !important; /* Total editor height */
-  overflow: auto; /* Allows scrolling if content overflows */
-  resize: none;
-}
-.error-container {
-  display: flex;
-  overflow-y: auto;
-
-  flex-direction: column;
-  border: 1px solid #ccc;
-  height: calc(100% - 100px) !important; /* Total container height */
-}
-
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-
-.error-list {
-}
-
-.error-item {
-  padding: 5px 0px;
-  font-size: 14px;
-}
-.report-list-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-.creators-message {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  word-break: break-word;
-  max-width: 100%;
-}
-</style>

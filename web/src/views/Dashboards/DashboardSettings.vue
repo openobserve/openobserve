@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer data-test="dashboard-settings-drawer"
     :open="open"
     :width="74"
-    title="Dashboard Settings"
+    :title="t('dashboard.setting')"
     @update:open="$emit('update:open', $event)"
   >
   <div
     data-test="dashboard-settings-main-container"
-    class="tw:p-0"
-    :class="store.state.theme == 'dark' ? 'dark-mode' : 'tw:bg-white'"
+    class="p-0"
+    :class="store.state.theme == 'dark' ? 'dark-mode bg-surface-panel' : 'bg-white'"
     style="min-height: inherit"
   >
 
@@ -44,38 +44,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="generalSettings"
               icon="settings"
               :label="t('dashboard.generalSettings')"
+              class="justify-start py-0 capitalize"
               data-test="dashboard-settings-general-tab"
             />
             <OTab
               name="variableSettings"
               icon="data-array"
               :label="t('dashboard.variableSettings')"
+              class="justify-start py-0 capitalize"
               data-test="dashboard-settings-variable-tab"
             />
             <OTab
               name="tabSettings"
               icon="tab"
               :label="t('dashboard.tabSettings')"
+              class="justify-start py-0 capitalize"
               data-test="dashboard-settings-tab-tab"
             />
           </OTabs>
         </div>
       </template>
       <template v-slot:after>
-        <div class="tw:mx-2 tw:my-2 scroll">
+        <div class="scroll">
           <OTabPanels
             v-model="activeTab"
             animated
           >
-            <OTabPanel name="generalSettings" data-test="general-tab-panels-default">
+            <OTabPanel name="generalSettings" class="!p-0" data-test="general-tab-panels-default">
               <GeneralSettings @save="refreshRequired" @close="$emit('close')" />
             </OTabPanel>
 
-            <OTabPanel name="variableSettings" data-test="variable-tab-panels-default">
+            <OTabPanel name="variableSettings" class="!p-0" data-test="variable-tab-panels-default">
               <VariableSettings @save="refreshRequired" />
             </OTabPanel>
 
-            <OTabPanel name="tabSettings" data-test="tab-tab-panels-default">
+            <OTabPanel name="tabSettings" class="!p-0" data-test="tab-tab-panels-default">
               <TabsSettings @refresh="refreshRequired" />
             </OTabPanel>
           </OTabPanels>
@@ -143,58 +146,26 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.dark-mode {
-  background-color: $dark-page;
-}
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
+<style>
+.functions-tabs .o-tabs--vertical .o-tab__content.tab_content .o-tab__icon + .o-tab__label {
+  padding-left: 0.875rem;
+  font-weight: 600;
 }
 
-.o-tab-panel {
-  padding: 0px !important;
+.functions-tabs .o-tabs--vertical .o-tab--active {
+  color: var(--o2-tab-text-color);
+  background-color: var(--o2-tab-bg);
 }
 
-.functions-tabs {
-  .o-tabs {
-    &--vertical {
-      margin: 20px 16px 0 16px;
-      .o-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        // color: $dark;
-        text-transform: capitalize;
-        &__content.tab_content {
-          .o-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          color: var(--o2-tab-text-color);
-          background-color: var(--o2-tab-bg);
-        }
-      }
-    }
-  }
+.o-splitter__before {
+  border-right: 1px solid var(--o2-border);
 }
 
-:deep(.o-splitter__before) {
-  border-right: 1px solid $border-color;
+.dark-mode .o-splitter__before {
+  border-right-color: rgba(255, 255, 255, 0.12);
 }
 
-.dark-mode {
-  :deep(.o-splitter__before) {
-    border-right-color: rgba(255, 255, 255, 0.12);
-  }
-}
-
-:deep(.o-splitter__separator) {
+.o-splitter__separator {
   display: none !important;
 }
 </style>

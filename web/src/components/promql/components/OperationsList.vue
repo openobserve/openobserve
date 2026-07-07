@@ -1,8 +1,11 @@
 <template>
-    <div style="display: flex; flex-direction: row" class="tw:pl-2">
-      <div class="layout-name">{{ t("panel.operations") }}</div>
-      <span class="layout-separator">:</span>
-      <div class="axis-container scroll tw:flex">
+    <div style="display: flex; flex-direction: row" class="pl-2">
+      <div
+        data-test="promql-operations-list-label"
+        class="text-sm whitespace-nowrap flex items-center min-w-21.5"
+      >{{ t("panel.operations") }}</div>
+      <span class="flex items-center ml-0.5 mr-0.5">:</span>
+      <div class="m-0.5 flex gap-2 flex-wrap items-center scroll">
         <!-- Operations with Drag and Drop -->
         <draggable
           v-if="props.operations.length"
@@ -10,10 +13,10 @@
           @update:modelValue="handleDragUpdate"
           :item-key="getItemKey"
           handle=".drag-handle"
-          class="operations-container"
+          class="flex gap-2 flex-wrap items-center"
         >
           <template v-for="(element, index) in props.operations">
-            <div class="operation-item">
+            <div data-test="promql-operations-item">
               <OButtonGroup class="axis-field" radius="sm">
                 <OButton
                   variant="outline"
@@ -31,7 +34,7 @@
                     <OButton
                       variant="primary"
                       size="chip"
-                      class="tw:!text-[12px]"
+                      class="!text-[12px]"
                       :no-wrap="true"
                       :data-test="`promql-operation-${index}`"
                     >
@@ -42,14 +45,14 @@
                     </OButton>
                   </template>
                   <div
-                    class="operations-list-dropdown tw:p-4"
+                    class="operations-list-dropdown p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
                     :data-test="`promql-operation-${index}-menu`"
                   >
                     <div style="width: 350px">
                       <div class="text-weight-medium">
                         {{ getOperationDef(element.id)?.name || element.id }}
                       </div>
-                      <div class="tw:text-xs tw:text-gray-400">
+                      <div class="text-xs text-gray-400">
                         {{ getOperationDef(element.id)?.documentation }}
                       </div>
 
@@ -66,7 +69,7 @@
                           v-model.number="element.params[paramIndex] as number"
                           type="number"
                           :label="param.name"
-                          class="showLabelOnTop tw:mb-2"
+                          class="showLabelOnTop mb-2"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
@@ -76,7 +79,7 @@
                           v-model="element.params[paramIndex] as string"
                           :label="param.name"
                           :placeholder="param.placeholder"
-                          class="showLabelOnTop tw:mb-2"
+                          class="showLabelOnTop mb-2"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
@@ -88,7 +91,7 @@
                           :label="param.name"
                           multiple
                           searchable
-                          class="operation-label-selector showLabelOnTop no-case tw:mb-2"
+                          class="operation-label-selector showLabelOnTop no-case mb-2"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         >
                           <template #empty>
@@ -138,7 +141,7 @@
       />
 
       <div style="max-height: 400px; overflow-y: auto">
-        <div class="tw:border tw:border-border tw:rounded-md tw:divide-y tw:divide-border">
+        <div class="border border-border rounded-md divide-y divide-border">
           <div
             v-for="category in categories"
             :key="category"
@@ -154,11 +157,11 @@
                   :key="op.id"
                   :data-test="`promql-operation-option-${op.id}`"
                   :data-test-value="op.name"
-                  class="promql-operation-option tw:px-4 tw:py-2 tw:cursor-pointer tw:hover:bg-primary-background tw:text-sm"
+                  class="promql-operation-option px-4 py-2 cursor-pointer hover:bg-primary-background text-sm"
                   @click="addOperation(op); showOperationSelector = false"
                 >
-                  <div class="tw:font-medium">{{ op.name }}</div>
-                  <div class="tw:text-xs tw:text-text-secondary tw:mt-0.5">{{ op.documentation }}</div>
+                  <div class="font-medium">{{ op.name }}</div>
+                  <div class="text-xs text-text-secondary mt-0.5">{{ op.documentation }}</div>
                 </div>
               </div>
             </OCollapsible>
@@ -287,37 +290,8 @@ defineExpose({
 });
 </script>
 
-<style scoped lang="scss">
-.layout-name {
-  font-size: 14px;
-  white-space: nowrap;
-  min-width: 86px;
-  display: flex;
-  align-items: center;
-}
-
-.layout-separator {
-  display: flex;
-  align-items: center;
-  margin-left: 2px;
-  margin-right: 2px;
-}
-
-.axis-container {
-  margin: 2px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.operations-container {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
+<style>
+/* Deep Quasar override — must stay in CSS */
 :deep(
   .operation-label-selector.q-field--labeled.showLabelOnTop.q-select
     .q-field__control-container
@@ -328,17 +302,8 @@ defineExpose({
   max-width: 75% !important;
 }
 
-.drag-handle {
-  cursor: grab;
-
-  &:active {
-    cursor: grabbing;
-  }
-}
-
-.operations-list-dropdown {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
+/* drag-handle :active state — compound pseudo-class selector, keep in CSS */
+.drag-handle:active {
+  cursor: grabbing;
 }
 </style>

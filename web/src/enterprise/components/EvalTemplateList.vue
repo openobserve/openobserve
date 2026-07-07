@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="eval-template-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="flex flex-col h-full min-h-0"
   >
     <!-- Standard section header: title + section tabs + actions. -->
     <AppPageHeader
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="fact-check"
       :subtitle="'Reusable scoring templates for LLM evaluations'"
       tabs-below
-      class="tw:shrink-0 tw:px-4"
+      class="shrink-0 px-4"
     >
       <template #title>
         <span data-test="eval-template-list-title">{{ t("evalTemplate.header") }}</span>
@@ -54,8 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
 
     <!-- Table area -->
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="card-container h-full">
         <OTable
           :frame="false"
           data-test="eval-template-list-table"
@@ -75,28 +75,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :persist-columns="true"
           table-id="pipelines-evaluation-templates"
           width="100%"
-          class="tw:w-full tw:h-full"
+          class="w-full h-full"
         >
           <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+            <div class="flex items-center gap-2 w-full">
               <OSearchInput
                 data-test="eval-template-list-search-input"
                 v-model="filterQuery"
-                class="tw:flex-1"
+                class="flex-1"
                 :placeholder="t('evalTemplate.search')"
               />
             </div>
           </template>
           <!-- Version column -->
           <template #cell-version="{ row }">
-            <span class="eval-version-badge">v{{ row.version }}</span>
+            <OTag type="fieldTag" value="soft">v{{ row.version }}</OTag>
           </template>
 
           <!-- Actions column -->
           <template #cell-actions="{ row }">
-            <div class="tw:flex tw:items-center tw:justify-center actions-container">
+            <div class="flex items-center justify-center actions-container">
               <OButton
                 :data-test="`eval-template-list-${row.name}-edit-btn`"
+                data-row-action="edit"
                 icon-left="edit"
                 variant="ghost"
                 size="icon-sm"
@@ -105,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 :data-test="`eval-template-list-${row.name}-delete-btn`"
+                data-row-action="delete"
                 icon-left="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
@@ -129,10 +131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Pagination footer -->
           <template #bottom="bottomProps">
             <div
-              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
+              class="flex items-center justify-between w-full py-2"
             >
               <div
-                class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4"
+                class="flex items-center font-bold text-[14px] mr-4"
               >
                 {{ bottomProps.totalRows }} {{ t("evalTemplate.header") }}
               </div>
@@ -181,6 +183,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
@@ -245,7 +248,7 @@ const columns = ref<OTableColumnDef<Template>[]>([
     resizable: true,
     hideable: true,
     size: COL.version,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "updated_at",
@@ -404,16 +407,3 @@ onBeforeMount(async () => {
 });
 </script>
 
-<style scoped lang="scss">
-.eval-version-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.15));
-  color: var(--q-color-text);
-  background: transparent;
-}
-</style>

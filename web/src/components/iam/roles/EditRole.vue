@@ -15,30 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:pb-[0.625rem] tw:h-full" data-test="edit-role-page">
+  <div class="flex flex-col pb-[0.625rem] h-full" data-test="edit-role-page">
     <!-- Sub-page header: the listing's icon becomes a Back button (→ Roles). -->
     <AppPageHeader
       :title="editingRole"
       :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     />
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
-      class="tw:shrink-0"
+      class="shrink-0"
     >
-    <div class="card-container tw:py-2 tw:flex tw:flex-col">
+    <div class="card-container py-2 flex flex-col">
            <AppTabs
               data-test="edit-role-tabs"
               :tabs="tabs"
               :active-tab="activeTab"
+              :dirty-title="t('iam.editRole.unsavedDot.title')"
               @update:active-tab="updateActiveTab"
             />
     </div>
 </div>
 
 
-      <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="flex-1 min-h-0 overflow-hidden">
         <GroupUsers
           data-test="edit-role-users-section"
           v-show="activeTab === 'users'"
@@ -54,28 +55,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="activeTab === 'serviceAccounts'"
           :groupUsers="roleUsers"
           :activeTab="activeTab"
-          :added-users="addedUsers"
-          :removed-users="removedUsers"
+          :added-users="addedServiceAccounts"
+          :removed-users="removedServiceAccounts"
         />
 
         <div
           v-show="activeTab === 'permissions'"
           data-test="edit-role-permissions-section"
-          class="card-container tw:flex tw:flex-col tw:h-full"
+          class="card-container flex flex-col h-full"
         >
           <div
-            class="tw:flex tw:justify-between tw:items-center tw:flex-shrink-0"
-            :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+            class="flex justify-between items-center flex-shrink-0"
+            :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
           >
             <div
               v-show="permissionsUiType === 'table'"
               data-test="edit-role-permissions-filters"
-              class="tw:flex tw:items-start tw:px-3 tw:py-2 tw:justify-start tw:gap-3"
+              class="flex items-start px-3 py-2 justify-start gap-3"
               style="position: sticky; top: 0px; z-index: 2"
             >
               <div
                 data-test="edit-role-permissions-show-toggle"
-                class="tw:flex tw:items-center"
+                class="flex items-center"
               >
                 <span
                   data-test="edit-role-permissions-show-text"
@@ -84,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Show
                 </span>
                 <OToggleGroup
-                  class="tw:ml-1"
+                  class="ml-1"
                   :model-value="filter.permissions"
                   @update:model-value="(v) => updateTableData(v as string)"
                 >
@@ -103,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OInput
                   v-model="filter.value"
                   :debounce="500"
-                  class="no-border o2-search-input tw:h-[36px] tw:w-[200px]"
+                  class="no-border o2-search-input h-[36px] w-[200px]"
                   :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                   :placeholder="`Search Permissions`"
                   @update:model-value="onResourceChange"
@@ -126,16 +127,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div></div>
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="flex items-center gap-2">
               <span
                 data-test="edit-role-permissions-count"
-                class="tw:font-bold tw:text-[14px]"
+                class="font-bold text-[14px]"
               >
                 {{ selectedPermissionsHash.size }} Permissions
               </span>
               <OToggleGroup
                 data-test="edit-role-permissions-ui-type-toggle"
-                class="tw:mr-3 tw:my-1"
+                class="mr-3 my-1"
               :model-value="permissionsUiType"
                 @update:model-value="(v) => updatePermissionsUi(v as string)"
               >
@@ -154,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             data-test="edit-role-permissions-table-section"
-            class="el-border-radius tw:flex-1 tw:min-h-0 tw:overflow-y-auto"
+            class="el-border-radius flex-1 min-h-0 overflow-y-auto"
           >
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
@@ -172,20 +173,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div v-show="permissionsUiType === 'json'">
-              <div class="tw:flex tw:items-center tw:justify-between">
-                <div class="tw:mb-3 tw:font-bold">
+              <div class="flex items-center justify-between">
+                <div class="mb-3 font-bold">
                   {{ selectedPermissionsHash.size }} Permission
                 </div>
                 <div
-                  class="tw:flex tw:items-center tw:cursor-pointer"
+                  class="flex items-center cursor-pointer"
                   :title="t('menu.help')"
                   @click="toggleHelpSection"
                 >
                   <OIcon name="help" size="sm" />
-                  <span class="tw:ml-1"> Help </span>
+                  <span class="ml-1"> Help </span>
                 </div>
               </div>
-              <div class="tw:flex tw:flex-nowrap">
+              <div class="flex flex-nowrap">
                 <div
                   :style="
                     isHelpOpen
@@ -196,26 +197,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <query-editor
                     data-test="logs-vrl-function-editor"
                     editor-id="add-function-editor"
-                    class="monaco-editor tw:mt-2"
+                    class="mt-2"
                     language="json"
                     ref="permissionJsonEditorRef"
                     v-model:query="permissionsJsonValue"
                     style="height: calc(100vh - var(--navbar-height) - 295px)"
                   />
                 </div>
-                <div v-if="isHelpOpen" style="width: 350px" class="tw:p-2">
-                  <div class="tw:flex tw:justify-between tw:items-center tw:px-2">
+                <div v-if="isHelpOpen" style="width: 350px" class="p-2">
+                  <div class="flex justify-between items-center px-2">
                     <div style="font-size: 16px">Quick Reference</div>
                     <OIcon
-                      class="tw:cursor-pointer"
+                      class="cursor-pointer"
                       name="close"
                       size="xs"
                       :title="t('common.close')"
                       @click="toggleHelpSection"
                     />
                   </div>
-                  <OSeparator class="tw:mt-2 tw:mb-4" />
-                  <div class="tw:mt-2 tw:px-2">
+                  <OSeparator class="mt-2 mb-4" />
+                  <div class="mt-2 px-2">
                     <div>
                       Configure access with JSON objects specifying "object"
                       (resource) and "permission" (access level).
@@ -227,9 +228,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }</pre
                     >
                     <div>
-                      <span class="tw:font-bold">Child Resource:</span> <br />
+                      <span class="font-bold">Child Resource:</span> <br />
                       Specific instance or
-                      <span class="tw:font-bold">organizationID</span> for all
+                      <span class="font-bold">organizationID</span> for all
                       instances within a main resource.
                     </div>
                   </div>
@@ -240,10 +241,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="tw:flex tw:justify-end tw:w-full tw:flex-shrink-0 tw:mt-[0.625rem]"
+        class="flex justify-end w-full flex-shrink-0 mt-[0.625rem]"
         style="z-index: 2"
       >
-      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2 tw:border-t tw:border-border-default">
+      <div class="card-container w-full py-2 px-3 justify-end flex gap-2 border-t border-border-default">
         <OButton
           data-test="edit-role-cancel-btn"
           variant="outline"
@@ -264,6 +265,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       </div>
   </div>
+  <ConfirmDialog
+    :title="t('iam.editRole.leaveConfirm.title')"
+    :message="t('iam.editRole.leaveConfirm.message')"
+    @update:ok="onLeaveConfirm(true)"
+    @update:cancel="onLeaveConfirm(false)"
+    v-model="leaveConfirm.show"
+  />
 </template>
 
 <script setup lang="ts">
@@ -280,8 +288,9 @@ import type { Resource, Entity, Permission } from "@/ts/interfaces";
 import PermissionsTable from "@/components/iam/roles/PermissionsTable.vue";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
-import { useRouter } from "vue-router";
+import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import {
   updateRole,
   getResources,
@@ -368,11 +377,63 @@ const permissionsJsonValue = ref("");
 const addedUsers = ref(new Set());
 const removedUsers = ref(new Set());
 
+// Service-account membership is staged in its own pair of sets so the Users and
+// Service Accounts tabs track dirty state independently (they're sent together
+// as users in the save payload, since the backend treats both as principals).
+const addedServiceAccounts = ref(new Set());
+const removedServiceAccounts = ref(new Set());
+
 const roleUsers: Ref<string[]> = ref([]);
 
 const permissionsUiType = ref("table");
 
 const { getStreams } = useStreams();
+
+// Per-tab unsaved-changes flags. Each tab tracks only its own pending changes.
+const isPermissionsDirty = computed(
+  () =>
+    Object.keys(addedPermissions.value).length > 0 ||
+    Object.keys(removedPermissions.value).length > 0,
+);
+
+const isUsersDirty = computed(
+  () => addedUsers.value.size > 0 || removedUsers.value.size > 0,
+);
+
+const isServiceAccountsDirty = computed(
+  () =>
+    addedServiceAccounts.value.size > 0 ||
+    removedServiceAccounts.value.size > 0,
+);
+
+const isAnyDirty = computed(
+  () =>
+    isPermissionsDirty.value ||
+    isUsersDirty.value ||
+    isServiceAccountsDirty.value,
+);
+
+// Route-leave guard: warn before discarding unsaved permission/membership
+// changes. The pending navigation is held until the user resolves the dialog.
+const leaveConfirm = ref<{
+  show: boolean;
+  resolve: ((proceed: boolean) => void) | null;
+}>({ show: false, resolve: null });
+
+const onLeaveConfirm = (proceed: boolean) => {
+  leaveConfirm.value.show = false;
+  leaveConfirm.value.resolve?.(proceed);
+  leaveConfirm.value.resolve = null;
+};
+
+onBeforeRouteLeave(() => {
+  if (!isAnyDirty.value) return true;
+
+  return new Promise<boolean>((resolve) => {
+    leaveConfirm.value.resolve = resolve;
+    leaveConfirm.value.show = true;
+  });
+});
 
 const tabs = computed(() => {
   const baseTabs = [
@@ -380,11 +441,13 @@ const tabs = computed(() => {
       value: "permissions",
       label: "Permissions",
       icon: "shield",
+      dirty: isPermissionsDirty.value,
     },
     {
       value: "users",
       label: "Users",
       icon: "group",
+      dirty: isUsersDirty.value,
     },
   ];
 
@@ -393,6 +456,7 @@ const tabs = computed(() => {
       value: "serviceAccounts",
       label: "Service Accounts",
       icon: "smart-toy",
+      dirty: isServiceAccountsDirty.value,
     });
   }
 
@@ -468,6 +532,21 @@ const getRoleDetails = () => {
       savePermissionHash();
       await updateRolePermissions(permissions.value);
       isFetchingInitialRoles.value = false;
+
+      // A brand-new role has no saved permissions, so the default "Selected"
+      // filter renders an empty matrix that looks broken. Default to "All" so
+      // the user sees the full permission grid to start checking boxes.
+      if (selectedPermissionsHash.value.size === 0) {
+        filter.value.permissions = "all";
+
+        // "Read-only" preset (from the Add Role dialog) seeds AllowList +
+        // AllowGet across all top-level resources so evaluators get a safe,
+        // non-empty starting point. These land as pending "added" permissions
+        // the user can still tweak before saving.
+        if (router.currentRoute.value.query.preset === "readonly") {
+          seedReadonlyPreset();
+        }
+      }
 
       updateTableData();
     })
@@ -867,6 +946,23 @@ const cancelPermissionsUpdate = () => {
         }
      } 
 );
+};
+
+// Seed AllowList + AllowGet on every visible top-level resource. Mirrors a
+// user manually checking those two columns, so the changes flow through the
+// normal added/removed-permission bookkeeping and the Save payload.
+const seedReadonlyPreset = () => {
+  const readonlyPerms = ["AllowList", "AllowGet"];
+  permissionsState.permissions.forEach((resource: Resource) => {
+    readonlyPerms.forEach((perm) => {
+      const permDetail = resource.permission?.[perm as "AllowList"];
+      // Only seed permissions the resource actually exposes and that are not
+      // already selected.
+      if (!permDetail || !permDetail.show || permDetail.value) return;
+      permDetail.value = true;
+      handlePermissionChange(resource, perm);
+    });
+  });
 };
 
 const handlePermissionChange = (row: any, permission: string) => {
@@ -2294,11 +2390,17 @@ const updateResourceResource = (
 const saveRole = () => {
   if (permissionsUiType.value === "json") updateJsonInTable();
 
+  // Users and service accounts are both sent as users; merge the two staging
+  // sets (dedup via Set) for the request payload.
   const payload = {
     add: Object.values(addedPermissions.value),
     remove: Object.values(removedPermissions.value),
-    add_users: Array.from(addedUsers.value) as string[],
-    remove_users: Array.from(removedUsers.value) as string[],
+    add_users: Array.from(
+      new Set([...addedUsers.value, ...addedServiceAccounts.value]),
+    ) as string[],
+    remove_users: Array.from(
+      new Set([...removedUsers.value, ...removedServiceAccounts.value]),
+    ) as string[],
   };
 
   if (
@@ -2352,16 +2454,26 @@ const saveRole = () => {
       removedPermissions.value = {};
 
       roleUsers.value = roleUsers.value.filter(
-        (user) => !removedUsers.value.has(user),
+        (user) =>
+          !removedUsers.value.has(user) &&
+          !removedServiceAccounts.value.has(user),
       );
 
       addedUsers.value.forEach((value: any) => {
         roleUsers.value.push(value);
       });
 
+      addedServiceAccounts.value.forEach((value: any) => {
+        roleUsers.value.push(value);
+      });
+
       addedUsers.value = new Set([]);
 
       removedUsers.value = new Set([]);
+
+      addedServiceAccounts.value = new Set([]);
+
+      removedServiceAccounts.value = new Set([]);
     })
     .catch((err) => {
       if (err.response.status != 403) {
@@ -2429,4 +2541,3 @@ const toggleHelpSection = async () => {
   permissionJsonEditorRef.value.resetEditorLayout();
 };
 </script>
-<style scoped></style>

@@ -1,5 +1,5 @@
 <template>
-  <div ref="chartEl" class="qbbars" data-test="quality-boolean-bars-chart" />
+  <div ref="chartEl" class="w-full h-full min-h-30" data-test="quality-boolean-bars-chart" />
 </template>
 
 <script setup lang="ts">
@@ -83,11 +83,3 @@ onBeforeUnmount(() => {
   chart = null;
 });
 </script>
-
-<style lang="scss" scoped>
-.qbbars {
-  width: 100%;
-  height: 100%;
-  min-height: 120px;
-}
-</style>

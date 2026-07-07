@@ -15,13 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="description">
+  <div class="wrap-break-word overflow-hidden whitespace-break-spaces">
     <template
       v-if="
         column.type === 'view' && column.view_loading_type === 'route_change'
       "
     >
-      <pre class="navigation tw:p-2">
+      <pre
+        data-test="error-event-description-navigation"
+        class="bg-[#ececec] rounded p-2"
+      >
 {
   <span class="text-primary">from</span> : {{ column.view_referrer }},
   <span class="text-primary">to</span> : {{ column.view_url }}
@@ -30,19 +33,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template
       v-else-if="column.type === 'resource' && column.resource_type === 'xhr'"
     >
-      <span class="tw:font-bold tw:pr-2 tw:text-[0.75rem]">{{
+      <span class="font-bold pr-2 text-[0.75rem]">{{
         column.resource_method
       }}</span>
       <a
         :href="column.resource_url"
         target="_blank"
-        class="resource-url text-primary"
+        data-test="error-event-description-resource-url"
+        class="resource-url no-underline text-sm text-primary"
         >{{ column.resource_url }}</a
       >
-      <span class="tw:pl-2">[ {{ column.resource_status_code }} ]</span>
+      <span class="pl-2">[ {{ column.resource_status_code }} ]</span>
     </template>
     <template v-else>
-      <span class="tw:text-[0.875rem]">{{ getDescription }}</span>
+      <span
+        data-test="error-event-description-default"
+        class="text-[0.875rem]"
+      >{{ getDescription }}</span>
     </template>
   </div>
 </template>
@@ -82,20 +89,3 @@ const getDescription = computed(() => {
 });
 </script>
 
-<style scoped>
-.description {
-  word-wrap: break-word;
-  overflow: hidden;
-  white-space: break-spaces;
-}
-
-.navigation {
-  background-color: #ececec;
-  border-radius: 4px;
-}
-
-.resource-url {
-  text-decoration: none;
-  font-size: 14px;
-}
-</style>

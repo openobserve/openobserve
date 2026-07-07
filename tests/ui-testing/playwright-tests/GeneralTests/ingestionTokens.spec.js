@@ -67,12 +67,13 @@ test.describe("Org-Level Ingestion Tokens", () => {
         // Should see success toast
         await pageManager.ingestionTokensPage.verifySuccessMessage('Token created successfully.');
 
-        // Revealed dialog should show the token
+        // Revealed dialog shows the ready-to-use "Basic base64(name:token)"
+        // credential (not the raw token) so it can be pasted straight into an
+        // Authorization header.
         const revealedCode = pageManager.ingestionTokensPage.revealedTokenCode;
         await expect(revealedCode).toBeVisible({ timeout: 5000 });
-        const tokenText = await revealedCode.textContent();
-        expect(tokenText).toMatch(/^o2oi_/);
-        expect(tokenText.length).toBe(37);
+        const credText = await revealedCode.textContent();
+        expect(credText).toMatch(/^Basic /);
 
         // Close revealed dialog
         await pageManager.ingestionTokensPage.closeRevealedDialog();
@@ -99,16 +100,18 @@ test.describe("Org-Level Ingestion Tokens", () => {
         await pageManager.ingestionTokensPage.gotoIngestionTokensTab();
         await pageManager.ingestionTokensPage.clickCreateToken();
 
-        // Primary button should be disabled when name is empty
-        await expect(pageManager.ingestionTokensPage.dialogPrimaryBtn).toBeDisabled();
-
-        // Typing a valid name should enable the button
-        await pageManager.ingestionTokensPage.fillTokenName('valid-name');
+        // R3: Save stays enabled; the Zod schema gates the submit, not the button.
         await expect(pageManager.ingestionTokensPage.dialogPrimaryBtn).toBeEnabled();
 
-        // Clearing the name should disable the button again
-        await pageManager.ingestionTokensPage.fillTokenName('');
-        await expect(pageManager.ingestionTokensPage.dialogPrimaryBtn).toBeDisabled();
+        // Submitting with an empty name reveals the inline required error and does
+        // NOT create the token (the dialog stays open).
+        await pageManager.ingestionTokensPage.clickCreate();
+        await expect(page.locator('[data-test="ingestion-token-name-input-error"]')).toBeVisible();
+        await expect(pageManager.ingestionTokensPage.dialogPrimaryBtn).toBeVisible();
+
+        // Typing a valid name clears the error.
+        await pageManager.ingestionTokensPage.fillTokenName('valid-name');
+        await expect(page.locator('[data-test="ingestion-token-name-input-error"]')).toBeHidden();
 
         // Cancel and close
         await pageManager.ingestionTokensPage.clickCancel();
@@ -135,19 +138,23 @@ test.describe("Org-Level Ingestion Tokens", () => {
         await pageManager.ingestionTokensPage.fillTokenName(uniqueName);
         await pageManager.ingestionTokensPage.clickCreate();
 
-        // Wait for revealed dialog
+        // Wait for revealed dialog — shows the ready-to-use Basic credential.
         const revealedCode = pageManager.ingestionTokensPage.revealedTokenCode;
         await expect(revealedCode).toBeVisible({ timeout: 5000 });
-        const tokenText = await revealedCode.textContent();
-        expect(tokenText).toMatch(/^o2oi_/);
+        const credText = await revealedCode.textContent();
+        expect(credText).toMatch(/^Basic /);
 
-        // Grant clipboard permissions and copy
         await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-        await pageManager.ingestionTokensPage.clickCopyToken();
 
-        // Verify clipboard contains the token
-        const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
-        expect(clipboardText).toBe(tokenText);
+        // Primary "Copy Authorization header" copies the Basic credential shown.
+        await pageManager.ingestionTokensPage.clickCopyToken();
+        const authClipboard = await page.evaluate(() => navigator.clipboard.readText());
+        expect(authClipboard).toBe(credText);
+
+        // Secondary "Copy raw token" copies the raw o2oi_ token.
+        await pageManager.ingestionTokensPage.clickCopyRawToken();
+        const rawClipboard = await page.evaluate(() => navigator.clipboard.readText());
+        expect(rawClipboard).toMatch(/^o2oi_/);
 
         // Close dialog
         await pageManager.ingestionTokensPage.closeRevealedDialog();

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:w-full"
+    class="w-full"
     :class="[containerClass]"
     :style="containerStyle"
   >
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!hideHeader"
       :title="title"
       :back="{ label: '', onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
-      class="tw:-mx-[0.625rem] tw:px-4 tw:border-b tw:border-border-default"
+      class="-mx-[0.625rem] px-4 border-b border-border-default"
       :class="headerContainerClass"
     >
       <template #actions>
@@ -54,8 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </AppPageHeader>
 
-    <div class="tw:flex" :class="contentWrapperClass">
-      <div class="tw:flex" :style="contentStyle">
+    <div class="flex" :class="contentWrapperClass">
+      <div class="flex" :style="contentStyle">
         <OSplitter
           v-if="showSplitter"
           class="logs-search-splitter"
@@ -65,10 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :horizontal="false"
         >
           <template #before>
-            <div class="tw:w-full tw:h-full tw:border-r tw:border-border-default">
+            <div class="w-full h-full border-r border-border-default">
               <!-- Tabs Section -->
-              <div class="card-container tw:py-2 tw:px-2 tw:mb-[0.625rem]">
-                <div class="app-tabs-container tw:h-[36px] tw:w-fit">
+              <div class="card-container py-2 px-2 mb-[0.625rem]">
+                <div class="app-tabs-container h-[36px] w-fit">
                   <app-tabs
                     :data-test="`${testPrefix}-import-tabs`"
                     class="tabs-selection-container"
@@ -82,12 +82,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- URL Import Tab -->
               <div
                 v-if="activeTab === 'import_json_url'"
-                class="editor-container-url card-container tw:py-1"
+                class="editor-container-url card-container py-1"
               >
-                <div class="tw:mx-2 tw:pb-2">
+                <div class="mx-2 pb-2">
                   <!-- Slot for custom URL input section -->
                   <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
-                    <div class="tw:flex tw:mt-3 tw:mb-3">
+                    <div class="flex mt-3 mb-3">
                         <OInput
                           :data-test="`${testPrefix}-import-url-input`"
                           v-model="url"
@@ -102,29 +102,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="monaco-editor tw:mx-2"
+                    class="import-editor-shell import-url-editor mx-2"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
-                    :class="
-                      jsonStr === '' && queryEditorPlaceholderFlag
-                        ? 'empty-query'
-                        : ''
-                    "
-                    @focus="queryEditorPlaceholderFlag = false"
-                    @blur="queryEditorPlaceholderFlag = true"
                   />
                 </div>
               </div>
               <div
                 v-if="activeTab === 'import_json_file'"
-                class="editor-container-json card-container tw:py-1"
+                class="editor-container-json card-container py-1"
               >
-                <div class="tw:mx-2 tw:mt-3 tw:pb-2">
+                <div class="mx-2 mt-3 pb-2">
                   <!-- Slot for custom file input section -->
                   <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
-                    <div style="width: calc(100% - 10px)" class="tw:mb-1 tw:flex">
-                      <div style="width: 100%" class="tw:pr-2">
+                    <div style="width: calc(100% - 10px)" class="mb-1 flex">
+                      <div style="width: 100%" class="pr-2">
                         <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
                           v-model="jsonFiles"
@@ -141,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OIcon
                               name="close" size="sm"
                               @click.stop.prevent="jsonFiles = null"
-                              class="tw:cursor-pointer"
+                              class="cursor-pointer"
                             />
                           </template>
                         </OFile>
@@ -154,17 +147,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="monaco-editor tw:mx-2"
+                    class="import-editor-shell import-file-editor mx-2"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
-                    :class="
-                      jsonStr === '' && queryEditorPlaceholderFlag
-                        ? 'empty-query'
-                        : ''
-                    "
-                    @focus="queryEditorPlaceholderFlag = false"
-                    @blur="queryEditorPlaceholderFlag = true"
                   />
                 </div>
               </div>
@@ -176,17 +162,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               :data-test="`${testPrefix}-import-output-editor`"
-              class="card-container tw:w-full"
+              class="card-container w-full"
               :style="outputContainerStyle"
             >
               <!-- Slot for complete output section customization -->
               <slot name="output-section">
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
-                  <div class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-                  <OSeparator class="tw:mr-4 tw:mt-4" />
+                  <div class="text-center text-xl font-semibold py-2">Output Messages</div>
+                  <OSeparator class="mr-4 mt-4" />
                   <div class="error-report-container">
-                    <div class="tw:text-center tw:p-3 tw:text-gray-400">
+                    <div class="text-center p-3 text-gray-400">
                       No messages to display
                     </div>
                   </div>
@@ -196,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OSplitter>
 
-        <!-- Slot for tw:w-full content (when splitter is not shown) -->
+        <!-- Slot for w-full content (when splitter is not shown) -->
         <slot name="full-width-content" v-if="!showSplitter" />
       </div>
     </div>
@@ -301,7 +287,7 @@ export default defineComponent({
     // Custom classes
     containerClass: {
       type: String,
-      default: "tw:px-[0.625rem] tw:mb-[0.625rem]",
+      default: "px-[0.625rem] mb-[0.625rem]",
     },
     containerStyle: {
       type: String,
@@ -313,11 +299,11 @@ export default defineComponent({
     },
     headerClass: {
       type: String,
-      default: "tw:py-3",
+      default: "py-3",
     },
     titleClass: {
       type: String,
-      default: "tw:font-[600] tw:text-[20px]",
+      default: "font-[600] text-[20px]",
     },
     contentWrapperClass: {
       type: String,
@@ -351,7 +337,6 @@ export default defineComponent({
     const jsonArrayOfObj = ref<any[]>([]);
     const activeTab = ref(props.defaultActiveTab);
     const splitterModel = ref(60);
-    const queryEditorPlaceholderFlag = ref(true);
     const editorKey = ref(0); // Force editor to re-render when changes
     const isImporting = ref(false); // Track if import is in progress
 
@@ -506,6 +491,13 @@ export default defineComponent({
       () => jsonStr.value,
       (newVal) => {
         emit("update:jsonStr", newVal);
+        // Editor emptied → clear the selected file(s) too, so the file input
+        // stays in sync with the editor (mirrors the file→editor clear above).
+        if (newVal === "" && jsonFiles.value) {
+          jsonFiles.value = null;
+          jsonArrayOfObj.value = [];
+          emit("update:jsonArray", jsonArrayOfObj.value);
+        }
       },
     );
 
@@ -538,7 +530,6 @@ export default defineComponent({
       jsonArrayOfObj,
       activeTab,
       splitterModel,
-      queryEditorPlaceholderFlag,
       editorKey,
       isImporting,
       handleBack,
@@ -557,42 +548,32 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.empty-query .monaco-editor-background {
-  background-image: url("../../assets/images/common/query-editor.png");
-  background-repeat: no-repeat;
-  background-size: 115px;
-}
-
-.editor-container-url {
-  .monaco-editor {
-    height: v-bind('editorHeights.urlEditor') !important;
-    overflow: auto;
-    resize: none;
-    border: 1px solid var(--o2-border-color);
-    border-radius: 0.375rem;
-    padding-top: 12px;
-  }
-}
-
-.editor-container-json {
-  .monaco-editor {
-    height: v-bind('editorHeights.fileEditor') !important;
-    overflow: auto;
-    resize: none;
-    border: 1px solid var(--o2-border-color);
-    border-radius: 0.375rem;
-    padding-top: 12px;
-  }
-}
-
-.monaco-editor {
-  height: v-bind('editorHeights.fileEditor') !important;
-  overflow: auto;
-  resize: none;
+<style>
+/*
+ * Box styling (border, radius, padding, height) lives on the editor SHELL
+ * wrapper — never on Monaco's internal .monaco-editor element. Monaco sizes
+ * its inner .overflow-guard to the full box it measures; adding border/padding
+ * directly to that element shrinks the content box and forces phantom
+ * horizontal + vertical scrollbars. Styling the wrapper lets Monaco fill a
+ * clean box and removes the scrollbars without any !important overrides.
+ */
+.import-editor-shell {
+  box-sizing: border-box;
+  /* w-full (100%) + mx-2 (1rem total) would overflow by 1rem and add a
+     horizontal scrollbar; subtract the margins so the box stays inside and
+     keeps a right-side gap. */
+  width: calc(100% - 1rem);
   border: 1px solid var(--o2-border-color);
   border-radius: 0.375rem;
-  width: calc(100% - 14px) !important;
+  overflow: hidden;
+}
+
+.import-url-editor {
+  height: v-bind('editorHeights.urlEditor');
+}
+
+.import-file-editor {
+  height: v-bind('editorHeights.fileEditor');
 }
 
 .error-report-container {
@@ -601,22 +582,4 @@ export default defineComponent({
   resize: none;
 }
 
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-
-.error-list {
-}
-
-.error-item {
-  padding: 5px 0px;
-  font-size: 14px;
-}
 </style>

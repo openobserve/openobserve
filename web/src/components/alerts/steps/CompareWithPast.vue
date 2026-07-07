@@ -15,44 +15,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="multiWindowContainerRef" class="step-compare-with-past" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
-      <div class="section-header">
-        <div class="section-header-accent" />
-        <span class="section-header-title">{{ t('alerts.steps.compareWithPast') }}</span>
+  <div ref="multiWindowContainerRef" class="step-compare-with-past w-full h-full flex flex-col mx-auto" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+    <div class="step-content rounded-lg flex-1 min-h-0 overflow-auto bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
+      <div class="section-header flex items-center gap-0 py-2.5 px-3" :class="store.state.theme === 'dark' ? 'border-b border-[#343434]' : 'border-b border-[#eeeeee]'">
+        <div class="section-header-accent w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--q-primary)]" />
+        <span class="section-header-title text-[13px] font-semibold text-[var(--color-text-primary)]">{{ t('alerts.steps.compareWithPast') }}</span>
       </div>
-      <div class="tw:px-3 tw:pb-2">
+      <div class="px-3 pb-2">
       <!-- Alert set for header -->
-      <div class="multi-window-text tw:flex tw:items-center tw:gap-2 tw:py-2 tw:mt-3">
+      <div class="multi-window-text flex items-center gap-2 py-2 mt-3 font-bold text-sm leading-6 align-middle" :class="store.state.theme === 'dark' ? 'text-white' : 'text-[#3d3d3d]'">
         <span>{{ t('alerts.compareWithPast.alertSetFor') }}</span>
-        <div class="tw:h-px border-line tw:flex-1"></div>
+        <div class="h-px border-line flex-1"></div>
       </div>
 
       <!-- Current Window -->
-      <div class="tw:flex tw:flex-row tw:justify-between tw:items-start multi-window-container tw:px-3 tw:py-2">
-        <div class="multi-window-text tw:w-auto tw:text-left">
+      <div class="flex flex-row justify-between items-start min-h-27.5 px-3 py-2 bg-[var(--o2-card-bg)]"
+        :class="store.state.theme === 'dark' ? 'border border-[#343434]' : 'border border-[#e6e6e6]'">
+        <div class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle" :class="store.state.theme === 'dark' ? 'text-white' : 'text-[#3d3d3d]'">
           {{ t('alerts.compareWithPast.currentWindow') }}
         </div>
 
-        <div class="tw:flex tw:flex-col tw:items-start tw:gap-2">
-          <div class="multi-window-text tw:w-auto tw:text-left">
+        <div class="flex flex-col items-start gap-2">
+          <div class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle" :class="store.state.theme === 'dark' ? 'text-white' : 'text-[#3d3d3d]'">
             {{ t('alerts.compareWithPast.cycle') }}
-            <span class="tw:cursor-pointer">
+            <span class="cursor-pointer">
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+                class="ml-1 cursor-pointer"
+                :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
                />
                 <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" align="center" max-width="300px" />
             </span>
           </div>
-          <div class="tw:flex tw:justify-between tw:items-start tw:gap-4">
-            <div class="tw:w-[300px] running-text">
+          <div class="flex justify-between items-start gap-4">
+            <div class="w-[300px] font-normal leading-5 text-sm">
               {{ t('alerts.compareWithPast.runningFor', { period: convertMinutesToDisplayValue(period), frequency: convertMinutesToDisplayValue(frequency) }) }}
             </div>
             <div>
-              <span class="tw:inline-block">
+              <span class="inline-block">
                 <OButton
                   variant="ghost"
                   size="icon-circle-sm"
@@ -69,37 +70,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Comparing with header -->
-      <div v-if="localMultiTimeRange.length > 0" class="multi-window-text tw:flex tw:items-center tw:gap-2 tw:py-2 tw:mt-2">
+      <div v-if="localMultiTimeRange.length > 0" class="multi-window-text flex items-center gap-2 py-2 mt-2 font-bold text-sm leading-6 align-middle" :class="store.state.theme === 'dark' ? 'text-white' : 'text-[#3d3d3d]'">
         <span>{{ t('alerts.compareWithPast.comparingWith') }}</span>
-        <div class="tw:h-px border-line tw:flex-1"></div>
+        <div class="h-px border-line flex-1"></div>
       </div>
 
       <!-- Reference Windows List -->
       <div
         v-for="(picker, index) in localMultiTimeRange"
         :key="picker.uuid"
-        class="tw:flex tw:flex-row tw:justify-between tw:items-start reference-window-container tw:mt-2 tw:px-3 tw:py-2"
+        class="reference-window-container flex flex-row justify-between items-start min-h-27.5 mt-2 px-3 py-2"
+        :class="store.state.theme === 'dark' ? ['bg-[var(--o2-card-bg)]', 'border', 'border-[#343434]'] : ['bg-[var(--o2-card-bg)]', 'border', 'border-[#e6e6e6]']"
       >
-        <div class="multi-window-text tw:w-auto tw:text-left">
+        <div class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle" :class="store.state.theme === 'dark' ? 'text-white' : 'text-[#3d3d3d]'">
           {{ t('alerts.compareWithPast.referenceWindow') }} {{ index + 1 }}
         </div>
 
         <!-- Time Frame -->
-        <div class="tw:flex tw:flex-col tw:gap-2 tw:items-start">
-          <div class="tw:flex tw:items-center">
-            <span class="tw:mr-1"><OIcon name="schedule" size="sm" /></span>
+        <div class="flex flex-col gap-2 items-start">
+          <div class="flex items-center">
+            <span class="mr-1"><OIcon name="schedule" size="sm" /></span>
             {{ t('alerts.compareWithPast.timeFrame') }}
-            <span class="tw:ml-2 tw:cursor-pointer">
+            <span class="ml-2 cursor-pointer">
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+                class="ml-1 cursor-pointer"
+                :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
                />
                 <OTooltip :content="t('alerts.compareWithPast.timeFrameTooltip')" side="right" align="center" max-width="300px" />
             </span>
           </div>
-          <div class="datetime-picker-wrapper tw:mt-2">
+          <div class="datetime-picker-wrapper mt-2 border rounded !border-[#d0d0d0] dark:!border-[#4a4a4a]">
             <CustomDateTimePicker
               v-model="picker.offSet"
               :picker="picker"
@@ -111,21 +113,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Cycle Info -->
-        <div class="tw:flex tw:flex-col tw:items-start tw:gap-2">
-          <div class="multi-window-text tw:w-auto tw:text-left">
+        <div class="flex flex-col items-start gap-2">
+          <div class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle" :class="store.state.theme === 'dark' ? 'text-white' : 'text-[#3d3d3d]'">
             {{ t('alerts.compareWithPast.cycle') }}
-            <span class="tw:cursor-pointer">
+            <span class="cursor-pointer">
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+                class="ml-1 cursor-pointer"
+                :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
                />
                 <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" align="center" max-width="300px" />
             </span>
           </div>
-          <div class="tw:flex tw:justify-between tw:items-start tw:gap-4">
-            <div class="tw:w-[300px] reference-text">
+          <div class="flex justify-between items-start gap-4">
+            <div class="w-[300px] text-sm font-normal">
               {{ t('alerts.compareWithPast.comparingText', { offset: getDisplayValue(picker.offSet) }) }}
             </div>
             <div>
@@ -143,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Action Buttons Section -->
-      <div class="tw:w-full tw:flex tw:justify-center tw:items-center tw:gap-3 tw:mt-2">
+      <div class="w-full flex justify-center items-center gap-3 mt-2">
         <OButton
           data-test="multi-time-range-alerts-add-btn"
           variant="outline"
@@ -162,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
       </div>
-      </div><!-- end tw:px-3 tw:py-2 -->
+      </div><!-- end px-3 py-2 -->
     </div>
   </div>
 </template>
@@ -323,136 +325,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.step-compare-with-past {
-  width: 100%;
-  height: 100%;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-
-  .step-content {
-    border-radius: 8px;
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-  }
-
-  &.dark-mode {
-    .step-content {
-      background-color: #212121;
-      border: 1px solid #343434;
-    }
-    .section-header { border-bottom: 1px solid #343434; }
-    .section-header-title { color: #e0e0e0; }
-    .section-header-accent { background: var(--q-primary); }
-  }
-
-  &.light-mode {
-    .step-content {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
-    }
-    .section-header { border-bottom: 1px solid #eeeeee; }
-    .section-header-title { color: #374151; }
-    .section-header-accent { background: var(--q-primary); }
-  }
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 10px 12px;
-}
-.section-header-accent {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-.section-header-title {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.dark-mode-multi-window .multi-window-text {
-  color: #FFFFFF;
-}
-
-.light-mode-multi-window .multi-window-text {
-  color: #3d3d3d;
-}
-
-.multi-window-text {
-  font-weight: 700;
-  font-size: 14px;
-  line-height: 24px;
-  vertical-align: middle;
-}
-
-.reference-text {
-  font-size: 14px;
-  font-weight: 400;
-}
-
-.dark-mode-multi-window .reference-window-container {
-  background-color: var(--o2-card-bg, #212121);
-  border: 1px solid var(--o2-border-color, #343434);
-}
-
-.light-mode-multi-window .reference-window-container {
-  background-color: var(--o2-card-bg, #ffffff);
-  border: 1px solid var(--o2-border-color, #e6e6e6);
-}
-
-.reference-window-container {
-  min-height: 110px;
-  // border-left: 6px solid #6832CC !important;
-}
-
-.dark-mode-multi-window .multi-window-container {
-  background-color: var(--o2-card-bg, #212121);
-  border: 1px solid var(--o2-border-color, #343434);
-}
-
-.light-mode-multi-window .multi-window-container {
-  background-color: var(--o2-card-bg, #ffffff);
-  border: 1px solid var(--o2-border-color, #e6e6e6);
-}
-
-.multi-window-container {
-  min-height: 110px;
-  // border-left: 6px solid #32CCCC !important;
-}
-
-.running-text {
-  font-weight: 400 !important;
-  line-height: 20px !important;
-  font-size: 14px;
-}
-
-.iconHoverBtn {
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.05);
-  }
-
-  &.icon-dark {
-    filter: none !important;
-  }
-}
-
-.datetime-picker-wrapper {
-    border: 1px solid;
-    border-radius: 4px;
-}
-
-.dark-mode-multi-window .datetime-picker-wrapper {
-    border-color: #4a4a4a !important;
-}
-
-.light-mode-multi-window .datetime-picker-wrapper {
-    border-color: #d0d0d0 !important;
-}
-</style>

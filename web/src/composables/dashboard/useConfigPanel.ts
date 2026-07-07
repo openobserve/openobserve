@@ -83,7 +83,7 @@ export function useConfigPanel(
   showColorPalette: ComputedRef<boolean>,
   isPivotMode: ComputedRef<boolean>,
 ) {
-  const { t } = useI18n();
+  const { t, tm } = useI18n();
 
   // ── Config options ────────────────────────────────────────────────────────
 
@@ -308,6 +308,10 @@ export function useConfigPanel(
         label: t("dashboard.tableDynamicColumns"),
         visible: !promqlMode.value && dashboardPanelData.data.type === "table",
       },
+      filtering: {
+        label: t("dashboard.tableFiltering"),
+        visible: dashboardPanelData.data.type === "table",
+      },
       pagination: {
         label: t("dashboard.pagination"),
         visible: dashboardPanelData.data.type === "table",
@@ -355,7 +359,15 @@ export function useConfigPanel(
       "value-transformations": { label: t("dashboard.configSectionValueTransformations") },
     },
     fieldOverrides: {
-      "field-overrides": { label: t("dashboard.configSectionFieldOverrides") },
+      "field-overrides": {
+        label: [
+          t("dashboard.configSectionFieldOverrides"),
+          ...(typeof tm === "function" &&
+          Array.isArray(tm("dashboard.configSectionFieldOverridesAliases"))
+            ? (tm("dashboard.configSectionFieldOverridesAliases") as string[])
+            : []),
+        ],
+      },
     },
     map: {
       "map-config": {

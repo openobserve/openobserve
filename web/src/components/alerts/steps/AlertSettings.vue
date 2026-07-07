@@ -16,34 +16,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-alert-conditions"
+    class="step-alert-conditions w-full rounded-lg mx-auto bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <!-- Section header -->
-    <div class="section-header">
-      <div class="section-header-accent" />
-      <span class="section-header-title">{{
+    <div
+      class="flex items-center py-2.5 px-3"
+      :class="store.state.theme === 'dark' ? 'border-b border-[#343434]' : 'border-b border-[#eeeeee]'"
+    >
+      <div class="w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--q-primary)]" />
+      <span
+        class="text-[13px] font-semibold tracking-[0.01em] text-[var(--color-text-primary)]"
+      >{{
         t("alerts.alertSettings.sectionTitle")
       }}</span>
     </div>
-    <div class="tw:px-3 tw:py-2">
+    <div class="px-3 py-2">
       <div>
         <!-- For Real-Time Alerts -->
         <template v-if="isRealTime === 'true'">
           <!-- Silence Notification (Cooldown) -->
-          <div class="tw:flex tw:justify-start tw:items-start tw:pb-3 tw:mb-4">
+          <div class="flex justify-start items-start pb-3 mb-4">
             <div
-              class="tw:font-semibold tw:flex tw:items-center"
+              class="font-semibold flex items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.cooldownTooltip')"
                   side="right"
                 />
             </div>
             <div>
-              <div class="tw:flex tw:items-center tw:mr-2" style="width: fit-content">
+              <div class="flex items-center mr-2" style="width: fit-content">
                 <div
                   style="width: 87px; margin-left: 0 !important"
                   class="silence-notification-input"
@@ -65,7 +71,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     height: 28px;
                     font-size: 13px;
                   "
-                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
+                  :class="
+                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
+                  "
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -77,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   formData.trigger_condition.silence === null ||
                   formData.trigger_condition.silence === ''
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -86,21 +95,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destinations -->
-          <div class="tw:flex tw:items-start tw:pb-4 tw:mb-4">
+          <div class="flex items-start pb-4 mb-4">
             <div
               style="width: 190px; height: 28px"
-              class="tw:flex tw:items-center tw:font-semibold"
+              class="flex items-center font-semibold"
             >
               <span>{{ t("alerts.destination") }} *</span>
             </div>
-            <div class="tw:flex tw:flex-col">
-              <div class="tw:flex tw:items-center">
+            <div class="flex flex-col">
+              <div class="flex items-center">
                 <OSelect
                   v-model="localDestinations"
                   :options="formattedDestinations"
                   data-test="alert-destinations-select"
                   multiple
-                  class="tw:min-w-[180px] tw:max-w-[300px]"
+                  class="min-w-[180px] max-w-[300px]"
                   @update:model-value="emitDestinationsUpdate"
                 >
                   <template #empty>{{
@@ -109,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OSelect>
                 <OButton
                   data-test="alert-settings-refresh-destinations-btn"
-                  class="tw:ml-1"
+                  class="ml-1"
                   variant="ghost"
                   size="icon-circle-sm"
                   :title="t('alerts.alertSettings.refreshDestinations')"
@@ -121,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="create-destination-btn"
                   variant="outline"
                   size="sm"
-                  class="tw:ml-2"
+                  class="ml-2"
                   @click="routeToCreateDestination"
                   >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
                 >
@@ -131,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   destinationsTouched &&
                   (!localDestinations || localDestinations.length === 0)
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -143,13 +152,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Scheduled Alerts -->
         <template v-else>
           <!-- Period -->
-          <div class="tw:flex tw:items-start tw:mr-2 alert-settings-row">
+          <div class="flex items-start mr-2 mb-4!">
             <div
-              class="tw:font-semibold tw:flex tw:items-center"
+              class="font-semibold flex items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.period") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.periodTooltip')"
                   side="right"
@@ -158,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div
                 ref="periodFieldRef"
-                class="tw:flex tw:items-center tw:mr-2"
+                class="flex items-center mr-2"
                 style="width: fit-content"
               >
                 <div
@@ -182,14 +191,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     font-weight: normal;
                     font-size: 13px;
                   "
-                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
+                  :class="
+                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
+                  "
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
               </div>
               <div
                 v-if="!Number(formData.trigger_condition.period)"
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -198,13 +210,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-          <div class="tw:flex tw:items-start tw:mr-2 alert-settings-row">
+          <div class="flex items-start mr-2 mb-4!">
             <div
-              class="tw:font-semibold tw:flex tw:items-center"
+              class="font-semibold flex items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.cooldownTooltip')"
                   side="right"
@@ -213,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div
                 ref="silenceFieldRef"
-                class="tw:flex tw:items-center tw:mr-2"
+                class="flex items-center mr-2"
                 style="width: fit-content"
               >
                 <div style="width: 87px; margin-left: 0 !important">
@@ -233,7 +245,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     height: 28px;
                     font-size: 13px;
                   "
-                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
+                  :class="
+                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
+                  "
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -245,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   formData.trigger_condition.silence === null ||
                   formData.trigger_condition.silence === ''
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -254,20 +269,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destinations -->
-          <div class="tw:flex tw:items-start tw:mr-2 alert-settings-row">
+          <div class="flex items-start mr-2 mb-4!">
             <div
-              class="tw:font-semibold tw:flex tw:items-center"
+              class="font-semibold flex items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.destination") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.destinationsTooltip')"
                   side="right"
                 />
             </div>
             <div>
-              <div class="tw:flex tw:items-center">
+              <div class="flex items-center">
                 <OSelect
                   ref="destinationsFieldRef"
                   v-model="localDestinations"
@@ -275,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-destinations-select"
                   multiple
                   :error="destinationError"
-                  class="tw:min-w-[180px] tw:max-w-[300px]"
+                  class="min-w-[180px] max-w-[300px]"
                   @update:model-value="
                     destinationError = false;
                     emitDestinationsUpdate();
@@ -287,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OSelect>
                 <OButton
                   data-test="alert-settings-refresh-destinations-btn"
-                  class="tw:ml-1"
+                  class="ml-1"
                   variant="ghost"
                   size="icon-circle-sm"
                   :title="t('alerts.alertSettings.refreshDestinations')"
@@ -299,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="create-destination-btn"
                   variant="outline"
                   size="sm"
-                  class="tw:ml-2"
+                  class="ml-2"
                   @click="routeToCreateDestination"
                   >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
                 >
@@ -309,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   destinationsTouched &&
                   (!localDestinations || localDestinations.length === 0)
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -319,13 +334,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- Creates Incident toggle — shown for all alert types -->
-        <div class="tw:flex tw:items-start alert-settings-row">
+        <div class="flex items-start mb-4!">
           <div
-            class="tw:font-semibold tw:flex tw:items-center"
+            class="font-semibold flex items-center"
             style="width: 190px; height: 28px"
           >
             {{ t("alerts.alertSettings.createsIncident") }}
-            <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+            <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
               <OTooltip
                 :content="t('alerts.alertSettings.createsIncidentTooltip')"
                 side="right"
@@ -970,158 +985,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.step-alert-conditions {
-  width: 100%;
-  margin: 0 auto;
-  border-radius: 8px;
-
-  .step-content {
-    border-radius: 8px;
-    height: 100%;
-    overflow-y: auto;
-  }
-
-  .step-header {
-    .step-title {
-      font-size: 20px;
-      font-weight: 600;
-      margin-bottom: 0.2rem;
-    }
-
-    .step-subtitle {
-      font-size: 13px;
-      opacity: 0.8;
-      margin: 0;
-      margin-bottom: 0.5rem;
-    }
-  }
-
-  background-color: var(--color-surface-overlay);
-  border: 1px solid var(--color-border-default);
-
-  .section-header {
-    border-bottom: 1px solid var(--color-border-default);
-  }
-  .section-header-title {
-    color: var(--color-text-primary);
-  }
-  .section-header-accent {
-    background: var(--q-primary);
-  }
-  .step-title {
-    color: var(--color-text-heading);
-  }
-  .step-subtitle {
-    color: var(--color-text-secondary);
-  }
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
-}
-
-.section-header-accent {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-
-.section-header-title {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-// Consistent spacing for alert settings rows
-.alert-settings-row {
-  margin-bottom: 16px !important;
-  padding-bottom: 0 !important;
-}
-
-// Fix for destinations select - keep selected items and input on same line
-.destinations-select-field {
-  :deep(.q-field__control) {
-    .q-field__native {
-      display: flex !important;
-      flex-direction: row !important;
-      align-items: center !important;
-      flex-wrap: nowrap !important;
-      overflow: hidden !important;
-
-      > span {
-        flex: 0 0 80% !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-        min-width: 0 !important;
-      }
-
-      > input {
-        flex: 0 0 20% !important;
-        min-width: 0 !important;
-        width: 20% !important;
-      }
-    }
-  }
-}
-
-// Destination select — always has a subtle border (like stream type fields)
-.destination-select-field {
-  :deep(.q-field__control) {
-    border: 1px solid rgba(0, 0, 0, 0.2) !important;
-    border-radius: 4px !important;
-    background: rgba(0, 0, 0, 0.03) !important;
-  }
-}
-.body--dark .destination-select-field {
-  :deep(.q-field__control) {
-    border-color: rgba(255, 255, 255, 0.2) !important;
-    background: rgba(255, 255, 255, 0.05) !important;
-  }
-}
-.destination-select-field.destination-select-error {
-  :deep(.q-field__control) {
-    border-color: #ef5350 !important;
-    background: rgba(239, 83, 80, 0.05) !important;
-  }
-}
-.body--dark .destination-select-field.destination-select-error {
-  :deep(.q-field__control) {
-    border-color: #ef5350 !important;
-    background: rgba(239, 83, 80, 0.08) !important;
-  }
-}
-
-// Fix for template select - keep selected value and input on same line
-.template-select-field {
-  :deep(.q-field__control) {
-    .q-field__native {
-      display: flex !important;
-      flex-direction: row !important;
-      align-items: center !important;
-      flex-wrap: nowrap !important;
-      overflow: hidden !important;
-
-      > span {
-        flex: 0 0 70% !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-        min-width: 0 !important;
-      }
-
-      > input {
-        flex: 0 0 30% !important;
-        min-width: 0 !important;
-        width: 30% !important;
-      }
-    }
-  }
-}
-</style>

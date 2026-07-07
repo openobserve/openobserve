@@ -16,16 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:pt-1 tw:overflow-hidden tw:h-full tw:flex tw:flex-col">
+  <div class="rounded-md p-0 pt-1 overflow-hidden h-full flex flex-col">
     <!-- Standard page header: title + icon. Usage date / data-type controls live
          in the toolbar row below. -->
     <AppPageHeader
       :title="headerBasedOnRoute()"
       icon="paid"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
-        <div v-if="isOrgGroupRoute" class="tw:flex tw:items-center tw:gap-2">
+        <div v-if="isOrgGroupRoute" class="flex items-center gap-2">
           <OButton
             v-if="orgGroupInvite.canInvite"
             variant="primary"
@@ -42,12 +42,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="splitterModel"
       unit="px"
       :horizontal="false"
-      before-class="tw:border-r tw:border-border-default"
-      class="tw:flex-1 tw:min-h-0"
+      before-class="border-r border-border-default"
+      class="flex-1 min-h-0"
     >
       <template v-slot:before>
-        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pt-2 tw:pb-[0.625rem]">
-          <div class="card-container tw:h-full">
+        <div class="w-full h-full pl-[0.625rem] pt-2 pb-[0.625rem]">
+          <div class="overflow-y-auto h-full">
             <OTabs
               v-model="billingtab"
               orientation="vertical"
@@ -116,10 +116,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-slot:after>
-        <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:pt-2">
+        <div class="w-full h-full flex flex-col pt-2">
           <div
             v-if="isUsageRoute"
-            class="tw:flex tw:gap-2 tw:items-center tw:justify-end card-container tw:shrink-0 tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-2"
+            class="flex gap-2 items-center justify-end overflow-y-auto shrink-0 mb-2 ml-2 mr-3 px-3 py-2"
           >
             <div class="custom-usage-date-select">
               <OSelect
@@ -128,23 +128,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="selectUsageDate"
-                class="tw:p-0 tw:mx-0 tw:h-[40px] tw:mt-1"
+                class="p-0 mx-0 h-[40px] mt-1"
               >
                 <template v-slot:prepend>
-                  <OIcon name="schedule" size="xs" class="tw:mr-2 tw:mt-1" @click.stop.prevent />
+                  <OIcon name="schedule" size="xs" class="mr-2 mt-1" @click.stop.prevent />
                 </template>
               </OSelect>
             </div>
-            <div class="tw:flex tw:items-center">
-              <div class="app-tabs-container tw:h-[36px]">
+            <div class="flex items-center">
+              <div class="app-tabs-container h-[36px]">
                 <AppTabs class="tabs-selection-container" :tabs="tabs" :activeTab="usageDataType" @update:activeTab="(value: any) => updateActiveTab(value)" />
               </div>
             </div>
           </div>
-          <div class="tw:flex-1 tw:min-h-0 tw:pr-[0.625rem] tw:pb-[0.625rem] tw:flex tw:gap-[0.625rem]">
+          <div class="flex-1 min-h-0 pr-[0.625rem] pb-[0.625rem] flex gap-[0.625rem]">
             <div
               v-if="isUsageRoute && billingMembers.length > 0"
-              class="tw:w-[260px] tw:shrink-0 tw:h-full"
+              class="w-[260px] shrink-0 h-full"
               data-test="usage-member-list"
             >
               <UsageMemberList
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :members="billingMembers"
               />
             </div>
-            <div class="card-container tw:pb-3 tw:flex-1 tw:min-w-0 tw:h-full">
+            <div class="overflow-y-auto pb-3 flex-1 min-w-0 h-full">
               <router-view title=""> </router-view>
             </div>
           </div>
@@ -379,11 +379,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-
-.card-container {
-  overflow-y: auto;
-}
-
-</style>

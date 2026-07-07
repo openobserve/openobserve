@@ -30,7 +30,6 @@
 
 export type LLMPanelType =
   | "stacked-area"
-  | "histogram-with-thresholds"
   | "horizontal-bar"
   | "table";
 
@@ -51,7 +50,7 @@ export interface LLMTableColumn {
   align?: "left" | "right";
 }
 
-export type LLMValueFormat = "cost";
+export type LLMValueFormat = "cost" | "latency-ms";
 
 export interface LLMPanelQuery {
   /** SQL with {{stream}}, {{startTime}}, {{endTime}}, {{interval}} placeholders */
@@ -88,23 +87,28 @@ export interface LLMPanelDef {
   /** Optional row cap for horizontal-bar panels (top N). */
   limit?: number;
   /**
-   * For time-series panels (stacked-area): how to handle missing/empty data.
-   * - "zero": synthesise a flat zero line across the time range so empty results
-   *   render as "0 over time" instead of "No data". Useful for absence-is-good
-   *   metrics like errors / timeouts / rate-limits.
+   * For grouped-bar panels: the value columns to render as side-by-side bars
+   * per category (e.g. p50/p90/p95/p99 per model). Each maps a hit field to a
+   * legend label and bar color. When set, these become the chart's Y-axis
+   * series instead of `query.valueField`.
    */
-  gapFill?: "zero";
+  series?: Array<{ field: string; label: string; color: string }>;
   /** Column definitions for "table" panels. */
   columns?: LLMTableColumn[];
   /** Friendly message shown when the panel has no data (overrides "No data"). */
   emptyStateText?: string;
-  /**
-   * For "histogram-with-thresholds": optional second query that returns a
-   * single row containing percentile values to render as guide lines.
-   * Each entry maps a hit field name to a label & color.
-   */
-  thresholds?: Array<{ field: string; label: string; color: string }>;
-  thresholdsQuery?: { sql: string };
+}
+
+/**
+ * i18n base key for a panel's title/subtitle. The panel `id` (kebab-case) maps
+ * to a camelCase key under `aiObservability.panels` — e.g. "traces-over-time" →
+ * "aiObservability.panels.tracesOverTime". Render sites resolve `${key}.title` /
+ * `${key}.subtitle` and fall back to the hardcoded `title`/`subtitle` when the
+ * key is missing, so the en.json copy is the source of truth where it exists.
+ */
+export function panelI18nKey(id: string): string {
+  const camel = id.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  return `aiObservability.panels.${camel}`;
 }
 
 // Time-range pruning is handled by the search engine via the start_time /
@@ -196,38 +200,39 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     },
   },
   {
-    id: "latency-percentiles",
-    title: "Latency p50 / p95 / p99",
-    subtitle: "all LLM calls",
-    type: "histogram-with-thresholds",
+    id: "latency-by-model",
+    title: "Latency by model",
+    subtitle: "p50 / p90 / p95 / p99",
+    type: "horizontal-bar",
     layout: { colSpan: 1 },
+    limit: 8,
     query: {
-      // Pull raw durations and bucket client-side so the bucket width adapts
-      // to the actual data range (sub-millisecond traces and 30s traces both
-      // render correctly). Thresholds below stay exact via approx_percentile.
-      sql: `
-        SELECT duration as duration_us
-        FROM {{stream}}
-        WHERE ${baseFilter}
-        LIMIT 50000
-      `,
-      valueField: "duration_us",
-    },
-    thresholds: [
-      { field: "p50_ms", label: "p50", color: "#64748b" },
-      { field: "p95_ms", label: "p95", color: "#3b82f6" },
-      { field: "p99_ms", label: "p99", color: "#ef4444" },
-    ],
-    thresholdsQuery: {
+      // One row per model with its latency percentiles (ms). Scoped to LLM
+      // calls so fast tool/child spans don't drag the tail down. Ordered by
+      // p95 so the slowest models surface first; the four percentile columns
+      // render as grouped bars per model (see `series`).
       sql: `
         SELECT
-          approx_percentile_cont(duration, 0.5) / 1000.0 as p50_ms,
+          COALESCE(${MODEL_FIELD}, 'unknown') as model,
+          approx_percentile_cont(duration, 0.5)  / 1000.0 as p50_ms,
+          approx_percentile_cont(duration, 0.9)  / 1000.0 as p90_ms,
           approx_percentile_cont(duration, 0.95) / 1000.0 as p95_ms,
           approx_percentile_cont(duration, 0.99) / 1000.0 as p99_ms
         FROM {{stream}}
         WHERE ${baseFilter}
+        GROUP BY COALESCE(${MODEL_FIELD}, 'unknown')
+        ORDER BY p95_ms DESC
       `,
+      seriesField: "model",
+      valueFormat: "latency-ms",
     },
+    // Severity escalation: slate (typical) → red (slow tail).
+    series: [
+      { field: "p50_ms", label: "p50", color: "#64748b" },
+      { field: "p90_ms", label: "p90", color: "#f59e0b" },
+      { field: "p95_ms", label: "p95", color: "#f97316" },
+      { field: "p99_ms", label: "p99", color: "#ef4444" },
+    ],
   },
   {
     id: "traces-over-time",
@@ -258,7 +263,6 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     type: "stacked-area",
     layout: { colSpan: 1 },
     color: "#ef4444",
-    gapFill: "zero",
     query: {
       // No baseFilter: OTel SDKs typically propagate the failure to a deep
       // child span (e.g. tool.<name>) which doesn't carry
@@ -387,13 +391,57 @@ export function renderPanelSql(
     startTime: number;
     endTime: number;
     interval: string;
+    // Bare agent predicate (no leading AND). Empty = "All Agents".
+    // Auto-spliced into each panel's WHERE (see below).
+    agentFilter?: string;
   },
 ): string {
-  return sql
+  const rendered = sql
     .replace(/\{\{stream\}\}/g, `"${ctx.stream}"`)
     .replace(/\{\{startTime\}\}/g, String(ctx.startTime))
     .replace(/\{\{endTime\}\}/g, String(ctx.endTime))
     .replace(/\{\{interval\}\}/g, ctx.interval);
+
+  if (!ctx.agentFilter) return compactSql(rendered);
+
+  // Append the agent predicate to the query's WHERE clause (Agent Filtering
+  // spec §6.6). Every panel has exactly one flat WHERE, so we splice ` AND
+  // <agentFilter>` in just before the first GROUP BY / ORDER BY / LIMIT (or at
+  // the end if none). Panel templates carry no subqueries of their own, so the
+  // first such keyword always belongs to the main query, not the agent
+  // sub-select that gets inserted here.
+  const clause = ` AND ${ctx.agentFilter} `;
+  const tail = rendered.match(/\b(group\s+by|order\s+by|limit)\b/i);
+  if (tail && tail.index !== undefined) {
+    return compactSql(
+      rendered.slice(0, tail.index) + clause + rendered.slice(tail.index),
+    );
+  }
+  return compactSql(`${rendered}${clause}`);
+}
+
+/**
+ * Collapse a multi-line SQL template into a single clean line.
+ *
+ * Our panel/KPI/sparkline SQL is authored as indented template literals for
+ * readability, which means every query carried its source indentation and
+ * blank-line gaps onto the wire (and into the network tab / debug logs). This
+ * flattens all runs of whitespace — newlines, tabs, the leading indentation —
+ * down to a single space and trims the ends. The result is byte-for-byte
+ * equivalent SQL: none of these queries embed intentional multi-space string
+ * literals (`'1 hour'`, `'5 minutes'` etc. keep their single space), so
+ * collapsing whitespace can't alter any value.
+ *
+ * @example
+ *   compactSql(`
+ *     SELECT a
+ *     FROM "default"
+ *     WHERE b IS NOT NULL
+ *   `)
+ *   // => `SELECT a FROM "default" WHERE b IS NOT NULL`
+ */
+export function compactSql(sql: string): string {
+  return sql.replace(/\s+/g, " ").trim();
 }
 
 /**

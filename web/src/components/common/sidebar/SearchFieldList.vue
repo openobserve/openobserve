@@ -1,8 +1,8 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:flex tw:flex-col index-menu default-index-menu tw:h-full!">
-    <div class="index-table logs-index-menu tw:h-full!">
+  <div class="flex flex-col w-full index-menu default-index-menu h-full!">
+    <div class="index-table logs-index-menu h-full! w-full">
       <OFieldList
         ref="fieldListRef"
         :fields="fieldListItems"
@@ -15,14 +15,39 @@
         :loading="loading"
         @update:current-page="currentPage = $event"
         @update:expanded-ids="onExpandedIdsChange"
+        @update:search="searchTerm = $event"
         @row-click="onRowClick"
       >
+        <!-- Group header (only rendered for grouped/label rows) -->
+        <template #group-header="{ row, groupName }">
+          <div
+            class="field-group-header h-full w-full flex justify-between items-center rounded-[0.25rem]"
+            :data-test="`search-field-list-group-${row.group}-header`"
+            @click="toggleGroup(row.group)"
+          >
+            <div class="flex-1 min-w-0 truncate">
+              {{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})
+            </div>
+            <OButton
+              v-if="(groupFieldCount[row.group] ?? 0) > 0"
+              variant="ghost"
+              size="icon"
+              class="flex-shrink-0"
+            >
+              <OIcon
+                :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
+                size="sm"
+              />
+            </OButton>
+          </div>
+        </template>
+
         <!-- Field row: render field name with expand chevron + actions inside OFieldRow -->
         <template #field-row="{ row }">
-          <OFieldRow :highlight="!!expandedRows[row.name]">
-            <span class="field-type-container">
+          <OFieldRow>
+            <span class="field-type-container w-[0.55rem] shrink-0 flex items-center justify-center">
               <OIcon
-                class="field-expand-icon"
+                class="field-expand-icon inline-flex items-center justify-center shrink-0 w-4 text-[var(--o2-text-muted)]"
                 :name="expandedRows[row.name] ? 'expand-more' : 'chevron-right'"
                 size="sm"
               />
@@ -53,7 +78,7 @@
 
         <!-- Expansion: FieldValuesPanel -->
         <template #expansion="{ row }">
-          <div class="tw:pl-2 tw:pr-1 tw:py-1">
+          <div class="pl-2 pr-1 py-1">
             <FieldValuesPanel
               :field-name="row.name"
               :field-values="fieldValues[row.name]"
@@ -75,64 +100,64 @@
         <template #loading>
           <div
             data-test="search-fieldlist-loading-skeleton"
-            class="tw:w-full tw:flex tw:flex-col"
+            class="w-full flex flex-col"
           >
             <!-- Group 1 header -->
-            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2">
-              <OSkeleton type="rect" class="tw:h-3 tw:w-24 tw:rounded-sm" />
-              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            <div class="h-7 flex items-center justify-between px-2">
+              <OSkeleton type="rect" class="h-3 w-24 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
             </div>
             <!-- Group 1 fields -->
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:flex-1" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:w-3/4" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="w-3/4" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:flex-1" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
             </div>
             <!-- Group 2 header -->
-            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2 tw:mt-2">
-              <OSkeleton type="rect" class="tw:h-3 tw:w-16 tw:rounded-sm" />
-              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            <div class="h-7 flex items-center justify-between px-2 mt-2">
+              <OSkeleton type="rect" class="h-3 w-16 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
             </div>
             <!-- Group 2 fields -->
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:w-4/5" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="w-4/5" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:w-2/3" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="w-2/3" />
             </div>
             <!-- Group 3 header -->
-            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2 tw:mt-2">
-              <OSkeleton type="rect" class="tw:h-3 tw:w-32 tw:rounded-sm" />
-              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            <div class="h-7 flex items-center justify-between px-2 mt-2">
+              <OSkeleton type="rect" class="h-3 w-32 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
             </div>
             <!-- Group 3 fields -->
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:flex-1" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:w-3/4" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="w-3/4" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:flex-1" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
             </div>
           </div>
         </template>
 
         <!-- After list: pagination -->
         <template #after-list="bottomProps">
-          <div v-if="bottomProps.totalPages > 1" class="field-list-pagination">
+          <div v-if="bottomProps.totalPages > 1" class="flex items-center gap-1 ml-auto">
             <OTooltip
               side="left"
               align="center"
@@ -144,7 +169,7 @@
               size="icon-panel"
               :disabled="bottomProps.isFirstPage"
               @click="bottomProps.firstPage"
-              class="pagination-nav-btn"
+              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded! overflow-visible!"
             >
               <OIcon name="fast-rewind" size="sm" />
             </OButton>
@@ -157,7 +182,7 @@
                   bottomProps.currentPage === page ? 'primary' : 'ghost'
                 "
                 size="icon-panel"
-                class="pagination-page-btn"
+                class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! text-xs! font-medium leading-none text-(--o2-text-primary)! rounded! overflow-visible!"
                 @click="setPage(page)"
                 >{{ page }}</OButton
               >
@@ -167,7 +192,7 @@
               size="icon-panel"
               :disabled="bottomProps.isLastPage"
               @click="bottomProps.lastPage"
-              class="pagination-nav-btn"
+              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded! overflow-visible!"
             >
               <OIcon name="fast-forward" size="sm" />
             </OButton>
@@ -179,10 +204,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type Ref } from "vue";
+import { computed, ref, watch, onMounted, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
+import useFieldGrouping from "@/composables/useFieldGrouping";
+import { applyCollapseFilter, type FieldObj } from "@/utils/fieldCategories";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -233,6 +260,12 @@ const props = defineProps({
     default: false,
   },
   loading: {
+    type: Boolean,
+    default: false,
+  },
+  // Opt-in semantic field grouping (same mechanism as the logs field sidebar).
+  // Off by default so existing flat consumers are unaffected.
+  enableGrouping: {
     type: Boolean,
     default: false,
   },
@@ -315,14 +348,16 @@ function walkFilters(
           }
         }
       } else if (op === "IS") {
+        // IS NULL maps to the synthetic "null" key used by the value list so
+        // the null row's checkbox round-trips (matches value.key === "null").
         if (node.left?.type === "column_ref") {
           const col = extractColName(node.left.column);
-          if (col) push(include, col, "");
+          if (col) push(include, col, "null");
         }
       } else if (op === "IS NOT") {
         if (node.left?.type === "column_ref") {
           const col = extractColName(node.left.column);
-          if (col) push(exclude, col, "");
+          if (col) push(exclude, col, "null");
         }
       }
     };
@@ -337,8 +372,92 @@ const parsedFilters = computed(() => walkFilters((props as any).query));
 const activeIncludeFilterValues = computed(() => parsedFilters.value.include);
 const activeExcludeFilterValues = computed(() => parsedFilters.value.exclude);
 
-// Build field items — pass all fields, rendering handles expandable vs non
-const fieldListItems = computed(() => props.fields as any[]);
+// ─── Semantic field grouping (opt-in) ────────────────────────────────
+// Reuses the exact mechanism the logs field sidebar uses: load the org's
+// semantic groups / key fields / grouping config, bucket fields under label
+// header rows, and collapse/expand groups. When grouping is disabled or no
+// semantic index is configured, fields fall back to a flat list unchanged.
+
+const { semanticIndex, loadGroupingContext, groupFields } = useFieldGrouping();
+const searchTerm = ref("");
+const expandGroupRows = ref<Record<string, boolean>>({});
+
+onMounted(() => {
+  if (props.enableGrouping) {
+    loadGroupingContext(props.streamType).catch(() => {
+      // grouping is best-effort — on failure the list stays flat
+    });
+  }
+});
+
+const groupingActive = computed(
+  () => props.enableGrouping && semanticIndex.value !== null,
+);
+
+// Map raw schema fields → FieldObj, bucket them, and annotate label rows so
+// OFieldList renders group headers (isGroup) vs field rows.
+const groupedFields = computed<any[]>(() => {
+  if (!groupingActive.value) return props.fields as any[];
+
+  const fieldObjs: FieldObj[] = (props.fields as any[]).map((f) => ({
+    ...f,
+    name: f.name,
+    dataType: f.dataType ?? f.type ?? "",
+    ftsKey: !!f.ftsKey,
+    isSchemaField: true,
+    showValues: !!f.showValues,
+    isInterestingField: false,
+    group: "",
+    streams: [],
+  }));
+
+  return groupFields(fieldObjs).map((row: any) => ({
+    ...row,
+    isGroup: !!row.label,
+    groupName: row.label ? row.name : undefined,
+  }));
+});
+
+// Count of non-group fields per group key — shown in the group header.
+const groupFieldCount = computed<Record<string, number>>(() => {
+  const counts: Record<string, number> = {};
+  if (!groupingActive.value) return counts;
+  for (const row of groupedFields.value) {
+    if (!row.isGroup && row.group) {
+      counts[row.group] = (counts[row.group] ?? 0) + 1;
+    }
+  }
+  return counts;
+});
+
+// Seed expand state to "expanded" for any newly seen group.
+watch(
+  groupedFields,
+  (list) => {
+    for (const row of list) {
+      if (row.isGroup && row.group && !(row.group in expandGroupRows.value)) {
+        expandGroupRows.value[row.group] = true;
+      }
+    }
+  },
+  { immediate: true },
+);
+
+function toggleGroup(group: string) {
+  expandGroupRows.value[group] = expandGroupRows.value[group] === false;
+}
+
+// Build field items — flat passthrough, or grouped + collapse-filtered.
+// applyCollapseFilter bypasses collapse while a search term is active so
+// matches inside collapsed groups remain findable.
+const fieldListItems = computed(() => {
+  if (!groupingActive.value) return props.fields as any[];
+  return applyCollapseFilter(
+    groupedFields.value as FieldObj[],
+    expandGroupRows.value,
+    searchTerm.value,
+  );
+});
 
 // ─── Field value streaming ──────────────────────────────────────────
 
@@ -575,6 +694,24 @@ const copyContentValue = (value: string) => {
 </script>
 
 <style lang="scss" scoped>
+// Expanded field values should read as inline content, not a selected card —
+// drop the bordered/rounded panel treatment so no border or background lingers
+// once the row is expanded and the pointer moves away.
+:deep(.o-field-list__expansion) {
+  border: none;
+  border-radius: 0;
+  margin-bottom: 0;
+}
+
+// Tighten the gap between expanded field values. FieldValuesPanel stacks
+// padding on both the <li> and its inner <label> (py-1 on each), which
+// reads as too much vertical space in the dense RUM sidebar. Drop the <li>
+// padding here (RUM-scoped) and keep the label padding as the click target.
+:deep(.o-field-list__expansion [data-test="field-values-panel-values-list"] > li) {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 .field-list-pagination {
   display: flex;
   align-items: center;
@@ -606,6 +743,15 @@ const copyContentValue = (value: string) => {
   color: var(--o2-text-primary) !important;
   border-radius: 0.25rem !important;
   overflow: visible !important;
+}
+
+.field-group-header {
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0 0.325rem;
+  cursor: pointer;
+  background-color: var(--color-surface-subtle);
+  color: var(--color-field-list-group-text);
 }
 
 .index-menu {

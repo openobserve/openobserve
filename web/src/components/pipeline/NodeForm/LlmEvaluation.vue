@@ -32,10 +32,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="llm-evaluation-node-section"
-      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+      :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
     >
       <OForm id="llm-evaluation-form" :form="form">
-        <div class="stream-routing-container tw:w-full tw:pt-3 tw:pb-3 tw:px-3 tw:flex tw:flex-col tw:gap-4">
+        <div class="stream-routing-container w-full pt-3 pb-3 px-3 flex flex-col gap-4">
           <!-- Node Name -->
           <OFormInput
             name="nodeName"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OFormSelect>
 
           <!-- Evaluation Template Selection -->
-          <div class="tw:flex tw:items-end tw:gap-2">
+          <div class="flex items-end gap-2">
             <OFormSelect
               name="template"
               :options="availableTemplates"
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               valueKey="id"
               :label="t('pipeline.evaluationTemplate')"
               :loading="loadingTemplates"
-              class="tw:flex-1"
+              class="flex-1"
               data-test="llm-evaluation-template-select"
             >
               <template #empty>
@@ -95,8 +95,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- Sampling Rate -->
-          <div v-if="enableSampling" class="tw:flex tw:flex-col tw:gap-2">
-            <div class="tw:text-sm">
+          <div v-if="enableSampling" class="flex flex-col gap-2">
+            <div class="text-sm">
               {{ t("pipeline.samplingRate") }}:
               {{ (samplingRate * 100).toFixed(0) }}%
             </div>

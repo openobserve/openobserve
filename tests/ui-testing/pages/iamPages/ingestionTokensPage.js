@@ -48,6 +48,8 @@ export class IngestionTokensPage {
         // ============================================================
         // Revealed token dialog
         // ============================================================
+        // The <code> block now shows the ready-to-use "Basic base64(name:token)"
+        // credential (not the raw token).
         this.revealedTokenCode = page.locator('[role="dialog"] code');
     }
 
@@ -69,11 +71,14 @@ export class IngestionTokensPage {
     }
 
     async fillTokenName(name) {
-        await this.page.getByRole('textbox', { name: 'Name *' }).fill(name);
+        // Migration: the label now uses the `required` prop (the `*` is
+        // aria-hidden), so the input's accessible name is "Name" not "Name *".
+        // Target it by data-test instead of role-name.
+        await this.page.locator('[data-test="ingestion-token-name-input"] input').fill(name);
     }
 
     async fillTokenDescription(desc) {
-        await this.page.getByRole('textbox', { name: 'Description' }).fill(desc);
+        await this.page.locator('[data-test="ingestion-token-description-input"] input').fill(desc);
     }
 
     async clickCreate() {
@@ -95,8 +100,16 @@ export class IngestionTokensPage {
         await this.page.waitForTimeout(500);
     }
 
+    // Copies the ready-to-use "Basic base64(name:token)" credential (primary btn).
     async clickCopyToken() {
-        await this.page.getByRole('button', { name: 'Copy' }).last().click();
+        await this.page
+            .getByRole('button', { name: 'Copy Authorization header' })
+            .click();
+    }
+
+    // Copies the raw o2oi_ token (secondary btn).
+    async clickCopyRawToken() {
+        await this.page.getByRole('button', { name: 'Copy raw token' }).click();
     }
 
     // ----- toggle -----

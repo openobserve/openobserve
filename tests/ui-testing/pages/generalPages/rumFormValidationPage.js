@@ -54,7 +54,8 @@ export class RumFormValidationPage {
     const orgId   = process.env['ORGNAME']      || 'default';
     const baseUrl = process.env['ZO_BASE_URL']  || 'http://localhost:5080';
     await this.page.goto(`${baseUrl}/web/rum/upload-source-maps?org_identifier=${orgId}`);
-    await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    // The Upload button is the explicit page-ready signal (networkidle is
+    // unreliable with streaming connections and is discouraged by Playwright).
     await this.uploadBtn.waitFor({ state: 'visible', timeout: 15000 });
     testLogger.debug('Upload Source Maps page ready');
   }

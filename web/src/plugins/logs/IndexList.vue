@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:flex-col logs-index-menu tw:pr-[0.375rem]! tw:h-full tw:bg-surface-panel!"
+    class="flex flex-col logs-index-menu pr-[0.375rem]! h-full bg-surface-panel!"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div
-      class="tw:flex tw:items-center tw:gap-1"
+      class="flex items-center gap-1"
       style="max-width: 100%; overflow: hidden"
     >
       <OButton
@@ -31,13 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="log-search-index-list-stream-type-badge"
         variant="ghost"
         size="icon-sm"
-        class="stream-type-badge tw:shrink-0"
+        class="shrink-0 h-8 w-8 border border-(--o2-border) rounded p-0"
         @click="onStreamTypeChange('logs')"
       >
         <OIcon :name="streamTypeIcon" size="sm" />
         <OTooltip :content="streamTypeLabel + ' — ' + t('search.switchToLogs')" side="bottom" align="center" />
       </OButton>
-      <div class="tw:flex-1 tw:min-w-0">
+      <div class="flex-1 min-w-0">
         <OSelect
           ref="streamSelect"
           data-test="log-search-index-list-select-stream"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="placeHolderText"
           :multiple="selectionMode === 'multi'"
           :row-click-single-select="selectionMode === 'multi'"
-          class="tw:w-full"
+          class="w-full"
           @update:model-value="handleStreamSelection"
         >
           <template #empty>{{ t("search.noResult") }}</template>
@@ -63,17 +63,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="!searchObj.data.stream.selectedStream.length"
-      class="index-table tw:mt-1"
+      class="index-table mt-1"
     >
-      <div
-        data-test="logs-search-no-field-found-text"
-        class="tw:text-center tw:w-5/6 tw:mx-0 tw:pt-3"
+      <OEmptyState
+        data-test="logs-search-no-stream-selected"
+        preset="no-stream-selected"
+        size="inline"
+        icon="database"
       >
-        <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
-        {{ t("search.noFieldFoundInStream") }}
-      </div>
+        <template v-if="quickPickStreams.length" #extra>
+          <div
+            data-test="logs-search-stream-quick-pick"
+            class="flex flex-col gap-1 w-full"
+          >
+            <span
+              class="text-text-secondary text-xs font-medium text-center mb-0.5"
+            >
+              {{ t("search.quickPickStreamsLabel") }}
+            </span>
+            <OButton
+              v-for="stream in quickPickStreams"
+              :key="stream.value"
+              :data-test="`logs-search-stream-quick-pick-${stream.value}`"
+              variant="outline"
+              size="sm"
+              icon-left="database"
+              class="w-full justify-start"
+              @click="quickSelectStream(stream.value)"
+            >
+              <span class="truncate">{{ stream.label }}</span>
+            </OButton>
+            <span
+              v-if="streamList.length > quickPickStreams.length"
+              data-test="logs-search-stream-quick-pick-more"
+              class="text-text-secondary text-xs text-center mt-0.5"
+            >
+              {{
+                t("search.quickPickMoreStreams", {
+                  count: streamList.length - quickPickStreams.length,
+                })
+              }}
+            </span>
+          </div>
+        </template>
+      </OEmptyState>
     </div>
-    <div v-else class="index-table tw:mt-1">
+    <div v-else class="index-table mt-1">
       <GroupedFieldList
         ref="fieldListRef"
         :fields="streamFieldsRows"
@@ -151,9 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty>
           <div
             data-test="logs-search-no-field-found-text"
-            class="tw:text-center tw:w-5/6 tw:mx-0 tw:pt-3"
+            class="text-center w-5/6 mx-0 pt-3"
           >
-            <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
+            <OIcon name="info" size="sm" class="align-middle mr-1" />
             {{ t("search.noFieldFoundInStream") }}
           </div>
         </template>
@@ -161,65 +196,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #loading>
           <div
             data-test="logs-indexlist-fieldlist-loading-skeleton"
-            class="tw:w-full tw:flex tw:flex-col"
+            class="w-full flex flex-col"
           >
             <!-- Group 1 header -->
-            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2">
-              <OSkeleton type="rect" class="tw:h-3 tw:w-24 tw:rounded-sm" />
-              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            <div class="h-7 flex items-center justify-between px-2">
+              <OSkeleton type="rect" class="h-3 w-24 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
             </div>
             <!-- Group 1 fields -->
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:flex-1" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:w-3/4" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="w-3/4" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:flex-1" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:w-4/5" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="w-4/5" />
             </div>
             <!-- Group 2 header -->
-            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2 tw:mt-2">
-              <OSkeleton type="rect" class="tw:h-3 tw:w-16 tw:rounded-sm" />
-              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            <div class="h-7 flex items-center justify-between px-2 mt-2">
+              <OSkeleton type="rect" class="h-3 w-16 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
             </div>
             <!-- Group 2 field -->
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:w-2/3" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="w-2/3" />
             </div>
             <!-- Group 3 header -->
-            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2 tw:mt-2">
-              <OSkeleton type="rect" class="tw:h-3 tw:w-32 tw:rounded-sm" />
-              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            <div class="h-7 flex items-center justify-between px-2 mt-2">
+              <OSkeleton type="rect" class="h-3 w-32 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
             </div>
             <!-- Group 3 fields -->
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:flex-1" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:w-4/5" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="w-4/5" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:flex-1" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:w-3/4" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="w-3/4" />
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-              <OSkeleton type="text" class="tw:flex-1" />
+            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
             </div>
           </div>
         </template>
@@ -277,6 +312,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
 import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
@@ -318,6 +354,7 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OSpinner,
+    OEmptyState,
   },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
@@ -335,6 +372,13 @@ export default defineComponent({
       });
       this.onStreamChange("");
       this.resetPagination();
+    },
+    // One-click stream pick from the empty state — mirrors a dropdown
+    // selection so fields load immediately, without opening the dropdown.
+    quickSelectStream(streamName: string) {
+      this.handleStreamSelection(
+        this.selectionMode === "single" ? streamName : [streamName],
+      );
     },
   },
   setup(props, { emit }) {
@@ -494,6 +538,27 @@ export default defineComponent({
 
     const streamList = computed(() => {
       return searchObj.data.stream.streamLists;
+    });
+
+    // First few streams surfaced as one-click picks in the no-stream empty
+    // state. Ordered by most recently ingested data (stats.doc_time_max desc)
+    // so the streams most likely worth exploring sit at the top. Capped so a
+    // narrow panel stays scannable; the rest stay reachable through the
+    // dropdown's search. Falls back to the plain stream-list order when
+    // ingestion stats aren't available.
+    const QUICK_PICK_LIMIT = 8;
+    const quickPickStreams = computed(() => {
+      const detailed = searchObj.data.streamResults?.list;
+      if (Array.isArray(detailed) && detailed.length) {
+        return [...detailed]
+          .sort(
+            (a: any, b: any) =>
+              (b?.stats?.doc_time_max ?? 0) - (a?.stats?.doc_time_max ?? 0),
+          )
+          .slice(0, QUICK_PICK_LIMIT)
+          .map((item: any) => ({ label: item.name, value: item.name }));
+      }
+      return (streamList.value || []).slice(0, QUICK_PICK_LIMIT);
     });
 
     const checkSelectedFields = computed(() => {
@@ -845,6 +910,9 @@ export default defineComponent({
     };
 
     function clickFieldFn(row: { name: never }) {
+      // Explicit user action — clear the system-pick marker so this selection
+      // persists to logFilterField.
+      searchObj.meta.isFtsDefaultColumn = false;
       let selectedFields = reorderSelectedFields();
 
       if (selectedFields.includes(row.name)) {
@@ -865,6 +933,7 @@ export default defineComponent({
     }
 
     function resetSelectedFileds() {
+      searchObj.meta.isFtsDefaultColumn = false;
       searchObj.data.stream.selectedFields = [];
       updatedLocalLogFilterField();
     }
@@ -1748,7 +1817,7 @@ export default defineComponent({
             });
           });
 
-          // [NEW] Background capture into IndexedDB — does not tw:block return
+          // [NEW] Background capture into IndexedDB — does not block return
           if (streamValues.length > 0 && fieldName) {
             captureFromValuesApi(
               {
@@ -2036,6 +2105,7 @@ export default defineComponent({
       cancelValueApi,
       getValuesPartition,
       streamList,
+      quickPickStreams,
       hasUserDefinedSchemas,
       setPage,
       resetPagination,
@@ -2048,46 +2118,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.stream-type-badge {
-  height: 32px;
-  width: 32px;
-  border: 1px solid var(--o2-border);
-  border-radius: 4px;
-  padding: 0;
-}
-
-.indexlist-search-input {
-  height: 36px;
-  .q-field__control {
-    height: 36px;
-    display: flex;
-    align-items: center;
-    font-size: 13px;
-    padding: 0px 6px !important;
-    font-weight: 500;
-  }
-  .q-field__prepend {
-    height: 36px !important;
-    padding-bottom: 4px !important;
-  }
-  .q-field__append {
-    padding-top: 8px !important;
-  }
-
-}
-</style>
-
-<style lang="scss">
-.indexlist-stream-toggle {
-  .q-toggle__inner {
-    padding: 0.325em !important;
-    font-size: 20px !important;
-  }
-
-  .q-toggle__thumb:before {
-    background: transparent !important;
-  }
-}
-</style>

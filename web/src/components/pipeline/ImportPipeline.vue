@@ -33,22 +33,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Pipeline-specific Error Display -->
     <template #output-content>
-      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
+      <div class="w-full h-full border-l border-border-default" style="min-width: 400px;">
         <div
           v-if="pipelineErrorsToDisplay.length > 0"
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-center text-xl font-semibold py-2"
         >
           Error Validations
         </div>
-        <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-        <OSeparator class="tw:mr-4 tw:mt-4" />
+        <div v-else class="text-center text-xl font-semibold py-2">Output Messages</div>
+        <OSeparator class="mr-4 mt-4" />
         <div class="error-report-container" style="height: calc(100vh - 128px) !important; overflow: auto; resize: none;">
           <!-- Pipeline Errors Section -->
           <div
-            class="error-section"
+            class="p-2.5 mb-2.5"
             v-if="pipelineErrorsToDisplay.length > 0"
           >
-            <div class="error-list">
+            <div>
               <!-- Iterate through the outer array -->
               <div
                 v-for="(errorGroup, index) in pipelineErrorsToDisplay"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="(errorMessage, errorIndex) in errorGroup"
                   :key="errorIndex"
-                  class="error-item"
+                  class="py-1.25 text-sm"
                   :data-test="`pipeline-import-error-${index}-${errorIndex}`"
                 >
                   <!-- pipeline name should not be empty -->
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedStreamName[index] || ''"
                         :options="streamList"
                         :label="t('alerts.stream_name') + ' *'"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                         @update:model-value="(val) => {
                           userSelectedStreamName[index] = val;
                           updateStreamFields(val, index);
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedStreamType[index] || ''"
                         :options="streamTypes"
                         :label="t('alerts.streamType') + ' *'"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                         style="width: 300px"
                         :error="touchedStreamType[index] && !userSelectedStreamType[index]"
                         :error-message="touchedStreamType[index] && !userSelectedStreamType[index] ? 'Stream type is required' : ''"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedDestinationStreamType[index] || ''"
                         :options="destinationStreamTypes"
                         :label="t('alerts.streamType') + ' *'"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                         style="width: 300px"
                         :error="touchedDestinationStreamType[index] && !userSelectedDestinationStreamType[index]"
                         :error-message="touchedDestinationStreamType[index] && !userSelectedDestinationStreamType[index] ? 'Stream type is required' : ''"
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         labelKey="label"
                         valueKey="value"
                         searchable
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                         @update:model-value="(val: any) => {
                           userSelectedOrgId[index] = val;
                           updateOrgId(val?.value || val, index);
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedFunctionName[errorMessage.nodeIndex] || ''"
                         :options="existingFunctions"
                         :label="'Function Name'"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                         style="width: 300px"
                         :error="touchedFunctionName[errorMessage.nodeIndex] && !userSelectedFunctionName[errorMessage.nodeIndex]"
                         :error-message="touchedFunctionName[errorMessage.nodeIndex] && !userSelectedFunctionName[errorMessage.nodeIndex] ? 'Function name is required' : ''"
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedRemoteDestination[index] || ''"
                         :options="pipelineDestinations"
                         :label="'Remote Destination'"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                         style="width: 300px"
                         :error="touchedRemoteDestination[index] && !userSelectedRemoteDestination[index]"
                         :error-message="touchedRemoteDestination[index] && !userSelectedRemoteDestination[index] ? 'Remote destination is required' : ''"
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="timezoneOptions"
                         :label="'Timezone'"
                         searchable
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                         style="width: 300px"
                         :error="touchedTimezone[index] && !userSelectedTimezone[index]"
                         :error-message="touchedTimezone[index] && !userSelectedTimezone[index] ? 'Timezone is required' : ''"
@@ -304,22 +304,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="error-section" v-if="pipelineCreators.length > 0">
+          <div class="p-2.5 mb-2.5" v-if="pipelineCreators.length > 0">
             <div
-              class="section-title text-primary"
+              class="text-base mb-2.5 uppercase text-primary"
               data-test="pipeline-import-creation-title"
             >
               Pipeline Creation
             </div>
             <div
-              class="error-list"
               v-for="(val, index) in pipelineCreators"
               :key="index"
               :data-test="`pipeline-import-creation-${index}`"
             >
               <div
                 :class="{
-                  'error-item tw:font-bold': true,
+                  'py-1.25 text-sm font-bold': true,
                   'text-green': val.success,
                   'text-red': !val.success,
                 }"
@@ -1509,26 +1508,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.error-report-container {
-  height: calc(100vh - 128px) !important;
-  overflow: auto;
-  resize: none;
-}
-
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-
-.error-item {
-  padding: 5px 0px;
-  font-size: 14px;
-}
-</style>

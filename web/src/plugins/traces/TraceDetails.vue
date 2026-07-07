@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="trace-details tw:h-[calc(100vh-2.625rem)]">
+  <div class="trace-details h-[calc(100vh-2.625rem)] overflow-hidden w-full flex flex-col relative">
     <!-- Original View -->
     <div
-      class="trace-details-content"
+      class="flex-1 flex flex-col min-h-0 overflow-hidden box-border"
       v-if="
         traceTree.length &&
         effectiveSpanList.length &&
@@ -28,19 +28,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         )
       "
     >
-      <div v-if="showHeader" class="trace-combined-header-wrapper card-container tw:border-b tw:border-border-default">
+      <div v-if="showHeader" class="trace-combined-header-wrapper card-container border-b border-border-default">
         <!-- New Modern Header -->
         <header
-          class="tw:h-auto tw:py-[0.125rem] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)] tw:pl-1"
+          class="h-auto py-[0.125rem] flex! items-center justify-between bg-[var(--o2-surface)] pl-1"
         >
-          <div class="tw:flex tw:items-center tw:space-x-4 tw:w-fit!">
+          <div class="flex items-center space-x-4 w-fit!">
             <!-- Back button -->
             <OButton
               v-if="mode === 'standalone' && showBackButton"
               data-test="trace-details-back-btn"
               variant="ghost-muted"
               size="icon-xs"
-              class="tw:mr-1.5"
+              class="mr-1.5"
               @click="handleBackOrClose"
             >
               <OIcon name="arrow-back" size="sm" />
@@ -48,12 +48,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
 
             <div
-              class="tw:flex tw:min-w-0 tw:w-full tw:gap-[0.625rem]! tw:items-center"
+              class="flex min-w-0 w-full gap-[0.625rem]! items-center"
             >
               <!-- Operation Name -->
               <div
                 data-test="trace-details-operation-name"
-                class="tw:text-base tw:font-semibold tw:leading-tight tw:text-[var(--o2-text-primary)] tw:truncate tw:min-w-0 tw:max-w-[24rem]!"
+                class="text-base font-semibold leading-tight text-[var(--o2-text-primary)] truncate min-w-0 max-w-[24rem]!"
                 :title="traceTree[0]?.operationName"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
@@ -62,18 +62,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Service, Timestamp, and Trace ID -->
               <div
-                class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:whitespace-nowrap"
+                class="flex items-center space-x-2 text-[11px] text-[var(--o2-text-secondary)] whitespace-nowrap"
               >
-                <span>{{ formatTimestamp(traceStartTime) }}</span>
+                <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
                 <div
-                  class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
+                  class="bg-[var(--o2-text-3)] py-[0rem] w-[1px] h-[16px]"
                 />
-                <span class="tw:mr-[0.25rem]">
+                <span class="mr-[0.25rem]">
                   {{ t("traces.traceId") }}:
                   <span
                     v-if="mode === 'embedded'"
                     data-test="trace-details-trace-id"
-                    class="tw:text-[var(--o2-text-primary)] tw:font-mono tw:cursor-pointer hover:tw:text-[var(--o2-theme-color)] tw:transition-colors"
+                    class="text-[var(--o2-text-primary)] font-mono cursor-pointer hover:text-[var(--o2-theme-color)] transition-colors"
                     :title="t('traces.openInTraces')"
                     @click="handleExpandToFullView"
                   >
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-else
                     data-test="trace-details-trace-id"
-                    class="tw:text-[var(--o2-text-primary)] tw:font-mono"
+                    class="text-[var(--o2-text-primary)] font-mono"
                     :title="effectiveTraceId"
                   >
                     {{ effectiveTraceId }}
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="trace-details-copy-trace-id-btn"
                   name="content-copy"
                   size="xs"
-                  class="tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)]"
+                  class="cursor-pointer hover:text-[var(--o2-text-primary)]"
                   :title="t('traces.copyTraceId')"
                   @click="copyTraceId"
                 />
@@ -102,13 +102,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Session ID (LLM traces) -->
                 <template v-if="sessionId">
                   <div
-                    class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
+                    class="bg-[var(--o2-text-3)] py-[0rem] w-[1px] h-[16px]"
                   />
-                  <span class="tw:mr-[0.25rem]">
+                  <span class="mr-[0.25rem]">
                     Session ID:
                     <span
                       data-test="trace-details-session-id"
-                      class="tw:text-[var(--o2-text-primary)] tw:font-mono"
+                      class="text-[var(--o2-text-primary)] font-mono"
                       :title="sessionId"
                     >
                       {{ sessionId }}
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="trace-details-copy-session-id-btn"
                     name="content-copy"
                     size="xs"
-                    class="tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)]"
+                    class="cursor-pointer hover:text-[var(--o2-text-primary)]"
                     title="Copy Session ID"
                     @click="copySessionId"
                   />
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   v-if="mode === 'embedded' && showExpandButton"
                   data-test="trace-details-trace-id-open-btn"
-                  class="tw:cursor-pointer hover:tw:text-[var(--o2-theme-color)]"
+                  class="cursor-pointer hover:text-[var(--o2-theme-color)]"
                   size="xs"
                   name="open-in-new"
                   :title="t('traces.openInTraces')"
@@ -137,40 +137,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
+                class="bg-[var(--o2-text-3)] py-[0rem] w-[1px] h-[16px]"
               />
               <!-- Span Count Badge -->
-              <div
-                data-test="trace-details-spans-count"
-                class="tw:flex tw:items-center tw:ml-[0rem] tw:space-x-1 tw:px-[0.625rem] tw:py-[0.1rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-text-4)] tw:bg-[var(--o2-tag-grey-1)]"
-              >
-                <span data-test="span-count-text">
-                  {{ formatLargeNumber(effectiveSpanList.length) }}
-                  {{ t("traces.spansLabel") }}
-                  <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
-                </span>
-              </div>
+              <span class="inline-flex">
+                <OTag
+                  type="logsResultChip"
+                  value="neutral"
+                  data-test="trace-details-spans-count"
+                >
+                  <span data-test="span-count-text">
+                    {{ formatLargeNumber(effectiveSpanList.length) }}
+                    {{ t("traces.spansLabel") }}
+                  </span>
+                </OTag>
+                <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
+              </span>
 
               <div
-                class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
+                class="bg-[var(--o2-text-3)] py-[0rem] w-[1px] h-[16px]"
               />
 
               <!-- Error Count Badge -->
-              <div
-                data-test="trace-details-error-spans-count"
-                class="tw:flex tw:items-center tw:space-x-1 tw:px-[0.625rem] tw:py-[0.1rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)] tw:bg-[var(--o2-error-tag-bg)] tw:mr-[0.85rem]"
-              >
-                <span
-                  >{{ formatLargeNumber(errorSpansCount) }}
-                  {{ t("traces.errorsLabel") }}</span
+              <span class="inline-flex mr-[0.85rem]">
+                <OTag
+                  type="logsResultChip"
+                  value="error"
+                  data-test="trace-details-error-spans-count"
                 >
+                  <span
+                    >{{ formatLargeNumber(errorSpansCount) }}
+                    {{ t("traces.errorsLabel") }}</span
+                  >
+                </OTag>
                 <OTooltip :content="errorSpansCount + ' ' + t('traces.errorsLabel')" />
-              </div>
+              </span>
             </div>
           </div>
 
           <div
-            class="tw:flex tw:justify-end tw:items-center tw:space-x-3 tw:w-fit!"
+            class="flex justify-end items-center space-x-3 w-fit!"
           >
             <!-- Apply filters button (standalone mode, right side) -->
             <OButton
@@ -178,14 +184,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-apply-filters-btn-right"
               variant="outline"
               size="xs"
-              class="tw:mr-2.5"
+              class="mr-2.5"
               @click="openFilterPopover"
             >
               <template #icon-left
                 ><OIcon name="filter-alt"
 size="xs"
               /></template>
-              <span class="tw:text-[0.75rem]">{{ t("traces.viewFilters") }}</span>
+              <span class="text-[0.75rem]">{{ t("traces.viewFilters") }}</span>
               <OTooltip :content="t('traces.reviewAndApplyFilters')" />
             </OButton>
 
@@ -207,7 +213,7 @@ size="xs"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
               variant="outline"
-              buttonClass="tw:mr-1!"
+              buttonClass="mr-1!"
               size="icon-xs"
             />
 
@@ -217,7 +223,7 @@ size="xs"
               data-test="trace-details-close-btn"
               variant="ghost"
               size="icon-xs"
-              class="tw:mr-1!"
+              class="mr-1!"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
@@ -227,15 +233,15 @@ size="xs"
         </header>
       </div>
       <div
-        class="card-container tw:overflow-hidden tw:h-full"
+        class="card-container overflow-hidden h-full"
         style="display: flex; flex-direction: column; min-height: 0"
       >
         <!-- Tabs & Search Bar -->
         <div
-          class="tw:py-0 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-white tw:bg-[var(--o2-card-bg)]!"
+          class="py-0 border-b border-[var(--o2-border)] flex items-center justify-between bg-white bg-[var(--o2-card-bg)]!"
         >
           <div
-            class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem] tw:py-[0.325rem]"
+            class="flex items-center space-x-4 trace-details-view-tabs ml-[0.325rem] py-[0.325rem]"
           >
             <OToggleGroup
               :model-value="activeTab"
@@ -243,21 +249,21 @@ size="xs"
             >
               <OToggleGroupItem value="waterfall" size="sm">
                 <template #icon-left
-                  ><OIcon name="align-left" size="sm" class="tw:shrink-0"
+                  ><OIcon name="align-left" size="sm" class="shrink-0"
                 /></template>
-                Waterfall
+                {{ t('traces.waterfall') }}
               </OToggleGroupItem>
               <OToggleGroupItem value="flame-graph" size="sm">
                 <template #icon-left>
                   <OIcon name="flame" size="sm" />
                 </template>
-                Flame Graph
+                {{ t('traces.flameGraph') }}
               </OToggleGroupItem>
               <OToggleGroupItem value="map" size="sm">
                 <template #icon-left
-                  ><OIcon name="account-tree" size="sm" class="tw:shrink-0"
+                  ><OIcon name="account-tree" size="sm" class="shrink-0"
                 /></template>
-                Trace Graph
+                {{ t('traces.traceGraph') }}
               </OToggleGroupItem>
               <OToggleGroupItem v-if="hasLLMSpans"
 value="dag"
@@ -265,7 +271,7 @@ size="sm">
                 <template #icon-left>
                   <OIcon name="git-branch" size="sm" />
                 </template>
-                DAG
+                {{ t('traces.dag') }}
               </OToggleGroupItem>
               <!--
                 Thread tab gated on:
@@ -282,14 +288,14 @@ size="sm">
                 data-test="trace-details-thread-tab"
               >
                 <template #icon-left
-                  ><OIcon name="chat" size="xs" class="tw:shrink-0"
+                  ><OIcon name="chat" size="xs" class="shrink-0"
                 /></template>
-                Thread
+                {{ t('traces.thread') }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
 
-          <div class="tw:flex tw:items-center tw:space-x-2 tw:gap-[0.5rem] tw:pr-[0.325rem]">
+          <div class="flex items-center space-x-2 gap-[0.5rem] pr-[0.325rem]">
             <!-- Unified Search Input Group -->
             <div
               v-if="
@@ -297,7 +303,7 @@ size="sm">
                 activeTab !== 'map' &&
                 activeTab !== 'thread'
               "
-              class="unified-search-group tw:mr-1! tw:gap-1 tw:flex tw:items-center"
+              class="unified-search-group mr-1! gap-1 flex items-stretch w-fit rounded-md transition-colors duration-200"
             >
               <div class="log-stream-search-input">
                 <OSearchInput
@@ -306,23 +312,23 @@ size="sm">
                   :placeholder="t('traces.searchInSpans')"
                   clearable
                   size="sm"
-                  class="tw:text-[12px]!"
+                  class="text-[12px]!"
                   @update:model-value="handleSearchQueryChange"
                 />
               </div>
               <!-- Search Results Navigation -->
-              <div class="search-navigation-container tw:h-8.2! tw:py-[0.125px]!">
+              <div class="inline-flex items-center bg-transparent px-[0.125rem] [transition:all_0.2s_ease] rounded-[var(--radius-md)] border border-[var(--color-input-border)] dark:hover:border-[var(--o2-theme-color)] h-8.2! py-[0.125px]!">
                 <div
-                  class="search-results-counter"
+                  class="flex items-center text-xs font-medium px-1 gap-[0.0625rem] select-none"
                   data-test="trace-details-search-results"
                 >
-                  <span class="counter-current">{{
+                  <span class="text-[var(--o2-text-secondary)]">{{
                     searchResults ? currentIndex + 1 : 0
                   }}</span>
-                  <span class="counter-separator">/</span>
-                  <span class="counter-total">{{ searchResults }}</span>
+                  <span class="text-[var(--o2-text-secondary)] mx-[0.125rem]">/</span>
+                  <span class="text-[var(--o2-text-secondary)]">{{ searchResults }}</span>
                 </div>
-                <div class="navigation-buttons">
+                <div class="flex items-center h-full ml-1">
                   <OButton
                     data-test="trace-details-search-prev-btn"
                     :disabled="!searchResults || currentIndex === 0"
@@ -333,7 +339,7 @@ size="sm">
                     <OIcon name="keyboard-arrow-up" size="sm" />
                     <OTooltip :content="t('traces.previousMatch')" />
                   </OButton>
-                  <div class="button-separator"></div>
+                  <div class="w-px h-[1.125rem] bg-[var(--o2-border-color)] mx-[0.125rem]"></div>
                   <OButton
                     data-test="trace-details-search-next-btn"
                     :disabled="
@@ -352,7 +358,7 @@ size="sm">
             <!-- Log Stream Selector (if enabled) -->
             <div
               v-if="showLogStreamSelector && config.isEnterprise !== 'true'"
-              class="log-stream-search-input tw:flex tw:items-center trace-logs-selector tw:mx-1!"
+              class="log-stream-search-input flex items-center trace-logs-selector mx-1!"
             >
               <OSelect
                 data-test="trace-details-log-streams-select"
@@ -361,19 +367,19 @@ size="sm">
                 :options="filteredStreamOptions"
                 multiple
                 :title="selectedStreamsString"
-                class="tw:w-44!"
+                class="w-44!"
               />
-              <span class="traces-view-logs-btn tw:pl-1">
+              <span class="traces-view-logs-btn pl-1">
                 <!-- Single button with wrapper for tooltip functionality -->
                 <span
-                  class="tw:inline-block"
+                  class="inline-block"
                   tabindex="0"
                 >
                   <OButton
                     data-test="trace-details-view-logs-btn"
                     variant="outline"
                     size="sm"
-                    class="tw:text-[0.75rem] tw:h-8! tw:font-normal!"
+                    class="text-[0.75rem] h-8! font-normal!"
                     :disabled="isViewLogsDisabled"
                     @click="redirectToLogs"
                   >
@@ -397,7 +403,7 @@ size="sm">
                 data-test="trace-details-view-session-replay-btn"
                 variant="outline"
                 size="sm"
-                class="tw:ml-1"
+                class="ml-1"
                 @click="redirectToSessionReplay"
               >
                 <template #icon-left>
@@ -408,21 +414,21 @@ size="sm">
           </div>
         </div>
         <div
-          class="histogram-spans-container"
+          class="min-h-0 relative pb-2 flex flex-col flex-1"
           :class="[
             isSidebarOpen ? 'histogram-container' : 'histogram-container-full',
             isTimelineExpanded ? '' : 'full',
           ]"
           ref="parentContainer"
         >
-          <div class="trace-tree-wrapper">
+          <div class="overflow-hidden flex-1 min-h-0 box-border flex flex-col">
             <!-- Waterfall View - show for waterfall tab, or when no LLM spans -->
             <div
               v-if="activeTab === 'waterfall'"
-              class="tw:flex tw:h-full tw:bg-[var(--o2-card-bg)]!"
+              class="flex h-full bg-[var(--o2-card-bg)]!"
             >
               <div
-                class="tw:flex tw:flex-col tw:min-h-0"
+                class="flex flex-col min-h-0"
                 :style="{
                   width: isSidebarOpen ? leftWidth + 'px' : '100%',
                 }"
@@ -440,13 +446,13 @@ size="sm">
                 />
                 <div
                   ref="traceScrollContainer"
-                  class="relative-position trace-content-scroll"
+                  class="relative-position trace-content-scroll overflow-y-auto! overflow-x-hidden! min-h-0! [scrollbar-gutter:stable]!"
                   :style="{
                     width: isSidebarOpen ? leftWidth + 'px' : '100%',
                   }"
                 >
                   <div
-                    class="trace-tree-container tw:bg-[var(--o2-card-bg)]!"
+                    class="pt-0 pb-0 mb-0 min-h-full bg-(--o2-card-bg)!"
                     data-test="trace-details-tree-container"
                   >
                     <div class="position-relative">
@@ -460,7 +466,7 @@ size="sm">
                               : '#ececec',
                           zIndex: 999,
                         }"
-                        class="tw:absolute resize tw:h-full tw:cursor-col-resize tw:top-0 tw:w-[1px]"
+                        class="absolute resize h-full cursor-col-resize top-0 w-[1px]"
                         @mousedown="startResize"
                       />
                       <trace-tree
@@ -473,7 +479,7 @@ size="sm">
                         :leftWidth="leftWidth"
                         :scrollContainer="traceScrollContainer"
                         ref="traceTreeRef"
-                        class="tw:bg-[var(--o2-card-bg)]!"
+                        class="bg-[var(--o2-card-bg)]!"
                         :search-query="searchQuery"
                         :spanList="spanList"
                         :selectedSpanId="selectedSpanId"
@@ -498,7 +504,7 @@ size="sm">
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="histogram-sidebar-inner tw:border-l tw:border-l-solid tw:border-l-[var(--o2-border-color)]"
+                class="shrink-0 overflow-y-auto overflow-x-hidden min-h-0 transition-all duration-300 border-l border-l-solid border-l-(--o2-border-color)"
                 :class="isTimelineExpanded ? '' : 'full'"
                 :style="{
                   width: `calc(100% - ${leftWidth}px)`,
@@ -531,7 +537,7 @@ size="sm">
               style="display: flex; flex: 1; min-height: 0"
             >
               <div
-                class="dag-left-panel"
+                class="h-[calc(100vh-200px)] p-4 min-w-0 overflow-hidden"
                 :style="{
                   width:
                     isSidebarOpen && (selectedSpanId || showTraceDetails)
@@ -557,14 +563,14 @@ size="sm">
               <!-- Resizable divider -->
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="dag-resizer"
+                class="dag-resizer w-2 cursor-col-resize flex items-center justify-center shrink-0 relative z-10"
                 @mousedown="startDagResize"
               >
-                <div class="dag-resizer-line"></div>
+                <div class="dag-resizer-line w-0.75 h-full bg-(--o2-border) rounded transition-colors duration-200"></div>
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="dag-right-panel"
+                class="h-[calc(100vh-200px)] overflow-y-auto overflow-x-hidden min-h-0"
                 :style="{
                   width: `${100 - dagLeftWidth}%`,
                   minWidth: '300px',
@@ -595,7 +601,7 @@ size="sm">
             <div
               v-if="activeTab === 'flame-graph'"
               style="display: flex; flex: 1; min-height: 0"
-              class="tw:w-full tw:bg-[var(--o2-card-bg)]!"
+              class="w-full bg-[var(--o2-card-bg)]!"
             >
               <FlameGraphView
                 :spans="flatSpans"
@@ -626,7 +632,7 @@ size="sm">
             <div
               v-if="config.showLLMUI !== 'false' && activeTab === 'thread'"
               style="display: flex; flex: 1; min-height: 0"
-              class="tw:w-full tw:bg-[var(--o2-card-bg)]!"
+              class="w-full bg-[var(--o2-card-bg)]!"
             >
               <div
                 class="thread-left-panel"
@@ -648,7 +654,7 @@ size="sm">
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="tw:border-l tw:border-l-solid tw:border-l-[var(--o2-border-color)]"
+                class="border-l border-l-solid border-l-[var(--o2-border-color)]"
                 style="width: 40%; min-width: 300px; height: 100%; overflow: hidden;"
               >
                 <trace-details-sidebar
@@ -712,7 +718,7 @@ size="sm">
                 min-height: 0;
                 flex-direction: column;
               "
-              class="tw:w-full tw:h-full"
+              class="w-full h-full"
             >
               <!-- Chart Container -->
               <div
@@ -726,13 +732,13 @@ size="sm">
               >
                 <div
                   style="text-align: center"
-                  class="tw:w-full tw:h-full tw:p-[0.625rem]"
+                  class="w-full h-full p-[0.625rem]"
                 >
                   <ChartRenderer
                     ref="chartRendererRef"
                     data-test="trace-details-service-map-chart"
                     :data="traceServiceMapChartOptions"
-                    class="trace-chart-height tw:h-full! tw:w-full!"
+                    class="trace-chart-height h-full! w-full!"
                   />
                 </div>
               </div>
@@ -748,14 +754,14 @@ size="sm">
         (searchObj.data.traceDetails.isLoadingTraceDetails ||
           searchObj.data.traceDetails.isLoadingTraceMeta)
       "
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center"
+      class="flex flex-col items-center justify-center"
       :style="{ height: '100%' }"
     >
       <OSpinner
         data-test="trace-details-loading-spinner"
         size="lg"
       />
-      <div data-test="trace-details-loading-text" class="tw:pt-2">
+      <div data-test="trace-details-loading-text" class="pt-2">
         {{ t("traces.fetchingTrace") }}
       </div>
     </div>
@@ -770,11 +776,11 @@ size="sm">
       @click:secondary="showFilterPopover = false"
       @click:primary="applyAndViewTraces"
     >
-      <div class="tw:flex-1 tw:border tw:border-[var(--o2-border)] tw:rounded">
+      <div class="flex-1 border border-[var(--o2-border)] rounded">
         <CodeQueryEditor
           v-model:query="localEditorValue"
           language="sql"
-          class="tw:h-full tw:w-full"
+          class="h-full w-full"
         />
       </div>
     </ODrawer>
@@ -797,6 +803,7 @@ import {
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import useTraces from "@/composables/useTraces";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
@@ -859,6 +866,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
 import {
   TRACE_SERVICE_DETECTION_KEY,
@@ -958,6 +967,7 @@ export default defineComponent({
   },
   components: {
     ShareButton,
+    OTag,
     TraceDetailsSidebar,
     TraceTree,
     TraceDAG,
@@ -2600,6 +2610,28 @@ export default defineComponent({
       await setupTraceDetails();
     };
 
+    // ── Keyboard shortcuts — span navigation ─────────────────────────────
+    const nextSpanHandler = () => {
+      if (isInputFocused()) return;
+      const list = spanList.value;
+      if (!list?.length) return;
+      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
+      if (idx < list.length - 1) updateSelectedSpan(list[idx + 1].span_id);
+    };
+    const prevSpanHandler = () => {
+      if (isInputFocused()) return;
+      const list = spanList.value;
+      if (!list?.length) return;
+      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
+      if (idx > 0) updateSelectedSpan(list[idx - 1].span_id);
+    };
+
+    useShortcuts([
+      // `traceNextSpan` registers j + ↓, `tracePrevSpan` registers k + ↑
+      // (both bindings live in the registry under `keys`).
+      { id: "traceNextSpan", handler: nextSpanHandler },
+      { id: "tracePrevSpan", handler: prevSpanHandler },
+    ]);
     return {
       router,
       t,
@@ -2732,130 +2764,9 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-$sidebarWidth: 84%;
-$separatorWidth: 2px;
-$toolbarHeight: 36px;
-$traceHeaderHeight: 30px;
-$traceChartHeight: 210px;
-$appNavbarHeight: 57px;
-
-$traceChartCollapseHeight: 42px;
-
-.toolbar {
-  height: $toolbarHeight;
-}
-.trace-details {
-  overflow: hidden;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-.trace-details-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-.histogram-container-full {
-  flex: 1;
-  min-height: 0;
-}
-.histogram-container {
-  flex: 1;
-  min-height: 0;
-}
-
-.histogram-sidebar-inner {
-  flex-shrink: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0;
-  transition: all 0.3s ease-in-out;
-}
-
-.histogram-spans-container {
-  min-height: 0;
-  position: relative;
-  padding-bottom: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
-.trace-tree-wrapper {
-  overflow: hidden;
-  flex: 1;
-  min-height: 0;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-}
-
-.trace-tree-container {
-  padding-top: 0;
-  padding-bottom: 0;
-  margin-bottom: 0;
-  min-height: 100%;
-}
-
-.trace-chart-btn {
-  cursor: pointer;
-  padding-right: 8px;
-  border-radius: 2px;
-  padding-top: 3px;
-  padding-bottom: 2px;
-
-  &:hover {
-    background-color: var(--o2-primary-btn-bg);
-    color: #ffffff;
-}
-}
-
-
-.toolbar-operation-name {
-  max-width: 225px;
-}
-
-.dag-left-panel {
-  height: calc(100vh - 200px);
-  padding: 16px;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.dag-right-panel {
-  height: calc(100vh - 200px);
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0;
-}
-
-.dag-resizer {
-  width: 8px;
-  cursor: col-resize;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 10;
-
-  &:hover .dag-resizer-line {
-    background-color: var(--o2-theme-color, #1976d2);
-  }
-}
-
-.dag-resizer-line {
-  width: 3px;
-  height: 100%;
-  background-color: #e0e0e0;
-  border-radius: 2px;
-  transition: background-color 0.2s ease;
+<style>
+.dag-resizer:hover .dag-resizer-line {
+  background-color: var(--o2-theme-color, #1976d2);
 }
 
 body.body--dark .dag-resizer-line {
@@ -2866,8 +2777,9 @@ body.body--dark .dag-resizer:hover .dag-resizer-line {
   background-color: #90caf9;
 }
 </style>
-<style lang="scss">
-// Prevent parent containers from adding scrollbars
+
+<style>
+/* Prevent parent containers from adding scrollbars */
 body:has(.trace-details),
 html:has(.trace-details) {
   overflow: hidden !important;
@@ -2890,115 +2802,17 @@ html:has(.trace-details) {
   scrollbar-gutter: stable !important;
 }
 
-.trace-details {
-  .q-splitter__before,
-  .q-splitter__after {
-    overflow: revert !important;
-  }
-
-  .q-splitter__before {
-    z-index: 999 !important;
-  }
-
-  .trace-details-chart {
-    .rangeslider-slidebox {
-      fill: #7076be !important;
-      opacity: 0.3 !important;
-    }
-    .rangeslider-mask-max,
-    .rangeslider-mask-min {
-      fill: #d2d2d2 !important;
-      fill-opacity: 0.15 !important;
-    }
-    .rangeslider-grabber {
-      fill: #7076be !important;
-      stroke: #ffffff !important;
-      stroke-width: 2 !important;
-      opacity: 1 !important;
-    }
-    .rangeslider-grabber:hover {
-      fill: #5a5fa0 !important;
-      cursor: ew-resize !important;
-    }
-    // Enhance the line graph (trace duration) visibility
-    .trace {
-      stroke-width: 2 !important;
-      opacity: 0.8 !important;
-    }
-    .scatterlayer .trace {
-      opacity: 1 !important;
-    }
-  }
-
-  .visual-selection-btn {
+.trace-details .trace-combined-header-wrapper {
+  padding: 0.2rem 0rem;
+  flex-shrink: 0;
 }
 
-  .visual-selector-container {
-    backdrop-filter: blur(0.625rem);
-    border-radius: 0.25rem;
-    border: 0.0625rem solid var(--o2-border-color);
-  }
-
-  .trace-combined-header-wrapper {
-    padding: 0.2rem 0rem;
-    flex-shrink: 0;
-  }
-
-  .trace-combined-header-wrapper.bg-white {
-    // background: rgba(240, 240, 245, 0.8);
-    // border: 0.125rem solid rgba(100, 100, 120, 0.3);
-  }
-  .chart-container-inner {
-    min-height: 12.5rem;
-    overflow: hidden;
-  }
-
-  .trace-chart-height {
-    height: 12.5rem !important;
-    min-height: 12.5rem !important;
-  }
+.trace-details .trace-chart-height {
+  height: 12.5rem !important;
+  min-height: 12.5rem !important;
 }
 
-.no-select {
-  user-select: none !important;
-  -moz-user-select: none !important;
-  -webkit-user-select: none !important;
-  -ms-user-select: none !important;
-}
-
-.trace-copy-icon {
-  &:hover {
-    &.OIcon {
-      text-shadow: 0px 2px 8px rgba(0, 0, 0, 0.5);
-    }
-  }
-}
-
-.trace-logs-selector {
-  .q-field {
-    border-radius: 0.2rem 0 0 0.2rem;
-
-    span {
-      display: inline-block;
-      width: 180px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      text-align: left;
-    }
-
-    .q-field__control {
-      border-radius: 0.2rem 0 0 0.2rem !important;
-    }
-
-    .q-field__control:before,
-    .q-field__control:after {
-      border: none !important;
-    }
-  }
-}
-
-// Unified Search Group - input and navigation as one element
+/* Unified Search Group - input and navigation as one element */
 .unified-search-group {
   display: flex;
   align-items: stretch;
@@ -3007,104 +2821,16 @@ html:has(.trace-details) {
   transition: border-color 0.2s ease;
 }
 
-// Search Navigation Container - integrated with input
-.search-navigation-container {
-  display: inline-flex;
-  align-items: center;
-  background-color: transparent;
-  padding: 0 0.125rem;
-  transition: all 0.2s ease;
-  border-radius: var(--radius-md);
-  border: 0.0625rem solid var(--color-input-border);
-
-  .search-results-counter {
-    display: flex;
-    align-items: center;
-    font-size: 0.75rem;
-    font-weight: 500;
-    padding: 0 0.25rem;
-    gap: 0.0625rem;
-    user-select: none;
-
-    .counter-separator {
-      color: var(--o2-text-secondary);
-      margin: 0 0.125rem;
-    }
-
-    .counter-total,
-    .counter-current {
-      color: var(--o2-text-secondary);
-    }
-  }
-
-  .navigation-buttons {
-    display: flex;
-    align-items: center;
-    height: 100%;
-    margin-left: 0.25rem;
-
-    .button-separator {
-      width: 0.0625rem;
-      height: 1.125rem;
-      background-color: var(--o2-border-color);
-      margin: 0 0.125rem;
-    }
-
-    .nav-btn {
-      min-width: 1.25rem;
-      height: 1.25rem;
-      padding: 0;
-      border-radius: 0.125rem;
-      transition: all 0.2s ease;
-&:hover:not(:disabled) {
-        background-color: var(--o2-hover-accent);
-      }
-
-      &:disabled {
-        opacity: 0.4;
-      }
-    }
-  }
+/* Dark mode support */
+body.body--dark .unified-search-group {
+  background-color: var(--o2-dark-page-bg);
 }
 
-// Dark mode support
-body.body--dark {
-  .unified-search-group {
-    background-color: var(--o2-dark-page-bg);
-
-    &:hover,
-    &:focus-within {
-      border-color: var(--o2-theme-color);
-    }
-  }
-
-  .search-navigation-container {
-    &:hover {
-      border-color: var(--o2-theme-color);
-    }
-  }
+body.body--dark .unified-search-group:hover,
+body.body--dark .unified-search-group:focus-within {
+  border-color: var(--o2-theme-color);
 }
 
-.custom-height {
-  height: 30px;
-}
-
-.trace-search-container {
-  border-radius: 0.5rem;
-}
-
-.trace-back-btn {
-  border: 0.09375rem solid;
-  border-radius: 50%;
-  width: 1.375rem;
-  height: 1.375rem;
-}
-
-.custom-height .q-field__control,
-.custom-height .q-field__append {
-  height: 100%; /* Ensures the input control fills the container height */
-  line-height: 36px; /* Vertically centers the text inside */
-}
 .resize::after {
   content: " ";
   position: absolute;
@@ -3114,15 +2840,5 @@ body.body--dark {
   top: 0;
   bottom: 0;
   z-index: 999;
-}
-</style>
-
-<style lang="scss">
-.trace-details-view-tabs {
-  .o2-tabs .active {
-    background-color: transparent !important;
-    color: var(--q-primary) !important;
-    border-color: var(--q-primary) !important;
-  }
 }
 </style>

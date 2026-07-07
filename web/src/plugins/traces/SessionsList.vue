@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="sessions-list tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container"
+    class="sessions-list h-full! flex flex-col bg-[var(--o2-card-bg-solid)] card-container"
   >
     <!-- No LLM streams exist in the org at all — nothing to select, so show
          the rich first-run empty state on its own (no table chrome). -->
     <div
       v-if="streamsLoaded && availableStreams.length === 0"
-      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center"
+      class="flex-1 min-h-0 flex items-center justify-center"
       data-test="sessions-empty-no-streams"
     >
       <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
@@ -52,27 +52,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :show-global-filter="false"
       :frame="false"
       width="100%"
-      class="tw:w-full tw:h-full"
+      class="w-full h-full"
       data-test="sessions-list-table"
       @row-click="(row: any) => handleRowClick(row)"
       @pagination-change="onPaginationChange"
     >
-      <!-- Toolbar: stream filter pushed to the right; OTable auto-injects the
-           column chooser immediately after it. -->
+      <!-- Toolbar: Stream/Agent mode + matching picker aligned with the table actions. -->
       <template #toolbar>
-        <div class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:flex-1 tw:min-w-0">
-          <div
-            data-test="sessions-list-stream-selector"
-            class="tw:w-[14rem] tw:flex-shrink-0"
+        <div class="flex items-center justify-end gap-2 flex-1 min-w-0">
+          <OToggleGroup
+            :model-value="filterMode"
+            type="single"
+            data-test="sessions-list-filter-mode"
+            @update:model-value="onFilterModeChange"
           >
-            <OSelect
-              v-model="activeStream"
-              :label="t('traces.sessionsList.streamLabel')"
-              label-position="inside"
-              :options="availableStreams.map((s) => ({ label: s, value: s }))"
-              class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
-              @update:model-value="onStreamChange"
-            />
+            <OToggleGroupItem value="stream" size="sm">Stream</OToggleGroupItem>
+            <OToggleGroupItem value="agent" size="sm">Agent</OToggleGroupItem>
+          </OToggleGroup>
+
+          <div class="flex items-center justify-end gap-2 min-w-0">
+            <div
+              v-if="filterMode === 'stream'"
+              data-test="sessions-list-stream-selector"
+              class="w-[14rem] flex-shrink-0"
+            >
+              <!-- Hold a picker-shaped skeleton until the stream list lands, so
+                   the selector doesn't flash an empty dropdown then populate. -->
+              <SkeletonBox
+                v-if="!streamsLoaded"
+                width="100%"
+                height="2.125rem"
+                rounded
+              />
+              <OSelect
+                v-else
+                v-model="activeStream"
+                :label="t('traces.sessionsList.streamLabel')"
+                label-position="inside"
+                :options="availableStreams.map((s) => ({ label: s, value: s }))"
+                labelKey="label"
+                valueKey="value"
+                class="w-full rounded"
+                @update:model-value="onStreamChange"
+              />
+            </div>
+            <div
+              v-else
+              data-test="sessions-list-agent-selector"
+              class="w-[14rem] flex-shrink-0"
+            >
+              <!-- Same treatment for agents: toggling to Agent mode kicks off the
+                   listAgents fetch, so show the skeleton until it resolves
+                   instead of an empty agent picker. -->
+              <SkeletonBox
+                v-if="!agentsLoaded"
+                width="100%"
+                height="2.125rem"
+                rounded
+              />
+              <OSelect
+                v-else
+                v-model="activeAgent"
+                label="Agent"
+                label-position="inside"
+                :options="agentSelectOptions"
+                labelKey="label"
+                valueKey="value"
+                class="w-full rounded"
+                @update:model-value="onAgentChange"
+              />
+            </div>
           </div>
         </div>
       </template>
@@ -80,19 +129,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty / error body — rendered inside the frame so the toolbar (and
            thus the stream selector) stays visible. -->
       <template #empty>
-        <EvalEmptyState
+        <OEmptyState
           v-if="error && hasLoadedOnce"
+          size="hero"
+          illustration="broken-panel"
+          variant="error"
           data-test="sessions-empty-error"
-          icon="error-outline"
           :title="t('traces.sessionsList.failedToLoad')"
           :description="error || ''"
-          :cta-label="t('traces.sessionsList.retry')"
-          cta-data-test="sessions-empty-retry-btn"
-          @create="loadSessions()"
+          :action-label="t('traces.sessionsList.retry')"
+          action-icon="refresh"
+          @action="loadSessions()"
+        />
+        <OEmptyState
+          v-else-if="agentEmpty"
+          size="hero"
+          illustration="constellation"
+          data-test="sessions-empty-no-agents"
+          title="No Agents In This Range"
+          description="No GenAI agents were detected for the selected time window. Try a wider range or switch back to stream view."
+          action-label="View by Stream"
+          @action="onFilterModeChange('stream')"
         />
         <div
           v-else
-          class="tw:flex tw:items-center tw:justify-center tw:py-12"
+          class="flex items-center justify-center py-12"
           data-test="sessions-empty"
         >
           <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
@@ -100,52 +161,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
         <!-- Timestamp -->
         <template #cell-firstSeenNanos="{ row }">
-          <span class="tw:font-mono tw:text-[0.75rem]">
+          <span class="text-[0.75rem] tabular-nums">
             {{ formatTimestamp(row.firstSeenNanos) }}
           </span>
         </template>
 
         <!-- Session ID -->
         <template #cell-sessionId="{ row }">
-          <span class="tw:font-mono tw:text-[0.75rem]">
-            {{ shortId(row.sessionId) }}
+          <div class="text-[0.75rem] truncate w-full">
+            {{ row.sessionId }}
             <OTooltip :content="row.sessionId" />
-          </span>
+          </div>
         </template>
 
         <!-- User -->
         <template #cell-userId="{ row }">
-          <span
-            v-if="row.userId"
-            class="tw:text-[0.75rem] tw:text-[var(--o2-text-primary)] tw:truncate tw:max-w-[160px] tw:block"
-          >
-            {{ row.userId }}
-          </span>
-          <span v-else class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">
-            {{ t('traces.sessionsList.unknownUser') }}
-          </span>
+          <OUserCell
+            :value="row.userId"
+            :empty-label="t('traces.sessionsList.unknownUser')"
+          />
         </template>
 
         <!-- First user message -->
         <template #cell-firstUserMessage="{ row }">
-          <span
+          <div
             v-if="row.firstUserMessage"
-            class="tw:text-[0.75rem] tw:text-[var(--o2-text-secondary)]"
+            class="text-[0.75rem] text-[var(--o2-text-secondary)] truncate w-full"
           >
-            {{ row.firstUserMessage.length > 30 ? row.firstUserMessage.slice(0, 30) + '…' : row.firstUserMessage }}
-            <OTooltip v-if="row.firstUserMessage.length > 30" :content="row.firstUserMessage" />
-          </span>
-          <span v-else class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">—</span>
+            {{ row.firstUserMessage }}
+            <OTooltip :content="row.firstUserMessage" />
+          </div>
+          <span v-else class="text-[0.75rem] text-[var(--o2-text-muted)]">—</span>
         </template>
 
         <!-- Turns -->
         <template #cell-turns="{ row }">
-          <span class="tw:text-[0.75rem]">{{ row.turns }}</span>
+          <span class="text-[0.75rem]">{{ row.turns }}</span>
         </template>
 
         <!-- Duration -->
         <template #cell-durationNanos="{ row }">
-          <span class="tw:text-[0.75rem]">
+          <span class="text-[0.75rem]">
             {{ formatDuration(row.durationNanos) }}
             <OTooltip :content="`${row.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`" />
           </span>
@@ -153,30 +209,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Tokens -->
         <template #cell-tokens="{ row }">
-          <span class="tw:text-[0.75rem] tw:tabular-nums">
-            {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} (Σ {{ formatTokens(row.tokens) }})
+          <span class="text-[0.75rem] tabular-nums">
+            {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} = {{ formatTokens(row.tokens) }}
             <OTooltip :content="t('traces.sessionsList.tokenTooltip', { input: row.inputTokens.toLocaleString(), output: row.outputTokens.toLocaleString(), total: row.tokens.toLocaleString() })" />
           </span>
         </template>
 
         <!-- Cost -->
         <template #cell-cost="{ row }">
-          <span class="tw:text-[0.75rem]">${{ row.cost.toFixed(4) }}</span>
+          <span class="text-[0.75rem]">${{ row.cost.toFixed(4) }}</span>
         </template>
 
         <!-- Status (derived from error_count) -->
         <template #cell-status="{ row }">
-          <span
-            class="tw:rounded tw:px-[0.5rem] tw:py-[0.125rem] tw:inline-flex tw:items-center tw:gap-[0.25rem] tw:w-fit tw:text-[0.7rem] tw:font-semibold tw:capitalize"
-            :class="statusBadgeClass(row.status)"
+          <OTag
+            type="sessionStatus"
+            :value="row.status"
             :data-test="`sessions-list-status-${row.sessionId}`"
-          >
-            <span
-              class="tw:w-[6px] tw:h-[6px] tw:rounded-full"
-              :class="statusDotClass(row.status)"
-            />
-            {{ row.status }}
-          </span>
+          />
         </template>
       </OTable>
   </div>
@@ -184,17 +234,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { formatDate } from "@/utils/date";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import useStreams from "@/composables/useStreams";
 import { useSessions, type SessionRow } from "./composables/useSessions";
-import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import genAiAgentMappingService, {
+  type GenAiAgentListItem,
+} from "@/services/gen-ai-agent-mapping.service";
+import {
+  ALL_AGENTS_VALUE,
+  agentOptionKey,
+  buildAgentSessionFilter,
+} from "./llmAgentFilter";
 import {
   splitNumberWithUnit,
   splitDuration,
@@ -218,6 +280,7 @@ const STREAM_LS_KEY = "sessionsList_streamFilter";
 
 const { t } = useI18n();
 const router = useRouter();
+const route = useRoute();
 const store = useStore();
 const { getStreams } = useStreams();
 const {
@@ -226,22 +289,77 @@ const {
   loading,
   error,
   hasLoadedOnce,
+  lastRunAt,
+  loadedOrg,
+  currentPage,
+  rowsPerPage,
+  agents,
+  agentsLoaded,
   fetchPage,
   cancelAll,
 } = useSessions();
 
+const urlType = typeof route.query.type === "string" ? route.query.type : "";
+const urlStream = typeof route.query.stream === "string" ? route.query.stream : "";
+const urlAgentName = typeof route.query.agent === "string" ? route.query.agent : "";
+
 const availableStreams = ref<string[]>([]);
 const streamsLoaded = ref(false);
 const activeStream = ref<string>(
-  localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
+  urlStream || localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
+);
+const MODE_LS_KEY = "sessionsList_filterMode";
+const AGENT_LS_KEY = "sessionsList_agentFilter";
+const filterMode = ref<"stream" | "agent">(
+  urlType === "agent"
+    ? "agent"
+    : urlType === "stream"
+      ? "stream"
+      : localStorage.getItem(MODE_LS_KEY) === "agent"
+        ? "agent"
+        : "stream",
+);
+const activeAgent = ref<string>(localStorage.getItem(AGENT_LS_KEY) || ALL_AGENTS_VALUE);
+// `agents` / `agentsLoaded` are module-scoped (see useSessions) so the agent
+// picker keeps its options — and stays off its skeleton — across a remount.
+const pendingAgentName = ref<string | null>(
+  filterMode.value === "agent" && urlAgentName ? urlAgentName : null,
 );
 
-// Server-side pagination state (1-indexed). OTable owns the footer controls
-// in `pagination="server"` mode and emits `pagination-change`; these refs are
-// the source of truth it reads back via `:current-page` / `:page-size`.
-const currentPage = ref(1);
-const rowsPerPage = ref(25);
-const rowsPerPageOptions = [10, 25, 50, 100];
+// Server-side pagination (1-indexed). OTable owns the footer controls in
+// `pagination="server"` mode and emits `pagination-change`; `currentPage` /
+// `rowsPerPage` come from useSessions (module-scoped) so the page/size survives
+// the unmount/remount cycle and stays in sync with the restored rows.
+// Page-size options match the dashboards' table pagination
+// (TablePaginationControls) so the AI module stays consistent.
+const rowsPerPageOptions = [20, 50, 100, 250, 500];
+
+const agentSelectOptions = computed(() =>
+  agents.value.map((agent) => ({
+    label: agent.id ? `${agent.name} (${agent.id})` : agent.name,
+    value: agentOptionKey(agent),
+  })),
+);
+
+const selectedAgent = computed<GenAiAgentListItem | null>(() => {
+  if (activeAgent.value === ALL_AGENTS_VALUE) return null;
+  return agents.value.find((agent) => agentOptionKey(agent) === activeAgent.value) ?? null;
+});
+
+const effectiveStream = computed(() =>
+  filterMode.value === "agent"
+    ? (selectedAgent.value?.source_stream ?? "")
+    : activeStream.value,
+);
+const effectiveAgent = computed<GenAiAgentListItem | null>(() =>
+  filterMode.value === "agent" ? selectedAgent.value : null,
+);
+const agentFilterClause = computed(() =>
+  buildAgentSessionFilter(effectiveAgent.value, effectiveStream.value),
+);
+const agentEmpty = computed(
+  () => filterMode.value === "agent" && agentsLoaded.value && agents.value.length === 0,
+);
 
 // `instrument` is the only action id the preset emits. Send the user to
 // the in-app AI integrations page (the closest "set this up" surface) so
@@ -281,7 +399,7 @@ const tableColumns = computed(() => [
     id: "sessionId",
     header: t('traces.sessionsList.columns.sessionId'),
     accessorKey: "sessionId",
-    size: 160,
+    size: 250,
     sortable: false,
     meta: { align: "left" },
   },
@@ -289,7 +407,7 @@ const tableColumns = computed(() => [
     id: "userId",
     header: t('traces.sessionsList.columns.user'),
     accessorKey: "userId",
-    size: 180,
+    size: 110,
     sortable: false,
     hideable: true,
     meta: { align: "left" },
@@ -298,7 +416,12 @@ const tableColumns = computed(() => [
     id: "firstUserMessage",
     header: t('traces.sessionsList.columns.firstMessage'),
     accessorKey: "firstUserMessage",
-    size: 200,
+    size: 360,
+    // Flex columns collapse to `minSize` when the table overflows horizontally;
+    // pin a floor so the message stays readable instead of clipping to "Han…".
+    // The user drives how much they want to see via resize, capped by maxSize.
+    minSize: 200,
+    maxSize: 600,
     sortable: false,
     hideable: true,
     meta: { align: "left", flex: true },
@@ -307,28 +430,29 @@ const tableColumns = computed(() => [
     id: "turns",
     header: t('traces.sessionsList.columns.turns'),
     accessorKey: "turns",
-    size: 90,
+    size: 50,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "durationNanos",
     header: t('traces.sessionsList.columns.duration'),
     accessorKey: "durationNanos",
-    size: 120,
+    size: 90,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "tokens",
     header: t('traces.sessionsList.columns.tokens'),
     accessorKey: "tokens",
-    size: 250,
+    size: 150,
+    minSize: 150,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "cost",
@@ -337,7 +461,7 @@ const tableColumns = computed(() => [
     size: 100,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "status",
@@ -346,7 +470,7 @@ const tableColumns = computed(() => [
     size: 100,
     sortable: false,
     hideable: true,
-    meta: { align: "center", disableCellAction: true },
+    meta: { align: "left", disableCellAction: true },
   },
 ].map((c: any) => ({
   ...c,
@@ -361,11 +485,6 @@ function formatTimestamp(nanos: number): string {
   return formatDate(Math.floor(nanos / 1_000_000), "YYYY-MM-DD HH:mm:ss");
 }
 
-function shortId(id: string): string {
-  if (!id) return "—";
-  if (id.length <= 16) return id;
-  return `${id.slice(0, 8)}…${id.slice(-5)}`;
-}
 
 function formatDuration(nanos: number): string {
   if (!nanos) return "—";
@@ -380,22 +499,14 @@ function formatTokens(n: number): string {
   return `${t.value}${t.unit}`;
 }
 
-function statusBadgeClass(s: SessionRow["status"]): string {
-  switch (s) {
-    case "error":
-      return "tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_12%,transparent)] tw:text-[var(--o2-service-health-critical)]";
-    default:
-      return "tw:bg-[color-mix(in_srgb,var(--o2-service-health-healthy,#16a34a)_12%,transparent)] tw:text-[var(--o2-service-health-healthy,#16a34a)]";
-  }
-}
 
-function statusDotClass(s: SessionRow["status"]): string {
-  switch (s) {
-    case "error":
-      return "tw:bg-[var(--o2-service-health-critical)]";
-    default:
-      return "tw:bg-emerald-500";
-  }
+// Load the trace-stream list at most once per mount. Both the initial mount
+// and the (parent-driven) session load await the SAME promise, so a load can
+// neither race ahead of the stream list nor trigger a second stream fetch.
+let streamsPromise: Promise<void> | null = null;
+function ensureStreamsLoaded(): Promise<void> {
+  if (!streamsPromise) streamsPromise = loadTraceStreams();
+  return streamsPromise;
 }
 
 async function loadTraceStreams() {
@@ -419,23 +530,134 @@ async function loadTraceStreams() {
   }
 }
 
-async function loadSessions(startTime?: number, endTime?: number) {
+async function loadAgents(startTime?: number, endTime?: number) {
+  const orgId = store.state.selectedOrganization?.identifier;
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
-  if (!activeStream.value || !start || !end) return;
-  localStorage.setItem(STREAM_LS_KEY, activeStream.value);
+  if (!orgId || !start || !end) return;
+  agentsLoaded.value = false;
+  try {
+    const agentList = await genAiAgentMappingService.listAgents(orgId, start, end);
+    agents.value = agentList.agents;
+    if (
+      activeAgent.value !== ALL_AGENTS_VALUE &&
+      !agents.value.some((agent) => agentOptionKey(agent) === activeAgent.value)
+    ) {
+      activeAgent.value = ALL_AGENTS_VALUE;
+    }
+  } catch (e) {
+    console.warn("Failed to load GenAI agents", e);
+    agents.value = [];
+    activeAgent.value = ALL_AGENTS_VALUE;
+  } finally {
+    agentsLoaded.value = true;
+  }
+}
+
+function syncFilterUrl() {
+  const query: Record<string, any> = { ...route.query, type: filterMode.value };
+  if (filterMode.value === "agent") {
+    delete query.stream;
+    if (selectedAgent.value?.name) query.agent = selectedAgent.value.name;
+    else delete query.agent;
+  } else {
+    delete query.agent;
+    if (activeStream.value) query.stream = activeStream.value;
+    else delete query.stream;
+  }
+  router.replace({ query }).catch(() => {});
+}
+
+function clearSessionRows() {
+  sessions.value = [];
+  total.value = 0;
+}
+
+async function loadSessions(
+  startTime?: number,
+  endTime?: number,
+  force = false,
+) {
+  const start = startTime ?? props.startTime;
+  const end = endTime ?? props.endTime;
+  if (!start || !end) return;
+
+  // Serve the already-loaded list from memory. This is the back-navigation
+  // case (SessionsList remounts, the parent's DateTime replays its window
+  // programmatically) — we keep the previous page instead of re-fetching. Only
+  // an explicit refresh or a real date change passes `force`. A prior error or
+  // an org switch invalidates the cache so those still re-fetch.
+  const orgId = store.state.selectedOrganization?.identifier || "default";
+  if (!force && hasLoadedOnce.value && !error.value && loadedOrg.value === orgId) {
+    return;
+  }
+
+  localStorage.setItem(MODE_LS_KEY, filterMode.value);
+
+  // Hold the table skeleton across the whole load. We await the stream list and
+  // (in Agent mode) the agents API before `fetchPage`, which is the only thing
+  // that flips `loading`. Setting it true up front means the table shows one
+  // continuous skeleton instead of flashing its empty body between phases.
+  loading.value = true;
+
+  // Stream-mode reads `effectiveStream` from `activeStream`, which is only set
+  // once the stream list loads — so make sure that's done before we fetch,
+  // regardless of whether this call raced ahead of the mount's stream load.
+  await ensureStreamsLoaded();
+
+  // Agents API is only relevant in Agent mode — don't touch it in Stream mode.
+  if (filterMode.value === "agent") {
+    await loadAgents(start, end);
+    if (pendingAgentName.value) {
+      const match = agents.value.find((agent) => agent.name === pendingAgentName.value);
+      if (match) activeAgent.value = agentOptionKey(match);
+      pendingAgentName.value = null;
+    }
+    if (!selectedAgent.value && agents.value.length > 0) {
+      activeAgent.value = agentOptionKey(agents.value[0]);
+    }
+    localStorage.setItem(AGENT_LS_KEY, activeAgent.value);
+  } else {
+    localStorage.setItem(STREAM_LS_KEY, activeStream.value);
+  }
+
+  syncFilterUrl();
+
+  const stream = effectiveStream.value;
+  if (!stream) {
+    clearSessionRows();
+    loading.value = false; // nothing to fetch — release the held skeleton
+    return;
+  }
   await fetchPage(
-    activeStream.value,
+    stream,
     start,
     end,
     currentPage.value - 1,
     rowsPerPage.value,
+    agentFilterClause.value,
   );
 }
 
+// Filter / pagination changes are deliberate user actions — force a re-fetch
+// so they bypass the "already loaded" cache guard.
 function onStreamChange() {
   currentPage.value = 1;
-  loadSessions();
+  loadSessions(undefined, undefined, true);
+}
+
+function onFilterModeChange(mode?: string | number | null) {
+  const next = mode === "agent" ? "agent" : "stream";
+  if (next === filterMode.value) return;
+  filterMode.value = next;
+  currentPage.value = 1;
+  clearSessionRows();
+  loadSessions(undefined, undefined, true);
+}
+
+function onAgentChange() {
+  currentPage.value = 1;
+  loadSessions(undefined, undefined, true);
 }
 
 // Single handler for OTable's server pagination footer. A page-size change
@@ -448,7 +670,7 @@ function onPaginationChange({ page, size }: { page: number; size: number }) {
   } else {
     currentPage.value = page;
   }
-  loadSessions();
+  loadSessions(undefined, undefined, true);
 }
 
 function handleRowClick(row: SessionRow) {
@@ -456,7 +678,7 @@ function handleRowClick(row: SessionRow) {
   router.push({
     name: props.detailRouteName || "sessionDetails",
     query: {
-      stream: activeStream.value,
+      stream: effectiveStream.value,
       session_id: row.sessionId,
       from: props.startTime,
       to: props.endTime,
@@ -466,20 +688,23 @@ function handleRowClick(row: SessionRow) {
   });
 }
 
-async function refresh(startTime?: number, endTime?: number) {
-  currentPage.value = 1;
-  await loadSessions(startTime, endTime);
+// Explicit refresh (header button) / real date change — always re-fetches,
+// bypassing the cache guard. `lastRunAt` is stamped inside `fetchPage`, so it
+// only advances on an actual load, never on a cache hit.
+async function refresh(startTime?: number, endTime?: number, force = true) {
+  // Only snap back to page 1 when we're actually going to fetch. On the
+  // non-forced mount replay we skip the fetch and keep the restored page.
+  if (force) currentPage.value = 1;
+  await loadSessions(startTime, endTime, force);
 }
 
-defineExpose({ refresh });
+defineExpose({ refresh, lastRunAt, loading });
 
-onMounted(async () => {
-  if (!streamsLoaded.value) {
-    await loadTraceStreams();
-  }
-  if (activeStream.value) {
-    loadSessions();
-  }
+onMounted(() => {
+  // Only kick off the stream-list load here. The session fetch is driven by the
+  // parent (its DateTime fires an initial `on:date-change` on mount, plus the
+  // refresh button) — a single owner, so we don't double-fetch on load.
+  ensureStreamsLoaded();
 });
 
 onUnmounted(() => {

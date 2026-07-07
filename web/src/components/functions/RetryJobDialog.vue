@@ -19,20 +19,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <Transition name="fade">
       <div
         v-if="modelValue"
-        class="retry-dialog-backdrop"
+        class="retry-dialog-backdrop fixed top-0 left-0 w-full h-full bg-[rgba(0,0,0,0.5)] flex justify-center items-center z-[9999]"
         @click="handleBackdropClick"
       >
         <div
-          class="retry-dialog"
+          class="retry-dialog bg-white dark:bg-[#1e1e1e] dark:text-[var(--o2-border)] rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.15)] w-[90%] max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden"
           ref="dialogRef"
           @click.stop
           role="dialog"
           aria-modal="true"
-          :class="{ 'dark-theme': store.state.theme === 'dark' }"
         >
           <!-- Header -->
-          <div class="retry-dialog-header">
-            <h3 class="retry-dialog-title">Retry Enrichment Table Job</h3>
+          <div
+            class="retry-dialog-header flex justify-between items-center py-5 px-6 border-b border-[#eaeaea] dark:border-[#3a3a3a]"
+          >
+            <h3
+              class="retry-dialog-title text-lg font-semibold m-0 text-[#333] dark:text-[var(--o2-border)]"
+            >Retry Enrichment Table Job</h3>
             <OButton
               variant="ghost"
               size="icon"
@@ -43,22 +46,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Content -->
-          <div class="retry-dialog-content">
-            <div class="table-info">
-              <div class="info-row">
-                <span class="info-label">Table:</span>
-                <span class="info-value">{{ tableName }}</span>
+          <div
+            class="retry-dialog-content p-6 overflow-y-auto flex-1"
+          >
+            <div
+              class="table-info mb-5 p-4 bg-[#f8f9fa] dark:bg-[#2a2a2a] rounded-md"
+            >
+              <div
+                class="info-row flex mb-2 last:mb-0"
+              >
+                <span class="font-semibold min-w-[60px] text-[#666]"
+                >Table:</span>
+                <span class="text-[#333] break-words"
+                >{{ tableName }}</span>
               </div>
-              <div class="info-row">
-                <span class="info-label">URL:</span>
-                <span class="info-value url-text">{{ url }}</span>
+              <div
+                class="info-row flex mb-2 last:mb-0"
+              >
+                <span class="font-semibold min-w-[60px] text-[#666]"
+                >URL:</span>
+                <span class="text-[#333] break-words font-mono text-[13px]"
+                >{{ url }}</span>
               </div>
             </div>
 
             <!-- Range Support Warning -->
-            <div v-if="!supportsRange" class="warning-banner">
-              <OIcon name="warning" size="sm" class="warning-icon" />
-              <div class="warning-text">
+            <div
+              v-if="!supportsRange"
+              class="warning-banner flex gap-3 p-4 bg-[#fff3cd] dark:bg-[#3d3516] border border-[#ffc107] dark:border-[#a67c00] rounded-md mb-5"
+            >
+              <OIcon name="warning" size="sm" class="text-[#ff9800] shrink-0" />
+              <div
+                class="warning-text flex-1"
+              >
                 <strong>Range requests not supported</strong>
                 <p>
                   This URL does not support resuming from the last position.
@@ -68,46 +88,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Retry Options (only shown if range is supported) -->
-            <div v-if="supportsRange" class="retry-options">
-              <p class="options-title">How would you like to retry?</p>
+            <div
+              v-if="supportsRange"
+              class="mt-5"
+            >
+              <p
+                class="options-title font-semibold mb-4 text-[#333] dark:text-[var(--o2-border)]"
+              >How would you like to retry?</p>
 
-              <div class="option-card" :class="{ selected: !resumeFromLast }">
-                <label class="option-label">
+              <div
+                class="option-card border-2 border-(--o2-border) dark:border-[#3a3a3a] rounded-lg mb-3 transition-all duration-200 cursor-pointer hover:border-[#1976d2] hover:bg-[#f5f9ff] dark:hover:border-[#1976d2] dark:hover:bg-[#1a2332]"
+                :class="[
+                  { selected: !resumeFromLast },
+                  !resumeFromLast ? 'border-[#1976d2]! bg-[#e3f2fd]!' : ''
+                ]"
+              >
+                <label
+                  class="block p-4 cursor-pointer w-full"
+                >
                   <input
                     type="radio"
                     name="retryOption"
                     :value="false"
                     v-model="resumeFromLast"
-                    class="option-radio"
+                   class="absolute opacity-0 cursor-pointer"
                   />
-                  <div class="option-content">
-                    <div class="option-header">
-                      <OIcon name="refresh" size="sm" class="option-icon" />
-                      <span class="option-name">Start from Beginning</span>
+                  <div
+                    class="flex flex-col gap-2"
+                  >
+                    <div
+                      class="option-header flex items-center gap-[10px] font-semibold text-[#333] dark:text-[var(--o2-border)]"
+                    >
+                      <OIcon name="refresh" size="sm" class="text-[#1976d2]" />
+                      <span class="flex-1">Start from Beginning</span>
                     </div>
-                    <p class="option-description">
+                    <p
+                      class="m-0 text-sm text-[#666] leading-normal"
+                    >
                       Download the entire file from scratch. All previous progress will be discarded.
                     </p>
                   </div>
                 </label>
               </div>
 
-              <div class="option-card" :class="{ selected: resumeFromLast }">
-                <label class="option-label">
+              <div
+                class="option-card border-2 border-(--o2-border) dark:border-[#3a3a3a] rounded-lg mb-3 transition-all duration-200 cursor-pointer hover:border-[#1976d2] hover:bg-[#f5f9ff] dark:hover:border-[#1976d2] dark:hover:bg-[#1a2332]"
+                :class="[
+                  { selected: resumeFromLast },
+                  resumeFromLast ? 'border-[#1976d2]! bg-[#e3f2fd]!' : ''
+                ]"
+              >
+                <label
+                  class="block p-4 cursor-pointer w-full"
+                >
                   <input
                     type="radio"
                     name="retryOption"
                     :value="true"
                     v-model="resumeFromLast"
-                    class="option-radio"
+                    class="absolute opacity-0 cursor-pointer"
                   />
-                  <div class="option-content">
-                    <div class="option-header">
-                      <OIcon name="play-arrow" size="sm" class="option-icon" />
-                      <span class="option-name">Resume from Last Position</span>
-                      <span class="recommended-badge">Recommended</span>
+                  <div
+                    class="flex flex-col gap-2"
+                  >
+                    <div
+                      class="option-header flex items-center gap-[10px] font-semibold text-[#333] dark:text-[var(--o2-border)]"
+                    >
+                      <OIcon name="play-arrow" size="sm" class="text-[#1976d2]" />
+                      <span class="flex-1">Resume from Last Position</span>
+                      <span
+                        class="bg-[#4caf50] text-white py-[2px] px-2 rounded-full text-[11px] font-semibold uppercase"
+                      >Recommended</span>
                     </div>
-                    <p class="option-description">
+                    <p
+                      class="m-0 text-sm text-[#666] leading-normal"
+                    >
                       Continue downloading from where it stopped.
                       <span v-if="lastBytePosition > 0">
                         Already processed: {{ formatBytes(lastBytePosition) }}
@@ -120,12 +175,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Footer -->
-          <div class="retry-dialog-footer">
+          <div
+            class="retry-dialog-footer py-4 px-6 border-t border-[#eaeaea] dark:border-[#3a3a3a] flex justify-end gap-3"
+          >
             <OButton
               variant="outline"
               size="sm-action"
               @click="handleCancel"
-              class="footer-btn"
+              class="min-w-[100px]"
             >
               Cancel
             </OButton>
@@ -133,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               size="sm-action"
               @click="handleConfirm"
-              class="footer-btn"
+              class="min-w-[100px]"
             >
               Retry
             </OButton>
@@ -300,143 +357,11 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.retry-dialog-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 9999;
-}
-
-.retry-dialog {
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  width: 90%;
-  max-width: 600px;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.retry-dialog.dark-theme {
-  background-color: #1e1e1e;
-  color: #e0e0e0;
-}
-
-.retry-dialog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #eaeaea;
-}
-
-.dark-theme .retry-dialog-header {
-  border-bottom-color: #3a3a3a;
-}
-
-.retry-dialog-title {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0;
-  color: #333;
-}
-
-.dark-theme .retry-dialog-title {
-  color: #e0e0e0;
-}
-
-
-.retry-dialog-content {
-  padding: 24px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.table-info {
-  margin-bottom: 20px;
-  padding: 16px;
-  background-color: #f8f9fa;
-  border-radius: 6px;
-}
-
-.dark-theme .table-info {
-  background-color: #2a2a2a;
-}
-
-.info-row {
-  display: flex;
-  margin-bottom: 8px;
-}
-
-.info-row:last-child {
-  margin-bottom: 0;
-}
-
-.info-label {
-  font-weight: 600;
-  min-width: 60px;
-  color: #666;
-}
-
-.dark-theme .info-label {
-  color: #999;
-}
-
-.info-value {
-  color: #333;
-  word-break: break-word;
-}
-
-.dark-theme .info-value {
-  color: #e0e0e0;
-}
-
-.url-text {
-  font-family: monospace;
-  font-size: 13px;
-}
-
-.warning-banner {
-  display: flex;
-  gap: 12px;
-  padding: 16px;
-  background-color: #fff3cd;
-  border: 1px solid #ffc107;
-  border-radius: 6px;
-  margin-bottom: 20px;
-}
-
-.dark-theme .warning-banner {
-  background-color: #3d3516;
-  border-color: #a67c00;
-}
-
-.warning-icon {
-  color: #ff9800;
-  flex-shrink: 0;
-}
-
-.warning-text {
-  flex: 1;
-}
-
+<style>
 .warning-text strong {
   display: block;
   margin-bottom: 4px;
   color: #d68400;
-}
-
-.dark-theme .warning-text strong {
-  color: #ffb84d;
 }
 
 .warning-text p {
@@ -445,132 +370,18 @@ export default defineComponent({
   color: #856404;
 }
 
-.dark-theme .warning-text p {
+.dark .warning-text strong {
+  color: #ffb84d;
+}
+
+.dark .warning-text p {
   color: #d4a86a;
 }
 
-.retry-options {
-  margin-top: 20px;
-}
-
-.options-title {
-  font-weight: 600;
-  margin-bottom: 16px;
-  color: #333;
-}
-
-.dark-theme .options-title {
-  color: #e0e0e0;
-}
-
-.option-card {
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  transition: all 0.2s;
-  cursor: pointer;
-}
-
-.option-card:hover {
-  border-color: #1976d2;
-  background-color: #f5f9ff;
-}
-
-.dark-theme .option-card {
-  border-color: #3a3a3a;
-}
-
-.dark-theme .option-card:hover {
-  border-color: #1976d2;
+.dark .option-card.selected {
   background-color: #1a2332;
 }
 
-.option-card.selected {
-  border-color: #1976d2;
-  background-color: #e3f2fd;
-}
-
-.dark-theme .option-card.selected {
-  background-color: #1a2332;
-}
-
-.option-label {
-  display: block;
-  padding: 16px;
-  cursor: pointer;
-  width: 100%;
-}
-
-.option-radio {
-  position: absolute;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.option-content {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.option-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
-  color: #333;
-}
-
-.dark-theme .option-header {
-  color: #e0e0e0;
-}
-
-.option-icon {
-  color: #1976d2;
-}
-
-.option-name {
-  flex: 1;
-}
-
-.recommended-badge {
-  background-color: #4caf50;
-  color: white;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.option-description {
-  margin: 0;
-  font-size: 14px;
-  color: #666;
-  line-height: 1.5;
-}
-
-.dark-theme .option-description {
-  color: #999;
-}
-
-.retry-dialog-footer {
-  padding: 16px 24px;
-  border-top: 1px solid #eaeaea;
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.dark-theme .retry-dialog-footer {
-  border-top-color: #3a3a3a;
-}
-
-.footer-btn {
-  min-width: 100px;
-}
-
-/* Transition effects */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease;
@@ -581,7 +392,6 @@ export default defineComponent({
   opacity: 0;
 }
 
-/* Ensure dialog slides in when it appears */
 .fade-enter-active .retry-dialog {
   animation: slide-up 0.3s ease;
 }

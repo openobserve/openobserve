@@ -15,21 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="hasValidContent" class="llm-content-renderer tw:h-full">
+  <div v-if="hasValidContent" class="llm-content-renderer w-full h-full">
     <!-- Tool-specific rendering -->
-    <div v-if="isToolObservation && toolContent !== null" class="tool-content tw:flex tw:flex-col tw:h-full">
-      <div v-if="toolMetadata" class="tool-metadata tw:mb-2">
-        <OBadge
+    <div v-if="isToolObservation && toolContent !== null" class="tool-content flex flex-col h-full">
+      <div v-if="toolMetadata" class="flex items-center flex-wrap gap-2 mb-2">
+        <OTag
           v-if="toolMetadata.name"
-          variant="warning"
-          class="tw:mr-2"
-        >{{ `Tool: ${toolMetadata.name}` }}</OBadge>
-        <OBadge
+          type="toolMeta"
+          value="tool"
+          class="mr-2"
+        >{{ `Tool: ${toolMetadata.name}` }}</OTag>
+        <OTag
           v-if="toolMetadata.callId"
-          variant="default"
-        >{{ `Call ID: ${toolMetadata.callId}` }}</OBadge>
+          type="toolMeta"
+          value="callid"
+        >{{ `Call ID: ${toolMetadata.callId}` }}</OTag>
       </div>
-      <div class="tool-data tw:flex-1">
+      <div class="tool-data flex-1">
         <CodeQueryEditor
           :editor-id="`${editorIdPrefix}tool-json-viewer-${span?.llm_tool_call_id || 'unknown'}`"
           :query="toolContentJson"
@@ -38,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-auto-complete="false"
           :show-line-numbers="false"
           :sticky-scroll="false"
-          class="json-viewer-editor tw:max-h-full! tw:h-full!"
+          class="min-h-25 w-full rounded overflow-hidden max-h-full! h-full!"
         />
       </div>
     </div>
@@ -51,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         props.viewMode === 'formatted' &&
         !shouldRenderAsMessages &&
         !isPlainText &&
-        'tw:h-full'
+        'h-full'
       "
     >
       <!-- Truncated view -->
@@ -61,26 +63,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           props.viewMode === 'formatted' &&
           !shouldRenderAsMessages &&
           !isPlainText &&
-          'tw:h-full'
+          'h-full'
         "
       >
         <!-- Formatted mode -->
         <div
           v-if="props.viewMode === 'formatted'"
-          :class="!shouldRenderAsMessages && !isPlainText && 'tw:h-full'"
+          :class="!shouldRenderAsMessages && !isPlainText && 'h-full'"
         >
           <div v-if="shouldRenderAsMessages" class="messages-view">
             <div
               v-for="(msg, idx) in previewMessages"
               :key="idx"
-              class="message-item tw:mb-2 tw:h-full"
+              class="message-item mb-2 h-full"
               :style="{
                 border: '1px solid var(--o2-border)',
                 borderRadius: '8px',
               }"
             >
               <div
-                class="message-role tw:text-xs tw:font-bold tw:p-2 tw:capitalize"
+                class="message-role text-xs font-bold p-2 capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
                   borderBottom: '1px solid var(--o2-border)',
@@ -90,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isMessageJson(msg.content)"
-                class="message-content-json tw:p-2 tw:h-full"
+                class="message-content-json p-2 h-full text-[13px]"
                 style="background-color: var(--o2-code-bg)"
               >
                 <CodeQueryEditor
@@ -101,19 +103,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-auto-complete="false"
                   :show-line-numbers="false"
                   :sticky-scroll="false"
-                  class="json-viewer-editor tw:max-h-full! tw:h-full!"
+                  class="min-h-25 w-full rounded overflow-hidden max-h-full! h-full!"
                 />
               </div>
               <div
                 v-else
-                class="message-content markdown-body tw:p-2 tw:overflow-x-auto"
+                class="message-content markdown-body p-2 overflow-x-auto"
                 style="background-color: var(--o2-code-bg)"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
-            <pre class="plain-text-content">{{ contentStats.previewText }}</pre>
+            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-[13px] leading-normal bg-(--o2-code-bg) rounded overflow-x-auto">{{ contentStats.previewText }}</pre>
           </div>
           <div v-else class="json-content">
             <CodeQueryEditor
@@ -124,13 +126,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-auto-complete="false"
               :show-line-numbers="false"
               :sticky-scroll="false"
-              class="json-viewer-editor tw:max-h-full! tw:h-full!"
+              class="min-h-25 w-full rounded overflow-hidden max-h-full! h-full!"
             />
           </div>
         </div>
 
         <!-- JSON mode -->
-        <div v-else class="json-content tw:h-full!">
+        <div v-else class="json-content h-full!">
           <CodeQueryEditor
             :editor-id="`truncated-json-mode-viewer-${editorIdPrefix}`"
             :query="parsedContentJson"
@@ -139,14 +141,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-auto-complete="false"
             :show-line-numbers="false"
             :sticky-scroll="false"
-            class="json-viewer-editor tw:max-h-full! tw:h-full!"
+            class="min-h-25 w-full rounded overflow-hidden max-h-full! h-full!"
           />
         </div>
 
-        <div class="expand-indicator tw:mt-2">
+        <div class="text-center mt-2">
           <OButton
             variant="ghost-primary"
             size="sm"
+            data-test="traces-llm-content-renderer-expand-btn"
             @click="isExpanded = true"
           >
             ...expand ({{ contentStats.remainingChars }} more characters)
@@ -161,26 +164,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           props.viewMode === 'formatted' &&
           !shouldRenderAsMessages &&
           !isPlainText &&
-          'tw:h-full'
+          'h-full'
         "
       >
         <!-- Formatted mode -->
         <div
           v-if="props.viewMode === 'formatted'"
-          :class="!shouldRenderAsMessages && !isPlainText && 'tw:h-full'"
+          :class="!shouldRenderAsMessages && !isPlainText && 'h-full'"
         >
           <div v-if="shouldRenderAsMessages" class="messages-view">
             <div
               v-for="(msg, idx) in parsedMessages"
               :key="idx"
-              class="message-item tw:mb-2 tw:h-full"
+              class="message-item mb-2 h-full"
               :style="{
                 border: '1px solid var(--o2-border)',
                 borderRadius: '8px',
               }"
             >
               <div
-                class="message-role tw:text-xs tw:font-bold tw:p-2 tw:capitalize"
+                class="message-role text-xs font-bold p-2 capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
                   borderBottom: '1px solid var(--o2-border)',
@@ -190,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isMessageJson(msg.content)"
-                class="message-content-json tw:p-2 tw:h-full"
+                class="message-content-json p-2 h-full text-[13px]"
                 style="background-color: var(--o2-code-bg)"
               >
                 <CodeQueryEditor
@@ -201,21 +204,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-auto-complete="false"
                   :show-line-numbers="false"
                   :sticky-scroll="false"
-                  class="json-viewer-editor tw:max-h-full! tw:h-full!"
+                  class="min-h-25 w-full rounded overflow-hidden max-h-full! h-full!"
                 />
               </div>
               <div
                 v-else
-                class="message-content markdown-body tw:p-2 tw:overflow-x-auto"
+                class="message-content markdown-body p-2 overflow-x-auto"
                 style="background-color: var(--o2-code-bg)"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
-            <pre class="plain-text-content">{{ fullText }}</pre>
+            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-[13px] leading-normal bg-(--o2-code-bg) rounded overflow-x-auto">{{ fullText }}</pre>
           </div>
-          <div v-else class="json-content tw:h-full">
+          <div v-else class="json-content h-full">
             <CodeQueryEditor
               :editor-id="`full-formatted-json-viewer-${editorIdPrefix}`"
               :query="parsedContentJson"
@@ -224,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-auto-complete="false"
               :show-line-numbers="false"
               :sticky-scroll="false"
-              class="json-viewer-editor tw:max-h-full! tw:h-full"
+              class="min-h-25 w-full rounded overflow-hidden max-h-full! h-full"
             />
           </div>
         </div>
@@ -239,11 +242,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-auto-complete="false"
             :show-line-numbers="false"
             :sticky-scroll="false"
-            class="json-viewer-editor"
+            class="h-full max-h-full min-h-25 w-full rounded overflow-hidden"
           />
         </div>
 
-        <div v-if="contentStats.shouldTruncate" class="collapse-btn tw:mt-2">
+        <div v-if="contentStats.shouldTruncate" class="text-center mt-2">
           <OButton
             variant="ghost-primary"
             size="sm"
@@ -266,7 +269,7 @@ const CodeQueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
 import OButton from '@/lib/core/Button/OButton.vue';
-import OBadge from '@/lib/core/Badge/OBadge.vue';
+import OTag from '@/lib/core/Badge/OTag.vue';
 
 const INITIAL_LINE_LIMIT = 15;
 
@@ -685,170 +688,116 @@ const renderMarkdown = (content: string): string => {
 };
 </script>
 
-<style scoped lang="scss">
-.llm-content-renderer {
-  width: 100%;
+<style>
+.messages-view .message-item .message-content {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
-.tool-content {
-  .tool-metadata {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
+.messages-view .message-item .message-content p {
+  margin: 0 0 8px 0;
 }
 
-.messages-view {
-  .message-item {
-    .message-content {
-      font-size: 13px;
-      line-height: 1.6;
-
-      :deep(p) {
-        margin: 0 0 8px 0;
-
-        &:last-child {
-          margin-bottom: 0;
-        }
-      }
-
-      :deep(img) {
-        max-width: 50%;
-        max-height: 400px;
-        object-fit: contain;
-        display: block;
-        margin: 8px 0;
-        border-radius: 4px;
-      }
-
-      :deep(pre) {
-        background-color: rgba(0, 0, 0, 0.05);
-        padding: 8px;
-        border-radius: 4px;
-        overflow-x: auto;
-        margin: 8px 0;
-      }
-
-      :deep(code) {
-        font-family: monospace;
-        font-size: 12px;
-        background-color: rgba(0, 0, 0, 0.05);
-        padding: 2px 4px;
-        border-radius: 3px;
-      }
-
-      :deep(pre code) {
-        background-color: transparent;
-        padding: 0;
-      }
-
-      :deep(ul),
-      :deep(ol) {
-        margin: 8px 0;
-        padding-left: 24px;
-      }
-
-      :deep(li) {
-        margin: 4px 0;
-      }
-
-      :deep(a) {
-        color: var(--q-primary);
-        text-decoration: none;
-
-        &:hover {
-          text-decoration: underline;
-        }
-      }
-
-      :deep(blockquote) {
-        border-left: 3px solid var(--o2-border-color);
-        margin: 8px 0;
-        padding-left: 12px;
-        color: var(--o2-text-secondary);
-      }
-
-      :deep(table) {
-        border-collapse: collapse;
-        width: 100%;
-        margin: 8px 0;
-
-        th,
-        td {
-          border: 1px solid var(--o2-border-color);
-          padding: 6px 8px;
-          text-align: left;
-        }
-
-        th {
-          background-color: rgba(0, 0, 0, 0.05);
-        }
-      }
-    }
-
-    .message-content-json {
-      font-size: 13px;
-    }
-  }
+.messages-view .message-item .message-content p:last-child {
+  margin-bottom: 0;
 }
 
-.text-content {
-  .plain-text-content {
-    margin: 0;
-    padding: 0.5rem;
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-family: monospace;
-    font-size: 13px;
-    line-height: 1.5;
-    background-color: var(--o2-code-bg);
-    border-radius: 4px;
-    overflow-x: auto;
-  }
-}
-
-.expand-indicator,
-.collapse-btn {
-  text-align: center;
-}
-
-.json-viewer-editor {
-  height: 100%;
-  max-height: 100%;
-  min-height: 100px;
-  width: 100%;
+.messages-view .message-item .message-content img {
+  max-width: 50%;
+  max-height: 400px;
+  object-fit: contain;
+  display: block;
+  margin: 8px 0;
   border-radius: 4px;
-  overflow: hidden;
 }
-</style>
 
-<style lang="scss">
+.messages-view .message-item .message-content pre {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.messages-view .message-item .message-content code {
+  font-family: monospace;
+  font-size: 12px;
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.messages-view .message-item .message-content pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.messages-view .message-item .message-content ul,
+.messages-view .message-item .message-content ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.messages-view .message-item .message-content li {
+  margin: 4px 0;
+}
+
+.messages-view .message-item .message-content a {
+  color: var(--q-primary);
+  text-decoration: none;
+}
+
+.messages-view .message-item .message-content a:hover {
+  text-decoration: underline;
+}
+
+.messages-view .message-item .message-content blockquote {
+  border-left: 3px solid var(--o2-border-color);
+  margin: 8px 0;
+  padding-left: 12px;
+  color: var(--o2-text-secondary);
+}
+
+.messages-view .message-item .message-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+}
+
+.messages-view .message-item .message-content table th,
+.messages-view .message-item .message-content table td {
+  border: 1px solid var(--o2-border-color);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.messages-view .message-item .message-content table th {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
 /* Unscoped — needed because innerHTML-injected nodes don't get the scoped attribute */
-.llm-content-renderer .messages-view .message-item .message-content {
-  h1,
-  h2,
-  h3,
-  h4 {
-    font-weight: 600;
-    margin: 10px 0 6px 0;
-    line-height: 1.4;
-  }
+.llm-content-renderer .messages-view .message-item .message-content h1,
+.llm-content-renderer .messages-view .message-item .message-content h2,
+.llm-content-renderer .messages-view .message-item .message-content h3,
+.llm-content-renderer .messages-view .message-item .message-content h4 {
+  font-weight: 600;
+  margin: 10px 0 6px 0;
+  line-height: 1.4;
+}
 
-  h1 {
-    font-size: 1.15rem;
-  }
+.llm-content-renderer .messages-view .message-item .message-content h1 {
+  font-size: 1.15rem;
+}
 
-  h2 {
-    font-size: 1.05rem;
-  }
+.llm-content-renderer .messages-view .message-item .message-content h2 {
+  font-size: 1.05rem;
+}
 
-  h3 {
-    font-size: 0.95rem;
-  }
+.llm-content-renderer .messages-view .message-item .message-content h3 {
+  font-size: 0.95rem;
+}
 
-  h4 {
-    font-size: 0.875rem;
-  }
+.llm-content-renderer .messages-view .message-item .message-content h4 {
+  font-size: 0.875rem;
 }
 </style>

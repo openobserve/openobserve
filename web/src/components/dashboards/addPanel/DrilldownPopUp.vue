@@ -10,7 +10,7 @@
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
- limitations under the License. 
+ limitations under the License.
 -->
 
 <!-- eslint-disable vue/no-unused-components -->
@@ -86,12 +86,11 @@
         v-if="drilldownData.data.logsMode === 'custom'"
         style="margin-top: 10px"
       >
-        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
+        <label class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
         <query-editor
           data-test="scheduled-alert-sql-editor"
           ref="queryEditorRef"
           editor-id="alerts-query-editor"
-          class="monaco-editor"
           style="height: 80px"
           :debounceTime="300"
           v-model:query="drilldownData.data.logsQuery"
@@ -101,7 +100,7 @@
     </div>
     <div v-if="drilldownData.type == 'byUrl'">
       <div style="margin-top: 10px; display: flex; flex-direction: column">
-        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterUrl") }}</label>
+        <label class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.enterUrl") }}</label>
         <OTextarea
           v-model="drilldownData.data.url"
           data-test="dashboard-drilldown-url-textarea"
@@ -118,32 +117,32 @@
 
     <div v-if="drilldownData.type == 'byDashboard'">
       <div style="margin-top: 10px">
-        <div class="dropdownDiv">
+        <div class="flex items-center my-[10px] w-full">
           <OSelect
             v-model="drilldownData.data.folder"
             :options="folderList"
             :label="t('dashboard.selectFolderDrilldown')"
-            class="tw:w-full"
+            class="w-full"
             :disabled="getFoldersListLoading.isLoading.value"
             data-test="dashboard-drilldown-folder-select"
           />
         </div>
-        <div class="dropdownDiv" v-if="drilldownData.data.folder">
+        <div class="flex items-center my-[10px] w-full" v-if="drilldownData.data.folder">
           <OSelect
             v-model="drilldownData.data.dashboard"
             :options="dashboardList"
             :label="t('dashboard.selectDashboardDrilldown')"
-            class="tw:w-full"
+            class="w-full"
             :disabled="getDashboardListLoading.isLoading.value"
             data-test="dashboard-drilldown-dashboard-select"
           />
         </div>
-        <div class="dropdownDiv" v-if="drilldownData.data.dashboard">
+        <div class="flex items-center my-[10px] w-full" v-if="drilldownData.data.dashboard">
           <OSelect
             v-model="drilldownData.data.tab"
             :options="tabList"
             :label="t('dashboard.selectTabDrilldown')"
-            class="tw:w-full"
+            class="w-full"
             :disabled="getTabListLoading.isLoading.value"
             data-test="dashboard-drilldown-tab-select"
           />
@@ -159,7 +158,7 @@
               align-items: center;
             "
           >
-            <span class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.variables") }}</span>
+            <span class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.variables") }}</span>
             <OButton
               variant="primary"
               size="sm"
@@ -738,27 +737,6 @@ export default defineComponent({
       }
     }, { deep: true });
 
-    watch(
-      () => props.open,
-      async (isOpen) => {
-        if (!isOpen) return;
-
-        // Re-initialize form data from the current props each time the dialog opens
-        drilldownData.value = props.isEditMode
-          ? JSON.parse(
-              JSON.stringify(
-                dashboardPanelData.data.config.drilldown[props.drilldownDataIndex],
-              ),
-            )
-          : getDefaultDrilldownData();
-
-        // Refresh dependent lists so they reflect the (possibly new) data
-        await getDashboardListLoading.execute();
-        await getTabListLoading.execute();
-        await getvariableNames();
-      },
-    );
-
     const updateQueryValue = (value: string) => {
       drilldownData.value.data.logsQuery = value;
     };
@@ -787,30 +765,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.selected {
-  background-color: var(--q-primary) !important;
-  font-weight: bold;
-  color: white;
-}
-
-.dropdownDiv {
-  display: flex;
-  align-items: center;
-  margin: 10px 0px;
-  width: 100%;
-}
-
-.dropdownLabel {
-  width: 150px;
-}
-
-.dropdown {
-  min-width: 100%;
-}
-
-:deep(.no-case .q-field__native > :first-child) {
-  text-transform: none !important;
-}
-</style>

@@ -15,56 +15,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:justify-center tw:gap-2 tw:leading-tight tw:min-w-0 tw:h-full">
-    <div class="tw:flex tw:items-center tw:flex-nowrap tw:min-w-0">
-      <span :class="`fi fi-${column.country_iso_code} tw:mr-1.5 tw:shrink-0`" />
-      <div class="tw:text-xs tw:truncate">{{ column.country }}</div>
+  <div class="flex flex-col justify-center gap-2 leading-tight min-w-0 h-full">
+    <div class="flex items-center flex-nowrap min-w-0">
+      <span
+        v-if="column.country_iso_code"
+        :class="`fi fi-${column.country_iso_code} mr-1.5 shrink-0`"
+      />
+      <div class="text-xs truncate">{{ column.country || "Unknown" }}</div>
     </div>
-    <div class="tw:flex tw:items-center tw:flex-nowrap tw:min-w-0 tw:text-xs tw:text-text-secondary">
-      <span class="tw:truncate">{{ column.city || "Unknown" }}</span>
-      <OIcon
-        data-test="circle-icon"
-        name="circle"
-        size="xs"
-        class="tw:mx-1.5 tw:text-gray-400 tw:shrink-0"
-      />
-      <span class="tw:truncate">{{ column.browser }}</span>
-      <OIcon
-        data-test="circle-icon"
-        name="circle"
-        size="xs"
-        class="tw:mx-1.5 tw:text-gray-400 tw:shrink-0"
-      />
-      <span class="tw:truncate">{{ column.os }}</span>
+    <div class="flex items-center flex-nowrap min-w-0 text-xs text-text-secondary">
+      <template v-for="(part, index) in detailParts" :key="`${index}-${part}`">
+        <OIcon
+          v-if="index > 0"
+          data-test="circle-icon"
+          name="circle"
+          size="xs"
+          class="mx-1.5 text-gray-400 shrink-0"
+        />
+        <span class="truncate">{{ part }}</span>
+      </template>
     </div>
   </div>
 </template>
 <script lang="ts" setup>
+import { computed } from "vue";
 import "flag-icons/css/flag-icons.min.css";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
-defineProps({
+const props = defineProps({
   column: {
     type: Object,
     required: true,
   },
 });
+
+// Only render the parts that are actually known — no dangling separators.
+const detailParts = computed(() => {
+  const parts = [props.column.city, props.column.browser, props.column.os]
+    .map((part) => (part || "").trim())
+    .filter(Boolean);
+  return parts.length ? parts : ["Unknown"];
+});
 </script>
-<style lang="scss">
-.error_type {
-  font-size: 1rem;
-  color: $info;
-}
-
-.error_description {
-  font-size: 0.875rem;
-}
-
-.error_message {
-  font-size: 0.875rem;
-}
-
-.error_time {
-  font-size: 0.75rem;
-}
-</style>

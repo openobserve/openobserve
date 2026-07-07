@@ -28,6 +28,7 @@ if (import.meta.env.DEV && !form) {
       <OInput
         v-bind="$attrs"
         :label="props.label"
+        :label-position="props.labelPosition"
         :placeholder="props.placeholder"
         :type="props.type"
         :disabled="props.disabled"
@@ -57,10 +58,25 @@ if (import.meta.env.DEV && !form) {
         @update:model-value="(val: unknown) => field.handleChange(val)"
         @blur="field.handleBlur"
       >
-        <!-- Forward every OInput slot (icon-left/icon-right/prefix/suffix/
-             tooltip/append) so consumers can keep them through the wrapper. -->
-        <template v-for="(_, slotName) in $slots" #[slotName]="slotProps">
-          <slot :name="slotName" v-bind="slotProps || {}" />
+        <!-- Forward OInput's presentational slots (e.g. a password visibility
+             toggle in #icon-right) so form fields keep full OInput affordances. -->
+        <template v-if="$slots['icon-left']" #icon-left>
+          <slot name="icon-left" />
+        </template>
+        <template v-if="$slots['icon-right']" #icon-right>
+          <slot name="icon-right" />
+        </template>
+        <template v-if="$slots.prefix" #prefix>
+          <slot name="prefix" />
+        </template>
+        <template v-if="$slots.suffix" #suffix>
+          <slot name="suffix" />
+        </template>
+        <template v-if="$slots.tooltip" #tooltip>
+          <slot name="tooltip" />
+        </template>
+        <template v-if="$slots.append" #append>
+          <slot name="append" />
         </template>
       </OInput>
     </template>

@@ -20,11 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-center! tw:w-full tw:overflow-hidden tw:border-b tw:solid tw:border-b-[var(--o2-border-color)]">
+    <div class="flex m-0! p-[0.375rem]! items-center! w-full overflow-hidden border-b solid border-b-[var(--o2-border-color)]">
       <div
         ref="toolbarLeftRef"
-        class="tw:flex tw:items-center tw:gap-1 tw:flex-nowrap tw:flex-1 tw:min-w-0 tw:overflow-hidden"
+        class="flex items-center gap-1 flex-nowrap flex-1 min-w-0"
       >
+        <!-- Collapsible region — clips its overflow so the More button (a
+             shrink-0 sibling below) always stays visible. Pinned items hide via
+             the pinBudget computation before they would clip. `flex-initial`
+             (not `flex-1`) keeps this sized to its content so the More button
+             sits right after the pinned items instead of being pushed to the
+             far right; it still shrinks + clips when content overflows. -->
+        <div class="flex items-center gap-1 flex-nowrap flex-initial min-w-0 overflow-hidden">
         <!-- View Mode: Dropdown when very narrow, Toggle Group otherwise -->
         <ODropdown v-if="toolbarToggleAsDropdown" side="bottom" align="start">
           <template #trigger>
@@ -34,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               icon-right="chevron-down"
             >
-              <OIcon :name="currentToggleOption.icon" size="sm" class="tw:shrink-0" />
+              <OIcon :name="currentToggleOption.icon" size="sm" class="shrink-0" />
               {{ currentToggleOption.label }}
             </OButton>
           </template>
@@ -62,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tooltip="toolbarToggleIconOnly ? t('common.search') : undefined"
           >
             <template #icon-left>
-              <OIcon name="search" size="sm" class="tw:shrink-0" />
+              <OIcon name="search" size="sm" class="shrink-0" />
             </template>
             <span v-if="!toolbarToggleIconOnly">{{ t("common.search") }}</span>
           </OToggleGroupItem>
@@ -76,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left>
-              <OIcon name="timeline" size="sm" class="tw:shrink-0" />
+              <OIcon name="timeline" size="sm" class="shrink-0" />
             </template>
             <span v-if="!toolbarToggleIconOnly">{{ t("search.visualize") }}</span>
           </OToggleGroupItem>
@@ -88,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tooltip="toolbarToggleIconOnly ? t('search.buildQuery') : undefined"
           >
             <template #icon-left>
-              <OIcon name="build" size="sm" class="tw:shrink-0" />
+              <OIcon name="build" size="sm" class="shrink-0" />
             </template>
             <span v-if="!toolbarToggleIconOnly">{{ t("search.buildQuery") }}</span>
           </OToggleGroupItem>
@@ -101,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tooltip="toolbarToggleIconOnly ? t('search.showPatternsLabel') : undefined"
           >
             <template #icon-left>
-              <OIcon name="layers" size="sm" class="tw:shrink-0" />
+              <OIcon name="layers" size="sm" class="shrink-0" />
             </template>
             <span v-if="!toolbarToggleIconOnly">{{ t("search.showPatternsLabel") }}</span>
           </OToggleGroupItem>
@@ -119,40 +126,157 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('search.resetFilters')" />
         </OButton>
 
-        <!-- Histogram toggle — moves into More menu below 328px available width -->
+        <!-- ── Pinned toolbar controls ──────────────────────────────────
+             Items pinned out of the More menu render here in fixed order.
+             They collapse back into the menu on narrow widths (see
+             showPinned*/pin* computeds). -->
+
+        <!-- Histogram (pinned by default — see useToolbarPins) -->
         <OButton
-          v-if="!shouldMoveButtonsToMenu"
+          v-if="showPinnedHistogram"
           data-test="logs-search-bar-histogram-btn"
           size="xs"
           variant="outline"
-          class="tw:gap-1.5"
+          class="gap-1.5"
           @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
         >
           <OSwitch
             v-model="searchObj.meta.showHistogram"
-            size="md"
+            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop
           />
-          <OIcon name="bar-chart" size="sm" class="tw:shrink-0" />
-          <OTooltip :content="searchObj.meta.showHistogram ? t('search.hideHistogram') : t('search.showHistogramLabel')" />
+          <OIcon name="bar-chart" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
+          <OTooltip :content="searchObj.meta.showHistogram ? t('search.hideHistogram') : t('search.showHistogramLabel')" shortcut-id="logsToggleHistogram" />
         </OButton>
 
+        <!-- SQL Mode (pinned) -->
+        <OButton
+          v-if="showPinnedSqlMode"
+          data-test="logs-search-bar-sql-mode-pinned-btn"
+          size="xs"
+          variant="outline"
+          class="gap-1.5"
+          @click="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
+        >
+          <OSwitch
+            :model-value="searchObj.meta.sqlMode"
+            :disabled="isSqlModeDisabled"
+            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
+            @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
+          />
+          <OIcon name="code" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
+          <OTooltip :content="t('search.sqlModeLabel')" />
+        </OButton>
+
+        <!-- Quick Mode (pinned) -->
+        <OButton
+          v-if="showPinnedQuickMode"
+          data-test="logs-search-bar-quick-mode-pinned-btn"
+          size="xs"
+          variant="outline"
+          class="gap-1.5"
+          @click="handleQuickMode"
+        >
+          <OSwitch
+            :model-value="searchObj.meta.quickMode"
+            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
+            @click.stop="handleQuickMode"
+          />
+          <!-- child-mode OTooltip attaches to its previous sibling, so this one
+               gives the switch its own tooltip (the button-level tooltip below
+               only covers the bolt icon). -->
+          <OTooltip :content="t('search.quickModeLabel')" :side-offset="2" />
+          <OIcon name="bolt" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
+          <OTooltip :content="t('search.quickModeLabel')" />
+        </OButton>
+
+        <!-- Saved Views (pinned) — button group styled to match the function
+             selector for visual consistency: open-list dropdown trigger + create. -->
+        <OButtonGroup
+          v-if="showPinnedSavedViews"
+          data-test="logs-search-bar-saved-views-pinned"
+          class="p-0 element-box-shadow border border-button-outline-border"
+        >
+          <OButton
+            data-test="logs-search-bar-saved-views-pinned-list-btn"
+            variant="ghost"
+            size="icon-toolbar"
+            @click="openSavedViewsList"
+          >
+            <OIcon name="saved-search" size="sm" />
+            <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
+            <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
+          </OButton>
+          <OButton
+            data-test="logs-search-bar-saved-views-pinned-create-btn"
+            variant="ghost"
+            size="icon-toolbar"
+            @click="fnSavedView"
+          >
+            <OIcon name="save" size="sm" />
+            <OTooltip :content="t('search.createSavedView')" :side-offset="6" />
+          </OButton>
+        </OButtonGroup>
+
+        <!-- Syntax Guide (pinned) — icon+label, becomes icon-only at narrow widths -->
+        <SyntaxGuide
+          v-if="showPinnedSyntaxGuide"
+          :sqlmode="searchObj.meta.sqlMode"
+          :toolbar="true"
+          :label="pinSyntaxGuideIconOnly ? '' : t('search.syntaxGuideLabel')"
+          data-test="logs-search-bar-syntax-guide-pinned-btn"
+        />
+
+        </div>
         <!-- this is the button group responsible for showing all the utilities -->
-        <ODropdown side="bottom" align="start">
+        <ODropdown class="flex-shrink-0" side="bottom" align="start">
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
-              class="group-menu-btn element-box-shadow"
+              class="p-1! ml-1 [border:0.0625rem_solid_var(--color-button-outline-border)]! rounded-md [transition:all_0.2s_ease] min-h-[1.875rem]! text-xs font-medium hover:bg-(--color-button-outline-hover-bg) element-box-shadow"
               icon-left="more-horiz"
               variant="outline"
               size="xs"
             >
-              More
+              {{ t('search.menuMore') }}
             </OButton>
           </template>
 
           <!-- SET ONCE — view controls that persist across sessions -->
           <ODropdownGroup :label="t('search.menuGroupSetOnce')">
+            <!-- SQL Mode — toggles the same flag used for SQL auto-detection -->
+            <ODropdownItem
+              data-test="logs-search-bar-menu-sql-mode-toggle-btn"
+              @select.prevent="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
+            >
+              <template #icon-left>
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
+                  <OIcon name="code" size="sm" />
+                </span>
+              </template>
+              {{ t("search.sqlModeLabel") }}
+              <template #icon-right>
+                <span class="ml-auto flex items-center gap-1">
+                  <OSwitch
+                    :model-value="searchObj.meta.sqlMode"
+                    :disabled="isSqlModeDisabled"
+                    size="md"
+                    data-test="logs-search-bar-sql-mode-toggle"
+                    @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
+                  />
+                  <OButton
+                    data-test="logs-search-bar-menu-pin-sql-mode-btn"
+                    variant="ghost-neutral"
+                    size="icon-sm"
+                    :title="isPinned('sqlMode') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                    @click.stop="togglePin('sqlMode')"
+                  >
+                    <OIcon :name="isPinned('sqlMode') ? 'keep' : 'keep-outline'" size="sm" />
+                  </OButton>
+                </span>
+              </template>
+            </ODropdownItem>
+
             <!-- Reset filters (shown here only when toolbar is too narrow for inline button) -->
             <ODropdownItem
               v-if="toolbarMoveResetToMenu"
@@ -160,33 +284,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="resetFilters"
             >
               <template #icon-left>
-                <span class="more-menu-icon-badge">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <OIcon name="restart-alt" size="sm" />
                 </span>
               </template>
               {{ t("search.resetFilters") }}
             </ODropdownItem>
 
-            <!-- Histogram (shown here only when toolbar is too narrow for inline button) -->
+            <!-- Histogram — pinned copy renders on the toolbar -->
             <ODropdownItem
-              v-if="shouldMoveButtonsToMenu"
               data-test="logs-search-bar-menu-histogram-btn"
               @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
             >
               <template #icon-left>
-                <span class="more-menu-icon-badge">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <OIcon name="bar-chart" size="sm" />
                 </span>
               </template>
               {{ t("search.showHistogramLabel") }}
               <template #icon-right>
-                <OSwitch
-                  v-model="searchObj.meta.showHistogram"
-                  size="md"
-                  data-test="logs-search-bar-show-histogram-toggle-btn"
-                  class="tw:ml-auto"
-                  @click.stop
-                />
+                <span class="ml-auto flex items-center gap-1">
+                  <OSwitch
+                    v-model="searchObj.meta.showHistogram"
+                    size="md"
+                    data-test="logs-search-bar-show-histogram-toggle-btn"
+                    @click.stop
+                  />
+                  <OButton
+                    data-test="logs-search-bar-menu-pin-histogram-btn"
+                    variant="ghost-neutral"
+                    size="icon-sm"
+                    :title="isPinned('histogram') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                    @click.stop="togglePin('histogram')"
+                  >
+                    <OIcon :name="isPinned('histogram') ? 'keep' : 'keep-outline'" size="sm" />
+                  </OButton>
+                </span>
               </template>
             </ODropdownItem>
 
@@ -196,19 +329,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="handleQuickMode"
             >
               <template #icon-left>
-                <span class="more-menu-icon-badge">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <OIcon name="bolt" size="sm" />
                 </span>
               </template>
               {{ t("search.quickModeLabel") }}
               <template #icon-right>
-                <OSwitch
-                  :model-value="searchObj.meta.quickMode"
-                  size="md"
-                  data-test="logs-search-bar-quick-mode-switch"
-                  class="tw:ml-auto"
-                  @click.stop="handleQuickMode"
-                />
+                <span class="ml-auto flex items-center gap-1">
+                  <OSwitch
+                    :model-value="searchObj.meta.quickMode"
+                    size="md"
+                    data-test="logs-search-bar-quick-mode-switch"
+                    @click.stop="handleQuickMode"
+                  />
+                  <OButton
+                    data-test="logs-search-bar-menu-pin-quick-mode-btn"
+                    variant="ghost-neutral"
+                    size="icon-sm"
+                    :title="isPinned('quickMode') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                    @click.stop="togglePin('quickMode')"
+                  >
+                    <OIcon :name="isPinned('quickMode') ? 'keep' : 'keep-outline'" size="sm" />
+                  </OButton>
+                </span>
               </template>
             </ODropdownItem>
 
@@ -218,17 +361,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
             >
               <template #icon-left>
-                <span class="more-menu-icon-badge more-menu-icon-badge--mono">fx</span>
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0 [font-family:var(--font-mono,monospace)] text-[var(--text-sm)] italic [font-weight:var(--font-bold)] text-(--o2-primary-color)">fx</span>
               </template>
               {{ t('search.functionEditorLabel') }}
               <template #icon-right>
-                <OSwitch
-                  data-test="logs-search-bar-show-query-toggle-btn"
-                  v-model="searchObj.meta.showTransformEditor"
-                  size="md"
-                  class="tw:ml-auto"
-                  @click.stop
-                />
+                <span class="ml-auto flex items-center gap-1">
+                  <OSwitch
+                    data-test="logs-search-bar-show-query-toggle-btn"
+                    v-model="searchObj.meta.showTransformEditor"
+                    size="md"
+                    @click.stop
+                  />
+                  <OButton
+                    data-test="logs-search-bar-menu-pin-function-editor-btn"
+                    variant="ghost-neutral"
+                    size="icon-sm"
+                    :title="isPinned('functionEditor') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                    @click.stop="togglePin('functionEditor')"
+                  >
+                    <OIcon :name="isPinned('functionEditor') ? 'keep' : 'keep-outline'" size="sm" />
+                  </OButton>
+                </span>
               </template>
             </ODropdownItem>
           </ODropdownGroup>
@@ -237,12 +390,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- SAVED VIEWS -->
           <ODropdownGroup :label="t('search.menuGroupSavedViews')">
+            <template #label-action>
+              <OButton
+                data-test="logs-search-bar-menu-pin-saved-views-btn"
+                variant="ghost-neutral"
+                size="icon-sm"
+                :title="isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                @click.stop="togglePin('savedViews')"
+              >
+                <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
+              </OButton>
+            </template>
             <ODropdownItem
               data-test="logs-search-bar-menu-list-saved-views-btn"
               @select="openSavedViewsList"
             >
               <template #icon-left>
-                <span class="more-menu-icon-badge">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <OIcon name="format-list-bulleted" size="sm" />
                 </span>
               </template>
@@ -251,10 +415,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <ODropdownItem
               data-test="logs-search-bar-menu-create-saved-view-btn"
+              shortcut-id="logsSaveView"
               @select="fnSavedView"
             >
               <template #icon-left>
-                <span class="more-menu-icon-badge">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <OIcon name="add" size="sm" />
                 </span>
               </template>
@@ -265,16 +430,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownSeparator />
 
           <!-- SYNTAX GUIDE -->
-          <SyntaxGuide
-            :sqlmode="searchObj.meta.sqlMode"
-            :menuItem="true"
-            ref="syntaxGuideRef"
-            data-test="logs-search-bar-syntax-guide-btn"
-          />
+          <div class="flex items-center w-full pr-2">
+            <SyntaxGuide
+              :sqlmode="searchObj.meta.sqlMode"
+              :menuItem="true"
+              ref="syntaxGuideRef"
+              class="min-w-0"
+              data-test="logs-search-bar-syntax-guide-btn"
+            />
+            <OButton
+              data-test="logs-search-bar-menu-pin-syntax-guide-btn"
+              variant="ghost-neutral"
+              size="icon-sm"
+              class="ml-auto"
+              :title="isPinned('syntaxGuide') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+              @click.stop="togglePin('syntaxGuide')"
+            >
+              <OIcon :name="isPinned('syntaxGuide') ? 'keep' : 'keep-outline'" size="sm" />
+            </OButton>
+          </div>
         </ODropdown>
       </div>
 
-      <div ref="toolbarRightRef" class="tw:flex tw:items-center tw:gap-1 tw:flex-shrink-0">
+      <div ref="toolbarRightRef" class="flex items-center gap-1 flex-shrink-0">
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
           <transform-selector
             v-if="isActionsEnabled"
@@ -299,7 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-more-options-btn"
-              class="download-logs-btn tw:order-4"
+              class="download-logs-btn order-4"
               variant="outline"
               size="icon-toolbar"
             >
@@ -309,13 +487,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <!-- Share Link -->
-          <div v-if="shouldMoveShareToMenu" class="tw:p-2" data-test="logs-search-bar-menu-share-link-btn">
+          <div v-if="shouldMoveShareToMenu" class="p-2" data-test="logs-search-bar-menu-share-link-btn">
             <share-button
               :url="shareURL"
               variant="outline"
               size="sm-action"
               :show-label="true"
-              class="tw:w-full"
+              class="w-full"
             />
           </div>
 
@@ -325,10 +503,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownGroup :label="t('search.menuGroupHistory')">
             <ODropdownItem
               data-test="search-history-item-btn"
+              shortcut-id="logsSearchHistory"
               @select="showSearchHistoryfn"
             >
               <template #icon-left>
-                <span class="more-menu-icon-badge">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <OIcon name="history" size="sm" />
                 </span>
               </template>
@@ -343,40 +522,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Download results — nested sub-dropdown (hover to open) -->
             <div
               data-test="search-download-submenu-trigger"
-              class="search-download-item"
-              :class="{ 'search-download-item--disabled': isDownloadDisabled }"
               :aria-disabled="isDownloadDisabled || undefined"
               @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
               @mouseleave="showDownloadSubmenu = false"
+              class="relative flex items-center gap-2 py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] cursor-pointer select-none hover:bg-(--color-interactive-hover-bg) search-download-item"
+              :class="{ 'cursor-not-allowed! text-(--o2-text-muted) hover:bg-transparent!': isDownloadDisabled }"
             >
-              <span class="more-menu-icon-badge search-download-item-icon">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                 <OIcon size="sm" name="download" />
               </span>
-              <span class="search-download-item-label">{{ t("search.downloadTable") }}</span>
+              <span class="flex-1 whitespace-nowrap">{{ t("search.downloadTable") }}</span>
               <OIcon size="sm" name="chevron-right" />
 
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu"
+                class="search-download-submenu absolute right-full top-0 mr-1 min-w-40 bg-(--color-dropdown-bg) [border:0.063rem_solid_var(--o2-border-color)] rounded-md [box-shadow:0_0.5rem_1.5rem_var(--o2-hover-shadow)] py-1 px-0 z-[9999]"
                 data-test="search-download-submenu"
               >
                 <button
                   type="button"
                   data-test="search-download-csv-btn"
-                  class="search-download-submenu-item"
+                  class="flex items-center gap-[0.625rem] w-full py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-(--o2-text-body) hover:bg-(--color-interactive-hover-bg)"
                   @click="downloadLogs(searchObj.data.queryResults.hits, 'csv'); showDownloadSubmenu = false"
                 >
                   <OIcon name="grid-on" size="sm" />
-                  <span class="tw:flex-1">{{ t("search.downloadCSV") }}</span>
+                  <span class="flex-1">{{ t("search.downloadCSV") }}</span>
                 </button>
                 <button
                   type="button"
                   data-test="search-download-json-btn"
-                  class="search-download-submenu-item"
+                  class="flex items-center gap-[0.625rem] w-full py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-(--o2-text-body) hover:bg-(--color-interactive-hover-bg)"
                   @click="downloadLogs(searchObj.data.queryResults.hits, 'json'); showDownloadSubmenu = false"
                 >
                   <OIcon name="data-object" size="sm" />
-                  <span class="tw:flex-1">{{ t("search.downloadJSON") }}</span>
+                  <span class="flex-1">{{ t("search.downloadJSON") }}</span>
                 </button>
               </div>
             </div>
@@ -387,11 +566,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="toggleCustomDownloadDialog"
             >
               <template #icon-left>
-                <span class="more-menu-icon-badge">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <img
                     :src="customRangeIcon"
                     alt="Custom Range"
-                    class="tw:w-4 tw:h-4"
+                    class="w-4 h-4"
                   />
                 </span>
               </template>
@@ -411,11 +590,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="createScheduleJob"
             >
               <template #icon-left>
-                <span class="more-menu-icon-badge">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <img
                     :src="createScheduledSearchIcon"
                     alt="Create Scheduled Search"
-                    class="tw:w-4 tw:h-4"
+                    class="w-4 h-4"
                   />
                 </span>
               </template>
@@ -430,11 +609,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="routeToSearchSchedule"
             >
               <template #icon-left>
-                <span class="more-menu-icon-badge">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <img
                     :src="listScheduledSearchIcon"
                     alt="List Scheduled Search"
-                    class="tw:w-4 tw:h-4"
+                    class="w-4 h-4"
                   />
                 </span>
               </template>
@@ -459,11 +638,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="openSearchInspectDialog"
             >
               <template #icon-left>
-                <span class="more-menu-icon-badge">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <OIcon name="troubleshoot" size="sm" />
                 </span>
               </template>
-              <span data-test="search-inspect-label">Search Inspect</span>
+              <span data-test="search-inspect-label">{{ t('search.searchInspect') }}</span>
             </ODropdownItem>
           </ODropdownGroup>
 
@@ -481,7 +660,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="openExplainDialog"
             >
               <template #icon-left>
-                <span class="more-menu-icon-badge">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <OIcon name="lightbulb" size="sm" />
                 </span>
               </template>
@@ -495,9 +674,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :url="shareURL"
           variant="outline"
           size="icon-toolbar"
-          class="tw:order-3"
+          class="order-3"
         />
-        <div class="tw:mr-1 tw:order-1">
+        <!-- Function Editor (pinned) — sits to the left of the date picker -->
+        <OButton
+          v-if="showPinnedFunctionEditor"
+          data-test="logs-search-bar-function-editor-pinned-btn"
+          size="xs"
+          variant="outline"
+          class="gap-1.5 mr-1 order-1 element-box-shadow"
+          @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
+        >
+          <OSwitch
+            v-model="searchObj.meta.showTransformEditor"
+            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
+            @click.stop
+          />
+          <span class="[font-family:var(--font-mono,monospace)] text-sm italic font-bold text-(--o2-primary-color) shrink-0">fx</span>
+          <OTooltip :content="t('search.functionEditorLabel')" />
+        </OButton>
+
+        <div class="mr-1 order-1">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -521,10 +718,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="element-box-shadow"
           />
         </div>
-        <div class="search-time tw:order-2">
-          <div class="tw:flex">
+
+        <div class="search-time order-2">
+          <div class="flex">
             <OButtonGroup
-              class="tw:p-0 tw:mr-1 element-box-shadow el-border"
+              class="p-0 mr-1 element-box-shadow el-border"
               v-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
@@ -540,25 +738,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     variant="outline"
                     size="sm"
-                    class="region-dropdown-btn tw:px-1"
+                    class="region-dropdown-btn px-1"
                     :title="t('search.regionTitle')"
                   >
                     {{ t("search.region") }}
-                    <OIcon name="arrow-drop-down" size="sm" class="tw:ml-1" />
+                    <OIcon name="arrow-drop-down" size="sm" class="ml-1" />
                   </OButton>
                 </template>
                 <div
-                  class="tw:p-2 tw:min-w-[240px]"
+                  class="p-2 min-w-[240px]"
                   data-test="logs-search-bar-region-menu"
                 >
                   <OInput
                     clearable
-                    class="tw:mb-[0.375rem]! indexlist-search-input tw:mx-2 tw:mt-2"
+                    class="mb-[0.375rem]! indexlist-search-input mx-2 mt-2"
                     v-model="regionFilter"
                     :label="t('search.regionFilterMsg')"
                   />
                   <OTree
-                    class="tw:w-full col-sm-6 tw:mx-2 tw:mb-2"
+                    class="w-full col-sm-6 mx-2 mb-2"
                     :nodes="store.state.regionInfo"
                     node-key="label"
                     :filter="regionFilter"
@@ -577,14 +775,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 v-if="config.isEnterprise == 'true'"
-                class="tw:flex tw:items-center"
+                class="flex items-center"
               >
                 <OButton
                   v-if="visualizeSearchRequestTraceIds.length > 0"
                   data-test="logs-search-bar-visualize-cancel-btn"
                   :title="t('search.cancel')"
                   variant="ghost"
-                  class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
+                  size="sm-toolbar"
+                  class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--o2-cancel-query-bg)]! text-[var(--o2-primary-btn-text)]! element-box-shadow [border-radius:0.375rem_0_0_0.375rem]!"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -604,14 +803,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.meta.nlpMode &&
                       !searchObj.data.stream.selectedStream.length)
                   "
-                  class="tw:p-0 tw:h-[1.875rem]! element-box-shadow"
+                  :size="
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? 'md'
+                      : 'sm-toolbar'
+                  "
+                  class="p-0 h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'o2-ai-generate-button'
-                      : 'o2-run-query-button o2-color-primary',
-                    config.isEnterprise == 'true'
-                      ? 'search-button-enterprise-border-radius'
-                      : 'search-button-normal-border-radius',
+                      ? 'o2-ai-generate-button [border-radius:0.375rem_0_0_0.375rem]!'
+                      : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--o2-primary-btn-bg)]! text-[var(--o2-primary-btn-text)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
+                    '[border-radius:0.375rem_0_0_0.375rem]!',
                   ]"
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -625,7 +827,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" vertical />
+                <OSeparator class="h-[1.875rem]! w-[1px]" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -637,16 +839,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ) &&
                         config.isEnterprise == 'true' &&
                         visualizeSearchRequestTraceIds.length
-                          ? 'o2-color-cancel'
+                          ? 'bg-[var(--o2-cancel-query-bg)]! text-[var(--o2-primary-btn-text)]!'
                           : !(
                                 isNaturalLanguageDetected &&
                                 !searchObj.meta.nlpMode
                               )
-                            ? 'o2-color-primary'
+                            ? 'bg-[var(--o2-primary-btn-bg)]! text-[var(--o2-primary-btn-text)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]'
                             : '',
-                        config.isEnterprise == 'true'
-                          ? 'search-button-dropdown-enterprise-border-radius'
-                          : 'search-button-normal-border-radius',
+                        '[border-radius:0_0.375rem_0.375rem_0]!',
                       ]"
                     >
                       <OIcon name="arrow-drop-down" size="sm" />
@@ -671,20 +871,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                   <p
                     v-else
-                    class="tw:text-xs tw:text-[var(--o2-text-caption)] tw:text-center tw:px-3 tw:py-2"
+                    class="text-xs text-[var(--o2-text-caption)] text-center px-3 py-2"
                   >
                     {{ t("nlMode.noAdditionalOptions") }}
                   </p>
                 </ODropdown>
               </div>
-              <div v-else class="tw:flex tw:items-center">
+              <div v-else class="flex items-center">
                 <!-- Cancel button when query is running -->
                 <OButton
-                  v-if="visualizeSearchRequestTraceIds.length > 0"
+                  v-if="visualizeSearchRequestTraceIds.length > 0 && config.isEnterprise == 'true'"
                   data-test="logs-search-bar-visualize-cancel-btn"
                   variant="ghost"
                   :title="t('search.cancel')"
-                  class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
+                  size="sm-toolbar"
+                  class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--o2-cancel-query-bg)]! text-[var(--o2-primary-btn-text)]! element-box-shadow [border-radius:0.375rem_0_0_0.375rem]!"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -705,14 +906,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.meta.nlpMode &&
                       !searchObj.data.stream.selectedStream.length)
                   "
-                  class="tw:p-0 tw:h-[1.875rem]! element-box-shadow"
+                  :size="
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? 'md'
+                      : 'sm-toolbar'
+                  "
+                  class="p-0 h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'o2-ai-generate-button'
-                      : 'o2-run-query-button o2-color-primary',
-                    config.isEnterprise == 'true'
-                      ? 'search-button-enterprise-border-radius'
-                      : 'search-button-normal-border-radius',
+                      ? 'o2-ai-generate-button [border-radius:0.375rem_0_0_0.375rem]!'
+                      : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--o2-primary-btn-bg)]! text-[var(--o2-primary-btn-text)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
+                    '[border-radius:0.375rem_0_0_0.375rem]!',
                   ]"
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -726,7 +930,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" />
+                <OSeparator class="h-[1.875rem]! w-[1px]" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -738,16 +942,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ) &&
                         config.isEnterprise == 'true' &&
                         visualizeSearchRequestTraceIds.length
-                          ? 'o2-color-cancel'
+                          ? 'bg-[var(--o2-cancel-query-bg)]! text-[var(--o2-primary-btn-text)]!'
                           : !(
                                 isNaturalLanguageDetected &&
                                 !searchObj.meta.nlpMode
                               )
-                            ? 'o2-color-primary'
+                            ? 'bg-[var(--o2-primary-btn-bg)]! text-[var(--o2-primary-btn-text)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]'
                             : '',
-                        config.isEnterprise == 'true'
-                          ? 'search-button-dropdown-enterprise-border-radius'
-                          : 'search-button-normal-border-radius',
+                        '[border-radius:0_0.375rem_0.375rem_0]!',
                       ]"
                     >
                       <OIcon name="arrow-drop-down" size="sm" />
@@ -772,14 +974,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                   <p
                     v-else
-                    class="tw:text-xs tw:text-[var(--o2-text-caption)] tw:text-center tw:px-3 tw:py-2"
+                    class="text-xs text-[var(--o2-text-caption)] text-center px-3 py-2"
                   >
                     {{ t("nlMode.noAdditionalOptions") }}
                   </p>
                 </ODropdown>
               </div>
             </div>
-            <div v-else class="tw:flex tw:items-center">
+            <div v-else class="flex items-center">
               <!-- Cancel button for patterns tab -->
               <OButton
                 v-if="
@@ -789,7 +991,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-patterns-cancel-btn"
                 variant="ghost"
                 :title="t('search.cancel')"
-                class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
+                size="sm-toolbar"
+                class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--o2-cancel-query-bg)]! text-[var(--o2-primary-btn-text)]! element-box-shadow rounded-md"
                 @click="cancelPatterns"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -804,13 +1007,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
-                variant="ghost"
+                variant="primary"
                 :title="t('search.cancel')"
-                class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow"
+                size="sm-toolbar"
+                class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--o2-cancel-query-bg)]! text-[var(--o2-primary-btn-text)]! element-box-shadow"
                 :class="
                   config.isEnterprise == 'true'
-                    ? 'search-button-enterprise-border-radius'
-                    : 'search-button-normal-border-radius'
+                    ? '[border-radius:0.375rem_0_0_0.375rem]!'
+                    : 'rounded-md'
                 "
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</OButton
@@ -820,20 +1024,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
-                variant="ghost"
+                variant="primary"
                 :title="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? t('search.generateQueryTooltip')
                     : t('search.runQuery')
                 "
-                class="tw:p-0 tw:h-[1.875rem]! element-box-shadow"
+                :size="
+                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                    ? 'md'
+                    : 'sm-toolbar'
+                "
+                class="p-0 h-[1.875rem]! element-box-shadow"
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
-                    : 'o2-run-query-button o2-color-primary',
+                    : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--o2-primary-btn-bg)]! text-[var(--o2-primary-btn-text)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
                   store.state.zoConfig.auto_query_enabled
-                    ? 'search-button-enterprise-border-radius'
-                    : 'search-button-normal-border-radius',
+                    ? '[border-radius:0.375rem_0_0_0.375rem]!'
+                    : 'rounded-md',
                 ]"
                 @click="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -867,7 +1076,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   name="autorenew"
                   size="xs"
-                  class="tw:mr-1"
+                  class="mr-1"
                 />
                 {{
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -878,7 +1087,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
               <OSeparator
                 v-if="store.state.zoConfig.auto_query_enabled"
-                class="tw:h-[1.875rem]! tw:w-[1px]"
+                class="h-[1.875rem]! w-[1px]"
                 vertical
               />
               <ODropdown
@@ -899,16 +1108,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           !!searchObj.data.searchWebSocketTraceIds.length) &&
                         (searchObj.loading == true ||
                           searchObj.loadingHistogram == true))
-                        ? 'o2-color-cancel'
+                        ? 'bg-[var(--o2-cancel-query-bg)]! text-[var(--o2-primary-btn-text)]!'
                         : !(
                               isNaturalLanguageDetected &&
                               !searchObj.meta.nlpMode
                             )
-                          ? 'o2-color-primary'
+                          ? 'bg-[var(--o2-primary-btn-bg)]! text-[var(--o2-primary-btn-text)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]'
                           : '',
                       store.state.zoConfig.auto_query_enabled
-                        ? 'search-button-dropdown-enterprise-border-radius'
-                        : 'search-button-normal-border-radius',
+                        ? '[border-radius:0_0.375rem_0.375rem_0]!'
+                        : 'rounded-md',
                     ]"
                   >
                     <OIcon name="arrow-drop-down" size="sm" />
@@ -954,18 +1163,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
                       "
                       size="sm"
-                      :class="searchObj.meta.liveMode ? 'tw:text-[var(--o2-primary)]' : ''"
+                      :class="searchObj.meta.liveMode ? 'text-[var(--o2-primary)]' : ''"
                     />
                   </template>
                   <span>
-                    <div class="tw:font-medium">
+                    <div class="font-medium">
                       {{
                         searchObj.meta.liveMode
                           ? t("search.turnOffLiveMode")
                           : t("search.turnOnLiveMode")
                       }}
                     </div>
-                    <div class="tw:text-xs tw:text-[var(--o2-text-secondary)]">
+                    <div class="text-xs text-[var(--o2-text-secondary)]">
                       {{ t("search.liveModeTooltip") }}
                     </div>
                   </span>
@@ -973,14 +1182,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- NLP mode: info message -->
                 <p
                   v-if="isNaturalLanguageDetected && !searchObj.meta.nlpMode"
-                  class="tw:text-xs tw:text-[var(--o2-text-caption)] tw:text-center tw:px-3 tw:py-2"
+                  class="text-xs text-[var(--o2-text-caption)] text-center px-3 py-2"
                 >
                   {{ t("nlMode.noAdditionalOptions") }}
                 </p>
               </ODropdown>
               <!-- Compact Auto Refresh Button -->
               <auto-refresh-interval
-                class="tw:ml-1"
+                class="ml-1"
                 v-model="searchObj.meta.refreshInterval"
                 :trigger="true"
                 :is-compact="true"
@@ -996,11 +1205,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <!-- pr-1.5 mirrors the editor's ml-1.5 so the editor area sits at 10px on
-         the right (4px wrapper + 6px), aligning with the results panel below. -->
+         the right (4px wrapper + 6px), aligning with the results panel below.
+         data-fullscreen is a stable test hook exposing the fullscreen state
+         (the styling itself is driven by the inline `isFocused` class binding). -->
     <div
       ref="editorContainerRef"
-      class="tw:flex tw:relative query-editor-container tw:w-full tw:overflow-visible"
-      :class="{ 'editor-fullscreen': isFocused }"
+      class="flex relative query-editor-container w-full overflow-visible"
+      :class="{ 'overflow-hidden! bg-[var(--o2-body-primary-bg)]! border border-[var(--o2-border-color)] rounded-md [box-shadow:0_0.5rem_2rem_rgba(0,0,0,0.18)]': isFocused }"
+      :data-fullscreen="isFocused ? 'true' : 'false'"
       :style="editorFullscreenStyle"
     >
       <!-- Expand / collapse button — always top-right of the full editor area -->
@@ -1010,25 +1222,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-toolbar"
         @click="toggleEditorFullscreen"
-        class="tw:absolute! tw:z-[51] tw:top-[0.1875rem] tw:right-[0.25rem] editor-expand-btn"
+        class="absolute! z-[51] top-[0.1875rem] right-[0.25rem] [border:1px_solid_var(--o2-border-color)]! rounded-md w-[30px]! h-[30px]! min-w-[30px]! min-h-[30px]!"
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
       <div
-        class="tw:flex tw:flex-col tw:h-full tw:w-full tw:min-w-0"
+        class="flex flex-col h-full w-full min-w-0"
       >
         <OSplitter
-          class="logs-search-splitter tw:h-full!"
+          class="h-full!"
           v-model="searchObj.config.fnSplitterModel"
           :limits="searchObj.config.fnSplitterLimit"
           :horizontal="false"
-          separator-class="tw:w-px! tw:bg-[var(--o2-border-color)]"
+          :separator="!!searchObj.data.transformType"
+          separator-class="w-px! bg-[var(--o2-border-color)]"
         >
           <template #before>
             <div
-              class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full tw:relative"
+              class="flex flex-col overflow-hidden h-full relative"
               :class="{
-                'tw:border-r-0 tw:rounded-r-none': searchObj.data.transformType,
+                'border-r-0 rounded-r-none': searchObj.data.transformType,
                 'fn-editor-open': showFunctionEditor
               }"
             >
@@ -1079,7 +1292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchObj.meta.queryEditorPlaceholderFlag &&
                   !searchObj.meta.nlpMode
                 "
-                class="query-editor-placeholder-overlay"
+                class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
               >
                 <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
               </div>
@@ -1089,12 +1302,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               data-test="logs-vrl-function-editor"
               v-if="searchObj.data.transformType"
-              class="tw:w-full tw:h-full"
+              class="w-full h-full"
             >
               <template v-if="showFunctionEditor">
-                <div class="tw:relative tw:h-full tw:w-full">
+                <div class="relative h-full w-full">
                   <div
-                    class="tw:relative tw:h-full"
+                    class="relative h-full"
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
@@ -1115,7 +1328,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :ai-tooltip="t('search.enterFunctionPrompt')"
                       :read-only="isVrlEditorDisabled"
                       editor-height="100%"
-                      class="monaco-editor"
                       @update:query="
                         searchObj.data.tempFunctionContent = $event
                       "
@@ -1130,20 +1342,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div
                       v-if="!searchObj.data.tempFunctionContent && searchObj.meta.functionEditorPlaceholderFlag && !isVrlEditorDisabled"
-                      class="query-editor-placeholder-overlay"
+                      class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
                     >
                       <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
                     </div>
                     <!-- VRL disabled warning for non-table charts -->
                     <div
                       v-if="isVrlEditorDisabled"
-                      class="tw:absolute tw:bottom-0 tw:w-full tw:mt-3 tw:flex tw:items-center vrl-disabled-warning"
+                      class="absolute bottom-0 w-full mt-3 flex items-center bg-black/10 dark:bg-[rgba(255,255,255,0.1)]"
                       data-test="vrl-editor-disabled-warning"
                     >
-                      <OIcon name="warning" size="md" class="tw:mx-2" />
+                      <OIcon name="warning" size="md" class="mx-2" />
                       <span
-                        class="tw:text-red-500 tw:p-2 tw:font-semibold"
-                        >VRL function is only supported for table chart.</span
+                        class="text-red-500 p-2 font-semibold"
+                        >{{ t('search.vrlOnlyForTableWarning') }}</span
                       >
                     </div>
                   </div>
@@ -1155,7 +1367,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"
                   editor-id="fnEditor"
-                  class="monaco-editor"
                   :query="actionEditorQuery"
                   read-only
                   language="markdown"
@@ -1172,7 +1383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="confirmDialog"
       v-model:open="confirmDialogVisible"
       size="xs"
-      title="Confirm"
+      :title="t('common.confirm')"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('confirmDialog.ok')"
       @click:secondary="cancelConfirmDialog"
@@ -1197,13 +1408,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="search-bar-custom-download-dialog"
       v-model:open="customDownloadDialog"
       size="md"
-      title="Custom Download"
+      :title="t('search.customDownloadTitle')"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('search.btnDownload')"
       @click:secondary="customDownloadDialog = false"
       @click:primary="downloadRangeData"
     >
-    <div class="tw:flex tw:flex-col tw:gap-y-2">
+    <div class="flex flex-col gap-y-2">
       <p>{{ t("search.customDownloadMessage") }}</p>
       <OInput
         type="number"
@@ -1217,14 +1428,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="downloadCustomRange"
         :options="downloadCustomRangeOptions"
         :label="t('search.range')"
-        class="tw:py-2"
+        class="py-2"
       />
-      <div class="file-type">
-        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:pr-2">{{ t("search.fileType") }}</label
-        ><br />
+      <div>
+        <div
+          class="text-sm font-semibold leading-tight pr-2"
+          :class="store.state.theme === 'dark' ? 'text-[#e5e5e5]' : 'text-[#262626]'"
+        >{{ t("search.fileType") }}</div>
         <OButtonGroup
           data-test="custom-download-file-type-button-group"
-          class="file-type-button-group tw:mt-1"
+          class="file-type-button-group mt-1"
         >
           <OButton
             v-for="option in downloadCustomFileTypeOptions"
@@ -1269,7 +1482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           labelKey="view_name"
           valueKey="view_id"
           :label="t('search.savedViewName')"
-          class="tw:py-2"
+          class="py-2"
           :error="!!savedViewSelectError"
           :error-message="savedViewSelectError"
           @update:model-value="savedViewSelectError = ''"
@@ -1292,11 +1505,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="saved-function-action-toggle"
         :model-value="isSavedFunctionAction"
         :disabled="functionOptions.length == 0"
-        class="tw:mb-3"
+        class="mb-3"
         @update:model-value="isSavedFunctionAction = $event; savedFunctionName = ''"
       >
-        <OToggleGroupItem value="update" size="sm">Update</OToggleGroupItem>
-        <OToggleGroupItem value="create" size="sm">Create</OToggleGroupItem>
+        <OToggleGroupItem value="update" size="sm">{{ t('common.update') }}</OToggleGroupItem>
+        <OToggleGroupItem value="create" size="sm">{{ t('common.create') }}</OToggleGroupItem>
       </OToggleGroup>
       <div v-if="isSavedFunctionAction == 'create'">
         <OInput
@@ -1316,8 +1529,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           labelKey="name"
           valueKey="name"
           :label="t('search.saveFunctionName')"
-          :placeholder="'Select Function Name'"
-          class="tw:py-2"
+          :placeholder="t('search.selectFunctionNamePlaceholder')"
+          class="py-2"
           :error="!!savedFunctionSelectError"
           :error-message="savedFunctionSelectError"
           @update:model-value="savedFunctionSelectError = ''"
@@ -1328,8 +1541,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Function update confirmation dialog -->
     <ConfirmDialog
       data-test="search-bar-function-update-confirm-dialog"
-      title="Confirm Update"
-      :message="`Are you sure you want to update the function ${savedFunctionSelectedName}?`"
+      :title="t('search.confirmFunctionUpdateTitle')"
+      :message="t('search.confirmFunctionUpdateMsg', { name: savedFunctionSelectedName })"
       v-model="functionUpdateConfirm"
       @update:ok="executeFunctionUpdate"
       @update:cancel="functionUpdateConfirm = false"
@@ -1348,12 +1561,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="addJobScheduler"
     >
       <div>
-        <div class="tw:text-left tw:mb-1">
+        <div class="text-left mb-1">
           {{ t("search.noOfRecords") }}:
-          <OIcon name="info-outline" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+          <OIcon name="info-outline" size="sm" class="ml-1 cursor-pointer" />
             <OTooltip side="right" align="center" max-width="300px">
               <template #content>
-                <span class="tw:text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
+                <span class="text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
               </template>
             </OTooltip>
         </div>
@@ -1364,11 +1577,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           min="100"
         />
       </div>
-      <div class="tw:text-left">
+      <div class="text-left">
         {{ t("search.maxEventsScheduleJob") }}
       </div>
-      <div class="tw:opacity-80 tw:text-left mapping-warning-msg tw:mt-3">
-        <OIcon name="warning" size="sm" class="tw:mr-2 tw:text-red-500" />
+      <div class="opacity-80 text-left mapping-warning-msg mt-3">
+        <OIcon name="warning" size="sm" class="mr-2 text-red-500" />
         <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
       </div>
     </ODialog>
@@ -1378,39 +1591,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="search-bar-search-inspect-dialog"
       v-model:open="searchInspectDialog"
       size="sm"
-      title="Search Inspect"
+      :title="t('search.searchInspect')"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('confirmDialog.ok')"
       :primary-button-disabled="!searchInspectTraceId.trim()"
       @click:secondary="searchInspectDialog = false"
       @click:primary="navigateToSearchInspect"
     >
-      <div class="tw:text-left tw:mb-1">Trace ID:</div>
+      <div class="text-left mb-1">{{ t('search.traceIdLabel') }}</div>
       <OInput
         v-model="searchInspectTraceId"
-        placeholder="Enter trace ID"
+        :placeholder="t('search.enterTraceIdPlaceholder')"
         autofocus
         data-test="search-inspect-trace-id-input"
       />
     </ODialog>
 
     <ConfirmDialog
-      title="Change Query Mode"
-      message="Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
+      :title="t('search.changeQueryModeTitle')"
+      :message="t('search.changeQueryModeConfirm')"
       @update:ok="confirmBuildModeChangeOk"
       @update:cancel="confirmBuildModeChange = false"
       v-model="confirmBuildModeChange"
     />
     <ConfirmDialog
-      title="Delete Saved View"
-      message="Are you sure you want to delete saved view?"
+      :title="t('search.deleteSavedView')"
+      :message="t('search.deleteSavedViewConfirm')"
       @update:ok="confirmDeleteSavedViews"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
     <ConfirmDialog
-      title="Update Saved View"
-      message="Are you sure you want to update the saved view? This action will overwrite the existing one."
+      :title="t('search.updateSavedView')"
+      :message="t('search.updateSavedViewConfirm')"
       @update:ok="confirmUpdateSavedViews"
       @update:cancel="confirmUpdate = false"
       v-model="confirmUpdate"
@@ -1426,10 +1639,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="saved-views-list-dialog"
     >
       <div>
-          <div data-test="logs-search-saved-view-list" class="tw:flex">
+          <div data-test="logs-search-saved-view-list" class="flex">
             <div
-              class="tw:flex tw:flex-col"
-              :class="localSavedViews.length > 0 ? 'tw:border-r tw:border-[var(--o2-border-color)]' : ''"
+              class="flex flex-col"
+              :class="localSavedViews.length > 0 ? 'border-r border-[var(--o2-border-color)]' : ''"
               :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
             >
               <div style="max-height: 486px; min-height: 280px; display: flex; flex-direction: column;">
@@ -1444,21 +1657,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="saved-view-table full-height o2-table-hide-header"
               >
                 <template #top>
-                  <div class="tw:px-2 tw:py-2 tw:w-full tw:min-w-0 tw:box-border">
+                  <div class="px-2 py-2 w-full min-w-0 box-border">
                     <OSearchInput
                       data-test="log-search-saved-view-field-search-input"
                       v-model="searchObj.data.savedViewFilterFields"
                       clearable
                       :debounce="300"
-                      class="tw:w-full"
+                      class="w-full"
                       :placeholder="t('search.searchSavedView')"
                     />
                   </div>
                   <div
                     v-if="searchObj.loadingSavedView == true"
-                    class="tw:w-full tw:p-2"
+                    class="w-full p-2"
                   >
-                    <div class="tw:text-sm tw:font-medium text-weight-bold">
+                    <div class="text-sm font-medium text-weight-bold">
                       <OSpinner size="xs" />
                       {{ t("confirmDialog.loading") }}
                     </div>
@@ -1466,7 +1679,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-view_name="{ row, value }">
                   <div
-                    class="tw:truncate tw:cursor-pointer tw:text-sm tw:min-w-0 tw:w-full"
+                    class="truncate cursor-pointer text-sm min-w-0 w-full"
                     :title="value"
                     :data-test="`logs-search-bar-apply-${value}-saved-view-btn`"
                     @click.stop="
@@ -1478,7 +1691,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template #cell-actions="{ row }">
-                  <div class="tw:flex tw:items-center tw:gap-0.5">
+                  <div class="flex items-center gap-0.5">
                     <OButton
                       :title="t('common.favourite')"
                       class="logs-saved-view-icon action-btn-hover"
@@ -1526,7 +1739,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #empty>
                   <div
                     v-if="searchObj.loadingSavedView == false"
-                    class="tw:text-center tw:p-2 tw:w-full"
+                    class="text-center p-2 w-full"
                   >
                     <span>{{
                       t("search.savedViewsNotFound")
@@ -1538,7 +1751,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div
-              class="tw:flex tw:flex-col tw:w-[40%] tw:ml-0 tw:pl-3"
+              class="flex flex-col w-[40%] ml-0 pl-3"
               v-if="localSavedViews.length > 0"
             >
               <div style="max-height: 480px; min-height: 280px; display: flex; flex-direction: column;">
@@ -1552,15 +1765,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #top>
                   <div
-                    class="tw:p-2 tw:font-bold favorite-label tw:text-xs tw:uppercase tw:tracking-wide tw:text-muted-foreground"
+                    class="p-2 font-bold favorite-label text-xs uppercase tracking-wide text-muted-foreground"
                   >
                     {{ t("search.favoriteViews") }}
                   </div>
-                  <div class="tw:border-t tw:my-1 tw:border-border" />
+                  <div class="border-t my-1 border-border" />
                 </template>
                 <template #cell-view_name="{ row, value }">
                   <div
-                    class="tw:truncate tw:cursor-pointer tw:text-sm tw:min-w-0 tw:w-full"
+                    class="truncate cursor-pointer text-sm min-w-0 w-full"
                     :title="value"
                     :data-test="`logs-search-bar-dialog-favorite-saved-view-row-${value}`"
                     @click.stop="
@@ -1572,7 +1785,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template #cell-actions="{ row }">
-                  <div class="tw:flex tw:items-center tw:gap-0.5">
+                  <div class="flex items-center gap-0.5">
                     <OButton
                       :title="t('common.favourite')"
                       class="logs-saved-view-icon action-btn-hover"
@@ -1641,6 +1854,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import useLogs from "@/composables/useLogs";
 import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
+import { useToolbarPins } from "@/composables/useToolbarPins";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
@@ -2199,9 +2413,87 @@ export default defineComponent({
     // Each threshold has a small buffer (+16px) so collapse fires before clipping.
     const shouldHideToolbarButtonText = computed(() => availableLeftWidth.value < 720);
     const toolbarToggleIconOnly       = computed(() => availableLeftWidth.value < 568);
-    const shouldMoveButtonsToMenu     = computed(() => availableLeftWidth.value < 328);
     const toolbarMoveResetToMenu      = computed(() => availableLeftWidth.value < 248);
     const toolbarToggleAsDropdown     = computed(() => availableLeftWidth.value < 176);
+
+    // ── Pinned toolbar items ──────────────────────────────────────────────
+    // Items pinned out of the "More" menu render as fixed-position toolbar
+    // controls. They share the left section with the toggle group / reset, so we
+    // allocate the leftover width to pinned items with a running budget: the More
+    // button is always reserved, then pinned items are kept in priority order
+    // (histogram kept longest, syntax guide dropped first).
+    const { isPinned, togglePin } = useToolbarPins();
+
+    // Approximate rendered widths (px) of each pinned control and of the fixed
+    // left-section content, used only to decide how many pinned items fit before
+    // they would clip. Hidden pinned items stay reachable inside the More menu.
+    const PIN_ITEM_WIDTH = { histogram: 46, sqlMode: 46, quickMode: 46, savedViews: 62 };
+    const SYNTAX_GUIDE_LABEL_WIDTH = 108;
+    const SYNTAX_GUIDE_ICON_WIDTH = 40;
+    const PIN_ITEM_GAP = 4;
+
+    // Width consumed by the always-present left content (toggle group in its
+    // current collapse state, reset) plus the reserved More button.
+    const baseReservedWidth = computed(() => {
+      let w = 0;
+      if (toolbarToggleAsDropdown.value) w += 120;
+      else if (toolbarToggleIconOnly.value) w += 190;
+      else w += 350;
+      if (!toolbarMoveResetToMenu.value) w += shouldHideToolbarButtonText.value ? 40 : 88;
+      w += 92; // More button (always visible)
+      w += 24; // inter-item gaps / padding buffer
+      return w;
+    });
+
+    const pinBudget = computed(() =>
+      Math.max(0, availableLeftWidth.value - baseReservedWidth.value),
+    );
+
+    // Greedily fit pinned items within the budget. Order = kept-longest-first, so
+    // the last item (syntax guide) is the first to drop when space runs out.
+    const pinnedVisibility = computed(() => {
+      const budget = pinBudget.value;
+      let used = 0;
+      const res = {
+        histogram: false,
+        sqlMode: false,
+        quickMode: false,
+        savedViews: false,
+        syntaxGuide: false,
+        syntaxGuideIconOnly: false,
+      };
+      const tryFit = (width: number) => {
+        const need = (used > 0 ? PIN_ITEM_GAP : 0) + width;
+        if (used + need <= budget) {
+          used += need;
+          return true;
+        }
+        return false;
+      };
+      if (isPinned("histogram")) res.histogram = tryFit(PIN_ITEM_WIDTH.histogram);
+      if (isPinned("sqlMode")) res.sqlMode = tryFit(PIN_ITEM_WIDTH.sqlMode);
+      if (isPinned("quickMode")) res.quickMode = tryFit(PIN_ITEM_WIDTH.quickMode);
+      if (isPinned("savedViews")) res.savedViews = tryFit(PIN_ITEM_WIDTH.savedViews);
+      if (isPinned("syntaxGuide")) {
+        if (tryFit(SYNTAX_GUIDE_LABEL_WIDTH)) {
+          res.syntaxGuide = true;
+        } else if (tryFit(SYNTAX_GUIDE_ICON_WIDTH)) {
+          res.syntaxGuide = true;
+          res.syntaxGuideIconOnly = true;
+        }
+      }
+      return res;
+    });
+
+    // Function editor lives on the right toolbar (next to the date picker), so it
+    // is not part of the left-section budget.
+    const showPinnedHistogram      = computed(() => pinnedVisibility.value.histogram);
+    const showPinnedSqlMode        = computed(() => pinnedVisibility.value.sqlMode);
+    const showPinnedQuickMode      = computed(() => pinnedVisibility.value.quickMode);
+    const showPinnedFunctionEditor = computed(() => isPinned("functionEditor"));
+    const showPinnedSavedViews     = computed(() => pinnedVisibility.value.savedViews);
+    const showPinnedSyntaxGuide    = computed(() => pinnedVisibility.value.syntaxGuide);
+    const pinSyntaxGuideIconOnly   = computed(() => pinnedVisibility.value.syntaxGuideIconOnly);
 
     // Computed label/icon for the toggle-group-as-dropdown trigger
     const toggleViewOptions = computed(() => [
@@ -2733,6 +3025,7 @@ export default defineComponent({
       await nextTick();
 
       if (
+        value.userChangedValue !== false &&
         searchObj.loading == false &&
         store.state.zoConfig.query_on_stream_selection == false &&
         searchObj.meta.logsVisualizeToggle === "logs" &&
@@ -3219,6 +3512,10 @@ export default defineComponent({
           if (res.status == 200) {
             store.dispatch("setSavedViewFlag", true);
             const extractedObj = res.data.data;
+
+            // A saved view's columns are an explicit user choice, not a system
+            // FTS default, so they must persist and never be auto-overridden.
+            searchObj.meta.isFtsDefaultColumn = false;
 
             // Resetting columns as its not required in searchObj
             // As we reassign columns from selectedFields and search results
@@ -4930,9 +5227,17 @@ export default defineComponent({
       toolbarRightRef,
       shouldHideToolbarButtonText,
       toolbarToggleIconOnly,
-      shouldMoveButtonsToMenu,
       toolbarMoveResetToMenu,
       toolbarToggleAsDropdown,
+      isPinned,
+      togglePin,
+      pinSyntaxGuideIconOnly,
+      showPinnedHistogram,
+      showPinnedSqlMode,
+      showPinnedQuickMode,
+      showPinnedFunctionEditor,
+      showPinnedSavedViews,
+      showPinnedSyntaxGuide,
       toggleViewOptions,
       currentToggleOption,
       toggleLiveMode,
@@ -5237,412 +5542,61 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-/* Icon badge — small rounded square used as icon container in dropdown menus */
-.more-menu-icon-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 0.375rem;
-  background: var(--o2-section-header-bg);
-  color: var(--o2-text-secondary);
-  flex-shrink: 0;
-
-  &--mono {
-    font-family: var(--font-mono, monospace);
-    font-size: var(--text-sm);
-    font-style: italic;
-    font-weight: var(--font-bold);
-    color: var(--o2-primary-color);
-  }
-}
-
-/* "Download results" item with hover-triggered CSV/JSON sub-popover.
-   Matches the language sub-menu pattern in Header.vue. */
-.search-download-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.375rem 0.75rem;
-  font-size: var(--text-base);
-  line-height: 1.2;
-  cursor: pointer;
-  user-select: none;
-
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
-
-  &--disabled {
-    cursor: not-allowed;
-    color: var(--o2-text-muted);
-
-    &:hover {
-      background-color: transparent;
-    }
-  }
-
-  /* Invisible hover bridge extending to the LEFT of the parent item,
-     covering the gap between the parent and the submenu. Without this,
-     moving the cursor leftward toward the submenu briefly enters dead
-     space, fires mouseleave on the parent, and closes the submenu
-     before the cursor can land on it. */
-  &::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: 100%;
-    width: 0.625rem;
-    height: 100%;
-    /* Stays transparent — only present to extend the hover hit-test area */
-  }
-
-  body.body--dark & {
-    &:hover {
-      background-color: var(--o2-hover-accent);
-    }
-  }
-}
-
-.search-download-item-label {
-  flex: 1;
-  white-space: nowrap;
-}
-
-.search-download-submenu {
+<style>
+.search-download-item::before {
+  content: "";
   position: absolute;
-  right: 100%;
   top: 0;
-  margin-right: 0.25rem;
-  min-width: 10rem;
-  background-color: var(--color-dropdown-bg);
-  border: 0.063rem solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  box-shadow: 0 0.5rem 1.5rem var(--o2-hover-shadow);
-  padding: 0.25rem 0;
-  z-index: 9999;
-
-  body.body--dark & {
-    background-color: var(--color-dropdown-bg);
-    border-color: var(--o2-border-color);
-    box-shadow: 0 0.5rem 1.5rem var(--o2-hover-shadow);
-  }
+  right: 100%;
+  width: 0.625rem;
+  height: 100%;
 }
 
-.search-download-submenu-item {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  width: 100%;
-  padding: 0.375rem 0.75rem;
-  font-size: var(--text-base);
-  line-height: 1.2;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  color: var(--o2-text-body);
-
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
-
-  body.body--dark & {
-    &:hover {
-      background-color: var(--o2-hover-accent);
-    }
-  }
-}
-
-.file-type label {
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: #262626;
-}
-html.dark .file-type label,
-.body--dark .file-type label {
-  color: #e5e5e5;
-}
-
-// Toolbar Icon and Toggle Styles
-.toolbar-toggle-container {
-  padding: 0.25rem 0.375rem; // 4px 6px
-  margin-left: 0.25rem; // 8px
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0.0625rem solid var(--color-button-outline-border); // 1px
-  border-radius: 0.375rem; // 6px
-  transition: all 0.2s ease;
-  cursor: pointer;
-
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
-}
-
-
-.toolbar-icon {
-  width: 1rem; // 16px
-  height: 1rem; // 16px
-  object-fit: contain;
-}
-
-
-.toolbar-icon-in-toggle {
-  font-size: 0.9rem; // ~14.4px
-}
-
-.syntax-guide-in-menu {
-  :deep(.q-btn) {
-    border: none !important;
-    margin-left: 0 !important;
-
-    &:hover {
-      background-color: transparent !important;
-    }
-
-    &::before {
-      display: none !important;
-    }
-  }
-}
-
-.syntax-guide-menu-item {
-  :deep(button) {
-    width: 100%;
-    justify-content: flex-start;
-    height: auto;
-    padding: 0.375rem 0.75rem;
-    border-radius: 0.375rem;
-    border: none;
-    margin: 0;
-    gap: 0.5rem;
-    color: var(--color-dropdown-item-text);
-    background: transparent;
-    font-size: var(--text-sm);
-
-    &:hover {
-      background-color: var(--color-dropdown-item-hover-bg);
-    }
-  }
-}
-
-.toolbar-reset-btn {
-  padding: 0.25rem 0.375rem; // 4px 6px
-  margin-left: 0.25rem; // 8px
-  border: 0.0625rem solid var(--o2-border-color); // 1px
-  border-radius: 0.375rem; // 6px
-  transition: all 0.2s ease;
-  min-height: 1.875rem; // 30px
-&:hover {
-    background-color: var(--o2-hover-accent);
-  }
-
-  &.theme-dark {
-    border-color: var(--o2-border-color) !important;
-  }
-}
-
-
-.group-menu-btn {
-  padding: 0.25rem 0.25rem !important; // 4px 8px
-  margin-left: 0.25rem; // 8px
-  border: 0.0625rem solid var(--color-button-outline-border) !important; // 1px
-  border-radius: 0.375rem; // 6px
-  transition: all 0.2s ease;
-  min-height: 1.875rem !important; // 30px
-  font-size: 0.75rem; // 12px
-  font-weight: 500;
-&:hover {
-    background-color: var(--o2-hover-accent);
-  }
-}
-
-.o2-run-query-button {
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium) !important;
-  line-height: 1rem !important;
-  padding: 0 0.25rem !important;
-  width: 5.875rem !important;
-  white-space: normal;
-  word-break: break-word;
-  text-align: center;
-  transition:
-    box-shadow 0.3s ease,
-    opacity 0.2s ease;
-  /* subtle default glow */
-  // box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 60%);
-}
-.o2-color-primary {
-  background-color: var(--o2-primary-btn-bg);
-  color: var(--o2-primary-btn-text);
-  &:hover {
-    opacity: 0.9;
-    box-shadow: 0 0 8px
-      color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
-  }
-}
-.search-button-enterprise-border-radius {
-  border-radius: 0.375rem 0px 0px 0.375rem !important;
-}
-.search-button-normal-border-radius {
-  border-radius: 0.375rem;
-}
-.search-button-dropdown-enterprise-border-radius {
-  border-radius: 0px 0.375rem 0.375rem 0px !important;
-}
-
-.o2-color-cancel {
-  background-color: var(--o2-cancel-query-bg);
-  color: var(--o2-primary-btn-text);
-}
-
-.logs-search-splitter {
-  :deep(.q-splitter__separator) {
-    height: 100%;
-  }
-}
 
 /* When function editor is open, move AI button flush to the right of the query panel */
-.fn-editor-open :deep(.ai-floating-button) {
+.fn-editor-open .ai-floating-button {
   right: 0.25rem;
 }
 
-/* Expand button border */
-.editor-expand-btn {
-  border: 1px solid var(--o2-border-color) !important;
-  border-radius: 0.375rem;
-  width: 30px !important;
-  height: 30px !important;
-  min-width: 30px !important;
-  min-height: 30px !important;
-}
 
-.editor-fullscreen {
-  overflow: hidden !important;
-  background: var(--o2-body-primary-bg) !important;
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.18);
-}
-
-.query-mode-toggle {
-  position: absolute;
-  bottom: 0.375rem;
-  right: 0.375rem;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  background: var(--o2-muted-background);
-  padding: 0.125rem 0.25rem;
-  border-radius: 0.375rem;
-  box-shadow: 0 0.063rem 0.25rem var(--o2-hover-shadow);
-  border: 0.063rem solid var(--o2-border-color);
-
-  .mode-label {
-    font-size: var(--text-xs);
-    font-weight: var(--font-medium);
-    color: var(--o2-text-secondary);
-  }
-}
-
-// Dark mode support
-.body--dark .query-mode-toggle {
-  background: var(--o2-card-bg-solid);
-  border-color: var(--o2-border-color);
-
-  .mode-label {
-    color: var(--o2-text-secondary);
-  }
-}
-
-.o2-table-hide-header :deep(thead) {
+.o2-table-hide-header thead {
   display: none;
 }
 
-.saved-view-table :deep(.action-btn-hover) {
+.saved-view-table .action-btn-hover {
   opacity: 0;
   transition: opacity 0.15s;
 }
 
-.saved-view-table :deep(tr:hover .action-btn-hover) {
+.saved-view-table tr:hover .action-btn-hover {
   opacity: 1;
 }
 
-// Remove outer box border so both panels blend into the dialog background
-// Exclude elements that also have tw:rounded-md (OInput wrapper) so the
-// search input keeps its visible border.
-.saved-view-table :deep(.tw\:border:not(.tw\:rounded-md)) {
+/* Remove outer box border so both panels blend into the dialog background
+   Exclude elements that also have rounded-md (OInput wrapper) so the
+   search input keeps its visible border. */
+.saved-view-table .border:not(.rounded-md) {
   border: none;
 }
 
-// Normalize cell background and strip the auto-pin shadow
-// (isAction columns are auto-pinned right by OTable, which adds an inline box-shadow)
-.saved-view-table :deep(td) {
+/* Normalize cell background and strip the auto-pin shadow
+   (isAction columns are auto-pinned right by OTable, which adds an inline box-shadow) */
+.saved-view-table td {
   background: transparent;
   box-shadow: none !important;
 }
 
-// Remove pagination top separator
-.saved-view-table :deep(.tw\:border-t) {
+/* Remove pagination top separator */
+.saved-view-table .border-t {
   border-top: none;
 }
 
-// Hide the redundant total-count chip on the left — "of N" on the right already shows it
-.saved-view-table :deep([data-test="o2-table-pagination-bottom"] .o2-table-footer-title) {
+/* Hide the redundant total-count chip on the left — "of N" on the right already shows it */
+.saved-view-table [data-test="o2-table-pagination-bottom"] .o2-table-footer-title {
   display: none;
 }
 
-// VRL disabled warning background — theme-aware via CSS cascade
-.vrl-disabled-warning {
-  background-color: rgba(0, 0, 0, 0.1);
-}
 
-.body--dark .vrl-disabled-warning {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.query-editor-placeholder-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-start;
-  /* Must line up with where Monaco actually starts rendering text in
-     CodeQueryEditor: host padding-left (0.5rem) + the line-number gutter
-     (lineNumbersMinChars: 2 @ 14px ≈ 1.05rem) + lineDecorationsWidth (10px ≈
-     0.625rem) ≈ 2.15rem. Keep this in sync if those editor options change.
-     top 0.1875rem matches the editor's padding.top (3px) so the placeholder sits
-     on line 1 next to the "1" gutter number. */
-  padding: 0.1875rem 0.5rem 0 2.15rem;
-  pointer-events: none;
-  z-index: 1;
-  user-select: none;
-
-  .query-editor-placeholder-typewriter {
-    /* Mirror Monaco's rendered text so the placeholder reads as the future
-       typed query, not a different (proportional) font on a different baseline:
-       same monospace family and same ~21px (1.5 × 14px) line height. */
-    font-family: monospace;
-    font-size: var(--text-base);
-    line-height: 1.3125rem;
-    color: #a0aec0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-
-.body--dark .query-editor-placeholder-overlay {
-  .query-editor-placeholder-typewriter {
-    color: #718096;
-  }
-}
+/* Query editor placeholder text styling is global (styles/tailwind.css) —
+   shared with traces, RUM sessions, RUM error tracking, and alerts. */
 </style>

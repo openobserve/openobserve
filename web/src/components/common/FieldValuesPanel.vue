@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="filter-values-container tw:py-2">
+  <div data-test="field-values-panel-container" class="py-2 text-xs">
     <!-- Value search input — only when fetched count hits the limit -->
-    <div v-if="showValueSearch" class="value-search-container tw:mb-1">
+    <div v-if="showValueSearch" class="value-search-container mb-1">
       <div class="value-search-input-wrap">
         <OSearchInput
           v-model="valueSearchTerm"
@@ -32,18 +32,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Filter mode toggle + selection count -->
     <div
       v-if="showMultiSelect"
-      class="filter-mode-bar tw:flex tw:items-center tw:justify-between tw:px-2 tw:py-1"
+      class="filter-mode-bar flex items-center justify-between px-2 py-1 border-b border-(--o2-border-color)"
       data-test="field-values-panel-filter-mode-bar"
     >
-      <div class="tw:flex tw:items-center tw:gap-1 ">
+      <div class="flex items-center gap-1 ">
         <span
           v-if="selectedValues.length > 0"
-          class="selection-count tw:text-3!"
+          class="selection-count text-3! text-[0.625rem] font-medium text-[var(--o2-primary-color)]"
           data-test="field-values-panel-selection-count"
         >
           {{ selectedValues.length }} selected
         </span>
-        <span v-else class="selection-hint  tw:text-3!">Select to filter</span>
+        <span v-else class="selection-hint  text-3! text-[0.625rem] text-[var(--o2-text-secondary)]">Select to filter</span>
         <OButton
           v-if="selectedValues.length > 0"
           variant="ghost"
@@ -57,32 +57,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="filter-mode-toggle"
+        class="filter-mode-toggle flex border border-[var(--o2-border-color)] rounded overflow-hidden"
         data-test="field-values-panel-filter-mode-toggle"
       >
         <OButton
           :variant="filterMode === 'include' ? 'primary' : 'ghost-muted'"
           size="icon-chip"
-          class="filter-mode-btn"
+          class="filter-mode-btn rounded-none! [transition:background_0.15s,color_0.15s]"
           :disabled="filterMode !== 'include' && isModeToggleDisabled"
           title="Include mode (=)"
           @click="setFilterMode('include')"
           data-test="field-values-panel-include-mode-btn"
         >
-          <OIcon class="tw:h-2.5! tw:w-2.5! tw:m-0.5!">
+          <OIcon class="h-2.5! w-2.5! m-0.5!">
             <EqualIcon />
           </OIcon>
         </OButton>
         <OButton
           :variant="filterMode === 'exclude' ? 'destructive' : 'ghost-muted'"
           size="icon-chip"
-          class="filter-mode-btn"
+          class="filter-mode-btn rounded-none! [transition:background_0.15s,color_0.15s]"
           :disabled="filterMode !== 'exclude' && isModeToggleDisabled"
           title="Exclude mode (≠)"
           @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
         >
-          <OIcon class="tw:h-2.5! tw:w-2.5! tw:m-0.5!">
+          <OIcon class="h-2.5! w-2.5! m-0.5!">
             <NotEqualIcon />
           </OIcon>
         </OButton>
@@ -90,15 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Scrollable values area -->
-    <div class="values-scroll-container">
-      <!-- Loading state (only shown when there are no interim cached results).
-           tw:relative is required: OInnerLoading is `absolute inset-0`, so this
-           wrapper must be its positioning context — otherwise the overlay escapes
-           to the nearest positioned ancestor (.o-field-list__row) and covers the
-           field row, blocking the click that collapses/cancels the request. -->
+    <div class="max-h-64 overflow-y-auto">
+      <!-- Loading state (only shown when there are no interim cached results) -->
       <div
         v-show="fieldValues?.isLoading && !displayValues.length"
-        class="tw:relative tw:pl-3 tw:py-1"
+        class="relative pl-3 py-1"
         style="height: 3.75rem"
       >
         <OInnerLoading
@@ -112,13 +108,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- No values found -->
       <div
         v-show="!displayValues.length && !fieldValues?.isLoading"
-        class="tw:pl-3 tw:py-1 tw:text-sm tw:text-o2-text-secondary"
+        class="pl-3 py-1 text-sm text-o2-text-secondary"
         data-test="field-values-panel-no-values-msg"
       >
         <template v-if="fieldValues?.errMsg">{{ fieldValues.errMsg }}</template>
         <template v-else>
           {{ t("search.fieldValuesEmpty") }}
-          <span class="tw:block tw:text-xs tw:text-o2-text-muted tw:mt-0.5">
+          <span class="block text-xs text-o2-text-muted mt-0.5">
             {{ t("search.fieldValuesEmptyHint") }}
           </span>
         </template>
@@ -127,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Selected values with no count data available (synthetic fallback) -->
       <div
         v-if="displayValues.length > 0 && (displayValues[0] as any)?.synthetic && !fieldValues?.isLoading"
-        class="tw:pl-3 tw:pb-1 tw:text-xs tw:text-o2-text-secondary tw:italic"
+        class="pl-3 pb-1 text-xs text-o2-text-secondary italic"
         data-test="field-values-panel-no-count-msg"
       >
         No data in range — values from active filter
@@ -135,12 +131,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Field values list -->
       <ul
-        class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none"
+        class="flex flex-col m-0 p-0 list-none"
         data-test="field-values-panel-values-list"
       >
-        <li v-for="value in displayValues" :key="value.key" class="tw:py-1">
+        <li v-for="value in displayValues" :key="value.key" class="py-1">
           <label
-            class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+            class="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-muted/50"
             :data-test="`logs-search-subfield-add-${fieldName}-${value.key}`"
           >
             <!-- Checkbox for multi-select — uses :model-value + @update to
@@ -152,20 +148,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :value="value.key"
               :color="filterMode === 'exclude' ? 'negative' : 'primary'"
               size="xs"
-              class="tw:shrink-0"
+              class="shrink-0"
               @update:model-value="handleUserCheckboxChange"
               @click.stop
             />
 
             <div
-              class="tw:flex tw:flex-row tw:flex-wrap tw:justify-between tw:min-w-0 tw:pl-1"
+              class="flex flex-row flex-wrap justify-between min-w-0 pl-1"
               :style="
                 showMultiSelect ? 'width: calc(100% - 1.5rem)' : 'width: 100%'
               "
             >
               <div
                 :title="value.key"
-                class="tw:truncate tw:pr-1 tw:text-field-list-label-text tw:text-3!"
+                class="truncate pr-1 text-field-list-label-text text-3!"
                 style="width: calc(100% - 3.125rem)"
               >
                 {{ value.label ?? value.key }}
@@ -173,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="value.count != null"
                 :title="String(value.count)"
-                class="tw:truncate tw:text-right tw:pr-0 tw:text-3!"
+                class="truncate text-right pr-0 text-3!"
                 style="display: contents"
                 :style="showMultiSelect ? 'width: 3.125rem' : ''"
               >
@@ -188,10 +184,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- View more values / loading more indicator -->
     <div
       v-if="isLoadingMore || (fieldValues?.hasMore && !fieldValues?.isLoading)"
-      class="view-more-container tw:w-full tw:flex tw:justify-center"
+      class="w-full flex justify-center border-t border-(--o2-border-color) pt-1 px-1"
     >
       <button
-        class="view-more-link"
+        class="inline-flex items-center gap-1 bg-transparent border-0 text-(--o2-primary-color) text-[0.6875rem] font-[inherit] py-0.5 px-1 cursor-pointer rounded-[0.1875rem] transition-opacity duration-150 hover:opacity-80 hover:bg-(--color-interactive-hover-bg) disabled:opacity-50 disabled:cursor-default"
         :disabled="isLoadingMore"
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"
@@ -471,150 +467,3 @@ const reset = () => {
 
 defineExpose({ reset });
 </script>
-
-<style scoped lang="scss">
-// ---------- compact filter panel ----------
-
-.filter-values-container {
-  font-size: 0.75rem;
-}
-
-.filter-mode-bar {
-  border-bottom: 1px solid var(--o2-border-color);
-
-  .selection-count {
-    font-size: 0.625rem;
-    font-weight: 500;
-    color: var(--o2-primary-color);
-  }
-
-  .selection-hint {
-    font-size: 0.625rem;
-    color: var(--o2-text-secondary);
-  }
-
-  .filter-mode-toggle {
-    display: flex;
-    border: 1px solid var(--o2-border-color);
-    border-radius: 0.25rem;
-    overflow: hidden;
-  }
-
-  .filter-mode-btn {
-    border-radius: 0 !important;
-    transition:
-      background 0.15s,
-      color 0.15s;
-  }
-}
-
-
-.value-search-input-wrap {
-  &:deep(.q-field__control) {
-    height: 1.5rem;
-    min-height: 1.5rem;
-    padding: 0 0.25rem;
-    display: flex;
-    align-items: center;
-    border: 1px solid var(--o2-border-color);
-    border-radius: 0.1875rem;
-  }
-
-  &:deep(.q-field__prepend),
-  &:deep(.q-field__append) {
-    height: 1.5rem;
-    display: flex;
-    align-items: center;
-    padding-right: 0.25rem;
-  }
-
-  &:deep(.q-field__native) {
-    padding: 0;
-    line-height: 1.3;
-    height: 1.5rem !important;
-    font-size: 0.6875rem;
-  }
-
-  &:deep(.q-field__append .OIcon) {
-    font-size: 0.75rem;
-  }
-}
-
-.values-scroll-container {
-  max-height: 16rem;
-  overflow-y: auto;
-}
-
-// ---------- value rows ----------
-.value-row {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.1875rem 0.25rem;
-  border-radius: 0.1875rem;
-  cursor: pointer;
-  font-size: 0.6875rem;
-  min-height: 1.5rem;
-}
-
-.value-row-checkbox {
-  flex-shrink: 0;
-}
-
-.value-row-checkbox :deep(button) {
-  border-color: var(--o2-border-input) !important;
-}
-
-.value-row-name {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--o2-text-primary);
-}
-
-.value-row-null {
-  font-style: italic;
-  color: var(--o2-text-muted);
-}
-
-.value-row-count {
-  flex-shrink: 0;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  color: var(--o2-text-secondary);
-  min-width: 3.5rem;
-}
-
-// ---------- view more ----------
-.view-more-container {
-  border-top: 1px solid var(--o2-border-color);
-  padding: 0.25rem 0.25rem 0;
-}
-
-.view-more-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  background: none;
-  border: none;
-  color: var(--o2-primary-color, #58c5d8);
-  font-size: 0.6875rem;
-  font-family: inherit;
-  padding: 0.125rem 0.25rem;
-  cursor: pointer;
-  border-radius: 0.1875rem;
-  transition: opacity 0.15s;
-}
-
-.view-more-link:hover {
-  opacity: 0.8;
-  background-color: var(--o2-hover-accent);
-}
-
-.view-more-link:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-</style>

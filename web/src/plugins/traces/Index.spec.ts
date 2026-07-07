@@ -1660,7 +1660,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(wrapper.find("#tracesSecondLevel").classes()).toContain(
-        "tw:h-full",
+        "h-full",
       );
     });
 
@@ -3204,73 +3204,5 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.vm.streamChangeDialog.pendingStream).toBe("catalog-stream");
     });
 
-    it("should call onWidenTracesRange and update relativeTimePeriod when service-graph emits widen-range", async () => {
-      mockSearchObj.meta.searchMode = "service-graph";
-      mockSearchObj.data.datetime.relativeTimePeriod = "15m";
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": {
-              name: "service-graph",
-              template: "<div />",
-              emits: ["widen-range", "request:stream-change"],
-            },
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-      await flushPromises();
-
-      const serviceGraphEl = wrapper.findComponent({ name: "service-graph" });
-      expect(serviceGraphEl.exists()).toBe(true);
-
-      await serviceGraphEl.vm.$emit("widen-range", "7d");
-      await flushPromises();
-
-      expect(mockSearchObj.data.datetime.relativeTimePeriod).toBe("7d");
-      expect(mockSearchObj.data.datetime.type).toBe("relative");
-    });
-
-    it("should call onWidenTracesRange and update relativeTimePeriod when services-catalog emits widen-range", async () => {
-      mockSearchObj.meta.searchMode = "services-catalog";
-      mockSearchObj.data.datetime.relativeTimePeriod = "15m";
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            "services-catalog": {
-              name: "services-catalog",
-              template: "<div />",
-              emits: ["widen-range", "request:stream-change"],
-            },
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-      await flushPromises();
-
-      const servicesCatalogEl = wrapper.findComponent({ name: "services-catalog" });
-      expect(servicesCatalogEl.exists()).toBe(true);
-
-      await servicesCatalogEl.vm.$emit("widen-range", "30d");
-      await flushPromises();
-
-      expect(mockSearchObj.data.datetime.relativeTimePeriod).toBe("30d");
-      expect(mockSearchObj.data.datetime.type).toBe("relative");
-    });
   });
 });

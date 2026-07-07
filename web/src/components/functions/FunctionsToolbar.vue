@@ -6,13 +6,13 @@
     :back="{ label: t('function.header'), onClick: redirectToFunctions, dataTest: 'add-function-back-btn' }"
   >
     <template #tabs>
-      <div class="o2-input tw:flex tw:items-center tw:gap-6">
-        <div class="tw:flex tw:items-center">
+      <div class="o2-input flex items-center gap-6">
+        <div class="flex items-center">
           <OInput
             data-test="add-function-name-input"
             v-model.trim="functionName"
             :placeholder="t('function.name')"
-            class="tw:p-0 tw:w-full"
+            class="p-0 w-full"
             v-bind:readonly="disableName"
             v-bind:disabled="disableName"
             :error="showInputError && !!nameError"
@@ -27,7 +27,7 @@
             v-if="isValidMethodName() !== true && showInputError"
             name="info-outline"
             size="md"
-            class="tw:ml-1 tw:cursor-pointer"
+            class="ml-1 cursor-pointer"
           >
             <OTooltip
               side="right"
@@ -39,27 +39,27 @@
           </OIcon>
         </div>
         <!-- Transform Type Radio Buttons -->
-        <div class="tw:flex tw:items-center tw:gap-4 tw:h-9">
-          <ORadioGroup v-model="selectedTransType" orientation="horizontal" class="tw:items-center tw:gap-4">
-            <div class="tw:flex tw:items-center tw:gap-1">
+        <div class="flex items-center gap-4 h-9">
+          <ORadioGroup v-model="selectedTransType" orientation="horizontal" class="items-center gap-4">
+            <div class="flex items-center gap-1">
               <ORadio value="0" data-test="function-transform-type-vrl-radio" />
-              <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[0]?.label }}</span>
+              <span class="text-[13px] font-medium leading-none">{{ transformTypeOptions[0]?.label }}</span>
             </div>
             <!-- JavaScript option only shown in _meta organization -->
-            <div v-if="transformTypeOptions[1]" class="tw:flex tw:items-center tw:gap-1">
+            <div v-if="transformTypeOptions[1]" class="flex items-center gap-1">
               <ORadio value="1" data-test="function-transform-type-js-radio" />
-              <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[1]?.label }}</span>
+              <span class="text-[13px] font-medium leading-none">{{ transformTypeOptions[1]?.label }}</span>
             </div>
           </ORadioGroup>
           <!-- Info icon with tooltip -->
           <OIcon
             name="info-outline"
             size="sm"
-            class="tw:cursor-pointer tw:text-gray-500 tw:shrink-0"
+            class="cursor-pointer text-gray-500 shrink-0"
           >
             <OTooltip>
               <template #content>
-                <div class="tw:font-semibold tw:mb-1">{{ selectedTransType === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
+                <div class="font-semibold mb-1">{{ selectedTransType === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
                 <div>{{ selectedTransType === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
               </template>
             </OTooltip>
@@ -74,13 +74,12 @@
         size="icon-sm"
         @click="emit('open:chat',!store.state.isAiChatEnabled)"
         data-test="menu-link-ai-item"
-        class="ai-hover-btn"
+        class="![background:linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)] transition-[background,box-shadow] duration-300 ease-in-out hover:![background:linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)] hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] rounded-md"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-        style="border-radius: 6px;"
         @mouseenter="isHovered = true"
         @mouseleave="isHovered = false"
       >
-        <img :src="getBtnLogo" class="header-icon ai-icon" />
+        <img :src="getBtnLogo" class="opacity-70 transition-transform duration-600 [.ai-btn-active_&]:!opacity-100 [.ai-hover-btn:hover_&]:rotate-180 [.ai-hover-btn:hover_&]:[filter:brightness(0)_invert(1)]" />
       </OButton>
       <OButton
         data-test="add-function-fullscreen-btn"
@@ -243,73 +242,3 @@ defineExpose({
   },
 });
 </script>
-<style scoped lang="scss">
-.functions-toolbar {
-  :deep(.q-field__bottom) {
-    display: none;
-  }
-
-  .add-function-actions {
-    :deep(.q-btn) {
-      padding-top: 4px !important;
-      padding-bottom: 4px !important;
-      font-size: 13px;
-    }
-    :deep(.q-btn .OIcon) {
-      margin-right: 2px;
-    }
-
-    :deep(.block) {
-      font-weight: lighter;
-    }
-
-    :deep(.cancel-btn)::before {
-      border: 1px solid var(--q-negative) !important;
-    }
-  }
-}
-
-/* ── AI button — mirrors MainLayout.vue ─────────────────────────── */
-.ai-hover-btn {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
-  ) !important;
-  transition: background 0.3s ease, box-shadow 0.3s ease;
-}
-
-.ai-hover-btn:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
-}
-
-.ai-btn-active {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
-  ) !important;
-
-  .header-icon {
-    opacity: 1 !important;
-  }
-}
-
-.ai-btn-active:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-}
-
-.header-icon {
-  opacity: 0.7;
-}
-
-.ai-icon {
-  transition: transform 0.6s ease;
-}
-
-.ai-hover-btn:hover .ai-icon {
-  transform: rotate(180deg);
-  filter: brightness(0) invert(1);
-}
-</style>

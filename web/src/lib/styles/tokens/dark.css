@@ -139,6 +139,11 @@
     --color-button-ghost-destructive-hover-bg: var(--color-surface-overlay);
     --color-button-ghost-destructive-active-bg: var(--color-surface-overlay);
 
+    /* ghost-success */
+    --color-button-ghost-success-text: var(--color-success-400);
+    --color-button-ghost-success-hover-bg: var(--color-surface-overlay);
+    --color-button-ghost-success-active-bg: var(--color-surface-overlay);
+
     /* ghost-muted */
     --color-button-ghost-muted-hover-text: var(--color-primary-400);
     --color-button-ghost-muted-hover-bg: var(--color-primary-900);
@@ -199,6 +204,9 @@
     --color-badge-primary-ol-text: var(--color-primary-300);
     --color-badge-primary-soft-bg: var(--color-primary-900);
     --color-badge-primary-soft-text: var(--color-primary-300);
+
+    /* Keyboard-shortcut cheatsheet — reversed dark tint */
+    --color-shortcut-highlight-bg: var(--color-primary-900);
 
     /* success: solid unchanged; outline text brightened (700 too dark on dark bg) */
     --color-badge-success-ol-text: var(--color-success-500);
@@ -455,6 +463,9 @@
     --color-banner-warning-text:   var(--color-warning-100);
     --color-banner-error-bg:       var(--color-error-700);
     --color-banner-error-text:     var(--color-grey-0);
+    --color-banner-error-soft-bg:     color-mix(in srgb, var(--color-error-700) 20%, transparent);
+    --color-banner-error-soft-border: var(--color-error-700);
+    --color-banner-error-soft-text:   var(--color-error-100);
 
     /* Note Container */
     --color-note-bg:               color-mix(in srgb, var(--color-warning-900) 15%, transparent);
@@ -463,6 +474,185 @@
     --color-note-highlight:        var(--color-note-highlight-dark);
     --color-note-emphasis:         var(--color-grey-300);
     --color-note-code:             var(--color-note-code-dark);
+}
+
+/* ── Legacy semantic tokens (_variables.scss dark mode) ── */
+.body--dark {
+  --o2-theme-mode: #112027;
+  --o2-primary-background: #2B2D30;
+  --o2-secondary-background: #F0F1F2;
+  --o2-muted-background: #CEDDD6;
+  --o2-text-heading:     #F0F1F2;
+  --o2-text-primary:     var(--o2-text-heading);
+  --o2-text-body:        #CEDDD6;
+  --o2-text-secondary:   #B4B8BF;
+  --o2-text-caption:     #9DA0A8;
+  --o2-text-label:       #868A91;
+  --o2-text-muted:       #6F737A;
+  --o2-text-placeholder: #6F737A;
+  --o2-text-link:        #525BAD;
+  --o2-text-link-hover:  #454D93;
+  --o2-text-code:        #B4B8BF;
+  --o2-text-inverse:     #2B2D30;
+  --o2-text-4: var(--o2-text-heading);
+  --o2-text-2: var(--o2-text-secondary);
+  --o2-text-1: var(--o2-text-caption);
+  --o2-text-3: var(--o2-text-label);
+  --o2-card-background: #2B2D30;
+  --o2-card-text: #D3D3D3;
+  --o2-popover-background: #F0F1F2;
+  --o2-popover-text: #D3D3D3;
+  --o2-code-bg: #2B2D30;
+  --o2-border: #868A91;
+  --o2-border-input: #B4B8BF;
+  --o2-primary-color: var(--color-primary-400);
+  --o2-primary-foreground: #1E1F22;
+  --o2-hover-accent: color-mix(in srgb, var(--o2-theme-color) 20%, rgb(39, 39, 39));
+  --color-interactive-hover-bg: color-mix(in srgb, var(--o2-theme-color) 20%, rgb(39, 39, 39));
+  --o2-destructive-foreground: #1E1F22;
+  --o2-focus-ring: #3A4180;
+  --o2-hover-shadow: rgba(0, 0, 0, 0.6);
+  --o2-hover-gray: color-mix(in srgb, var(--o2-theme-color) 8%, rgb(38, 38, 38));
+  --o2-bg-gray: color-mix(in srgb, var(--o2-theme-color) 5%, rgb(42, 42, 42));
+  --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
+  --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);
+  --o2-scrollbar-thumb-bg: color-mix(in srgb, #3F7994 20%, white);
+  --o2-scrollbar-thumb-hover-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
+  --o2-scrollbar-thumb-active-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
+  --o2-theme-color: #112027;
+  --o2-dark-theme-color: #3F7994;
+  --o2-body-primary-bg: rgba(14, 19, 29, 0.01);
+  --o2-body-secondary-bg: rgba(14, 19, 29, 0.4);
+  --o2-primary-btn-bg: var(--o2-dark-theme-color);
+  --o2-primary-btn-text: #FFFFFF;
+  --q-primary: var(--o2-theme-color);
+  --o2-toggle-track-bg: var(--o2-dark-theme-color);
+  --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-dark-theme-color) 30%, rgb(100, 100, 100));
+  --o2-card-bg: var(--color-surface-base);
+  --o2-card-bg-solid: var(--color-surface-base);
+  --o2-header-menu-bg: color-mix(in srgb, #19191e 90%, white);
+  --o2-border-color: rgba(255, 255, 255, 0.40);
+  --o2-border-2: rgba(255, 255, 255, 0.12);
+  --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
+  --o2-menu-gradient-start: rgba(89, 155, 174, 0.3);
+  --o2-menu-gradient-end: rgba(48, 193, 233, 0.3);
+  --o2-menu-border-color: #3F7994;
+  --o2-menu-color: #FFFFFF;
+  --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
+  --o2-sticky-col-header-bg: #565656;
+  --o2-pivot-header-border: rgba(255, 255, 255, 0.12);
+  --o2-table-actions-bg: #1f2223;
+  --o2-log-table-row-bg: #21242c;
+  --o2-log-table-row-alt-bg: #252934;
+  --o2-log-table-row-hover: #3a4a78;
+  --o2-log-table-row-border: rgba(255, 255, 255, 0.14);
+  --o2-log-table-header-bg: var(--color-table-header-bg);
+  --o2-log-table-text: var(--o2-text-heading);
+  --o2-tab-bg: color-mix(in srgb, white 20%, var(--o2-theme-color));
+  --o2-tab-text-color: #FFFFFF;
+  --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, #112027);
+  --o2-actions-column-shawdow: rgba(125, 125, 125, 0.694);
+  --q-primary: var(--o2-dark-theme-color);
+  --o2-json-key: #f67a7aff;
+  --o2-json-string: #6EE7B7;
+  --o2-json-number: #60A5FA;
+  --o2-json-boolean: #A5B4FC;
+  --o2-json-null: #9CA3AF;
+  --o2-json-object: #D1D5DB;
+  --o2-input-label-text-color: #BDBDBD;
+  --tw-border-style: #e5e7eb;
+  --o2-trace-surface: #2B2D30;
+  --o2-trace-border: #5A5D63;
+  --o2-trace-text-primary: #F0F1F2;
+  --o2-trace-text-secondary: #B4B8BF;
+  --o2-trace-hover: #393840;
+  --o2-trace-selected: #D4E2FF;
+  --o2-latency-p95: #5586f7;
+  --o2-latency-p99: #ef8e43;
+  --o2-error-tag-bg: #681a1a;
+  --o2-error-tag-text: #f9cbcb;
+  --o2-status-success-text: #A0DBA5;
+  --o2-status-success-bg: #253627;
+  --o2-status-info-text: #A1AFFF;
+  --o2-status-info-bg: #181829;
+  --o2-status-warning-text: #E37774;
+  --o2-status-warning-bg: #402929;
+  --o2-status-error-text: #EB938D;
+  --o2-status-error-bg: #402929;
+  /* Log-severity colors — aligned with STATUS_COLORS_DARK in statusParser.ts */
+  --o2-severity-error-color: #D95C5C;
+  --o2-severity-warning-color: #D4944A;
+  --o2-status-neutral-text: #9DA0A8;
+  --o2-status-neutral-bg: #2B2D30;
+  --o2-span-kind-client-text: #A1AFFF;
+  --o2-span-kind-client-bg: #181829;
+  --o2-span-kind-server-text: #A0DBA5;
+  --o2-span-kind-server-bg: #253627;
+  --o2-span-kind-producer-text: #C4A0F3;
+  --o2-span-kind-producer-bg: #2F2936;
+  --o2-span-kind-consumer-text: #60C0B5;
+  --o2-span-kind-consumer-bg: #1D3838;
+  --o2-span-kind-internal-text: #9DA0A8;
+  --o2-span-kind-internal-bg: #2B2D30;
+  --o2-positive: #89CC8E;
+  --o2-negative: #E37774;
+  --o2-warning: #F2C55C;
+  --o2-info: #588CF3;
+  --o2-gray: #868A91;
+  --o2-service-health-healthy: #52c41a;
+  --o2-service-health-degraded: #faad14;
+  --o2-service-health-warning: #fa8c16;
+  --o2-service-health-critical: #f5222d;
+  --o2-section-header-bg: #28292a;
+  --o2-tag-grey-1: #565b60;
+  --o2-tag-grey-2: #313234;
+  --o2-wildcard-header-blue-bg: #F5F8FE;
+  --o2-wildcard-header-blue-text: #588CF3;
+  --o2-wildcard-header-green-bg: #253627;
+  --o2-wildcard-header-green-text: #89CC8E;
+  --o2-wildcard-header-orange-bg: #402929;
+  --o2-wildcard-header-orange-text: #E37774;
+  --o2-wildcard-header-purple-bg: #2F2936;
+  --o2-wildcard-header-purple-text: #A571E6;
+  --o2-wildcard-header-grey-bg: #2B2D30;
+  --o2-wildcard-header-grey-text: #B4B8BF;
+  --o2-wildcard-bar-blue: #88ADF7;
+  --o2-wildcard-bar-green: #5FAD65;
+  --o2-wildcard-bar-orange: #DB5C5C;
+  --o2-wildcard-bar-purple: #955AE0;
+  --o2-wildcard-bar-grey: #6F737A;
+  --o2-label-chip-ip-bg:       #253627;
+  --o2-label-chip-ip-text:     #89CC8E;
+  --o2-label-chip-ipv4-bg:     #253627;
+  --o2-label-chip-ipv4-text:   #89CC8E;
+  --o2-label-chip-ipv6-bg:     #253627;
+  --o2-label-chip-ipv6-text:   #89CC8E;
+  --o2-label-chip-method-bg:   #5E3838;
+  --o2-label-chip-method-text: #F2B1AA;
+  --o2-label-chip-url-bg:      #22264A;
+  --o2-label-chip-url-text:    #A1AFFF;
+  --o2-label-chip-num-bg:      #402929;
+  --o2-label-chip-num-text:    #E37774;
+  --o2-label-chip-float-bg:    #402929;
+  --o2-label-chip-float-text:  #E37774;
+  --o2-label-chip-hex-bg:      #3D3223;
+  --o2-label-chip-hex-text:    #F7DE8B;
+  --o2-label-chip-ts-bg:       #2F2936;
+  --o2-label-chip-ts-text:     #A571E6;
+  --o2-label-chip-date-bg:     #2F2936;
+  --o2-label-chip-date-text:   #A571E6;
+  --o2-label-chip-time-bg:     #2F2936;
+  --o2-label-chip-time-text:   #A571E6;
+  --o2-label-chip-id-bg:       #1D3838;
+  --o2-label-chip-id-text:     #9BDDD6;
+  --o2-label-chip-email-bg:    #402929;
+  --o2-label-chip-email-text:  #EB938D;
+  --o2-label-chip-str-bg:      #393840;
+  --o2-label-chip-str-text:    #B4B8BF;
+  --o2-label-chip-default-bg:  #393840;
+  --o2-label-chip-default-text: #B4B8BF;
+  --o2-label-chip-pattern-bg:  #393840;
+  --o2-label-chip-pattern-text: #88ADF7;
 }
 
 /* ToggleGroup — primary variant dark overrides */

@@ -17,21 +17,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="catalogContainerRef"
-    class="services-catalog tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container tw:px-[0.625rem] tw:relative tw:overflow-hidden"
+    class="services-catalog h-full! flex flex-col bg-[var(--o2-card-bg-solid)] card-container px-[0.625rem] relative overflow-hidden"
   >
     <!-- Toolbar: stream selector + filter + chips + legend -->
-    <div class="tw:flex tw:items-center tw:gap-2 tw:py-[0.625rem]">
+    <div class="flex items-center gap-2 py-[0.625rem]">
       <!-- Stream selector -->
       <div
         data-test="services-catalog-stream-selector"
-        class="tw:w-[11rem] tw:flex-shrink-0"
+        class="w-[11rem] flex-shrink-0"
       >
         <OSelect
           :model-value="streamFilter"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+          class="w-[auto] flex-shrink-0 rounded"
           :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
         />
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="t('traces.servicesCatalog.filterPlaceholder')"
           clearable
           :debounce="300"
-          class="tw:w-[14rem]!"
+          class="w-[14rem]!"
           data-test="services-catalog-filter-input"
         />
       </div>
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="!isLoading && services.length > 0">
         <!-- Combined pill: total count + colored status dots with counts -->
         <div
-          class="tw:flex tw:items-center tw:gap-[0.375rem] tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-text-4)] tw:bg-[var(--o2-tag-grey-1)]"
+          class="flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] text-[var(--o2-text-4)] bg-[var(--o2-tag-grey-1)]"
           data-test="services-catalog-status-pill"
         >
           <template v-if="filterText">
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template v-if="statusCounts.critical > 0">
           <div
-            class="tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:text-[0.75rem] tw:font-medium tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_12%,transparent)] tw:text-[var(--o2-service-health-critical)]"
+            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] font-medium bg-[color-mix(in_srgb,var(--o2-service-health-critical)_12%,transparent)] text-[var(--o2-service-health-critical)]"
             data-test="services-catalog-pill-critical"
           >
             <span>{{ statusCounts.critical }}</span>
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-if="statusCounts.warning > 0">
           <div
-            class="tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:text-[0.75rem] tw:font-medium tw:bg-[color-mix(in_srgb,var(--o2-service-health-warning)_12%,transparent)] tw:text-[var(--o2-service-health-warning)]"
+            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] font-medium bg-[color-mix(in_srgb,var(--o2-service-health-warning)_12%,transparent)] text-[var(--o2-service-health-warning)]"
             data-test="services-catalog-pill-warning"
           >
             <span>{{ statusCounts.warning }}</span>
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-if="statusCounts.degraded > 0">
           <div
-            class="tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:text-[0.75rem] tw:font-medium tw:bg-[color-mix(in_srgb,var(--o2-service-health-degraded)_12%,transparent)] tw:text-[var(--o2-service-health-degraded)]"
+            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] font-medium bg-[color-mix(in_srgb,var(--o2-service-health-degraded)_12%,transparent)] text-[var(--o2-service-health-degraded)]"
             data-test="services-catalog-pill-degraded"
           >
             <span>{{ statusCounts.degraded }}</span>
@@ -117,13 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- pagination controls -->
       <div
         v-if="services.length > 0"
-        class="tw:flex tw:items-center tw:justify-end tw:px-[0.5rem] tw:py-[0.25rem] tw:ml-auto"
+        class="flex items-center justify-end px-[0.5rem] py-[0.25rem] ml-auto"
         data-test="services-catalog-pagination-bar"
       >
         <OSelect
           v-model="rowsPerPage"
           :options="rowsPerPageOptions"
-          class="select-pagination tw:mr-[0.25rem] tw:mt-0!"
+          class="select-pagination mr-[0.25rem] mt-0!"
           size="sm"
           data-test="services-catalog-records-per-page"
           @update:model-value="changeRowsPerPage"
@@ -131,75 +131,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OPagination
           v-model="currentPage"
           :max="totalPages"
-          class="float-right paginator-section tw:mt-0!"
+          class="float-right paginator-section mt-0!"
           data-test="services-catalog-pagination"
           @update:model-value="changePage"
         />
       </div>
       <!-- Status legend -->
       <!-- <div
-        class="tw:ml-auto tw:flex tw:items-center tw:gap-3 tw:px-[0.625rem] tw:py-[0.325rem] tw:rounded tw:border tw:border-[var(--o2-border-color)]"
+        class="ml-auto flex items-center gap-3 px-[0.625rem] py-[0.325rem] rounded border border-[var(--o2-border-color)]"
         data-test="services-catalog-status-legend"
       >
         <span
-          class="tw:text-[0.7rem] tw:font-bold tw:text-[var(--o2-text-4)] tw:whitespace-nowrap"
+          class="text-[0.7rem] font-bold text-[var(--o2-text-4)] whitespace-nowrap"
         >
           {{ t("traces.servicesCatalog.legend.title") }}
         </span>
-        <div class="tw:flex tw:items-center tw:gap-[0.875rem]">
+        <div class="flex items-center gap-[0.875rem]">
           <div
-            class="tw:flex tw:items-center tw:gap-[0.375rem]"
+            class="flex items-center gap-[0.375rem]"
             data-test="services-catalog-legend-healthy"
           >
             <span class="sc-legend-dot sc-legend-dot--healthy" />
             <span
-              class="tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-2)]"
+              class="text-[0.7rem] font-semibold text-[var(--o2-text-2)]"
               >{{ t("traces.servicesCatalog.status.healthy") }}</span
             >
             <span
-              class="tw:text-[0.65rem] tw:opacity-55 tw:text-[var(--o2-text-4)]"
+              class="text-[0.65rem] opacity-55 text-[var(--o2-text-4)]"
               >&lt;&nbsp;1%</span
             >
           </div>
           <div
-            class="tw:flex tw:items-center tw:gap-[0.375rem]"
+            class="flex items-center gap-[0.375rem]"
             data-test="services-catalog-legend-degraded"
           >
             <span class="sc-legend-dot sc-legend-dot--degraded" />
             <span
-              class="tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-2)]"
+              class="text-[0.7rem] font-semibold text-[var(--o2-text-2)]"
               >{{ t("traces.servicesCatalog.status.degraded") }}</span
             >
             <span
-              class="tw:text-[0.65rem] tw:opacity-55 tw:text-[var(--o2-text-4)]"
+              class="text-[0.65rem] opacity-55 text-[var(--o2-text-4)]"
               >1&nbsp;–&nbsp;5%</span
             >
           </div>
           <div
-            class="tw:flex tw:items-center tw:gap-[0.375rem]"
+            class="flex items-center gap-[0.375rem]"
             data-test="services-catalog-legend-warning"
           >
             <span class="sc-legend-dot sc-legend-dot--warning" />
             <span
-              class="tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-2)]"
+              class="text-[0.7rem] font-semibold text-[var(--o2-text-2)]"
               >{{ t("traces.servicesCatalog.status.warning") }}</span
             >
             <span
-              class="tw:text-[0.65rem] tw:opacity-55 tw:text-[var(--o2-text-4)]"
+              class="text-[0.65rem] opacity-55 text-[var(--o2-text-4)]"
               >5&nbsp;–&nbsp;10%</span
             >
           </div>
           <div
-            class="tw:flex tw:items-center tw:gap-[0.375rem]"
+            class="flex items-center gap-[0.375rem]"
             data-test="services-catalog-legend-critical"
           >
             <span class="sc-legend-dot sc-legend-dot--critical" />
             <span
-              class="tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-2)]"
+              class="text-[0.7rem] font-semibold text-[var(--o2-text-2)]"
               >{{ t("traces.servicesCatalog.status.critical") }}</span
             >
             <span
-              class="tw:text-[0.65rem] tw:opacity-55 tw:text-[var(--o2-text-4)]"
+              class="text-[0.65rem] opacity-55 text-[var(--o2-text-4)]"
               >&gt;&nbsp;10%</span
             >
           </div>
@@ -210,25 +210,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state (shown when not loading and no data) -->
     <div
       v-if="!isLoading && services.length === 0"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1"
+      class="flex flex-col items-center justify-center flex-1"
       data-test="services-catalog-empty"
     >
-      <ServicesCatalogNoDataState @widen-range="$emit('widen-range', $event)" />
+      <ServicesCatalogNoDataState
+        @jump-to-stream-data="
+          (from, to) => emit('jump-to-stream-data', from, to)
+        "
+      />
     </div>
 
     <!-- Table -->
     <div
       v-else
-      class="tw:w-full tw:h-auto! tw:overflow-x-auto tw:relative tw:flex-1"
+      class="w-full h-auto! overflow-x-auto relative flex-1"
     >
       <TenstackTable
-        class="tw:h-auto!"
+        class="h-auto!"
         :rows="paginatedServices"
         :columns="tableColumns"
         :loading="isLoading"
         :sort-by="sortBy"
         :sort-order="sortOrder"
-        :row-height="28"
+        :row-height="38"
         :enable-column-reorder="true"
         :enable-row-expand="false"
         :enable-text-highlight="false"
@@ -240,33 +244,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Status badge -->
         <template #cell-status="{ item }">
-          <span
-            class="tw:rounded tw:py-[0.125rem] tw:inline-flex tw:items-center tw:w-fit tw:text-[0.75rem] tw:font-semibold"
-            :class="statusBadgeClass(item.status)"
+          <OTag
+            type="serviceStatus"
+            :value="item.status"
             :data-test="`services-catalog-status-${item.service_name}`"
           >
             {{ t(`traces.servicesCatalog.status.${item.status}`) }}
-          </span>
+          </OTag>
         </template>
 
         <!-- Service name via TraceServiceCell -->
         <template #cell-service_name="{ item }">
           <TraceServiceCell
             :item="item"
-            class="tw:cursor-pointer"
+            class="cursor-pointer"
             :data-test="`services-catalog-service-link-${item.service_name}`"
             @click.stop="handleRowClick(item)"
           />
         </template>
 
-        <!-- Error rate with color coding -->
+        <!-- Error rate with progress bar -->
         <template #cell-error_rate="{ item }">
-          <span
-            :class="errorRateClass(item.error_rate)"
+          <ServiceCatalogBarCell
+            :value="item.error_rate"
+            :max="columnMaxes.error_rate"
+            :label="formatPercent(item.error_rate)"
+            :variant="item.error_rate > 10 ? 'danger' : item.error_rate > 5 ? 'warning' : 'default'"
             :data-test="`services-catalog-error-rate-${item.service_name}`"
-          >
-            {{ formatPercent(item.error_rate) }}
-          </span>
+          />
         </template>
 
         <!-- Request / error count columns -->
@@ -286,42 +291,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Latency / duration columns -->
         <template #cell-p50_latency_ns="{ item }">
-          <span>
-            {{ formatLat(item.p50_latency_ns) }}
-            <OTooltip :content="item.p50_latency_ns.toLocaleString() + ' ns'" />
-          </span>
+          <ServiceCatalogBarCell
+            :value="item.p50_latency_ns"
+            :max="columnMaxes.p50_latency_ns"
+            :label="formatLat(item.p50_latency_ns)"
+            :tooltip="item.p50_latency_ns.toLocaleString() + ' ns'"
+          />
         </template>
 
         <template #cell-p95_latency_ns="{ item }">
-          <span>
-            {{ formatLat(item.p95_latency_ns) }}
-            <OTooltip :content="item.p95_latency_ns.toLocaleString() + ' ns'" />
-          </span>
+          <ServiceCatalogBarCell
+            :value="item.p95_latency_ns"
+            :max="columnMaxes.p95_latency_ns"
+            :label="formatLat(item.p95_latency_ns)"
+            :tooltip="item.p95_latency_ns.toLocaleString() + ' ns'"
+          />
         </template>
 
         <template #cell-p99_latency_ns="{ item }">
-          <span
-            :class="
-              item.p99_latency_ns > P99_WARN_NS ? 'tw:text-orange-500' : ''
-            "
-          >
-            {{ formatLat(item.p99_latency_ns) }}
-            <OTooltip :content="item.p99_latency_ns.toLocaleString() + ' ns'" />
-          </span>
+          <ServiceCatalogBarCell
+            :value="item.p99_latency_ns"
+            :max="columnMaxes.p99_latency_ns"
+            :label="formatLat(item.p99_latency_ns)"
+            :tooltip="item.p99_latency_ns.toLocaleString() + ' ns'"
+            :variant="item.p99_latency_ns > P99_WARN_NS ? 'warning' : 'default'"
+          />
         </template>
 
         <template #cell-avg_duration_ns="{ item }">
-          <span>
-            {{ formatLat(item.avg_duration_ns) }}
-            <OTooltip :content="item.avg_duration_ns.toLocaleString() + ' ns'" />
-          </span>
+          <ServiceCatalogBarCell
+            :value="item.avg_duration_ns"
+            :max="columnMaxes.avg_duration_ns"
+            :label="formatLat(item.avg_duration_ns)"
+            :tooltip="item.avg_duration_ns.toLocaleString() + ' ns'"
+          />
         </template>
 
         <template #cell-max_duration_ns="{ item }">
-          <span>
-            {{ formatLat(item.max_duration_ns) }}
-            <OTooltip :content="item.max_duration_ns.toLocaleString() + ' ns'" />
-          </span>
+          <ServiceCatalogBarCell
+            :value="item.max_duration_ns"
+            :max="columnMaxes.max_duration_ns"
+            :label="formatLat(item.max_duration_ns)"
+            :tooltip="item.max_duration_ns.toLocaleString() + ' ns'"
+          />
         </template>
 
         <!-- Cell actions overlay -->
@@ -366,6 +378,7 @@ import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
 import TenstackTable from "@/components/TenstackTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import TraceServiceCell from "./components/TraceServiceCell.vue";
+import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
@@ -385,6 +398,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 
 const { t } = useI18n();
@@ -398,7 +412,7 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
 const emit = defineEmits<{
   "view-traces": [data: string | Record<string, any>];
   "request:stream-change": [stream: string];
-  "widen-range": [period: string];
+  "jump-to-stream-data": [fromUs: number, toUs: number];
 }>();
 
 // p99 > 1 second triggers the orange highlight
@@ -502,7 +516,7 @@ const tableColumns = computed(() => [
     header: t("traces.servicesCatalog.columns.serviceName"),
     accessorKey: "service_name",
     enableSorting: true,
-    size: 200,
+    size: 260,
     meta: { slot: true, align: "left", sortable: true },
   },
   {
@@ -534,18 +548,18 @@ const tableColumns = computed(() => [
     meta: { slot: true, align: "right", sortable: true },
   },
   {
-    id: "error_rate",
-    header: t("traces.servicesCatalog.columns.errorRate"),
-    accessorKey: "error_rate",
-    size: 110,
-    enableSorting: true,
-    meta: { slot: true, align: "right", sortable: true },
-  },
-  {
     id: "error_count",
     header: t("traces.servicesCatalog.columns.errors"),
     accessorKey: "error_count",
     size: 90,
+    enableSorting: true,
+    meta: { slot: true, align: "right", sortable: true },
+  },
+  {
+    id: "error_rate",
+    header: t("traces.servicesCatalog.columns.errorRate"),
+    accessorKey: "error_rate",
+    size: 110,
     enableSorting: true,
     meta: { slot: true, align: "right", sortable: true },
   },
@@ -597,6 +611,20 @@ const statusCounts = computed(() => ({
   degraded: services.value.filter((s) => s.status === "degraded").length,
 }));
 
+function colMax(key: keyof ServiceRow): number {
+  const vals = filteredServices.value.map((s) => (s[key] as number) ?? 0);
+  return vals.length ? Math.max(...vals) : 1;
+}
+
+const columnMaxes = computed(() => ({
+  error_rate: colMax("error_rate"),
+  p50_latency_ns: colMax("p50_latency_ns"),
+  p95_latency_ns: colMax("p95_latency_ns"),
+  p99_latency_ns: colMax("p99_latency_ns"),
+  avg_duration_ns: colMax("avg_duration_ns"),
+  max_duration_ns: colMax("max_duration_ns"),
+}));
+
 const filteredServices = computed(() => {
   if (!filterText?.value?.trim()) return services.value;
   const q = filterText.value?.trim().toLowerCase();
@@ -643,16 +671,16 @@ function deriveStatus(
 }
 
 function statusBadgeClass(status: string): string {
-  if (status === "critical") return "o2-status-badge--error";
-  if (status === "warning") return "o2-status-badge--warning";
-  if (status === "degraded") return "o2-status-badge--degraded";
-  return "o2-status-badge--success";
+  if (status === "critical") return "text-(--o2-service-health-critical)";
+  if (status === "warning") return "text-(--o2-service-health-warning)";
+  if (status === "degraded") return "text-(--o2-service-health-degraded)";
+  return "text-(--o2-service-health-healthy)";
 }
 
 function errorRateClass(rate: number): string {
-  if (rate > 10) return "tw:text-red-500 tw:font-medium";
-  if (rate > 5) return "tw:text-orange-500";
-  if (rate > 1) return "tw:text-yellow-500";
+  if (rate > 10) return "text-red-500 font-medium";
+  if (rate > 5) return "text-orange-500";
+  if (rate > 1) return "text-yellow-500";
   return "";
 }
 
@@ -903,27 +931,3 @@ onUnmounted(() => {
   }
 });
 </script>
-
-<style lang="scss" scoped>
-@import "@/styles/pagination.scss";
-
-:deep(.services-catalog-table-container) {
-  .container {
-    border-radius: 0 !important;
-  }
-}
-
-// Table status badges — use service-health colors for consistency with ServiceGraph
-.o2-status-badge--success {
-  color: var(--o2-service-health-healthy);
-}
-.o2-status-badge--degraded {
-  color: var(--o2-service-health-degraded);
-}
-.o2-status-badge--warning {
-  color: var(--o2-service-health-warning);
-}
-.o2-status-badge--error {
-  color: var(--o2-service-health-critical);
-}
-</style>

@@ -26,10 +26,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     filter-mode="client"
     :default-columns="false"
     :show-global-filter="false"
-    class="tw:h-full tw:w-full"
+    class="h-full w-full"
   >
     <template #empty>
       <NoData />
+    </template>
+    <template #cell-start_date="{ row }">
+      <OTimeCell :value="row.start_date" unit="s" mode="date" :timezone="store.state.timezone" />
+    </template>
+    <template #cell-end_date="{ row }">
+      <OTimeCell :value="row.end_date" unit="s" mode="date" :timezone="store.state.timezone" />
+    </template>
+    <template #cell-status="{ row }">
+      <OTag type="invoiceStatus" :value="row.status" />
     </template>
     <template #cell-actions="{ row }">
       <OButton
@@ -39,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('billing.downloadInvoice')"
         variant="ghost"
         size="icon-sm"
-        class="tw:ml-1"
+        class="ml-1"
       >
         <OIcon name="download" size="sm" />
       </OButton>
@@ -56,6 +65,8 @@ import BillingService from "@/services/billings";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -77,7 +88,7 @@ const columns: OTableColumnDef[] = [
     accessorKey: "amount",
     sortable: true,
     size: COL.price,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "paid",
@@ -85,7 +96,7 @@ const columns: OTableColumnDef[] = [
     accessorKey: "paid",
     sortable: true,
     size: COL.price,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "start_date",

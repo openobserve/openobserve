@@ -112,16 +112,8 @@ const http = ({ headers } = {} as any) => {
       if (error && error.response && error.response.status) {
         switch (error.response.status) {
           case 400:
-            console.log(
-              JSON.stringify(error.response.data["error"] || "Bad Request"),
-            );
             break;
           case 401:
-            console.log(
-              JSON.stringify(
-                error.response.data["error"] || "Invalid credentials",
-              ),
-            );
             if (
               config.isCloud == "true" &&
               !error.request.responseURL.includes("/auth/login")
@@ -158,23 +150,10 @@ const http = ({ headers } = {} as any) => {
                 error.request?.responseURL || error.config?.url || "";
               addUnauthorizedError(responseUrl);
             }
-            console.log(
-              JSON.stringify(
-                error.response.data["error"] || "Unauthorized Access",
-              ),
-            );
             break;
           case 404:
-            console.log(
-              JSON.stringify(error.response.data["error"] || "Not Found"),
-            );
             break;
           case 500:
-            console.log(
-              JSON.stringify(
-                error.response.data["error"] || "Invalid ServerError",
-              ),
-            );
             break;
           default:
           // noop

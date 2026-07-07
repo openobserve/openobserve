@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "../Button/OButton.vue";
 import type {
   RefreshButtonProps,
   RefreshButtonEmits,
 } from "./ORefreshButton.types";
+
+const { t } = useI18n();
 
 const props = withDefaults(defineProps<RefreshButtonProps>(), {
   lastRunAt: null,
@@ -24,11 +27,11 @@ const diffSeconds = (): number => {
 
 const getRelativeTime = (ts: number): string => {
   const sec = Math.floor((Date.now() - ts) / 1000);
-  if (sec < 5) return "just now";
-  if (sec < 60) return `${sec}s ago`;
+  if (sec < 5) return t("refreshButton.justNow");
+  if (sec < 60) return t("refreshButton.secondsAgo", { sec });
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  return `${Math.floor(min / 60)}h ago`;
+  if (min < 60) return t("refreshButton.minutesAgo", { min });
+  return t("refreshButton.hoursAgo", { h: Math.floor(min / 60) });
 };
 
 const updateRelativeTime = () => {
@@ -41,25 +44,27 @@ const updateRelativeTime = () => {
 
 // green < 30s, amber 30s–5min, red > 5min
 const dotColor = computed(() => {
-  if (props.loading) return "tw:bg-refresh-dot-idle";
+  if (props.loading) return "bg-refresh-dot-idle";
   const s = diffSeconds();
-  if (s === Infinity) return "tw:bg-refresh-dot-idle";
-  if (s < 30) return "tw:bg-refresh-dot-fresh";
-  if (s < 300) return "tw:bg-refresh-dot-stale";
-  return "tw:bg-refresh-dot-critical";
+  if (s === Infinity) return "bg-refresh-dot-idle";
+  if (s < 30) return "bg-refresh-dot-fresh";
+  if (s < 300) return "bg-refresh-dot-stale";
+  return "bg-refresh-dot-critical";
 });
 
 const dotTitle = computed(() => {
   const s = diffSeconds();
-  if (s === Infinity) return "Not yet refreshed";
-  if (s < 30) return "Data is fresh";
-  if (s < 300) return "Data is getting stale";
-  return "Data is stale";
+  if (s === Infinity) return t("refreshButton.notYetRefreshed");
+  if (s < 30) return t("refreshButton.dataFresh");
+  if (s < 300) return t("refreshButton.dataGettingStale");
+  return t("refreshButton.dataStale");
 });
 
 const exactTime = computed(() => {
-  if (!props.lastRunAt) return "Not yet refreshed";
-  return `Last refreshed: ${new Date(props.lastRunAt).toLocaleTimeString()}`;
+  if (!props.lastRunAt) return t("refreshButton.notYetRefreshed");
+  return t("refreshButton.lastRefreshed", {
+    time: new Date(props.lastRunAt).toLocaleTimeString(),
+  });
 });
 
 onMounted(() => {
@@ -80,11 +85,11 @@ function handleClick(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="tw:inline-flex tw:items-center tw:gap-1.5">
+  <div class="inline-flex items-center gap-1.5">
     <!-- staleness dot -->
     <span
       :class="[
-        'tw:size-2 tw:rounded-full tw:shrink-0 tw:transition-colors tw:duration-700',
+        'size-2 rounded-full shrink-0 transition-colors duration-700',
         dotColor,
       ]"
       :title="dotTitle"
@@ -92,10 +97,10 @@ function handleClick(e: MouseEvent) {
     <!-- relative timestamp -->
     <span
       v-if="lastRunAt"
-      class="tw:text-xs tw:text-text-secondary tw:tabular-nums tw:whitespace-nowrap tw:select-none"
+      class="text-xs text-text-secondary tabular-nums whitespace-nowrap select-none"
       :title="exactTime"
     >
-      {{ relativeTime || "just now" }}
+      {{ relativeTime || t("refreshButton.justNow") }}
     </span>
     <!-- refresh icon button -->
     <OButton
@@ -105,7 +110,7 @@ function handleClick(e: MouseEvent) {
       :disabled="disabled"
       :title="exactTime"
       data-test="refresh-button"
-      class="tw:size-7"
+      class="size-7"
       @click="handleClick"
     >
       <svg
@@ -118,7 +123,7 @@ function handleClick(e: MouseEvent) {
         stroke-width="2"
         stroke-linecap="round"
         stroke-linejoin="round"
-        :class="{ 'tw:animate-spin': loading }"
+        :class="{ 'animate-spin': loading }"
       >
         <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
         <path d="M21 3v5h-5" />

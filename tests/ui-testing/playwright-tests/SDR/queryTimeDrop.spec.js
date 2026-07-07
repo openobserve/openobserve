@@ -104,14 +104,16 @@ test.describe("Query Time Drop - Combined Test", { tag: '@enterprise' }, () => {
       fieldValue: p.value
     }));
 
-    await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
+    // Query-time SDR transforms data at search time, so STEP 1 (visible) and STEP 4
+    // (dropped) inspect the SAME ingested batch — reuse one marker for both.
+    const ingestMarker = await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
     // Verify all fields are visible before drop
     const fieldsBeforeDrop = patternsToTest.map(p => ({
       fieldName: p.field,
       shouldBeDropped: false
     }));
-    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsBeforeDrop);
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsBeforeDrop, ingestMarker);
     testLogger.info('✓ STEP 1 PASSED: All fields visible without SDR');
 
     // STEP 2: Create all 4 SDR patterns
@@ -154,7 +156,7 @@ test.describe("Query Time Drop - Combined Test", { tag: '@enterprise' }, () => {
       fieldName: p.field,
       shouldBeDropped: true
     }));
-    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsAfterDrop);
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsAfterDrop, ingestMarker);
     testLogger.info('✓ STEP 4 PASSED: All fields are DROPPED at query time');
 
     testLogger.info('=== ✓ COMBINED QUERY TIME DROP TEST COMPLETED SUCCESSFULLY ===');

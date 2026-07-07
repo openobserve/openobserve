@@ -17,24 +17,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <div
-    :class="position === 'bottom' ? 'tw:py-2' : 'tw:pt-2'"
-    class="q-table__control tw:w-full tw:flex tw:justify-between"
+    :class="position === 'bottom' ? 'py-2' : 'pt-2'"
+    class="w-full flex justify-between"
   >
     <div
       v-if="position === 'bottom' && maxRecords"
-      class="max-result"
+      class="flex items-center whitespace-nowrap w-50 justify-center"
       style="justify-content: start"
     >
-      <span class="q-table__bottom-item">{{ t("search.maxRecords") }}</span>
+      <span class="mr-4 text-xs font-semibold">{{ t("search.maxRecords") }}</span>
       <OInput
         v-model="maxRecords"
-        class="max-records-input"
         @blur="changeMaxRecordToReturn"
       />
     </div>
     <div
       v-if="position === 'top' && pageTitle"
-      class="tw:font-bold tw:flex tw:items-center"
+      class="font-bold flex items-center"
     >
       <OButton
         v-if="
@@ -43,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         variant="ghost"
         size="icon"
-        class="tw:mr-2"
+        class="mr-2"
         @click="toggleSidePanel"
       >
         <img
@@ -59,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         variant="ghost"
         size="icon"
-        class="tw:mr-2"
+        class="mr-2"
         @click="toggleSidePanel"
       >
         <img
@@ -68,13 +67,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           height="16"
         />
       </OButton>
-      <div class="tw:ml-1">
+      <div class="ml-1">
         {{ resultTotal }}
         {{ pageTitle.slice(-1) == "s" ? pageTitle.slice(0, -1) : pageTitle }}(s)
       </div>
     </div>
-    <div class="q-table__control tw:ml-auto">
-      <span class="q-table__bottom-item">
+    <div class="ml-auto">
+      <span class="mr-4 text-xs font-semibold">
         {{ t("search.showing") }}
         {{
           resultTotal > 0
@@ -95,15 +94,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         of {{ resultTotal }} -->
       </span>
 
-      <div v-if="position === 'bottom'" class="tw:flex tw:items-center">
-        <OSeparator vertical class="tw:my-2 tw:mr-4" />
+      <div v-if="position === 'bottom'" class="flex items-center">
+        <OSeparator vertical class="my-2 mr-4" />
 
-        <span class="q-table__bottom-item">
+        <span class="mr-4 text-xs font-semibold">
           {{ t("search.recordsPerPage") }}
         </span>
         <OSelect
           v-model="scope.pagination.rowsPerPage"
-          class="tw:mr-3"
+          class="mr-3"
           :options="perPageOptions"
           @update:modelValue="changePagination"
         />
@@ -212,58 +211,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.footer-text {
-  margin-right: 1rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-.q-table__bottom-item {
-  @extend .footer-text;
-}
-.q-select .q-field {
-  &__native {
-    @extend .footer-text;
-    text-align: center;
-    margin-right: 0;
-  }
-  &__append {
-    padding: 0;
-  }
-}
-
-.pageNav {
-  padding: 0.125rem 0.5rem;
-}
-
-.max-result {
-  justify-content: center;
-  align-items: center;
-  white-space: nowrap;
-  display: flex;
-  width: 200px;
-
-  .q-field {
-    max-width: 3.5rem;
-  }
-
-  .max-records-input {
-    .q-field {
-      &__control {
-        // background-color: #fafbfd !important;
-        max-width: 2.5rem;
-        height: 1.5rem;
-        padding: 0;
-      }
-      &__native {
-        font-size: 0.75rem;
-        text-align: center;
-        font-weight: 600;
-        // color: $dark;
-        padding: 0;
-        width: fit-content;
-      }
-    }
-  }
-}
-</style>

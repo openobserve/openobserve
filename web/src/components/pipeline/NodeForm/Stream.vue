@@ -33,11 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="add-stream-input-stream-routing-section"
-      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+      :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
     >
 
 
-    <div class="stream-routing-container tw:w-full tw:py-3">
+    <div class="stream-routing-container w-full py-3">
       <!-- Mode toggle — stays a bare UI control OUTSIDE the form: it swaps the
            select-existing form for the AddStream create child. -->
       <OSwitch
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="create-stream-toggle"
         :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
         v-model="createNewStream"
-        class="tw:px-3 tw:mb-3"
+        class="px-3 mb-3"
       />
 
       <div>
@@ -54,8 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           id="stream-node-form"
           :form="form"
         >
-          <div class="tw:p-4 tw:flex tw:flex-col tw:gap-3">
-            <div data-test="input-node-stream-type-select" class="tw:w-full">
+          <div class="p-4 flex flex-col gap-3">
+            <div data-test="input-node-stream-type-select" class="w-full">
               <OFormSelect
                 name="stream_type"
                 :options="(filteredStreamTypes as any)"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
 
-            <div class="tw:w-full">
+            <div class="w-full">
               <OFormSelect
                 name="stream_name"
                 :options="indexOptions"
@@ -86,30 +86,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 name="appendData"
                 :label="t('function.appendData')"
-                class="tw:mt-2"
+                class="mt-2"
               />
             </div>
 
             <div
               v-if="selectedNodeType == 'output'"
-              class="note-message tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2"
+              class="note-message rounded-md p-3 flex flex-col gap-2"
             >
-              <div class="tw:text-sm tw:text-gray-800">Guidelines:</div>
-              <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800">
-                <div class="tw:flex tw:items-start tw:gap-2">
-                  <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+              <div class="text-sm text-gray-800">Guidelines:</div>
+              <div class="flex flex-col gap-1 text-sm text-gray-800">
+                <div class="flex items-start gap-2">
+                  <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                   <span>
                     Select an existing stream from the list or enter the name to create a new one
                   </span>
                 </div>
-                <div class="tw:flex tw:items-start tw:gap-2">
-                  <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <div class="flex items-start gap-2">
+                  <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                   <span>
                     <span class="highlight">Enrichment_tables</span> as destination stream is only available for scheduled pipelines
                   </span>
                 </div>
-                <div class="tw:flex tw:items-start tw:gap-2">
-                  <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+                <div class="flex items-start gap-2">
+                  <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                   <span>
                     Use curly braces <span class="code">{}</span> to configure stream name dynamically. e.g.
                     <span class="code">static_text_{fieldname}_postfix</span>. Static text before/after <span class="code">{}</span> is optional

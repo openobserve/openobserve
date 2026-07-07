@@ -283,6 +283,7 @@ pub fn find_pricing_sync_at(
 pub struct CostResult {
     pub cost: HashMap<String, f64>,
     pub tier_name: String,
+    pub prices: HashMap<String, f64>,
 }
 
 /// Calculate cost using a model pricing definition.
@@ -293,7 +294,18 @@ pub fn calculate_cost_from_definition(
     definition: &ModelPricingDefinition,
     usage: &HashMap<String, i64>,
 ) -> CostResult {
-    let tier = match select_tier(definition, usage) {
+    calculate_cost_from_definition_with_tier_usage(definition, usage, usage)
+}
+
+/// Calculate cost using `usage`, but select conditional pricing tiers with `tier_usage`.
+/// This lets callers price uncached input separately while selecting context-length tiers from
+/// total input tokens, including cached tokens.
+pub fn calculate_cost_from_definition_with_tier_usage(
+    definition: &ModelPricingDefinition,
+    usage: &HashMap<String, i64>,
+    tier_usage: &HashMap<String, i64>,
+) -> CostResult {
+    let tier = match select_tier(definition, tier_usage) {
         Some(t) => t,
         None => {
             log::warn!(
@@ -303,10 +315,12 @@ pub fn calculate_cost_from_definition(
             return CostResult {
                 cost: HashMap::new(),
                 tier_name: String::new(),
+                prices: HashMap::new(),
             };
         }
     };
     let tier_name = tier.name.clone();
+    let prices = tier.prices.clone();
 
     let mut cost = HashMap::new();
     let mut total = 0.0;
@@ -337,7 +351,11 @@ pub fn calculate_cost_from_definition(
         cost.insert("total".to_string(), total);
     }
 
-    CostResult { cost, tier_name }
+    CostResult {
+        cost,
+        tier_name,
+        prices,
+    }
 }
 
 fn select_tier<'a>(
@@ -537,6 +555,46 @@ mod tests {
         assert_eq!(result.tier_name, "Extended Context");
         assert!((result.cost["input"] - 1.5).abs() < 1e-10);
         assert!((result.cost["output"] - 0.225).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_selects_tier_from_total_usage_but_prices_billable_usage() {
+        let def = make_definition(vec![
+            PricingTierDefinition {
+                name: "Default".to_string(),
+                condition: None,
+                prices: HashMap::from([
+                    ("input".to_string(), 0.000001),
+                    ("cache_read_input_tokens".to_string(), 0.0000001),
+                ]),
+            },
+            PricingTierDefinition {
+                name: "Extended Context".to_string(),
+                condition: Some(TierCondition {
+                    usage_key: "input".to_string(),
+                    operator: TierOperator::Gte,
+                    value: 1_000.0,
+                }),
+                prices: HashMap::from([
+                    ("input".to_string(), 0.000002),
+                    ("cache_read_input_tokens".to_string(), 0.0000002),
+                ]),
+            },
+        ]);
+
+        let billable_usage = HashMap::from([
+            ("input".to_string(), 200i64),
+            ("cache_read_input_tokens".to_string(), 800i64),
+        ]);
+        let tier_usage = HashMap::from([("input".to_string(), 1_000i64)]);
+
+        let result =
+            calculate_cost_from_definition_with_tier_usage(&def, &billable_usage, &tier_usage);
+
+        assert_eq!(result.tier_name, "Extended Context");
+        assert!((result.cost["input"] - 0.0004).abs() < 1e-10);
+        assert!((result.cost["cache_read_input_tokens"] - 0.00016).abs() < 1e-10);
+        assert!((result.cost["total"] - 0.00056).abs() < 1e-10);
     }
 
     #[test]

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="handleCancel"
     @click:neutral="openDeleteDialog"
   >
-    <div class="tw:w-full tw:pt-3 tw:pb-3 tw:px-3 tw:flex tw:flex-col tw:gap-4">
+    <div class="w-full pt-3 pb-3 px-3 flex flex-col gap-4">
       <!-- Mode toggle — stays a bare UI control OUTSIDE the form: it swaps the
            select-existing form for the CreateDestinationForm create child. -->
       <OSwitch
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="createNewDestination"
       />
 
-      <div v-if="createNewDestination" class="tw:w-full">
+      <div v-if="createNewDestination" class="w-full">
         <!-- Create New Destination Form -->
         <CreateDestinationForm
           @created="handleDestinationCreated"

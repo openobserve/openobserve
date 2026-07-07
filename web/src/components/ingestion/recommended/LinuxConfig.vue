@@ -1,18 +1,18 @@
-<template>
-  <div class="tw:p-3">
+﻿<template>
+  <div class="p-3">
     <!-- Environment selection cards -->
-    <div class="tw:grid tw:grid-cols-2 tw:gap-3 tw:mb-5">
+    <div class="grid grid-cols-2 gap-3 mb-5">
       <div
         v-for="opt in options"
         :key="opt.value"
-        class="tw:rounded-lg tw:border tw:p-4 tw:cursor-pointer tw:transition-all tw:flex tw:gap-3 tw:items-start"
+        class="rounded-lg border p-4 cursor-pointer transition-all flex gap-3 items-start"
         :class="selected === opt.value ? selectedCardClass : unselectedCardClass"
         @click="selected = opt.value"
       >
-        <OIcon :name="opt.icon" size="lg" :class="selected === opt.value ? 'tw:text-[var(--q-primary)]' : 'tw:text-gray-400'" />
+        <OIcon :name="opt.icon" size="lg" :class="selected === opt.value ? 'text-[var(--q-primary)]' : 'text-gray-400'" />
         <div>
-          <div class="tw:font-semibold tw:text-sm">{{ opt.label }}</div>
-          <div class="tw:text-xs tw:mt-0.5" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">{{ opt.description }}</div>
+          <div class="font-semibold text-sm">{{ opt.label }}</div>
+          <div class="text-xs mt-0.5" :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'">{{ opt.description }}</div>
         </div>
       </div>
     </div>
@@ -20,15 +20,15 @@
     <!-- EC2 IAM prerequisite note -->
     <div
       v-if="selected === 'ec2'"
-      class="tw:flex tw:gap-2 tw:items-start tw:rounded-lg tw:p-3 tw:mb-4 tw:text-sm"
-      :class="store.state.theme === 'dark' ? 'tw:bg-amber-950/40 tw:border tw:border-amber-800/50' : 'tw:bg-amber-50 tw:border tw:border-amber-200'"
+      class="flex gap-2 items-start rounded-lg p-3 mb-4 text-sm"
+      :class="store.state.theme === 'dark' ? 'bg-amber-950/40 border border-amber-800/50' : 'bg-amber-50 border border-amber-200'"
     >
-      <OIcon name="info" size="sm" class="tw:text-amber-500 tw:shrink-0 tw:mt-0.5" />
-      <div :class="store.state.theme === 'dark' ? 'tw:text-amber-200' : 'tw:text-amber-900'">
-        <span class="tw:font-semibold">IAM role required.</span>
+      <OIcon name="info" size="sm" class="text-amber-500 shrink-0 mt-0.5" />
+      <div :class="store.state.theme === 'dark' ? 'text-amber-200' : 'text-amber-900'">
+        <span class="font-semibold">IAM role required.</span>
         Attach an IAM role to your EC2 instance with
-        <code class="tw:font-mono tw:text-xs">ec2:DescribeTags</code> and
-        <code class="tw:font-mono tw:text-xs">ec2:DescribeInstances</code>
+        <code class="font-mono text-xs">ec2:DescribeTags</code> and
+        <code class="font-mono text-xs">ec2:DescribeInstances</code>
         permissions. This allows the collector to read the instance Name tag and use it as the host identifier.
       </div>
     </div>
@@ -36,12 +36,12 @@
     <!-- Install command -->
     <ContentCopy :content="activeCommand" :key="selected" />
 
-    <OSeparator class="tw:my-4" />
+    <OSeparator class="my-4" />
 
     <!-- What it collects -->
-    <div class="tw:text-sm tw:font-medium tw:pl-1">
+    <div class="text-sm font-medium pl-1">
       Once installed, the collector will:
-      <ul class="tw:list-disc tw:ml-5 tw:mt-1 tw:font-normal tw:space-y-0.5">
+      <ul class="list-disc ml-5 mt-1 font-normal space-y-0.5">
         <li>Collect system logs and journald logs</li>
         <li>Collect host metrics (CPU, memory, disk, network)</li>
         <li v-if="selected === 'ec2'">Detect EC2 instance metadata automatically</li>
@@ -100,15 +100,13 @@ const activeCommand = computed(() => {
 
 const selectedCardClass = computed(() =>
   store.state.theme === "dark"
-    ? "tw:border-[var(--q-primary)] tw:bg-blue-950/30"
-    : "tw:border-[var(--q-primary)] tw:bg-blue-50"
+    ? "border-[var(--q-primary)] bg-blue-950/30"
+    : "border-[var(--q-primary)] bg-blue-50"
 );
 
 const unselectedCardClass = computed(() =>
   store.state.theme === "dark"
-    ? "tw:border-gray-700 tw:bg-gray-800/40 hover:tw:border-gray-500"
-    : "tw:border-gray-200 tw:bg-white hover:tw:border-gray-300"
+    ? "border-gray-700 bg-gray-800/40 hover:border-gray-500"
+    : "border-gray-200 bg-white hover:border-gray-300"
 );
 </script>
-
-<style scoped></style>

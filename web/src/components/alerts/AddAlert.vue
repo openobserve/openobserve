@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full">
+  <div class="w-full h-full">
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-      <div class="tw:flex tw:flex-col tw:h-full">
+      <div class="flex flex-col h-full">
       <AppPageHeader
-        class="alert-v3-topbar tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="alert-v3-topbar [container-type:inline-size] [container-name:topbar] shrink-0 px-4 border-b border-border-default"
         :back="{
           label: activeFolderName || t('alerts.header'),
           onClick: goBackToAlertsList,
@@ -32,30 +32,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Inline title editing (name + folder), kept in the header per the
              AddPanel convention (#tabs slot renders inline beside the back tile). -->
         <template #tabs>
-          <div class="tw:flex tw:items-center tw:gap-1.5 tw:min-w-0">
+          <div class="flex items-center gap-1.5 min-w-0">
 
           <!-- EDIT MODE: (folder → chevron → name) -->
           <template v-if="beingUpdated || anomalyEditMode">
             <span
-              class="tw:text-xl tw:tracking-[0.005em] alert-folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm"
+              class="alert-folder-name text-xl tracking-[0.005em] px-2 cursor-pointer transition-all rounded-sm text-(--o2-menu-color)! hover:rounded-[0.325rem] hover:bg-(--o2-tab-bg)!"
               @click="goBackToAlertsList"
             >{{ activeFolderName }}</span>
-            <OIcon name="chevron-right" size="sm" class="tw:text-gray-400 tw:mt-0.5 tw:shrink-0" />
+            <OIcon name="chevron-right" size="sm" class="text-gray-400 mt-0.5 shrink-0" />
             <template v-if="!isAnomalyMode">
-              <span class="tw:text-xl tw:tracking-[0.005em] tw:truncate tw:max-w-[200px]">
+              <span class="text-xl tracking-[0.005em] truncate max-w-[200px]">
                 {{ formData.name }}
                 <OTooltip v-if="formData.name?.length > 24" :content="formData.name" />
               </span>
             </template>
             <template v-else>
-              <span class="tw:text-xl tw:tracking-[0.005em] tw:truncate tw:max-w-[200px]">
+              <span class="text-xl tracking-[0.005em] truncate max-w-[200px]">
                 {{ anomalyConfig.name }}
                 <OTooltip v-if="anomalyConfig.name?.length > 24" :content="anomalyConfig.name" />
               </span>
-              <OBadge v-if="anomalyConfig.status" :variant="anomalyStatusVariant" class="tw:text-xs">{{ anomalyConfig.status }}</OBadge>
+              <OTag v-if="anomalyConfig.status" type="anomalyStatus" :value="anomalyConfig.status" />
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
-                class="tw:text-[11px] tw:whitespace-nowrap tw:text-text-secondary"
+                class="text-[11px] whitespace-nowrap text-text-secondary"
               >
                 Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
               </span>
@@ -67,15 +67,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- CREATE MODE: Alert Name + Folder -->
           <template v-else>
-            <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-              <label class="alert-v3-inline-label">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="tw:text-text-primary">*</span></label>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="text-text-primary">*</span></div>
               <OInput
                 v-if="!isAnomalyMode"
                 ref="step1Ref"
                 v-model="formData.name"
                 data-test="add-alert-name-input"
                 :placeholder="t('alerts.alertNamePlaceholder')"
-                class="alert-v3-field topbar-name-input tw:text-sm"
+                class="topbar-name-input text-sm h-[28px]! min-h-[28px]! min-w-[120px] max-w-[150px]"
                 :class="alertNameError ? 'field-error' : ''"
                 @update:model-value="alertNameError = false"
               />
@@ -84,13 +84,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="anomalyNameRef"
                 v-model="anomalyConfig.name"
                 :placeholder="t('alerts.anomalyNamePlaceholder')"
-                class="alert-v3-field topbar-name-input tw:text-sm"
+                class="topbar-name-input text-sm h-[28px]! min-h-[28px]! min-w-[120px] max-w-[150px]"
               />
             </div>
 
             <!-- Folder -->
-            <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-              <label class="alert-v3-inline-label">{{ t('alerts.folder') }}</label>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t('alerts.folder') }}</div>
               <InlineSelectFolderDropdown
                 :model-value="activeFolderId"
                 type="alerts"
@@ -104,28 +104,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </AppPageHeader>
 
-      <div class="tw:flex tw:flex-1 tw:min-h-0">
+      <div class="flex flex-1 min-h-0">
 
       <!-- LEFT column wrapper (flex: 6.5) -->
       <div style="flex: 6.5; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px 0;">
 
       <!-- Stream Name & Stream Type -->
-      <div class="card-container tw:shrink-0 stream-config-card">
-        <div class="section-header">
-          <div class="section-header-accent" />
-          <span class="section-header-title">Stream Config <span class="tw:text-text-primary">*</span></span>
+      <div class="card-container shrink-0 stream-config-card [container-type:inline-size] [container-name:stream-config]">
+        <div class="flex items-center gap-0 py-[10px] px-3 border-b border-[#e6e6e6] dark:border-[var(--color-border-default)]">
+          <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
+          <span class="text-[13px] font-semibold tracking-[0.01em]">{{ t('alerts.streamConfig') }} <span class="text-text-primary">*</span></span>
         </div>
-        <div class="tw:flex tw:items-center tw:gap-4 tw:px-3 tw:py-2">
+        <div class="flex items-center gap-4 px-3 py-2">
         <!-- Stream Type -->
-        <div class="tw:flex tw:items-center tw:gap-1.5">
-          <label class="alert-v3-inline-label">{{ t("alerts.streamType") }} <span class="tw:text-text-primary">*</span></label>
+        <div class="flex items-center gap-1.5">
+          <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.streamType") }} <span class="text-text-primary">*</span></div>
           <OSelect
             ref="streamTypeRef"
             data-test="add-alert-stream-type-select-dropdown"
             v-model="formData.stream_type"
             :options="streamTypes"
             :searchable="false"
-            class="no-case alert-v3-field stream-type-select"
+            class="stream-type-select h-[28px]! min-h-[28px]!"
             :class="streamTypeError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode"
             @update:model-value="streamTypeError = false; updateStreams()"
@@ -133,15 +133,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Stream Name -->
-        <div class="tw:flex tw:items-center tw:gap-1.5">
-          <label class="alert-v3-inline-label">{{ t("alerts.stream_name") }} <span class="tw:text-text-primary">*</span></label>
+        <div class="flex items-center gap-1.5">
+          <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.stream_name") }} <span class="text-text-primary">*</span></div>
           <OSelect
             ref="streamNameRef"
             data-test="add-alert-stream-name-select-dropdown"
             v-model="formData.stream_name"
             :options="indexOptions"
             :loading="isFetchingStreams"
-            class="no-case alert-v3-field stream-name-select"
+            class="stream-name-select h-[28px]! min-h-[28px]!"
             :class="streamNameError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
             @update:model-value="streamNameError = false; updateStreamFields($event)"
@@ -150,14 +150,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Alert Type -->
-        <div class="tw:flex tw:items-center tw:gap-1.5">
-          <label class="alert-v3-inline-label">{{ t("alerts.alertType") || 'Alert Type' }}</label>
+        <div class="flex items-center gap-1.5">
+          <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.alertType") || 'Alert Type' }}</div>
           <OSelect
             data-test="add-alert-type-select-dropdown"
             v-model="formData.is_real_time"
             :options="alertTypeOptions"
             :disabled="beingUpdated || anomalyEditMode"
-            class="alert-v3-field alert-type-select"
+            class="alert-type-select h-[28px]! min-h-[28px]!"
             :searchable="false"
           />
         </div>
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OToggleGroup
           :model-value="activeTab"
           @update:model-value="activeTab = ($event as string)"
-          class="tw:shrink-0"
+          class="shrink-0"
         >
           <OToggleGroupItem
             v-for="tab in alertTabs"
@@ -190,9 +190,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
 
         <!-- Tab Content -->
-        <div class="tw:flex-1 tw:overflow-auto">
+        <div class="flex-1 overflow-auto">
           <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
-          <div v-show="activeTab === 'condition'" class="tw:flex tw:flex-col tw:gap-4">
+          <div v-show="activeTab === 'condition'" class="flex flex-col gap-4">
             <div>
               <QueryConfig
               ref="step2Ref"
@@ -250,7 +250,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div v-show="activeTab === 'advanced'" class="tw:flex tw:flex-col tw:gap-4">
+          <div v-show="activeTab === 'advanced'" class="flex flex-col gap-4">
+
+            <!-- Additional Settings (first) -->
+            <div>
+              <Advanced
+                :template="formData.template"
+                :templates="templates"
+                :contextAttributes="formData.context_attributes"
+                :description="formData.description"
+                :rowTemplate="formData.row_template"
+                :rowTemplateType="formData.row_template_type"
+                :destinations="destinations"
+                :selectedDestinations="formData.destinations"
+                :alertName="formData.name"
+                :streamName="formData.stream_name"
+                :streamType="formData.stream_type"
+                :triggerCondition="formData.trigger_condition"
+                :streamFields="filteredColumns"
+                @update:template="(val) => (formData.template = val)"
+                @refresh:templates="refreshTemplates"
+                @update:contextAttributes="(val) => (formData.context_attributes = val)"
+                @update:description="(val) => (formData.description = val)"
+                @update:rowTemplate="(val) => (formData.row_template = val)"
+                @update:rowTemplateType="(val) => (formData.row_template_type = val)"
+              />
+            </div>
 
             <!-- Compare with Past (scheduled only) -->
             <div v-if="formData.is_real_time === 'false'">
@@ -274,24 +299,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:deduplication="(val) => (formData.deduplication = val)"
               />
             </div>
-
-            <!-- Advanced settings -->
-            <div>
-              <Advanced
-                :template="formData.template"
-                :templates="templates"
-                :contextAttributes="formData.context_attributes"
-                :description="formData.description"
-                :rowTemplate="formData.row_template"
-                :rowTemplateType="formData.row_template_type"
-                @update:template="(val) => (formData.template = val)"
-                @refresh:templates="refreshTemplates"
-                @update:contextAttributes="(val) => (formData.context_attributes = val)"
-                @update:description="(val) => (formData.description = val)"
-                @update:rowTemplate="(val) => (formData.row_template = val)"
-                @update:rowTemplateType="(val) => (formData.row_template_type = val)"
-              />
-            </div>
           </div>
 
           <div v-show="activeTab === 'anomaly-config'">
@@ -313,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Footer: Cancel / Save (left column, separate card) -->
       <div
-        class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2 tw:border-t tw:border-border-default"
+        class="card-container flex items-center justify-end px-3 py-2.5 shrink-0 gap-2 border-t border-border-default"
       >
         <OButton
           data-test="add-alert-cancel-btn"
@@ -335,30 +342,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- TIER 2: Preview + Summary (RIGHT 30%) -->
       <!-- border-l: full-height vertical divider flush against the Preview/Summary pane -->
-      <div class="tw:flex tw:flex-col tw:gap-2 tw:border-l tw:border-border-default tw:pt-2 tw:pb-2" style="flex: 3.5; min-width: 0; min-height: 0; overflow: hidden;">
+      <div class="flex flex-col gap-2 border-l border-border-default pt-2 pb-2" style="flex: 3.5; min-width: 0; min-height: 0; overflow: hidden;">
         <!-- Preview Card -->
-        <div class="card-container tw:overflow-hidden tw:flex tw:flex-col" style="flex: 1; min-height: 0;">
+        <div class="card-container overflow-hidden flex flex-col" style="flex: 1; min-height: 0;">
           <div
-            class="tw:flex tw:items-center tw:px-3 tw:py-[0.625rem] tw:select-none tw:border-b tw:border-border-default tw:shrink-0 tw:gap-2"
+            class="flex items-center px-3 py-[0.625rem] select-none border-b border-border-default shrink-0 gap-2"
           >
-            <span class="tw:text-sm tw:font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
+            <span class="text-sm font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
             <template v-if="!isAnomalyMode && activeEvaluationStatus">
-              <div class="tw:w-px tw:h-4 tw:bg-border-default" />
-              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-[var(--o2-positive)]' : 'tw:text-[var(--o2-gray)]'" size="sm" />
-              <span class="tw:text-xs tw:font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-[var(--o2-positive)]' : 'tw:text-[var(--o2-gray)]'">
+              <div class="w-px h-4 bg-border-default" />
+              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :class="activeEvaluationStatus.wouldTrigger ? 'text-[var(--o2-positive)]' : 'text-[var(--o2-gray)]'" size="sm" />
+              <span class="text-xs font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'text-[var(--o2-positive)]' : 'text-[var(--o2-gray)]'">
                 {{ activeEvaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
               </span>
-              <span class="tw:text-xs tw:opacity-60">{{ activeEvaluationStatus.reason }}</span>
+              <span class="text-xs opacity-60">{{ activeEvaluationStatus.reason }}</span>
             </template>
           </div>
-          <div class="tw:flex-1 tw:min-h-0" style="overflow: hidden;">
+          <div class="flex-1 min-h-0" style="overflow: hidden;">
             <template v-if="isAnomalyMode">
               <QueryEditor editor-id="anomaly-sql-preview" language="sql" :read-only="true" :show-auto-complete="false" :hide-nl-toggle="true" :query="anomalyPreviewSql" style="height: 100%" />
             </template>
             <template v-else>
-              <div v-if="!formData.stream_name" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2">
-                <OIcon name="query-stats" size="lg" class="tw:opacity-20" />
-                <span class="tw:text-sm tw:font-medium tw:text-text-secondary">
+              <div v-if="!formData.stream_name" class="flex flex-col items-center justify-center h-full gap-2">
+                <OIcon name="query-stats" size="lg" class="opacity-20" />
+                <span class="text-sm font-medium text-text-secondary">
                   {{ t('alerts.previewEmptyState') }}
                 </span>
               </div>
@@ -379,13 +386,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Summary Card -->
-        <div class="card-container tw:overflow-hidden tw:flex tw:flex-col" style="flex: 1; min-height: 0;">
+        <div class="card-container overflow-hidden flex flex-col" style="flex: 1; min-height: 0;">
           <div
-            class="tw:flex tw:items-center tw:px-3 tw:py-[0.625rem] tw:select-none tw:border-b tw:border-border-default tw:shrink-0"
+            class="flex items-center px-3 py-[0.625rem] select-none border-b border-border-default shrink-0"
           >
-            <span class="tw:text-sm tw:font-medium">{{ t('alerts.summary.title') || 'Summary' }}</span>
+            <span class="text-sm font-medium">{{ t('alerts.summary.title') || 'Summary' }}</span>
           </div>
-          <div class="tw:flex-1 tw:min-h-0" style="overflow: auto;">
+          <div class="flex-1 min-h-0" style="overflow: auto;">
             <AnomalySummary
               v-if="isAnomalyMode"
               style="height: 100%; overflow: auto;"
@@ -452,7 +459,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
@@ -500,7 +507,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     ODrawer,
-    OBadge,
+    OTag,
     OTooltip,
     OInput,
     OSelect,
@@ -551,7 +558,7 @@ export default defineComponent({
             { key: "anomaly-alerting", label: alertForm.t("alerts.alerting") || "Alerting", required: alertForm.anomalyConfig.value.alert_enabled },
           ]
         : [
-            { key: "condition", label: "Alert Rules", required: true },
+            { key: "condition", label: alertForm.t("alerts.alertRules"), required: true },
             { key: "advanced", label: alertForm.t("alerts.steps.advanced") },
           ];
       return tabs.filter((tab: any) => (tab as any).show !== false);
@@ -586,452 +593,30 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.alert-v3-inline-label {
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  color: rgba(0, 0, 0, 0.72);
+<style>
+@container topbar (max-width: 1300px) {
+  .topbar-name-input  { min-width: 100px; }
 }
 
-.body--dark .alert-v3-inline-label {
-  color: rgba(255, 255, 255, 0.7);
+/* Compact — AI chat open or narrow viewport */
+@container topbar (max-width: 850px) {
+  .topbar-name-input  { min-width: 90px; }
 }
 
-.alert-v3-field {
-  height: 28px !important;
-  min-height: 28px !important;
-
-  :deep(.q-field__control) {
-    height: 28px !important;
-    min-height: 28px !important;
-    border-radius: 4px !important;
-    border: 1px solid rgba(0, 0, 0, 0.2) !important;
-    background: rgba(0, 0, 0, 0.03) !important;
-    padding: 0 8px !important;
-  }
-  :deep(.q-field__native) {
-    padding: 0 0px !important;
-    font-size: 13px;
-    min-height: 28px !important;
-    height: 28px !important;
-    line-height: 28px !important;
-  }
-  :deep(.q-field__input) {
-    padding: 0 0px !important;
-    font-size: 13px;
-    min-height: 28px !important;
-    height: 28px !important;
-    line-height: 28px !important;
-  }
-  :deep(.q-field__marginal) {
-    height: 28px !important;
-    min-height: 28px !important;
-  }
-  :deep(.q-field__control-container) {
-    height: 28px !important;
-    min-height: 28px !important;
-  }
-  :deep(.q-field__append) {
-    height: 28px !important;
-    align-items: center;
-  }
+/* Minimum — very narrow */
+@container topbar (max-width: 680px) {
+  .topbar-name-input  { min-width: 70px; }
 }
 
-.body--dark .alert-v3-field {
-  :deep(.q-field__control) {
-    border-color: rgba(255, 255, 255, 0.2) !important;
-    background: rgba(255, 255, 255, 0.05) !important;
-  }
-}
-
-// Error highlight for topbar fields — combined selector beats .body--dark .alert-v3-field specificity
-.alert-v3-field.field-error {
-  :deep(.q-field__control) {
-    border-color: #ef5350 !important;
-    background: rgba(239, 83, 80, 0.05) !important;
-  }
-}
-.body--dark .alert-v3-field.field-error {
-  :deep(.q-field__control) {
-    border-color: #ef5350 !important;
-    background: rgba(239, 83, 80, 0.08) !important;
-  }
-}
-
-.alert-condition {
-  .__column,
-  .__value {
-    width: 250px;
-  }
-
-  .__operator {
-    width: 100px;
-  }
-}
-
-.alert-preview-datetime {
-  :deep(.q-btn) {
-    height: 26px !important;
-    min-height: 26px !important;
-    font-size: 11px;
-    padding: 0 8px !important;
-    border-radius: 1rem !important;
-  }
-}
-
-</style>
-<style lang="scss">
-// ── Section header (matches QueryConfig.vue pattern) ───────────────────────
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border-default, #e6e6e6);
-}
-
-body.body--dark .section-header {
-  border-bottom-color: var(--color-border-default, #343434);
-}
-
-.section-header-accent {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  margin-right: 8px;
-  flex-shrink: 0;
-  background: var(--q-primary);
-}
-
-.section-header-title {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-// ── Global compact 28px sizing for alert inputs/selects ────────────────────
-.alert-v3-input {
-  min-height: 28px !important;
-  height: 28px !important;
-  .q-field__control {
-    min-height: 28px !important;
-    max-height: 28px !important;
-    height: 28px !important;
-  }
-  .q-field__control-container {
-    .q-field__native {
-      height: 28px !important;
-      min-height: 28px !important;
-      &::-webkit-inner-spin-button,
-      &::-webkit-outer-spin-button {
-        height: 16px;
-        margin-block: auto;
-      }
-    }
-  }
-}
-
-.alert-v3-select {
-  min-height: 1.75rem !important;
-  .q-field__inner {
-    min-height: 1.75rem !important;
-    max-height: 1.75rem !important;
-  }
-  .q-field__control {
-    min-height: 1.75rem !important;
-    max-height: 1.75rem !important;
-    height: 1.75rem !important;
-  }
-  .q-field__control-container {
-    .q-field__native {
-      min-height: 1.75rem !important;
-      height: 1.75rem !important;
-      padding: 0px !important;
-    }
-  }
-  .q-field__marginal {
-    height: 1.75rem !important;
-  }
-  .q-field__append {
-    height: 1.75rem !important;
-  }
-}
-// ───────────────────────────────────────────────────────────────────────────
-
-// ── Global query-mode-tabs (Builder / SQL toggle used in alert forms) ───────
-.query-mode-tabs {
-  display: flex;
-  gap: 2px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 6px;
-  padding: 3px;
-  width: fit-content;
-
-  .query-mode-tab {
-    padding: 4px 12px;
-    border-radius: 4px;
-    border: none;
-    background: transparent;
-    color: rgba(0, 0, 0, 0.4);
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    line-height: 1.4;
-
-    &:hover { color: rgba(0, 0, 0, 0.7); }
-
-    &.active {
-      background: #fff;
-      color: #1a1a1a;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-    }
-  }
-}
-
-body.body--dark .query-mode-tabs {
-  background: rgba(255, 255, 255, 0.05);
-
-  .query-mode-tab {
-    color: rgba(255, 255, 255, 0.6);
-
-    &:hover { color: rgba(255, 255, 255, 0.85); }
-
-    &.active {
-      background: #374151;
-      color: #e4e7eb;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-    }
-  }
-}
-// ───────────────────────────────────────────────────────────────────────────
-
-// ── static-text: inline label/hint aligned to 28px row height ──────────────
-.static-text {
-  display: inline-flex;
-  align-items: center;
-  height: 2.3rem;
-  line-height: 1.3rem;
-  font-size: 12px;
-  margin-top: 0.1rem;
-}
-// ───────────────────────────────────────────────────────────────────────────
-
-.no-case .q-field__native span {
-  text-transform: none !important;
-}
-
-.no-case .q-field__input {
-  text-transform: none !important;
-}
-
-.add-alert-form {
-  .q-field--dense .q-field__control {
-    .q-field__native span {
-      overflow: hidden;
-    }
-  }
-
-  .alert-condition .__column .q-field__control .q-field__native span {
-    max-width: 152px;
-    text-overflow: ellipsis;
-    text-align: left;
-    white-space: nowrap;
-  }
-
-  .q-field__bottom {
-    padding: 2px 0;
-  }
-}
-
-.silence-notification-input,
-.threshould-input {
-  .q-field--filled .q-field__control {
-    background-color: transparent !important;
-  }
-
-  .q-field--dark .q-field__control {
-    background-color: rgba(255, 255, 255, 0.07) !important;
-  }
-}
-
-.dark-mode {
-  .alert-setup-container {
-    background-color: #212121;
-    padding: 8px 16px;
-    margin-left: 8px;
-    border: 1px solid #343434;
-    border-top: 0px !important;
-    border-bottom-left-radius: 4px;
-    border-bottom-right-radius: 4px;
-  }
-  .q-text-area-input > div > div {
-    background-color: rgb(30, 31, 31) !important;
-    border: 1px solid $input-border !important;
-  }
-  .dark-mode-row-template > div > div {
-    background-color: rgb(30, 31, 31) !important;
-    border: 1px solid $input-border !important;
-  }
-  .custom-input-label {
-    color: #bdbdbd;
-  }
-}
-.light-mode {
-  .alert-setup-container {
-    background-color: #ffffff;
-    padding: 8px 16px;
-    margin-left: 8px;
-    border: 1px solid var(--color-border-default, #e6e6e6);
-    border-top: 0px !important;
-    border-bottom-left-radius: 4px;
-    border-bottom-right-radius: 4px;
-  }
-  .custom-input-label {
-    color: #5c5c5c;
-  }
-  .q-field--labeled.showLabelOnTop.q-field .q-field__control {
-    border: 1px solid var(--color-border-default, #d4d4d4);
-  }
-  .add-folder-btn {
-    border: 1px solid #d4d4d4;
-  }
-  .dark-mode .q-text-area-input > div > div {
-    background-color: #181a1b !important;
-    border: 1px solid black !important;
-  }
-
-  .light-mode .q-text-area-input > div > div {
-    background-color: #ffffff !important;
-    border: 1px solid #e0e0e0 !important;
-  }
-  .dark-mode-row-template > div > div {
-    background-color: #181a1b !important;
-    border: 1px solid black !important;
-  }
-  .light-mode-row-template > div > div {
-    background-color: #ffffff !important;
-    border: 1px solid #e0e0e0 !important;
-  }
-}
-.q-text-area-input > div > div > div > textarea {
-  height: 80px !important;
-  resize: none !important;
-}
-.row-template-input > div > div > div > textarea {
-  height: 160px !important;
-  resize: none !important;
-}
-.bottom-sticky-dark {
-  background-color: #212121;
-}
-.bottom-sticky-light {
-  background-color: #ffffff;
-  border-top: 1px solid #d4d4d4;
-}
-.input-box-bg-dark .q-field__control {
-  background-color: #181a1b !important;
-}
-.input-box-bg-light .q-field__control {
-  background-color: #ffffff !important;
-}
-.input-border-dark .q-field__control {
-  border: 1px solid #181a1b !important;
-}
-.input-border-light .q-field__control {
-  border: 1px solid #d4d4d4 !important;
-}
-
-.o2-alert-tab-border {
-  border-top: 0.0625rem solid var(--o2-border-color);
-}
-
-// Persistent step caption styles (helper text style)
-.persistent-step-caption {
-  font-size: 12px;
-  line-height: 1.6;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-  font-weight: 400;
-  margin-left: 0.375rem;
-  letter-spacing: 0.01em;
-}
-
-.dark-mode-caption {
-  background-color: transparent;
-  color: #9e9e9e;
-  border-left: 3px solid #5a5a5a;
-  padding-left: 12px !important;
-}
-
-.light-mode-caption {
-  background-color: transparent;
-  color: #757575;
-  border-left: 3px solid #bdbdbd;
-  padding-left: 12px !important;
-}
-
-// ── Responsive topbar: container queries so AI chat panel triggers shrink too
-.alert-v3-topbar {
-  container-type: inline-size;
-  container-name: topbar;
-}
-
-
-// Folder name — exact same as ViewDashboard.vue
-.alert-folder-name {
-  color: var(--o2-menu-color) !important;
-}
-
-.alert-folder-name:hover {
-  border-radius: 0.325rem;
-  background-color: var(--o2-tab-bg) !important;
-}
-
-// Folder breadcrumb select — matches tw:text-xl tw:tracking-[0.005em] sizing/weight
 .topbar-folder-select {
   min-width: 60px;
   max-width: 140px;
-
-  :deep(.q-field__control) { padding: 0; }
-
-  :deep(.q-field__native) {
-    font-size: 1.25rem;
-    font-weight: 500;
-    cursor: pointer;
-  }
 }
-
-// Base (widest) — full widths
-.topbar-name-input  { min-width: 120px; max-width: 150px; }
-.topbar-stream-type { width: 150px; }
-.topbar-stream-name { width: 160px; }
-
-// Medium — topbar ~1050–1300px
-@container topbar (max-width: 1300px) {
-  .topbar-name-input  { min-width: 100px; }
-  .topbar-stream-type { width: 90px; }
-  .topbar-stream-name { width: 110px; }
-}
-
-// Compact — AI chat open or narrow viewport
-@container topbar (max-width: 850px) {
-  .topbar-name-input  { min-width: 90px; }
-  .topbar-stream-type { width: 90px; }
-  .topbar-stream-name { width: 95px; }
-}
-
-// Minimum — very narrow
-@container topbar (max-width: 680px) {
-  .topbar-name-input  { min-width: 70px; }
-  .topbar-stream-type { width: 75px; }
-  .topbar-stream-name { width: 80px; }
-}
-// ── Stream Config card responsive container queries ───────────────────────
-.stream-config-card {
-  container-type: inline-size;
-  container-name: stream-config;
+.topbar-folder-select .q-field__control { padding: 0; }
+.topbar-folder-select .q-field__native {
+  font-size: 1.25rem;
+  font-weight: 500;
+  cursor: pointer;
 }
 
 .stream-type-select { width: 150px; }
@@ -1055,5 +640,4 @@ body.body--dark .query-mode-tabs {
   .stream-name-select { width: 80px; }
   .alert-type-select  { min-width: 75px; }
 }
-// ───────────────────────────────────────────────────────────────────────────
 </style>

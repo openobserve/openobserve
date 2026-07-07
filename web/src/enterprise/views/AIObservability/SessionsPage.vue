@@ -17,12 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="ai-sessions-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:overflow-hidden"
+    class="flex flex-col h-full min-h-0 overflow-hidden"
   >
     <AppPageHeader
       :title="t('aiObservability.nav.sessions')"
+      :subtitle="t('aiObservability.subtitle.sessions')"
       icon="forum"
-      class="tw:px-4 tw:border-b tw:border-border-default"
+      class="px-4 border-b border-border-default"
     >
       <template #actions>
         <date-time
@@ -36,42 +37,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :default-relative-time="dateState.relativeTimePeriod ?? ''"
           data-test="ai-sessions-date-time"
-          class="tw:h-[2rem]"
+          class="h-[2rem]"
           @on:date-change="onDateChange"
         />
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
-          :loading="isRefreshing"
-          title="Refresh"
-          data-test="ai-sessions-refresh-btn"
-          @click="refresh"
-        />
+        <!-- Last-refresh + refresh control (logs-style), consistent with the
+             LLM Insights page header. -->
+        <div
+          class="inline-flex items-center border border-border-default rounded-md px-1 h-[2rem] overflow-hidden"
+        >
+          <ORefreshButton
+            :last-run-at="sessionsLastRunAt"
+            :loading="isLoading"
+            :disabled="isLoading"
+            data-test="ai-sessions-refresh-btn"
+            @click="refresh"
+          />
+        </div>
       </template>
     </AppPageHeader>
 
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:px-4 tw:py-3">
+    <div class="flex-1 min-h-0 overflow-hidden">
       <SessionsList
         ref="sessionsRef"
         :stream-name="streamName"
         :start-time="timeRange.startTime"
         :end-time="timeRange.endTime"
         detail-route-name="aiSessionDetails"
-        class="tw:h-full"
+        class="h-full"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
 import SessionsList from "@/plugins/traces/SessionsList.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import {
   useAiDateRange,
@@ -94,6 +99,17 @@ const streamName = ref("");
 const dateTimeRef = ref<any>(null);
 const sessionsRef = ref<any>(null);
 const isRefreshing = ref(false);
+
+// Last-refresh + loading state for the header's ORefreshButton. SessionsList
+// stamps `lastRunAt` when its fetch settles and exposes its own `loading`; OR in
+// the page-level `isRefreshing` so the icon spins from the moment of click
+// (covering the relative-window re-anchor before the list load starts).
+const sessionsLastRunAt = computed<number | null>(
+  () => sessionsRef.value?.lastRunAt ?? null,
+);
+const isLoading = computed(
+  () => isRefreshing.value || sessionsRef.value?.loading || false,
+);
 
 function applyRelative(period: string) {
   const range = getConsumableRelativeTime(period);
@@ -167,7 +183,15 @@ async function onDateChange(value: any) {
   }
   writeToUrl();
   await nextTick();
-  sessionsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
+  // `userChangedValue` distinguishes a genuine user date pick from the
+  // programmatic window replay DateTime fires on every mount. Only the former
+  // forces a re-fetch; the mount replay lets SessionsList restore its cached
+  // list (so returning from a session detail doesn't re-hit the API).
+  sessionsRef.value?.refresh?.(
+    timeRange.value.startTime,
+    timeRange.value.endTime,
+    value?.userChangedValue === true,
+  );
 }
 
 async function refresh() {

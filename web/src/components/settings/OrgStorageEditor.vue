@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:p-0 storage-settings-editor">
+  <div class="p-0 storage-settings-editor">
     <!-- Header -->
     <AppPageHeader
       :back="{
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dataTest: 'storage-settings-editor-back-btn',
       }"
       :title="headerTitle"
-      class="tw:px-4 tw:border-b tw:border-border-default tw:mb-[0.675rem]"
+      class="px-4 border-b border-border-default mb-[0.675rem]"
     >
       <template #title>
         <span data-test="storage-settings-editor-title">{{ headerTitle }}</span>
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
 
     <!-- Stepper -->
-    <div class="card-container tw:h-[calc(100vh-7rem)] tw:py-2 tw:px-3 tw:overflow-auto">
+    <div class="card-container h-[calc(100vh-7rem)] py-2 px-3 overflow-auto">
     <div style="max-width: 720px;">
       <OForm ref="storageForm" :default-values="{}" @submit="submitStorage">
         <OStepper
@@ -49,66 +49,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :done="step > 1"
             :navigable="step > 1 && !isEditMode"
           >
-            <div class="tw:text-sm tw:text-gray-500 tw:mb-3">
+            <div class="text-sm text-gray-500 mb-3">
               {{ t("storage_settings.selectProviderDesc") }}
               once configured, all new data for this org will be written to your
               own storage infrastructure.
             </div>
             <div
               v-if="!isEditMode"
-              class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] tw:mb-3 tw:rounded-[10px] tw:border"
+              class="flex items-start gap-[10px] px-3 py-[10px] mb-3 rounded-[10px] border"
               :class="store.state.theme === 'dark'
-                ? 'tw:bg-amber-950/20 tw:border-amber-400/30'
-                : 'tw:bg-amber-50 tw:border-amber-300'"
+                ? 'bg-amber-950/20 border-amber-400/30'
+                : 'bg-amber-50 border-amber-300'"
             >
-              <OIcon name="warning" size="sm" class="tw:flex-shrink-0 tw:mt-px" />
-              <div class="tw:text-[0.82rem] tw:leading-[1.55] tw:text-[var(--o2-text-primary)]">
+              <OIcon name="warning" size="sm" class="flex-shrink-0 mt-px" />
+              <div class="text-[0.82rem] leading-[1.55] text-[var(--o2-text-primary)]">
                 This action is <strong>irreversible</strong>. Once set, you cannot switch to a different storage provider or delete this configuration. To use a different provider, you must create a new organization.
               </div>
             </div>
             <div
               v-if="!isEditMode"
-              class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] tw:mb-3 tw:rounded-[10px] tw:border"
+              class="flex items-start gap-[10px] px-3 py-[10px] mb-3 rounded-[10px] border"
               :class="store.state.theme === 'dark'
-                ? 'tw:bg-blue-950/20 tw:border-blue-400/20'
-                : 'tw:bg-blue-50 tw:border-blue-200'"
+                ? 'bg-blue-950/20 border-blue-400/20'
+                : 'bg-blue-50 border-blue-200'"
             >
-              <OIcon name="info" size="sm" class="tw:flex-shrink-0 tw:mt-px" />
-              <div class="tw:text-[0.82rem] tw:leading-[1.55] tw:text-[var(--o2-text-primary)]">
+              <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
+              <div class="text-[0.82rem] leading-[1.55] text-[var(--o2-text-primary)]">
                 Once configured, only credential fields can be updated. All other fields will be locked.
               </div>
             </div>
-            <div class="tw:text-sm tw:font-medium tw:mb-2" style="font-weight: 500">
+            <div class="text-sm font-medium mb-2" style="font-weight: 500">
               Select Storage Provider <span class="text-red">*</span>
             </div>
-            <div class="destination-type-grid">
+            <div class="destination-type-grid grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));">
               <div
                 v-for="provider in availableProviders"
                 :key="provider.value"
                 :data-test="`storage-settings-provider-card-${provider.value}`"
-                class="destination-type-card"
-                :class="{
-                  selected: selectedProvider === provider.value,
-                  'dark-mode': store.state.theme === 'dark',
-                }"
+                class="group/card relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-xl cursor-pointer transition-all duration-300 min-h-30 hover:-translate-y-0.5"
+                :class="[
+                  { selected: selectedProvider === provider.value },
+                  store.state.theme === 'dark'
+                    ? 'bg-[#1e1e1e] border-[#424242] hover:border-[#5d9cec] hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
+                    : 'bg-white border-(--o2-border) hover:border-(--o2-border-color) hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
+                ]"
+                :style="selectedProvider === provider.value && store.state.theme !== 'dark'
+                  ? 'border-color: var(--o2-border-color); background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%); box-shadow: 0 4px 16px rgba(25,118,210,0.2);'
+                  : selectedProvider === provider.value && store.state.theme === 'dark'
+                  ? 'border-color: #5d9cec; background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%); box-shadow: 0 4px 16px rgba(93,156,236,0.25);'
+                  : ''"
                 @click="selectedProvider = provider.value"
               >
                 <img
                   v-if="provider.image"
                   :src="provider.image"
                   :alt="provider.label"
-                  class="card-image"
+                  class="card-image w-[48px] h-[48px] mb-2 object-contain"
                 />
                 <OIcon
                   v-else
                   :name="provider.icon"
                   size="lg"
-                  class="card-icon"
+                  class="mb-2 text-[#666] [transition:color_0.3s_ease] group-[.selected]/card:text-(--o2-border-color) dark:group-[.selected]/card:text-[#5d9cec]"
                 />
-                <div class="card-label">{{ provider.label }}</div>
+                <div class="text-[13px] font-medium text-center [line-height:1.3] mt-1 text-[var(--o2-text-primary)] group-[.selected]/card:text-[#333333] dark:group-[.selected]/card:text-white">{{ provider.label }}</div>
                 <div
                   v-if="selectedProvider === provider.value"
-                  class="check-icon"
+                  class="check-icon absolute top-[0.375rem] right-[0.375rem] w-[1.25rem] h-[1.25rem] rounded-full overflow-hidden bg-[var(--o2-positive)] text-white flex items-center justify-center z-[1]"
                 >
                   <OIcon name="check" size="xs" />
                 </div>
@@ -124,10 +131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :done="step > 2"
             :navigable="step > 2"
           >
-            <div class="tw:gap-2">
+            <div class="gap-2">
               <!-- AwsCredentials Fields -->
               <template v-if="selectedProvider === 'AwsCredentials'">
-                <div class="tw:flex tw:flex-col tw:gap-y-3">
+                <div class="flex flex-col gap-y-3">
                   <OInput
                     v-if="!isCloud"
                     data-test="storage-settings-server-url-input"
@@ -179,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- AzureCredentials Fields -->
               <template v-if="selectedProvider === 'AzureCredentials'">
-                <div class="tw:flex tw:flex-col tw:gap-y-3">
+                <div class="flex flex-col gap-y-3">
                   <OInput
                     data-test="storage-settings-access-key-input"
                     v-model="formData.storage_account"
@@ -224,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- GcpCredentials Fields -->
               <template v-if="selectedProvider === 'GcpCredentials'">
-                 <div class="tw:flex tw:flex-col tw:gap-y-3">
+                 <div class="flex flex-col gap-y-3">
                   <OInput
                     data-test="storage-settings-bucket-name-input"
                     v-model="formData.bucket_name"
@@ -259,13 +266,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- AwsRoleArn Fields -->
               <template v-if="selectedProvider === 'AwsRoleArn'">
                 <div
-                  class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] tw:mb-3 tw:rounded-[10px] tw:border"
+                  class="flex items-start gap-[10px] px-3 py-[10px] mb-3 rounded-[10px] border"
                   :class="store.state.theme === 'dark'
-                    ? 'tw:bg-blue-950/20 tw:border-blue-400/20'
-                    : 'tw:bg-blue-50 tw:border-blue-200'"
+                    ? 'bg-blue-950/20 border-blue-400/20'
+                    : 'bg-blue-50 border-blue-200'"
                 >
-                  <OIcon name="info" size="sm" class="tw:flex-shrink-0 tw:mt-px" />
-                  <div class="tw:text-[0.82rem] tw:leading-[1.55] tw:text-[var(--o2-text-primary)]">
+                  <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
+                  <div class="text-[0.82rem] leading-[1.55] text-[var(--o2-text-primary)]">
                     <template v-if="isCloud">
                       {{ t("storage_settings.awsStsCloudInfo") }}
                     </template>
@@ -274,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </div>
                 </div>
-                 <div class="tw:flex tw:flex-col tw:gap-y-3">
+                 <div class="flex flex-col gap-y-3">
                   <OInput
                     data-test="storage-settings-bucket-name-input"
                     v-model="formData.bucket_name"
@@ -320,12 +327,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OStepper>
 
         <!-- Form buttons -->
-        <div class="tw:flex tw:justify-start tw:mt-3">
+        <div class="flex justify-start mt-3">
           <div v-if="step === 1">
             <OButton
               data-test="step1-cancel-btn"
               variant="outline"
-              class="o2-secondary-button tw:h-[36px] tw:mr-2"
+              class="o2-secondary-button h-[36px] mr-2"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
@@ -338,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="step1-continue-btn"
               variant="primary"
-              class="no-border o2-primary-button tw:h-[36px]"
+              class="no-border o2-primary-button h-[36px]"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-primary-button-dark'
@@ -355,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isEditMode"
               data-test="step2-back-btn"
               variant="outline"
-              class="o2-secondary-button tw:h-[36px] tw:mr-2"
+              class="o2-secondary-button h-[36px] mr-2"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
@@ -368,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="step2-cancel-btn"
               variant="outline"
-              class="o2-secondary-button tw:h-[36px]"
+              class="o2-secondary-button h-[36px]"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
@@ -381,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="storage-settings-submit-btn"
               variant="primary"
-              class="no-border tw:ml-2 o2-primary-button tw:h-[36px]"
+              class="no-border ml-2 o2-primary-button h-[36px]"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-primary-button-dark'
@@ -670,109 +677,3 @@ watch(selectedProvider, (newProvider) => {
 });
 </script>
 
-<style lang="scss" scoped>
-.destination-type-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
-}
-
-.destination-type-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 12px;
-  background: #ffffff;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  min-height: 120px;
-
-  &:hover {
-    border-color: var(--o2-border-color);
-    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
-    transform: translateY(-2px);
-  }
-
-  &.selected {
-    border-color: var(--o2-border-color);
-    background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
-    box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
-
-    .card-icon { color: var(--o2-border-color); }
-    .card-label { color: #333333; }
-  }
-
-  &.dark-mode {
-    background: #1e1e1e;
-    border-color: #424242;
-
-    &:hover {
-      border-color: #5d9cec;
-      box-shadow: 0 4px 12px rgba(93, 156, 236, 0.2);
-    }
-
-    &.selected {
-      border-color: #5d9cec;
-      background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%);
-      box-shadow: 0 4px 16px rgba(93, 156, 236, 0.25);
-
-      .card-icon { color: #5d9cec; }
-      .card-label { color: #ffffff; }
-    }
-  }
-
-  .card-icon {
-    margin-bottom: 8px;
-    color: #666;
-    transition: color 0.3s ease;
-  }
-
-  .card-image {
-    width: 48px;
-    height: 48px;
-    margin-bottom: 8px;
-    object-fit: contain;
-  }
-
-  .card-label {
-    font-size: 13px;
-    font-weight: 500;
-    text-align: center;
-    line-height: 1.3;
-    margin-top: 4px;
-    color: var(--o2-text-primary);
-  }
-
-  .check-icon {
-    position: absolute;
-    top: 0.375rem;
-    right: 0.375rem;
-    width: 1.25rem;
-    height: 1.25rem;
-    border-radius: 50%;
-    overflow: hidden;
-    background: var(--o2-positive);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1;
-  }
-}
-</style>
-
-<style lang="scss">
-.storage-settings-editor {
-  .q-field--labeled.showLabelOnTop .q-field__bottom {
-    padding: 0.275rem 0 0 !important;
-  }
-
-  .q-field--labeled.showLabelOnTop {
-    padding-top: 20px;
-  }
-}
-</style>

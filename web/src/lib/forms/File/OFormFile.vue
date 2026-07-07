@@ -24,7 +24,7 @@ if (import.meta.env.DEV && !form) {
 <template>
   <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
-      <div class="tw:flex tw:flex-col tw:gap-1">
+      <div class="flex flex-col gap-1">
         <OFile
           v-bind="$attrs"
           :label="props.label"
@@ -61,7 +61,7 @@ if (import.meta.env.DEV && !form) {
           v-if="
             field.state.meta.errors.length > 0
           "
-          class="tw:text-xs tw:text-file-error-text"
+          class="text-xs text-file-error-text"
         >
           {{ firstFieldError(field.state.meta.errors) }}
         </div>

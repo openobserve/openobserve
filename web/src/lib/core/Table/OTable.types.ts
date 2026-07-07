@@ -29,6 +29,7 @@ export const COL = {
   // Full "YYYY-MM-DD HH:mm:ss" timestamps — predictable, so fix their width.
   createdAt:    200,
   updatedAt:    200,
+  dateAbsolute: 160,
   duration:     120,
   frequency:    130,
   type:         180,
@@ -366,6 +367,8 @@ export interface OTableEmits<TData = any> {
   // Row events
   "row-click": [row: TData, event: MouseEvent];
   "row-dblclick": [row: TData, event: MouseEvent];
+  "row-mouseenter": [row: TData, event: MouseEvent];
+  "row-mouseleave": [row: TData];
   "cell-click": [params: { columnId: string; row: TData; value: any }];
 
   // Column events

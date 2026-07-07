@@ -12,7 +12,7 @@
   </div>
   <Teleport to="body">
   <div
-    class="user-guide"
+    class="user-guide p-[10px] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.25)_rgba(0,0,0,0.05)]"
     v-show="showUserGuide"
     style="
       position: fixed;
@@ -26,8 +26,8 @@
     "
     :class="
       store.state.theme == 'dark'
-        ? 'theme-dark tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]'
-        : 'theme-light tw:bg-white'
+        ? 'theme-dark bg-[var(--o2-bg-card-dark,#1a1a1a)]'
+        : 'theme-light bg-white'
     "
     @mouseleave="showUserGuide = false"
     ref="userGuideDivRef"
@@ -37,110 +37,110 @@
       dynamic variables:
     </p>
 
-    <div class="header">Use current dashboard's variable</div>
+    <div class="font-bold">Use current dashboard's variable</div>
     <p>You can reference a variable with the following format:</p>
     <ul>
       <li>
-        <span class="bg-highlight">${variable_name}</span>
+        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${variable_name}</span>
         <br />
         (For Example, if your variable name is "test", you can use
-        <span class="bg-highlight">${test}</span>)
+        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${test}</span>)
       </li>
     </ul>
 
     <br />
 
-    <div class="header">Use current query</div>
+    <div class="font-bold">Use current query</div>
     <p>You can reference current query with the following format:</p>
     <ul>
-      <li><span class="bg-highlight">${query}</span></li>
-      <li><span class="bg-highlight">${query_encoded}</span></li>
+      <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${query}</span></li>
+      <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${query_encoded}</span></li>
     </ul>
     <br />
 
-    <div class="header">Use current selected time period</div>
+    <div class="font-bold">Use current selected time period</div>
     <p>
       You can reference current selected Time period with the following format:
     </p>
     <ul>
-      <li><span class="bg-highlight">${start_time}</span></li>
-      <li><span class="bg-highlight">${end_time}</span></li>
+      <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${start_time}</span></li>
+      <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${end_time}</span></li>
     </ul>
     For Example:
-    <span class="bg-highlight">from=${start_time}&to=${end_time}</span>
+    <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">from=${start_time}&to=${end_time}</span>
     <br />
-    <span class="header">Note: </span>
+    <span class="font-bold">Note: </span>
     <span
       >Even with a relative time period, you can still use
-      <span class="bg-highlight">start_time</span> and
-      <span class="bg-highlight">end_time</span>.</span
+      <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">start_time</span> and
+      <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">end_time</span>.</span
     >
     <br />
     <br />
-    <div class="header">Use Series name and value</div>
+    <div class="font-bold">Use Series name and value</div>
     <p>You can reference the following variables to pass chart data:</p>
 
     <ul>
       <li>
-        <span class="bg-highlight">${series.__name}</span> – The name of the
+        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__name}</span> – The name of the
         series.
       </li>
       <li>
-        <span class="bg-highlight">${series.__value}</span> – The numeric value
+        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__value}</span> – The numeric value
         of the data point.
       </li>
       <li>
-        <span class="bg-highlight">${series.__axisValue}</span> – The value on
+        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__axisValue}</span> – The value on
         the axis for the selected/clicked data point.
       </li>
     </ul>
 
     <br />
 
-    <div class="header">For table chart drilldown</div>
+    <div class="font-bold">For table chart drilldown</div>
     <p>
       You can reference the row field and index with the following variables:
     </p>
     <ul>
       <li>
-        <span class="bg-highlight"
+        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"
           >${row.field["field_label"]} or ${row.field.field_label}</span
         >
         <br />
         (For Example, if your want to use "test" column's value of clicked row,
-        you can use <span class="bg-highlight">${row.field.test} </span> or
-        <span class="bg-highlight">${row.field["test"]}</span>)
+        you can use <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${row.field.test} </span> or
+        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${row.field["test"]}</span>)
       </li>
-      <li><span class="bg-highlight">${row.index}</span></li>
+      <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${row.index}</span></li>
     </ul>
 
     <br />
 
-    <div class="header">For Pie/Donut chart drilldown</div>
+    <div class="font-bold">For Pie/Donut chart drilldown</div>
     <p>You can reference the series and value with the following variables:</p>
     <ul>
-      <li><span class="bg-highlight">${series.__name}</span></li>
-      <li><span class="bg-highlight">${series.__value}</span></li>
+      <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__name}</span></li>
+      <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__value}</span></li>
     </ul>
 
     <br />
 
-    <div class="header">For Sankey chart drilldown</div>
+    <div class="font-bold">For Sankey chart drilldown</div>
     <p>
       You can reference the edge source, target, and value, as well as the node
       name and value, with the following variables:
     </p>
     <ul>
-      <li class="header">Edge</li>
+      <li class="font-bold">Edge</li>
       <ul>
-        <li><span class="bg-highlight">${edge.__source}</span></li>
-        <li><span class="bg-highlight">${edge.__target}</span></li>
-        <li><span class="bg-highlight">${edge.__value}</span></li>
+        <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${edge.__source}</span></li>
+        <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${edge.__target}</span></li>
+        <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${edge.__value}</span></li>
       </ul>
-      <li class="header">Node</li>
+      <li class="font-bold">Node</li>
       <ul>
-        <li><span class="bg-highlight">${node.__name}</span></li>
-        <li><span class="bg-highlight">${node.__value}</span></li>
+        <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${node.__name}</span></li>
+        <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${node.__value}</span></li>
       </ul>
     </ul>
   </div>
@@ -185,41 +185,23 @@ export default {
 };
 </script>
 
-<style scoped lang="scss">
-.user-guide {
-  padding: 10px;
-  overflow-y: auto;
-
-  /* Override global transparent-by-default scrollbar so it is always visible */
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.25);
-    border-radius: 3px;
-  }
-  &::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.05);
-  }
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.25) rgba(0, 0, 0, 0.05);
+<style scoped>
+/* Override global transparent-by-default scrollbar so it is always visible */
+.user-guide::-webkit-scrollbar {
+  width: 6px;
 }
-.header {
-  font-weight: bold;
+.user-guide::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 3px;
+}
+.user-guide::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
 }
 
-ul,
-li,
-p,
-div {
+.user-guide ul,
+.user-guide li,
+.user-guide p,
+.user-guide div {
   margin: 0;
-}
-
-.theme-dark .bg-highlight {
-  background-color: #747474;
-}
-
-.theme-light .bg-highlight {
-  background-color: #e7e6e6;
 }
 </style>

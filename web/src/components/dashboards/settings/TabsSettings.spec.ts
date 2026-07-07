@@ -81,15 +81,6 @@ const mockTabsDeletePopUp = {
   template: "<div data-test='mock-tabs-delete-popup'></div>",
 };
 
-const mockDraggable = {
-  name: "draggable",
-  template: `<div data-test="mock-draggable">
-    <slot></slot>
-  </div>`,
-  props: ["modelValue", "options"],
-};
-
-
 describe("TabsSettings", () => {
   let wrapper: VueWrapper<any>;
 
@@ -111,7 +102,6 @@ describe("TabsSettings", () => {
           DashboardHeader: mockDashboardHeader,
           AddTab: mockAddTab,
           TabsDeletePopUp: mockTabsDeletePopUp,
-          draggable: mockDraggable,
         },
         stubs: {},
       },
@@ -253,14 +243,15 @@ describe("TabsSettings", () => {
     it("should render table header with correct columns", () => {
       wrapper = createWrapper();
 
-      const nameHeader = wrapper.find('[data-test="dashboard-tab-settings-name"]');
-      const actionsHeader = wrapper.find('[data-test="dashboard-tab-settings-actions"]');
+      // OTable renders its own column headers (th[data-test="o2-table-th-<id>"]).
+      const nameHeader = wrapper.find('[data-test="o2-table-th-name"]');
+      const actionsHeader = wrapper.find('[data-test="o2-table-th-actions"]');
 
       expect(nameHeader.exists()).toBe(true);
-      expect(nameHeader.text()).toBe("dashboard.name");
+      expect(nameHeader.text()).toContain("dashboard.name");
 
       expect(actionsHeader.exists()).toBe(true);
-      expect(actionsHeader.text()).toBe("dashboard.actions");
+      expect(actionsHeader.text()).toContain("dashboard.actions");
     });
 
     it("should render draggable container", async () => {
@@ -276,7 +267,7 @@ describe("TabsSettings", () => {
       await wrapper.vm.$nextTick();
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const tabRows = wrapper.findAll('[data-test="dashboard-tab-settings-draggable-row"]');
+      const tabRows = wrapper.findAll('[data-test^="o2-table-row-"]');
       expect(tabRows).toHaveLength(mockDashboardData.tabs.length);
     });
   });
@@ -554,27 +545,22 @@ describe("TabsSettings", () => {
   });
 
   describe("Drag and Drop Functionality", () => {
-    it("should configure drag options correctly", () => {
+    it("should expose drag-and-drop reorder handling", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.dragOptions).toEqual({
-        animation: 200,
-      });
+      // Row reordering now uses SortableJS attached to the OTable body (see
+      // initSortable), with handleDragEnd persisting the new order.
+      expect(wrapper.find('[data-test="dashboard-tab-settings-drag"]').exists()).toBe(true);
+      expect(typeof wrapper.vm.handleDragEnd).toBe("function");
     });
 
     it("should call updateDashboard when drag ends", async () => {
-      // NOTE: Real bug in TabsSettings.vue — handleDragEnd references
-      // `updateDashboard` but the import statement on L154 only imports
-      // { deleteTab, editTab, getDashboard }. As a result handleDragEnd
-      // throws ReferenceError at runtime and falls into the catch branch.
-      // This spec verifies the catch branch (refresh emit + getDashboardData)
-      // so the suite stays green while the .vue bug stands.
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
       await wrapper.vm.handleDragEnd();
 
-      // Catch branch refetches dashboard data and emits refresh.
+      // handleDragEnd emits refresh on both the success and error paths.
       expect(wrapper.emitted("refresh")).toBeTruthy();
     });
 
@@ -744,7 +730,7 @@ describe("TabsSettings", () => {
       const editInput = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit"]');
       // Check that the edit input exists and has the dark theme tailwind class applied
       expect(editInput.exists()).toBe(true);
-      expect(editInput.classes()).toContain("tw:bg-gray-800");
+      expect(editInput.classes()).toContain("bg-gray-800");
     });
 
     it("should not apply dark theme class when theme is light", async () => {
@@ -756,7 +742,7 @@ describe("TabsSettings", () => {
       await wrapper.vm.$nextTick();
 
       const editInput = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit"]');
-      expect(editInput.classes()).not.toContain("tw:bg-gray-800");
+      expect(editInput.classes()).not.toContain("bg-gray-800");
     });
   });
 
@@ -837,7 +823,7 @@ describe("TabsSettings", () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
-      const tabRows = wrapper.findAll('[data-test="dashboard-tab-settings-draggable-row"]');
+      const tabRows = wrapper.findAll('[data-test^="o2-table-row-"]');
       expect(tabRows).toHaveLength(0);
     });
 
@@ -912,11 +898,11 @@ describe("TabsSettings", () => {
       expect(deletePopup.exists()).toBe(true);
     });
 
-    it("should integrate with draggable component", () => {
+    it("should integrate with the OTable component", () => {
       wrapper = createWrapper();
 
-      const draggable = wrapper.findComponent({ name: "draggable" });
-      expect(draggable.exists()).toBe(true);
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.exists()).toBe(true);
     });
 
     it("should integrate with AddTab component (owns its own ODrawer)", () => {

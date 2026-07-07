@@ -10,6 +10,7 @@
 
 import { expect } from '@playwright/test';
 import testLogger from '../../playwright-tests/utils/test-logger.js';
+import { openOSelectDropdown } from './oselectHelpers.js';
 
 export class AlertCreationWizard {
     constructor(page, commonActions, locators) {
@@ -153,7 +154,7 @@ export class AlertCreationWizard {
         // Destination selection with fallback
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 10000 });
-        await destinationDropdown.click();
+        await openOSelectDropdown(this.page, destinationDropdown);
         await this.page.waitForTimeout(1000);
 
         // Destination dropdown is OSelect (Reka Listbox) post-migration.
@@ -265,7 +266,7 @@ export class AlertCreationWizard {
         // Destination selection with fallback
         const destinationSection = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationSection.waitFor({ state: 'visible', timeout: 10000 });
-        await destinationSection.click();
+        await openOSelectDropdown(this.page, destinationSection);
         await this.page.waitForTimeout(1000);
 
         const visibleDestMenuDefItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
@@ -412,28 +413,17 @@ export class AlertCreationWizard {
         // ==================== ALERT SETTINGS ====================
         // SQL tab: threshold row uses data-test="alert-trigger-operator-select" (not alert-threshold-operator-select)
         // The visible "Alert if No. of events" row lives directly on the SQL query config panel.
-        const thresholdSection = this.page.locator('.alert-condition-row').filter({ hasText: 'No. of events' }).first();
-        await thresholdSection.waitFor({ state: 'visible', timeout: 10000 });
+        const thresholdOperator = this.page.locator('[data-test="alert-trigger-operator-select"]').first();
+        await thresholdOperator.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Threshold section visible');
 
-        const thresholdOperator = thresholdSection.locator('.alert-v3-select').first();
-        await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
-        await thresholdOperator.click({ force: true });
-        await this.page.locator('[data-test$="-popover"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        let operatorSelected = false;
-        try {
-            await this.page.getByRole('option', { name: '>=', exact: true }).click({ timeout: 5000 });
-            operatorSelected = true;
-        } catch {
-            testLogger.warn('Role option not found, trying popover fallback');
-        }
-        if (!operatorSelected) {
-            await this.page.locator('[data-test$="-popover"]').getByText('>=', { exact: true }).click({ timeout: 3000 });
-        }
+        await thresholdOperator.click();
+        await this.page.locator('[data-test="alert-trigger-operator-select-popover"]').first().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[data-test="alert-trigger-operator-select-option"][data-test-value=">="]').first().click();
         testLogger.info('Set threshold operator: >=');
 
-        // SQL threshold OInput has no data-test — scope to the section's number input
-        const thresholdInput = thresholdSection.locator('input[type="number"]').first();
+        // SQL threshold OInput → fill the auto-derived `-field` native input variant.
+        const thresholdInput = this.page.locator('[data-test="alert-trigger-threshold-input-field"]').first();
         await thresholdInput.waitFor({ state: 'visible', timeout: 5000 });
         await thresholdInput.fill('1');
         testLogger.info('Set threshold value: 1');
@@ -449,7 +439,7 @@ export class AlertCreationWizard {
         // Destination selection using v3 data-test locator
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await destinationDropdown.click();
+        await openOSelectDropdown(this.page, destinationDropdown);
         await this.page.waitForTimeout(1000);
 
         const visibleDestMenuSqlItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
@@ -619,7 +609,7 @@ export class AlertCreationWizard {
         // Select destination for REAL-TIME alerts
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 10000 });
-        await destinationDropdown.click();
+        await openOSelectDropdown(this.page, destinationDropdown);
         await this.page.waitForTimeout(1000);
 
         // Use popover selector for destination
@@ -804,7 +794,7 @@ export class AlertCreationWizard {
 
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await destinationDropdown.click();
+        await openOSelectDropdown(this.page, destinationDropdown);
         await this.page.waitForTimeout(1000);
 
         // Use popover selector for destination
@@ -1294,7 +1284,7 @@ export class AlertCreationWizard {
 
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 10000 });
-        await destinationDropdown.click();
+        await openOSelectDropdown(this.page, destinationDropdown);
         await this.page.waitForTimeout(1000);
 
         // Use popover selector for destination
@@ -1547,7 +1537,7 @@ export class AlertCreationWizard {
         // Destination (v3 uses data-test locator)
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await destinationDropdown.click();
+        await openOSelectDropdown(this.page, destinationDropdown);
         await this.page.waitForTimeout(1000);
 
         const visibleDestMenuAggItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
@@ -1714,14 +1704,29 @@ export class AlertCreationWizard {
         // The outer flex container holds both the label div and controls div as siblings
         const promqlConditionRow = promqlConditionLabel.locator('..');
 
-        // Select operator
-        const promqlOperatorSelect = promqlConditionRow.locator('.alert-v3-select').first();
-        await promqlOperatorSelect.click({ timeout: 10000 });
-        await this.page.waitForTimeout(800);
-        // Pick operator from the now-visible popover
-        const visibleMenuPromqlItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
-        await expect(visibleMenuPromqlItems.first()).toBeVisible({ timeout: 5000 });
-        await visibleMenuPromqlItems.filter({ hasText: operator }).first().click();
+        // Select operator — v3 UI renders this as an OSelect with a stable data-test.
+        // The old `.alert-v3-select` class was removed in PR #12764; use the data-test
+        // hook + popover pattern (same as the SQL threshold operator in this file).
+        const promqlOperatorSelect = this.page.locator('[data-test="alert-threshold-operator-select"]').first();
+        await promqlOperatorSelect.waitFor({ state: 'visible', timeout: 10000 });
+        await promqlOperatorSelect.click();
+        const promqlOperatorPopover = this.page.locator('[data-test="alert-threshold-operator-select-popover"]').first();
+        await promqlOperatorPopover.waitFor({ state: 'visible', timeout: 5000 });
+        // Pick operator by exact value; fall back to text match if data-test-value is absent.
+        const promqlOperatorOption = promqlOperatorPopover.locator(`[data-test$="-option"][data-test-value="${operator}"]`);
+        if (await promqlOperatorOption.count() > 0) {
+            await promqlOperatorOption.first().click();
+        } else {
+            const promqlOptionsByText = promqlOperatorPopover.locator('[data-test$="-option"]');
+            await expect(promqlOptionsByText.first()).toBeVisible({ timeout: 5000 });
+            // Exact match — operators overlap as substrings (">" ⊂ ">="), so anchor the
+            // regex (operator chars are regex-special and must be escaped).
+            const operatorExact = new RegExp(`^\\s*${operator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
+            const promqlOperatorMatch = promqlOptionsByText.filter({ hasText: operatorExact });
+            // Fail fast with a clear locator error instead of a 30s click timeout if nothing matches.
+            await expect(promqlOperatorMatch.first()).toBeVisible({ timeout: 5000 });
+            await promqlOperatorMatch.first().click();
+        }
         await this.page.waitForTimeout(300);
         testLogger.info('Set PromQL condition operator', { operator });
 
@@ -1747,7 +1752,7 @@ export class AlertCreationWizard {
         // Select destination (v3 uses data-test locator)
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await destinationDropdown.click();
+        await openOSelectDropdown(this.page, destinationDropdown);
         await this.page.waitForTimeout(1000);
 
         const visibleDestMenuPromqlItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');

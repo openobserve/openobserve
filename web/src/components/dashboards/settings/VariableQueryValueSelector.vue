@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="computedOptions"
       labelKey="label"
       valueKey="value"
-      class="textbox tw:flex tw:flex-col no-case o2-custom-select-dashboard"
-      :loading="variableItem.isLoading"
+      class="textbox flex flex-col no-case o2-custom-select-dashboard"
+      :loading="variableItem.isLoading && !isOpen"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
       @search="onSearch"
@@ -37,16 +37,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #trigger>
         <span
-          class="tw:flex-1 tw:text-start tw:truncate tw:text-xs tw:font-semibold tw:leading-4 tw:text-select-text"
+          class="flex-1 text-start truncate text-xs font-semibold leading-4 text-select-text"
           :data-test="`variable-selector-${variableItem.name}-inner-value`"
         >{{ displayValue }}</span>
       </template>
       <template #before-options>
-        <template v-if="computedOptions.length > 0">
+        <template v-if="hasVisibleFilteredOptions">
           <!-- multiSelect: show checkbox + Select All -->
           <div
             v-if="variableItem.multiSelect"
-            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
+            class="flex items-center gap-2 px-3 py-2 cursor-pointer"
             @click.stop="toggleSelectAll"
           >
             <OCheckbox
@@ -59,36 +59,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- single-select: show plain All -->
           <div
             v-else
-            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
+            class="flex items-center gap-2 px-3 py-2 cursor-pointer"
             @click.stop="toggleSelectAll"
           >
             <span>All</span>
           </div>
+        </template>
+      </template>
+      <!-- Custom suggestion rendered AFTER the matching options so real results
+           take priority. The no-match case is handled by the #empty slot below. -->
+      <template #after-options>
+        <template
+          v-if="
+            hasVisibleFilteredOptions &&
+            currentSearchTerm &&
+            !isSearchTermExistingOption
+          "
+        >
           <OSeparator />
           <div
-            v-if="currentSearchTerm && !isSearchTermExistingOption"
-            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
+            class="flex items-center gap-2 px-3 py-2 cursor-pointer"
             @click.stop="handleCustomValue(currentSearchTerm)"
           >
             {{ currentSearchTerm }}
-            <span class="tw:text-gray-400 tw:text-xs tw:italic">(Custom)</span>
+            <span class="text-gray-400 text-xs italic">(Custom)</span>
           </div>
-          <OSeparator v-if="currentSearchTerm && !isSearchTermExistingOption" />
         </template>
+        <div
+          v-if="variableItem.isLoading && hasVisibleFilteredOptions"
+          class="flex justify-center items-center py-2"
+          data-test="variable-query-value-selector-loading-more"
+        >
+          <OSpinner size="sm" />
+        </div>
       </template>
       <template #empty>
-        <div v-if="variableItem.isLoading" class="tw:flex tw:justify-center tw:items-center tw:py-3">
+        <div v-if="variableItem.isLoading" class="flex justify-center items-center py-3">
           <OSpinner size="sm" />
         </div>
         <div
           v-else-if="currentSearchTerm && !isSearchTermExistingOption"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
+          class="flex items-center gap-2 cursor-pointer text-select-text"
           @click.stop="handleCustomValue(currentSearchTerm)"
         >
           {{ currentSearchTerm }}
-          <span class="tw:text-gray-400 tw:text-xs tw:italic">(Custom)</span>
+          <span class="text-gray-400 text-xs italic">(Custom)</span>
         </div>
-        <div v-else class="tw:italic tw:text-gray-500 tw:flex tw:justify-center tw:items-center tw:py-3" data-test="variable-query-value-selector-no-data">
+        <div v-else class="italic text-gray-500 flex justify-center items-center py-3" data-test="variable-query-value-selector-no-data">
           No Data Found
         </div>
       </template>
@@ -205,6 +222,16 @@ export default defineComponent({
         }
         return false;
       });
+    });
+
+    const hasVisibleFilteredOptions = computed(() => {
+      const term = currentSearchTerm.value?.trim().toLowerCase();
+      if (!term) return computedOptions.value.length > 0;
+      return computedOptions.value.some(
+        (opt: any) =>
+          typeof opt.label === "string" &&
+          opt.label.toLowerCase().includes(term),
+      );
     });
 
     const isAllSelected = computed(() => {
@@ -409,6 +436,8 @@ export default defineComponent({
     };
 
     return {
+      isOpen,
+      hasVisibleFilteredOptions,
       selectedValue,
       oSelectModelValue,
       computedOptions,
@@ -429,15 +458,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.o2-custom-select-dashboard {
-  max-width: 37.5rem;
-}
-
-:deep(.q-field__native) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-</style>

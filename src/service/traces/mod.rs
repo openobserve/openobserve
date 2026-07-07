@@ -32,6 +32,7 @@ use config::{
     DISTINCT_FIELDS, TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::alert::Alert,
+        gen_ai::GenAiAgentMappingConfig,
         otlp::OtlpRequestType,
         self_reporting::usage::{RequestStats, UsageType},
         stream::{StreamParams, StreamPartition, StreamType},
@@ -114,17 +115,33 @@ const ATTR_STATUS_MESSAGE: &str = "status_message";
 // Gen-AI semantic-convention column names produced by the OTEL processor after
 // dot→underscore flattening. Must stay in sync with GEN_AI_SCHEMA_FIELDS in
 // service/db/schema.rs.
-const GEN_AI_INT64_FIELDS: [&str; 3] = [
+const GEN_AI_INT64_FIELDS: [&str; 5] = [
     "gen_ai_usage_input_tokens",
     "gen_ai_usage_output_tokens",
     "gen_ai_usage_total_tokens",
+    "gen_ai_usage_cache_read_input_tokens",
+    "gen_ai_usage_cache_creation_input_tokens",
 ];
-const GEN_AI_FLOAT64_FIELDS: [&str; 4] = [
+const GEN_AI_FLOAT64_FIELDS: [&str; 9] = [
     "gen_ai_response_time_to_first_chunk",
     "gen_ai_usage_cost",
     "gen_ai_usage_cost_input",
     "gen_ai_usage_cost_output",
+    "gen_ai_usage_cost_cache_read_input",
+    "gen_ai_usage_cost_cache_creation_input",
+    "gen_ai_usage_cost_estimated_without_cache",
+    "gen_ai_usage_cost_cache_read_savings",
+    "gen_ai_usage_cost_net_cache_impact",
 ];
+
+#[cfg(feature = "enterprise")]
+type AgentObservationBuffer = std::collections::BTreeMap<
+    String,
+    o2_enterprise::enterprise::llm_evaluations::agent_registry::AgentObservation,
+>;
+
+#[cfg(not(feature = "enterprise"))]
+type AgentObservationBuffer = Option<std::convert::Infallible>;
 
 fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
     for &field in GEN_AI_INT64_FIELDS.iter() {
@@ -146,6 +163,82 @@ fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
             );
         }
     }
+}
+
+fn collect_gen_ai_agent_observation(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    timestamp: i64,
+    record_val: &mut Map<String, json::Value>,
+    mapping_config: &GenAiAgentMappingConfig,
+    observations: &mut AgentObservationBuffer,
+) -> Option<(Option<String>, Option<String>)> {
+    #[cfg(feature = "enterprise")]
+    {
+        let observation =
+            o2_enterprise::enterprise::llm_evaluations::agent_registry::observation_from_record(
+                org_id,
+                stream_type,
+                stream_name,
+                timestamp,
+                record_val,
+                mapping_config,
+            )?;
+        let canonical_fields = (observation.agent_name.clone(), observation.agent_id.clone());
+        let agent_key = observation.agent_key.clone();
+        let identity_source = observation.identity_source.clone();
+        let buffer_size_before = observations.len();
+        observations
+            .entry(observation.agent_key.clone())
+            .and_modify(|existing| existing.merge(&observation))
+            .or_insert(observation);
+        log::debug!(
+            "[GenAiAgentRegistry] collected observation org={org_id} stream_type={} stream={stream_name} agent_key={agent_key} identity_source={identity_source} buffer_size_before={buffer_size_before} buffer_size_after={}",
+            stream_type.as_str(),
+            observations.len()
+        );
+        Some(canonical_fields)
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (
+            org_id,
+            stream_type,
+            stream_name,
+            timestamp,
+            record_val,
+            mapping_config,
+            observations,
+        );
+        None
+    }
+}
+
+fn restore_canonical_agent_fields(
+    record_val: &mut Map<String, json::Value>,
+    canonical_fields: Option<(Option<String>, Option<String>)>,
+) {
+    let Some((agent_name, agent_id)) = canonical_fields else {
+        return;
+    };
+
+    if let Some(agent_name) = agent_name {
+        record_val.insert("gen_ai_agent_name".to_string(), json::json!(agent_name));
+    }
+    if let Some(agent_id) = agent_id {
+        record_val.insert("gen_ai_agent_id".to_string(), json::json!(agent_id));
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn queue_gen_ai_agent_observations(org_id: &str, observations: AgentObservationBuffer) {
+    o2_enterprise::enterprise::llm_evaluations::agent_registry::queue_observations(
+        org_id.to_string(),
+        observations,
+    )
+    .await;
 }
 
 fn normalized_trace_key(key: &str) -> String {
@@ -354,6 +447,10 @@ pub async fn handle_otlp_request(
         std::sync::Arc::clone(EMPTY_PRICING.get_or_init(|| std::sync::Arc::new(vec![])))
     };
 
+    let gen_ai_agent_mapping_config =
+        crate::service::db::system_settings::get_gen_ai_agent_mapping_config(org_id).await;
+    let mut agent_observations = AgentObservationBuffer::default();
+
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         let mut service_name_explicitly_set = false;
@@ -453,13 +550,14 @@ pub async fn handle_otlp_request(
                 // Enrich span attributes with OTEL processor if enabled
                 // This adds AI/ML observability fields like model_name, usage_details, etc.
                 if is_llm_span {
-                    otel_processor.process_span_with_pricing(
+                    otel_processor.process_span_with_pricing_and_agent_mapping(
                         &mut span_att_map,
                         &service_att_map,
                         scope_name,
                         &events,
                         &org_pricing_entries,
                         start_time,
+                        &gen_ai_agent_mapping_config,
                     );
 
                     // set stream to llm stream if not already set
@@ -574,10 +672,13 @@ pub async fn handle_otlp_request(
                     stream_pipeline_inputs.push(value);
                 } else if !finalize_and_buffer_trace_span(
                     value,
+                    org_id,
                     &user_defined_schema_map,
                     &traces_stream_name,
+                    &gen_ai_agent_mapping_config,
                     &mut partial_success,
                     &mut json_data_by_stream,
+                    &mut agent_observations,
                 ) {
                     log::error!(
                         "[TRACES:OTLP] stream did not receive a valid json object, trace_id: {trace_id}"
@@ -604,8 +705,30 @@ pub async fn handle_otlp_request(
     // batch process records through pipeline
     if !executable_pipelines.is_empty() {
         let records = stream_pipeline_inputs.clone();
+        let mut evaluation_tasks = tokio::task::JoinSet::new();
 
         for exec_pl in &executable_pipelines {
+            if exec_pl.kind == config::meta::pipeline::PipelineKind::Evaluation
+                && exec_pl.contains_llm_evaluation_node()
+            {
+                let exec_pl = exec_pl.clone();
+                let org_id = org_id.to_string();
+                let records = records.clone();
+                let in_stream_name = in_stream_name.map(String::from);
+                let traces_stream_name = traces_stream_name.clone();
+                evaluation_tasks.spawn(async move {
+                    if let Err(e) = exec_pl
+                        .process_batch(&org_id, records, in_stream_name)
+                        .await
+                    {
+                        log::error!(
+                            "[TRACES:OTLP] evaluation pipeline({org_id}/{traces_stream_name}) batch execution error: {e}."
+                        );
+                    }
+                });
+                continue;
+            }
+
             let records_count = records.len();
             match exec_pl
                 .process_batch(org_id, records.clone(), in_stream_name.map(String::from))
@@ -655,19 +778,6 @@ pub async fn handle_otlp_request(
                             };
                             normalize_llm_field_types(&mut record_val);
 
-                            if let Some(Some(fields)) =
-                                user_defined_schema_map.get(&stream_params.stream_name.to_string())
-                            {
-                                record_val =
-                                    crate::service::ingestion::refactor_map(record_val, fields);
-                            }
-
-                            log::debug!(
-                                "[TRACES:OTLP] pipeline result for stream: {} got {} records",
-                                stream_params.stream_name,
-                                record_val.len()
-                            );
-
                             let Some(timestamp) = record_val
                                 .get(TIMESTAMP_COL_NAME)
                                 .and_then(|ts| ts.as_i64())
@@ -678,6 +788,30 @@ pub async fn handle_otlp_request(
                                 partial_success.rejected_spans += 1;
                                 continue;
                             };
+                            let canonical_agent_fields = collect_gen_ai_agent_observation(
+                                org_id,
+                                StreamType::Traces,
+                                &stream_params.stream_name,
+                                timestamp,
+                                &mut record_val,
+                                &gen_ai_agent_mapping_config,
+                                &mut agent_observations,
+                            );
+
+                            if let Some(Some(fields)) =
+                                user_defined_schema_map.get(&stream_params.stream_name.to_string())
+                            {
+                                record_val =
+                                    crate::service::ingestion::refactor_map(record_val, fields);
+                            }
+                            restore_canonical_agent_fields(&mut record_val, canonical_agent_fields);
+
+                            log::debug!(
+                                "[TRACES:OTLP] pipeline result for stream: {} got {} records",
+                                stream_params.stream_name,
+                                record_val.len()
+                            );
+
                             let (ts_data, _) = json_data_by_stream
                                 .entry(stream_params.stream_name.to_string())
                                 .or_insert((Vec::new(), None));
@@ -688,20 +822,39 @@ pub async fn handle_otlp_request(
             }
         } // for each pipeline
 
+        while let Some(result) = evaluation_tasks.join_next().await {
+            if let Err(e) = result {
+                log::error!(
+                    "[TRACES:OTLP] evaluation pipeline task({org_id}/{traces_stream_name}) failed: {e}.",
+                );
+            }
+        }
+
         // When only evaluation pipelines exist for this stream (no user pipeline
         // is responsible for writing to the source stream), preserve original
         // records by writing them back to the source stream.
         let has_user_pipeline = executable_pipelines
             .iter()
             .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+        let has_evaluation_pipeline = executable_pipelines
+            .iter()
+            .any(|p| p.kind == config::meta::pipeline::PipelineKind::Evaluation);
+        log::debug!(
+            "[TRACES:OTLP] source preservation check stream={traces_stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, has_evaluation_pipeline={has_evaluation_pipeline}, source_buffered={}",
+            executable_pipelines.len(),
+            json_data_by_stream.contains_key(&traces_stream_name)
+        );
         if !has_user_pipeline && !json_data_by_stream.contains_key(&traces_stream_name) {
             for value in &stream_pipeline_inputs {
                 let _ = finalize_and_buffer_trace_span(
                     value.clone(),
+                    org_id,
                     &user_defined_schema_map,
                     &traces_stream_name,
+                    &gen_ai_agent_mapping_config,
                     &mut partial_success,
                     &mut json_data_by_stream,
+                    &mut agent_observations,
                 );
             }
         }
@@ -738,6 +891,9 @@ pub async fn handle_otlp_request(
             .into_response());
     }
 
+    #[cfg(feature = "enterprise")]
+    queue_gen_ai_agent_observations(org_id, agent_observations).await;
+
     // mark llm stream if needed
     if need_mark_llm_stream
         && let Err(e) = super::db::schema::set_stream_is_llm(
@@ -771,12 +927,16 @@ pub async fn handle_otlp_request(
 /// and push it into `json_data_by_stream`.
 ///
 /// Returns `true` on success, `false` when the span should be skipped.
+#[allow(clippy::too_many_arguments)]
 fn finalize_and_buffer_trace_span(
     mut value: json::Value,
+    org_id: &str,
     user_defined_schema_map: &HashMap<String, Option<HashSet<String>>>,
     traces_stream_name: &str,
+    gen_ai_agent_mapping_config: &GenAiAgentMappingConfig,
     partial_success: &mut ExportTracePartialSuccess,
     json_data_by_stream: &mut HashMap<String, O2IngestJsonData>,
+    agent_observations: &mut AgentObservationBuffer,
 ) -> bool {
     value = match flatten::flatten(value) {
         Ok(v) => v,
@@ -793,9 +953,6 @@ fn finalize_and_buffer_trace_span(
         }
     };
     normalize_llm_field_types(&mut record_val);
-    if let Some(Some(fields)) = user_defined_schema_map.get(traces_stream_name) {
-        record_val = crate::service::ingestion::refactor_map(record_val, fields);
-    }
     let Some(timestamp) = record_val
         .get(TIMESTAMP_COL_NAME)
         .and_then(|ts| ts.as_i64())
@@ -803,6 +960,19 @@ fn finalize_and_buffer_trace_span(
         partial_success.rejected_spans += 1;
         return false;
     };
+    let canonical_agent_fields = collect_gen_ai_agent_observation(
+        org_id,
+        StreamType::Traces,
+        traces_stream_name,
+        timestamp,
+        &mut record_val,
+        gen_ai_agent_mapping_config,
+        agent_observations,
+    );
+    if let Some(Some(fields)) = user_defined_schema_map.get(traces_stream_name) {
+        record_val = crate::service::ingestion::refactor_map(record_val, fields);
+    }
+    restore_canonical_agent_fields(&mut record_val, canonical_agent_fields);
     let (ts_data, _) = json_data_by_stream
         .entry(traces_stream_name.to_string())
         .or_insert((Vec::new(), None));
@@ -871,6 +1041,9 @@ pub async fn ingest_json(
     let json_values: Vec<json::Value> = json::from_slice(&body)?;
     let mut json_data_by_stream = HashMap::new();
     let mut partial_success = ExportTracePartialSuccess::default();
+    let gen_ai_agent_mapping_config =
+        crate::service::db::system_settings::get_gen_ai_agent_mapping_config(org_id).await;
+    let mut agent_observations = AgentObservationBuffer::default();
     for mut value in json_values {
         let timestamp = value[TIMESTAMP_COL_NAME].as_i64().unwrap_or(
             value["start_time"]
@@ -965,6 +1138,15 @@ pub async fn ingest_json(
             TIMESTAMP_COL_NAME.to_string(),
             json::Value::Number(timestamp.into()),
         );
+        let _ = collect_gen_ai_agent_observation(
+            org_id,
+            StreamType::Traces,
+            traces_stream_name,
+            timestamp,
+            &mut record_val,
+            &gen_ai_agent_mapping_config,
+            &mut agent_observations,
+        );
         let (ts_data, _) = json_data_by_stream
             .entry(traces_stream_name.to_string())
             .or_insert((Vec::new(), None));
@@ -1001,6 +1183,9 @@ pub async fn ingest_json(
         )
             .into_response());
     }
+
+    #[cfg(feature = "enterprise")]
+    queue_gen_ai_agent_observations(org_id, agent_observations).await;
 
     // mark llm stream if needed
     if need_mark_llm_stream
@@ -1355,12 +1540,28 @@ async fn write_traces(
 
 fn detect_llm_stream(contains_key: impl Fn(&str) -> bool) -> bool {
     let keys = [
+        otel::attributes::GenAiAttributes::OPERATION_NAME,
+        "gen_ai_operation_name",
+        otel::attributes::GenAiAttributes::REQUEST_MODEL,
+        "gen_ai_request_model",
+        otel::attributes::GenAiAttributes::RESPONSE_MODEL,
+        "gen_ai_response_model",
+        otel::attributes::GenAiAttributes::AGENT_NAME,
+        "gen_ai_agent_name",
+        otel::attributes::GenAiAttributes::AGENT_ID,
+        "gen_ai_agent_id",
         otel::attributes::GenAiAttributes::USAGE_INPUT_TOKENS,
+        "gen_ai_usage_input_tokens",
         otel::attributes::GenAiAttributes::USAGE_OUTPUT_TOKENS,
+        "gen_ai_usage_output_tokens",
         otel::attributes::GenAiAttributes::INPUT_MESSAGES,
+        "gen_ai_input_messages",
         otel::attributes::GenAiAttributes::OUTPUT_MESSAGES,
+        "gen_ai_output_messages",
         otel::attributes::LangfuseAttributes::INPUT,
+        "langfuse_observation_input",
         otel::attributes::LangfuseAttributes::OUTPUT,
+        "langfuse_observation_output",
     ];
     keys.iter().any(|k| contains_key(k))
 }
@@ -1419,9 +1620,16 @@ mod tests {
             "gen_ai_usage_input_tokens": "12",
             "gen_ai_usage_output_tokens": 34.8,
             "gen_ai_usage_total_tokens": true,
+            "gen_ai_usage_cache_read_input_tokens": "7",
+            "gen_ai_usage_cache_creation_input_tokens": 3.8,
             "gen_ai_response_time_to_first_chunk": "123456789",
             "gen_ai_usage_cost_input": "0.25",
             "gen_ai_usage_cost_output": 1,
+            "gen_ai_usage_cost_cache_read_input": "0.07",
+            "gen_ai_usage_cost_cache_creation_input": 2,
+            "gen_ai_usage_cost_estimated_without_cache": "0.32",
+            "gen_ai_usage_cost_cache_read_savings": "0.18",
+            "gen_ai_usage_cost_net_cache_impact": "0.11",
             "gen_ai_usage_cost": false,
             "unrelated": "value"
         })
@@ -1451,6 +1659,18 @@ mod tests {
         );
         assert_eq!(
             record
+                .get("gen_ai_usage_cache_read_input_tokens")
+                .and_then(|v| v.as_i64()),
+            Some(7)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_cache_creation_input_tokens")
+                .and_then(|v| v.as_i64()),
+            Some(3)
+        );
+        assert_eq!(
+            record
                 .get("gen_ai_response_time_to_first_chunk")
                 .and_then(|v| v.as_f64()),
             Some(123456789.0)
@@ -1466,6 +1686,36 @@ mod tests {
                 .get("gen_ai_usage_cost_output")
                 .and_then(|v| v.as_f64()),
             Some(1.0)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_cost_cache_read_input")
+                .and_then(|v| v.as_f64()),
+            Some(0.07)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_cost_cache_creation_input")
+                .and_then(|v| v.as_f64()),
+            Some(2.0)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_cost_estimated_without_cache")
+                .and_then(|v| v.as_f64()),
+            Some(0.32)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_cost_cache_read_savings")
+                .and_then(|v| v.as_f64()),
+            Some(0.18)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_cost_net_cache_impact")
+                .and_then(|v| v.as_f64()),
+            Some(0.11)
         );
         assert_eq!(
             record.get("gen_ai_usage_cost").and_then(|v| v.as_f64()),

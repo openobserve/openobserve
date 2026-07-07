@@ -1,403 +1,548 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
-  <ODialog data-test="override-config-popup-dialog"
+  <ODialog
+    data-test="override-config-popup-dialog"
     :open="open"
-    @update:open="(v) => { if (!v) closePopup() }"
-    :title="t('dashboard.overrideConfigTitle')"
-    :width="70"
-    :neutral-button-label="t('dashboard.overrideConfigAddNew')"
-    neutral-button-variant="outline"
-    :primary-button-label="t('dashboard.overrideConfigSave')"
-    @click:neutral="addOverrideConfig"
-    @click:primary="saveOverrides"
+    @update:open="(v: boolean) => { if (!v) closePopup() }"
+    :title="t('dashboard.columnFormattingTitle')"
+    :sub-title="t('dashboard.columnFormattingSubtitle')"
+    :width="80"
   >
-
     <div
-      v-for="(overrideConfig, index) in overrideConfigs"
-      :key="index"
-      class="tw:mb-3 tw:flex tw:items-start tw:w-full tw:flex"
-      style="gap: 15px"
+      data-test="override-config-accordion"
+      class="grid grid-cols-[264px_minmax(0,1fr)_360px] max-[900px]:grid-cols-[220px_minmax(0,1fr)] h-[calc(86vh-150px)] overflow-hidden -mx-(--spacing-dialog-content-px) -my-(--spacing-dialog-content-py)"
     >
-      <OSelect
-        v-model="overrideConfig.field.value"
-        :label="t('dashboard.overrideConfigFieldLabel')"
-        :options="columnsOptions"
-        style="width: 40%"
-        :data-test="`dashboard-addpanel-config-unit-config-select-column-${index}`"
-        class="tw:flex-1"
-      />
-      <div class="tw:flex tw:items-center" style="width: 60%; gap: 10px">
-<OSelect
-            v-model="overrideConfig.config[0].type"
-            :label="t('dashboard.overrideConfigTypeLabel')"
-            :options="configTypeOptions"
-            :disabled="!overrideConfig.field.value"
-            style="width: 40%"
-            :data-test="`dashboard-addpanel-config-type-select-${index}`"
-            @update:model-value="onConfigTypeChange(index)"
-        />
+      <!-- Left: add-field dropdown + list of added fields -->
+      <div
+        class="flex flex-col gap-2.5 min-w-0 p-3 border-r border-[rgba(128,128,128,0.18)]"
+      >
+        <ODropdown
+          v-model:open="addOpenLeft"
+          align="start"
+          content-class="min-w-(--reka-popper-anchor-width)!"
+        >
+          <template #trigger>
+            <button
+              type="button"
+              data-test="dashboard-addpanel-config-add-column"
+              class="flex items-center justify-center gap-1.5 w-full shrink-0 p-[9px] rounded-lg border border-dashed border-[rgba(25,118,210,0.5)] bg-transparent cursor-pointer text-[length:var(--text-sm,13px)] font-medium text-[var(--color-primary-600,#1976d2)] transition-colors hover:bg-[rgba(25,118,210,0.05)] hover:border-[var(--color-primary-600,#1976d2)]"
+            >
+              <OIcon name="add" size="sm" />
+              {{ t("dashboard.columnFormattingAddField") }}
+            </button>
+          </template>
+          <div class="max-h-[17.5rem] overflow-y-auto">
+            <ODropdownItem
+              v-for="opt in availableToAdd"
+              :key="opt.value"
+              :data-test="`dashboard-addpanel-config-add-field-${opt.value}`"
+              @select="addField(opt.value)"
+            >
+              <span class="flex items-center gap-2">
+                <span :class="['cf-badge-base', badgeClass(opt.isNumeric)]">
+                  {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
+                </span>
+                <span>{{ opt.label }}</span>
+              </span>
+            </ODropdownItem>
+            <div
+              v-if="!availableToAdd.length"
+              class="py-2 px-2.5 text-xs text-[var(--o2-text-2,#9e9e9e)]"
+            >
+              {{ t("dashboard.columnFormattingAllAdded") }}
+            </div>
+          </div>
+        </ODropdown>
 
         <div
-          v-if="overrideConfig.config[0].type === 'unit'"
-          class="tw:flex tw:items-center"
-          style="gap: 10px; flex-grow: 1; width: 60%"
+          v-if="columnOverrides.length"
+          class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-1"
         >
-          <OSelect            v-model="overrideConfig.config[0].value.unit"           :label="t('dashboard.overrideConfigUnitLabel')"            :options="unitOptions"            :disabled="!overrideConfig.field.value"            style="flex-grow: 1; width: 50%"            :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"            class="tw:flex-1"          />
-          <OInput
-            v-if="overrideConfig.config[0].value.unit === 'custom'"
-            v-model="overrideConfig.config[0].value.customUnit"
-            :label="t('dashboard.customunitLabel')"
-            data-test="dashboard-config-unit"
-            style="width: 50%"
-          />
+          <div
+            v-for="(col, idx) in columnOverrides"
+            :key="idx"
+            role="button"
+            tabindex="0"
+            :data-test="`override-config-row-${idx}`"
+            class="group relative flex items-center gap-2 w-full py-2 pl-[9px] pr-1.5 rounded-lg border-l-[3px] border-transparent cursor-pointer outline-none transition-colors hover:bg-[rgba(128,128,128,0.05)]"
+            :class="
+              idx === selectedIdx
+                ? 'bg-[rgba(46,85,163,0.06)] border-l-[var(--color-primary-600,#1976d2)]!'
+                : ''
+            "
+            @click="selectedIdx = idx"
+            @keydown.enter.prevent="selectedIdx = idx"
+            @keydown.space.prevent="selectedIdx = idx"
+          >
+            <span :class="['cf-badge-base', badgeClass(isNumericColumn(col))]">
+              {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
+            </span>
+            <span
+              class="flex-1 min-w-0 font-semibold text-[length:var(--text-sm,13px)] overflow-hidden text-ellipsis whitespace-nowrap group-hover:pr-7"
+            >
+              {{ getFieldLabel(col.field) || t("dashboard.columnFormattingPick") }}
+            </span>
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              icon-left="close"
+              :title="t('common.remove')"
+              :data-test="`dashboard-addpanel-config-delete-column-${idx}`"
+              class="absolute! right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+              @click.stop="removeColumn(idx)"
+            />
+          </div>
         </div>
-
         <div
-          v-else-if="overrideConfig.config[0].type === 'unique_value_color'"
-          class="tw:flex tw:items-center"
-          style="gap: 10px; flex-grow: 1; width: 60%"
+          v-else
+          class="flex-1 flex flex-col items-center justify-center gap-1.5 text-center p-4"
         >
-          <OCheckbox
-            v-model="overrideConfig.config[0].autoColor"
-            :label="t('dashboard.overrideConfigUniqueValueColor')"
-            :disabled="!overrideConfig.field.value"
-            :data-test="`dashboard-addpanel-config-override-unique-value-checkbox-${index}`"
+          <OIcon
+            name="format-color-text"
+            size="lg"
+            class="text-[var(--o2-text-2,#b0bec5)]"
+          />
+          <div class="font-semibold text-[length:var(--text-sm,13px)]">
+            {{ t("dashboard.columnFormattingNoFields") }}
+          </div>
+          <div class="text-xs text-[var(--o2-text-2,#9e9e9e)] leading-[1.4]">
+            {{ t("dashboard.columnFormattingNoFieldsHint") }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Detail: controls + live preview for the selected field -->
+      <template v-if="selectedCol">
+        <div class="min-w-0 overflow-y-auto">
+          <ColumnFormatControls
+            :col="selectedCol"
+            :is-numeric="isNumericColumn(selectedCol)"
           />
         </div>
-
-        <OButton
-          variant="ghost"
-          size="icon"
-          @click="removeOverrideConfig(index)"
-          :data-test="`dashboard-addpanel-config-unit-config-delete-btn-${index}`"
-          icon-left="close"
+        <div
+          class="flex flex-col gap-2 min-w-0 overflow-y-auto p-3 border-l border-[rgba(128,128,128,0.18)]"
         >
-        </OButton>
+          <div
+            class="flex items-center gap-[5px] text-[10px] font-bold tracking-[0.06em] uppercase text-[var(--o2-text-2,#757575)]"
+          >
+            <OIcon name="visibility" size="xs" />
+            <span>{{ t("dashboard.inlinePreview") }}</span>
+          </div>
+          <div
+            class="cf-preview-table border border-[rgba(128,128,128,0.18)] rounded-md overflow-hidden"
+          >
+            <TableRenderer
+              v-if="selectedPreview"
+              :data="selectedPreview"
+              :value-mapping="valueMapping"
+              :wrap-cells="true"
+              :show-pagination="false"
+            />
+          </div>
+          <div class="text-[11px] text-[var(--o2-text-2,#9e9e9e)]">
+            {{ t("dashboard.columnFormattingSampleNote") }}
+          </div>
+        </div>
+      </template>
+
+      <!-- Empty state: nothing added yet -->
+      <div
+        v-else
+        class="col-start-2 col-end-4 max-[900px]:col-end-3 flex items-center justify-center p-6"
+      >
+        <OEmptyState
+          size="block"
+          :title="t('dashboard.columnFormattingEmptyTitle')"
+          :description="t('dashboard.columnFormattingEmptyHint')"
+        >
+          <template #illustration>
+            <div
+              class="w-[72px] h-[72px] rounded-2xl bg-[rgba(128,128,128,0.08)] flex items-center justify-center text-[var(--o2-text-2,#90a4ae)]"
+            >
+              <OIcon name="tune" size="xl" />
+            </div>
+          </template>
+          <template #actions>
+            <ODropdown
+              v-model:open="addOpenCenter"
+              align="start"
+              content-class="min-w-(--reka-popper-anchor-width)!"
+            >
+              <template #trigger>
+                <OButton
+                  variant="primary"
+                  icon-left="add"
+                  data-test="dashboard-addpanel-config-add-column-empty"
+                >
+                  {{ t("dashboard.columnFormattingAddField") }}
+                </OButton>
+              </template>
+              <div class="max-h-[17.5rem] overflow-y-auto">
+                <ODropdownItem
+                  v-for="opt in availableToAdd"
+                  :key="opt.value"
+                  :data-test="`dashboard-addpanel-config-add-field-empty-${opt.value}`"
+                  @select="addField(opt.value)"
+                >
+                  <span class="flex items-center gap-2">
+                    <span :class="['cf-badge-base', badgeClass(opt.isNumeric)]">
+                      {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
+                    </span>
+                    <span>{{ opt.label }}</span>
+                  </span>
+                </ODropdownItem>
+                <div
+                  v-if="!availableToAdd.length"
+                  class="py-2 px-2.5 text-xs text-[var(--o2-text-2,#9e9e9e)]"
+                >
+                  {{ t("dashboard.columnFormattingAllAdded") }}
+                </div>
+              </div>
+            </ODropdown>
+          </template>
+        </OEmptyState>
       </div>
     </div>
+
+    <template #footer>
+      <div class="flex items-center justify-between w-full">
+        <span class="text-xs text-[var(--o2-text-2,#9e9e9e)]">{{ footerSummary }}</span>
+        <div class="flex gap-2">
+          <OButton
+            variant="outline"
+            data-test="override-config-popup-cancel"
+            @click="closePopup"
+          >
+            {{ t("dashboard.cancel") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            data-test="override-config-popup-save"
+            @click="saveOverrides"
+          >
+            {{ t("dashboard.overrideConfigSave") }}
+          </OButton>
+        </div>
+      </div>
+    </template>
   </ODialog>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  computed,
-  watch,
-  PropType,
-} from "vue";
+import { defineComponent, ref, computed, watch, defineAsyncComponent, PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ColumnFormatControls from "./ColumnFormatControls.vue";
+import {
+  type ColumnOverrideUI,
+  emptyColumnOverride,
+  loadAllFromRaw,
+  serializeOverrides,
+  serializeColumnOverride,
+} from "@/composables/dashboard/useColumnFormatting";
+import {
+  parseOverrideConfigs,
+  applyColumnOverrides,
+  buildValueMappingCache,
+  formatNumericValue,
+} from "@/utils/dashboard/tableConfigUtils";
+
+// Async import breaks the circular dependency (TableRenderer renders this dialog).
+const TableRenderer = defineAsyncComponent(
+  () => import("@/components/dashboards/panels/TableRenderer.vue"),
+);
 
 export default defineComponent({
   name: "OverrideConfigPopup",
-  components: { OButton, ODialog, OSelect, OInput, OCheckbox },
+  components: { OButton, OIcon, ODialog, ODropdown, ODropdownItem, OEmptyState, ColumnFormatControls, TableRenderer },
   props: {
     open: {
       type: Boolean,
       required: true,
     },
     columns: {
-      type: Array as PropType<Array<{ label: string; alias: string }>>,
+      type: Array as PropType<
+        Array<{ label: string; alias: string; isNumeric?: boolean }>
+      >,
       required: true,
-      validator: (value: any[]) =>
-        value.every(
-          (item) =>
-            typeof item.label === "string" && typeof item.alias === "string",
-        ),
     },
     overrideConfig: {
-      type: Object as PropType<{
-        overrideConfigs?: Array<{
-          field: { matchBy: string; value: string };
-          config: Array<{
-            type: string;
-            value?: { unit: string; customUnit: string };
-            autoColor?: boolean;
-          }>;
-        }>;
-      }>,
+      type: Object as PropType<{ overrideConfigs?: any[] }>,
       required: true,
+    },
+    /** Per-column sample preview: { [aliasLower]: { column, rows } }. */
+    previewData: {
+      type: Object as PropType<Record<string, { column: any; rows: any[] }>>,
+      default: () => ({}),
+    },
+    valueMapping: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
+    // Panel-level fallbacks so the preview matches the real table.
+    panelUnit: {
+      type: String,
+      default: "",
+    },
+    panelUnitCustom: {
+      type: String,
+      default: "",
+    },
+    panelDecimals: {
+      type: Number,
+      default: 2,
     },
   },
   emits: ["close", "save"],
-  setup(props: any, { emit }) {
+  setup(props: any, { emit }: any) {
     const { t } = useI18n();
 
-    const configTypeOptions = computed(() => [
-      {
-        label: t("dashboard.overrideConfigTypeUnit"),
-        value: "unit",
-      },
-      {
-        label: t("dashboard.overrideConfigTypeUniqueValueColor"),
-        value: "unique_value_color",
-      },
-    ]);
+    const columnOverrides = ref<ColumnOverrideUI[]>([]);
+    const selectedIdx = ref<number>(-1);
+    const addOpenLeft = ref(false);
+    const addOpenCenter = ref(false);
 
-    const unitOptions = [
-      {
-        label: t("dashboard.default"),
-        value: null,
-      },
-      {
-        label: t("dashboard.numbers"),
-        value: "numbers",
-      },
-      {
-        label: t("dashboard.bytes"),
-        value: "bytes",
-      },
-      {
-        label: t("dashboard.kilobytes"),
-        value: "kilobytes",
-      },
-      {
-        label: t("dashboard.megabytes"),
-        value: "megabytes",
-      },
-      {
-        label: t("dashboard.bytesPerSecond"),
-        value: "bps",
-      },
-      {
-        label: t("dashboard.seconds"),
-        value: "seconds",
-      },
-      {
-        label: t("dashboard.milliseconds"),
-        value: "milliseconds",
-      },
-      {
-        label: t("dashboard.microseconds"),
-        value: "microseconds",
-      },
-      {
-        label: t("dashboard.nanoseconds"),
-        value: "nanoseconds",
-      },
-      {
-        label: t("dashboard.percent1"),
-        value: "percent-1",
-      },
-      {
-        label: t("dashboard.percent"),
-        value: "percent",
-      },
-      {
-        label: t("dashboard.currencyDollar"),
-        value: "currency-dollar",
-      },
-      {
-        label: t("dashboard.currencyEuro"),
-        value: "currency-euro",
-      },
-      {
-        label: t("dashboard.currencyPound"),
-        value: "currency-pound",
-      },
-      {
-        label: t("dashboard.currencyYen"),
-        value: "currency-yen",
-      },
-      {
-        label: t("dashboard.currencyRupees"),
-        value: "currency-rupee",
-      },
-
-      {
-        label: t("dashboard.custom"),
-        value: "custom",
-      },
-    ];
-
-    const originalOverrideConfigs = ref(
-      JSON.parse(JSON.stringify(props.overrideConfig.overrideConfigs || [])),
-    );
-
-    const overrideConfigs = ref(
-      JSON.parse(
-        JSON.stringify(
-          normalizeOverrideConfigs(props.overrideConfig.overrideConfigs || []),
-        ),
-      ),
-    );
-
-    function normalizeOverrideConfigs(configs: any[]) {
-      if (configs.length === 0) {
-        return [];
-      }
-
-      return configs.map((config) => ({
-        field: {
-          matchBy: config.field?.matchBy || "name",
-          value: config.field?.value || "",
-        },
-        config: [
-          config.config?.[0]?.type === "unique_value_color"
-            ? {
-                type: "unique_value_color",
-                autoColor: Boolean(config.config[0].autoColor),
-              }
-            : {
-                type: "unit",
-                value: {
-                  unit: config.config?.[0]?.value?.unit || "",
-                  customUnit: config.config?.[0]?.value?.customUnit || "",
-                },
-              },
-        ],
-      }));
-    }
-
-    const columnsOptions = computed(() =>
-      props.columns.map((column: any) => ({
-        label: column.label,
-        value: column.alias,
-      })),
-    );
-
-    const closePopup = () => {
-      overrideConfigs.value = JSON.parse(
-        JSON.stringify(originalOverrideConfigs.value),
+    const initFromProps = () => {
+      columnOverrides.value = loadAllFromRaw(
+        props.overrideConfig.overrideConfigs ?? [],
       );
-      emit("close");
-    };
-
-    const addOverrideConfig = () => {
-      overrideConfigs.value.push({
-        field: { matchBy: "name", value: "" },
-        config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
-      });
-    };
-
-    const onConfigTypeChange = (index: number) => {
-      const config = overrideConfigs.value[index].config[0];
-      if (config.type === "unit") {
-        // Initialize unit config
-        config.value = { unit: "", customUnit: "" };
-        delete config.autoColor;
-      } else if (config.type === "unique_value_color") {
-        // Initialize color config
-        config.autoColor = Boolean(config.autoColor ?? false);
-        delete config.value;
-      }
-    };
-
-    const removeOverrideConfig = (index: number) => {
-      overrideConfigs.value.splice(index, 1);
-    };
-
-    const saveOverrides = () => {
-      const transformedConfigs = overrideConfigs.value
-        .filter((config: any) => config.field.value) // Only include configs with field values
-        .map((config: any) => ({
-          field: {
-            matchBy: config.field.matchBy,
-            value: config.field.value,
-          },
-          config: [
-            config.config[0].type === "unit"
-              ? {
-                  type: "unit",
-                  value: {
-                    unit: config.config[0].value?.unit || "",
-                    customUnit: config.config[0].value?.customUnit || "",
-                  },
-                }
-              : {
-                  type: "unique_value_color",
-                  autoColor: config.config[0].autoColor === true,
-                },
-          ],
-        }));
-
-      props.overrideConfig.overrideConfigs = transformedConfigs;
-      emit("save", transformedConfigs);
-      emit("close");
+      selectedIdx.value = columnOverrides.value.length ? 0 : -1;
     };
 
     watch(
       () => props.open,
       (isOpen) => {
-        if (isOpen) {
-          originalOverrideConfigs.value = JSON.parse(
-            JSON.stringify(props.overrideConfig.overrideConfigs || []),
-          );
-          const normalized = normalizeOverrideConfigs(
-            props.overrideConfig.overrideConfigs || [],
-          );
-          overrideConfigs.value =
-            normalized.length > 0
-              ? normalized
-              : [
-                  {
-                    field: { matchBy: "name", value: "" },
-                    config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
-                  },
-                ];
-        }
+        if (isOpen) initFromProps();
       },
       { immediate: true },
     );
 
+    const allColumnOptions = computed(() => {
+      const seen = new Set<string>();
+      const out: Array<{ label: string; value: string; isNumeric: boolean }> = [];
+      for (const c of props.columns as any[]) {
+        if (!c?.alias || seen.has(c.alias)) continue;
+        seen.add(c.alias);
+        // Mirror the table renderer (convertTableData uses `label || alias`):
+        // fall back to the alias so columns with an empty label (e.g. custom-SQL
+        // columns) still show a name instead of a blank row.
+        out.push({
+          label: c.label || c.alias,
+          value: c.alias,
+          isNumeric: !!c.isNumeric,
+        });
+      }
+      return out;
+    });
+
+    const availableToAdd = computed(() => {
+      const used = new Set(
+        columnOverrides.value.map((c) => c.field).filter(Boolean),
+      );
+      return allColumnOptions.value.filter((o: any) => !used.has(o.value));
+    });
+
+    const selectedCol = computed(
+      () => columnOverrides.value[selectedIdx.value] ?? null,
+    );
+
+    const footerSummary = computed(() => {
+      const n = columnOverrides.value.length;
+      if (n === 0) return t("dashboard.columnFormattingNoFieldsToFormat");
+      if (n === 1) return t("dashboard.columnFormattingOneFieldToFormat");
+      return `${n} ${t("dashboard.columnFormattingFieldsToFormat")}`;
+    });
+
+    // Field-type badge colour (num = blue, text = grey).
+    const badgeClass = (isNum: boolean) =>
+      isNum
+        ? "text-[#2e55a3] bg-[rgba(46,85,163,0.1)]"
+        : "text-[#6b7280] bg-[rgba(107,114,128,0.12)]";
+
+    const getFieldLabel = (alias: string) => {
+      if (!alias) return "";
+      return (
+        allColumnOptions.value.find((o: any) => o.value === alias)?.label ??
+        `${alias}`
+      );
+    };
+
+    const detectedNumeric = (field: string): boolean => {
+      if (!field) return false;
+      return props.columns.find((c: any) => c.alias === field)?.isNumeric ?? false;
+    };
+
+    const isNumericColumn = (col: ColumnOverrideUI): boolean =>
+      col.fieldType === "num"
+        ? true
+        : col.fieldType === "text"
+          ? false
+          : detectedNumeric(col.field);
+
     watch(
-      () =>
-        overrideConfigs.value.map((config: any) =>
-          config.config[0].type === "unit"
-            ? config.config[0].value?.unit
-            : null,
-        ),
-      (newUnits, oldUnits) => {
-        newUnits.forEach((newUnit: any, index: any) => {
-          const config = overrideConfigs.value[index].config[0];
-          if (
-            config.type === "unit" &&
-            newUnit !== "custom" &&
-            oldUnits[index] === "custom"
-          ) {
-            if (config.value) {
-              config.value.customUnit = "";
-            }
+      () => columnOverrides.value.map((c) => `${c.field}|${c.fieldType}`),
+      (keys, prevKeys) => {
+        const prevTypeByField = new Map<string, string>();
+        (prevKeys ?? []).forEach((k) => {
+          const sep = k.lastIndexOf("|");
+          prevTypeByField.set(k.slice(0, sep), k.slice(sep + 1));
+        });
+        columnOverrides.value.forEach((c) => {
+          const prevType = prevTypeByField.get(c.field);
+          if (prevType !== undefined && prevType !== c.fieldType && !isNumericColumn(c)) {
+            c.unit = null;
+            c.customUnit = null;
+            c.conditions = [];
           }
         });
       },
-      { deep: true },
     );
 
-    const getFieldDisplayValue = (fieldValue: string) => {
-      if (!fieldValue) return "";
+    const buildPreviewColumn = (base: any, col: ColumnOverrideUI, isNumeric: boolean) => {
+      const c: any = { ...base };
+      delete c.colorMode;
+      delete c.textColor;
+      delete c.bgColor;
+      delete c.conditionalRules;
 
-      const option = columnsOptions.value.find(
-        (option) => option.value === fieldValue,
+      const aliasLower = String(col.field ?? "").toLowerCase();
+      const entry = serializeColumnOverride(col);
+      const maps = parseOverrideConfigs(entry ? [entry] : []);
+      applyColumnOverrides(c, aliasLower, maps, isNumeric ? "right" : "left");
+
+      if (isNumeric) {
+        const cache = buildValueMappingCache(props.valueMapping);
+        const unit = maps.unitConfigMap[aliasLower]?.unit || props.panelUnit;
+        const customUnit =
+          maps.unitConfigMap[aliasLower]?.customUnit || props.panelUnitCustom;
+        const decimals = props.panelDecimals ?? 2;
+        c.format = (val: any) =>
+          formatNumericValue(val, cache, unit, customUnit, decimals);
+      }
+      return c;
+    };
+
+    const DUMMY_NUMERIC = [12, 47, 83, 100, 6];
+    const DUMMY_TEXT = ["alpha", "bravo", "charlie", "delta", "echo"];
+    const makeDummyRows = (dataKey: string, isNumeric: boolean) =>
+      (isNumeric ? DUMMY_NUMERIC : DUMMY_TEXT).map((v) => ({ [dataKey]: v }));
+
+    const previewFor = (col: ColumnOverrideUI) => {
+      const pd = props.previewData ?? {};
+      const key = String(col.field ?? "").toLowerCase();
+      let base = pd[key];
+      if (!base?.column) {
+        base = Object.values(pd).find((d: any) =>
+          [d?.column?.alias, d?.column?.field, d?.column?.name].some(
+            (v) => String(v ?? "").toLowerCase() === key,
+          ),
+        ) as any;
+      }
+      const isNumeric = isNumericColumn(col);
+      const label = getFieldLabel(col.field) || col.field;
+      const baseColumn = base?.column ?? {
+        field: col.field,
+        alias: col.field,
+        name: label,
+        label,
+      };
+      const dataKey = String(
+        baseColumn.field ?? baseColumn.alias ?? baseColumn.name ?? col.field,
       );
+      const rows = base?.rows?.length
+        ? base.rows
+        : makeDummyRows(dataKey, isNumeric);
+      const previewCol = buildPreviewColumn(baseColumn, col, isNumeric);
+      return { rows, columns: [previewCol] };
+    };
 
-      if (option) {
-        return option.label;
-      } else {
-        // Field not found, show with error message
-        return `${fieldValue} (Field not found)`;
+    const selectedPreview = computed(() => {
+      const c = selectedCol.value;
+      return c && c.field ? previewFor(c) : null;
+    });
+
+    const addField = (alias: string) => {
+      if (!alias) return;
+      columnOverrides.value.push(emptyColumnOverride(alias));
+      selectedIdx.value = columnOverrides.value.length - 1;
+      addOpenLeft.value = false;
+      addOpenCenter.value = false;
+    };
+
+    const removeColumn = (idx: number) => {
+      columnOverrides.value.splice(idx, 1);
+      if (selectedIdx.value >= columnOverrides.value.length) {
+        selectedIdx.value = columnOverrides.value.length - 1;
+      } else if (selectedIdx.value > idx) {
+        selectedIdx.value -= 1;
       }
     };
 
+    const closePopup = () => emit("close");
+
+    const saveOverrides = () => {
+      const raw = serializeOverrides(columnOverrides.value);
+      props.overrideConfig.overrideConfigs = raw;
+      emit("save", raw);
+      emit("close");
+    };
+
     return {
-      configTypeOptions,
-      unitOptions,
-      columnsOptions,
-      overrideConfigs,
-      closePopup,
-      addOverrideConfig,
-      removeOverrideConfig,
-      saveOverrides,
-      onConfigTypeChange,
-      getFieldDisplayValue,
       t,
+      columnOverrides,
+      selectedIdx,
+      selectedCol,
+      footerSummary,
+      availableToAdd,
+      addOpenLeft,
+      addOpenCenter,
+      badgeClass,
+      getFieldLabel,
+      isNumericColumn,
+      selectedPreview,
+      addField,
+      removeColumn,
+      closePopup,
+      saveOverrides,
     };
   },
 });
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+// Shared field-type badge base (variant colour comes from badgeClass()).
+.cf-badge-base {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+// :deep needed to reach the renderer's copy button inside the mini preview.
+.cf-preview-table :deep([data-test="dashboard-table-cell-copy-btn"]) {
+  display: none !important;
+}
+</style>

@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="action-scripts-list-page" class="tw:h-full">
-    <div v-if="!showAddActionScriptDialog" class="tw:h-full">
+  <div data-test="action-scripts-list-page" class="h-full">
+    <div v-if="!showAddActionScriptDialog" class="h-full">
       <PageLayout
-        :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+        :header-class="'shrink-0 px-4 border-b border-border-default'"
       >
         <!-- Row 1: standard header — title + actions only. Search moved into the
              table's own toolbar below. -->
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #toolbar>
             <OSearchInput
               v-model="filterQuery"
-              class="tw:w-64 no-border o2-search-input"
+              class="w-64 no-border o2-search-input"
               :placeholder="t('actions.search')"
               data-test="action-list-search-input"
             />
@@ -66,18 +66,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #empty>
               <NoData />
             </template>
+            <template #cell-created_by="{ row }">
+              <OUserCell :value="row.created_by" />
+            </template>
+            <template #cell-created_at="{ row }">
+              <OTimeCell
+                :value="row.created_at_raw"
+                unit="us"
+                :timezone="store.state.timezone"
+              />
+            </template>
+            <template #cell-execution_details_type="{ row }">
+              <OTag :value="row.execution_details_type" />
+            </template>
+            <template #cell-last_run_at="{ row }">
+              <OTimeCell
+                :value="row.last_run_at_raw"
+                unit="us"
+                mode="absolute"
+                :timezone="store.state.timezone"
+                empty-label="Never"
+              />
+            </template>
+            <template #cell-last_successful_at="{ row }">
+              <OTimeCell
+                :value="row.last_successful_at_raw"
+                unit="us"
+                mode="absolute"
+                :timezone="store.state.timezone"
+                empty-label="Never"
+              />
+            </template>
+            <template #cell-status="{ row }">
+              <OTag :value="row.status" />
+            </template>
             <template #cell-actions="{ row }">
               <div
                 data-test="action-scripts-loading"
                 v-if="alertStateLoadingMap[row.uuid]"
                 style="display: inline-block; width: 33.14px; height: auto"
-                class="tw:flex tw:justify-center tw:items-center tw:ml-1"
+                class="flex justify-center items-center ml-1"
                 :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
               >
                 <OSpinner size="xs" />
               </div>
               <OButton
                 :data-test="`alert-list-${row.name}-update-alert`"
+                data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alerts.edit')"
@@ -86,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               /></OButton>
               <OButton
                 :data-test="`alert-list-${row.name}-delete-alert`"
+                data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alerts.delete')"
@@ -96,11 +132,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #bottom>
               <div
-                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+                class="flex items-center justify-between w-full h-[48px]"
               >
-                <div class="tw:flex tw:items-center tw:gap-2">
+                <div class="flex items-center gap-2">
                   <div
-                    class="o2-table-footer-title tw:flex tw:items-center tw:w-[80px] tw:mr-md"
+                    class="o2-table-footer-title flex items-center w-[80px] mr-md"
                   >
                     {{ resultTotal }} {{ t("actions.header") }}
                   </div>
@@ -110,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="secondary"
                     size="sm"
                     @click="openBulkDeleteDialog"
-                    ><OIcon name="delete" size="sm" /><span class="tw:ml-1.5"
+                    ><OIcon name="delete" size="sm" /><span class="ml-1.5"
                       >Delete</span
                     ></OButton
                   >
@@ -121,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </PageLayout>
     </div>
     <template v-else>
-      <div class="tw:w-full">
+      <div class="w-full">
         <EditScript
           :isUpdated="isUpdated"
           @update:list="refreshList"
@@ -160,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header-left>
         <div
           data-test="add-action-back-btn"
-          class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer"
+          class="flex justify-center items-center cursor-pointer"
           style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
           title="Go Back"
           @click="showForm = false"
@@ -240,6 +276,9 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
@@ -277,6 +316,9 @@ export default defineComponent({
     OSelect,
     OForm,
     OTable,
+    OTimeCell,
+    OUserCell,
+    OTag,
   },
   emits: [
     "updated:fields",
@@ -349,7 +391,7 @@ export default defineComponent({
         accessorKey: "created_by",
         sortable: true,
         size: COL.owner,
-        meta: { align: "center" },
+        meta: { align: "left" },
       },
       {
         id: "created_at",
@@ -372,7 +414,7 @@ export default defineComponent({
         header: t("alerts.lastRunAt"),
         accessorKey: "last_run_at",
         sortable: true,
-        size: COL.date,
+        size: COL.dateAbsolute,
         meta: { align: "left" },
       },
       {
@@ -380,7 +422,7 @@ export default defineComponent({
         header: t("alerts.lastSuccessfulAt"),
         accessorKey: "last_successful_at",
         sortable: true,
-        size: COL.date,
+        size: COL.dateAbsolute,
         meta: { align: "left" },
       },
       {
@@ -451,12 +493,15 @@ export default defineComponent({
               name: data.name,
               uuid: data.uuid,
               created_by: data.created_by,
+              created_at_raw: data.created_at || null,
               created_at: data.created_at
                 ? convertUnixToQuasarFormat(data.created_at)
                 : "-",
+              last_run_at_raw: data.last_run_at || null,
               last_run_at: data.last_run_at
                 ? convertUnixToQuasarFormat(data.last_run_at)
                 : "-",
+              last_successful_at_raw: data.last_successful_at || null,
               last_successful_at: data.last_successful_at
                 ? convertUnixToQuasarFormat(data.last_successful_at)
                 : "-",
@@ -827,35 +872,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.alerts-tabs {
-  .o-tabs {
-    &--vertical {
-      margin: 1.5rem 1rem 0 0;
-
-      .o-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-
-        &__content.tab_content {
-          .o-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-
-        &--active {
-          background-color: $accent;
-        }
-      }
-    }
-  }
-}
-.clone-alert-popup {
-  width: 400px;
-}
-</style>

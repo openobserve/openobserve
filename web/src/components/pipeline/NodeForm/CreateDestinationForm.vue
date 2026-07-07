@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="create-destination-form">
     <OForm
       :form="form"
-      class="tw:w-full pipeline-add-remote-destination-form"
+      class="w-full pipeline-add-remote-destination-form"
       v-slot="{ isSubmitting }"
     >
       <!-- Stepper for Create New Destination.
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the External Destination drawer without overflowing/clipping. The
            footer below stays full-width so its top border lines up with the
            full-width page header (matching the other destination forms). -->
-      <div class="tw:w-full tw:max-w-[50vw]">
+      <div class="w-full max-w-[50vw]">
       <OStepper
         v-model="step"
         ref="stepper"
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="step > 1"
           :navigable="step > 1"
         >
-          <div class="tw:text-sm tw:font-medium tw:mb-3" style="font-weight: 500">
+          <div class="text-sm font-medium mb-3" style="font-weight: 500">
             Select Destination Type <span class="text-red">*</span>
           </div>
           <div class="destination-type-grid">
@@ -88,11 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="step > 2"
           :navigable="step > 2"
         >
-          <div class="tw:text-sm tw:font-medium tw:mb-4" style="font-weight: 500">
+          <div class="text-sm font-medium mb-4" style="font-weight: 500">
             Connection Details
           </div>
 
-          <div class="tw:flex tw:flex-col tw:gap-4">
+          <div class="flex flex-col gap-4">
             <OFormInput
               data-test="add-destination-name-input"
               name="name"
@@ -113,9 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- OpenObserve Organization and Stream fields -->
             <div
               v-if="destinationType === 'openobserve'"
-              class="tw:flex tw:gap-4"
+              class="flex gap-4"
             >
-              <div class="tw:w-1/2">
+              <div class="w-1/2">
                 <OFormInput
                   data-test="add-destination-openobserve-org-input"
                   name="org"
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                 />
               </div>
-              <div class="tw:w-1/2">
+              <div class="w-1/2">
                 <OFormInput
                   data-test="add-destination-openobserve-stream-input"
                   name="stream"
@@ -198,8 +198,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destination-specific Metadata Section -->
-          <div v-if="showMetadataFields" class="tw:flex tw:flex-col tw:gap-4 tw:mt-4">
-            <div class="tw:w-full tw:text-[14px] tw:font-bold header-label">
+          <div v-if="showMetadataFields" class="flex flex-col gap-4 mt-4">
+            <div class="w-full text-[14px] font-bold header-label">
               Metadata Configuration
             </div>
 
@@ -276,17 +276,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           </div>
 
-          <div class="tw:flex tw:flex-col tw:gap-1 tw:mt-4">
-            <div class="o-input-label tw:leading-tight tw:flex tw:items-center">
+          <div class="flex flex-col gap-1 mt-4">
+            <div class="o-input-label leading-tight flex items-center">
               Headers
             </div>
-            <div class="tw:flex tw:flex-col tw:gap-2">
+            <div class="flex flex-col gap-2">
             <div
               v-for="(header, index) in apiHeaders"
               :key="index"
-              class="tw:flex tw:gap-1"
+              class="flex gap-1"
             >
-              <div class="tw:w-5/12">
+              <div class="w-5/12">
                 <OFormInput
                   :data-test="`add-destination-header-${header['key']}-key-input`"
                   :name="`headers[${index}].key`"
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                 />
               </div>
-              <div class="tw:w-5/12">
+              <div class="w-5/12">
                 <OFormInput
                   :data-test="`add-destination-header-${header['key']}-value-input`"
                   :name="`headers[${index}].value`"
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                 />
               </div>
-              <div class="tw:w-1/6 headers-btns">
+              <div class="w-1/6 headers-btns">
                 <OButton
                   :data-test="`add-destination-header-${header['key']}-delete-btn`"
                   variant="ghost-destructive"
@@ -325,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tw:w-full tw:mt-3 tw:inline-flex">
+          <div class="w-full mt-3 inline-flex">
             <OFormSwitch
               data-test="add-destination-skip-tls-verify-toggle"
               name="skip_tls_verify"
@@ -335,38 +335,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Connection Notes Card -->
           <OCard
-            class="connection-notes-card tw:mb-6 tw:mt-4 tw:!bg-[var(--color-banner-info-bg)]"
+            class="connection-notes-card mb-6 mt-4 !bg-[var(--color-banner-info-bg)]"
           >
             <OCardSection role="body">
-              <div class="tw:flex tw:items-center tw:mb-2">
+              <div class="flex items-center mb-2">
                 <OIcon
                   name="info"
                   size="md"
-                  class="tw:mr-2"
+                  class="mr-2"
                 />
-                <div class="tw:text-sm tw:font-medium text-weight-medium">
+                <div class="text-sm font-medium text-weight-medium">
                   {{ connectionNotes.title }}
                 </div>
               </div>
-              <div class="tw:text-sm">
-                <ol class="connection-steps tw:pl-3 tw:mb-0">
+              <div class="text-sm">
+                <ol class="connection-steps pl-3 mb-0">
                   <li
                     v-for="(stepText, index) in connectionNotes.steps"
                     :key="index"
-                    class="tw:mb-1"
+                    class="mb-1"
                   >
                     {{ stepText }}
                   </li>
                 </ol>
                 <div
                   v-if="connectionNotes.example"
-                  class="tw:mt-2 tw:p-2 example-url"
+                  class="mt-2 p-2 example-url"
                   :class="
-                    store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-white'
+                    store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-white'
                   "
                 >
                   <strong>Example:</strong>
-                  <code class="tw:ml-1">{{ connectionNotes.example }}</code>
+                  <code class="ml-1">{{ connectionNotes.example }}</code>
                 </div>
               </div>
             </OCardSection>
@@ -376,8 +376,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Form buttons -->
-      <div class="tw:flex tw:justify-start tw:mb-3 tw:pt-4 tw:border-t tw:border-border-default">
-        <div v-if="step === 1" class="tw:flex tw:gap-2">
+      <div class="flex justify-start mb-3 pt-4 border-t border-border-default">
+        <div v-if="step === 1" class="flex gap-2">
           <OButton
             data-test="step1-cancel-btn"
             variant="outline"
@@ -396,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Continue
           </OButton>
         </div>
-        <div v-if="step > 1" class="tw:flex tw:gap-2">
+        <div v-if="step > 1" class="flex gap-2">
           <OButton
             data-test="step3-back-btn"
             variant="outline"

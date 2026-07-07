@@ -36,7 +36,10 @@ use serde::{Deserialize, Serialize};
 use sha256::digest;
 
 use crate::{
-    meta::{cluster, stream::QueryPartitionStrategy},
+    meta::{
+        cluster,
+        stream::{QueryPartitionStrategy, StreamType},
+    },
     utils::sysinfo,
 };
 
@@ -49,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 45;
+pub const DB_SCHEMA_VERSION: u64 = 47;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -65,6 +68,10 @@ pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
 pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
 pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
+/// Initial HTTP/2 flow-control windows (bytes) for internal gRPC channels. Apply when
+/// `ZO_GRPC_HTTP2_ADAPTIVE_WINDOW=false` (default); adaptive resets to 64 KB and grows via BDP.
+pub const GRPC_HTTP2_STREAM_WINDOW_SIZE: u32 = 8 * 1024 * 1024; // 8 MB
+pub const GRPC_HTTP2_CONNECTION_WINDOW_SIZE: u32 = 16 * 1024 * 1024; // 16 MB
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 // The current value is recorded in each tantivy index file (puffin `row_group_size`
 // property) so it can be changed safely without breaking row_id → row_group mapping
@@ -121,12 +128,15 @@ const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 10] = [
     "llm_output",
 ];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    let cfg = get_config();
+    let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {
+        &_DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS
+    } else {
+        &[]
+    };
     let mut fields = chain(
-        _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS
-            .iter()
-            .map(|s| s.to_string()),
-        get_config()
-            .common
+        default_fields.iter().map(|s| s.to_string()),
+        cfg.common
             .feature_fulltext_extra_fields
             .split(',')
             .filter_map(|s| {
@@ -147,12 +157,15 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
 const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 3] =
     ["trace_id", "service_name", "operation_name"];
 pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    let cfg = get_config();
+    let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {
+        &_DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS
+    } else {
+        &[]
+    };
     let mut fields = chain(
-        _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS
-            .iter()
-            .map(|s| s.to_string()),
-        get_config()
-            .common
+        default_fields.iter().map(|s| s.to_string()),
+        cfg.common
             .feature_secondary_index_extra_fields
             .split(',')
             .filter_map(|s| {
@@ -191,10 +204,15 @@ pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
 
 const _DEFAULT_DISTINCT_FIELDS: [&str; 2] = ["service_name", "operation_name"];
 pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    let cfg = get_config();
+    let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {
+        &_DEFAULT_DISTINCT_FIELDS
+    } else {
+        &[]
+    };
     let mut fields = chain(
-        _DEFAULT_DISTINCT_FIELDS.iter().map(|s| s.to_string()),
-        get_config()
-            .common
+        default_fields.iter().map(|s| s.to_string()),
+        cfg.common
             .feature_distinct_extra_fields
             .split(',')
             .filter_map(|s| {
@@ -215,7 +233,7 @@ pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
 pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = get_config()
         .common
-        .bloom_filter_default_fields
+        .feature_bloom_filter_extra_fields
         .split(',')
         .filter_map(|s| {
             let s = s.trim();
@@ -547,6 +565,14 @@ impl std::str::FromStr for FileFormat {
 }
 
 impl FileFormat {
+    pub fn for_ingester_stream(stream_type: StreamType, configured: Self) -> Self {
+        if stream_type == StreamType::Metrics {
+            Self::Parquet
+        } else {
+            configured
+        }
+    }
+
     pub fn extension(&self) -> &'static str {
         match self {
             Self::Parquet => FILE_EXT_PARQUET,
@@ -781,6 +807,14 @@ pub struct Grpc {
     pub connect_timeout: u64,
     #[env_config(name = "ZO_GRPC_CHANNEL_CACHE_DISABLED", default = false)]
     pub channel_cache_disabled: bool,
+    #[env_config(
+        name = "ZO_GRPC_HTTP2_ADAPTIVE_WINDOW",
+        default = false,
+        help = "Enable HTTP/2 adaptive (BDP-based) flow-control window growth for inter-node \
+                gRPC. Off by default (fixed stream/connection windows apply). Turn on for \
+                high-latency links; costs more memory under many concurrent streams."
+    )]
+    pub http2_adaptive_window: bool,
     #[env_config(name = "ZO_GRPC_TLS_ENABLED", default = false)]
     pub tls_enabled: bool,
     #[env_config(name = "ZO_GRPC_TLS_CERT_DOMAIN", default = "")]
@@ -970,10 +1004,22 @@ pub struct Common {
         help = "Show field values dropdown for full text search fields in the logs page field list"
     )]
     pub show_fts_field_values: bool,
+    #[env_config(
+        name = "ZO_FEATURE_DEFAULT_INDEX_FIELDS_ENABLED",
+        default = true,
+        help = "When false, the built-in default fields for full text search, secondary index and distinct values are disabled; only the fields from the *_EXTRA_FIELDS ENVs and per-stream settings are used"
+    )]
+    pub feature_default_index_fields_enabled: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_INDEX_EXTRA_FIELDS", default = "")]
     pub feature_secondary_index_extra_fields: String,
+    #[env_config(
+        name = "ZO_FEATURE_BLOOM_FILTER_EXTRA_FIELDS",
+        default = "",
+        help = "Comma-separated fields to build bloom filter on for all streams, replaces the deprecated ZO_BLOOM_FILTER_DEFAULT_FIELDS"
+    )]
+    pub feature_bloom_filter_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
     pub feature_distinct_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
@@ -1086,6 +1132,10 @@ pub struct Common {
         help = "Enable bloom filter for parquet files"
     )]
     pub bloom_filter_parquet_enabled: bool,
+    #[deprecated(
+        since = "0.92.0",
+        note = "Please use `ZO_FEATURE_BLOOM_FILTER_EXTRA_FIELDS` instead. This ENV will be removed in v1.0.0"
+    )]
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
     #[env_config(
@@ -1364,7 +1414,7 @@ pub struct Common {
     pub regex_patterns_source_url: String,
     #[env_config(
         name = "ZO_MODEL_PRICING_ENABLED",
-        default = false,
+        default = true,
         help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
     )]
     pub model_pricing_enabled: bool,
@@ -1495,10 +1545,10 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 512)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 512)]
     pub max_file_size_in_memory: usize,
     #[deprecated(
         since = "0.14.1",
@@ -1537,7 +1587,7 @@ pub struct Limit {
     pub wal_write_buffer_size: usize,
     #[env_config(name = "ZO_WAL_WRITE_QUEUE_SIZE", default = 10000)] // 10k messages
     pub wal_write_queue_size: usize,
-    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
+    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 2)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
     pub file_push_limit: usize,
@@ -1658,8 +1708,6 @@ pub struct Limit {
     pub wal_runtime_worker_num: usize, // equals to mem_table_bucket_num if 0
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
     pub calculate_stats_interval: u64,
-    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT_SECS", default = 600)] // seconds
-    pub calculate_stats_step_limit_secs: i64,
     #[env_config(name = "ZO_HTTP_SHUTDOWN_TIMEOUT", default = 5)] // seconds
     pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_HTTP_SLOW_LOG_THRESHOLD", default = 5)] // seconds
@@ -1692,6 +1740,83 @@ pub struct Limit {
     pub alert_considerable_delay: i32,
     #[env_config(name = "ZO_SCHEDULER_WATCH_INTERVAL", default = 30)] // seconds
     pub scheduler_watch_interval: i64,
+    // Per-module scheduler pullers (Part A / A3+A4). When enabled, each TriggerModule gets its
+    // own pull loop, cadence, LIMIT budget, channel and worker pool, so a backlog or slow handler
+    // in one module cannot starve another. Default off → single shared puller (legacy behavior).
+    #[env_config(
+        name = "ZO_SCHEDULER_PER_MODULE_PULLERS",
+        default = false,
+        help = "Run a dedicated pull loop + worker pool per scheduler module. When false, a single shared puller handles all modules (legacy)."
+    )]
+    pub scheduler_per_module_pullers: bool,
+    // Per-module concurrency (LIMIT + channel cap + worker count). 0 = inherit
+    // ZO_ALERT_SCHEDULE_CONCURRENCY. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true.
+    // Backfill defaults to the smallest budget so bulk/background jobs never crowd out others.
+    // Note: the alert lane reuses ZO_ALERT_SCHEDULE_CONCURRENCY directly (no duplicate var).
+    #[env_config(
+        name = "ZO_SCHEDULER_REPORT_CONCURRENCY",
+        default = 0,
+        help = "Max report jobs pulled per cycle and the report worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
+    )]
+    pub scheduler_report_concurrency: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_DERIVED_STREAM_CONCURRENCY",
+        default = 0,
+        help = "Max derived-stream/pipeline jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
+    )]
+    pub scheduler_derived_stream_concurrency: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_BACKFILL_CONCURRENCY",
+        default = 1,
+        help = "Max backfill jobs pulled per cycle and the backfill worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. Defaults to 1 (smallest budget) so bulk backfills never crowd out latency-sensitive modules."
+    )]
+    pub scheduler_backfill_concurrency: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_ANOMALY_CONCURRENCY",
+        default = 0,
+        help = "Max anomaly-detection jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
+    )]
+    pub scheduler_anomaly_concurrency: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_QUERY_RECO_CONCURRENCY",
+        default = 0,
+        help = "Max query-recommendation jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
+    )]
+    pub scheduler_query_reco_concurrency: i64,
+    // Per-module poll cadence in seconds. 0 = inherit ZO_ALERT_SCHEDULE_INTERVAL (the alert pull
+    // frequency). Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. One var per module so each
+    // puller can poll at its own rate (e.g. backfill slower, synthetics faster). The alert lane
+    // reuses ZO_ALERT_SCHEDULE_INTERVAL directly (no duplicate var).
+    #[env_config(
+        name = "ZO_SCHEDULER_REPORT_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the report puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_report_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_DERIVED_STREAM_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the derived-stream/pipeline puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_derived_stream_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_BACKFILL_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the backfill puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_backfill_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_ANOMALY_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the anomaly-detection puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_anomaly_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_QUERY_RECO_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the query-recommendation puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_query_reco_interval: i64,
     #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
     pub search_job_workers: i64,
     #[env_config(name = "ZO_SEARCH_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds
@@ -1908,6 +2033,12 @@ pub struct Compact {
     pub enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
+    #[env_config(
+        name = "ZO_COMPACT_DATA_RETENTION_INTERVAL",
+        default = 3600,
+        help = "Interval in seconds for the data retention job, default is 3600. Retention works at day granularity, so it doesn't need to run at ZO_COMPACT_INTERVAL"
+    )] // seconds
+    pub data_retention_interval: u64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_INTERVAL", default = 3600)] // seconds
     pub old_data_interval: u64,
     #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")]
@@ -2598,8 +2729,18 @@ pub fn init() -> Config {
 fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // set real cpu num
     cfg.limit.real_cpu_num = max(1, sysinfo::get_cpu_limit());
+    // limit cpu num by memory, 1 core per 1GB, in case the user only set memory
+    // limit on k8s and we detect the whole node's cpu cores
+    let mem_total = sysinfo::get_memory_limit();
+    let cpu_num = if mem_total == 0 {
+        cfg.limit.real_cpu_num
+    } else {
+        cfg.limit
+            .real_cpu_num
+            .min(max(1, mem_total / (1024 * 1024 * 1024)))
+    };
     // set at least 2 threads
-    let cpu_num = max(2, cfg.limit.real_cpu_num);
+    let cpu_num = max(2, cpu_num);
     cfg.limit.cpu_num = cpu_num;
     if cfg.limit.http_worker_num == 0 {
         cfg.limit.http_worker_num = cpu_num;
@@ -2638,11 +2779,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
-        if cfg.common.local_mode {
-            cfg.limit.file_move_thread_num = std::cmp::max(1, cpu_num / 2);
-        } else {
-            cfg.limit.file_move_thread_num = cpu_num;
-        }
+        cfg.limit.file_move_thread_num = cpu_num;
     }
     // HACK for file_merge_thread_num equal to CPU core
     if cfg.limit.file_merge_thread_num == 0 {
@@ -2711,14 +2848,6 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.schema_max_fields_to_enable_uds = cfg.limit.udschema_max_fields;
     }
 
-    // check for calculate stats
-    if cfg.limit.calculate_stats_step_limit_secs < 1 {
-        cfg.limit.calculate_stats_step_limit_secs = 600;
-    }
-    if cfg.limit.calculate_stats_step_limit_secs > 86400 {
-        cfg.limit.calculate_stats_step_limit_secs = 86400;
-    }
-
     // migrate deprecated *_file_retention ENVs to *_query_retention for backward compatibility
     // if the user explicitly set a non-hourly file retention, apply it to query retention
     if cfg.limit.logs_file_retention != "hourly" && cfg.limit.logs_query_retention == "hourly" {
@@ -2771,13 +2900,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check max_file_size_on_disk to MB
     if cfg.limit.max_file_size_on_disk == 0 {
-        cfg.limit.max_file_size_on_disk = 256 * 1024 * 1024; // 256MB
+        cfg.limit.max_file_size_on_disk = 512 * 1024 * 1024; // 512MB
     } else {
         cfg.limit.max_file_size_on_disk *= 1024 * 1024;
     }
     // check max_file_size_in_memory to MB
     if cfg.limit.max_file_size_in_memory == 0 {
-        cfg.limit.max_file_size_in_memory = 256 * 1024 * 1024; // 256MB
+        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024; // 512MB
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
     }
@@ -2912,6 +3041,25 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "Default scrape interval can not be set to lesser than 5s ."
         ));
+    }
+
+    // migrate deprecated ZO_BLOOM_FILTER_DEFAULT_FIELDS into
+    // ZO_FEATURE_BLOOM_FILTER_EXTRA_FIELDS for backward compatibility
+    #[allow(deprecated)]
+    if !cfg.common.bloom_filter_default_fields.is_empty() {
+        log::warn!(
+            "ZO_BLOOM_FILTER_DEFAULT_FIELDS is deprecated and will be removed in v1.0.0, please use ZO_FEATURE_BLOOM_FILTER_EXTRA_FIELDS instead"
+        );
+        if cfg.common.feature_bloom_filter_extra_fields.is_empty() {
+            cfg.common.feature_bloom_filter_extra_fields =
+                cfg.common.bloom_filter_default_fields.clone();
+        } else {
+            cfg.common.feature_bloom_filter_extra_fields = format!(
+                "{},{}",
+                cfg.common.feature_bloom_filter_extra_fields,
+                cfg.common.bloom_filter_default_fields
+            );
+        }
     }
 
     // check bloom filter fpp: must be a probability in (0, 1)
@@ -3181,12 +3329,36 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Strip the Windows extended-length prefix (`\\?\`) from a canonicalized path
+/// so it can be compared with sysinfo mount points that use the plain DOS form.
+///
+/// Uses [`std::path::Prefix`] to detect verbatim prefixes rather than
+/// manipulating the string directly, which would silently break on non-ASCII
+/// drive letters or UNC paths.
+pub fn deverbatim(path: &Path) -> std::borrow::Cow<'_, str> {
+    #[cfg(windows)]
+    {
+        use std::path::{Component, Prefix};
+        if let Some(Component::Prefix(p)) = path.components().next() {
+            if let Prefix::VerbatimDisk(drive) = p.kind() {
+                // \\?\C:\rest → C:\rest
+                // p.as_os_str() is "\\?\C:" (6 bytes); the remainder of the
+                // original string is "\rest", so prepend the plain drive letter.
+                let after_prefix = &path.to_string_lossy()[p.as_os_str().len()..];
+                return format!("{}:{}", drive as char, after_prefix).into();
+            }
+        }
+    }
+    path.to_string_lossy()
+}
+
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
-    let cache_dir = Path::new(&cfg.common.data_cache_dir)
+    let cache_dir_path = Path::new(&cfg.common.data_cache_dir)
         .canonicalize()
         .unwrap();
-    let cache_dir = cache_dir.to_str().unwrap();
+    let cache_dir_owned = deverbatim(&cache_dir_path).into_owned();
+    let cache_dir = cache_dir_owned.as_str();
 
     // disable disk cache for local disk storage
     if cfg.common.is_local_storage
@@ -3329,6 +3501,9 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.compact.delete_files_delay_hours = 2;
     }
 
+    if cfg.compact.data_retention_interval < 1 {
+        cfg.compact.data_retention_interval = 3600;
+    }
     if cfg.compact.old_data_interval < 1 {
         cfg.compact.old_data_interval = 3600;
     }
@@ -3727,6 +3902,22 @@ mod tests {
     }
 
     #[test]
+    fn test_file_format_for_ingester_stream() {
+        assert_eq!(
+            FileFormat::for_ingester_stream(StreamType::Metrics, FileFormat::Vortex),
+            FileFormat::Parquet
+        );
+        assert_eq!(
+            FileFormat::for_ingester_stream(StreamType::Logs, FileFormat::Vortex),
+            FileFormat::Vortex
+        );
+        assert_eq!(
+            FileFormat::for_ingester_stream(StreamType::Traces, FileFormat::Parquet),
+            FileFormat::Parquet
+        );
+    }
+
+    #[test]
     fn test_file_format_from_extension() {
         assert_eq!(
             FileFormat::from_extension("data.parquet"),
@@ -4029,6 +4220,7 @@ mod tests {
         cfg.compact.interval = 0;
         cfg.compact.max_file_size = 0;
         cfg.compact.delete_files_delay_hours = 0;
+        cfg.compact.data_retention_interval = 0;
         cfg.compact.old_data_interval = 0;
         cfg.compact.old_data_max_days = 0;
         cfg.compact.old_data_min_hours = 0;
@@ -4040,6 +4232,7 @@ mod tests {
         assert_eq!(cfg.compact.interval, 10);
         assert_eq!(cfg.compact.max_file_size, 512 * 1024 * 1024);
         assert_eq!(cfg.compact.delete_files_delay_hours, 2);
+        assert_eq!(cfg.compact.data_retention_interval, 3600);
         assert_eq!(cfg.compact.old_data_interval, 3600);
         assert_eq!(cfg.compact.old_data_max_days, 7);
         assert_eq!(cfg.compact.old_data_min_hours, 2);
@@ -4123,6 +4316,44 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
+    fn test_check_common_config_bloom_filter_fields_migration() {
+        let mut cfg = Config::init().unwrap();
+        // deprecated ZO_BLOOM_FILTER_DEFAULT_FIELDS should migrate to the new ENV
+        cfg.common.bloom_filter_default_fields = "trace_id,span_id".to_string();
+        cfg.common.feature_bloom_filter_extra_fields = "".to_string();
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(
+            cfg.common.feature_bloom_filter_extra_fields,
+            "trace_id,span_id"
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_check_common_config_bloom_filter_fields_merge() {
+        let mut cfg = Config::init().unwrap();
+        // when both ENVs are set, the deprecated one is merged into the new one
+        cfg.common.bloom_filter_default_fields = "span_id".to_string();
+        cfg.common.feature_bloom_filter_extra_fields = "trace_id".to_string();
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(
+            cfg.common.feature_bloom_filter_extra_fields,
+            "trace_id,span_id"
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_check_common_config_bloom_filter_fields_no_migration() {
+        let mut cfg = Config::init().unwrap();
+        cfg.common.bloom_filter_default_fields = "".to_string();
+        cfg.common.feature_bloom_filter_extra_fields = "trace_id".to_string();
+        check_common_config(&mut cfg).unwrap();
+        assert_eq!(cfg.common.feature_bloom_filter_extra_fields, "trace_id");
+    }
+
+    #[test]
     fn test_check_s3_config_bucket_prefix_trailing_slash() {
         let mut cfg = Config::default();
         cfg.s3.server_url = "".to_string();
@@ -4202,5 +4433,35 @@ mod tests {
     fn test_get_cluster_name_returns_nonempty() {
         let name = get_cluster_name();
         assert!(!name.is_empty(), "cluster name should not be empty");
+    }
+
+    #[test]
+    fn test_deverbatim_plain_path_unchanged() {
+        let p = std::path::Path::new("/data/openobserve");
+        let result = deverbatim(p);
+        assert_eq!(result, "/data/openobserve");
+    }
+
+    #[test]
+    fn test_deverbatim_empty_path_unchanged() {
+        let p = std::path::Path::new("");
+        let result = deverbatim(p);
+        assert_eq!(result, "");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_deverbatim_verbatim_disk_stripped() {
+        let p = std::path::Path::new(r"\\?\C:\data\openobserve");
+        let result = deverbatim(p);
+        assert_eq!(result, r"C:\data\openobserve");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_deverbatim_plain_windows_path_unchanged() {
+        let p = std::path::Path::new(r"C:\data\openobserve");
+        let result = deverbatim(p);
+        assert_eq!(result, r"C:\data\openobserve");
     }
 }

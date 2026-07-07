@@ -906,12 +906,13 @@ GROUP BY stream;
         stream_type: StreamType,
         stream_name: &str,
     ) -> Result<()> {
-        let sql = format!(
-            "DELETE FROM stream_stats WHERE stream = '{org_id}/{stream_type}/{stream_name}';"
-        );
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        sqlx::query(&sql).execute(&*client).await?;
+        sqlx::query("DELETE FROM stream_stats WHERE stream = ?;")
+            .bind(&stream_key)
+            .execute(&*client)
+            .await?;
         Ok(())
     }
 
@@ -968,28 +969,6 @@ DO UPDATE SET
             return Err(e.into());
         }
 
-        Ok(())
-    }
-
-    async fn reset_stream_stats_min_ts(
-        &self,
-        _org_id: &str,
-        stream: &str,
-        min_ts: i64,
-    ) -> Result<()> {
-        let client = CLIENT_RW.clone();
-        let client = client.lock().await;
-        sqlx::query(r#"UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;"#)
-            .bind(min_ts)
-            .bind(stream)
-            .execute(&*client)
-            .await?;
-        sqlx::query(
-            r#"UPDATE stream_stats SET max_ts = min_ts WHERE stream = $1 AND max_ts < min_ts;"#,
-        )
-        .bind(stream)
-        .execute(&*client)
-        .await?;
         Ok(())
     }
 

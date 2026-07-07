@@ -295,7 +295,9 @@ describe("BuildQueryPage Component", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.find(".build-query-page").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="logs-build-query-page"]').exists(),
+      ).toBe(true);
     });
 
     it("should render the PanelEditor component", async () => {

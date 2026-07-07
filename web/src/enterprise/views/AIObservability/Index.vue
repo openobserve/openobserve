@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
-    <section class="tw:h-full tw:min-w-0 tw:min-h-0 tw:overflow-y-auto">
+    <section class="h-full min-w-0 min-h-0 overflow-y-auto">
       <router-view />
     </section>
   </PageLayout>
@@ -137,6 +137,11 @@ const activeSectionItem = computed(() =>
 // Group order: Monitor before Evaluate.
 const sectionGroupOrder = ["Monitor", "Evaluate"];
 
+const groupLabels = computed<Record<string, string>>(() => ({
+  Monitor: t("aiObservability.sections.monitor"),
+  Evaluate: t("aiObservability.sections.evaluate"),
+}));
+
 const sectionGroups = computed<SectionHubGroup[]>(() => {
   const buckets = new Map<string, SectionHubItem[]>();
   for (const item of sectionItems.value) {
@@ -150,7 +155,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   };
   return [...buckets.keys()]
     .sort((a, b) => rank(a) - rank(b))
-    .map((label) => ({ label, items: buckets.get(label)! }));
+    .map((key) => ({ label: groupLabels.value[key] ?? key, items: buckets.get(key)! }));
 });
 
 // Reserved for future per-section header chrome wiring (mirrors Settings'

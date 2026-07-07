@@ -34,19 +34,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Destination-specific Error Display -->
     <template #output-content>
-      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
+      <div class="w-full h-full border-l border-border-default" style="min-width: 400px;">
         <div
           v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-center text-xl font-semibold py-2"
         >
           {{ destinationErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
         </div>
-        <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-        <OSeparator class="tw:mr-4 tw:mt-4" />
-        <div class="error-report-container">
+        <div v-else class="text-center text-xl font-semibold py-2">Output Messages</div>
+        <OSeparator class="mr-4 mt-4" />
+        <div class="h-[calc(60vh-8px)] overflow-auto [resize:none] w-full min-w-100">
           <!-- Destination Errors Section -->
           <div
-            class="error-section"
+            class="error-section p-2.5 mb-2.5"
             v-if="destinationErrorsToDisplay.length > 0"
           >
             <div class="error-list">
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="(errorMessage, errorIndex) in errorGroup"
                   :key="errorIndex"
-                  class="error-item"
+                  class="py-1.25 px-0 text-sm wrap-break-word"
                   :data-test="`destination-import-error-${index}-${errorIndex}`"
                 >
                   <!-- Destination Name Error -->
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                         :options="destinationTypes"
                         :label="'Destination Type *'"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                       />
                     </div>
                   </span>
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                         :options="destinationMethods"
                         :label="'Destination Method *'"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                       />
                     </div>
                   </span>
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                         :options="filteredTemplates"
                         label="Templates *"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                         :error="!!templateErrors[index]"
                         :error-message="templateErrors[index]"
                         @search="filterTemplates"
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         label="Actions *"
                         labelKey="label"
                         valueKey="value"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                         :error="!!actionErrors[index]"
                         :error-message="actionErrors[index]"
                         @search="filterActions"
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="destination-import-skip-tls-verify-input"
                         :model-value="userSelectedSkipTlsVerify[index] ?? false"
                         :label="t('alert_destinations.skip_tls_verify')"
-                        class="tw:mt-2"
+                        class="mt-2"
                         @update:model-value="updateSkipTlsVerify($event, index)"
                       />
                     </div>
@@ -270,9 +270,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destination Creation Success Messages -->
-          <div class="error-section" v-if="destinationCreators.length > 0">
+          <div class="error-section p-2.5 mb-2.5" v-if="destinationCreators.length > 0">
             <div
-              class="section-title text-primary"
+              class="text-base mb-2.5 uppercase text-primary"
               data-test="destination-import-creation-title"
             >
               Destination Creation
@@ -285,13 +285,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="{
-                  'error-item tw:font-bold': true,
+                  'font-bold py-1.25 px-0 text-sm wrap-break-word': true,
                   'text-green ': val.success,
                   'text-red': !val.success,
                 }"
                 :data-test="`destination-import-creation-${index}-message`"
               >
-                <pre>{{ val.message }}</pre>
+                <pre class="[white-space:pre-wrap] [word-wrap:break-word] [word-break:break-word] [overflow-wrap:break-word] font-[inherit] m-0">{{ val.message }}</pre>
               </div>
             </div>
           </div>
@@ -925,41 +925,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.error-report-container {
-  height: calc(60vh - 8px) !important;
-  overflow: auto;
-  resize: none;
-  width: 100%;
-  min-width: 400px;
-}
-
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-
-  pre {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    word-break: break-word;
-    overflow-wrap: break-word;
-    font-family: inherit;
-    margin: 0;
-  }
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-
-.error-item {
-  padding: 5px 0px;
-  font-size: 14px;
-  word-wrap: break-word;
-  word-break: break-word;
-  overflow-wrap: break-word;
-}
-</style>

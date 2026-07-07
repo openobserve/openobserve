@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #separator>
         <div
           data-test="errors-list-splitter-drag-grip"
-          class="bg-primary text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full tw:top-[0.625rem]"
+          class="bg-primary text-white inline-flex items-center justify-center w-5 h-5 rounded-full top-[0.625rem]"
         >
           <OIcon name="drag-indicator" size="xs" />
         </div>
@@ -108,7 +108,7 @@ const tableColumns = [
     accessorKey: "error_count",
     sortable: true,
     size: COL.count,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "initial_view_name",
@@ -125,47 +125,22 @@ const rows = ref<Session[]>([]);
 const tableRows = computed(() => rows.value);
 </script>
 
-<style lang="scss">
-.sessions_page {
-  .index-menu .field_list .field_overlay .field_label,
-  .q-field__native,
-  .q-field__input,
-  .q-table tbody td {
-    font-size: 0.75rem !important;
-  }
+<style>
+.sessions_page .index-table :hover::-webkit-scrollbar,
+#tracesSearchGridComponent:hover::-webkit-scrollbar {
+  height: 0.8125rem;
+  width: 0.8125rem;
+}
 
-  .q-splitter__after {
-    overflow: hidden;
-  }
+.sessions_page .index-table ::-webkit-scrollbar-track,
+#tracesSearchGridComponent::-webkit-scrollbar-track {
+  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+  border-radius: 0.625rem;
+}
 
-  .index-table :hover::-webkit-scrollbar,
-  #tracesSearchGridComponent:hover::-webkit-scrollbar {
-    height: 0.8125rem;
-    width: 0.8125rem;
-  }
-
-  .index-table ::-webkit-scrollbar-track,
-  #tracesSearchGridComponent::-webkit-scrollbar-track {
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-    border-radius: 0.625rem;
-  }
-
-  .index-table ::-webkit-scrollbar-thumb,
-  #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-    border-radius: 0.625rem;
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-  }
-
-  .q-table__top {
-    padding: 0 !important;
-  }
-
-  .q-table__control {
-    width: 100%;
-  }
-
-  .q-field__control-container {
-    padding-top: 0 !important;
-  }
+.sessions_page .index-table ::-webkit-scrollbar-thumb,
+#tracesSearchGridComponent::-webkit-scrollbar-thumb {
+  border-radius: 0.625rem;
+  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
 }
 </style>

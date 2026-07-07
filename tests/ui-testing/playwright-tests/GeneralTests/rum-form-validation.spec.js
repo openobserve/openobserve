@@ -23,26 +23,16 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/**
- * Create a temporary file on disk and return its absolute path.
- * @param {string} filename - File name including extension
- * @param {string} [content] - Optional content (defaults to empty)
- * @returns {string} absolute path to the temp file
- */
-function createTempFile(filename, content = '') {
-  const dir  = fs.mkdtempSync(path.join(os.tmpdir(), 'rum-fv-'));
-  const file = path.join(dir, filename);
-  fs.writeFileSync(file, content);
-  return file;
-}
+const { buildZip, createTempFile } = require('../utils/zip-builder.js');
 
 // ── RUM Source Maps form validation tests ─────────────────────────────────────
+
+// Unique per run: duplicate uploads are rejected by the backend with 400
+// "already exists", so a stable service name would break reruns against the
+// same (persistent) instance. The uploaded group is deleted in afterAll.
+const UPLOAD_SERVICE = `test-service-fv-${Date.now()}`;
+const UPLOAD_VERSION = '1.0.0';
+const UPLOAD_ENV = 'production';
 
 test.describe('RUM Source Maps upload form validation', () => {
   test.describe.configure({ mode: 'serial' });
@@ -61,17 +51,43 @@ test.describe('RUM Source Maps upload form validation', () => {
 
   // Create temp files once before the suite runs
   test.beforeAll(async () => {
-    // Minimal *valid* empty ZIP archive: a single End-Of-Central-Directory
-    // record (22 bytes). A bare local-file signature ("PK\x03\x04") is rejected
-    // by the backend with "Could not find EOCD", so the upload happy-path needs
-    // a structurally valid archive.
-    const emptyZip = Buffer.from([
-      0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0,
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    // A structurally valid ZIP that actually contains a sourcemap pair
+    // (a minified .js and its matching .js.map). The backend now rejects any
+    // archive with no valid .js/.js.map files ("No valid sourcemap files found
+    // in uploaded zip"), so the upload happy-path needs real entries — an empty
+    // archive is no longer accepted.
+    const sourceMapContent = JSON.stringify({
+      version: 3,
+      file: 'app.js',
+      sources: ['app.ts'],
+      names: [],
+      mappings: 'AAAA',
+    });
+    const validSourceMapZip = buildZip([
+      { name: 'app.js',     content: 'console.log("hello");' },
+      { name: 'app.js.map', content: sourceMapContent },
     ]);
-    tempZipPath = createTempFile('test_sourcemaps_fv.zip', emptyZip);
+    tempZipPath = createTempFile('test_sourcemaps_fv.zip', validSourceMapZip);
     // Non-zip file used to trigger format error
     tempTxtPath = createTempFile('invalid_sourcemaps_fv.txt', 'not a zip');
+  });
+
+  test.afterAll(async ({ browser }) => {
+    // Remove the group uploaded by the happy-path test so reruns against the
+    // same instance never hit the duplicate-upload 400.
+    const orgId = process.env['ORGNAME'] || 'default';
+    const baseUrl = process.env['ZO_BASE_URL'] || 'http://localhost:5080';
+    const auth = Buffer.from(
+      `${process.env['ZO_ROOT_USER_EMAIL']}:${process.env['ZO_ROOT_USER_PASSWORD']}`,
+    ).toString('base64');
+    const page = await browser.newPage();
+    await page.request
+      .delete(
+        `${baseUrl}/api/${orgId}/sourcemaps?service=${UPLOAD_SERVICE}&version=${UPLOAD_VERSION}&env=${UPLOAD_ENV}`,
+        { headers: { Authorization: `Basic ${auth}` } },
+      )
+      .catch(() => {});
+    await page.close();
   });
 
   // ── Test 1: No file selected → toast error ──────────────────────────────────
@@ -177,9 +193,9 @@ test.describe('RUM Source Maps upload form validation', () => {
   }, async ({ page }) => {
     testLogger.info('Testing successful source map upload with valid inputs');
 
-    await pm.rumFormValidation.fillService('test-service-fv-001');
-    await pm.rumFormValidation.fillVersion('1.0.0');
-    await pm.rumFormValidation.fillEnvironment('production');
+    await pm.rumFormValidation.fillService(UPLOAD_SERVICE);
+    await pm.rumFormValidation.fillVersion(UPLOAD_VERSION);
+    await pm.rumFormValidation.fillEnvironment(UPLOAD_ENV);
     await pm.rumFormValidation.attachFile(tempZipPath);
 
     // Confirm file was attached (upload area should reflect a file is selected)

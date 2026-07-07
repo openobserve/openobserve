@@ -86,13 +86,13 @@ describe("CellActions", () => {
     it("applies dark background class in dark theme", () => {
       mockStore.state.theme = "dark";
       const wrapper = mountComponent();
-      expect(wrapper.find(".field_overlay").classes()).toContain("tw:bg-black");
+      expect(wrapper.find(".field_overlay").classes()).toContain("bg-black");
     });
 
     it("applies light background class in light theme", () => {
       mockStore.state.theme = "light";
       const wrapper = mountComponent();
-      expect(wrapper.find(".field_overlay").classes()).toContain("tw:bg-white");
+      expect(wrapper.find(".field_overlay").classes()).toContain("bg-white");
     });
   });
 

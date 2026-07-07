@@ -27,9 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="emits('update:open', $event)"
     @click:secondary="emits('update:open', false)"
   >
-    <div class="tw:w-full">
+    <div class="w-full">
       <OForm id="add-stream-form" :default-values="streamInputsDefault" @submit="submitForm">
-        <div class="tw:mt-2">
+        <div class="mt-2">
           <OInput
             data-test="add-stream-name-input"
             v-model="streamInputs.name"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="tw:mt-2">
+        <div class="mt-2">
           <OSelect
             data-test="add-stream-type-input"
             v-model="streamInputs.stream_type"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="tw:mt-2">
+        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="mt-2">
           <OInput
             data-test="add-stream-data-retention"
             v-model="streamInputs.dataRetentionDays"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <StreamFieldInputs
           ref="fieldInputsRef"
-          class="tw:mt-4"
+          class="mt-4"
           :fields="fields"
           @add="addField"
           @remove="removeField"
@@ -83,9 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODialog>
 
   <!-- Inline form for pipeline usage (no drawer wrapper) -->
-    <div v-else class="tw:p-4 tw:w-full">
+    <div v-else class="p-4 w-full">
       <OForm :default-values="streamInputsDefault" @submit="submitForm">
-        <div class="tw:mt-2">
+        <div class="mt-2">
           <OInput
             data-test="add-stream-name-input"
             v-model="streamInputs.name"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="tw:mt-2">
+        <div class="mt-2">
           <OSelect
             data-test="add-stream-type-input"
             v-model="streamInputs.stream_type"
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="tw:mt-2">
+        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="mt-2">
           <OInput
             data-test="add-stream-data-retention"
             v-model="streamInputs.dataRetentionDays"
@@ -129,13 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <StreamFieldInputs
           ref="fieldInputsRef"
-          class="tw:mt-4"
+          class="mt-4"
           :fields="fields"
           @add="addField"
           @remove="removeField"
         />
 
-        <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
+        <div class="flex justify-start mt-6 gap-2">
           <OButton
             data-test="add-stream-cancel-btn"
             variant="outline"
@@ -198,7 +198,7 @@ const dataRetentionError = ref('');
 // Allowed characters mirror the backend `format_stream_name` regex
 // (src/config/src/utils/schema.rs): alphanumeric, underscore and colon only.
 const streamNameRegex = /^[a-zA-Z0-9_:]+$/;
-const streamNameHelpText = "Use alphanumeric characters, underscore and colon only.";
+const streamNameHelpText = t("logStream.streamNameHelpText");
 
 const validateStreamName = () => {
   if (streamInputs.value.name && !streamNameRegex.test(streamInputs.value.name)) {

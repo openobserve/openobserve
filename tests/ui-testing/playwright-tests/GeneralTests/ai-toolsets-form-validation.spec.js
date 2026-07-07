@@ -159,9 +159,13 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
 test.describe('CrossLink dialog form validation', () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
-    // Name of a stream to use for the cross-link tests. Can be any existing
-    // stream in the environment; falls back to 'default' if not set.
-    const testStream = process.env['TEST_STREAM_NAME'] || 'default';
+    // Name of a stream to use for the cross-link tests. Must be a *logs* stream:
+    // the streams page defaults to the "logs" type filter (LogStream.vue
+    // selectedStreamType=ref("logs")), so a non-logs stream (e.g. the traces
+    // stream named "default") never renders a row and the schema button is
+    // unreachable. e2e_automate is the logs stream the global ingestion always
+    // creates in CI; override via TEST_STREAM_NAME for other environments.
+    const testStream = process.env['TEST_STREAM_NAME'] || 'e2e_automate';
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);

@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('menu.iam')"
       />
     </template>
-    <section class="tw:h-full tw:min-w-0 tw:min-h-0 tw:overflow-y-auto">
+    <section class="h-full min-w-0 min-h-0 overflow-y-auto">
       <RouterView />
     </section>
   </PageLayout>
@@ -83,12 +83,12 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
 
   const groups: { label: string; items: SectionHubItem[] }[] = [
     {
-      label: "Access",
+      label: t("iam.sectionAccess"),
       items: [
         {
           key: "users",
           label: t("iam.basicUsers"),
-          description: "People with access to this organization",
+          description: t("iam.usersDesc"),
           icon: "person",
           to: { name: "users", query: orgQuery.value },
           dataTest: "iam-users-tab",
@@ -96,7 +96,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
         {
           key: "serviceAccounts",
           label: t("iam.serviceAccounts"),
-          description: "Programmatic access tokens for APIs",
+          description: t("iam.serviceAccountsDesc"),
           icon: "manage-accounts",
           to: { name: "serviceAccounts", query: orgQuery.value },
           visible: svc,
@@ -105,7 +105,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
         {
           key: "ingestionTokens",
           label: t("iam.ingestionTokens"),
-          description: "Tokens for ingesting data into this organization",
+          description: t("iam.ingestionTokensDesc"),
           icon: "key",
           to: { name: "ingestionTokens", query: orgQuery.value },
           dataTest: "iam-ingestion-tokens-tab",
@@ -113,7 +113,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
         {
           key: "invitations",
           label: t("iam.invitations"),
-          description: "Pending and sent member invitations",
+          description: t("iam.invitationsDesc"),
           icon: "mail",
           to: { name: "invitations", query: orgQuery.value },
           visible: isCloud,
@@ -122,12 +122,12 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
       ],
     },
     {
-      label: "Permissions",
+      label: t("iam.sectionPermissions"),
       items: [
         {
           key: "groups",
           label: t("iam.groups"),
-          description: "Group users together to assign roles",
+          description: t("iam.groupsDesc"),
           icon: "group",
           to: { name: "groups", query: orgQuery.value },
           visible: isEnt && rbac,
@@ -136,7 +136,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
         {
           key: "roles",
           label: t("iam.roles"),
-          description: "Define permissions and access policies",
+          description: t("iam.rolesDesc"),
           icon: "shield",
           to: { name: "roles", query: orgQuery.value },
           visible: isEnt && rbac,
@@ -145,7 +145,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
         {
           key: "quota",
           label: t("iam.quota"),
-          description: "Usage limits applied per role",
+          description: t("iam.quotaDesc"),
           icon: "speed",
           to: { name: "quota", query: orgQuery.value },
           visible: isEnt && rbac && meta,
@@ -154,12 +154,12 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
       ],
     },
     {
-      label: "Organization",
+      label: t("iam.sectionOrganization"),
       items: [
         {
           key: "organizations",
           label: t("iam.organizations"),
-          description: "Organizations you can access",
+          description: t("iam.organizationsDesc"),
           icon: "corporate-fare",
           to: { name: "organizations", query: orgQuery.value },
           dataTest: "iam-organizations-tab",

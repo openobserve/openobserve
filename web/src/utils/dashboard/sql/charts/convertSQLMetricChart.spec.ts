@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { applyMetricChart } from "@/utils/dashboard/sql/charts/convertSQLMetricChart";
+import {
+  applyMetricChart,
+  calculateMetricFontSize,
+  METRIC_COPY_BTN_SLOT_PX,
+  METRIC_MIN_FONT_PX,
+} from "@/utils/dashboard/sql/charts/convertSQLMetricChart";
+import { calculateOptimalFontSize } from "@/utils/dashboard/chartDimensionUtils";
 
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
   formatUnitValue: vi.fn((v) => String(v ?? "")),
@@ -92,6 +98,70 @@ function makeMockContext(overrides: Partial<any> = {}): any {
 }
 
 describe("applyMetricChart", () => {
+  describe("copy-button support", () => {
+    it("exposes the formatted value as _metricText for copy", () => {
+      const ctx = makeMockContext();
+      applyMetricChart(ctx);
+      // getUnitValue/formatUnitValue are mocked passthrough → raw value string.
+      expect(ctx.options.series[0]._metricText).toBe("100");
+    });
+
+    it("stores _metricLayout sized to the panel for icon positioning", () => {
+      const ctx = makeMockContext();
+      applyMetricChart(ctx);
+      expect(ctx.options.series[0]._metricLayout).toMatchObject({
+        left: 0,
+        top: 0,
+        width: 800,
+        height: 400,
+        cx: 400,
+        cy: 200,
+      });
+    });
+
+    it("reserves the copy-button slot on both sides and caps by height when fitting the font size", () => {
+      const ctx = makeMockContext();
+      applyMetricChart(ctx);
+      // layout font size is computed against width minus the button slot on
+      // each side (the value is centered, so free width splits evenly),
+      // capped by the panel height so the value also fits vertically.
+      expect(calculateOptimalFontSize).toHaveBeenCalledWith(
+        "100",
+        800 - 2 * METRIC_COPY_BTN_SLOT_PX,
+        400,
+      );
+    });
+
+    it("floors the metric font size at the readable minimum", () => {
+      vi.mocked(calculateOptimalFontSize).mockReturnValueOnce(3);
+      // narrow-but-tall cell: width fit says 3px, floor lifts it to 12px
+      expect(calculateMetricFontSize("311688.00", 74, 267)).toBe(
+        METRIC_MIN_FONT_PX,
+      );
+    });
+
+    it("does not floor beyond what the cell height allows", () => {
+      vi.mocked(calculateOptimalFontSize).mockReturnValueOnce(3);
+      // 10px-tall cell: the floor is limited by the height cap (10 / 1.2 = 8)
+      expect(calculateMetricFontSize("311688.00", 74, 10)).toBe(8);
+    });
+
+    it("does not floor beyond what the full cell width fits (no clipped digits)", () => {
+      // slot-reserved fit says 3px; the full-width fit only allows 9px, so
+      // the 12px floor is capped at 9px instead of clipping the value
+      vi.mocked(calculateOptimalFontSize)
+        .mockReturnValueOnce(3)
+        .mockReturnValueOnce(9);
+      expect(calculateMetricFontSize("311688.00", 60, 267)).toBe(9);
+    });
+
+    it("omits _metricLayout when the panel ref is unavailable", () => {
+      const ctx = makeMockContext({ chartPanelRef: { value: null } });
+      applyMetricChart(ctx);
+      expect(ctx.options.series[0]._metricLayout).toBeUndefined();
+    });
+  });
+
   it("sets xAxis to empty array", () => {
     const ctx = makeMockContext();
     applyMetricChart(ctx);

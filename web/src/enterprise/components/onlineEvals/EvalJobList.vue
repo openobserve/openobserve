@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <EvalListShell
     data-test="eval-job"
     :show-empty="false"
@@ -20,13 +20,13 @@
         :persist-columns="true"
         table-id="eval-job-list"
         width="100%"
-        class="tw:w-full tw:h-full"
+        class="w-full h-full"
         @row-click="(row: any) => $emit('view', row)"
       >
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="tw:flex-1 tw:min-w-0"
+            class="flex-1 min-w-0"
             :placeholder="t('onlineEvals.job.searchPlaceholder')"
             data-test="eval-job-list-search-input"
             clearable
@@ -38,13 +38,13 @@
             :placeholder="t('onlineEvals.job.allStatuses')"
             size="md"
             width="sm"
-            class="tw:shrink-0"
+            class="shrink-0"
             data-test="eval-job-list-status-filter"
           />
         </template>
 
         <template #empty>
-          <div class="tw:flex tw:items-center tw:justify-center tw:py-8">
+          <div class="flex items-center justify-center py-8">
             <OEmptyState
               size="hero"
               preset="no-eval-jobs"
@@ -56,22 +56,19 @@
         </template>
 
         <template #cell-status="{ row }">
-          <span class="ej-status-chip" :class="`ej-status-chip--${statusOf(row)}`">
-            <span class="ej-status-chip__dot" />
-            {{ statusLabel(statusOf(row)) }}
-          </span>
+          <OTag
+            type="evalStatus"
+            :value="statusOf(row)"
+            :label="statusLabel(statusOf(row))"
+          />
         </template>
 
         <template #cell-stream="{ row }">
-          <span class="ej-mono-cell">{{ row.stream }}</span>
+          <span class="font-mono text-xs">{{ row.stream }}</span>
         </template>
 
         <template #cell-scorers="{ row }">
-          <span class="ej-mono-cell">{{ scorerCountText(row) }}</span>
-        </template>
-
-        <template #cell-lastRun>
-          <span class="ej-muted-cell">—</span>
+          <span class="font-mono text-xs">{{ scorerCountText(row) }}</span>
         </template>
 
         <template #cell-created="{ row }">
@@ -79,11 +76,11 @@
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center actions-container">
+          <div class="flex items-center actions-container">
             <OButton
               v-if="canActivate(row.status)"
               :data-test="`eval-job-list-${row.name}-activate-btn`"
-              variant="ghost"
+              variant="ghost-success"
               size="icon-sm"
               :title="t('onlineEvals.actions.activate')"
               icon-left="play-arrow"
@@ -94,7 +91,7 @@
             <OButton
               v-if="canPause(row.status)"
               :data-test="`eval-job-list-${row.name}-pause-btn`"
-              variant="ghost"
+              variant="ghost-destructive"
               size="icon-sm"
               :title="t('onlineEvals.actions.pause')"
               icon-left="pause"
@@ -130,6 +127,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -222,14 +220,7 @@ const columns = computed(() => [
     accessorFn: (row: EvalJob) => (row.scorers || []).length,
     sortable: true,
     size: COL.count,
-    meta: { align: "left" },
-  },
-  {
-    id: "lastRun",
-    header: t("onlineEvals.job.columns.lastRun"),
-    sortable: false,
-    size: COL.date,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "created",
@@ -302,57 +293,3 @@ function formatDateShort(value: number) {
   return formatDate(value, "YYYY-MM-DD HH:mm:ss");
 }
 </script>
-
-<style lang="scss">
-.ej-status-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font: 600 11px/1.5 inherit;
-  text-transform: capitalize;
-}
-
-.ej-status-chip__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: currentColor;
-}
-
-.ej-status-chip--active {
-  background: color-mix(in srgb, var(--o2-status-success-text) 14%, transparent);
-  color: var(--o2-status-success-text);
-}
-
-.ej-status-chip--draft {
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.ej-status-chip--paused {
-  background: color-mix(in srgb, var(--o2-status-warning-text) 14%, transparent);
-  color: var(--o2-status-warning-text);
-}
-
-.ej-status-chip--degraded {
-  background: color-mix(in srgb, var(--o2-status-warning-text) 14%, transparent);
-  color: var(--o2-status-warning-text);
-}
-
-.ej-status-chip--archived {
-  background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  opacity: 0.7;
-}
-
-.ej-mono-cell {
-  font-size: 12px;
-}
-
-.ej-muted-cell {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-}
-</style>

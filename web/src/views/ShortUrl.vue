@@ -1,10 +1,10 @@
 <template>
   <div
     data-test="loading-container"
-    class="tw:h-[100vh] tw:flex tw:flex-col tw:items-center tw:justify-center"
+    class="h-[100vh] flex flex-col items-center justify-center"
   >
     <OSpinner size="lg" data-test="spinner" />
-    <div data-test="message" class="message">Redirecting...</div>
+    <div data-test="message" class="text-base text-[#666]">Redirecting...</div>
   </div>
 </template>
 
@@ -86,36 +86,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-}
-
-.spinner {
-  border: 4px solid rgba(0, 0, 0, 0.1);
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border-left-color: #09f;
-  animation: spin 1s linear infinite;
-  margin-bottom: 16px;
-}
-
-.message {
-  font-size: 16px;
-  color: #666;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-</style>

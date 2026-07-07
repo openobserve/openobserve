@@ -4,7 +4,9 @@ run-name: "Playwright Auto-Rerun - ${{ github.event.workflow_run.head_branch || 
 
 on:
   workflow_run:
-    workflows: ["Playwright UI Tests"]
+    workflows:
+      - "Playwright UI Tests"
+      - "Playwright Regression Tests"
     types:
       - completed
     branches:

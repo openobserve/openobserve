@@ -351,16 +351,20 @@ describe("FieldExpansion", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, dataType: "Utf8" },
       });
-      const expandIconSpan = wrapper.find(".field-type-container");
-      expect(expandIconSpan.exists()).toBe(true);
+      const expandBtn = wrapper.find(
+        '[data-test="log-search-expand-log_level-field-btn"]',
+      );
+      expect(expandBtn.exists()).toBe(true);
     });
 
     it("renders expand icon span even when field has no dataType", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, dataType: undefined },
       });
-      const expandIconSpan = wrapper.find(".field-type-container");
-      expect(expandIconSpan.exists()).toBe(true);
+      const expandBtn = wrapper.find(
+        '[data-test="log-search-expand-log_level-field-btn"]',
+      );
+      expect(expandBtn.exists()).toBe(true);
     });
   });
 
