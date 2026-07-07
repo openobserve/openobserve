@@ -86,28 +86,39 @@ export class RumPage {
     }
 
     async clickRunQuery() {
-        // Set up response listener to capture first error ID
+        // The errors page (useErrorIssuesData.fetchAll) fans out FIVE parallel
+        // RUM `_search` requests — issues list, histogram, KPIs, denominators
+        // and deploys — so matching URL alone is a race and usually captures the
+        // wrong response. Only the issues-list query aliases `latest_error_id`
+        // (buildIssuesSql), so we key the predicate on that field to lock onto
+        // the correct response regardless of which returns first.
         const responsePromise = this.page.waitForResponse(
-            response => response.url().includes('/_search') &&
-                       response.url().includes('search_type=RUM') &&
-                       response.status() === 200,
+            async response => {
+                if (!response.url().includes('/_search') ||
+                    !response.url().includes('search_type=RUM') ||
+                    response.status() !== 200) {
+                    return false;
+                }
+                try {
+                    const data = await response.json();
+                    return Boolean(data?.hits?.[0]?.latest_error_id);
+                } catch {
+                    return false;
+                }
+            },
             { timeout: 30000 }
         ).catch(() => null);
 
         // Click run query
         await this.page.locator(this.runQueryButton).click();
 
-        // Try to extract first error ID and timestamp from response
+        // Extract first error ID and timestamp from the issues-list response
         const response = await responsePromise;
         if (response) {
             try {
-                const data = await response.json();
-                // The response contains hits with aggregated error data
-                if (data.hits && data.hits.length > 0) {
-                    const firstHit = data.hits[0];
-                    this.firstErrorId = firstHit.latest_error_id;
-                    this.firstErrorTimestamp = firstHit.zo_sql_timestamp;
-                }
+                const firstHit = (await response.json()).hits[0];
+                this.firstErrorId = firstHit.latest_error_id;
+                this.firstErrorTimestamp = firstHit.zo_sql_timestamp;
             } catch (e) {
                 // Ignore JSON parse errors
             }

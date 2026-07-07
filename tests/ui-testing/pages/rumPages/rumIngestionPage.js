@@ -6,12 +6,19 @@ export class RumIngestionPage {
     constructor(page) {
         this.page = page;
 
-        // Locators
-        this.titleText = page.locator('[data-test="rumweb-title-text"]');
+        // Locators — the page now renders the shared rich setup card
+        // (SetupCardRenderer), so RUM-specific selectors were replaced by the
+        // card's data-test attributes. The card only mounts once a RUM token
+        // exists (v-if="rumToken"), so its presence == page loaded.
+        // FrontendRumConfig passes data-test="rum-web-setup-card" to the
+        // renderer; Vue attribute fallthrough puts it on the card's root div
+        // (it overrides the renderer's own "ai-rich-setup-card"), so that is
+        // the selector that actually lands in the DOM.
+        this.titleText = page.locator('[data-test="rum-web-setup-card"]');
         this.resetTokenButton = page.locator('[data-test="ingestion-reset-token-btn"]');
-        // CopyContent blocks: first = npm install command, second = SDK init config.
-        this.contentBlocks = page.locator('[data-test="rum-content-text"]');
-        this.copyButtons = page.locator('[data-test="rum-copy-btn"]');
+        // Code blocks: first = npm install command, second = SDK init config.
+        this.contentBlocks = page.locator('[data-test="ai-code"]');
+        this.copyButtons = page.locator('[data-test="ai-code-copy-btn"]');
     }
 
     async gotoFrontendMonitoring() {
