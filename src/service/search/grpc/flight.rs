@@ -49,13 +49,10 @@ use infra::{
     },
 };
 use itertools::Itertools;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::sampling::execution::apply_sampling_to_files;
 use parking_lot::Mutex;
 use rayon::slice::ParallelSliceMut;
-#[cfg(feature = "enterprise")]
-use {
-    o2_enterprise::enterprise::search::datafusion::distributed_plan::metadata_count::metadata_count_rewrite,
-    o2_enterprise::enterprise::search::sampling::execution::apply_sampling_to_files,
-};
 
 use crate::service::{
     db,
@@ -63,7 +60,7 @@ use crate::service::{
         datafusion::{
             distributed_plan::{
                 NewEmptyExecVisitor, ReplaceTableScanExec, codec::get_physical_extension_codec,
-                rewrite::tantivy_optimize_rewrite,
+                rewrite::aggregate_optimize_rewrite,
             },
             exec::{DataFusionContextBuilder, register_udf},
             optimizer::physical_optimizer::{
@@ -578,51 +575,28 @@ fn apply_pushdowns_and_optimizations(
         })?;
     }
 
-    if !metadata_count_file_list.is_empty() {
-        #[cfg(not(feature = "enterprise"))]
-        let _ = metadata_count_file_list;
-
-        #[cfg(feature = "enterprise")]
-        {
-            let metadata_count_start = std::time::Instant::now();
-            scan_stats.add(&collect_stats(&metadata_count_file_list));
-            physical_plan = metadata_count_rewrite(metadata_count_file_list, physical_plan)?;
-            log::info!(
-                "{}",
-                search_inspector_fields(
-                    format!("[trace_id {trace_id}] flight->search: metadata count rewrite"),
-                    SearchInspectorFieldsBuilder::new()
-                        .trace_id(trace_id.to_string())
-                        .node_name(LOCAL_NODE.name.clone())
-                        .component("flight:do_get::search metadata count rewrite".to_string())
-                        .search_role("follower".to_string())
-                        .duration(metadata_count_start.elapsed().as_millis() as usize)
-                        .build()
-                )
-            );
-        }
-    }
-
-    if !tantivy_file_list.is_empty() {
-        let tantivy_start = std::time::Instant::now();
+    if !metadata_count_file_list.is_empty() || !tantivy_file_list.is_empty() {
+        let index_optimize_start = std::time::Instant::now();
+        scan_stats.add(&collect_stats(&metadata_count_file_list));
         scan_stats.add(&collect_stats(&tantivy_file_list));
-        physical_plan = tantivy_optimize_rewrite(
+        physical_plan = aggregate_optimize_rewrite(
             query_params.clone(),
+            metadata_count_file_list,
             tantivy_file_list,
             index_condition,
-            idx_optimize_rule.unwrap(), // guaranteed Some, if tantivy_file_list is not empty
+            idx_optimize_rule,
             physical_plan,
         )?;
         log::info!(
             "{}",
             search_inspector_fields(
-                format!("[trace_id {trace_id}] flight->search: tantivy optimize rewrite"),
+                format!("[trace_id {trace_id}] flight->search: index optimize rewrite"),
                 SearchInspectorFieldsBuilder::new()
                     .trace_id(trace_id.to_string())
                     .node_name(LOCAL_NODE.name.clone())
-                    .component("flight:do_get::search tantivy optimize rewrite".to_string())
+                    .component("flight:do_get::search index optimize rewrite".to_string())
                     .search_role("follower".to_string())
-                    .duration(tantivy_start.elapsed().as_millis() as usize)
+                    .duration(index_optimize_start.elapsed().as_millis() as usize)
                     .build()
             )
         );
