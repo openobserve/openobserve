@@ -117,6 +117,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loadingState"
+              data-test="log-stream-refresh-btn"
+              @click="() => getLogStream(true)"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="streamsRefresh" />
+            </OButton>
+          </template>
           <!--
             Render the stream-name cell with a deterministic per-name data-test.
             Tests can target a specific stream row via
@@ -291,6 +303,7 @@ import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -311,6 +324,7 @@ export default defineComponent({
     OEmptyState,
     AddStream,
     OButton,
+    OTooltip,
     ODialog,
     OIcon,
     OToggleGroup,

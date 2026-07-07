@@ -79,6 +79,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="ingestion-tokens-refresh-btn"
+              @click="fetchTokens"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="ingestionTokensRefresh" />
+            </OButton>
+          </template>
           <template #empty>
             <OEmptyState
               size="hero"

@@ -147,6 +147,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-class="cursor-pointer"
             @row-click="handleRowClick"
           >
+            <template #toolbar-trailing>
+              <OButton
+                variant="outline"
+                size="icon-sm"
+                icon-left="refresh"
+                :loading="isLoadingIssues"
+                data-test="rum-app-errors-refresh-btn"
+                @click="runQuery"
+              >
+                <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="rumErrorsRefresh" />
+              </OButton>
+            </template>
             <template #empty>
               <NoData />
             </template>
@@ -258,6 +270,9 @@ import {
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import NoData from "@/components/shared/grid/NoData.vue";
 
 const QueryEditor = defineAsyncComponent(
@@ -675,6 +690,10 @@ function updateUrlQueryParams() {
   query["org_identifier"] = store.state.selectedOrganization.identifier;
   router.push({ query });
 }
+
+useShortcuts([
+  { id: "rumErrorsRefresh", handler: () => { if (!isInputFocused()) runQuery(); } },
+]);
 </script>
 <style>
 .sessions_page .index-table :hover::-webkit-scrollbar,

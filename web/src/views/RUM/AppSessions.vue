@@ -270,6 +270,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-global-filter="false"
                   :default-columns="false"
                 >
+                  <template #toolbar-trailing>
+                    <OButton
+                      variant="outline"
+                      size="icon-sm"
+                      icon-left="refresh"
+                      :loading="isLoading.length > 0"
+                      data-test="rum-app-sessions-refresh-btn"
+                      @click="runQuery"
+                    >
+                      <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="rumSessionsRefresh" />
+                    </OButton>
+                  </template>
                   <template #empty>
                     <div
                       v-if="hasSegmentFilteredOutAllRows"
@@ -440,6 +452,9 @@ import {
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -1563,6 +1578,10 @@ const getStarted = () => {
     name: "rumMonitoring",
   });
 };
+
+useShortcuts([
+  { id: "rumSessionsRefresh", handler: () => { if (!isInputFocused()) runQuery(); } },
+]);
 </script>
 <style>
 .sessions_page {

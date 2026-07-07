@@ -29,6 +29,18 @@
         dense
         @pagination-change="onPaginationChange"
       >
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="isLoading"
+            data-test="stream-explorer-refresh-btn"
+            @click="getQueryData"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="streamExplorerRefresh" />
+          </OButton>
+        </template>
         <template #empty>
           <no-data />
         </template>
@@ -46,6 +58,10 @@ import { cloneDeep } from "lodash-es";
 
 import SearchBar from "@/components/logstream/explore/SearchBar.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import NoData from "@/components/shared/grid/NoData.vue";
 import stream from "@/services/stream";
@@ -241,4 +257,8 @@ const updateDateTime = (value: IDateTime) => {
     getQueryData();
   }
 };
+
+useShortcuts([
+  { id: "streamExplorerRefresh", handler: () => { if (!isInputFocused()) getQueryData(); } },
+]);
 </script>

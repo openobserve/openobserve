@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #actions>
         <OButton
-          data-test="eval-template-list-refresh-btn"
+          data-test="eval-template-list-header-refresh-btn"
           variant="outline"
           size="sm"
           @click="loadTemplates"
@@ -86,6 +86,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="t('evalTemplate.search')"
               />
             </div>
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="isLoading"
+              data-test="eval-template-list-refresh-btn"
+              @click="loadTemplates"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="evalTemplatesRefresh" />
+            </OButton>
           </template>
           <!-- Version column -->
           <template #cell-version="{ row }">
@@ -188,9 +200,12 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 interface Template {
   id: string;
@@ -405,5 +420,9 @@ const bulkDeleteTemplates = async () => {
 onBeforeMount(async () => {
   await loadTemplates();
 });
+
+useShortcuts([
+  { id: "evalTemplatesRefresh", handler: () => { if (!isInputFocused()) loadTemplates(); } },
+]);
 </script>
 

@@ -80,6 +80,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="user-list-refresh-btn"
+              @click="getOrgMembers"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamUsersRefresh" />
+            </OButton>
+          </template>
           <template #empty>
             <OEmptyState
               size="hero"
@@ -239,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -281,6 +294,7 @@ export default defineComponent({
     AddUser,
     MemberInvitation,
     OButton,
+    OTooltip,
     OTag,
     OIcon,
     ODialog,

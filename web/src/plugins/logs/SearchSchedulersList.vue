@@ -38,6 +38,18 @@
             :show-global-filter="false"
             :default-columns="false"
           >
+            <template #toolbar-trailing>
+              <OButton
+                variant="outline"
+                size="icon-sm"
+                icon-left="refresh"
+                :loading="isLoading"
+                data-test="search-scheduler-refresh-btn"
+                @click="fetchSearchHistory"
+              >
+                <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="searchSchedulersRefresh" />
+              </OButton>
+            </template>
             <template #cell-user_id="{ row }">
               <OUserCell :value="row.user_id" />
             </template>
@@ -264,6 +276,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -277,6 +290,8 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "SearchSchedulersList",
@@ -292,6 +307,7 @@ export default defineComponent({
     AppTabs,
     JsonPreview,
     OButton,
+    OTooltip,
     OSpinner,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
@@ -763,6 +779,9 @@ export default defineComponent({
       searchObj.meta.jobId = row.id;
       goToLogs(row);
     };
+    useShortcuts([
+      { id: "searchSchedulersRefresh", handler: () => { if (!isInputFocused()) fetchSearchHistory(); } },
+    ]);
     return {
       searchObj,
       store,

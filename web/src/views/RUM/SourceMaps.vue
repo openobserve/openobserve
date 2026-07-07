@@ -98,6 +98,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:expanded-ids="expandedIds"
           class="w-full"
         >
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="isLoading"
+              data-test="source-maps-refresh-btn"
+              @click="fetchSourceMaps"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="sourceMapsRefresh" />
+            </OButton>
+          </template>
           <template #expansion="{ row }">
             <div class="p-3 bg-(--q-background) border-t border-(--q-border-color,var(--o2-border))">
               <div class="text-sm font-medium mb-2">
@@ -178,6 +190,9 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -500,4 +515,8 @@ onMounted(async () => {
   await fetchFilterValues();
   fetchSourceMaps();
 });
+
+useShortcuts([
+  { id: "sourceMapsRefresh", handler: () => { if (!isInputFocused()) fetchSourceMaps(); } },
+]);
 </script>

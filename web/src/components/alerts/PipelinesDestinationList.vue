@@ -63,6 +63,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('pipeline_destinations.search')"
           />
         </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="pipeline-destination-list-refresh-btn"
+            @click="getDestinations"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="pipelineDestinationsRefresh" />
+          </OButton>
+        </template>
         <template #empty>
           <OEmptyState
             size="hero"
@@ -184,6 +196,9 @@ import type { Template } from "@/ts/interfaces/index";
 
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -214,6 +229,7 @@ export default defineComponent({
     OEmptyState,
     ConfirmDialog,
     OButton,
+    OTooltip,
     OIcon,
     OTag,
     OSearchInput,
@@ -628,6 +644,10 @@ export default defineComponent({
 
       confirmBulkDelete.value = false;
     };
+
+    useShortcuts([
+      { id: "pipelineDestinationsRefresh", handler: () => { if (!isInputFocused()) getDestinations(); } },
+    ]);
 
     return {
       t,

@@ -63,6 +63,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="action-list-search-input"
             />
           </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="action-scripts-list-refresh-btn"
+              @click="getActionScripts"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="actionsRefresh" />
+            </OButton>
+          </template>
             <template #empty>
               <NoData />
             </template>
@@ -282,6 +294,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 interface ActionScriptList {
   "#": string | number;
@@ -814,6 +828,10 @@ export default defineComponent({
       },
       { immediate: true },
     );
+
+    useShortcuts([
+      { id: "actionsRefresh", handler: () => { if (!isInputFocused()) getActionScripts(); } },
+    ]);
 
     return {
       t,

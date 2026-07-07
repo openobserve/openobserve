@@ -89,6 +89,9 @@ const columns: OTableColumnDef[] = [
         />
       </div>
     </template>
+    <template #toolbar-trailing>
+      <slot name="toolbar-trailing" />
+    </template>
     <!-- Row actions: edit + delete -->
     <template #cell-actions="{ row }">
       <div class="flex items-center justify-center">

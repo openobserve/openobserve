@@ -91,6 +91,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="incident-list-refresh-btn"
+            @click="refreshIncidents"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="alertIncidentsRefresh" />
+          </OButton>
+        </template>
         <template #cell-status="{ row }">
           <OTag
             type="incidentStatus"
@@ -223,6 +235,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
@@ -612,6 +626,10 @@ export default defineComponent({
         timeout: 1500,
       });
     };
+
+    useShortcuts([
+      { id: "alertIncidentsRefresh", handler: () => { if (!isInputFocused()) refreshIncidents(); } },
+    ]);
 
     return {
       t,

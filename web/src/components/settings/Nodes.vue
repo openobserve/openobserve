@@ -449,6 +449,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('nodes.search')"
             />
           </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="nodes-list-refresh-btn"
+              @click="() => getData(true)"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="nodesRefresh" />
+            </OButton>
+          </template>
           <template #empty>
             <OEmptyState
               size="hero"
@@ -546,6 +558,8 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -1030,6 +1044,10 @@ export default defineComponent({
         filterClusterQuery.value,
       );
     });
+
+    useShortcuts([
+      { id: "nodesRefresh", handler: () => { if (!isInputFocused()) getData(true); } },
+    ]);
 
     return {
       t,

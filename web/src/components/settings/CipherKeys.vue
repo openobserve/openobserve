@@ -66,6 +66,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('cipherKey.search')"
           />
         </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="cipher-keys-list-refresh-btn"
+            @click="getData"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="cipherKeysRefresh" />
+          </OButton>
+        </template>
         <template #empty>
           <OEmptyState
             size="hero"
@@ -153,12 +165,15 @@ import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
 import CipherKeysService from "@/services/cipher_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -168,6 +183,7 @@ export default defineComponent({
     AddCipherKey,
     ConfirmDialog,
     OButton,
+    OTooltip,
     OSearchInput,
     OTable,
 },
@@ -455,6 +471,10 @@ export default defineComponent({
           }
         });
     };
+
+    useShortcuts([
+      { id: "cipherKeysRefresh", handler: () => { if (!isInputFocused()) getData(); } },
+    ]);
 
     return {
       t,
