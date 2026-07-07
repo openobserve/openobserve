@@ -541,10 +541,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :wrap="searchObj.meta.toggleSourceWrap"
             :scroll-target="scrollContainerRef"
+            :stream-doc-time-range="streamDocTimeRange"
+            :query-window-us="queryWindowUs"
             @open-details="openPatternDetails"
             @add-to-search="addPatternToSearch"
             @create-alert="createAlertFromPattern"
             @filter-value="addWildcardValueToSearch"
+            @jump-to-stream-data="(from, to) => $emit('jump-to-stream-data', from, to)"
           />
         </div>
       </div>
@@ -759,11 +762,20 @@ export default defineComponent({
     "update:columnSizes",
     "sendToAiChat",
     "run-query",
+    "jump-to-stream-data",
   ],
   props: {
     expandedLogs: {
       type: Array,
       default: () => [],
+    },
+    streamDocTimeRange: {
+      type: Object,
+      default: undefined,
+    },
+    queryWindowUs: {
+      type: Object,
+      default: undefined,
     },
   },
   methods: {

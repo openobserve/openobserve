@@ -87,6 +87,12 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-patterns": {
+    illustration: "wave-bars",
+    variant: "no-results",
+    titleKey: "emptyState.noPatterns.title",
+    descriptionKey: "emptyState.noPatterns.description",
+  },
   "no-stream-selected": {
     illustration: "query",
     variant: "neutral",
@@ -685,6 +691,7 @@ export type EmptyStatePresetName = keyof typeof emptyStatePresets;
 // preset. Presets not listed fall back to a generic "results".
 export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-logs": "emptyState.nouns.logs",
+  "no-patterns": "emptyState.nouns.patterns",
   "no-dashboards": "emptyState.nouns.dashboards",
   "no-pipelines": "emptyState.nouns.pipelines",
   "no-functions": "emptyState.nouns.functions",

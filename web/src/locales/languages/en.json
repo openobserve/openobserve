@@ -12,6 +12,11 @@
       "action": "Widen time range",
       "actionDesc": "Search across a longer period"
     },
+    "noPatterns": {
+      "title": "No patterns found",
+      "description": "Try increasing the time range or selecting a different stream with more log data. Pattern extraction works best with at least 1,000 logs.",
+      "logsAnalyzed": "Only {count} logs were analyzed."
+    },
     "noStreamSelected": {
       "title": "Select a stream to get started",
       "description": "Pick a stream, then run your query to explore its data. Refine results with filters and a custom time range."
@@ -294,6 +299,7 @@
     },
     "nouns": {
       "logs": "logs",
+      "patterns": "patterns",
       "dashboards": "dashboards",
       "pipelines": "pipelines",
       "functions": "functions",
