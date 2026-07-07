@@ -13,7 +13,7 @@ defineSlots<TimelineItemSlots>();
 /**
  * Maps each variant to the CSS custom property holding the dot colour.
  * Tailwind JIT cannot generate `bg-[var(...)]` utilities from dynamic
- * strings, so we use tw:inline style instead of a class map.
+ * strings, so we use inline style instead of a class map.
  */
 const dotColorMap: Record<TimelineItemVariant, string> = {
   primary: "var(--color-timeline-dot-primary)",
@@ -35,12 +35,12 @@ const isOIcon = computed<boolean>(() =>
 </script>
 
 <template>
-  <li class="tw:relative tw:flex tw:gap-4 tw:pb-6 tw:last:pb-0">
+  <li class="relative flex gap-4 pb-6 last:pb-0">
     <!-- Left column: dot + vertical connector line -->
-    <div class="tw:relative tw:flex tw:flex-col tw:items-center tw:shrink-0">
+    <div class="relative flex flex-col items-center shrink-0">
       <!-- Dot / icon circle -->
       <div
-        class="tw:relative tw:z-10 tw:flex tw:size-7 tw:shrink-0 tw:items-center tw:justify-center tw:rounded-full"
+        class="relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full"
         :style="dotStyle"
         aria-hidden="true"
       >
@@ -51,7 +51,7 @@ const isOIcon = computed<boolean>(() =>
         />
         <span
           v-else-if="icon"
-          class="material-icons tw:text-[14px] tw:leading-none tw:text-timeline-dot-fg tw:select-none"
+          class="material-icons text-[14px] leading-none text-timeline-dot-fg select-none"
         >{{ icon }}</span>
       </div>
 
@@ -61,21 +61,21 @@ const isOIcon = computed<boolean>(() =>
         parent <li> is :last-child.
       -->
       <div
-        class="timeline-connector tw:w-px tw:flex-1 tw:bg-timeline-line tw:mt-1"
+        class="timeline-connector w-px flex-1 bg-timeline-line mt-1"
       />
     </div>
 
     <!-- Right column: title, subtitle, extra slot content -->
-    <div class="tw:flex-1 tw:min-w-0 tw:pt-0.5 tw:pb-1">
+    <div class="flex-1 min-w-0 pt-0.5 pb-1">
       <p
         v-if="title"
-        class="tw:m-0 tw:text-sm tw:font-medium tw:leading-snug tw:text-text-primary"
+        class="m-0 text-sm font-medium leading-snug text-text-primary"
       >
         {{ title }}
       </p>
       <p
         v-if="subtitle"
-        class="tw:m-0 tw:mt-0.5 tw:text-xs tw:leading-normal tw:text-text-secondary"
+        class="m-0 mt-0.5 text-xs leading-normal text-text-secondary"
       >
         {{ subtitle }}
       </p>

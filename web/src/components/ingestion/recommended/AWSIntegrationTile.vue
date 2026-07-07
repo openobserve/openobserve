@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCard
-    class="tw:border tw:border-border tw:h-full tw:flex tw:flex-col tw:transition-all tw:duration-200 tw:ease-in-out tw:rounded-lg tw:hover:-translate-y-0.5 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] tw:dark:hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)]"
+    class="border border-border h-full flex flex-col transition-all duration-200 ease-in-out rounded-lg hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] dark:hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)]"
   >
-    <OCardSection class="tw:p-4 tw:pb-2 tw:flex-1">
-      <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
-        <div class="tw:font-semibold tw:text-base tw:leading-[1.4]" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
+    <OCardSection class="p-4 pb-2 flex-1">
+      <div class="flex items-start justify-between mb-2">
+        <div class="font-semibold text-base leading-[1.4]" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#1a1a1a]'">
           {{ integration.displayName }}
         </div>
         <OButton
@@ -28,26 +28,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-circle-sm"
           @click="handleDocumentation()"
-          class="docs-btn tw:opacity-70 tw:hover:opacity-100 tw:transition-opacity tw:duration-200 tw:ease-in-out"
+          class="docs-btn opacity-70 hover:opacity-100 transition-opacity duration-200 ease-in-out"
           :data-test="`aws-${integration.id}-docs-btn`"
         >
           <OIcon name="description" size="sm" />
           <OTooltip content="View Documentation" />
         </OButton>
       </div>
-      <div class="tw:text-sm tw:mb-3 tw:leading-normal tw:min-h-[3em]" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
+      <div class="text-sm mb-3 leading-normal min-h-[3em]" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
         {{ integration.description }}
       </div>
     </OCardSection>
 
-    <OCardActions align="left" class="tw:px-4 tw:pb-4">
+    <OCardActions align="left" class="px-4 pb-4">
       <!-- Add Source Button -->
       <OButton
         v-if="hasCloudFormation"
         variant="primary"
         size="sm"
         @click="handleAddSource()"
-        class="tw:flex-1"
+        class="flex-1"
         :data-test="`aws-${integration.id}-add-source-btn`"
         >Add Source</OButton
       >
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="primary"
         size="sm"
         @click="handleDocumentation()"
-        class="tw:flex-1"
+        class="flex-1"
         :data-test="`aws-${integration.id}-documentation-btn`"
         >Documentation</OButton
       >
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         @click="handleAddDashboard"
         :disabled="!integration.hasDashboard || !integration.dashboardGithubUrl"
-        class="tw:flex-1"
+        class="flex-1"
         :data-test="`aws-${integration.id}-add-dashboard-btn`"
         >Add Dashboard</OButton
       >
@@ -78,27 +78,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       secondary-button-label="Cancel"
       @click:secondary="showTemplateDialog = false"
     >
-      <div class="tw:text-sm tw:font-medium tw:mb-3">
+      <div class="text-sm font-medium mb-3">
         Select how you want to integrate {{ integration.displayName }}:
       </div>
-      <ul class="aws-integration-options-list tw:flex tw:flex-col tw:list-none tw:p-0 tw:m-0">
+      <ul class="aws-integration-options-list flex flex-col list-none p-0 m-0">
         <!-- CloudFormation Templates -->
         <li
           v-for="(template, index) in integration.cloudFormationTemplates"
           :key="`cf-${index}`"
           @click="handleTemplateSelection(template)"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-2 tw:cursor-pointer tw:rounded tw:border tw:border-border tw:hover:bg-muted/50"
+          class="flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded border border-border hover:bg-muted/50"
           :data-test="`aws-${integration.id}-template-option-${index}`"
         >
-          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-            <span class="tw:text-sm tw:font-medium">
+          <div class="flex flex-col flex-1 min-w-0">
+            <span class="text-sm font-medium">
               {{ template.name }}
             </span>
-            <span class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-1">
+            <span class="block text-xs text-muted-foreground mt-1">
               {{ template.description }}
             </span>
           </div>
-          <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:ms-auto" />
+          <OIcon name="chevron-right" size="sm" class="shrink-0 ms-auto" />
         </li>
 
         <!-- Component Options -->
@@ -106,18 +106,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(option, index) in integration.componentOptions"
           :key="`comp-${index}`"
           @click="handleComponentSelection(option)"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-2 tw:cursor-pointer tw:rounded tw:border tw:border-border tw:hover:bg-muted/50"
+          class="flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded border border-border hover:bg-muted/50"
           :data-test="`aws-${integration.id}-component-option-${index}`"
         >
-          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-            <span class="tw:text-sm tw:font-medium">
+          <div class="flex flex-col flex-1 min-w-0">
+            <span class="text-sm font-medium">
               {{ option.name }}
             </span>
-            <span class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-1">
+            <span class="block text-xs text-muted-foreground mt-1">
               {{ option.description }}
             </span>
           </div>
-          <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:ms-auto" />
+          <OIcon name="chevron-right" size="sm" class="shrink-0 ms-auto" />
         </li>
       </ul>
     </ODialog>

@@ -20,36 +20,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <div
         data-test="dashboard-errors-expand-bar"
-        class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-2 tw:cursor-pointer tw:overflow-hidden tw:hover:bg-[#eaeaeaa5]"
+        class="flex items-center gap-2 px-2 py-2 cursor-pointer overflow-hidden hover:bg-[#eaeaeaa5]"
         :style="{ backgroundColor: store.state.theme === 'dark' ? 'var(--o2-header-menu-bg)' : 'var(--color-primary-100)' }"
         @click="onDropDownClick"
       >
         <OIcon
           :name="!showErrors ? 'arrow-right' : 'arrow-drop-down'"
           size="sm"
-          class="tw:mr-1"
+          class="mr-1"
         />
-        <span class="tw:text-sm tw:font-semibold tw:text-red-500">
+        <span class="text-sm font-semibold text-red-500">
           Errors ({{ props.errors.errors.length }})
         </span>
       </div>
     </div>
     <div
-      class="tw:flex"
+      class="flex"
       :style="!showErrors ? 'height: 0px;' : 'height: auto;'"
       style="overflow: hidden"
     >
-      <div class="tw:flex tw:flex-col">
+      <div class="flex flex-col">
         <div data-test="dashboard-error">
           <ul
             data-test="dashboard-errors-list"
-            class="tw:list-disc tw:list-inside tw:px-3"
+            class="list-disc list-inside px-3"
           >
             <li
               v-for="(item, index) in props.errors.errors"
               :key="index"
               style="color: red"
-              class="tw:py-1"
+              class="py-1"
               data-test="dashboard-errors-list-item"
             >
               {{ item }}

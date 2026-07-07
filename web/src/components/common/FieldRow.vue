@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OFieldRow
     v-if="(field.ftsKey && !showFtsFieldValues) || !field.isSchemaField || !field.showValues"
     :data-test="`logs-field-list-item-${field.name}`"
-    class="tw:pl-[1.5rem]"
+    class="pl-[1.5rem]"
     :highlight="isFieldSelected && field.name !== timestampColumn"
   >
     <OFieldLabel :field="field" :show-type-icon="false" />
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showQuickMode && field.name !== timestampColumn"
       :name="field.isInterestingField ? 'info-filled' : 'info-outline'"
       variant="ghost-neutral"
-      class="tw:gap-0! tw:mr-1"
+      class="gap-0! mr-1"
       size="icon"
       :title="
         field.isInterestingField
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="showVisibilityToggle && !isFieldSelected && field.name !== timestampColumn"
         variant="ghost-neutral"
         size="icon"
-        class="tw:gap-0!"
+        class="gap-0!"
         title="Add field to table"
         @click.stop="$emit('toggle-field', field)"
       >
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
         v-if="showVisibilityToggle && isFieldSelected"
         variant="ghost-neutral"
-        class="tw:gap-0!"
+        class="gap-0!"
         size="icon"
         title="Remove field from table"
         @click.stop="$emit('toggle-field', field)"
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
         v-if="showQuickMode && field.name !== timestampColumn"
         variant="ghost-neutral"
-        class="tw:gap-0!"
+        class="gap-0!"
         size="icon"
         :title="
           field.isInterestingField

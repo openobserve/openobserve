@@ -27,7 +27,7 @@
     @click:primary="applyValueMapping"
     data-test="dashboard-value-mapping-popup"
   >
-    <div class="tw:mb-4">
+    <div class="mb-4">
       <draggable
         v-model="editedValueMapping"
         :options="dragOptions"
@@ -37,26 +37,26 @@
         <div
           v-for="(mapping, index) in editedValueMapping"
           :key="index"
-          class="tw:flex tw:items-center tw:justify-between tw:mb-2"
+          class="flex items-center justify-between mb-2"
         >
-          <div class="tw:self-center tw:cursor-move tw:p-2">
+          <div class="self-center cursor-move p-2">
             <OIcon
               name="drag-indicator" size="sm"
-              class="tw:mr-1"
+              class="mr-1"
               :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
             />
           </div>
-          <div class="tw:flex tw:items-center tw:justify-between tw:flex-1 tw:gap-x-6">
+          <div class="flex items-center justify-between flex-1 gap-x-6">
             <OSelect
               v-model="mapping.type"
               :label="t('dashboard.valueMappingType')"
               :options="mappingTypes"
               :data-test="`dashboard-addpanel-config-value-mapping-type-select-${index}`"
-              class="tw:flex-1"
+              class="flex-1"
             />
             <div
               v-if="mapping.type === 'value'"
-              class="input-container tw:flex-1"
+              class="input-container flex-1"
             >
               <OInput
                 v-model="mapping.value"
@@ -66,7 +66,7 @@
             </div>
             <div
               v-if="mapping.type === 'regex'"
-              class="input-container tw:flex-1"
+              class="input-container flex-1"
             >
               <OInput
                 v-model="mapping.pattern"
@@ -76,7 +76,7 @@
             </div>
             <div
               v-if="mapping.type === 'range'"
-              class="input-container tw:flex-1 tw:flex tw:flex-col tw:gap-2"
+              class="input-container flex-1 flex flex-col gap-2"
             >
               <OInput
                 v-model="mapping.from"
@@ -86,27 +86,27 @@
               <OInput
                 v-model="mapping.to"
                 :placeholder="t('dashboard.valueMappingTo')"
-                class="tw:flex-1"
+                class="flex-1"
                 :data-test="`dashboard-addpanel-config-value-mapping-to-input-${index}`"
               />
             </div>
             <OInput
               v-model="mapping.text"
               :label="t('dashboard.valueMappingDisplayValue')"
-              class="tw:flex-1"
+              class="flex-1"
               :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
             />
             <div
-              class="tw:flex tw:items-center tw:flex-1"
+              class="flex items-center flex-1"
               :data-test="`dashboard-addpanel-config-value-mapping-color-section-${index}`"
             >
               <div
                 v-if="mapping.color !== null"
-                class="tw:items-center tw:flex tw:gap-1"
+                class="items-center flex gap-1"
               >
                 <OColor
                   v-model="mapping.color"
-                  class="tw:flex-1 tw:h-9 tw:mt-3"
+                  class="flex-1 h-9 mt-3"
                 />
                 <OButton
                   variant="ghost"
@@ -119,11 +119,11 @@
                   </template>
                 </OButton>
               </div>
-              <div v-else class="tw:w-full">
+              <div v-else class="w-full">
                 <OButton
                   variant="ghost-primary"
                   size="sm"
-                  class="tw:w-full"
+                  class="w-full"
                   :data-test="`dashboard-addpanel-config-value-mapping-set-color-btn-${index}`"
                   @click="setColorByIndex(index)"
                   >{{ t("dashboard.valueMappingSetColor") }}</OButton

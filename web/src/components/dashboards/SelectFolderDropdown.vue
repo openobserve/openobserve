@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:items-end tw:gap-2">
+  <div class="flex items-end gap-2">
     <!-- select new folder -->
     <OSelect
       v-model="selectedFolder"
@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       data-test="index-dropdown-stream_type"
       labelKey="label"
-      class="tw:flex-1"
+      class="flex-1"
     />
 
     <OButton
       data-test="dashboard-folder-move-new-add"
       variant="outline"
       size="icon-xs-sq"
-      class="tw:h-8! tw:w-8!"
+      class="h-8! w-8!"
       @mousedown.prevent
       @click="
         () => {

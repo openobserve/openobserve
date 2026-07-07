@@ -16,18 +16,18 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="height: 100%; display: flex; flex-direction: column; overflow: hidden" data-test="view-panel-screen">
-    <div class="tw:flex tw:justify-between tw:items-center tw:p-3">
-      <div class="tw:flex tw:items-center tw:text-xl tw:tracking-[0.005em] tw:mr-3">
+    <div class="flex justify-between items-center p-3">
+      <div class="flex items-center text-xl tracking-[0.005em] mr-3">
         <span data-test="dashboard-viewpanel-title">
           {{ dashboardPanelData.data.title }}
         </span>
       </div>
-      <div class="tw:flex tw:items-center" style="gap: 0.5rem">
+      <div class="flex items-center" style="gap: 0.5rem">
         <!-- histogram interval for sql queries -->
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
-          class="tw:h-8 tw:transition-all tw:duration-200 tw:hover:bg-[var(--color-interactive-hover-bg)]"
+          class="h-8 transition-all duration-200 hover:bg-[var(--color-interactive-hover-bg)]"
           style="width: 150px"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
         />
@@ -35,7 +35,7 @@
         <DateTimePickerDashboard
           v-model="selectedDate"
           ref="dateTimePickerRef"
-          class="tw:h-8 tw:min-h-8 tw:transition-all tw:duration-200 tw:hover:bg-[var(--color-interactive-hover-bg)]"
+          class="h-8 min-h-8 transition-all duration-200 hover:bg-[var(--color-interactive-hover-bg)]"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
           @hide="setTimeForVariables()"
@@ -47,7 +47,7 @@
             store.state?.zoConfig?.min_auto_refresh_interval || 5
           "
           @trigger="refreshData"
-          class="tw:h-8 tw:transition-all tw:duration-200 tw:hover:bg-[var(--color-interactive-hover-bg)]"
+          class="h-8 transition-all duration-200 hover:bg-[var(--color-interactive-hover-bg)]"
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <OButton
@@ -86,11 +86,11 @@
       </div>
     </div>
     <OSeparator />
-    <div class="tw:flex" style="flex: 1; overflow: hidden">
-      <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
-        <div class="tw:flex" style="height: 100%; width: 100%">
-          <div class="tw:flex tw:flex-col" style="height: 100%; width: 100%">
-            <div class="tw:flex tw:flex-col" style="height: 100%">
+    <div class="flex" style="flex: 1; overflow: hidden">
+      <div class="flex flex-col" style="width: 100%; height: 100%">
+        <div class="flex" style="height: 100%; width: 100%">
+          <div class="flex flex-col" style="height: 100%; width: 100%">
+            <div class="flex flex-col" style="height: 100%">
               <VariablesValueSelector
                 :variablesConfig="currentDashboardData.data?.variables"
                 :showDynamicFilters="
@@ -108,7 +108,7 @@
               />
               <div style="flex: 1; overflow: hidden">
                 <div
-                  class="tw:flex tw:justify-end tw:mr-2 tw:items-center"
+                  class="flex justify-end mr-2 items-center"
                   data-test="view-panel-last-refreshed-at"
                 >
                   <!-- Error/Warning tooltips -->

@@ -23,15 +23,15 @@ const context = computed<TabPanelsContext>(() => ({
 provide(TAB_PANELS_CONTEXT_KEY, context)
 
 const scrollClasses: Record<TabPanelsScroll, string> = {
-  none: 'tw:overflow-hidden',
-  auto: 'tw:overflow-auto',
-  y:    'tw:overflow-y-auto',
+  none: 'overflow-hidden',
+  auto: 'overflow-auto',
+  y:    'overflow-y-auto',
 }
 
 const rootClasses = computed<string[]>(() => {
   const classes: string[] = ['o-tab-panels', scrollClasses[props.scroll]]
   if (props.animated) classes.push('o-tab-panels--animated')
-  if (props.grow) classes.push('tw:flex-1')
+  if (props.grow) classes.push('flex-1')
   return classes
 })
 </script>

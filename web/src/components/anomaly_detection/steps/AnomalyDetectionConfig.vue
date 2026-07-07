@@ -16,15 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-anomaly-config tw:h-full"
+    class="step-anomaly-config h-full"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div
-      class="step-content tw:px-3 tw:py-4 tw:rounded-lg tw:h-full tw:overflow-y-auto tw:overflow-x-hidden tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]"
+      class="step-content px-3 py-4 rounded-lg h-full overflow-y-auto overflow-x-hidden bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
     >
       <OForm ref="formRef">
         <!-- Query Mode Tabs -->
-        <div class="tw:mb-4">
+        <div class="mb-4">
           <OToggleGroup
             :model-value="
               config.query_mode === 'custom_sql' ? 'custom_sql' : 'filters'
@@ -46,10 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Filters mode -->
         <div
           v-if="config.query_mode === 'filters'"
-          class="tw:flex tw:items-start tw:mb-4! tw:pb-0!"
+          class="flex items-start mb-4! pb-0!"
         >
           <div
-            class="tw:font-semibold tw:flex tw:items-center"
+            class="font-semibold flex items-center"
             style="width: 178px; min-height: 36px"
           >
             {{ t("alerts.anomaly.filters") }}
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(filter, idx) in config.filters"
               :key="idx"
-              class="tw:flex tw:items-center tw:gap-2 tw:mb-2"
+              class="flex items-center gap-2 mb-2"
             >
               <OSelect
                 v-model="filter.field"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="loadingFields"
               >
                 <template #empty>
-                  <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
+                  <div class="px-3 py-2 text-muted-foreground">
                     {{
                       config.stream_name
                         ? t("alerts.anomaly.noFieldsFound")
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="sm-action"
-              class="tw:mt-2"
+              class="mt-2"
               @click="addFilter"
             >
               {{ t("alerts.anomaly.addFilter") }}
@@ -114,21 +114,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Custom SQL mode -->
         <div
           v-if="config.query_mode === 'custom_sql'"
-          class="tw:flex tw:items-start tw:mb-4! tw:pb-0!"
+          class="flex items-start mb-4! pb-0!"
         >
           <div
-            class="tw:font-semibold tw:flex tw:items-center"
+            class="font-semibold flex items-center"
             style="width: 190px; height: 36px"
           >
-            SQL <span class="tw:text-red-500 tw:ml-1">*</span>
+            SQL <span class="text-red-500 ml-1">*</span>
           </div>
           <div style="width: calc(100% - 190px)">
             <div
-              class="custom-sql-editor-wrapper tw:h-[140px] tw:rounded tw:overflow-hidden"
+              class="custom-sql-editor-wrapper h-[140px] rounded overflow-hidden"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:border tw:border-white/[0.18]'
-                  : 'tw:border tw:border-black/[0.12]'
+                  ? 'border border-white/[0.18]'
+                  : 'border border-black/[0.12]'
               "
             >
               <QueryEditor
@@ -149,14 +149,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="!config.custom_sql"
-              class="text-red-8 tw:pt-1"
+              class="text-red-8 pt-1"
               style="font-size: 11px; line-height: 12px"
             >
               {{ t("alerts.anomaly.sqlRequired") }}
             </div>
             <div
               v-if="hasTimestampAlias"
-              class="text-red-8 tw:pt-1"
+              class="text-red-8 pt-1"
               data-test="anomaly-custom-sql-timestamp-alias-error"
               style="font-size: 11px; line-height: 12px"
             >
@@ -167,9 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <code>time_bucket</code> instead.
             </div>
             <div
-              class="tw:text-xs tw:mt-1"
+              class="text-xs mt-1"
               :class="
-                store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
+                store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'
               "
             >
               Query must return two columns: <code>time_bucket</code> and
@@ -181,15 +181,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Row: Detection Function + Detection Resolution (filters mode) -->
         <div
           v-if="config.query_mode === 'filters'"
-          class="tw:grid tw:grid-cols-2 tw:gap-3 tw:items-start tw:mb-4! tw:pb-0!"
+          class="grid grid-cols-2 gap-3 items-start mb-4! pb-0!"
         >
           <!-- Detection Function -->
-          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
-            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
+          <div class="flex flex-row items-start gap-2">
+            <div class="w-[170px] min-w-[170px] min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
               {{ t("alerts.detectionFunction") }}
-              <span class="tw:text-red-500 tw:ml-1">*</span>
+              <span class="text-red-500 ml-1">*</span>
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="flex items-center gap-2">
               <OSelect
                 v-model="config.detection_function"
                 :options="detectionFunctions"
@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: 140px"
               >
                 <template #empty>
-                  <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
+                  <div class="px-3 py-2 text-muted-foreground">
                     {{
                       config.stream_name
                         ? t("alerts.anomaly.noFieldsFound")
@@ -228,14 +228,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Detection Resolution -->
-          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
-            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
+          <div class="flex flex-row items-start gap-2">
+            <div class="w-[170px] min-w-[170px] min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
               {{ t("alerts.anomaly.detectionResolution") }}
-              <span class="tw:text-red-500 tw:ml-1">*</span>
+              <span class="text-red-500 ml-1">*</span>
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+                class="ml-1 cursor-pointer text-gray-400"
               >
                 <OTooltip
                   side="right"
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OIcon>
             </div>
             <div>
-              <div class="tw:flex tw:items-center tw:gap-0">
+              <div class="flex items-center gap-0">
                 <OInput
                   v-model.number="config.histogram_interval_value"
                   type="number"
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !config.histogram_interval_value ||
                   config.histogram_interval_value < 1
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 Field is required!
@@ -280,16 +280,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Detection Resolution alone (custom_sql mode) -->
-        <div v-else class="tw:flex tw:items-start tw:mb-4! tw:pb-0!">
+        <div v-else class="flex items-start mb-4! pb-0!">
           <div
-            class="tw:font-semibold tw:flex tw:items-center"
+            class="font-semibold flex items-center"
             style="width: 190px; height: 36px"
           >
-            Detection Resolution <span class="tw:text-red-500 tw:ml-1">*</span>
+            Detection Resolution <span class="text-red-500 ml-1">*</span>
             <OIcon
               name="info"
               size="sm"
-              class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+              class="ml-1 cursor-pointer text-gray-400"
             >
               <OTooltip
                 side="right"
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OIcon>
           </div>
           <div>
-            <div class="tw:flex tw:items-center tw:gap-0">
+            <div class="flex items-center gap-0">
               <OInput
                 v-model.number="config.histogram_interval_value"
                 type="number"
@@ -324,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 !config.histogram_interval_value ||
                 config.histogram_interval_value < 1
               "
-              class="text-red-8 tw:pt-1"
+              class="text-red-8 pt-1"
               style="font-size: 11px; line-height: 12px"
             >
               Field is required!
@@ -333,16 +333,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Row: Check Every + Look Back Window -->
-        <div class="tw:grid tw:grid-cols-2 tw:gap-3 tw:items-start tw:mb-4! tw:pb-0!">
+        <div class="grid grid-cols-2 gap-3 items-start mb-4! pb-0!">
           <!-- Check Every -->
-          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
-            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
+          <div class="flex flex-row items-start gap-2">
+            <div class="w-[170px] min-w-[170px] min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
               {{ t("alerts.anomaly.checkEvery") }}
-              <span class="tw:text-red-500 tw:ml-1">*</span>
+              <span class="text-red-500 ml-1">*</span>
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+                class="ml-1 cursor-pointer text-gray-400"
               >
                 <OTooltip
                   side="right"
@@ -353,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OIcon>
             </div>
             <div>
-              <div class="tw:flex tw:items-center tw:gap-0">
+              <div class="flex items-center gap-0">
                 <OInput
                   v-model.number="config.schedule_interval_value"
                   type="number"
@@ -377,7 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !config.schedule_interval_value ||
                   config.schedule_interval_value < 1
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 Field is required!
@@ -385,14 +385,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Look Back Window -->
-          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
-            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
+          <div class="flex flex-row items-start gap-2">
+            <div class="w-[170px] min-w-[170px] min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
               {{ t("alerts.anomaly.lookBackWindow") }}
-              <span class="tw:text-red-500 tw:ml-1">*</span>
+              <span class="text-red-500 ml-1">*</span>
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+                class="ml-1 cursor-pointer text-gray-400"
               >
                 <OTooltip
                   side="right"
@@ -403,7 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OIcon>
             </div>
             <div>
-              <div class="tw:flex tw:items-center tw:gap-0">
+              <div class="flex items-center gap-0">
                 <OInput
                   v-model.number="config.detection_window_value"
                   type="number"
@@ -427,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !config.detection_window_value ||
                   config.detection_window_value < 1
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
                 data-test="anomaly-detection-window-error"
               >
@@ -438,16 +438,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Row: Training Window + Retrain Every -->
-        <div class="tw:grid tw:grid-cols-2 tw:gap-3 tw:items-start tw:mb-4! tw:pb-0!">
+        <div class="grid grid-cols-2 gap-3 items-start mb-4! pb-0!">
           <!-- Training Window -->
-          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
-            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
+          <div class="flex flex-row items-start gap-2">
+            <div class="w-[170px] min-w-[170px] min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
               {{ t("alerts.trainingWindow") }}
-              <span class="tw:text-red-500 tw:ml-1">*</span>
+              <span class="text-red-500 ml-1">*</span>
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+                class="ml-1 cursor-pointer text-gray-400"
               >
                 <OTooltip side="right" align="center" max-width="300px">
                   <template #content><span style="font-size: 14px">
@@ -458,7 +458,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </OIcon>
             </div>
-            <div class="tw:flex tw:flex-col">
+            <div class="flex flex-col">
               <OInput
                 v-model.number="config.training_window_days"
                 type="number"
@@ -468,9 +468,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: 87px"
               />
               <span
-                class="static-text tw:text-xs"
+                class="static-text text-xs"
                 :class="
-                  store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
+                  store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'
                 "
               >
                 days (seasonality:
@@ -483,13 +483,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Retrain Every -->
-          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
-            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
+          <div class="flex flex-row items-start gap-2">
+            <div class="w-[170px] min-w-[170px] min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
               {{ t("alerts.anomaly.retrainEvery") }}
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+                class="ml-1 cursor-pointer text-gray-400"
               >
                 <OTooltip
                   side="right"
@@ -512,16 +512,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Threshold / Sensitivity -->
-        <div class="tw:flex tw:items-start tw:mb-4! tw:pb-0!">
+        <div class="flex items-start mb-4! pb-0!">
           <div
-            class="tw:font-semibold tw:flex tw:items-center"
+            class="font-semibold flex items-center"
             style="width: 190px; padding-top: 4px"
           >
             {{ t("alerts.sensitivity") }}
             <OIcon
               name="info"
               size="sm"
-              class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+              class="ml-1 cursor-pointer text-gray-400"
             >
                 <OTooltip
                   side="right"
@@ -533,15 +533,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div style="width: calc(100% - 190px)">
             <!-- Chart + Slider container -->
-            <div class="tw:w-full">
+            <div class="w-full">
               <!-- Header row: range labels + load button -->
-              <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
-                <div class="tw:flex tw:items-center tw:gap-2">
-                  <span class="tw:text-xs tw:text-gray-400">{{
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-gray-400">{{
                     t("alerts.anomaly.anomalyScoreRange")
                   }}</span>
                   <span
-                    class="tw:font-semibold tw:text-xs"
+                    class="font-semibold text-xs"
                     data-test="anomaly-threshold-range-label"
                     >{{ config.threshold_min ?? 0 }} –
                     {{ config.threshold }}</span
@@ -567,25 +567,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Chart + Vertical Slider row -->
-              <div class="tw:flex tw:gap-3">
+              <div class="flex gap-3">
                 <!-- Time series chart -->
-                <div class="tw:min-h-45 tw:relative tw:flex-1">
+                <div class="min-h-45 relative flex-1">
                   <div
                     v-if="!previewActive"
-                    class="tw:w-full tw:h-45 tw:flex tw:flex-col tw:items-center tw:justify-center tw:rounded tw:border tw:border-dashed tw:border-(--o2-border)"
+                    class="w-full h-45 flex flex-col items-center justify-center rounded border border-dashed border-(--o2-border)"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-gray-400'
-                        : 'tw:text-gray-400'
+                        ? 'text-gray-400'
+                        : 'text-gray-400'
                     "
                     data-test="anomaly-sensitivity-empty"
                   >
                     <OIcon
                       name="bar-chart"
                       size="lg"
-                      class="tw:mb-2 tw:opacity-40"
+                      class="mb-2 opacity-40"
                     />
-                    <span class="tw:text-xs">{{
+                    <span class="text-xs">{{
                       !config.stream_name
                         ? t("alerts.anomaly.selectStreamFirst")
                         : t("alerts.anomaly.clickLoadDataHint")
@@ -607,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Vertical dual-handle range slider -->
                 <div
-                  class="tw:flex tw:flex-col tw:items-center tw:w-15 tw:shrink-0"
+                  class="flex flex-col items-center w-15 shrink-0"
                 >
                   <ORange
                     v-model="thresholdRange"
@@ -625,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       { value: 75, label: '75' },
                       { value: 100, label: '100' },
                     ]"
-                    class="sensitivity-range-slider tw:mt-[14px] tw:h-[145px]! tw:[--color-slider-track-fill:var(--o2-primary-color)] tw:[--color-slider-thumb:var(--o2-primary-color)] tw:[--color-slider-thumb-border:white] tw:[--color-slider-value:var(--o2-text-secondary)]"
+                    class="sensitivity-range-slider mt-[14px] h-[145px]! [--color-slider-track-fill:var(--o2-primary-color)] [--color-slider-thumb:var(--o2-primary-color)] [--color-slider-thumb-border:white] [--color-slider-value:var(--o2-text-secondary)]"
                     data-test="anomaly-threshold-range"
                     @update:model-value="onThresholdRangeChange"
                   />

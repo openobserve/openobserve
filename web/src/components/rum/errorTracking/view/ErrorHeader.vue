@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div>
-      <div class="tw:pt-2 tw:pb-1 tw:flex tw:justify-start">
+      <div class="pt-2 pb-1 flex justify-start">
         <div
           data-test="back-button"
-          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer tw:hover:text-[var(--o2-primary-btn-bg)]"
+          class="flex justify-center items-center mr-3 cursor-pointer hover:text-[var(--o2-primary-btn-bg)]"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -32,33 +32,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <span class="tw:font-bold">{{ t("rum.eventID") }}:</span>
+        <span class="font-bold">{{ t("rum.eventID") }}:</span>
         <span
           data-test="error-id"
           :title="error.error_id"
-          class="tw:pl-1 tw:cursor-pointer"
+          class="pl-1 cursor-pointer"
           >{{ error.error_id }}
           <OIcon
             size="xs"
             name="content-copy"
-            class="tw:hover:text-[var(--o2-primary-btn-bg)]"
+            class="hover:text-[var(--o2-primary-btn-bg)]"
             @click="copyErrorId(error.error_id)"
         /></span>
-        <span class="tw:ml-4">{{ error.timestamp }}</span>
+        <span class="ml-4">{{ error.timestamp }}</span>
       </div>
-      <div class="tw:flex tw:items-center tw:flex-nowrap tw:my-1">
+      <div class="flex items-center flex-nowrap my-1">
         <div
           data-test="error-header-error-type"
-          class="tw:text-[22px] tw:font-bold"
+          class="text-[22px] font-bold"
         >{{ error.type }}</div>
       </div>
-      <div class="tw:text-base tw:pt-1 tw:flex tw:items-center">
+      <div class="text-base pt-1 flex items-center">
         <div
           v-if="error.error_handling === 'unhandled'"
           data-test="error-header-unhandled-badge"
           :class="
             error.error_handling === 'unhandled'
-              ? 'text-red-6 tw:border tw:border-[rgb(246,68,68)] tw:rounded tw:text-sm tw:px-1 tw:mr-2'
+              ? 'text-red-6 border border-[rgb(246,68,68)] rounded text-sm px-1 mr-2'
               : ''
           "
         >

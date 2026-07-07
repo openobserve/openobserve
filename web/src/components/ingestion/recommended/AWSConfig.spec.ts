@@ -278,8 +278,8 @@ describe("AWSConfig", () => {
 
   // Test 18: Integration section structure
   it("should have correct integration section structure", () => {
-    expect(wrapper.find('.tw\\:mt-8').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:mb-4').exists()).toBe(true);
+    expect(wrapper.find('.mt-8').exists()).toBe(true);
+    expect(wrapper.find('.mb-4').exists()).toBe(true);
   });
 
   // Test 19: CopyContent component integration
@@ -296,7 +296,7 @@ describe("AWSConfig", () => {
 
   // Test 21: Template structure
   it("should have correct template structure", () => {
-    expect(wrapper.find('.tw\\:m-3').exists()).toBe(true);
+    expect(wrapper.find('.m-3').exists()).toBe(true);
     expect(
       wrapper.find('[data-test="aws-config-page-title"]').exists(),
     ).toBe(true);
@@ -466,7 +466,7 @@ describe("AWSConfig", () => {
     expect(quickSetupComponent.exists()).toBe(true);
 
     // Verify template structure
-    expect(wrapper.find('.tw\\:m-3').exists()).toBe(true);
+    expect(wrapper.find('.m-3').exists()).toBe(true);
     expect(
       wrapper.find('[data-test="aws-config-page-title"]').exists(),
     ).toBe(true);

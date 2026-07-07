@@ -1,6 +1,6 @@
 <template>
   <OForm
-    class="job-form tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:gap-2.5"
+    class="job-form flex flex-col flex-1 min-h-0 gap-2.5"
     :form="form"
     v-slot="{ isSubmitting }"
   >
@@ -10,7 +10,7 @@
         onClick: () => $emit('cancel'),
         dataTest: 'job-form-back-btn',
       }"
-      class="card-container tw:px-3 tw:border-b tw:border-border-default"
+      class="card-container px-3 border-b border-border-default"
       style="flex-shrink: 0"
     >
       <template #title>
@@ -32,20 +32,20 @@
       </template>
     </AppPageHeader>
 
-    <div class="job-form__body tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:flex tw:gap-2">
-      <div class="job-form__main tw:flex-[6.5] tw:min-w-0 tw:min-h-0 tw:overflow-auto tw:flex tw:flex-col tw:gap-2 tw:p-2">
+    <div class="job-form__body flex-1 min-h-0 overflow-hidden flex gap-2">
+      <div class="job-form__main flex-[6.5] min-w-0 min-h-0 overflow-auto flex flex-col gap-2 p-2">
         <!-- Target -->
-        <section class="card-container tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:overflow-hidden tw:shrink-0">
-          <div class="tw:flex tw:items-center tw:py-[10px] tw:px-3 tw:border-b tw:border-(--color-border-default,var(--o2-border))">
-            <div class="tw:w-[3px] tw:h-4 tw:rounded-[2px] tw:mr-2 tw:shrink-0 tw:bg-(--q-primary)" />
-            <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.targetSection") }}</span>
+        <section class="card-container border border-(--color-dialog-header-border,var(--o2-border)) rounded-md overflow-hidden shrink-0">
+          <div class="flex items-center py-[10px] px-3 border-b border-(--color-border-default,var(--o2-border))">
+            <div class="w-[3px] h-4 rounded-[2px] mr-2 shrink-0 bg-(--q-primary)" />
+            <span class="text-[13px] font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.targetSection") }}</span>
           </div>
-          <div class="tw:flex tw:flex-col tw:gap-3 tw:py-3.5 tw:px-4">
+          <div class="flex flex-col gap-3 py-3.5 px-4">
           <div class="job-field">
-            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
+            <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
               {{ t("onlineEvals.job.nameLabel") }}
-              <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="tw:ml-1.5 tw:text-(--color-text-secondary,var(--o2-text-secondary))" />
+              <span class="text-(--o2-status-error-text) ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--o2-text-secondary))" />
             </label>
             <OFormInput
               name="name"
@@ -57,10 +57,10 @@
           </div>
 
           <div class="job-field">
-            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
+            <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
               {{ t("onlineEvals.job.streamLabel") }}
-              <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="tw:ml-1.5 tw:text-(--color-text-secondary,var(--o2-text-secondary))" />
+              <span class="text-(--o2-status-error-text) ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--o2-text-secondary))" />
             </label>
             <OFormSelect
               name="stream"
@@ -86,12 +86,12 @@
         </section>
 
         <!-- Scorers + Filter + Mapping -->
-        <section class="card-container tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:overflow-hidden tw:shrink-0">
-          <div class="tw:flex tw:items-center tw:py-[10px] tw:px-3 tw:border-b tw:border-(--color-border-default,var(--o2-border))">
-            <div class="tw:w-[3px] tw:h-4 tw:rounded-[2px] tw:mr-2 tw:shrink-0 tw:bg-(--q-primary)" />
-            <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</span>
+        <section class="card-container border border-(--color-dialog-header-border,var(--o2-border)) rounded-md overflow-hidden shrink-0">
+          <div class="flex items-center py-[10px] px-3 border-b border-(--color-border-default,var(--o2-border))">
+            <div class="w-[3px] h-4 rounded-[2px] mr-2 shrink-0 bg-(--q-primary)" />
+            <span class="text-[13px] font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</span>
           </div>
-          <div class="tw:flex tw:flex-col tw:gap-3 tw:py-3.5 tw:px-4">
+          <div class="flex flex-col gap-3 py-3.5 px-4">
           <JobScorerPicker
             :model-value="formValues.scorerIds"
             :scorers="scorers"
@@ -112,13 +112,13 @@
         </section>
 
         <!-- Sampling -->
-        <section class="card-container tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:overflow-hidden tw:shrink-0">
-          <div class="tw:flex tw:items-center tw:py-[10px] tw:px-3 tw:border-b tw:border-(--color-border-default,var(--o2-border))">
-            <div class="tw:w-[3px] tw:h-4 tw:rounded-[2px] tw:mr-2 tw:shrink-0 tw:bg-(--q-primary)" />
-            <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</span>
+        <section class="card-container border border-(--color-dialog-header-border,var(--o2-border)) rounded-md overflow-hidden shrink-0">
+          <div class="flex items-center py-[10px] px-3 border-b border-(--color-border-default,var(--o2-border))">
+            <div class="w-[3px] h-4 rounded-[2px] mr-2 shrink-0 bg-(--q-primary)" />
+            <span class="text-[13px] font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</span>
           </div>
-          <div class="tw:flex tw:flex-col tw:gap-3 tw:py-3.5 tw:px-4">
-          <div class="job-field-row tw:grid tw:grid-cols-2 tw:max-[1100px]:grid-cols-1 tw:gap-[14px]">
+          <div class="flex flex-col gap-3 py-3.5 px-4">
+          <div class="job-field-row grid grid-cols-2 max-[1100px]:grid-cols-1 gap-[14px]">
             <div class="job-field">
               <label class="job-field__label">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
               <OFormSelect
@@ -127,11 +127,11 @@
                 size="md"
                 data-test="job-form-sampling-mode-select"
               />
-              <div class="job-field__help tw:text-[11.5px] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:mt-1">{{ t("onlineEvals.job.samplingHelp") }}</div>
+              <div class="job-field__help text-[11.5px] text-(--color-text-secondary,var(--o2-text-secondary)) mt-1">{{ t("onlineEvals.job.samplingHelp") }}</div>
             </div>
 
             <div class="job-field">
-              <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
+              <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
                 {{ t("onlineEvals.job.samplingValueLabel") }}
                 <span v-if="formValues.samplingMode !== 'all'" class="job-field__req">*</span>
               </label>
@@ -155,7 +155,7 @@
       <JobPreviewPanel :name="formValues.name" :stream-type="formValues.streamType" :mode="mode" />
     </div>
 
-    <footer class="tw:sticky tw:bottom-0 tw:flex tw:items-center tw:justify-end tw:gap-2 tw:px-5.5 tw:py-3 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] tw:shrink-0 tw:z-1">
+    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-(--o2-card-bg) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] shrink-0 z-1">
       <OButton
         data-test="job-form-cancel-btn"
         type="button"

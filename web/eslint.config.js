@@ -108,12 +108,12 @@ export default [
         {
           element: "q-item-section",
           message:
-            "Use <ODropdownItem>'s #icon-left / #default / #icon-right slots (inside <ODropdown>), or a native <div class=\"tw:flex ...\"> (display). See web/bannerImplementation/quasar-list-components-migration.md.",
+            "Use <ODropdownItem>'s #icon-left / #default / #icon-right slots (inside <ODropdown>), or a native <div class=\"flex ...\"> (display). See web/bannerImplementation/quasar-list-components-migration.md.",
         },
         {
           element: "q-item-label",
           message:
-            'Use plain text / <span class="tw:text-sm">, <span class="tw:block tw:text-xs tw:text-muted-foreground"> (caption), or <ODropdownGroup :label="..."> (header) instead of <q-item-label>. See web/bannerImplementation/quasar-list-components-migration.md.',
+            'Use plain text / <span class="text-sm">, <span class="block text-xs text-muted-foreground"> (caption), or <ODropdownGroup :label="..."> (header) instead of <q-item-label>. See web/bannerImplementation/quasar-list-components-migration.md.',
         },
         // Button
         {
@@ -195,7 +195,7 @@ export default [
         },
         {
           element: "q-avatar",
-          message: 'Use a plain <div class="tw:rounded-full ..."> wrapper with an inner <OIcon> or <img> instead of <q-avatar>.',
+          message: 'Use a plain <div class="rounded-full ..."> wrapper with an inner <OIcon> or <img> instead of <q-avatar>.',
         },
         {
           element: "q-img",

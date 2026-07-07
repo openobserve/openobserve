@@ -24,31 +24,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Slots: illustration | title | description | actions | extra
 -->
 <template>
-  <div class="tw:relative tw:w-full tw:h-full tw:overflow-hidden tw:[--empty-dot:var(--color-grey-300)] tw:dark:[--empty-dot:var(--color-grey-800)]">
+  <div class="relative w-full h-full overflow-hidden [--empty-dot:var(--color-grey-300)] dark:[--empty-dot:var(--color-grey-800)]">
     <!-- decorative backdrop — subtle dot texture only (no color gradient) -->
     <div
       aria-hidden="true"
-      class="tw:absolute tw:inset-0 tw:pointer-events-none"
+      class="absolute inset-0 pointer-events-none"
       :style="dotGridStyle"
     />
 
     <!-- content -->
     <div
-      class="tw:relative tw:w-full tw:h-full tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-7 tw:px-6 tw:py-12 tw:text-center"
+      class="relative w-full h-full flex flex-col items-center justify-center gap-7 px-6 py-12 text-center"
     >
-      <div v-if="$slots.illustration" class="tw:shrink-0">
+      <div v-if="$slots.illustration" class="shrink-0">
         <slot name="illustration" />
       </div>
 
-      <div class="tw:flex tw:flex-col tw:gap-2.5 tw:max-w-xl">
+      <div class="flex flex-col gap-2.5 max-w-xl">
         <h2
-          class="tw:text-2xl! tw:font-semibold! tw:text-text-primary tw:tracking-[-0.01em]"
+          class="text-2xl! font-semibold! text-text-primary tracking-[-0.01em]"
         >
           <slot name="title">{{ title }}</slot>
         </h2>
         <p
           v-if="description || $slots.description"
-          class="tw:text-base tw:text-text-secondary tw:leading-relaxed"
+          class="text-base text-text-secondary leading-relaxed"
         >
           <slot name="description">{{ description }}</slot>
         </p>
@@ -59,21 +59,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            rather than one sparse centered block. -->
       <div
         v-if="$slots.actions"
-        class="tw:w-full tw:max-w-3xl tw:flex tw:flex-col tw:items-center tw:gap-4"
+        class="w-full max-w-3xl flex flex-col items-center gap-4"
       >
         <div
           v-if="actionsLabel"
-          class="tw:flex tw:items-center tw:gap-3 tw:w-full tw:max-w-md"
+          class="flex items-center gap-3 w-full max-w-md"
         >
-          <span class="tw:h-px tw:flex-1 tw:bg-border-default" />
+          <span class="h-px flex-1 bg-border-default" />
           <span
-            class="tw:text-[0.6875rem] tw:font-semibold tw:text-text-secondary tw:whitespace-nowrap"
+            class="text-[0.6875rem] font-semibold text-text-secondary whitespace-nowrap"
             >{{ actionsLabel }}</span
           >
-          <span class="tw:h-px tw:flex-1 tw:bg-border-default" />
+          <span class="h-px flex-1 bg-border-default" />
         </div>
         <div
-          class="tw:flex tw:flex-wrap tw:items-stretch tw:justify-center tw:gap-3"
+          class="flex flex-wrap items-stretch justify-center gap-3"
         >
           <slot name="actions" />
         </div>
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-if="$slots.extra"
-        class="tw:w-full tw:flex tw:flex-col tw:items-center tw:gap-3 tw:pt-2"
+        class="w-full flex flex-col items-center gap-3 pt-2"
       >
         <slot name="extra" />
       </div>

@@ -24,17 +24,17 @@
     <OForm id="score-config-form" class="sc-form" :form="form">
       <div v-if="mode === 'edit'" class="sc-callout">
         <OIcon name="info" size="xs" />
-        <div class="sc-callout__text tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0">
+        <div class="sc-callout__text flex flex-col gap-0.5 min-w-0">
           <i18n-t
             :keypath="`onlineEvals.scoreConfig.editInfoBannerEmphasis.${formValues.dataType}`"
             tag="span"
-            class="sc-callout__lead tw:font-normal"
+            class="sc-callout__lead font-normal"
           >
             <template #nextVersion>
               <strong>{{ nextVersionLabel }}</strong>
             </template>
           </i18n-t>
-          <em class="sc-callout__detail tw:italic tw:font-normal tw:text-(--color-text-secondary)">{{ t("onlineEvals.scoreConfig.editInfoBannerDetail") }}</em>
+          <em class="sc-callout__detail italic font-normal text-(--color-text-secondary)">{{ t("onlineEvals.scoreConfig.editInfoBannerDetail") }}</em>
         </div>
       </div>
 
@@ -61,7 +61,7 @@
           :rows="3"
           data-test="score-config-description-input"
         />
-        <div v-if="mode === 'edit'" class="sc-field__help tw:text-[11px] tw:text-(--color-text-secondary) tw:mt-1">
+        <div v-if="mode === 'edit'" class="sc-field__help text-[11px] text-(--color-text-secondary) mt-1">
           {{ t("onlineEvals.scoreConfig.descriptionHelp") }}
         </div>
       </div>
@@ -70,7 +70,7 @@
       <div class="sc-field">
         <label class="sc-field__label o-input-label">
           {{ t("onlineEvals.scoreConfig.dataTypeLabel")
-          }}<span v-if="mode === 'create'" class="tw:select-none" aria-hidden="true">&nbsp;*</span>
+          }}<span v-if="mode === 'create'" class="select-none" aria-hidden="true">&nbsp;*</span>
         </label>
         <!-- Radio cards reuse ORadio inside ORadioGroup. `dataType` is a bespoke
              card-grid discriminator (not an OForm* input) → bridged into the one
@@ -112,8 +112,8 @@
         <label class="sc-field__label o-input-label">
           {{ t("onlineEvals.scoreConfig.numericRangeLabel") }}
         </label>
-        <div class="sc-range-row tw:flex tw:items-center tw:gap-[10px]">
-          <span class="sc-range-row__label tw:text-(--color-text-secondary) tw:text-[11px]">{{ t("onlineEvals.scoreConfig.minLabel") }}</span>
+        <div class="sc-range-row flex items-center gap-[10px]">
+          <span class="sc-range-row__label text-(--color-text-secondary) text-[11px]">{{ t("onlineEvals.scoreConfig.minLabel") }}</span>
           <OFormInput
             name="min"
             type="number"
@@ -121,7 +121,7 @@
             field-width="xs"
             data-test="score-config-min-input"
           />
-          <span class="sc-range-row__label tw:text-(--color-text-secondary) tw:text-[11px]">{{ t("onlineEvals.scoreConfig.maxLabel") }}</span>
+          <span class="sc-range-row__label text-(--color-text-secondary) text-[11px]">{{ t("onlineEvals.scoreConfig.maxLabel") }}</span>
           <OFormInput
             name="max"
             type="number"
@@ -150,7 +150,7 @@
       <!-- Boolean info banner -->
       <div
         v-if="formValues.dataType === 'boolean'"
-        class="sc-callout sc-callout--neutral tw:flex tw:gap-[10px] tw:items-start tw:px-3 tw:py-[10px] tw:bg-[color-mix(in_srgb,var(--color-text-secondary,var(--o2-text-secondary))_12%,transparent)] tw:border tw:border-(--color-dialog-header-border) tw:rounded-md tw:text-xs tw:leading-normal tw:text-(--color-text-primary) tw:mb-4"
+        class="sc-callout sc-callout--neutral flex gap-[10px] items-start px-3 py-[10px] bg-[color-mix(in_srgb,var(--color-text-secondary,var(--o2-text-secondary))_12%,transparent)] border border-(--color-dialog-header-border) rounded-md text-xs leading-normal text-(--color-text-primary) mb-4"
       >
         <OIcon name="info" size="xs" />
         <span>
@@ -175,10 +175,10 @@
 
         <!-- Numeric threshold -->
         <template v-if="formValues.dataType === 'numeric'">
-          <div class="sc-ht-field-label tw:text-[11.5px] tw:font-semibold tw:text-(--color-text-primary) tw:mb-1.5">{{ t("onlineEvals.scoreConfig.healthyWhenValueIs") }}</div>
-          <div class="sc-ht-radio-row tw:flex tw:flex-col tw:gap-1.5">
+          <div class="sc-ht-field-label text-[11.5px] font-semibold text-(--color-text-primary) mb-1.5">{{ t("onlineEvals.scoreConfig.healthyWhenValueIs") }}</div>
+          <div class="sc-ht-radio-row flex flex-col gap-1.5">
             <label
-              class="sc-ht-num-radio tw:grid tw:grid-cols-[18px_22px_1fr_110px] tw:items-center tw:gap-[10px] tw:px-3 tw:py-1.5 tw:border tw:border-(--color-dialog-header-border) tw:rounded-[5px] tw:bg-(--color-card-bg) tw:cursor-pointer tw:transition-[border-color,background] tw:duration-[120ms]"
+              class="sc-ht-num-radio grid grid-cols-[18px_22px_1fr_110px] items-center gap-[10px] px-3 py-1.5 border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) cursor-pointer transition-[border-color,background] duration-[120ms]"
               :class="{ 'sc-ht-num-radio--selected': formValues.healthyDirection === 'gte' }"
             >
               <input
@@ -188,8 +188,8 @@
                 :checked="formValues.healthyDirection === 'gte'"
                 @change="form.setFieldValue('healthyDirection', 'gte')"
               />
-              <span class="sc-ht-sym sc-mono tw:text-[17px] tw:font-bold tw:text-(--color-text-primary) tw:text-center">≥</span>
-              <span class="sc-ht-op tw:text-[12.5px] tw:text-(--color-text-primary)">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
+              <span class="sc-ht-sym sc-mono text-[17px] font-bold text-(--color-text-primary) text-center">≥</span>
+              <span class="sc-ht-op text-[12.5px] text-(--color-text-primary)">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
               <OFormInput
                 name="healthyGteValue"
                 type="number"
@@ -201,7 +201,7 @@
               />
             </label>
             <label
-              class="sc-ht-num-radio tw:grid tw:grid-cols-[18px_22px_1fr_110px] tw:items-center tw:gap-[10px] tw:px-3 tw:py-1.5 tw:border tw:border-(--color-dialog-header-border) tw:rounded-[5px] tw:bg-(--color-card-bg) tw:cursor-pointer tw:transition-[border-color,background] tw:duration-[120ms]"
+              class="sc-ht-num-radio grid grid-cols-[18px_22px_1fr_110px] items-center gap-[10px] px-3 py-1.5 border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) cursor-pointer transition-[border-color,background] duration-[120ms]"
               :class="{ 'sc-ht-num-radio--selected': formValues.healthyDirection === 'lte' }"
             >
               <input
@@ -211,8 +211,8 @@
                 :checked="formValues.healthyDirection === 'lte'"
                 @change="form.setFieldValue('healthyDirection', 'lte')"
               />
-              <span class="sc-ht-sym sc-mono tw:text-[17px] tw:font-bold tw:text-(--color-text-primary) tw:text-center">≤</span>
-              <span class="sc-ht-op tw:text-[12.5px] tw:text-(--color-text-primary)">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
+              <span class="sc-ht-sym sc-mono text-[17px] font-bold text-(--color-text-primary) text-center">≤</span>
+              <span class="sc-ht-op text-[12.5px] text-(--color-text-primary)">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
               <OFormInput
                 name="healthyLteValue"
                 type="number"
@@ -228,15 +228,15 @@
 
         <!-- Categorical threshold -->
         <template v-else-if="formValues.dataType === 'categorical'">
-          <div class="sc-ht-field-label tw:text-[11.5px] tw:font-semibold tw:text-(--color-text-primary) tw:mb-1.5">{{ t("onlineEvals.scoreConfig.healthyCategories") }}</div>
-          <div v-if="formValues.categories.length === 0" class="sc-ht-empty tw:text-[11.5px] tw:italic tw:text-(--color-text-secondary) tw:px-3 tw:py-[10px] tw:border tw:border-dashed tw:border-(--color-dialog-header-border) tw:rounded-[5px] tw:bg-(--color-card-bg)">
+          <div class="sc-ht-field-label text-[11.5px] font-semibold text-(--color-text-primary) mb-1.5">{{ t("onlineEvals.scoreConfig.healthyCategories") }}</div>
+          <div v-if="formValues.categories.length === 0" class="sc-ht-empty text-[11.5px] italic text-(--color-text-secondary) px-3 py-[10px] border border-dashed border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg)">
             {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder") }}…
           </div>
-          <div v-else class="sc-ht-checks tw:flex tw:flex-col tw:gap-0.5 tw:border tw:border-(--color-dialog-header-border) tw:rounded-[5px] tw:bg-(--color-card-bg) tw:p-1">
+          <div v-else class="sc-ht-checks flex flex-col gap-0.5 border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) p-1">
             <label
               v-for="cat in formValues.categories"
               :key="cat"
-              class="sc-ht-check tw:flex tw:items-center tw:gap-[10px] tw:px-[10px] tw:py-[7px] tw:rounded tw:cursor-pointer tw:transition-[background] tw:duration-[120ms]"
+              class="sc-ht-check flex items-center gap-[10px] px-[10px] py-[7px] rounded cursor-pointer transition-[background] duration-[120ms]"
               :class="{ 'sc-ht-check--on': formValues.healthyCategories.includes(cat) }"
             >
               <input
@@ -245,10 +245,10 @@
                 :checked="formValues.healthyCategories.includes(cat)"
                 @change="toggleHealthyCategory(cat)"
               />
-              <span class="sc-mono tw:font-[var(--o2-font-mono)]">{{ cat }}</span>
+              <span class="sc-mono font-[var(--o2-font-mono)]">{{ cat }}</span>
             </label>
           </div>
-          <div class="sc-ht-example tw:flex tw:items-center tw:gap-1.5 tw:mt-2 tw:text-[11px] tw:text-(--color-text-secondary)">
+          <div class="sc-ht-example flex items-center gap-1.5 mt-2 text-[11px] text-(--color-text-secondary)">
             <OIcon name="info" size="xs" />
             <span>{{ t("onlineEvals.scoreConfig.healthyCategoriesHint") }}</span>
           </div>
@@ -256,10 +256,10 @@
 
         <!-- Boolean threshold -->
         <template v-else>
-          <div class="sc-ht-field-label tw:text-[11.5px] tw:font-semibold tw:text-(--color-text-primary) tw:mb-1.5">{{ t("onlineEvals.scoreConfig.healthyValue") }}</div>
-          <div class="sc-ht-bool-radios tw:flex tw:flex-col tw:gap-1.5">
+          <div class="sc-ht-field-label text-[11.5px] font-semibold text-(--color-text-primary) mb-1.5">{{ t("onlineEvals.scoreConfig.healthyValue") }}</div>
+          <div class="sc-ht-bool-radios flex flex-col gap-1.5">
             <label
-              class="sc-ht-bool-radio tw:grid tw:grid-cols-[16px_1fr] tw:items-start tw:gap-[10px] tw:px-3 tw:py-[7px] tw:border tw:border-(--color-dialog-header-border) tw:rounded-[5px] tw:bg-(--color-card-bg) tw:cursor-pointer tw:transition-[border-color,background] tw:duration-[120ms]"
+              class="sc-ht-bool-radio grid grid-cols-[16px_1fr] items-start gap-[10px] px-3 py-[7px] border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) cursor-pointer transition-[border-color,background] duration-[120ms]"
               :class="{ 'sc-ht-bool-radio--selected': formValues.healthyBool === true }"
             >
               <input
@@ -270,12 +270,12 @@
                 @change="form.setFieldValue('healthyBool', true)"
               />
               <div>
-                <div class="sc-ht-bool-radio__hd tw:text-(--color-text-primary) tw:font-[var(--o2-font-mono)]">{{ t("onlineEvals.scoreConfig.trueIsHealthy") }}</div>
-                <div class="sc-ht-bool-radio__sub tw:text-[11px] tw:text-(--color-text-secondary) tw:mt-0.5 tw:leading-[1.4]">{{ t("onlineEvals.scoreConfig.trueIsHealthyHint") }}</div>
+                <div class="sc-ht-bool-radio__hd text-(--color-text-primary) font-[var(--o2-font-mono)]">{{ t("onlineEvals.scoreConfig.trueIsHealthy") }}</div>
+                <div class="sc-ht-bool-radio__sub text-[11px] text-(--color-text-secondary) mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.trueIsHealthyHint") }}</div>
               </div>
             </label>
             <label
-              class="sc-ht-bool-radio tw:grid tw:grid-cols-[16px_1fr] tw:items-start tw:gap-[10px] tw:px-3 tw:py-[7px] tw:border tw:border-(--color-dialog-header-border) tw:rounded-[5px] tw:bg-(--color-card-bg) tw:cursor-pointer tw:transition-[border-color,background] tw:duration-[120ms]"
+              class="sc-ht-bool-radio grid grid-cols-[16px_1fr] items-start gap-[10px] px-3 py-[7px] border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) cursor-pointer transition-[border-color,background] duration-[120ms]"
               :class="{ 'sc-ht-bool-radio--selected': formValues.healthyBool === false }"
             >
               <input
@@ -286,14 +286,14 @@
                 @change="form.setFieldValue('healthyBool', false)"
               />
               <div>
-                <div class="sc-ht-bool-radio__hd tw:text-(--color-text-primary) tw:font-[var(--o2-font-mono)]">{{ t("onlineEvals.scoreConfig.falseIsHealthy") }}</div>
-                <div class="sc-ht-bool-radio__sub tw:text-[11px] tw:text-(--color-text-secondary) tw:mt-0.5 tw:leading-[1.4]">{{ t("onlineEvals.scoreConfig.falseIsHealthyHint") }}</div>
+                <div class="sc-ht-bool-radio__hd text-(--color-text-primary) font-[var(--o2-font-mono)]">{{ t("onlineEvals.scoreConfig.falseIsHealthy") }}</div>
+                <div class="sc-ht-bool-radio__sub text-[11px] text-(--color-text-secondary) mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.falseIsHealthyHint") }}</div>
               </div>
             </label>
           </div>
         </template>
 
-        <div class="sc-ht-section__foot tw:flex tw:items-start tw:gap-1.5 tw:mt-[10px] tw:pt-2 tw:border-t tw:border-dashed tw:border-(--color-dialog-header-border) tw:text-[11px] tw:text-(--color-text-secondary) tw:leading-normal">
+        <div class="sc-ht-section__foot flex items-start gap-1.5 mt-[10px] pt-2 border-t border-dashed border-(--color-dialog-header-border) text-[11px] text-(--color-text-secondary) leading-normal">
           <OIcon name="info" size="xs" />
           <span>{{ t("onlineEvals.scoreConfig.thresholdEmptyHint") }}</span>
         </div>

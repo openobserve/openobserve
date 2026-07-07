@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="search-bar-component tw:border-b tw:border-(--o2-border) tw:pb-px" id="searchBarComponent">
-    <div class="tw:flex tw:my-1">
-      <div class="float-right tw:flex tw:flex-col">
+  <div class="search-bar-component border-b border-(--o2-border) pb-px" id="searchBarComponent">
+    <div class="flex my-1">
+      <div class="float-right flex flex-col">
         <syntax-guide
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="float-right col-auto">
         <OButton
           v-if="searchObj.data.queryResults.hits"
-          class="tw:mr-2 float-left tw:h-7.5"
+          class="mr-2 float-left h-7.5"
           variant="ghost"
           size="icon-sm"
           icon-left="download"
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
         </div>
-        <div class="tw:pl-2 tw:mr-2.5 float-left">
+        <div class="pl-2 mr-2.5 float-left">
           <OButton
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
@@ -66,12 +66,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="tw:flex" v-if="searchObj.meta.showQuery">
-      <div class="tw:flex tw:flex-col">
+    <div class="flex" v-if="searchObj.meta.showQuery">
+      <div class="flex flex-col">
         <query-editor
           ref="queryEditorRef"
           editor-id="rum-searchbar-query-editor"
-          class="tw:w-full! tw:h-17.5!"
+          class="w-full! h-17.5!"
           v-model:query="searchObj.data.editorValue"
           :keywords="effectiveKeywords"
           v-model:functions="searchObj.data.stream.functions"
