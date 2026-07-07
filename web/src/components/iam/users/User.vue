@@ -674,7 +674,17 @@ export default defineComponent({
                 rawEmail: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
-                role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
+                // Store the display-cased role (e.g. "Admin", "Admin (Invited)") so
+                // the edit/update payloads stay byte-identical to pre-migration, which
+                // sent the capitalized value. The role options from getRoles use the
+                // lowercase value ("admin"), so this seeded "Admin" doesn't match an
+                // option — but OSelect renders the raw value as a fallback, so the
+                // field still displays "Admin" correctly. The only cosmetic quirk is
+                // that the open dropdown won't highlight the lowercase option as active.
+                role:
+                  data?.status == "pending"
+                    ? toCamelCase(data.role) + " (Invited)"
+                    : toCamelCase(data.role),
                 roles: rolesArr,
                 auth_type: data?.auth_type
                   ? data.auth_type
@@ -859,7 +869,9 @@ export default defineComponent({
     };
 
     const updateUser = (props: any) => {
-      selectedUser.value = props.row;
+      // The row already stores the canonical role VALUE, so it seeds the role
+      // select directly (matches an option, shows its label).
+      selectedUser.value = { ...props.row };
       showUpdateUserDialog.value = true;
     };
 
@@ -869,7 +881,9 @@ export default defineComponent({
         store.state.selectedOrganization.identifier;
 
       if (props.row != undefined) {
-        selectedUser.value = props.row;
+        // The row already stores the canonical role VALUE, so AddUser's role
+        // select matches an option directly (see updateUser).
+        selectedUser.value = { ...props.row };
         segment.track("Button Click", {
           button: "Actions",
           user_org: store.state.selectedOrganization.identifier,
