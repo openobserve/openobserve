@@ -232,10 +232,8 @@ export class BarConverter implements PromQLChartConverter {
       };
     }
 
-    // containLabel already reserves the category/tick label area, so the
-    // grid insets only need small fixed margins — percentage insets waste
-    // huge bands on wide panels ("15%" ≈ 280px on a full-width panel) and
-    // starve short panels ("10%" bottom is less than the legend row needs).
+    // containLabel reserves the label area; fixed px insets avoid the waste
+    // of percentage margins on wide panels and starvation on short ones.
     const legendAtBottom =
       config.show_legends && config.legends_position !== "right";
     return {

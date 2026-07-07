@@ -293,14 +293,8 @@ export function buildSQLContext(
 
   const [min, max] = getSQLMinMaxValue(yAxisKeys, missingValueData);
 
-  // Compute the ticks the y-axis will render (calculateNiceTickValues
-  // mirrors ECharts' nice-interval algorithm): formatting and measuring
-  // these exact values keeps the axis name clear of the labels ("995.56GB"
-  // is a smaller value than "1.34TB" but a wider label) and lets us extend
-  // the decimal precision when neighbouring ticks would otherwise format
-  // identically (a 0–0.012 range with 2 decimals shows "0.00, 0.01, 0.01").
-  // min/max are already computed for the color palette, so only stacked
-  // charts need an extra dataset pass for their stack-sum extent.
+  // Predict the exact y-axis ticks (mirrors ECharts' nice-interval algo) to
+  // measure the widest label and extend decimals when ticks would collide.
   const getYAxisTickInfo = (): {
     decimals: number;
     widestLabelWidth: number;
@@ -384,19 +378,15 @@ export function buildSQLContext(
       : Math.max(configValue, dataValue);
   };
 
-  // Same rule as the y-axis below, applied vertically: on panels too short
-  // to fit the tick labels + axis name + a usable plot, drop the x-axis name
-  // (the ~150px covers top margin, min plot height, label row and name row).
+  // Drop the x-axis name on panels too short to fit labels + name + plot.
   const panelHeightPx = chartPanelRef?.value?.offsetHeight ?? 0;
   const xAxisNameFits = !panelHeightPx || panelHeightPx >= 150;
 
   const hasXAxisName =
     xAxisNameFits && panelSchema?.queries?.[0]?.fields?.x?.[0]?.label;
 
-  // On panels too narrow to fit the rotated name + tick labels + a usable
-  // plot, ECharts squeezes the name onto the labels no matter the nameGap —
-  // drop the name instead (the ~110px covers the name column, the right
-  // margin and a minimum plot width).
+  // Drop the y-axis name on panels too narrow to fit name + labels + plot;
+  // ECharts would squeeze the name onto the labels regardless of nameGap.
   const panelWidthPx = chartPanelRef?.value?.offsetWidth ?? 0;
   const yAxisNameFits =
     !panelWidthPx || panelWidthPx >= widestYAxisTickLabel + 110;
@@ -503,9 +493,8 @@ export function buildSQLContext(
             return baseBottom;
           })()
         : (() => {
-            // Even without an x-axis name, a bottom-anchored horizontal
-            // legend needs its row reserved — otherwise it draws on top of
-            // the plot and the tick labels.
+            // A bottom legend needs its row reserved even without an
+            // x-axis name, or it draws over the plot and tick labels.
             const baseBottom =
               legendConfig.orient === "horizontal" &&
               panelSchema.config?.show_legends
@@ -686,12 +675,8 @@ export function buildSQLContext(
         if (i == 0 || data[i] != data[i - 1]) arr.push(i);
       }
 
-      // Pixel-aware thinning of the unique-value labels: with a breakdown,
-      // the category data repeats each x value once per group, which makes
-      // ECharts' "auto" interval mis-estimate, and hideOverlap alone lets
-      // the surviving labels abut edge-to-edge. Show every K-th unique
-      // value instead, where K keeps a measured label width + gap between
-      // neighbours.
+      // Breakdowns repeat each x value per group, breaking ECharts' auto
+      // interval — show every K-th unique value with a measured pixel gap.
       const xPlotWidthPx = Math.max(80, panelWidthPx - 80);
       const sampleXLabel = String(data?.[arr?.[arr.length - 1]] ?? "");
       const xLabelPxWithGap = calculateWidthText(sampleXLabel) + 8;
@@ -783,10 +768,8 @@ export function buildSQLContext(
       nameLocation: "middle",
       min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
-      // nameGap positions the name's CENTERLINE from the axis, so it must
-      // clear the label column (widest label + ECharts' 8px label margin)
-      // plus half the rotated name's own line height (14px font) and a small
-      // buffer — "+8" alone leaves the name's near edge ~7px inside the labels
+      // nameGap positions the name's centerline: clear the label column,
+      // its 8px margin and half the rotated name's own height.
       nameGap:
         (panelSchema?.type == "h-bar" || panelSchema?.type == "h-stacked"
           ? calculateWidthText(

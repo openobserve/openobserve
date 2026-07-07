@@ -616,15 +616,8 @@ export default defineComponent({
     });
     // Fixed copy-button size (icon-xs-sq), matching the table chart.
     const COPY_BTN_PX = 28;
-    // The value is centered and the font fit reserves the button's slot on
-    // both sides, so on any reasonably wide cell the icon sits immediately
-    // right of the digits — hugging the value. When the readability floor
-    // ate the slot (narrow cells), the icon wraps below the value (clearing
-    // the field label if the cell renders one), then above. In cells too
-    // small for any clean spot it docks at the right edge with a solid
-    // background — it may sit over the value's edge while hovered, but the
-    // copy affordance is always available.
-    // Measuring (vs estimating) keeps the icon snug for any value.
+    // Icon placement: beside the value (the font fit reserves the slot),
+    // else wrapped below/above it, else docked at the right edge (tiny cells).
     const metricIconStyle = (m: any) => {
       const layout = m?.layout;
       if (!layout) return null;
