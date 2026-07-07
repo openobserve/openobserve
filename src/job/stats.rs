@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job};
+use config::{cluster::LOCAL_NODE, deverbatim, get_config, spawn_pausable_job};
 use tokio::time;
 
 use crate::service::{compact::stats::update_stats_from_file_list, db};
@@ -112,21 +112,22 @@ async fn update_node_memory_usage() -> Result<(), anyhow::Error> {
 // update node disk usage metrics every 60 seconds
 async fn update_node_disk_usage() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    let data_dir = std::path::Path::new(&cfg.common.data_dir);
+    let data_dir_raw = std::path::Path::new(&cfg.common.data_dir)
+        .canonicalize()
+        .unwrap_or_else(|_| std::path::PathBuf::from(&cfg.common.data_dir));
+    // Strip any Windows extended-length prefix (\\?\) returned by canonicalize
+    // so comparisons with sysinfo mount points (plain DOS form) work correctly.
+    let data_dir_norm = deverbatim(&data_dir_raw).into_owned();
 
     loop {
         let disks = config::utils::sysinfo::disk::get_disk_usage();
-        // Sum up all disks that contain subdirectories of the data directory
-        // This handles cases where multiple disks are mounted at different subpaths
+        // Sum up all disks whose mount point is a prefix of the data directory.
+        // This finds the disk(s) that actually host the data directory.
         let mut total_space = 0_u64;
         let mut total_used = 0_u64;
 
         for disk in disks {
-            // Check if the disk mount point is under the data directory
-            if disk
-                .mount_point
-                .starts_with(data_dir.to_string_lossy().as_ref())
-            {
+            if data_dir_norm.starts_with(disk.mount_point.as_str()) {
                 total_space += disk.total_space;
                 total_used += disk.total_space - disk.available_space;
             }

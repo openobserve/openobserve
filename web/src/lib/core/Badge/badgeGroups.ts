@@ -561,7 +561,7 @@ export const BADGE_GROUPS = {
   // component needs no slot (was dimensionKey/fieldTag + hardcoded t() slots).
   templateOrigin: {
     mode: "plain",
-    shape: "rounded",
+    shape: "pill",
     size: "sm",
     values: {
       prebuilt: { variant: "blue-soft", labelKey: "alert_templates.prebuiltBadge" },
