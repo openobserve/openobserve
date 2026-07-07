@@ -76,7 +76,9 @@ pub async fn token_validator(
                     o2_enterprise::enterprise::domain_management::evaluate_cached(user_id).await,
                     o2_enterprise::enterprise::domain_management::meta::AccessDecision::Deny
                 ) {
-                    log::warn!("Blocked external identity denied at session token validation: {user_id}");
+                    log::warn!(
+                        "Blocked external identity denied at session token validation: {user_id}"
+                    );
                     return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
                 }
 

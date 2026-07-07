@@ -231,8 +231,9 @@ pub async fn validate_token(token: &str, org_id: &str) -> Result<(), AuthError> 
 ///
 /// Denies **external SSO identities** (users AND SSO/token service accounts) that are on the
 /// blocklist — covering UI/API session tokens, external static tokens, and passcode ingestion. The
-/// `is_external` short-circuit means native/internal principals (incl. root, which is internal) skip
-/// the cache lookup entirely. Kept as one helper so the three validator call sites stay identical.
+/// `is_external` short-circuit means native/internal principals (incl. root, which is internal)
+/// skip the cache lookup entirely. Kept as one helper so the three validator call sites stay
+/// identical.
 #[cfg(feature = "enterprise")]
 async fn blocked_external(user: &config::meta::user::User) -> bool {
     use o2_enterprise::enterprise::domain_management::{self, meta::AccessDecision};

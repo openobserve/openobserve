@@ -1217,8 +1217,9 @@ pub async fn refresh_token_with_dex(
             }
 
             // Blocklist: a refresh must not resurrect a blocked user. Decode the freshly minted
-            // access token; if the identity is blocked, deny WITHOUT minting a session and clear the
-            // auth cookie, so the FE's 401 → /dex_refresh → retry loop terminates at the login page.
+            // access token; if the identity is blocked, deny WITHOUT minting a session and clear
+            // the auth cookie, so the FE's 401 → /dex_refresh → retry loop terminates
+            // at the login page.
             {
                 let keys = get_dex_jwks().await;
                 let refreshed_email = verify_decode_token(
@@ -1245,8 +1246,7 @@ pub async fn refresh_token_with_dex(
                     audit(audit_message).await;
 
                     let conf = get_config();
-                    let cleared =
-                        base64::encode(&json::to_string(&AuthTokens::default()).unwrap());
+                    let cleared = base64::encode(&json::to_string(&AuthTokens::default()).unwrap());
                     let mut auth_cookie = Cookie::new("auth_tokens", cleared);
                     auth_cookie.set_expires(
                         time::OffsetDateTime::now_utc()
