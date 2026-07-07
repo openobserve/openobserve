@@ -69,6 +69,7 @@ pub struct IndexOptimizeRewriter {
     index_condition: Option<IndexCondition>,
     index_optimize_mode: Option<IndexOptimizeMode>,
     metadata_records: i64,
+    #[allow(unused)]
     metadata_files: usize,
 }
 
