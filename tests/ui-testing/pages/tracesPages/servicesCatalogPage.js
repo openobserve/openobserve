@@ -80,15 +80,6 @@ export class ServicesCatalogPage {
     this.lastPageBtn = page.locator('[data-test="o2-table-last-page-btn"]');
 
     // =====================================================================
-    // Legend locators
-    // =====================================================================
-    this.legend = page.locator('[data-test="services-catalog-status-legend"]');
-    this.legendCritical = page.locator('[data-test="services-catalog-legend-critical"]');
-    this.legendWarning = page.locator('[data-test="services-catalog-legend-warning"]');
-    this.legendDegraded = page.locator('[data-test="services-catalog-legend-degraded"]');
-    this.legendHealthy = page.locator('[data-test="services-catalog-legend-healthy"]');
-
-    // =====================================================================
     // Side panel — uses ServiceGraphNodeSidePanel.vue root data-test
     // (parent's "services-catalog-node-side-panel" is overridden by Vue 3
     // attribute inheritance — the root <div> renders with
@@ -140,9 +131,6 @@ export class ServicesCatalogPage {
       page.locator(
         `[data-test="o2-table-th-${columnId}"] [data-test^="o2-table-sort-icon-"]`,
       );
-    /** @param {string} status */
-    this.getLegendItem = (status) =>
-      page.locator(`[data-test="services-catalog-legend-${status}"]`);
     /**
      * OTable page-size OSelect option. OSelect renders options as
      * `[data-test="o2-table-page-size-select-option"][data-test-value="<n>"]`.
@@ -617,21 +605,6 @@ export class ServicesCatalogPage {
     }
     const text = await this.firstServiceLink.textContent().catch(() => '');
     return (text || '').trim();
-  }
-
-  // =========================================================================
-  // LEGEND
-  // =========================================================================
-
-  async isLegendVisible() {
-    return await this.legend.isVisible().catch(() => false);
-  }
-
-  async getLegendCount(status) {
-    const el = this.getLegendItem(status);
-    const text = await el.textContent().catch(() => '0');
-    const match = text.match(/(\d+)/);
-    return match ? parseInt(match[1], 10) : 0;
   }
 
   // =========================================================================
