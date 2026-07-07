@@ -32,9 +32,6 @@ test.describe('RUM Onboarding Snippets', () => {
 
     await pm.rumIngestionPage.gotoFrontendMonitoring();
     await pm.rumIngestionPage.expectPageLoaded();
-    // New SetupCardRenderer UI shows NPM/CDN variant tabs; make the NPM
-    // snippets deterministic (no-op on the pre-refactor UI).
-    await pm.rumIngestionPage.ensureNpmVariant();
   });
 
   test('shows the NPM install command for both browser packages', {
