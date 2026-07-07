@@ -54,10 +54,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OTabs>
 
     <div class="tw:flex-1 tw:min-h-0">
-      <OTabPanels v-model="activeTab" grow scroll="y" class="tw:h-full tw:min-h-0">
+      <OTabPanels
+        v-model="activeTab"
+        grow
+        scroll="y"
+        class="tw:h-full tw:min-h-0"
+      >
         <!-- ════════════ OVERVIEW ════════════ -->
         <OTabPanel name="overview">
-          <div class="tw:max-w-[85rem] tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]">
+          <div
+            class="tw:max-w-[85rem] tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
+          >
             <!-- Status Timeline -->
             <OCard>
               <OCardSection role="header" class="tw:gap-2">
@@ -461,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     <OBadge
-                      variant="error"
+                      variant="error-outline"
                       size="sm"
                       class="tw:truncate tw:max-w-[200px]"
                     >
@@ -498,7 +505,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- ════════════ STEPS ════════════ -->
         <OTabPanel name="steps">
-          <div class="tw:max-w-[85rem] tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]">
+          <div
+            class="tw:max-w-[85rem] tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
+          >
             <div class="tw:flex tw:items-center tw:gap-2.5">
               <span class="tw:font-bold tw:text-sm tw:text-text-heading">
                 Cross-run step analysis
@@ -540,7 +549,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tw:min-w-0">
                       <div
                         class="tw:font-semibold tw:text-xs tw:text-text-heading tw:truncate"
-                        :class="stepsGroupBy === 'locator' ? 'tw:font-mono tw:tabular-nums' : ''"
+                        :class="
+                          stepsGroupBy === 'locator'
+                            ? 'tw:font-mono tw:tabular-nums'
+                            : ''
+                        "
                       >
                         {{ g.name }}
                       </div>
@@ -571,7 +584,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                     <div class="tw:flex tw:flex-col tw:gap-1">
-                      <span class="tw:font-mono tw:tabular-nums tw:text-xs tw:text-text-body">
+                      <span
+                        class="tw:font-mono tw:tabular-nums tw:text-xs tw:text-text-body"
+                      >
                         {{ g.avgDuration }}
                       </span>
                       <div
@@ -693,7 +708,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- ════════════ ERRORS ════════════ -->
         <OTabPanel name="errors">
-          <div class="tw:max-w-[85rem] tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]">
+          <div
+            class="tw:max-w-[85rem] tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
+          >
             <div class="tw:flex tw:items-center tw:gap-2.5">
               <span class="tw:font-bold tw:text-sm tw:text-text-heading">
                 Error patterns
@@ -720,7 +737,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="monitor-runs-error-row"
                 @click="filterByErrorPattern(e.pattern)"
               >
-                <span class="tw:font-mono tw:tabular-nums tw:text-xs tw:text-text-heading tw:truncate">
+                <span
+                  class="tw:font-mono tw:tabular-nums tw:text-xs tw:text-text-heading tw:truncate"
+                >
                   {{ e.pattern }}
                 </span>
                 <span class="tw:font-bold tw:text-sm tw:text-status-error-text">
@@ -1144,14 +1163,23 @@ const kpiCards = computed<KpiCard[]>(() => {
     ];
   }
   // Fallback: derive from mock data
-  const fallbackPassPct = allRuns.value.length > 0
-    ? ((allRuns.value.filter((r) => r.status === "pass").length / allRuns.value.length) * 100).toFixed(1) + "%"
-    : "100%";
+  const fallbackPassPct =
+    allRuns.value.length > 0
+      ? (
+          (allRuns.value.filter((r) => r.status === "pass").length /
+            allRuns.value.length) *
+          100
+        ).toFixed(1) + "%"
+      : "100%";
   const lastRun = allRuns.value[0];
   return [
     { key: "pass-rate", label: "Pass Rate", value: fallbackPassPct },
     { key: "p95-duration", label: "p95 Duration", value: "—" },
-    { key: "failed-runs", label: "Failed Runs", value: String(totalFails.value) },
+    {
+      key: "failed-runs",
+      label: "Failed Runs",
+      value: String(totalFails.value),
+    },
     {
       key: "last-run",
       label: "Last Run",
@@ -1182,7 +1210,10 @@ const timelineSegments = computed(() => {
   });
   return merged.map((seg) => ({
     pct: ((seg.width / totalSpan) * 100).toFixed(2) + "%",
-    color: seg.status === "fail" ? "var(--o2-status-error-text)" : "var(--o2-status-success-text)",
+    color:
+      seg.status === "fail"
+        ? "var(--o2-status-error-text)"
+        : "var(--o2-status-success-text)",
     title:
       (seg.status === "fail" ? "Failed" : "Passed") +
       " · ~" +
@@ -1331,7 +1362,7 @@ const visibleRuns = computed<VisibleRun[]>(() => {
     const isFail = run.status === "fail";
     return {
       id: run.id,
-      statusBadgeVariant: isFail ? "error" : "success",
+      statusBadgeVariant: isFail ? "error-outline" : "success-outline",
       statusIcon: isFail ? "cancel" : "check_circle",
       statusLabel: isFail ? "Failed" : "Passed",
       age: fmtAge(run.ageMin),
@@ -1727,4 +1758,3 @@ async function refresh(startTime?: number, endTime?: number) {
 
 defineExpose({ refresh });
 </script>
-
