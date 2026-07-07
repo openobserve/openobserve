@@ -7,12 +7,12 @@ import { useLLMStreamQuery } from '@/plugins/traces/composables/useLLMStreamQuer
 import {
   buildRunDetailSql,
   mapRunLocationResult,
-  type RetryAttempt,
   type RunLocationResult,
   type RunStatus,
   type StepResult,
 } from '@/composables/synthetics/syntheticResultsSchema'
 import syntheticsService from '@/services/synthetics'
+import ExecutionDetailDrawer from './ExecutionDetailDrawer.vue'
 
 const props = defineProps<{
   runId: string
@@ -40,15 +40,15 @@ watch(
       const windowUs = 5 * 60 * 1_000_000
       const start = props.scheduledTs - windowUs
       const end = props.scheduledTs + windowUs
-      const rows = await executeQuery(buildRunDetailSql(props.monitorId), start, end, 'logs')
+      const rows = await executeQuery(buildRunDetailSql(props.monitorId, props.runId), start, end, 'logs')
       executions.value = rows.map(mapRunLocationResult)
       initExpanded()
     } catch (e: any) {
       const msg: string = e?.message ?? ''
       // Stream not found = no results written yet (e.g. probe infra error before first run).
       // Treat as empty rather than surfacing a technical error.
-      const isStreamMissing = /stream.*not.*found|table.*not.*found|not.*found/i.test(msg)
-      if (!isStreamMissing) {
+      const isIgnorable = /stream.*not.*found|table.*not.*found|not.*found|field.*not.*found|search field|column.*not.*exist/i.test(msg)
+      if (!isIgnorable) {
         queryError.value = msg || 'Query failed'
       }
     } finally {
@@ -88,25 +88,15 @@ const locationGroups = computed<LocationGroup[]>(() => {
 
 // Locations expanded (show execution table inside)
 const expandedLocations = ref(new Set<string>())
-// Executions with steps expanded
-const expandedExecutions = ref(new Set<string>())
-// Retry attempt 0 expanded per executionId
-const expandedRetry = ref(new Set<string>())
+// Drawer state
+const selectedExecution = ref<RunLocationResult | null>(null)
+
+function openDrawer(ex: RunLocationResult) {
+  selectedExecution.value = ex
+}
 
 function initExpanded() {
-  const locs = new Set<string>()
-  const execs = new Set<string>()
-  for (const ex of executions.value) {
-    if (ex.status !== 'passed') {
-      locs.add(ex.location)
-      if (ex.status === 'failed' || ex.status === 'error') {
-        execs.add(ex.executionId)
-      }
-    }
-  }
-  expandedLocations.value = locs
-  expandedExecutions.value = execs
-  expandedRetry.value = new Set()
+  expandedLocations.value = new Set()
 }
 
 function toggleLocation(loc: string) {
@@ -114,20 +104,6 @@ function toggleLocation(loc: string) {
   if (s.has(loc)) s.delete(loc)
   else s.add(loc)
   expandedLocations.value = s
-}
-
-function toggleExecution(id: string) {
-  const s = new Set(expandedExecutions.value)
-  if (s.has(id)) s.delete(id)
-  else s.add(id)
-  expandedExecutions.value = s
-}
-
-function toggleRetry(id: string) {
-  const s = new Set(expandedRetry.value)
-  if (s.has(id)) s.delete(id)
-  else s.add(id)
-  expandedRetry.value = s
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -147,13 +123,6 @@ const STATUS_COLOR: Record<RunStatus | 'pending', string> = {
   failed:  'tw:text-red-500',
   error:   'tw:text-orange-500',
   pending: 'tw:text-gray-400',
-}
-
-const STATUS_BG: Record<RunStatus, string> = {
-  passed:  'tw:bg-green-500',
-  warning: 'tw:bg-amber-500',
-  failed:  'tw:bg-red-500',
-  error:   'tw:bg-orange-500',
 }
 
 function statusDot(s: RunStatus) {
@@ -188,9 +157,6 @@ function failedAtStep(steps: StepResult[]): string {
   return step ? (step.stepId || '—') : '—'
 }
 
-function totalRetries(ex: RunLocationResult): number {
-  return ex.retryHistory.length
-}
 </script>
 
 <template>
@@ -279,8 +245,7 @@ function totalRetries(ex: RunLocationResult): number {
                     v-for="ex in group.execs"
                     :key="ex.executionId"
                     class="hover:tw:bg-[var(--o2-surface-hover)] tw:transition-colors tw:cursor-pointer"
-                    :class="expandedExecutions.has(ex.executionId) ? 'tw:bg-[var(--o2-surface-hover)]' : ''"
-                    @click="ex.status !== 'passed' && toggleExecution(ex.executionId)"
+                    @click="openDrawer(ex)"
                   >
                     <td class="tw:px-3 tw:py-2 tw:font-medium tw:capitalize">{{ ex.browserEngine }}</td>
                     <td class="tw:px-3 tw:py-2">
@@ -305,146 +270,20 @@ function totalRetries(ex: RunLocationResult): number {
               </table>
             </div>
 
-            <!-- Per-execution step detail blocks for non-passed executions -->
-            <div
-              v-for="ex in group.execs.filter(e => e.status !== 'passed')"
-              :key="`detail-${ex.executionId}`"
-              class="tw:rounded tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden tw:mb-2"
-            >
-              <!-- Execution detail header -->
-              <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2.5 tw:bg-[var(--o2-surface-secondary)] tw:border-b tw:border-[var(--o2-border-color)]">
-                <span class="tw:font-semibold tw:text-sm tw:capitalize tw:text-[var(--o2-text-heading)]">
-                  {{ ex.browserEngine }} · {{ ex.device }}
-                </span>
-                <span :class="STATUS_COLOR[ex.status]" class="tw:font-semibold tw:text-xs">
-                  {{ statusDot(ex.status) }} {{ statusLabel(ex.status) }}
-                </span>
-                <span class="tw:text-xs tw:text-[var(--o2-text-muted)]">{{ fmtDuration(ex.durationMs) }}</span>
-                <span v-if="totalRetries(ex) > 0" class="tw:text-xs tw:text-[var(--o2-text-muted)]">
-                  · {{ totalRetries(ex) + 1 }} attempts
-                </span>
-                <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
-                  <a
-                    v-if="ex.traceKey"
-                    :href="artifactUrl(ex.traceKey)"
-                    target="_blank"
-                    class="tw:inline-flex tw:items-center tw:gap-1 tw:text-xs tw:text-[var(--o2-text-link)] hover:tw:underline"
-                    @click.stop
-                  >
-                    View trace
-                    <OIcon name="open_in_new" size="xs" />
-                  </a>
-                  <button
-                    class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:text-[var(--o2-text-muted)] hover:tw:text-[var(--o2-text-primary)]"
-                    @click="toggleExecution(ex.executionId)"
-                  >
-                    <OIcon :name="expandedExecutions.has(ex.executionId) ? 'expand_less' : 'expand_more'" size="sm" />
-                    {{ expandedExecutions.has(ex.executionId) ? 'Hide steps' : 'Show steps' }}
-                  </button>
-                </div>
-              </div>
-
-              <div v-if="expandedExecutions.has(ex.executionId)" class="tw:p-3 tw:flex tw:flex-col tw:gap-3">
-
-                <!-- Final attempt steps -->
-                <div>
-                  <p class="tw:text-[0.65rem] tw:font-semibold tw:uppercase tw:tracking-wider tw:text-[var(--o2-text-muted)] tw:mb-1.5">
-                    Attempt {{ totalRetries(ex) }} ({{ ex.status === 'passed' || ex.status === 'warning' ? 'passed — final' : 'failed — final' }})
-                  </p>
-                  <StepList :steps="ex.steps" :show-screenshots="true" :artifact-url-fn="artifactUrl" />
-                </div>
-
-                <!-- Error message if no step detail -->
-                <div
-                  v-if="ex.error && !ex.steps.length"
-                  class="tw:rounded tw:border tw:border-orange-500/30 tw:bg-orange-500/10 tw:px-3 tw:py-2"
-                >
-                  <p class="tw:text-xs tw:text-orange-600 tw:font-mono tw:whitespace-pre-wrap">{{ ex.error }}</p>
-                </div>
-
-                <!-- Retry history -->
-                <div v-if="ex.retryHistory.length">
-                  <button
-                    class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-[var(--o2-text-muted)] hover:tw:text-[var(--o2-text-primary)] tw:mb-1.5"
-                    @click="toggleRetry(ex.executionId)"
-                  >
-                    <OIcon :name="expandedRetry.has(ex.executionId) ? 'expand_less' : 'expand_more'" size="xs" />
-                    Attempt {{ ex.retryHistory[0]?.attempt ?? 0 }} (failed · {{ fmtDuration(ex.retryHistory[0]?.durationMs) }})
-                  </button>
-                  <div v-if="expandedRetry.has(ex.executionId)">
-                    <StepList :steps="ex.retryHistory[0]?.steps ?? []" :show-screenshots="false" :artifact-url-fn="artifactUrl" />
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
           </div>
         </div>
       </div>
     </template>
+
+    <!-- Execution detail drawer -->
+    <ExecutionDetailDrawer
+      :execution="selectedExecution"
+      :artifact-url-fn="artifactUrl"
+      @close="selectedExecution = null"
+    />
   </div>
 </template>
 
-<!-- Step list sub-component inlined -->
-<script lang="ts">
-import { defineComponent, h, PropType } from 'vue'
-import type { StepResult } from '@/composables/synthetics/syntheticResultsSchema'
-
-const StepList = defineComponent({
-  name: 'StepList',
-  props: {
-    steps: { type: Array as PropType<StepResult[]>, required: true },
-    showScreenshots: { type: Boolean, default: false },
-    artifactUrlFn: { type: Function as PropType<(key: string) => string>, required: true },
-  },
-  setup(props) {
-    const maxDuration = () => Math.max(...props.steps.map((s) => s.durationMs), 1)
-
-    return () => {
-      if (!props.steps.length) {
-        return h('p', { class: 'tw:text-xs tw:text-[var(--o2-text-muted)] tw:italic' }, 'No step data available.')
-      }
-      const max = maxDuration()
-      return h('div', { class: 'tw:flex tw:flex-col tw:gap-0.5' },
-        props.steps.map((step, i) => {
-          const isFail = step.status === 'fail'
-          const pct = max > 0 ? Math.max(4, Math.round((step.durationMs / max) * 100)) : 4
-          return h('div', {
-            key: step.stepId,
-            class: `tw:rounded tw:text-xs tw:px-2 tw:py-1.5 ${isFail ? 'tw:bg-red-500/10 tw:border tw:border-red-500/30' : 'tw:bg-[var(--o2-surface-secondary)]'}`,
-          }, [
-            h('div', { class: 'tw:flex tw:items-center tw:gap-2' }, [
-              h('span', {
-                class: `tw:shrink-0 tw:w-4 tw:h-4 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:text-white tw:text-[0.58rem] tw:font-bold ${isFail ? 'tw:bg-red-500' : 'tw:bg-green-600'}`,
-              }, String(i + 1)),
-              h('span', { class: 'tw:font-mono tw:text-[var(--o2-text-secondary)] tw:flex-1 tw:truncate', title: step.stepId }, step.stepId || `Step ${i + 1}`),
-              h('span', { class: 'tw:tabular-nums tw:text-[var(--o2-text-muted)] tw:shrink-0' }, step.durationMs ? `${step.durationMs} ms` : '—'),
-            ]),
-            // Duration bar
-            step.durationMs ? h('div', { class: 'tw:mt-1 tw:h-0.5 tw:rounded tw:bg-[var(--o2-border-color)]' }, [
-              h('div', { class: `tw:h-full tw:rounded ${isFail ? 'tw:bg-red-500' : 'tw:bg-blue-500'}`, style: `width:${pct}%` }),
-            ]) : null,
-            // Error
-            isFail && step.error ? h('p', { class: 'tw:mt-1 tw:text-red-600 tw:font-mono tw:text-[0.7rem] tw:whitespace-pre-wrap tw:leading-relaxed' }, step.error) : null,
-            // Screenshot
-            props.showScreenshots && step.screenshotKey
-              ? h('a', { href: props.artifactUrlFn(step.screenshotKey), target: '_blank', class: 'tw:block tw:mt-2' }, [
-                  h('img', {
-                    src: props.artifactUrlFn(step.screenshotKey),
-                    alt: `Screenshot step ${step.stepId}`,
-                    class: 'tw:w-full tw:max-h-48 tw:object-contain tw:rounded tw:border tw:border-[var(--o2-border-color)]',
-                    loading: 'lazy',
-                  }),
-                ])
-              : null,
-          ])
-        }),
-      )
-    }
-  },
-})
-</script>
 
 <style scoped lang="scss">
 .skel {

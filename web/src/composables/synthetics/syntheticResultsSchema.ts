@@ -72,6 +72,13 @@ export interface ScreenshotRef {
   key: string;
 }
 
+/** Step definition as recorded at run time (from recorded_steps field). */
+export interface RecordedStep {
+  id: string;
+  name: string;
+  action: string;
+}
+
 /** One step execution result from last_attempt_steps or retry_history. */
 export interface StepResult {
   stepId: string;
@@ -101,6 +108,7 @@ export interface RunLocationResult {
   executionId: string;
   traceKey: string | null;
   steps: StepResult[];
+  recordedSteps: RecordedStep[];
   retryHistory: RetryAttempt[];
 }
 
@@ -228,11 +236,12 @@ ORDER BY ts`;
 }
 
 /** Per-execution results for a single run — one row per engine×device combo. */
-export function buildRunDetailSql(monitorId: string): string {
+export function buildRunDetailSql(monitorId: string, runId: string): string {
   const id = escapeSqlLiteral(monitorId);
-  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, ${F.error} as error, job_id, execution_id, trace_key, last_attempt_steps
+  const rid = escapeSqlLiteral(runId);
+  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, ${F.error} as error, job_id, execution_id, trace_key, last_attempt_steps, recorded_steps
 FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}'
+WHERE ${F.monitorId} = '${id}' AND run_id = '${rid}'
 ORDER BY ${F.location} ASC`;
 }
 
@@ -296,6 +305,11 @@ export function mapRunLocationResult(rawHit: Record<string, unknown>): RunLocati
     executionId: str(rawHit.execution_id),
     traceKey: rawHit.trace_key ? str(rawHit.trace_key) : null,
     steps: parseSteps(rawHit.last_attempt_steps),
+    recordedSteps: parseJsonArray(rawHit.recorded_steps).map((s: any) => ({
+      id: str(s.id),
+      name: str(s.name),
+      action: str(s.action),
+    })),
     retryHistory: [],
   };
 }

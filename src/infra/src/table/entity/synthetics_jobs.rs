@@ -58,7 +58,10 @@ mod tests {
             lease_expires_at: None,
             attempts: 0,
             run_id: "3Fzn001XXXXXXXXXXXXXXXX".to_string(),
-            browser_devices: Some(r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"laptop_large"}]"#.to_string()),
+            browser_devices: Some(
+                r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"laptop_large"}]"#
+                    .to_string(),
+            ),
             result: None,
             started_at: None,
             completed_at: None,
