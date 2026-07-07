@@ -1095,16 +1095,51 @@ describe("ServicesCatalog", () => {
       ]);
     });
 
-    it("should update sortBy, sortOrder, and reset currentPage on handleSortChange", async () => {
+    it("clicking a NEW column sorts it descending and resets currentPage", async () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
       wrapper.vm.currentPage = 3;
+      // A new column starts descending (worst/highest first). OTable's emitted
+      // order is ignored — the catalog computes direction itself for a clean
+      // 2-state toggle.
       wrapper.vm.handleSortChange("total_requests", "asc");
 
       expect(wrapper.vm.sortBy).toBe("total_requests");
-      expect(wrapper.vm.sortOrder).toBe("asc");
+      expect(wrapper.vm.sortOrder).toBe("desc");
       expect(wrapper.vm.currentPage).toBe(1);
+    });
+
+    it("clicking the SAME column flips the direction (2-state toggle)", async () => {
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      // Default: status / desc.
+      expect(wrapper.vm.sortBy).toBe("status");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+
+      // Re-click status → flips to asc.
+      wrapper.vm.handleSortChange("status", "asc");
+      expect(wrapper.vm.sortBy).toBe("status");
+      expect(wrapper.vm.sortOrder).toBe("asc");
+
+      // Re-click again → flips back to desc (never a "cleared" 3rd state).
+      wrapper.vm.handleSortChange("status", "desc");
+      expect(wrapper.vm.sortBy).toBe("status");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+    });
+
+    it("treats OTable's cleared-sort emit (empty column) as a flip of the current column", async () => {
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      // OTable's 3-state cycle emits column:"" on its clear step; the catalog
+      // reinterprets that as re-clicking the current column → flip, so the table
+      // is never left unsorted.
+      expect(wrapper.vm.sortOrder).toBe("desc");
+      wrapper.vm.handleSortChange("", "asc");
+      expect(wrapper.vm.sortBy).toBe("status");
+      expect(wrapper.vm.sortOrder).toBe("asc");
     });
   });
 

@@ -534,9 +534,26 @@ const hasInferColumns = ref<boolean | null>(null);
 
 // OTable owns pagination internally; `currentPage` is retained only as the
 // "reset to page 1 on sort/filter change" signal the tests assert against.
-function handleSortChange(field: string, order: "asc" | "desc") {
-  sortBy.value = field;
-  sortOrder.value = order;
+//
+// OTable server-mode sort is a 3-state cycle (asc → desc → cleared). The catalog
+// always shows sorted data, so we collapse it to a simple 2-state toggle:
+//   - click a NEW column      → sort it descending (worst-first, matching the
+//     default status sort)
+//   - click the SAME column   → flip its direction
+// We derive the column from OTable's payload but ignore its emitted order (which
+// includes the "cleared" step), computing the direction ourselves. When OTable
+// emits its clear step (empty column), that means the currently-sorted column
+// was clicked again → flip it.
+function handleSortChange(field: string, _order: "asc" | "desc") {
+  const clickedField = field || sortBy.value;
+  if (clickedField === sortBy.value && sortBy.value) {
+    // Same column re-clicked → flip direction (2-state toggle).
+    sortOrder.value = sortOrder.value === "asc" ? "desc" : "asc";
+  } else {
+    // New column → start descending (worst / highest first).
+    sortBy.value = clickedField;
+    sortOrder.value = "desc";
+  }
   currentPage.value = 1;
 }
 
