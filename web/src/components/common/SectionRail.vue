@@ -23,26 +23,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <nav
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:bg-surface-panel"
+    class="flex flex-col h-full min-h-0 bg-surface-panel"
     data-test="section-rail"
   >
     <div
       v-if="title"
-      class="tw:shrink-0 tw:px-3.5 tw:pt-3 tw:pb-1 tw:text-sm tw:font-semibold tw:text-text-primary tw:truncate"
+      class="shrink-0 px-3.5 pt-3 pb-1 text-sm font-semibold text-text-primary truncate"
     >
       {{ title }}
     </div>
 
-    <div class="tw:flex-1 tw:overflow-y-auto tw:px-2 tw:pt-1 tw:pb-3">
+    <div class="flex-1 overflow-y-auto px-2 pt-1 pb-3">
       <OTabs
         :model-value="activeKey ?? ''"
         orientation="vertical"
-        class="tw:w-full"
+        class="w-full"
         @change="onTabChange"
       >
         <template v-for="group in visibleGroups" :key="group.label">
           <div
-            class="tw:px-2 tw:py-1 tw:text-[0.72rem] tw:font-semibold tw:text-text-secondary"
+            class="px-2 py-1 text-[0.72rem] font-semibold text-text-secondary"
           >
             {{ group.label }}
           </div>
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="item.label"
             :icon="item.icon"
             :data-test="item.dataTest"
-            class="tw:w-full"
+            class="w-full"
             @click="navigate(item.to)"
           />
         </template>

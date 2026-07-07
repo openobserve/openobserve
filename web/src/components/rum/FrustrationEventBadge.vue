@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <span class="tw:inline-flex tw:gap-1 tw:items-center" data-test="frustration-event-badge-wrapper">
+  <span class="inline-flex gap-1 items-center" data-test="frustration-event-badge-wrapper">
     <OTag
       v-for="(type, index) in frustrationTypes"
       :key="index"

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
     data-test="panel-layout-settings-content"
-    class="tw:p-0"
+    class="p-0"
     style="min-height: inherit"
   >
     <div>
@@ -46,11 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="panel-layout-settings-height-input"
         />
 
-        <div class="tw:text-[12px] tw:flex tw:items-center tw:gap-1 tw:mt-1">
-          <span class="tw:whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
+        <div class="text-[12px] flex items-center gap-1 mt-1">
+          <span class="whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
           <OIcon
             name="info-outline"
-            class="tw:cursor-pointer tw:shrink-0"
+            class="cursor-pointer shrink-0"
             size="xs"
            />
             <OTooltip content="1 unit = 30px" />

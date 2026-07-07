@@ -62,10 +62,10 @@ describe("NoData.vue", () => {
       expect(container.exists()).toBe(true);
     });
 
-    it("should apply tw:w-full class to root div", () => {
+    it("should apply w-full class to root div", () => {
       wrapper = createWrapper();
       const container = wrapper.find('[data-test="no-data-message"]');
-      expect(container.classes()).toContain("tw:w-full");
+      expect(container.classes()).toContain("w-full");
     });
   });
 
@@ -135,14 +135,14 @@ describe("NoData.vue", () => {
       wrapper = createWrapper();
       const container = wrapper.find('[data-test="no-data-message"]');
       expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain("tw:w-full");
+      expect(container.classes()).toContain("w-full");
     });
 
     it("should maintain consistent styling across different contexts", () => {
       wrapper = createWrapper();
       const container = wrapper.find('[data-test="no-data-message"]');
       expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain("tw:w-full");
+      expect(container.classes()).toContain("w-full");
     });
   });
 

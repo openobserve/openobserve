@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       :id="scopeId"
       :class="[
-        'tw:prose tw:prose-sm tw:max-w-none',
-        store.state?.theme === 'dark' && 'tw:prose-invert',
+        'prose prose-sm max-w-none',
+        store.state?.theme === 'dark' && 'prose-invert',
       ]"
       style="min-height: 100%; flex-shrink: 0"
       v-html="sanitizedContent"

@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:gap-[0.15rem] tw:w-full tw:min-w-0">
-    <span class="tw:text-[0.75rem] tw:leading-none tw:tabular-nums tw:truncate">
+  <div class="flex flex-col gap-[0.15rem] w-full min-w-0">
+    <span class="text-[0.75rem] leading-none tabular-nums truncate">
       {{ label }}
       <OTooltip v-if="tooltip" :content="tooltip" />
     </span>

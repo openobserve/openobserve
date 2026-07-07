@@ -1,11 +1,11 @@
 <template>
   <IngestionContent>
-    <div class="tw:flex tw:flex-col tw:gap-2">
-      <div class="tw:text-base tw:font-semibold">OTLP HTTP</div>
+    <div class="flex flex-col gap-2">
+      <div class="text-base font-semibold">OTLP HTTP</div>
       <ContentCopy :content="getOtelHttpConfig" />
     </div>
-    <div class="tw:flex tw:flex-col tw:gap-2" v-if="config.isCloud == 'false'">
-      <div class="tw:text-base tw:font-semibold">OTLP gRPC</div>
+    <div class="flex flex-col gap-2" v-if="config.isCloud == 'false'">
+      <div class="text-base font-semibold">OTLP gRPC</div>
       <ContentCopy :content="getOtelGrpcConfig" />
     </div>
   </IngestionContent>

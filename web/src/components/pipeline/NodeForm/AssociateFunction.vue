@@ -32,8 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="add-function-node-routing-section"
-      class="tw:flex tw:flex-col tw:h-full"
-      :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-bg-card-dark,#1a1a1a)' : 'tw:bg-white'"
+      class="flex flex-col h-full"
+      :class="store.state.theme === 'dark' ? 'bg-(--o2-bg-card-dark,#1a1a1a)' : 'bg-white'"
     >
 
 
@@ -41,16 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSpinner
         v-if="loading"
         size="md"
-        class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
+        class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
         data-test="associate-function-loading-indicator"
       />
     </div>
     <div
       v-else
       data-test="associate-function-routing-container"
-      class="tw:rounded-lg tw:w-full tw:pt-3 tw:pb-3 tw:flex tw:flex-col tw:gap-4 tw:flex-1 tw:min-h-0"
+      class="rounded-lg w-full pt-3 pb-3 flex flex-col gap-4 flex-1 min-h-0"
     >
-      <div class="tw:flex tw:items-center tw:gap-3 tw:px-(--spacing-dialog-header-px)">
+      <div class="flex items-center gap-3 px-(--spacing-dialog-header-px)">
         <OSwitch
           data-test="create-function-toggle"
           :label="isUpdating ? 'Edit function' : 'Create new function'"
@@ -58,15 +58,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="createNewFunction"
-          class="tw:text-sm tw:text-gray-600"
+          class="text-sm text-gray-600"
         >
           ({{ t("alerts.newFunctionAssociationMsg") }})
         </div>
       </div>
-      <div class="tw:flex tw:flex-col tw:gap-4" :class="[!createNewFunction ? 'tw:px-3' : 'tw:flex-1 tw:min-h-0']">
+      <div class="flex flex-col gap-4" :class="[!createNewFunction ? 'px-3' : 'flex-1 min-h-0']">
         <div
           v-if="!createNewFunction"
-          class="tw:w-full"
+          class="w-full"
         >
           <OSelect
             v-model="selectedFunction"
@@ -95,18 +95,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             pipelineObj.functions[selectedFunction]
           "
           data-test="associate-function-definition-section"
-          class="tw:mt-4 tw:mb-4"
+          class="mt-4 mb-4"
         >
-          <OCard class="function-definition-card tw:border tw:border-[#e1e5e9] tw:dark:border-[#2d3748] tw:rounded-lg tw:shadow-[0_2px_4px_rgba(0,0,0,0.05)] tw:dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] tw:overflow-hidden tw:dark:bg-[#1a202c]">
-            <OCardSection role="header" class="function-definition-header tw:bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] tw:dark:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] tw:border-b tw:border-b-[#e2e8f0] tw:dark:border-b-[#4a5568]">
-              <div class="tw:text-base tw:font-semibold tw:text-[#2d3748] tw:dark:text-white">
+          <OCard class="function-definition-card border border-[#e1e5e9] dark:border-[#2d3748] rounded-lg shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] overflow-hidden dark:bg-[#1a202c]">
+            <OCardSection role="header" class="function-definition-header bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] dark:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] border-b border-b-[#e2e8f0] dark:border-b-[#4a5568]">
+              <div class="text-base font-semibold text-[#2d3748] dark:text-white">
                 {{ t("function.function_definition") }}
               </div>
             </OCardSection>
             <OSeparator />
-            <OCardSection class="tw:p-0 function-definition-content">
-              <div class="function-code-container tw:bg-[#fafbfc] tw:dark:bg-[#0d1117] tw:dark:border tw:dark:border-[#21262d] tw:rounded-none tw:max-w-[584px] tw:max-h-[250px] tw:overflow-y-auto tw:relative">
-                <pre class="function-code tw:text-[#2d3748] tw:dark:text-[#f7fafc] tw:bg-transparent tw:m-0 tw:p-4 tw:font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] tw:text-[13px] tw:leading-normal tw:whitespace-pre-wrap tw:break-words tw:border-0 tw:font-normal tw:cursor-default tw:select-text">{{
+            <OCardSection class="p-0 function-definition-content">
+              <div class="function-code-container bg-[#fafbfc] dark:bg-[#0d1117] dark:border dark:border-[#21262d] rounded-none max-w-[584px] max-h-[250px] overflow-y-auto relative">
+                <pre class="function-code text-[#2d3748] dark:text-[#f7fafc] bg-transparent m-0 p-4 font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] text-[13px] leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text">{{
                   pipelineObj.functions[selectedFunction]?.function ||
                   "No definition available"
                 }}</pre>
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OCard>
         </div>
 
-        <div v-if="createNewFunction" class="pipeline-add-function tw:w-full tw:flex-1 tw:min-h-0">
+        <div v-if="createNewFunction" class="pipeline-add-function w-full flex-1 min-h-0">
           <AddFunction
             ref="addFunctionRef"
             :is-updated="isUpdating"
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="tw:w-full tw:flex tw:flex-col tw:gap-3"
+          class="w-full flex flex-col gap-3"
           v-if="!createNewFunction"
         >
           <OSwitch
@@ -136,30 +136,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- Info note explaining RAF/RBF -->
-          <div class="tw:bg-[#f9f290] tw:text-[#2d3748] tw:w-full tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2">
-            <div class="tw:text-sm tw:text-[#2d3748]">
+          <div class="bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 flex flex-col gap-2">
+            <div class="text-sm text-[#2d3748]">
               Function Execution Guidelines:
             </div>
-            <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-[#2d3748]">
-              <div class="tw:flex tw:items-start tw:gap-2">
+            <div class="flex flex-col gap-1 text-sm text-[#2d3748]">
+              <div class="flex items-start gap-2">
                 <OIcon
                   name="info"
                   size="sm"
-                  class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500"
+                  class="shrink-0 mt-0.5 text-amber-500"
                 />
                 <span>
-                  <span class="tw:font-bold tw:text-[#007bff]">RBF (Run Before Flattening):</span>
+                  <span class="font-bold text-[#007bff]">RBF (Run Before Flattening):</span>
                   Function executes before data structure is flattened
                 </span>
               </div>
-              <div class="tw:flex tw:items-start tw:gap-2">
+              <div class="flex items-start gap-2">
                 <OIcon
                   name="info"
                   size="sm"
-                  class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500"
+                  class="shrink-0 mt-0.5 text-amber-500"
                 />
                 <span>
-                  <span class="tw:font-bold tw:text-[#007bff]">RAF (Run After Flattening):</span>
+                  <span class="font-bold text-[#007bff]">RAF (Run After Flattening):</span>
                   Function executes after data structure is flattened
                 </span>
               </div>

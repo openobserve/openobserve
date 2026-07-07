@@ -53,7 +53,7 @@ describe('OSplitter', () => {
     it('should render with default props', () => {
       expect(wrapper.find('.o-splitter').exists()).toBe(true)
       expect(wrapper.classes()).toContain('o-splitter--vertical')
-      expect(wrapper.classes()).toContain('tw:flex-row')
+      expect(wrapper.classes()).toContain('flex-row')
     })
 
     it('should render before and after slots', () => {
@@ -114,13 +114,13 @@ describe('OSplitter', () => {
 
     it('should render with horizontal classes', () => {
       expect(wrapper.classes()).toContain('o-splitter--horizontal')
-      expect(wrapper.classes()).toContain('tw:flex-col')
+      expect(wrapper.classes()).toContain('flex-col')
     })
 
     it('should render horizontal separator', () => {
       const separator = wrapper.find('[role="separator"]')
       expect(separator.classes()).toContain('o-splitter__separator--horizontal')
-      expect(separator.classes()).toContain('tw:cursor-row-resize')
+      expect(separator.classes()).toContain('cursor-row-resize')
     })
 
     it('should call useResizer with horizontal direction', () => {
@@ -153,13 +153,13 @@ describe('OSplitter', () => {
 
     it('should render with vertical classes', () => {
       expect(wrapper.classes()).toContain('o-splitter--vertical')
-      expect(wrapper.classes()).toContain('tw:flex-row')
+      expect(wrapper.classes()).toContain('flex-row')
     })
 
     it('should render vertical separator', () => {
       const separator = wrapper.find('[role="separator"]')
       expect(separator.classes()).toContain('o-splitter__separator--vertical')
-      expect(separator.classes()).toContain('tw:cursor-col-resize')
+      expect(separator.classes()).toContain('cursor-col-resize')
     })
 
     it('should apply correct styles for vertical layout', () => {
@@ -207,8 +207,8 @@ describe('OSplitter', () => {
 
     it('should render disabled separator', () => {
       const separator = wrapper.find('[role="separator"]')
-      expect(separator.classes()).toContain('tw:cursor-default!')
-      expect(separator.classes()).toContain('tw:opacity-50')
+      expect(separator.classes()).toContain('cursor-default!')
+      expect(separator.classes()).toContain('opacity-50')
       expect(separator.attributes('tabindex')).toBe('-1')
     })
 

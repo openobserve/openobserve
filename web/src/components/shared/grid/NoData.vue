@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OEmptyState preset="…" /> directly instead.
 -->
 <template>
-  <div data-test="no-data-message" class="tw:w-full">
+  <div data-test="no-data-message" class="w-full">
     <OEmptyState
       v-if="filtered"
       size="block"

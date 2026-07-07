@@ -15,32 +15,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-[calc(100%-1px)] tw:overflow-hidden relative-position tw:h-full tw:flex tw:flex-col">
-    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:px-2 tw:py-1 tw:mt-2! tw:mx-2!" />
+  <div class="w-[calc(100%-1px)] overflow-hidden relative-position h-full flex flex-col">
+    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="px-2 py-1 mt-2! mx-2!" />
     <template v-if="activeTab === 'tags'">
       <div
         data-test="event-metadata"
-        class="tw:flex tw:p-2 tw:sticky tw:top-0 tw:px-3"
+        class="flex p-2 sticky top-0 px-3"
       >
-        <div class="tw:w-full tw:flex tw:flex-col">
-          <div class="tw:w-full tw:pb-2 tw:text-xs">
-            <OIcon name="mail" size="sm" class="tw:pr-1" />
+        <div class="w-full flex flex-col">
+          <div class="w-full pb-2 text-xs">
+            <OIcon name="mail" size="sm" class="pr-1" />
             {{ sessionDetails.user_email || "Unknown User" }}
           </div>
-          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate tw:pr-1">
-            <OIcon name="schedule" size="sm" class="tw:pr-1" />
+          <div class="w-full mb-2 text-xs truncate pr-1">
+            <OIcon name="schedule" size="sm" class="pr-1" />
             {{ sessionDetails.date }}
           </div>
-          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate tw:pr-1">
-            <OIcon name="settings" size="sm" class="tw:pr-1" />
+          <div class="w-full mb-2 text-xs truncate pr-1">
+            <OIcon name="settings" size="sm" class="pr-1" />
             {{ sessionDetails.browser }}, {{ sessionDetails.os }}
           </div>
-          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate">
-            <OIcon name="language" size="sm" class="tw:pr-1" />
+          <div class="w-full mb-2 text-xs truncate">
+            <OIcon name="language" size="sm" class="pr-1" />
             {{ sessionDetails.ip }}
           </div>
-          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate">
-            <OIcon name="location-on" size="sm" class="tw:pr-1" />
+          <div class="w-full mb-2 text-xs truncate">
+            <OIcon name="location-on" size="sm" class="pr-1" />
             {{ sessionDetails.city }}, {{ sessionDetails.country }}
           </div>
         </div>
@@ -57,9 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div
-        class="tw:flex tw:items-center tw:justify-between tw:w-full tw:pt-2 tw:px-[0.375rem]"
+        class="flex items-center justify-between w-full pt-2 px-[0.375rem]"
       >
-        <div class="tw:pr-1 tw:w-[60%]">
+        <div class="pr-1 w-[60%]">
           <OInput
             v-model="searchEvent"
             clearable
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="searchEvents"
           />
         </div>
-        <div class="tw:pl-1 event-type-selector tw:w-[40%] relative-position">
+        <div class="pl-1 event-type-selector w-[40%] relative-position">
           <OSelect
             v-model="selectedEventTypes"
             :options="eventOptions"
@@ -79,25 +79,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <OSeparator class="tw:my-2" />
-      <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden tw:px-2">
+      <OSeparator class="my-2" />
+      <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2">
         <template
           v-for="(filteredEvent, index) in filteredEvents"
           :key="filteredEvent.id + '-' + index"
         >
           <div
-            class="tw:mb-1 tw:px-2 tw:py-2 tw:cursor-pointer tw:rounded tw:hover:bg-[#ededed] tw:hover:text-black"
+            class="mb-1 px-2 py-2 cursor-pointer rounded hover:bg-[#ededed] hover:text-black"
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >
-            <div class="tw:truncate">
-              <div class="tw:mr-3 tw:inline" data-test="event-display-time">
+            <div class="truncate">
+              <div class="mr-3 inline" data-test="event-display-time">
                 {{ filteredEvent.displayTime }}
               </div>
               <OTag
                 type="rumEventType"
                 :value="filteredEvent.type"
-                class="tw:mr-3"
+                class="mr-3"
                 data-test="event-type-badge"
               />
               <template
@@ -108,11 +108,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <FrustrationEventBadge
                   :frustration-types="filteredEvent.frustration_types"
-                  class="tw:mr-1 tw:inline"
+                  class="mr-1 inline"
                 />
               </template>
               <div
-                class="tw:inline"
+                class="inline"
                 :title="filteredEvent.name"
                 data-test="event-name"
               >

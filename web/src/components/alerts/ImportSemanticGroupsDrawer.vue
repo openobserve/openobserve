@@ -29,9 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="handleApply"
     @update:open="handleOpenChange"
   >
-  <div class="tw:p-3">
+  <div class="p-3">
       <!-- File Upload -->
-      <div class="tw:mb-3">
+      <div class="mb-3">
         <OFile
           v-model="jsonFile"
           label="Select JSON file"
@@ -48,23 +48,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="close"
               size="sm"
               @click.stop="clearFile"
-              class="tw:cursor-pointer"
+              class="cursor-pointer"
             />
           </template>
         </OFile>
       </div>
 
       <!-- Loading State -->
-      <div v-if="isLoading" class="tw:text-center tw:p-4">
+      <div v-if="isLoading" class="text-center p-4">
         <OSpinner variant="dots" size="lg" />
-        <div class="tw:text-sm tw:text-gray-400 tw:mt-3">Analyzing file...</div>
+        <div class="text-sm text-gray-400 mt-3">Analyzing file...</div>
       </div>
 
       <!-- Diff Preview -->
       <div v-else-if="diffData" class="diff-preview">
         <!-- Summary -->
-        <div class="summary-bar tw:mb-3">
-          <div class="tw:flex tw:gap-2 tw:items-center">
+        <div class="summary-bar mb-3">
+          <div class="flex gap-2 items-center">
             <div class="col-auto">
               <OTag type="diffCategory" value="new">
                 <strong>{{ diffData.additions.length }}</strong
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Selection Actions -->
-        <div class="selection-actions tw:mb-3">
+        <div class="selection-actions mb-3">
           <OButtonGroup>
             <OButton
               variant="ghost-primary"
@@ -107,38 +107,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Groups List -->
-        <div class="tw:max-h-[calc(100vh-400px)] tw:overflow-y-auto">
+        <div class="max-h-[calc(100vh-400px)] overflow-y-auto">
           <!-- Additions -->
-          <div v-if="diffData.additions.length > 0" class="tw:mb-3">
-            <div class="tw:text-sm tw:font-semibold tw:border-b tw:border-[var(--color-separator)] tw:text-green-500 tw:p-2">
+          <div v-if="diffData.additions.length > 0" class="mb-3">
+            <div class="text-sm font-semibold border-b border-[var(--color-separator)] text-green-500 p-2">
               <OIcon name="add-circle" size="sm" />
               New ({{ selectedAdditions.length }}/{{
                 diffData.additions.length
               }})
             </div>
-            <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+            <ul class="flex flex-col divide-y divide-border border rounded-md">
               <li
                 v-for="group in diffData.additions"
                 :key="group.id"
                 data-test="semantic-groups-drawer-addition-item"
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
+                class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50"
                 @click="toggleAddition(group.id)"
               >
-                <div class="tw:flex tw:items-center tw:shrink-0">
+                <div class="flex items-center shrink-0">
                   <OCheckbox
                     :model-value="selectedAdditions.includes(group.id)"
                     @update:model-value="toggleAddition(group.id)"
                   />
                 </div>
-                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                  <span class="tw:text-sm tw:font-medium">{{
+                <div class="flex flex-col flex-1 min-w-0">
+                  <span class="text-sm font-medium">{{
                     group.display
                   }}</span>
-                  <span class="tw:block tw:text-xs tw:text-muted-foreground">
+                  <span class="block text-xs text-muted-foreground">
                     {{ group.id }} • {{ group.fields.length }} fields
                   </span>
                 </div>
-                <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
+                <div class="flex items-center shrink-0 ms-auto">
                   <OButton
                     variant="ghost"
                     size="icon-circle-sm"
@@ -152,22 +152,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Modifications -->
-          <div v-if="diffData.modifications.length > 0" class="tw:mb-3">
-            <div class="tw:text-sm tw:font-semibold tw:border-b tw:border-[var(--color-separator)] tw:text-amber-500 tw:p-2">
+          <div v-if="diffData.modifications.length > 0" class="mb-3">
+            <div class="text-sm font-semibold border-b border-[var(--color-separator)] text-amber-500 p-2">
               <OIcon name="edit" size="sm" />
               Modified ({{ selectedModifications.length }}/{{
                 diffData.modifications.length
               }})
             </div>
-            <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+            <ul class="flex flex-col divide-y divide-border border rounded-md">
               <li
                 v-for="mod in diffData.modifications"
                 :key="mod.proposed.id"
                 data-test="semantic-groups-drawer-modification-item"
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
+                class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50"
                 @click="toggleModification(mod.proposed.id)"
               >
-                <div class="tw:flex tw:items-center tw:shrink-0">
+                <div class="flex items-center shrink-0">
                   <OCheckbox
                     :model-value="
                       selectedModifications.includes(mod.proposed.id)
@@ -175,16 +175,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:model-value="toggleModification(mod.proposed.id)"
                   />
                 </div>
-                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                  <span class="tw:text-sm tw:font-medium">{{
+                <div class="flex flex-col flex-1 min-w-0">
+                  <span class="text-sm font-medium">{{
                     mod.proposed.display
                   }}</span>
-                  <span class="tw:block tw:text-xs tw:text-muted-foreground">
+                  <span class="block text-xs text-muted-foreground">
                     {{ mod.proposed.id }} • {{ mod.current.fields.length }} →
                     {{ mod.proposed.fields.length }} fields
                   </span>
                 </div>
-                <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
+                <div class="flex items-center shrink-0 ms-auto">
                   <OButton
                     variant="ghost"
                     size="icon-circle-sm"
@@ -204,15 +204,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="`Unchanged (${diffData.unchanged.length})`"
               icon="check-circle"
             >
-              <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+              <ul class="flex flex-col divide-y divide-border border rounded-md">
                 <li
                   v-for="group in diffData.unchanged"
                   :key="group.id"
-                  class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
+                  class="flex items-center gap-2 px-3 py-2"
                 >
-                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                    <span class="tw:text-sm">{{ group.display }}</span>
-                    <span class="tw:block tw:text-xs tw:text-muted-foreground"
+                  <div class="flex flex-col flex-1 min-w-0">
+                    <span class="text-sm">{{ group.display }}</span>
+                    <span class="block text-xs text-muted-foreground"
                       >{{ group.id }} •
                       {{ group.fields.length }} fields</span
                     >
@@ -225,10 +225,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Empty State -->
-      <div v-else class="empty-state tw:text-center tw:p-4">
-        <OIcon name="cloud-upload" class="tw:mb-3" style="width: 64px; height: 64px;" />
-        <div class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mb-2">Upload a JSON file</div>
-        <div class="tw:text-sm tw:text-gray-400">
+      <div v-else class="empty-state text-center p-4">
+        <OIcon name="cloud-upload" class="mb-3" style="width: 64px; height: 64px;" />
+        <div class="text-xl font-semibold text-gray-400 mb-2">Upload a JSON file</div>
+        <div class="text-sm text-gray-400">
           The system will analyze the file and show you what will change
         </div>
       </div>
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="showGroupDialog = false"
   >
     <div>
-      <div class="tw:text-sm tw:font-medium tw:mb-2">
+      <div class="text-sm font-medium mb-2">
         Fields ({{ selectedGroup?.fields.length }})
       </div>
       <OTag
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="field"
         type="fieldNameChip"
         value="highlight"
-        class="tw:m-1"
+        class="m-1"
       >
         {{ field }}
       </OTag>
@@ -271,36 +271,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     primary-button-label="Close"
     @click:primary="showModificationDialog = false"
   >
-    <div class="tw:flex tw:gap-3">
-      <div class="tw:w-1/2">
-        <div class="tw:text-sm tw:font-medium tw:text-red-500 tw:mb-2">Current</div>
-        <div class="tw:text-xs tw:mb-1">
+    <div class="flex gap-3">
+      <div class="w-1/2">
+        <div class="text-sm font-medium text-red-500 mb-2">Current</div>
+        <div class="text-xs mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--q-dark)] tw:rounded">
+        <div class="max-h-[250px] overflow-y-auto p-2 bg-[var(--q-dark)] rounded">
           <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
             type="fieldNameChip"
             value="muted"
-            class="tw:m-1"
+            class="m-1"
           >
             {{ field }}
           </OTag>
         </div>
       </div>
-      <div class="tw:w-1/2">
-        <div class="tw:text-sm tw:font-medium tw:text-green-500 tw:mb-2">Proposed</div>
-        <div class="tw:text-xs tw:mb-1">
+      <div class="w-1/2">
+        <div class="text-sm font-medium text-green-500 mb-2">Proposed</div>
+        <div class="text-xs mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--q-dark)] tw:rounded">
+        <div class="max-h-[250px] overflow-y-auto p-2 bg-[var(--q-dark)] rounded">
           <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
             type="fieldDiffStatus"
             :value="isNewField(field) ? 'new' : 'existing'"
-            class="tw:m-1"
+            class="m-1"
           >
             {{ field }}
             <template #trailing>
@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="isNewField(field)"
                 name="add"
                 size="xs"
-                class="tw:ml-1"
+                class="ml-1"
               />
             </template>
           </OTag>

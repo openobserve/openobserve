@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('serviceAccounts.form.identifier.placeholder')"
             :help-text="t('serviceAccounts.form.identifier.help')"
             data-test="iam-add-service-account-identifier-input"
-            class="showLabelOnTop tw:mt-2"
+            class="showLabelOnTop mt-2"
             :error="!!emailError"
             :error-message="emailError"
             @update:model-value="emailError = ''"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="firstName"
             :label="t('user.description')"
             data-test="iam-add-service-account-description-input"
-            class="showLabelOnTop tw:mt-2"
+            class="showLabelOnTop mt-2"
           />
         </div>
     </div>

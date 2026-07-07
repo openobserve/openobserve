@@ -730,7 +730,7 @@ describe("TabsSettings", () => {
       const editInput = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit"]');
       // Check that the edit input exists and has the dark theme tailwind class applied
       expect(editInput.exists()).toBe(true);
-      expect(editInput.classes()).toContain("tw:bg-gray-800");
+      expect(editInput.classes()).toContain("bg-gray-800");
     });
 
     it("should not apply dark theme class when theme is light", async () => {
@@ -742,7 +742,7 @@ describe("TabsSettings", () => {
       await wrapper.vm.$nextTick();
 
       const editInput = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit"]');
-      expect(editInput.classes()).not.toContain("tw:bg-gray-800");
+      expect(editInput.classes()).not.toContain("bg-gray-800");
     });
   });
 

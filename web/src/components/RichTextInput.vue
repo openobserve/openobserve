@@ -1,19 +1,19 @@
 <template>
   <div
-    class="rich-text-input-wrapper tw:py-1 tw:px-2 tw:pb-2 tw:rounded-xl tw:transition-all tw:duration-200 tw:ease-in-out tw:min-h-15 tw:cursor-text"
+    class="rich-text-input-wrapper py-1 px-2 pb-2 rounded-xl transition-all duration-200 ease-in-out min-h-15 cursor-text"
     :class="[
       theme === 'dark'
-        ? ['dark-mode', 'tw:bg-[#191919]', 'tw:border', 'tw:border-[#323232]', 'tw:focus-within:border-transparent', 'tw:focus-within:shadow-[0_0_0_2px_#5a6ec3]']
-        : ['light-mode', 'tw:bg-white', 'tw:border', 'tw:border-[#e4e7ec]', 'tw:focus-within:border-transparent', 'tw:focus-within:shadow-[0_0_0_2px_#8B5CF6]'],
-      disabled ? ['is-disabled', 'tw:opacity-60', 'tw:cursor-not-allowed'] : [],
-      borderless ? ['borderless', 'tw:p-0', 'tw:border-0!', 'tw:bg-transparent!', 'tw:shadow-none!', 'tw:rounded-none'] : []
+        ? ['dark-mode', 'bg-[#191919]', 'border', 'border-[#323232]', 'focus-within:border-transparent', 'focus-within:shadow-[0_0_0_2px_#5a6ec3]']
+        : ['light-mode', 'bg-white', 'border', 'border-[#e4e7ec]', 'focus-within:border-transparent', 'focus-within:shadow-[0_0_0_2px_#8B5CF6]'],
+      disabled ? ['is-disabled', 'opacity-60', 'cursor-not-allowed'] : [],
+      borderless ? ['borderless', 'p-0', 'border-0!', 'bg-transparent!', 'shadow-none!', 'rounded-none'] : []
     ]"
     @click="focusInput"
   >
     <div
       ref="editableDiv"
-      class="rich-text-input tw:relative tw:outline-none tw:text-sm tw:leading-[1.6] tw:min-h-[40px] tw:max-h-[300px] tw:overflow-y-auto tw:break-words tw:whitespace-pre-wrap"
-      :class="theme === 'dark' ? 'tw:text-[#e2e8f0]' : 'tw:text-[#1a202c]'"
+      class="rich-text-input relative outline-none text-sm leading-[1.6] min-h-[40px] max-h-[300px] overflow-y-auto break-words whitespace-pre-wrap"
+      :class="theme === 'dark' ? 'text-[#e2e8f0]' : 'text-[#1a202c]'"
       contenteditable="true"
       :data-placeholder="placeholder"
       @input="handleInput"
@@ -26,10 +26,10 @@
     <!-- Detail Card -->
     <div
       v-if="showDetailCard"
-      class="chip-detail-card tw:fixed tw:max-w-75 tw:max-h-75 tw:border tw:rounded-lg tw:shadow-[0_8px_24px_rgba(0,0,0,0.25)] tw:z-[100000] tw:flex tw:flex-col tw:overflow-hidden"
+      class="chip-detail-card fixed max-w-75 max-h-75 border rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.25)] z-[100000] flex flex-col overflow-hidden"
       :class="theme === 'dark'
-        ? ['dark-mode', 'tw:bg-(--o2-primary-background)', 'tw:border-(--o2-primary-background)']
-        : ['light-mode', 'tw:bg-white', 'tw:border-[#e4e7ec]']"
+        ? ['dark-mode', 'bg-(--o2-primary-background)', 'border-(--o2-primary-background)']
+        : ['light-mode', 'bg-white', 'border-[#e4e7ec]']"
       :style="{
         top: cardPosition.top + 'px',
         left: cardPosition.left + 'px',
@@ -37,8 +37,8 @@
       }"
       @click.stop
     >
-      <div class="card-content tw:overflow-y-auto tw:max-h-75 tw:py-1 tw:px-2 tw:font-[Monaco,Menlo,'Courier_New',monospace] tw:text-[11px] tw:leading-[1.5] tw:whitespace-pre-wrap tw:break-words"
-        :class="theme === 'dark' ? 'tw:text-[#e2e8f0]' : 'tw:text-[#1a202c]'"
+      <div class="card-content overflow-y-auto max-h-75 py-1 px-2 font-[Monaco,Menlo,'Courier_New',monospace] text-[11px] leading-[1.5] whitespace-pre-wrap break-words"
+        :class="theme === 'dark' ? 'text-[#e2e8f0]' : 'text-[#1a202c]'"
         v-html="formatContent(detailCardContent)"></div>
     </div>
   </div>
