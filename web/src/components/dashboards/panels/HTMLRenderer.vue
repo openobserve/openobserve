@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       :id="scopeId"
       :class="[
-        'prose prose-sm max-w-none',
+        'prose prose-sm max-w-none px-2 py-1',
         store.state?.theme === 'dark' && 'prose-invert',
       ]"
       style="min-height: 100%; flex-shrink: 0"
