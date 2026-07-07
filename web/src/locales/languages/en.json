@@ -202,7 +202,7 @@
     },
     "noIncidents": {
       "title": "No active incidents",
-      "description": "You're all caught up — nothing needs your attention right now. Triggered incidents will appear here."
+      "description": "Incidents are created when an alert triggers — none have fired yet. Once you have alerts in place, any triggered incidents will appear here."
     },
     "noLLMInsights": {
       "title": "No LLM activity yet",
@@ -5252,6 +5252,7 @@
     },
     "quality": {
       "scopeLabel": "All quality dimensions in this workspace",
+      "agentPlaceholder": "All agents",
       "timeRange": {
         "label": "Time range",
         "last1h": "Past 1 hour",
