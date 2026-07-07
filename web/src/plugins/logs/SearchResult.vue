@@ -523,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Patterns View -->
         <div
           v-if="searchObj.meta.logsVisualizeToggle === 'patterns'"
-          class="flex flex-col"
+          class="flex flex-col h-full"
           :class="[
             !searchObj.meta.showHistogram ||
             (searchObj.meta.showHistogram &&

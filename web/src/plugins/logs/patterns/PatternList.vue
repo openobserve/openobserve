@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col">
+  <div class="flex flex-col h-full">
     <!-- Patterns Table — hidden during loading so skeleton always shows on re-run -->
     <div v-if="!loading && patterns?.length > 0" class="flex flex-col">
       <!-- Table Header -->
