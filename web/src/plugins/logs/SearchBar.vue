@@ -2309,6 +2309,18 @@ export default defineComponent({
         if (open) savedFunctionForm.reset(savedFunctionDefaults.value);
       },
     );
+    // Parity with the pre-migration toggle handler (main cleared the name on
+    // every mode switch: `isSavedFunctionAction = $event; savedFunctionName = ''`).
+    // Clear ONLY the create-mode name field when the mode changes so toggling
+    // update→create shows a blank input, not a stale name (the update select is
+    // untouched). `dontUpdateMeta`/`dontValidate` mirror the old naked assignment
+    // — no touched/dirty marking, no premature "required" flash.
+    watch(savedFunctionMode, () => {
+      savedFunctionForm.setFieldValue("savedFunctionName", "", {
+        dontUpdateMeta: true,
+        dontValidate: true,
+      });
+    });
 
     const isFocused = ref(false);
     const editorContainerRef = ref<HTMLElement | null>(null);

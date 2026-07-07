@@ -25,10 +25,11 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { defineComponent, h } from "vue";
+import { defineComponent, h, watch } from "vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import {
   makeSavedViewSchema,
   type SavedViewForm,
@@ -287,5 +288,66 @@ describe("SavedFunction dialog — real OForm", () => {
     await flushPromises();
     expect(getForm(w).state.isValid).toBe(false);
     expect(w.emitted("save")).toBeFalsy();
+  });
+});
+
+// ── Mode-switch dependent reset (parity with the pre-migration toggle) ─────────
+// The old dialog cleared the name on every toggle
+// (`@update:model-value="isSavedFunctionAction = $event; savedFunctionName = ''"`).
+// After migration the OFormToggleGroup only records the mode, so SearchBar's
+// setup() re-adds that clear via a watch on the form-owned mode field. SearchBar
+// itself can't be mounted (see header), so this harness mirrors its owner-pattern
+// wiring (useOForm + the mode-change watch) exactly and proves the toggle blanks
+// the create-mode name field without surfacing a premature "required" error.
+describe("SavedFunction dialog — mode toggle clears the name", () => {
+  const Harness = defineComponent({
+    setup(_, { expose }) {
+      const form = useOForm<SavedFunctionForm>({
+        defaultValues: {
+          isSavedFunctionAction: "create",
+          savedFunctionName: "",
+          savedFunctionSelectedName: "",
+        },
+        schema: savedFunctionSchema,
+        onSubmit: () => {},
+      });
+      const mode = form.useStore(
+        (s) => (s.values.isSavedFunctionAction as string) ?? "create",
+      );
+      // Same watch SearchBar.vue installs in setup().
+      watch(mode, () => {
+        form.setFieldValue("savedFunctionName", "", {
+          dontUpdateMeta: true,
+          dontValidate: true,
+        });
+      });
+      expose({ form });
+      return () => h("div");
+    },
+  });
+
+  it("blanks savedFunctionName when the mode toggles create→update", async () => {
+    const w = mount(Harness);
+    const form = (w.vm as any).form;
+    // User types a name in create mode.
+    form.setFieldValue("savedFunctionName", "myFn_1");
+    expect(form.state.values.savedFunctionName).toBe("myFn_1");
+    // Toggling the OFormToggleGroup writes the mode field.
+    form.setFieldValue("isSavedFunctionAction", "update");
+    await flushPromises();
+    expect(form.state.values.savedFunctionName).toBe("");
+  });
+
+  it("clearing on toggle does not surface a 'required' error on the name", async () => {
+    const w = mount(Harness);
+    const form = (w.vm as any).form;
+    form.setFieldValue("savedFunctionName", "myFn_1");
+    form.setFieldValue("isSavedFunctionAction", "update");
+    await flushPromises();
+    // Toggle back to create: the freshly-cleared field must not pre-show an error.
+    form.setFieldValue("isSavedFunctionAction", "create");
+    await flushPromises();
+    const meta = form.getFieldMeta("savedFunctionName");
+    expect(meta?.errors ?? []).toHaveLength(0);
   });
 });
