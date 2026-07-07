@@ -99,7 +99,7 @@ export class PieConverter implements PromQLChartConverter {
     }
 
     // Get dynamic radius and center position based on legend and chart alignment
-    const { radius, center } = buildPieChartConfig(
+    const { radius, center, bottom } = buildPieChartConfig(
       panelSchema,
       chartPanelRef,
       data,
@@ -160,8 +160,15 @@ export class PieConverter implements PromQLChartConverter {
           show: config.show_label_line !== false,
         },
 
+        // hide colliding labels and skip sliver slices (e.g. 0-value modes)
+        labelLayout: { hideOverlap: true },
+        minShowLabelAngle: 3,
+
         // Dynamic center position based on chart alignment
         center,
+
+        // Keep the pie's layout box (sectors + labels) above a bottom legend
+        ...(bottom > 0 && { bottom }),
       },
     ];
 

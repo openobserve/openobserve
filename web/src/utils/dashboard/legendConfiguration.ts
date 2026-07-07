@@ -100,7 +100,7 @@ export const calculateBottomLegendHeight = (
 
   // Constants for legend sizing in rem units (converted to pixels)
   const LEGEND_ITEM_HEIGHT = remToPx(1.25); // 1.25rem = 20px (Height per legend item row)
-  const LEGEND_PADDING = remToPx(1.5); // 1.5rem = 24px (Top and bottom padding)
+  const LEGEND_PADDING = remToPx(0.75); // 0.75rem = 12px (Top and bottom padding)
   const LEGEND_ICON_WIDTH = remToPx(0.875); // 0.875rem = 14px (Width of legend icon/symbol)
   const LEGEND_ICON_MARGIN = remToPx(0.5); // 0.5rem = 8px (Margin between icon and text)
   const LEGEND_ITEM_MARGIN = remToPx(1.25); // 1.25rem = 20px (Horizontal margin between legend items)
@@ -140,7 +140,7 @@ export const calculateBottomLegendHeight = (
 
   // Apply 50% maximum height constraint if maxHeight is provided
   // This ensures 50% of space is reserved for the chart and 50% maximum for legends
-  let finalHeight = Math.max(totalHeight, remToPx(3.125)); // Minimum height of 3.125rem = 50px
+  let finalHeight = Math.max(totalHeight, remToPx(1.875)); // Minimum height of 1.875rem = 30px
 
   if (maxHeight && maxHeight > 0) {
     const maxAllowedHeight = maxHeight * 0.5; // 50% maximum for legends, 50% for chart
@@ -153,9 +153,9 @@ export const calculateBottomLegendHeight = (
     gridConfig.bottom = finalHeight;
 
     // Position legend at exact location to prevent overflow to top
-    const legendTopPosition = chartHeight - finalHeight + 10; // 10px padding from bottom
+    const legendTopPosition = chartHeight - finalHeight + 4; // small padding from bottom
     legendConfig.top = legendTopPosition;
-    legendConfig.height = finalHeight - 20; // Constrain height within allocated space
+    legendConfig.height = finalHeight - 8; // Constrain height within allocated space
   }
 
   return finalHeight;
@@ -373,9 +373,8 @@ const calculateLegendHeight = (
     );
   }
 
-  // Scroll legends - reserve minimum space
-  const minScrollLegendHeight = Math.min(chartHeight * 0.25, 100);
-  return Math.max(minScrollLegendHeight, 60);
+  // Scroll legends page horizontally on a single row — reserve just that row
+  return 34;
 };
 
 /**
