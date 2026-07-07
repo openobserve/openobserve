@@ -211,10 +211,10 @@ describe("DomainManagement Integration Tests", () => {
       await vm.addDomain();
       expect(vm.domains.length).toBe(4);
       expect(vm.domains[3].name).toBe("newcompany.com");
-      expect(vm.domains[3].allowAllUsers).toBe(true);
+      expect(vm.domains[3].policy).toBe("allow_all");
 
       // 3. Modify domain to restrict users
-      vm.domains[3].allowAllUsers = false;
+      vm.domains[3].policy = "allow_specific";
 
       // 4. Add emails to restricted domain
       vm.domains[3].newEmail = "admin@newcompany.com";
@@ -279,7 +279,7 @@ describe("DomainManagement Integration Tests", () => {
       await flushPromises();
 
       const vm = wrapper.vm;
-      const restrictedDomain = vm.domains.find(d => !d.allowAllUsers);
+      const restrictedDomain = vm.domains.find(d => d.policy === "allow_specific");
       
       if (restrictedDomain) {
         const initialEmailCount = restrictedDomain.allowedEmails.length;
@@ -548,7 +548,7 @@ describe("DomainManagement Integration Tests", () => {
         for (let i = 0; i < 30; i++) {
           vm.domains.push({
             name: `domain${i}.com`,
-            allowAllUsers: true,
+            policy: "allow_all",
             allowedEmails: []
           });
         }
@@ -567,7 +567,7 @@ describe("DomainManagement Integration Tests", () => {
         // Add a domain with many emails
         const testDomain = {
           name: "test.com",
-          allowAllUsers: false,
+          policy: "allow_specific",
           allowedEmails: [],
           newEmail: ""
         };
