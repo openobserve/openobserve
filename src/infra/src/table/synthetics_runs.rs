@@ -285,20 +285,6 @@ pub async fn increment_jobs_done<C: ConnectionTrait>(
     }
 }
 
-/// Deletes all run rows for a given monitor. Called when the monitor is deleted.
-pub async fn delete_by_monitor<C: ConnectionTrait>(
-    conn: &C,
-    synthetics_id: &str,
-) -> Result<(), errors::Error> {
-    conn.execute(Statement::from_sql_and_values(
-        conn.get_database_backend(),
-        "DELETE FROM synthetics_runs WHERE synthetics_id = $1",
-        [Value::from(synthetics_id.to_owned())],
-    ))
-    .await?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
