@@ -218,7 +218,9 @@
       "title": "No scorers yet",
       "description": "Scorers grade LLM responses against your score configs — start with an LLM judge or import one from the library.",
       "action": "Create scorer",
-      "actionDesc": "Define an LLM judge or remote scorer"
+      "actionDesc": "Define an LLM judge or remote scorer",
+      "import": "Import scorer",
+      "importDesc": "Import from a JSON file"
     },
     "noEvalJobs": {
       "title": "No evaluation jobs yet",
