@@ -51,6 +51,11 @@ use infra::{
 use itertools::Itertools;
 use parking_lot::Mutex;
 use rayon::slice::ParallelSliceMut;
+#[cfg(feature = "enterprise")]
+use {
+    o2_enterprise::enterprise::search::datafusion::distributed_plan::metadata_count::metadata_count_rewrite,
+    o2_enterprise::enterprise::search::sampling::execution::apply_sampling_to_files,
+};
 
 use crate::service::{
     db,
@@ -198,6 +203,7 @@ pub async fn search(
     )?;
     let index_condition = { index_condition_ref.lock().clone() };
     let idx_optimize_rule = { index_optimizer_rule_ref.lock().clone() };
+    let use_metadata_count = can_use_metadata_count(&idx_optimize_rule, index_condition.as_ref());
 
     // the index cutoff only depends on the fields the query actually reads from the index
     // and we don't check the FTS fields here on purpose
@@ -233,6 +239,7 @@ pub async fn search(
     );
 
     // search in object storage
+    let mut metadata_count_file_list = Vec::new();
     let mut tantivy_file_list = Vec::new();
     if !req.search_info.file_id_list.is_empty() {
         let (mut file_list, file_list_took) = get_file_list_by_ids(
@@ -262,6 +269,20 @@ pub async fn search(
                     .build()
             )
         );
+
+        if use_metadata_count {
+            let (metadata_files, scan_files) =
+                split_metadata_count_files(file_list, query_params.time_range);
+            if !metadata_files.is_empty() {
+                log::info!(
+                    "[trace_id {trace_id}] flight->search: metadata count files: {}, remaining storage files: {}",
+                    metadata_files.len(),
+                    scan_files.len()
+                );
+            }
+            metadata_count_file_list.extend(metadata_files);
+            file_list = scan_files;
+        }
 
         let tantivy_optimize_start = std::time::Instant::now();
         let mut storage_idx_optimize_rule = idx_optimize_rule.clone();
@@ -293,7 +314,7 @@ pub async fn search(
         // Apply sampling if configured (enterprise feature)
         #[cfg(feature = "enterprise")]
         if let Some(sampling_config) = &req.search_info.sampling_config {
-            o2_enterprise::enterprise::search::sampling::execution::apply_sampling_to_files(
+            apply_sampling_to_files(
                 &mut file_list,
                 sampling_config,
                 Some(query_params.time_range),
@@ -481,12 +502,13 @@ pub async fn search(
         )
     );
 
-    physical_plan = apply_pushdowns_and_tantivy(
+    physical_plan = apply_pushdowns_and_optimizations(
         &trace_id,
         &ctx,
         physical_plan,
         &mut scan_stats,
         query_params.clone(),
+        metadata_count_file_list,
         tantivy_file_list,
         index_condition,
         idx_optimize_rule,
@@ -513,12 +535,13 @@ pub async fn search(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn apply_pushdowns_and_tantivy(
+fn apply_pushdowns_and_optimizations(
     trace_id: &str,
     ctx: &SessionContext,
     mut physical_plan: Arc<dyn ExecutionPlan>,
     scan_stats: &mut ScanStats,
     query_params: Arc<QueryParams>,
+    metadata_count_file_list: Vec<FileKey>,
     tantivy_file_list: Vec<FileKey>,
     index_condition: Option<IndexCondition>,
     idx_optimize_rule: Option<IndexOptimizeMode>,
@@ -555,6 +578,31 @@ fn apply_pushdowns_and_tantivy(
         })?;
     }
 
+    if !metadata_count_file_list.is_empty() {
+        #[cfg(not(feature = "enterprise"))]
+        let _ = metadata_count_file_list;
+
+        #[cfg(feature = "enterprise")]
+        {
+            let metadata_count_start = std::time::Instant::now();
+            scan_stats.add(&collect_stats(&metadata_count_file_list));
+            physical_plan = metadata_count_rewrite(metadata_count_file_list, physical_plan)?;
+            log::info!(
+                "{}",
+                search_inspector_fields(
+                    format!("[trace_id {trace_id}] flight->search: metadata count rewrite"),
+                    SearchInspectorFieldsBuilder::new()
+                        .trace_id(trace_id.to_string())
+                        .node_name(LOCAL_NODE.name.clone())
+                        .component("flight:do_get::search metadata count rewrite".to_string())
+                        .search_role("follower".to_string())
+                        .duration(metadata_count_start.elapsed().as_millis() as usize)
+                        .build()
+                )
+            );
+        }
+    }
+
     if !tantivy_file_list.is_empty() {
         let tantivy_start = std::time::Instant::now();
         scan_stats.add(&collect_stats(&tantivy_file_list));
@@ -581,6 +629,15 @@ fn apply_pushdowns_and_tantivy(
     }
 
     Ok(physical_plan)
+}
+
+fn can_use_metadata_count(
+    idx_optimize_rule: &Option<IndexOptimizeMode>,
+    index_condition: Option<&IndexCondition>,
+) -> bool {
+    cfg!(feature = "enterprise")
+        && matches!(idx_optimize_rule, Some(IndexOptimizeMode::SimpleCount))
+        && index_condition.is_some_and(IndexCondition::is_condition_all)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -689,6 +746,15 @@ async fn get_file_list_by_ids(
     files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
     Ok((files, start.elapsed().as_millis() as usize))
+}
+
+fn split_metadata_count_files(
+    file_list: Vec<FileKey>,
+    time_range: (i64, i64),
+) -> (Vec<FileKey>, Vec<FileKey>) {
+    file_list
+        .into_iter()
+        .partition(|file| file.meta.min_ts >= time_range.0 && file.meta.max_ts < time_range.1)
 }
 
 async fn handle_tantivy_optimize(
@@ -838,6 +904,22 @@ mod tests {
         let (tantivy, datafusion) = split_file_list_by_time_range(files, 500, None);
         assert!(tantivy.is_empty());
         assert_eq!(datafusion.len(), 1);
+    }
+
+    #[test]
+    fn test_split_file_list_for_metadata_count_only_full_range_files() {
+        let files = vec![
+            make_file(100, 199, 0), // fully in [100, 200)
+            make_file(99, 150, 0),  // overlaps the start boundary
+            make_file(150, 200, 0), // touches the exclusive end boundary
+        ];
+
+        let (metadata, scan) = split_metadata_count_files(files, (100, 200));
+
+        assert_eq!(metadata.len(), 1);
+        assert_eq!(metadata[0].meta.min_ts, 100);
+        assert_eq!(metadata[0].meta.max_ts, 199);
+        assert_eq!(scan.len(), 2);
     }
 
     #[test]
