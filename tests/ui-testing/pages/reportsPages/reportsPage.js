@@ -113,8 +113,10 @@ export class ReportsPage {
     await this.dashboardInput.dblclick({ force: true });
     await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
     await this.dashboardInput.fill(dashboardName);
-    await this.page.waitForTimeout(2000);
-    await this.page.getByRole('option', { name: dashboardName }).locator('div').nth(2).click({ force: true });
+    // Wait for the option to appear before clicking (dashboard search can be slow).
+    const option = this.page.getByRole('option', { name: dashboardName });
+    await option.first().waitFor({ state: 'visible', timeout: 30000 });
+    await option.locator('div').nth(2).click({ force: true });
   }
 
   async createReportDashboardTabInput() {
@@ -211,10 +213,10 @@ export class ReportsPage {
   }
 
   async verifyReportCreated(reportName) {
-    // Wait for save success alert (reports API takes 10-11 seconds)
-    await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 15000 });
+    // Wait for save success alert (reports API takes 10-11 seconds).
+    // Filter directly on the success text so stale error alerts don't shadow it.
     const saveAlert = this.page.getByRole('alert').filter({ hasText: 'Report saved successfully.' });
-    await expect(saveAlert).toBeVisible({ timeout: 5000 });
+    await expect(saveAlert).toBeVisible({ timeout: 30000 });
 
     // Navigate to reports list to verify report exists
     await this.page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);

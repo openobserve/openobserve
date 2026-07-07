@@ -96,6 +96,8 @@ export class ReportFoldersPage {
     await this.clickSaveFolder();
     // Wait for the dialog to close after save
     await this.page.locator(this.folderDialog).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    // Also wait for the Quasar backdrop to fade — otherwise it can intercept the next click.
+    await this.page.locator('.q-dialog__backdrop').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
   async expectFolderTabVisible(folderName) {

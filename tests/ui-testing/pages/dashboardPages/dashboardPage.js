@@ -180,7 +180,8 @@ export class DashboardPage {
     await this.dashboardDelete.click({ force: true });
     await this.page.waitForTimeout(2000);
     await this.confirmButton.filter({ has: this.page.locator(':visible') }).first().click();
-    await expect(this.page.getByRole('alert')).toContainText('Dashboard deleted successfully.');
+    const successAlert = this.page.getByRole('alert').filter({ hasText: 'Dashboard deleted successfully.' });
+    await expect(successAlert).toBeVisible({ timeout: 30000 });
   }
 
   async deleteSearchedDashboard(dashboardName) {
