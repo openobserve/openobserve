@@ -491,6 +491,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 size="sm"
                 class="shrink-0 text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
+                data-test-sort-direction="asc"
               />
               <OIcon
                 v-else-if="getSortIcon(header.id) === 'desc'"
@@ -498,6 +499,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 size="sm"
                 class="shrink-0 text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
+                data-test-sort-direction="desc"
               />
               <OIcon
                 v-else
@@ -505,6 +507,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 size="sm"
                 class="shrink-0 opacity-40"
                 data-test="o2-table-sort-icon-inactive"
+                data-test-sort-direction="none"
               />
             </template>
           </div>
