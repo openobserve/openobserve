@@ -278,6 +278,20 @@ export const convertServiceGraphToTree = (
 
   // Helper to build tree recursively
   // incomingEdge: the edge that led to this node (for direction-aware metrics)
+    // Labels are placed to the side of each node; when a level (a set of
+    // siblings) is crowded, their side-labels overlap because ECharts spaces
+    // nodes by symbol, not label height. To keep everything on one screen and
+    // readable, we ZIG-ZAG the labels of a crowded level: alternate each
+    // sibling's label.distance so adjacent labels sit at different offsets and
+    // clear each other. Below this many siblings, no stagger is needed.
+  const ZIGZAG_MIN_SIBLINGS = 4;
+  const ZIGZAG_BASE_DISTANCE = 6;
+  const ZIGZAG_FAR_DISTANCE = 58;
+  const zigzagDistance = (siblingIndex: number, siblingCount: number): number => {
+    if (siblingCount < ZIGZAG_MIN_SIBLINGS) return ZIGZAG_BASE_DISTANCE;
+    return siblingIndex % 2 === 0 ? ZIGZAG_BASE_DISTANCE : ZIGZAG_FAR_DISTANCE;
+  };
+
   const buildTree = (
     nodeId: string,
     visited = new Set<string>(),
@@ -299,6 +313,15 @@ export const convertServiceGraphToTree = (
     const children = outgoingEdges
       .map((edge: any) => buildTree(edge.to, new Set(visited), edge))
       .filter((child: any) => child !== null);
+
+    // Zig-zag the labels of this node's children when the level is crowded, so
+    // their side-labels stop overlapping (see zigzagDistance). Applied here where
+    // the final sibling set + order is known.
+    children.forEach((child: any, i: number) => {
+      const dist = zigzagDistance(i, children.length);
+      if (child.label) child.label.distance = dist;
+      if (child.leaves?.label) child.leaves.label.distance = dist;
+    });
 
     // Direction-aware request count based on tree position
     let totalRequests: number;
@@ -431,6 +454,14 @@ export const convertServiceGraphToTree = (
       .filter((n: any) => n !== null);
     treeData = [...treeData, ...additionalTrees];
   }
+
+  // Zig-zag the root-level nodes too (the left column of entry services) when
+  // that level is crowded, using the same alternating label distance.
+  treeData.forEach((root: any, i: number) => {
+    const dist = zigzagDistance(i, treeData.length);
+    if (root.label) root.label.distance = dist;
+    if (root.leaves?.label) root.leaves.label.distance = dist;
+  });
 
   // If still no tree data, create a flat structure
   if (treeData.length === 0 && graphData.nodes.length > 0) {
