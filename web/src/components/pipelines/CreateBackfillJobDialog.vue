@@ -21,9 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     title="Create Backfill Job for"
     secondary-button-label="Cancel"
     primary-button-label="Create Backfill Job"
-    :primary-button-loading="loading"
+    form-id="create-backfill-form"
     @click:secondary="onCancel"
-    @click:primary="onSubmit"
     data-test="create-backfill-job-dialog"
   >
     <template #header-left>
@@ -41,27 +40,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="tw:mx-6 tw:my-3 tw:space-y-3">
-          <!-- Time Range Section -->
+          <!-- Advanced Options + numeric ranges are form-owned. The time range is
+               a form-owned field too (OFormDateTimeRange). -->
+          <OForm id="create-backfill-form" :form="form">
+          <!-- Time Range Section (form-owned via OFormDateTimeRange). -->
           <div>
-            <div class="tw:flex tw:items-center tw:gap-4">
-              <div class="tw:text-sm tw:font-medium tw:whitespace-nowrap">
-                Time Range <span class="text-red-600">*</span>
-              </div>
-              <date-time
-                ref="dateTimeRef"
-                auto-apply
-                default-type="absolute"
-                @on:date-change="updateDateTime"
-                data-test="time-range-picker"
-                disable-relative
-                min-date="1999/01/01"
-              />
-            </div>
+            <OFormDateTimeRange
+              name="timerange"
+              label="Time Range"
+              required
+              disable-relative
+              min-date="1999/01/01"
+              auto-apply
+              data-test="time-range-picker"
+            />
             <div
-              v-if="formData.startTimeMicros <= 0 || formData.endTimeMicros <= 0"
+              v-if="timerangeError"
               class="tw:text-xs text-red-600 tw:mt-1"
             >
-              Please select a valid time range
+              {{ timerangeError }}
             </div>
           </div>
 
@@ -97,20 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div class="tw:col-span-7">
-                  <OInput
-                    v-model="formData.chunkPeriodMinutes"
+                  <OFormInput
+                    name="chunkPeriodMinutes"
                     type="number"
                     :placeholder="String(scheduleFrequency || 60)"
-                    :error="!!chunkPeriodError"
-                    :error-message="chunkPeriodError"
-                    @update:model-value="chunkPeriodError = ''"
                     data-test="chunk-period-input"
                   >
                     <template #icon-right>
                       <OIcon name="info-outline" size="sm" />
                         <OTooltip content="Default: {{ scheduleFrequency || 60 }} minutes" />
                     </template>
-                  </OInput>
+                  </OFormInput>
                 </div>
               </div>
 
@@ -125,33 +119,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div class="tw:col-span-7">
-                  <OInput
-                    v-model="formData.delayBetweenChunks"
+                  <OFormInput
+                    name="delayBetweenChunks"
                     type="number"
                     placeholder="5"
-                    :error="!!delayBetweenError"
-                    :error-message="delayBetweenError"
-                    @update:model-value="delayBetweenError = ''"
                     data-test="delay-between-chunks-input"
                   >
                     <template #icon-right>
                       <OIcon name="info-outline" size="sm" />
                         <OTooltip content="Default: 5 seconds" />
                     </template>
-                  </OInput>
+                  </OFormInput>
                 </div>
               </div>
 
               <!-- Delete Before Backfill -->
               <div class="tw:pt-2">
-                <OCheckbox
-                  v-model="formData.deleteBeforeBackfill"
+                <OFormCheckbox
+                  name="deleteBeforeBackfill"
                   label="Delete existing data before backfill"
                   data-test="delete-before-backfill-checkbox"
                   class="tw:font-medium"
                 />
                 <div
-                  v-if="formData.deleteBeforeBackfill"
+                  v-if="deleteBeforeBackfill"
                   :class="[
                     'tw:mt-3 tw:p-4 tw:rounded-lg tw:border',
                     store.state.theme === 'dark'
@@ -205,6 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="error" size="sm" class="tw:mr-2" />
             {{ errorMessage }}
           </div>
+          </OForm>
         </div>
 
         </ODrawer>
@@ -215,6 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     secondary-button-label="Cancel"
     primary-button-label="Yes, Delete and Backfill"
     primary-button-variant="destructive"
+    :primary-button-loading="loading"
     @click:secondary="showDeleteConfirmation = false"
     @click:primary="confirmDelete"
   >
@@ -235,12 +228,16 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
+import OFormDateTimeRange from "@/lib/forms/DateTime/OFormDateTimeRange.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import backfillService from "../../services/backfill";
-import DateTime from "@/components/DateTime.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { backfillSchema, type BackfillForm } from "./backfillJob.schema";
 
 interface Props {
   modelValue: boolean;
@@ -266,39 +263,73 @@ const show = computed({
 
 const showAdvanced = ref(false);
 const showDeleteConfirmation = ref(false);
+// `loading` only drives the delete-confirmation ODialog's primary button. The
+// main create flow's spinner is form-driven (the form-id bridge mirrors the
+// awaited onSubmit's isSubmitting onto the ODrawer footer).
 const loading = ref(false);
 const errorMessage = ref("");
-const chunkPeriodError = ref("");
-const delayBetweenError = ref("");
-const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
 
-const formData = ref({
-  startTimeMicros: 0,
-  endTimeMicros: 0,
+// Typed dynamic defaults for the form-owned fields. The time range is an
+// absolute range seeded empty (forces the picker to absolute mode).
+const backfillDefaults = computed((): BackfillForm => ({
+  timerange: { type: "absolute", from: undefined, to: undefined },
   chunkPeriodMinutes: (props.scheduleFrequency || 60) as number | null,
-  delayBetweenChunks: null as number | null,
+  delayBetweenChunks: null,
   deleteBeforeBackfill: false,
+}));
+
+// Rule ③ OWNER pattern: this component OWNS <OForm> and needs the live values
+// (timerange/chunk/delay/deleteBeforeBackfill) for estimatedInfo + the delete
+// warning `v-if`, so it creates the form here with useOForm and reads it
+// reactively via form.useStore — a SINGLE source of truth (no mirror,
+// no store.subscribe). The form is handed to <OForm :form="form">.
+const form = useOForm<BackfillForm>({
+  defaultValues: backfillDefaults.value,
+  schema: backfillSchema,
+  onSubmit: (value) => onSubmit(value),
 });
 
-// Handle datetime changes from the DateTime component
-const updateDateTime = (value: any) => {
-  formData.value.startTimeMicros = value.startTime;
-  formData.value.endTimeMicros = value.endTime;
-};
+const timerange = form.useStore((s: any) => s.values.timerange);
+const formChunkPeriod = form.useStore((s: any) => s.values.chunkPeriodMinutes);
+const formDelay = form.useStore((s: any) => s.values.delayBetweenChunks);
+const deleteBeforeBackfill = form.useStore(
+  (s: any) => s.values.deleteBeforeBackfill,
+);
+
+// Surface the form-level `timerange` error (OFormDateTimeRange renders none) —
+// a reactive view of the SAME form, no mirror.
+const timerangeErrors = form.useStore(
+  (s: any) => s.fieldMeta?.timerange?.errors ?? [],
+);
+const timerangeError = computed(() =>
+  timerangeErrors.value.length
+    ? String(firstFieldError(timerangeErrors.value))
+    : "",
+);
 
 // Calculate estimated processing info
 const estimatedInfo = computed(() => {
-  if (!formData.value.startTimeMicros || !formData.value.endTimeMicros) return null;
+  const from = timerange.value?.from;
+  const to = timerange.value?.to;
+  if (!from || !to) return null;
 
   // Convert microseconds to milliseconds
-  const diffMs = (formData.value.endTimeMicros - formData.value.startTimeMicros) / 1000;
+  const diffMs = (to - from) / 1000;
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
 
   if (diffMinutes <= 0) return null;
 
-  const chunkPeriod = formData.value.chunkPeriodMinutes || 60;
+  const chunk = formChunkPeriod.value;
+  const chunkPeriod =
+    chunk === "" || chunk === null || chunk === undefined
+      ? 60
+      : Number(chunk) || 60;
   const chunks = Math.ceil(diffMinutes / chunkPeriod);
-  const delaySeconds = formData.value.delayBetweenChunks || 5;
+  const delay = formDelay.value;
+  const delaySeconds =
+    delay === "" || delay === null || delay === undefined
+      ? 5
+      : Number(delay) || 5;
   const estimatedSeconds = chunks * delaySeconds;
 
   const hours = Math.floor(estimatedSeconds / 3600);
@@ -323,22 +354,12 @@ watch(
 );
 
 const resetForm = () => {
-  formData.value = {
-    startTimeMicros: 0,
-    endTimeMicros: 0,
-    chunkPeriodMinutes: (props.scheduleFrequency || 60) as number | null,
-    delayBetweenChunks: null,
-    deleteBeforeBackfill: false,
-  };
   showAdvanced.value = false;
   errorMessage.value = "";
-  chunkPeriodError.value = "";
-  delayBetweenError.value = "";
 
-  // Reset the DateTime component to default
-  if (dateTimeRef.value) {
-    dateTimeRef.value.resetTime("", "");
-  }
+  // Reset the form-owned fields (including the time range) to their (current)
+  // defaults.
+  form.reset(backfillDefaults.value);
 };
 
 const onCancel = () => {
@@ -346,66 +367,58 @@ const onCancel = () => {
   show.value = false;
 };
 
-const onSubmit = async () => {
-  // Validate optional numeric range fields
-  let hasError = false;
-  if (formData.value.chunkPeriodMinutes !== null && formData.value.chunkPeriodMinutes !== undefined &&
-    (formData.value.chunkPeriodMinutes < 1 || formData.value.chunkPeriodMinutes > 1440)) {
-    chunkPeriodError.value = "Must be between 1 and 1440";
-    hasError = true;
-  }
-  if (formData.value.delayBetweenChunks !== null && formData.value.delayBetweenChunks !== undefined &&
-    (formData.value.delayBetweenChunks < 1 || formData.value.delayBetweenChunks > 3600)) {
-    delayBetweenError.value = "Must be between 1 and 3600";
-    hasError = true;
-  }
-  if (hasError) return;
+// The validated value stashed for the delete-confirmation branch (so confirmDelete
+// can save with the exact submitted payload).
+const pendingValue = ref<BackfillForm | null>(null);
 
-  // Validate time range
-  if (formData.value.startTimeMicros <= 0 || formData.value.endTimeMicros <= 0) {
-    toast({
-      variant: "error",
-      message: "Please select a valid time range",
-    });
-    return;
-  }
-
-  if (formData.value.startTimeMicros >= formData.value.endTimeMicros) {
-    toast({
-      variant: "error",
-      message: "Start time must be before end time",
-    });
-    return;
-  }
-
+// @submit handler — OForm only calls it once the schema passes (the time-range
+// cross-field guard + chunk/delay numeric ranges live in the schema), so the
+// schema gates everything. `value` is the validated, single-source-of-truth
+// payload.
+const onSubmit = async (value: BackfillForm) => {
+  pendingValue.value = value;
   // Show confirmation dialog if delete_before_backfill is enabled
-  if (formData.value.deleteBeforeBackfill) {
+  if (value.deleteBeforeBackfill) {
     showDeleteConfirmation.value = true;
   } else {
-    createBackfillJobRequest();
+    await createBackfillJobRequest(value);
   }
 };
 
-const confirmDelete = () => {
+const confirmDelete = async () => {
   showDeleteConfirmation.value = false;
-  createBackfillJobRequest();
+  const value = pendingValue.value;
+  if (!value) return;
+  loading.value = true;
+  try {
+    await createBackfillJobRequest(value);
+  } finally {
+    loading.value = false;
+  }
 };
 
-const createBackfillJobRequest = async () => {
+const createBackfillJobRequest = async (value: BackfillForm) => {
   errorMessage.value = "";
-  loading.value = true;
 
   try {
+    const chunkPeriodMinutes =
+      value.chunkPeriodMinutes === null || value.chunkPeriodMinutes === undefined
+        ? null
+        : Number(value.chunkPeriodMinutes);
+    const delayBetweenChunks =
+      value.delayBetweenChunks === null || value.delayBetweenChunks === undefined
+        ? null
+        : Number(value.delayBetweenChunks);
     const requestData = {
-      start_time: formData.value.startTimeMicros,
-      end_time: formData.value.endTimeMicros,
-      ...(formData.value.chunkPeriodMinutes && {
-        chunk_period_minutes: formData.value.chunkPeriodMinutes,
+      start_time: value.timerange!.from as number,
+      end_time: value.timerange!.to as number,
+      ...(chunkPeriodMinutes && {
+        chunk_period_minutes: chunkPeriodMinutes,
       }),
-      ...(formData.value.delayBetweenChunks && {
-        delay_between_chunks_secs: formData.value.delayBetweenChunks,
+      ...(delayBetweenChunks && {
+        delay_between_chunks_secs: delayBetweenChunks,
       }),
-      delete_before_backfill: formData.value.deleteBeforeBackfill,
+      delete_before_backfill: !!value.deleteBeforeBackfill,
     };
 
     const response = await backfillService.createBackfillJob({
@@ -434,8 +447,6 @@ const createBackfillJobRequest = async () => {
       message: errorMessage.value,
       timeout: 5000,
     });
-  } finally {
-    loading.value = false;
   }
 };
 </script>

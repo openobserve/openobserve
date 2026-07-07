@@ -17,13 +17,15 @@
 //     `destination_type` discriminator.
 //   • `headers`: a dynamic array-field (`headers[i].key` / `headers[i].value`),
 //     each row form-owned (see the §2 array-field pattern in the playbook).
-//   • A few entangled/auto-prefilled fields (url_endpoint/method/output_format/
-//     esbulk_index/separator/org/stream) stay mirrored on the component's
-//     `formData` reactive (a sanctioned single-source exception) but their rules
-//     still live here in `superRefine`.
-//   • `destination_type` is NOT an <input> — it is a custom card grid. It is
-//     bridged into the form via `watch -> setFieldValue("destination_type", …)`
-//     (the documented sanctioned bridge) so `superRefine` can branch on it.
+//   • The auto-prefilled / conditionally-editable fields (url_endpoint/method/
+//     output_format/esbulk_index/separator/org/stream) are also form-owned OForm
+//     fields; the component keeps them in sync when destination_type changes via
+//     direct `form.setFieldValue(...)` calls — there is NO `formData` mirror.
+//     Their conditional rules live here in `superRefine`.
+//   • `destination_type` is NOT an <input> — it is a custom card grid. The card
+//     @click writes it with a DIRECT `form.setFieldValue("destination_type", …)`
+//     and the template reads it back via `form.useStore`, so `superRefine` can
+//     branch on it (no watch, no mirror — the Rule-③ headless owner pattern).
 //
 // Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
 // this file only describes WHAT is valid.
@@ -82,10 +84,10 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
         })
         .optional(),
 
-      // ── Discriminator (bridged from the card grid) + entangled fields that
-      //    remain mirrored on `formData`. Kept loose at the object level; the
-      //    real conditional requirements are enforced in `superRefine` below so
-      //    they only apply for the relevant destination_type / output_format. ──
+      // ── Discriminator (written from the card grid via form.setFieldValue) +
+      //    the auto-prefilled entangled fields. Kept loose at the object level;
+      //    the real conditional requirements are enforced in `superRefine` below
+      //    so they only apply for the relevant destination_type / output_format. ─
       destination_type: z.string().default("openobserve"),
       url_endpoint: z.string().optional().default(""),
       method: z.string().optional().default("post"),

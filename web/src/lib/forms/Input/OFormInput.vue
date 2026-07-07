@@ -56,7 +56,13 @@ if (import.meta.env.DEV && !form) {
         "
         @update:model-value="(val: unknown) => field.handleChange(val)"
         @blur="field.handleBlur"
-      />
+      >
+        <!-- Forward every OInput slot (icon-left/icon-right/prefix/suffix/
+             tooltip/append) so consumers can keep them through the wrapper. -->
+        <template v-for="(_, slotName) in $slots" #[slotName]="slotProps">
+          <slot :name="slotName" v-bind="slotProps || {}" />
+        </template>
+      </OInput>
     </template>
   </component>
 </template>
