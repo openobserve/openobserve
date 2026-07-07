@@ -81,8 +81,15 @@ static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
 });
 
 pub static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
+    // Local part follows the RFC 5321/5322 dot-atom form: one or more non-empty
+    // atoms separated by single dots. This accepts single-character dotted
+    // segments (e.g. `first.x`) while still rejecting leading/trailing/consecutive
+    // dots. The domain requires at least one dot-separated label and a TLD of
+    // 2-63 letters (RFC 1035 max label length; covers long TLDs like `.software`
+    // and the RFC 2606 reserved `.invalid`). Anchored on both ends to reject any
+    // trailing/leading garbage.
     Regex::new(
-        r"^([a-zA-Z0-9_+]([a-zA-Z0-9_+\-]*(\.[a-zA-Z0-9_+\-]+)*)?[a-zA-Z0-9_+])@([a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*\.[a-zA-Z]{2,6})",
+        r"^([a-zA-Z0-9_+\-]+(\.[a-zA-Z0-9_+\-]+)*)@([a-zA-Z0-9]+([\-\.][a-zA-Z0-9]+)*\.[a-zA-Z]{2,63})$",
     )
     .unwrap()
 });
@@ -824,6 +831,15 @@ mod tests {
         assert!(is_valid_email("user@example.com"));
         assert!(is_valid_email("john.doe+123@mail.co.in"));
         assert!(is_valid_email("a_b-c.d+e@domain.org"));
+        // Regression for #12961: local part ending in a single-char dotted segment.
+        assert!(is_valid_email("first.x@example.com"));
+        assert!(is_valid_email("s.a@example.com"));
+        assert!(is_valid_email("first.x.y@example.com"));
+        assert!(is_valid_email("first.xy@example.com"));
+        // TLDs longer than 6 letters, incl. the RFC 2606 reserved `.invalid`
+        // used across the API test suite.
+        assert!(is_valid_email("sa_88dddbd4@test.invalid"));
+        assert!(is_valid_email("user@example.software"));
         assert!(!is_valid_email("no-at-symbol.com"));
         assert!(!is_valid_email("@missing-user.com"));
         assert!(!is_valid_email("user@.com"));
@@ -971,6 +987,8 @@ mod tests {
         assert!(!is_valid_email("user@domain with space.com"));
         assert!(!is_valid_email(".user@example.com"));
         assert!(!is_valid_email("user@.example.com"));
+        assert!(!is_valid_email("user.@example.com")); // trailing dot in local part
+        assert!(!is_valid_email("user@example.com trailing")); // trailing garbage
     }
 
     #[test]

@@ -112,8 +112,9 @@ pub async fn pull(
     concurrency: i64,
     alert_timeout: i64,
     report_timeout: i64,
+    module: Option<TriggerModule>,
 ) -> Result<Vec<Trigger>> {
-    infra_scheduler::pull(concurrency, alert_timeout, report_timeout).await
+    infra_scheduler::pull(concurrency, alert_timeout, report_timeout, module).await
 }
 
 /// Returns the scheduled job associated with the given id in read-only fashion
