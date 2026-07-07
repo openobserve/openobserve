@@ -1,4 +1,5 @@
 import { toZonedTime } from "date-fns-tz";
+import { computeTreeLayout } from "./computeTreeLayout";
 export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
     backgroundColor: "transparent",
@@ -263,6 +264,15 @@ export const convertServiceGraphToTree = (
     (n: any) => !nodesWithIncoming.has(n.id),
   );
 
+  // Adaptive layout: compute explicit x/y per node so we can use ECharts
+  // `layout: 'none'`. Columns are sized by label width (no horizontal bleed) and
+  // rows by node count at a minimum height (no vertical crowding), so labels stay
+  // attached to their nodes and never overlap regardless of density.
+  const layoutPos = computeTreeLayout(
+    { nodes: graphData.nodes, edges: graphData.edges },
+    layoutType,
+  );
+
   const green = isDarkMode ? "#10b981" : "#52c41a";
 
   // Node color: same absolute thresholds as Graph View so color matches tooltip error rate
@@ -406,6 +416,9 @@ export const convertServiceGraphToTree = (
         },
       },
       children: children.length > 0 ? children : undefined,
+      // Explicit position from the adaptive layout (used with layout:'none').
+      x: layoutPos.get(node.id)?.x,
+      y: layoutPos.get(node.id)?.y,
       // Carry identity so click handlers can detect collapsed boundary nodes
       // (name is the display label, not the id).
       id: node.id,
@@ -495,9 +508,11 @@ export const convertServiceGraphToTree = (
       {
         type: "tree",
         data: finalTreeData,
-        layout: "orthogonal",
+        // Adaptive layout: we compute explicit x/y per node (see
+        // computeTreeLayout) so labels never overlap. layout:'none' makes ECharts
+        // honor those positions; orthogonal would recompute and ignore them.
+        layout: "none",
         orient: layoutType === "vertical" ? "TB" : "LR",
-        // Maximize layout space so siblings spread further apart
         left: layoutType === "vertical" ? "2%" : "3%",
         right: layoutType === "vertical" ? "2%" : "20%",
         top: layoutType === "vertical" ? "8%" : "2%",

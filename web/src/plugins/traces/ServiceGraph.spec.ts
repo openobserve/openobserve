@@ -1624,8 +1624,8 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.vm.searchObj.meta.serviceGraphVisualizationType).toBe(
         "tree",
       );
-      // chartData series uses orthogonal layout for tree
-      expect(wrapper.vm.chartData.options.series[0].layout).toBe("orthogonal");
+      // chartData series uses adaptive layout:none for tree
+      expect(wrapper.vm.chartData.options.series[0].layout).toBe("none");
     });
 
     it("should handle tree mode with empty graph data", async () => {
@@ -1751,14 +1751,14 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       consoleWarn.mockRestore();
     });
 
-    it("should use orthogonal layout in tree mode", async () => {
+    it("should use adaptive layout:none in tree mode", async () => {
       // beforeEach sets visualizationType = "tree" on mockSearchObj.meta
       wrapper = createWrapper();
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
       expect(chartData.options).toBeDefined();
-      expect(chartData.options.series[0].layout).toBe("orthogonal");
+      expect(chartData.options.series[0].layout).toBe("none");
     });
 
     it("should set tree bounds for horizontal layout", async () => {
