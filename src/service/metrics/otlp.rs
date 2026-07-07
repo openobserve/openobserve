@@ -413,18 +413,22 @@ pub async fn handle_otlp_request(
         if pipelines.is_empty() {
             continue;
         }
+        let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
+            let err_msg = format!(
+                "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG",
+            );
+            log::error!("{err_msg}");
+            partial_success.error_message = err_msg;
+            continue;
+        };
+        let count = pipeline_inputs.len();
+        let has_user_pipeline = pipelines
+            .iter()
+            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+
         for exec_pl in pipelines {
-            let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
-                let err_msg = format!(
-                    "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG",
-                );
-                log::error!("{err_msg}");
-                partial_success.error_message = err_msg;
-                continue;
-            };
-            let count = pipeline_inputs.len();
             match exec_pl
-                .process_batch(org_id, pipeline_inputs, Some(stream_name.clone()))
+                .process_batch(org_id, pipeline_inputs.clone(), Some(stream_name.clone()))
                 .await
             {
                 Err(e) => {
@@ -479,6 +483,24 @@ pub async fn handle_otlp_request(
                         }
                     }
                 }
+            }
+        }
+
+        if !has_user_pipeline && !json_data_by_stream.contains_key(stream_name) {
+            for mut rec in pipeline_inputs {
+                let mut local_val = match rec.take() {
+                    json::Value::Object(val) => val,
+                    _ => unreachable!(),
+                };
+
+                if let Some(Some(fields)) = user_defined_schema_map.get(stream_name) {
+                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                }
+
+                json_data_by_stream
+                    .entry(stream_name.clone())
+                    .or_default()
+                    .push(local_val);
             }
         }
     }

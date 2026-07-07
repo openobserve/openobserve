@@ -437,17 +437,21 @@ pub async fn remote_write(
         if pipelines.is_empty() {
             continue;
         }
+        let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
+            log::error!(
+                "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG"
+            );
+            continue;
+        };
+        let (records, timestamps): (Vec<json::Value>, Vec<i64>) =
+            pipeline_inputs.into_iter().unzip();
+        let has_user_pipeline = pipelines
+            .iter()
+            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+
         for exec_pl in pipelines {
-            let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
-                log::error!(
-                    "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG"
-                );
-                continue;
-            };
-            let (records, timestamps): (Vec<json::Value>, Vec<i64>) =
-                pipeline_inputs.into_iter().unzip();
             match exec_pl
-                .process_batch(org_id, records, Some(stream_name.clone()))
+                .process_batch(org_id, records.clone(), Some(stream_name.clone()))
                 .await
             {
                 Err(e) => {
@@ -498,6 +502,24 @@ pub async fn remote_write(
                         }
                     }
                 }
+            }
+        }
+
+        if !has_user_pipeline && !json_data_by_stream.contains_key(stream_name) {
+            for (mut value, timestamp) in records.into_iter().zip(timestamps.into_iter()) {
+                let mut local_val = match value.take() {
+                    json::Value::Object(val) => val,
+                    _ => unreachable!(),
+                };
+
+                if let Some(Some(fields)) = user_defined_schema_map.get(stream_name) {
+                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                }
+
+                json_data_by_stream
+                    .entry(stream_name.clone())
+                    .or_default()
+                    .push((local_val, timestamp));
             }
         }
     }
