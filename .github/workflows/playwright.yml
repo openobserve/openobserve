@@ -68,11 +68,14 @@ jobs:
 
       - id: check
         run: |
-          # Skip the suite when a PR touches only docs or images. Anything else — source,
-          # web/, workflows (incl. this file) — runs the suite.
-          IGNORE_RE='(\.md$|^docs/|\.(png|jpe?g|gif|svg|webp)$)'
+          # Skip when a PR touches only docs, images, or unrelated workflow files. Source,
+          # web/, and this workflow (playwright.yml) still run the suite.
+          IGNORE_RE='(\.md$|^docs/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'
           CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qvE "$IGNORE_RE"; then
+          # Files not matching IGNORE_RE; captured (not `grep -qv`) so the check doesn't depend
+          # on grep -qv exit semantics, which differ across grep builds.
+          RELEVANT=$(printf '%s' "$CHANGED" | grep -vE "$IGNORE_RE" || true)
+          if [ -z "$CHANGED" ] || [ -n "$RELEVANT" ] || printf '%s' "$CHANGED" | grep -qE '^\.github/workflows/playwright\.yml$'; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT

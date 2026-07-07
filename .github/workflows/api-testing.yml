@@ -47,11 +47,15 @@ jobs:
 
       - id: check
         run: |
-          # Skip the suite when a PR touches only docs, images, or frontend/UI-test files
-          # (none affect the API). Anything else — source, workflows (incl. this file) — runs it.
-          IGNORE_RE='(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/|\.(png|jpe?g|gif|svg|webp)$)'
+          # Skip when a PR touches only docs, images, frontend/UI-test files, or unrelated
+          # workflow files (none affect the API). Source and this workflow (api-testing.yml)
+          # still run the suite.
+          IGNORE_RE='(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'
           CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qvE "$IGNORE_RE"; then
+          # Files not matching IGNORE_RE; captured (not `grep -qv`) so the check doesn't depend
+          # on grep -qv exit semantics, which differ across grep builds.
+          RELEVANT=$(printf '%s' "$CHANGED" | grep -vE "$IGNORE_RE" || true)
+          if [ -z "$CHANGED" ] || [ -n "$RELEVANT" ] || printf '%s' "$CHANGED" | grep -qE '^\.github/workflows/api-testing\.yml$'; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
