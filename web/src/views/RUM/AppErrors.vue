@@ -69,6 +69,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("metrics.runQuery") }}
             </OButton>
+            <!-- Refresh button -->
+            <OButton
+              variant="outline"
+              size="icon-toolbar"
+              icon-left="refresh"
+              :loading="isLoadingIssues"
+              data-test="rum-app-errors-refresh-btn"
+              class="shrink-0"
+              @click="runQuery"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="rumErrorsRefresh" />
+            </OButton>
           </div><!-- end controls -->
         </div><!-- end flex row -->
       </div><!-- end card-container -->
@@ -147,18 +159,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-class="cursor-pointer"
             @row-click="handleRowClick"
           >
-            <template #toolbar-trailing>
-              <OButton
-                variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
-                :loading="isLoadingIssues"
-                data-test="rum-app-errors-refresh-btn"
-                @click="runQuery"
-              >
-                <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="rumErrorsRefresh" />
-              </OButton>
-            </template>
             <template #empty>
               <NoData />
             </template>

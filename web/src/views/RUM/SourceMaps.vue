@@ -68,13 +68,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       </div>
 
-        <!-- Upload Button -->
-
+        <!-- Refresh + Upload Buttons -->
+        <div class="flex gap-2 items-center">
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="isLoading"
+            data-test="source-maps-refresh-btn"
+            @click="fetchSourceMaps"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="sourceMapsRefresh" />
+          </OButton>
           <OButton
             variant="outline"
             size="sm-action"
             @click="navigateToUpload"
           >{{ t('rum.uploadSourceMaps') }}</OButton>
+        </div>
       </div>
     </div>
 
@@ -98,18 +109,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:expanded-ids="expandedIds"
           class="w-full"
         >
-          <template #toolbar-trailing>
-            <OButton
-              variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="isLoading"
-              data-test="source-maps-refresh-btn"
-              @click="fetchSourceMaps"
-            >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="sourceMapsRefresh" />
-            </OButton>
-          </template>
           <template #expansion="{ row }">
             <div class="p-3 bg-(--q-background) border-t border-(--q-border-color,var(--o2-border))">
               <div class="text-sm font-medium mb-2">
