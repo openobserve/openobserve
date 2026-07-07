@@ -379,6 +379,54 @@ describe("CreateReport", () => {
       expect(row.attachmentHeight).toBe(900);
     });
 
+    it("coerces the STRING emitted by the number inputs into a numeric attachment_dimensions payload", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      await fillValidForm(wrapper);
+
+      // report_type is "pdf" by default → the Custom Dimensions section renders.
+      // Expand it so the width/height number inputs mount.
+      await wrapper
+        .find('[data-test="add-report-custom-dimensions-section"] .cursor-pointer')
+        .trigger("click");
+      await flushPromises();
+
+      // Type through the REAL <input type="number">. An OInput number field (no
+      // `.number` modifier) emits the RAW STRING the DOM input holds — exactly what
+      // a user's keystrokes produce — so this drives the z.coerce.number() path the
+      // schema exists for, not a pre-made JS number handed straight to the form.
+      await wrapper
+        .find('[data-test="add-report-dimension-width"] input')
+        .setValue("1440");
+      await wrapper
+        .find('[data-test="add-report-dimension-height"] input')
+        .setValue("900");
+      await flushPromises();
+
+      // The form holds the raw STRING the number input emitted (pre-coercion).
+      const row = (wrapper.vm as any).form.state.values.dashboards[0];
+      expect(row.attachmentWidth).toBe("1440");
+      expect(row.attachmentHeight).toBe("900");
+
+      await submitForm(wrapper);
+
+      // …but the SAVED payload carries NUMBERS — attachment_dimensions matches the
+      // API contract (guards the dashboards `max_record_size` string-leak class of
+      // regression: a plain z.number() / a leaked "1440" would fail this).
+      expect(reports.createReportV2).toHaveBeenCalledTimes(1);
+      const payload = vi.mocked(reports.createReportV2).mock.calls[0][1] as any;
+      expect(payload.dashboards[0].attachment_dimensions).toEqual({
+        width: 1440,
+        height: 900,
+      });
+      expect(typeof payload.dashboards[0].attachment_dimensions.width).toBe(
+        "number",
+      );
+      expect(typeof payload.dashboards[0].attachment_dimensions.height).toBe(
+        "number",
+      );
+    });
+
     it("submits in cron mode with a valid cron + timezone", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
