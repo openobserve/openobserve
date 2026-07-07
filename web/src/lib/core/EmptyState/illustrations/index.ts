@@ -53,6 +53,7 @@ import EmptyAlert from "./EmptyAlert.vue";
 import EmptyExplorer from "./EmptyExplorer.vue";
 import EmptyServiceGraph from "./EmptyServiceGraph.vue";
 import EmptyServicesCatalog from "./EmptyServicesCatalog.vue";
+import EmptyStreamSelect from "./EmptyStreamSelect.vue";
 
 export const illustrations = {
   // ---- object / metaphor illustrations (the DEFAULT — no character) --------
@@ -67,6 +68,7 @@ export const illustrations = {
   trace: EmptyTrace,
   "service-graph": EmptyServiceGraph,
   "services-catalog": EmptyServicesCatalog,
+  "stream-select": EmptyStreamSelect,
   pipeline: EmptyPipeline,
   function: EmptyFunction,
   history: EmptyHistory,
