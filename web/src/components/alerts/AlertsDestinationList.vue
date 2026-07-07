@@ -116,7 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="hero"
               preset="no-alert-destinations"
               :filtered="!!filterQuery"
-              @action="(id) => id === 'clear-filters' ? (filterQuery = '') : (templates.length && editDestination(null))"
+              :actions="[
+                { id: 'create', icon: 'add', titleKey: 'emptyState.noAlertDestinations.action', descriptionKey: 'emptyState.noAlertDestinations.actionDesc' },
+                { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noAlertDestinations.import', descriptionKey: 'emptyState.noAlertDestinations.importDesc' },
+              ]"
+              @action="(id) => id === 'clear-filters' ? (filterQuery = '') : id === 'import' ? importDestination() : (templates.length && editDestination(null))"
             />
           </template>
 

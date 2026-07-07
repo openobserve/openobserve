@@ -81,7 +81,9 @@
       "title": "No destinations yet",
       "description": "Destinations define where alert notifications are sent — Slack, email, webhooks, and more.",
       "action": "New destination",
-      "actionDesc": "Connect a notification channel"
+      "actionDesc": "Connect a notification channel",
+      "import": "Import destination",
+      "importDesc": "Import from a JSON file"
     },
     "noPipelineDestinations": {
       "title": "No destinations yet",
@@ -93,7 +95,9 @@
       "title": "No templates yet",
       "description": "Templates define the format of alert notification messages.",
       "action": "New template",
-      "actionDesc": "Create a notification template"
+      "actionDesc": "Create a notification template",
+      "import": "Import template",
+      "importDesc": "Import from a JSON file"
     },
     "noEvalTemplates": {
       "title": "No evaluation templates yet",
@@ -221,7 +225,9 @@
       "title": "No score configs yet",
       "description": "Score configs define the schema scorers produce — numeric, boolean, or categorical. Add one to start scoring.",
       "action": "Create score config",
-      "actionDesc": "Define the score shape + healthy range"
+      "actionDesc": "Define the score shape + healthy range",
+      "import": "Import score config",
+      "importDesc": "Import from a JSON file"
     },
     "loadError": {
       "title": "Something went wrong",
