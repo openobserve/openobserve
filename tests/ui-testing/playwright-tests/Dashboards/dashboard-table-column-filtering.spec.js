@@ -118,6 +118,7 @@ test.describe("Dashboard Table — Column Filtering (PR #12531)", () => {
     const dashboardName = generateDashboardName();
 
     await setupTablePanelWithConfig(page, pm, dashboardName);
+    expect(await pm.dashboardPanelConfigs.isTableFilteringEnabled()).toBe(false);
     await pm.dashboardPanelConfigs.toggleTableFiltering();
     await pm.dashboardPanelActions.applyDashboardBtn();
     await expect(getColumnFilterBtn(page, 0)).toBeVisible();
@@ -149,14 +150,19 @@ test.describe("Dashboard Table — Column Filtering (PR #12531)", () => {
     const panel = await openColumnFilter(page, 0);
     const items = columnFilter.valueItems(panel);
     const initialCount = await items.count();
-    expect(initialCount).toBeGreaterThan(0);
+    // Must have more than the eventual 1-item "no matches" placeholder, otherwise a
+    // panel that failed to load any values at all would be indistinguishable from
+    // "search narrowed the list down to nothing".
+    expect(initialCount).toBeGreaterThan(1);
 
     // A search term that matches nothing real should collapse the list to the
     // "no matches" placeholder row.
     await columnFilter.search(panel, "zzz_no_such_value_zzz");
     await expect(items).toHaveCount(1);
+    const narrowedCount = await items.count();
+    expect(narrowedCount).toBeLessThan(initialCount);
     await expect(items.first()).toContainText(/no matches/i);
-    testLogger.info("Filter search narrowed value list to no-matches placeholder");
+    testLogger.info("Filter search narrowed value list to no-matches placeholder", { initialCount, narrowedCount });
 
     await page.keyboard.press("Escape");
     await pm.dashboardPanelActions.savePanel();

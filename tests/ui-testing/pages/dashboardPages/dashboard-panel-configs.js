@@ -545,6 +545,7 @@ export default class DashboardPanelConfigs {
       ).set;
       setter.call(el, value);
       el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
     }, hex);
   }
 
@@ -607,6 +608,7 @@ export default class DashboardPanelConfigs {
       ).set;
       setter.call(el, value);
       el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
     }, hex);
   }
 

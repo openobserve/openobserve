@@ -48,6 +48,10 @@ export async function reopenPanelConfig(page, pm) {
  * @param {string} dashboardName
  */
 export async function discardAndCleanupTestDashboard(page, dashboardName) {
+  // Defensive: accept a native "leave site / discard changes" dialog if the app ever
+  // adds a beforeunload guard for unsaved panel edits. Not currently triggered (this
+  // app doesn't gate navigation on unsaved changes), but costs nothing to guard against.
+  page.once('dialog', (dialog) => dialog.accept());
   await page.goto(
     `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}`
   );

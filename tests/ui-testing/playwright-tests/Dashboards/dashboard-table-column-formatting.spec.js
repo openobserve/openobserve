@@ -41,6 +41,31 @@ async function addXAxisOverrideColumn(pm) {
   await pm.dashboardPanelConfigs.addFirstOverrideField();
 }
 
+/**
+ * Builds a table panel with an explicit categorical x-axis (kubernetes_container_hash,
+ * 7 distinct values with a wide count spread in the fixture: 8, 28, 440, 554, 814, 2002)
+ * instead of the default histogram(_timestamp) grouping. The ingestion endpoint stamps
+ * the whole fixture batch with one ingestion-time timestamp (the fixture has no explicit
+ * _timestamp field), so histogram(_timestamp) collapses to a single bucket in CI's single
+ * fresh ingestion — this made row-count-dependent tests flaky/failing there despite
+ * passing locally (hours of accumulated repeat runs gave the dev server real timestamp
+ * spread that CI doesn't have). Grouping by a raw field instead gives deterministic,
+ * environment-independent row counts and per-row values.
+ */
+async function buildCategoricalTablePanel(page, pm, dashboardName) {
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectChartType("table");
+  await pm.chartTypeSelector.selectStreamType("logs");
+  await pm.chartTypeSelector.selectStream("e2e_automate");
+  await pm.chartTypeSelector.removeField("y_axis_1", "y");
+  await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "x");
+  await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
+  await pm.dashboardPanelActions.addPanelName("Test Panel");
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await pm.dashboardPanelConfigs.openConfigPanel();
+}
+
 test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
@@ -152,42 +177,66 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
     await discardAndCleanupTestDashboard(page, dashboardName);
   });
 
-  test("conditional styling: matching rule colors the cell; later rule overrides an earlier match", async ({ page }) => {
+  test("conditional styling: rules evaluate per row; a later matching rule overrides an earlier match", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
 
-    await setupTablePanelWithConfig(page, pm, dashboardName);
-    await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
-    await pm.dashboardPanelActions.applyDashboardBtn();
+    // Categorical x-axis (kubernetes_container_hash) gives 7 rows with a real, deterministic
+    // count() spread (8, 28, 440, 554, 814, 2002, plus a null-hash group) — needed so the two
+    // rules below produce a genuine, verifiable per-row split rather than an all-or-nothing
+    // result that a first-match-wins bug couldn't be distinguished from.
+    await buildCategoricalTablePanel(page, pm, dashboardName);
 
     await addYAxisOverrideColumn(pm);
     await pm.dashboardPanelConfigs.selectFieldType("num");
 
-    // Rule 0: operator defaults to "<"; a very high threshold matches every real count value.
+    // Rule 0: operator defaults to "<"; matches every row with count < 1000 (most rows) — blue.
     await pm.dashboardPanelConfigs.addConditionalRule();
-    await pm.dashboardPanelConfigs.fillConditionThreshold(0, "999999999");
+    await pm.dashboardPanelConfigs.fillConditionThreshold(0, "1000");
     await pm.dashboardPanelConfigs.setConditionRuleColor(0, "bg", "#0000ff");
 
-    // Rule 1: same match-everything condition, different color — since rules are evaluated
-    // in order and the last match wins, rule 1's color must be what renders.
+    // Rule 1: a strict subset of rule 0 (count < 30) — red. Rows with count < 30 match BOTH
+    // rules; since rules are evaluated in order and the last match wins, those rows must
+    // render red, not blue. Rows with 30 <= count < 1000 match only rule 0 and stay blue.
+    // If evaluation were first-match-wins instead, the <30 rows would incorrectly stay blue —
+    // this design catches that regression, unlike asserting a single overall color.
     await pm.dashboardPanelConfigs.addConditionalRule();
-    await pm.dashboardPanelConfigs.fillConditionThreshold(1, "999999999");
+    await pm.dashboardPanelConfigs.fillConditionThreshold(1, "30");
     await pm.dashboardPanelConfigs.setConditionRuleColor(1, "bg", "#ff0000");
-    testLogger.info("Two overlapping conditional rules configured");
+    testLogger.info("Two conditional rules configured: rule0 count<1000 blue, rule1 count<30 red (subset)");
 
     await pm.dashboardPanelConfigs.overrideSaveBtn.click();
     await pm.dashboardPanelConfigs.overrideDialog.waitFor({ state: "hidden", timeout: 5000 });
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    const firstRow = page.locator(TABLE_DATA_ROW_SELECTOR).first();
-    await firstRow.waitFor({ state: "visible", timeout: 15000 });
-    const styledCell = firstRow.locator("td").last();
-    await expect(styledCell).toHaveCSS("background-color", hexToRgb("#ff0000"));
-    testLogger.info("Later conditional rule (red) overrides earlier rule (blue) for same match");
+    const rows = page.locator(TABLE_DATA_ROW_SELECTOR);
+    await rows.first().waitFor({ state: "visible", timeout: 15000 });
+    const rowCount = await rows.count();
+    expect(rowCount).toBeGreaterThan(1);
+
+    let sawBlue = false;
+    let sawRed = false;
+    for (let i = 0; i < rowCount; i++) {
+      const cell = rows.nth(i).locator("td").last();
+      const text = await cell.locator('[data-test="dashboard-table-cell-value"]').textContent();
+      const value = parseFloat(text || "");
+      if (Number.isNaN(value)) continue;
+      const bg = await cell.evaluate((el) => getComputedStyle(el).backgroundColor);
+      if (value < 30) {
+        expect(bg, `row with count ${value} (<30, matches both rules) must show rule 1's red — last matching rule wins`).toBe(hexToRgb("#ff0000"));
+        sawRed = true;
+      } else if (value < 1000) {
+        expect(bg, `row with count ${value} (matches only rule 0) must show rule 0's blue`).toBe(hexToRgb("#0000ff"));
+        sawBlue = true;
+      }
+    }
+    expect(sawBlue, "expected at least one row matching only rule 0 (blue)").toBe(true);
+    expect(sawRed, "expected at least one row matching both rules, showing rule 1's red (last-wins)").toBe(true);
+    testLogger.info("Conditional rules evaluated per row with correct last-match-wins override");
 
     // This environment's backend build doesn't yet accept the conditional_styles
     // override_config variant on save (version-skew, not a product bug) — the
-    // in-session DOM assertion above already proves the feature works.
+    // in-session DOM assertions above already prove the feature works.
     await discardAndCleanupTestDashboard(page, dashboardName);
   });
 
@@ -221,25 +270,7 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
 
-    // Build the panel manually (not via setupTablePanelWithConfig) so the x-axis is an
-    // explicit raw field (kubernetes_container_hash, 7 distinct values in the fixture)
-    // instead of the default histogram(_timestamp) grouping. The ingestion endpoint
-    // stamps the whole fixture batch with one ingestion-time timestamp (the fixture has
-    // no explicit _timestamp field), so histogram(_timestamp) collapses to a single
-    // bucket in CI — this made the test flaky/failing there despite passing locally,
-    // where hours of accumulated repeat test runs gave the dev server real timestamp
-    // spread that CI's single fresh ingestion doesn't have.
-    await setupTestDashboard(page, pm, dashboardName);
-    await pm.dashboardCreate.addPanel();
-    await pm.chartTypeSelector.selectChartType("table");
-    await pm.chartTypeSelector.selectStreamType("logs");
-    await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.chartTypeSelector.removeField("y_axis_1", "y");
-    await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "x");
-    await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
-    await pm.dashboardPanelActions.addPanelName("Test Panel");
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelConfigs.openConfigPanel();
+    await buildCategoricalTablePanel(page, pm, dashboardName);
 
     // Target the x-axis column (kubernetes_container_hash) — a genuine text column with
     // guaranteed multi-value cardinality — so the unique-color toggle has real distinct
@@ -257,13 +288,19 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
     const rowCount = await rows.count();
     expect(rowCount).toBeGreaterThan(1);
 
+    const textValues = new Set();
     const bgColors = new Set();
     for (let i = 0; i < Math.min(rowCount, 10); i++) {
       const cell = rows.nth(i).locator("td").first();
+      textValues.add(await cell.locator('[data-test="dashboard-table-cell-value"]').textContent());
       bgColors.add(await cell.evaluate((el) => getComputedStyle(el).backgroundColor));
     }
+    // Sanity check: the column itself must actually have multiple distinct values —
+    // otherwise a single-color result below would be indistinguishable from "the
+    // unique-color feature is broken" vs. "there was nothing to color differently".
+    expect(textValues.size).toBeGreaterThan(1);
     expect(bgColors.size).toBeGreaterThan(1);
-    testLogger.info("Distinct column values render with distinct auto-assigned colors", { distinctColors: bgColors.size });
+    testLogger.info("Distinct column values render with distinct auto-assigned colors", { distinctValues: textValues.size, distinctColors: bgColors.size });
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);

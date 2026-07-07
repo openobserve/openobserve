@@ -106,9 +106,12 @@ async function clearColumnFilter(panel) {
   await panel.getByText("Clear filter", { exact: false }).click();
 }
 
+/**
+ * Panel-scoped column filter actions — take the `panel` locator returned by
+ * openColumnFilter() rather than `page`. (getColumnFilterBtn/openColumnFilter are
+ * exported standalone above since they're page-scoped, not part of this namespace.)
+ */
 export const columnFilter = {
-  getBtn: getColumnFilterBtn,
-  open: openColumnFilter,
   valueItems: getFilterValueItems,
   selectValueByIndex: selectFilterValueByIndex,
   search: searchInFilterPanel,
