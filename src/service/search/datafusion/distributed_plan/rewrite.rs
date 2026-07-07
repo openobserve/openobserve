@@ -47,6 +47,7 @@ pub fn aggregate_optimize_rewrite(
     let metadata_records = metadata_count_file_list.iter().fold(0i64, |total, file| {
         total.saturating_add(file.meta.records.max(0))
     });
+    let metadata_files = metadata_count_file_list.len();
     if metadata_records == 0 && tantivy_file_list.is_empty() {
         return Ok(physical_plan);
     }
@@ -57,6 +58,7 @@ pub fn aggregate_optimize_rewrite(
         index_condition,
         index_optimize_mode,
         metadata_records,
+        metadata_files,
     );
     Ok(physical_plan.rewrite(&mut visitor)?.data)
 }
@@ -67,6 +69,7 @@ pub struct IndexOptimizeRewriter {
     index_condition: Option<IndexCondition>,
     index_optimize_mode: Option<IndexOptimizeMode>,
     metadata_records: i64,
+    metadata_files: usize,
 }
 
 impl IndexOptimizeRewriter {
@@ -76,6 +79,7 @@ impl IndexOptimizeRewriter {
         index_condition: Option<IndexCondition>,
         index_optimize_mode: Option<IndexOptimizeMode>,
         metadata_records: i64,
+        metadata_files: usize,
     ) -> Self {
         Self {
             query,
@@ -83,6 +87,7 @@ impl IndexOptimizeRewriter {
             index_condition,
             index_optimize_mode,
             metadata_records,
+            metadata_files,
         }
     }
 
@@ -103,6 +108,7 @@ impl IndexOptimizeRewriter {
         Ok(Arc::new(MetadataCountExec::new(
             schema,
             self.metadata_records,
+            self.metadata_files,
         )))
     }
 
