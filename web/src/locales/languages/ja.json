@@ -3875,6 +3875,8 @@
     "saveChanges": "[保存]",
     "invalidDomain": "有効なドメイン名を入力してください",
     "invalidEmail": "このドメインの有効なメールアドレスを入力してください",
+    "domainRequired": "ドメインが必要です",
+    "emailRequired": "メールアドレスが必要です",
     "domainAlreadyExists": "このドメインは既に追加されています",
     "domainAdded": "ドメインは正常に追加されました",
     "confirmRemoveDomain": "ドメイン '{domain}' を削除してよろしいですか?",

@@ -3875,6 +3875,8 @@
     "saveChanges": "저장",
     "invalidDomain": "유효한 도메인 이름을 입력하세요",
     "invalidEmail": "이 도메인의 유효한 이메일 주소를 입력하십시오.",
+    "domainRequired": "도메인이 필요합니다.",
+    "emailRequired": "이메일 주소가 필요합니다.",
     "domainAlreadyExists": "이 도메인은 이미 추가되었습니다",
     "domainAdded": "도메인이 성공적으로 추가되었습니다.",
     "confirmRemoveDomain": "'{domain}' 도메인을 정말로 제거하시겠습니까?",

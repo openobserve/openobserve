@@ -3875,6 +3875,8 @@
     "saveChanges": "Kaydet",
     "invalidDomain": "Lütfen geçerli bir alan adı girin",
     "invalidEmail": "Lütfen bu alan adı için geçerli bir e-posta adresi girin",
+    "domainRequired": "Alan adı gereklidir",
+    "emailRequired": "E-posta adresi gereklidir",
     "domainAlreadyExists": "Bu alan adı zaten eklendi",
     "domainAdded": "Etki alanı başarıyla eklendi",
     "confirmRemoveDomain": "'{ domain} 'alan adını kaldırmak istediğinizden emin misiniz?",

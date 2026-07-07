@@ -3875,6 +3875,8 @@
     "saveChanges": "Salvar",
     "invalidDomain": "Insira um nome de domínio válido",
     "invalidEmail": "Insira um endereço de e-mail válido para este domínio",
+    "domainRequired": "O domínio é necessário",
+    "emailRequired": "O e-mail é necessário",
     "domainAlreadyExists": "Este domínio já foi adicionado",
     "domainAdded": "Domínio adicionado com sucesso",
     "confirmRemoveDomain": "Tem certeza de que deseja remover o domínio '{domain}'?",

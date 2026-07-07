@@ -3875,6 +3875,8 @@
     "saveChanges": "保存",
     "invalidDomain": "请输入有效的域名",
     "invalidEmail": "请输入该域的有效电子邮件地址",
+    "domainRequired": "需要域名",
+    "emailRequired": "需要电子邮件地址",
     "domainAlreadyExists": "此域已被添加",
     "domainAdded": "域名已成功添加",
     "confirmRemoveDomain": "您确定要移除域名 '{domain}' 吗？",

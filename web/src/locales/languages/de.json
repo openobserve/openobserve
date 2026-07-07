@@ -3875,6 +3875,8 @@
     "saveChanges": "Speichern",
     "invalidDomain": "Bitte geben Sie einen gültigen Domainnamen ein",
     "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse für diese Domain ein",
+    "domainRequired": "Die Domain ist erforderlich",
+    "emailRequired": "Die E-Mail-Adresse ist erforderlich",
     "domainAlreadyExists": "Diese Domain wurde bereits hinzugefügt",
     "domainAdded": "Domain wurde erfolgreich hinzugefügt",
     "confirmRemoveDomain": "Möchten Sie die Domain '{domain}' wirklich entfernen?",
