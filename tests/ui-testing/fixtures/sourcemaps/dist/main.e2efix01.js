@@ -1,0 +1,2 @@
+(()=>{function n(e){return e.profile.name}function o(){return undeclaredVariableThatDoesNotExist+1}function t(){return new Array(-1)}var r=class extends Error{constructor(i){super(i),this.name="PaymentError"}};function a(){throw new r("Insufficient funds in account")}var c={typeError:()=>n(void 0),referenceError:()=>o(),rangeError:()=>t(),customError:()=>a()};typeof window<"u"&&(window.__o2SourcemapFixture=c);var f=c;})();
+//# sourceMappingURL=main.e2efix01.js.map
