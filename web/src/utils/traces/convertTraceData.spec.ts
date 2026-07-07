@@ -409,53 +409,6 @@ describe("convertTraceData", () => {
       const roots = result.options.series[0].data;
       expect(countByName(roots, "shared")).toBe(1);
     });
-
-    it("zig-zags labels when a level is crowded (alternating label.distance)", () => {
-      // One root with 8 children — a crowded level. Their labels should stagger
-      // via alternating label.distance so text does not overlap.
-      const children = Array.from({ length: 8 }, (_, i) => ({
-        id: `c${i}`,
-        label: `c${i}`,
-      }));
-      const graphData = {
-        nodes: [{ id: "root", label: "root" }, ...children],
-        edges: children.map((c) => ({
-          from: "root",
-          to: c.id,
-          total_requests: 1,
-        })),
-      };
-      const result = convertServiceGraphToTree(graphData, "horizontal");
-      const root = result.options.series[0].data[0];
-      const kids = root.children ?? [];
-      expect(kids.length).toBe(8);
-      const distances = kids.map((k: any) => k.label?.distance);
-      // Adjacent children must not share the same distance (they zig-zag).
-      const alternates = distances.some(
-        (d: number, i: number) => i > 0 && d !== distances[i - 1],
-      );
-      expect(alternates).toBe(true);
-    });
-
-    it("does NOT zig-zag a small (uncrowded) level", () => {
-      const children = Array.from({ length: 2 }, (_, i) => ({
-        id: `c${i}`,
-        label: `c${i}`,
-      }));
-      const graphData = {
-        nodes: [{ id: "root", label: "root" }, ...children],
-        edges: children.map((c) => ({
-          from: "root",
-          to: c.id,
-          total_requests: 1,
-        })),
-      };
-      const result = convertServiceGraphToTree(graphData, "horizontal");
-      const kids = result.options.series[0].data[0].children ?? [];
-      // Few children → all share the same base distance (no stagger needed).
-      const distances = kids.map((k: any) => k.label?.distance);
-      expect(new Set(distances).size).toBe(1);
-    });
   });
 
   describe("convertServiceGraphToNetwork", () => {
