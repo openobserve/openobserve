@@ -23,7 +23,9 @@
     },
     "noQueryApplied": {
       "title": "Run a query to see results",
-      "description": "Adjust your filters and click 'Run query' to load events for this stream."
+      "description": "Adjust your filters and click 'Run query' to load events for this stream.",
+      "action": "Run query",
+      "actionDesc": "Load events for the selected filters"
     },
 
     "noDashboards": {

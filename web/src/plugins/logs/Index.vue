@@ -203,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         preset="no-query-applied"
                         size="hero"
                         data-test="logs-search-apply-search-text"
+                        @action="() => searchBarRef?.handleRunQueryFn?.()"
                       />
                     </div>
                     <div
@@ -217,6 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         preset="no-query-applied"
                         size="hero"
                         data-test="logs-search-patterns-apply-search-text"
+                        @action="() => searchBarRef?.handleRunQueryFn?.()"
                       />
                     </div>
                     <div

@@ -259,6 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       preset="no-query-applied"
                       size="hero"
                       data-test="traces-search-not-started-text"
+                      @action="() => searchData()"
                     />
                   </div>
                   <div

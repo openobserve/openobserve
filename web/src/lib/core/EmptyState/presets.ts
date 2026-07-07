@@ -104,6 +104,14 @@ export const emptyStatePresets = {
     variant: "neutral",
     titleKey: "emptyState.noQueryApplied.title",
     descriptionKey: "emptyState.noQueryApplied.description",
+    actions: [
+      {
+        id: "run",
+        icon: "play-arrow",
+        titleKey: "emptyState.noQueryApplied.action",
+        descriptionKey: "emptyState.noQueryApplied.actionDesc",
+      },
+    ],
   },
 
   // --- first-run "create your first X" -------------------------------------
