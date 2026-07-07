@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-full"
               @view-traces="handleServiceGraphViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
+              @jump-to-stream-data="onJumpToPanelStreamData"
             />
           </div>
 
@@ -99,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-full"
               @view-traces="handleServicesCatalogViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
+              @jump-to-stream-data="onJumpToPanelStreamData"
             />
           </div>
 
@@ -1813,6 +1815,17 @@ const onJumpToTracesStreamData = (fromUs: number, toUs: number) => {
   searchObj.data.datetime.endTime = toUs;
   searchObj.data.datetime.type = "absolute";
   runQueryFn();
+};
+
+// Jump handler for the service-graph / services-catalog empty states. Mirrors
+// the datetime + picker sync above, but does not run the traces query — each
+// panel reloads itself from its own watch on the shared datetime.
+const onJumpToPanelStreamData = (fromUs: number, toUs: number) => {
+  searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);
+  searchObj.data.datetime.startTime = fromUs;
+  searchObj.data.datetime.endTime = toUs;
+  searchObj.data.datetime.type = "absolute";
+  searchObj.data.datetime.relativeTimePeriod = null;
 };
 
 const onSelectTracesStream = () => {

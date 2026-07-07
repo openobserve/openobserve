@@ -213,7 +213,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col items-center justify-center flex-1"
       data-test="services-catalog-empty"
     >
-      <ServicesCatalogNoDataState />
+      <ServicesCatalogNoDataState
+        @jump-to-stream-data="
+          (from, to) => emit('jump-to-stream-data', from, to)
+        "
+      />
     </div>
 
     <!-- Table -->
@@ -408,6 +412,7 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
 const emit = defineEmits<{
   "view-traces": [data: string | Record<string, any>];
   "request:stream-change": [stream: string];
+  "jump-to-stream-data": [fromUs: number, toUs: number];
 }>();
 
 // p99 > 1 second triggers the orange highlight
