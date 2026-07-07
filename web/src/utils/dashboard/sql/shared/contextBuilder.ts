@@ -384,7 +384,14 @@ export function buildSQLContext(
       : Math.max(configValue, dataValue);
   };
 
-  const hasXAxisName = panelSchema.queries[0]?.fields?.x[0]?.label;
+  // Same rule as the y-axis below, applied vertically: on panels too short
+  // to fit the tick labels + axis name + a usable plot, drop the x-axis name
+  // (the ~150px covers top margin, min plot height, label row and name row).
+  const panelHeightPx = chartPanelRef?.value?.offsetHeight ?? 0;
+  const xAxisNameFits = !panelHeightPx || panelHeightPx >= 150;
+
+  const hasXAxisName =
+    xAxisNameFits && panelSchema?.queries?.[0]?.fields?.x?.[0]?.label;
 
   // On panels too narrow to fit the rotated name + tick labels + a usable
   // plot, ECharts squeezes the name onto the labels no matter the nameGap —
@@ -496,13 +503,19 @@ export function buildSQLContext(
             return baseBottom;
           })()
         : (() => {
+            // Even without an x-axis name, a bottom-anchored horizontal
+            // legend needs its row reserved — otherwise it draws on top of
+            // the plot and the tick labels.
             const baseBottom =
-              legendConfig.orient === "vertical" &&
+              legendConfig.orient === "horizontal" &&
               panelSchema.config?.show_legends
-                ? 0
-                : breakDownKeys.length > 0
-                  ? 25
-                  : 0;
+                ? 30
+                : legendConfig.orient === "vertical" &&
+                    panelSchema.config?.show_legends
+                  ? 0
+                  : breakDownKeys.length > 0
+                    ? 25
+                    : 0;
             return baseBottom + additionalBottomSpace;
           })(),
     },
@@ -673,6 +686,25 @@ export function buildSQLContext(
         if (i == 0 || data[i] != data[i - 1]) arr.push(i);
       }
 
+      // Pixel-aware thinning of the unique-value labels: with a breakdown,
+      // the category data repeats each x value once per group, which makes
+      // ECharts' "auto" interval mis-estimate, and hideOverlap alone lets
+      // the surviving labels abut edge-to-edge. Show every K-th unique
+      // value instead, where K keeps a measured label width + gap between
+      // neighbours.
+      const xPlotWidthPx = Math.max(80, panelWidthPx - 80);
+      const sampleXLabel = String(data?.[arr?.[arr.length - 1]] ?? "");
+      const xLabelPxWithGap = calculateWidthText(sampleXLabel) + 8;
+      const showEveryKthLabel = Math.max(
+        1,
+        Math.ceil(
+          xLabelPxWithGap / (xPlotWidthPx / Math.max(1, arr.length)),
+        ),
+      );
+      const shownLabelIndexes = new Set(
+        arr.filter((_: any, j: number) => j % showEveryKthLabel === 0),
+      );
+
       // Use 0 for rotation and width if time-based field or horizontal chart
       const labelRotation =
         hasTimestampField || isHorizontalChart
@@ -690,7 +722,7 @@ export function buildSQLContext(
         position: panelSchema.type == "h-bar" ? "left" : "bottom",
         // inverse data for h-stacked and h-bar
         inverse: ["h-stacked", "h-bar"].includes(panelSchema.type),
-        name: index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
+        name: index == 0 ? hasXAxisName || "" : "",
         label: {
           show: panelSchema.config?.label_option?.position != null,
           position: panelSchema.config?.label_option?.position || "None",
@@ -709,7 +741,7 @@ export function buildSQLContext(
               : index == xAxisKeys.length + breakDownKeys.length - 1
                 ? "auto"
                 : function (i: any) {
-                    return arr.includes(i);
+                    return shownLabelIndexes.has(i);
                   },
           overflow:
             index == xAxisKeys.length + breakDownKeys.length - 1
@@ -739,7 +771,7 @@ export function buildSQLContext(
             panelSchema.type == "h-stacked"
               ? "auto"
               : function (i: any) {
-                  return arr.includes(i);
+                  return shownLabelIndexes.has(i);
                 },
         },
         data: data,
