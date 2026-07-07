@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Checkout — OpenObserve RUM CDN Sample</title>
+
+  <link rel="preconnect" href="https://browsersdk.openobserve.ai" crossorigin />
+  <link rel="dns-prefetch" href="https://browsersdk.openobserve.ai" />
+
+  <!-- Same RUM + Logs async loader stub as every page -->
+  <script>
+    (function (h, o, u, n, g) {
+      h[g] = h[g] || { q: [], onReady: function (c) { this.q.push(c); } };
+      var s = o.createElement(u); s.async = 1; s.src = n;
+      var f = o.getElementsByTagName(u)[0]; f.parentNode.insertBefore(s, f);
+    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.3.4/openobserve-logs.js', 'OO_LOGS');
+    (function (h, o, u, n, g) {
+      h[g] = h[g] || { q: [], onReady: function (c) { this.q.push(c); } };
+      var s = o.createElement(u); s.async = 1; s.src = n;
+      var f = o.getElementsByTagName(u)[0]; f.parentNode.insertBefore(s, f);
+    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.3.4/openobserve-rum.js', 'OO_RUM');
+  </script>
+
+  <script src="./oo-rum.js"></script>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <nav class="site-nav" aria-label="Primary">
+    <span class="brand">O2 RUM Demo</span>
+    <a href="./index.html" data-test="nav-home-link">Home</a>
+    <a href="./products.html" data-test="nav-products-link">Products</a>
+    <a href="./checkout.html" data-test="nav-checkout-link" aria-current="page">Checkout</a>
+    <a href="./about.html" data-test="nav-about-link">About</a>
+  </nav>
+
+  <main>
+    <h1>Checkout</h1>
+    <p class="sub">Form interactions are captured in Session Replay (inputs are masked by <code>defaultPrivacyLevel: 'mask-user-input'</code>). Submitting fires a RUM action and a log.</p>
+
+    <section>
+      <form id="checkout-form" novalidate>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" data-test="checkout-email-input" placeholder="you@example.com" />
+        </div>
+        <div class="field">
+          <label for="card">Card number</label>
+          <input id="card" inputmode="numeric" data-test="checkout-card-input" placeholder="4242 4242 4242 4242" />
+        </div>
+        <div class="row">
+          <button type="submit" class="primary" data-test="checkout-submit-btn">Place order</button>
+        </div>
+        <div id="checkout-result" data-test="checkout-result" class="status"></div>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+      var form = document.getElementById('checkout-form');
+      var result = document.getElementById('checkout-result');
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var email = document.getElementById('email').value.trim();
+        var card = document.getElementById('card').value.replace(/\s+/g, '');
+        var ok = /\S+@\S+\.\S+/.test(email) && card.length >= 12;
+
+        result.textContent = ok ? 'Order placed. Thank you!' : 'Please enter a valid email and card number.';
+
+        if (window.OO_RUM) window.OO_RUM.onReady(function () {
+          window.OO_RUM.addAction(ok ? 'checkout_success' : 'checkout_validation_failed', {
+            hasEmail: !!email,
+            cardLen: card.length,
+          });
+        });
+        if (window.OO_LOGS) window.OO_LOGS.onReady(function () {
+          var logger = window.OO_LOGS.logger;
+          ok ? logger.info('Checkout completed') : logger.warn('Checkout validation failed');
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
