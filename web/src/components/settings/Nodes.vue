@@ -25,11 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :subtitle="'Cluster nodes and their health'"
       class="shrink-0 px-4 border-b border-border-default"
     >
-      <template #actions>
-        <OButton variant="outline" size="sm-action" @click="getData(true)">
-          {{ t("common.refresh") }}
-        </OButton>
-      </template>
     </AppPageHeader>
     <OSplitter
       :model-value="splitterModel"

@@ -27,15 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="notifications-active"
           :subtitle="t('alerts.incidents.subtitle')"
         >
-          <template #actions>
-            <OButton
-              variant="outline"
-              size="sm"
-              :loading="loading"
-              @click="refreshIncidents"
-              data-test="incident-refresh-btn"
-            >{{ t('common.refresh') }}</OButton>
-          </template>
         </AppPageHeader>
       </template>
       <OTable

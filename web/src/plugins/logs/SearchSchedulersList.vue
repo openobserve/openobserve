@@ -10,14 +10,15 @@
         <template #actions>
           <div>
             <OButton
-              variant="primary"
-              size="sm"
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
               class="ml-3"
-              @click="fetchSearchHistory"
-              :disabled="isLoading"
+              :loading="isLoading"
               data-test="search-scheduler-get-jobs-btn"
+              @click="fetchSearchHistory"
             >
-              {{ t('search_scheduler_job.get_jobs') }}
+              <OTooltip side="bottom" :content="t('search_scheduler_job.get_jobs')" shortcut-id="searchSchedulersRefresh" />
             </OButton>
           </div>
         </template>
@@ -38,18 +39,6 @@
             :show-global-filter="false"
             :default-columns="false"
           >
-            <template #toolbar-trailing>
-              <OButton
-                variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
-                :loading="isLoading"
-                data-test="search-scheduler-refresh-btn"
-                @click="fetchSearchHistory"
-              >
-                <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="searchSchedulersRefresh" />
-              </OButton>
-            </template>
             <template #cell-user_id="{ row }">
               <OUserCell :value="row.user_id" />
             </template>
@@ -276,7 +265,6 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -285,12 +273,13 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import JsonPreview from "./JsonPreview.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
@@ -703,6 +692,8 @@ export default defineComponent({
     watch(
       () => props.isClicked,
       (value) => {
+        // v-show sub-view of the Logs page: own the keyboard scope only while visible.
+        getManager()?.setScope(value ? "search-schedulers" : "logs");
         if (value && !isLoading.value) {
           fetchSearchHistory();
         }
@@ -782,6 +773,11 @@ export default defineComponent({
     useShortcuts([
       { id: "searchSchedulersRefresh", handler: () => { if (!isInputFocused()) fetchSearchHistory(); } },
     ]);
+    // useShortcuts activates this sub-view's scope on mount, but it mounts while
+    // hidden inside the Logs page — restore the logs scope until it's shown.
+    onMounted(() => {
+      if (!props.isClicked) getManager()?.setScope("logs");
+    });
     return {
       searchObj,
       store,

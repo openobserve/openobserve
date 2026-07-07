@@ -66,7 +66,11 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
   { titleKey: "shortcuts.modules.global", pages: ["shortcuts.pages.global"] },
   {
     titleKey: "shortcuts.modules.logs",
-    pages: ["shortcuts.pages.logs", "shortcuts.pages.searchSchedulers"],
+    pages: [
+      "shortcuts.pages.logs",
+      "shortcuts.pages.searchSchedulers",
+      "shortcuts.pages.searchHistory",
+    ],
   },
   {
     titleKey: "shortcuts.modules.dashboards",
@@ -534,6 +538,15 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     scope: "search-schedulers",
     shortcuts: [
       { id: "searchSchedulersRefresh", key: "r", descriptionKey: "shortcuts.actions.searchSchedulersRefresh" },
+    ],
+  },
+
+  // ── Search History ──────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.searchHistory",
+    scope: "search-history",
+    shortcuts: [
+      { id: "searchHistoryRefresh", key: "r", descriptionKey: "shortcuts.actions.searchHistoryRefresh" },
     ],
   },
 

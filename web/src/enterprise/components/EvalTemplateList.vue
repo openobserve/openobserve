@@ -35,14 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #actions>
         <OButton
-          data-test="eval-template-list-header-refresh-btn"
-          variant="outline"
-          size="sm"
-          @click="loadTemplates"
-        >
-          {{ t('common.refresh') }}
-        </OButton>
-        <OButton
           data-test="eval-template-list-add-btn"
           variant="primary"
           size="sm"
