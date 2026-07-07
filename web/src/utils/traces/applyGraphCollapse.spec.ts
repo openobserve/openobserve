@@ -151,6 +151,56 @@ describe("applyGraphCollapse — collapse", () => {
     ).toBe(true);
   });
 
+  it("expandedGroups expands ONLY the clicked caller's group, not the whole kind", () => {
+    // Two callers each with their own externals, both collapsed. Expanding only
+    // payment's boundary id must reveal payment's members while product's group
+    // stays collapsed (its members hidden). This is the per-group drill-in — the
+    // fix for "clicking one External group expands every External group".
+    const g = {
+      nodes: [
+        N("payment"),
+        N("product"),
+        N("pe0", "external"),
+        N("pe1", "external"),
+        N("qe0", "external"),
+        N("qe1", "external"),
+      ],
+      edges: [
+        { from: "payment", to: "pe0", total_requests: 1, failed_requests: 0 },
+        { from: "payment", to: "pe1", total_requests: 1, failed_requests: 0 },
+        { from: "product", to: "qe0", total_requests: 1, failed_requests: 0 },
+        { from: "product", to: "qe1", total_requests: 1, failed_requests: 0 },
+      ],
+    };
+    const out = applyGraphCollapse(
+      g,
+      st({
+        mode: "collapsed",
+        threshold: 1,
+        expandedGroups: new Set(["__group_external__payment"]),
+      }),
+    );
+    // payment's group is a hub: its members are visible + boundary→member edges.
+    expect(out.nodes.some((n) => n.id === "pe0")).toBe(true);
+    expect(out.nodes.some((n) => n.id === "pe1")).toBe(true);
+    expect(
+      out.edges.some(
+        (e) => e.from === "__group_external__payment" && e.to === "pe0",
+      ),
+    ).toBe(true);
+    const paymentGrp = out.nodes.find(
+      (n) => n.id === "__group_external__payment",
+    )!;
+    expect(paymentGrp.is_expanded).toBe(true);
+    // product's group stays COLLAPSED: its members remain hidden.
+    expect(out.nodes.some((n) => n.id === "qe0")).toBe(false);
+    expect(out.nodes.some((n) => n.id === "qe1")).toBe(false);
+    const productGrp = out.nodes.find(
+      (n) => n.id === "__group_external__product",
+    )!;
+    expect(productGrp.is_expanded).toBe(false);
+  });
+
   it("mode=expanded never collapses; mode=collapsed always collapses", () => {
     const exts = many("external", 3);
     const g = {

@@ -19,82 +19,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="catalogContainerRef"
     class="services-catalog h-full! flex flex-col bg-[var(--o2-card-bg-solid)] card-container px-[0.625rem] relative overflow-hidden"
   >
-    <!-- Toolbar: stream selector + filter + chips + legend -->
-    <div class="flex items-center gap-2 py-[0.625rem]">
-      <!-- Stream selector -->
+    <!-- Toolbar: stream selector (width-matched to the rail below) + search
+         (width-matched to the table below) + status pills. The stream selector
+         sits exactly above the 230px left rail; the search + pills group starts
+         exactly at the table's left edge (no gap between the two columns), so
+         the toolbar columns line up with the body columns. -->
+    <div class="flex items-center py-[0.625rem]">
+      <!-- Stream selector — same 230px width as the left rail below it. -->
       <div
         data-test="services-catalog-stream-selector"
-        class="w-[11rem] flex-shrink-0"
+        class="flex-shrink-0"
+        :style="{ width: '230px' }"
       >
         <OSelect
           :model-value="streamFilter"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-[auto] flex-shrink-0 rounded"
+          class="w-full rounded"
           :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
         />
         <OTooltip v-if="availableStreams.length === 0" :content="t('traces.servicesCatalog.noStreamsDetected')" />
       </div>
 
-      <!-- Search input -->
-      <div>
+      <!-- Search + pills group — occupies the table's column (everything right
+           of the rail). A left pad adds breathing room after the stream
+           selector while the column's outer edge still aligns to the table. -->
+      <div class="flex-1 min-w-0 flex items-center gap-2 pl-2">
+      <!-- Search input — grows to fill, aligning to the table below. -->
+      <div class="flex-1 min-w-0">
         <OSearchInput
           v-model="filterText"
           :placeholder="t('traces.servicesCatalog.filterPlaceholder')"
           clearable
           :debounce="300"
-          class="w-[14rem]!"
+          class="w-full!"
           data-test="services-catalog-filter-input"
         />
       </div>
 
-      <!-- Entity-type filter: Services / Datastores / Queues / External / RPC.
-           Mirrors the Streams page type tabs; defaults to Services. -->
-      <OToggleGroup
+      <!-- Health-status pills, kept grouped on the right (search flexes to fill
+           the gap). Entity totals are shown per-tab in the type rail, so no
+           separate total pill here. -->
+      <div
         v-if="!isLoading && services.length > 0"
-        :model-value="typeFilter"
-        data-test="services-catalog-type-filter"
-        @update:model-value="(v) => onTypeFilterChange(v as string)"
+        class="flex items-center gap-2 flex-shrink-0"
+        data-test="services-catalog-status-pills"
       >
-        <OToggleGroupItem
-          v-for="cat in visibleTypeFilters"
-          :key="cat"
-          :value="cat"
-          size="sm"
-          :class="tabStatusClass(cat)"
-          :data-test="`services-catalog-type-${cat}`"
-        >
-          {{ t(`traces.servicesCatalog.types.${cat}`) }}
-          <span class="opacity-60">{{ categoryCounts[cat] }}</span>
-          <!-- Unhealthy count in a filled circle, colored by the tab's worst
-               status. The solid circle reads as "N problems", distinct from the
-               plain total to its left. Hover explains it. -->
-          <span
-            v-if="categoryUnhealthyCounts[cat] > 0"
-            class="inline-flex items-center justify-center min-w-[1.05rem] h-[1.05rem] px-[0.25rem] rounded-full text-[0.65rem] font-semibold leading-none text-white"
-            :style="{ backgroundColor: tabStatusColorVar(cat) }"
-            :data-test="`services-catalog-type-unhealthy-${cat}`"
-          >
-            {{ categoryUnhealthyCounts[cat] }}
-            <OTooltip
-              :content="
-                t('traces.servicesCatalog.unhealthyTooltip', {
-                  count: categoryUnhealthyCounts[cat],
-                  status: t(
-                    `traces.servicesCatalog.status.${categoryWorstStatus[cat]}`,
-                  ),
-                })
-              "
-            />
-          </span>
-        </OToggleGroupItem>
-      </OToggleGroup>
-
-      <template v-if="!isLoading && services.length > 0">
-        <!-- Entity count is already shown per-tab in the type filter, so no
-             separate total pill here — only the health-status pills below. -->
         <template v-if="statusCounts.critical > 0">
           <div
             class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] font-medium bg-[color-mix(in_srgb,var(--o2-service-health-critical)_12%,transparent)] text-[var(--o2-service-health-critical)]"
@@ -140,29 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTooltip>
           </div>
         </template>
-      </template>
-
-      <!-- pagination controls -->
-      <div
-        v-if="services.length > 0"
-        class="flex items-center justify-end px-[0.5rem] py-[0.25rem] ml-auto"
-        data-test="services-catalog-pagination-bar"
-      >
-        <OSelect
-          v-model="rowsPerPage"
-          :options="rowsPerPageOptions"
-          class="select-pagination mr-[0.25rem] mt-0!"
-          size="sm"
-          data-test="services-catalog-records-per-page"
-          @update:model-value="changeRowsPerPage"
-        />
-        <OPagination
-          v-model="currentPage"
-          :max="totalPages"
-          class="float-right paginator-section mt-0!"
-          data-test="services-catalog-pagination"
-          @update:model-value="changePage"
-        />
+      </div>
       </div>
       <!-- Status legend -->
       <!-- <div
@@ -235,147 +185,210 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div> -->
     </div>
 
-    <!-- Empty state (shown when not loading and no data) -->
-    <div
-      v-if="!isLoading && services.length === 0"
-      class="flex flex-col items-center justify-center flex-1"
-      data-test="services-catalog-empty"
-    >
-      <ServicesCatalogNoDataState />
-    </div>
-
-    <!-- Table -->
-    <div
-      v-else
-      class="w-full h-auto! overflow-x-auto relative flex-1"
-    >
-      <TenstackTable
-        class="h-auto!"
-        :rows="paginatedServices"
-        :columns="tableColumns"
-        :loading="isLoading"
-        :sort-by="sortBy"
-        :sort-order="sortOrder"
-        :row-height="38"
-        :enable-column-reorder="true"
-        :enable-row-expand="false"
-        :enable-text-highlight="false"
-        :enable-status-bar="false"
-        :default-columns="false"
-        data-test="services-catalog-table"
-        @click:dataRow="handleRowClick"
-        @sort-change="handleSortChange"
+    <!-- Body: left rail (entity-type filter) + table — mirrors the Dashboards
+         folder-rail + table layout (panel bg + vertical separator, 230px). -->
+    <div class="flex flex-1 min-h-0">
+      <!-- Left rail: the entity-type filter. Panel background + right border
+           match FolderList.vue so the rail reads like the app's other left
+           rails. The stream selector lives in the top toolbar alongside the
+           search. -->
+      <div
+        class="shrink-0 h-full bg-surface-panel border-r border-border-default flex flex-col gap-2 py-2 px-1"
+        :style="{ width: '230px' }"
       >
-        <!-- Status badge -->
-        <template #cell-status="{ item }">
-          <OTag
-            type="serviceStatus"
-            :value="item.status"
-            :data-test="`services-catalog-status-${item.service_name}`"
+        <!-- Entity-type filter: All / Services / Datastores / Queues /
+             External / RPC. A vertical nav rail — same OTabs pattern as the
+             Dashboards folder list, so the active row shows the tint + primary
+             text the app's other left rails use. Row = label left, total +
+             unhealthy badge right. -->
+        <div
+          v-if="!isLoading && services.length > 0"
+          class="catalog-type-filter overflow-y-auto"
+        >
+          <OTabs
+            orientation="vertical"
+            dense
+            :model-value="typeFilter"
+            data-test="services-catalog-type-filter"
+            @update:model-value="(v) => onTypeFilterChange(v as string)"
           >
-            {{ t(`traces.servicesCatalog.status.${item.status}`) }}
-          </OTag>
-        </template>
+            <OTab
+              v-for="cat in visibleTypeFilters"
+              :key="cat"
+              :name="cat"
+              class="min-h-[1.75rem]"
+              :data-test="`services-catalog-type-${cat}`"
+            >
+              <div
+                class="w-full flex items-center justify-between flex-nowrap gap-2"
+              >
+                <span class="flex-1 min-w-0 truncate text-left">{{
+                  t(`traces.servicesCatalog.types.${cat}`)
+                }}</span>
+                <span class="flex items-center gap-1 shrink-0">
+                  <span class="text-text-tertiary tabular-nums">{{
+                    categoryCounts[cat]
+                  }}</span>
+                  <!-- Unhealthy count in a filled circle, colored by the tab's
+                       worst status. Reads as "N problems", distinct from the
+                       plain total to its left. Hover explains it. -->
+                  <span
+                    v-if="categoryUnhealthyCounts[cat] > 0"
+                    class="inline-flex items-center justify-center min-w-[1.05rem] h-[1.05rem] px-[0.25rem] rounded-full text-[0.65rem] font-semibold leading-none text-white"
+                    :style="{ backgroundColor: tabStatusColorVar(cat) }"
+                    :data-test="`services-catalog-type-unhealthy-${cat}`"
+                  >
+                    {{ categoryUnhealthyCounts[cat] }}
+                    <OTooltip
+                      :content="
+                        t('traces.servicesCatalog.unhealthyTooltip', {
+                          count: categoryUnhealthyCounts[cat],
+                          status: t(
+                            `traces.servicesCatalog.status.${categoryWorstStatus[cat]}`,
+                          ),
+                        })
+                      "
+                    />
+                  </span>
+                </span>
+              </div>
+            </OTab>
+          </OTabs>
+        </div>
+      </div>
 
-        <!-- Service name via TraceServiceCell -->
-        <template #cell-service_name="{ item }">
-          <TraceServiceCell
-            :item="item"
-            class="cursor-pointer"
-            :data-test="`services-catalog-service-link-${item.service_name}`"
-            @click.stop="handleRowClick(item)"
-          />
-        </template>
+      <!-- Empty state (shown when not loading and no data) -->
+      <div
+        v-if="!isLoading && services.length === 0"
+        class="flex flex-col items-center justify-center flex-1"
+        data-test="services-catalog-empty"
+      >
+        <ServicesCatalogNoDataState />
+      </div>
 
-        <!-- Error rate with progress bar -->
-        <template #cell-error_rate="{ item }">
-          <ServiceCatalogBarCell
-            :value="item.error_rate"
-            :max="columnMaxes.error_rate"
-            :label="formatPercent(item.error_rate)"
-            :variant="item.error_rate > 10 ? 'danger' : item.error_rate > 5 ? 'warning' : 'default'"
-            :data-test="`services-catalog-error-rate-${item.service_name}`"
-          />
-        </template>
+      <!-- Table — shared OTable (same component as the Dashboards list), so the
+           header, rows, in-frame toolbar and footer (count + "Showing X–Y of N"
+           + records-per-page + pager) all match. OTable owns pagination, so we
+           feed it the full sorted list and it paginates internally. -->
+      <div v-else class="flex-1 min-w-0 h-full">
+        <div class="h-full card-container">
+          <OTable
+            ref="oTableRef"
+            :data="sortedServices"
+            :columns="tableColumns"
+            row-key="service_name"
+            :loading="isLoading"
+            :frame="false"
+            :default-columns="false"
+            :show-global-filter="false"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            sorting="server"
+            pagination="client"
+            :page-size="rowsPerPage"
+            :page-size-options="rowsPerPageOptions"
+            :footer-title="t('traces.servicesCatalog.footerTitle')"
+            table-id="services-catalog"
+            data-test="services-catalog-table"
+            @row-click="(row) => handleRowClick(row)"
+            @sort-change="(p) => handleSortChange(p.column, p.order)"
+          >
+            <!-- Status badge -->
+            <template #cell-status="{ row }">
+              <OTag
+                type="serviceStatus"
+                :value="row.status"
+                :data-test="`services-catalog-status-${row.service_name}`"
+              >
+                {{ t(`traces.servicesCatalog.status.${row.status}`) }}
+              </OTag>
+            </template>
 
-        <!-- Request / error count columns -->
-        <template #cell-total_requests="{ item }">
-          <span :data-test="`services-catalog-requests-${item.service_name}`">
-            {{ formatLargeNumber(item.total_requests) }}
-            <OTooltip :content="item.total_requests.toLocaleString()" />
-          </span>
-        </template>
+            <!-- Service name via TraceServiceCell -->
+            <template #cell-service_name="{ row }">
+              <TraceServiceCell
+                :item="row"
+                class="cursor-pointer"
+                :data-test="`services-catalog-service-link-${row.service_name}`"
+                @click.stop="handleRowClick(row)"
+              />
+            </template>
 
-        <template #cell-error_count="{ item }">
-          <span :data-test="`services-catalog-errors-${item.service_name}`">
-            {{ formatLargeNumber(item.error_count) }}
-            <OTooltip :content="item.error_count.toLocaleString()" />
-          </span>
-        </template>
+            <!-- Error rate with progress bar -->
+            <template #cell-error_rate="{ row }">
+              <ServiceCatalogBarCell
+                :value="row.error_rate"
+                :max="columnMaxes.error_rate"
+                :label="formatPercent(row.error_rate)"
+                :variant="row.error_rate > 10 ? 'danger' : row.error_rate > 5 ? 'warning' : 'default'"
+                :data-test="`services-catalog-error-rate-${row.service_name}`"
+              />
+            </template>
 
-        <!-- Latency / duration columns -->
-        <template #cell-p50_latency_ns="{ item }">
-          <ServiceCatalogBarCell
-            :value="item.p50_latency_ns"
-            :max="columnMaxes.p50_latency_ns"
-            :label="formatLat(item.p50_latency_ns)"
-            :tooltip="item.p50_latency_ns.toLocaleString() + ' ns'"
-          />
-        </template>
+            <!-- Request / error count columns -->
+            <template #cell-total_requests="{ row }">
+              <span :data-test="`services-catalog-requests-${row.service_name}`">
+                {{ formatLargeNumber(row.total_requests) }}
+                <OTooltip :content="row.total_requests.toLocaleString()" />
+              </span>
+            </template>
 
-        <template #cell-p95_latency_ns="{ item }">
-          <ServiceCatalogBarCell
-            :value="item.p95_latency_ns"
-            :max="columnMaxes.p95_latency_ns"
-            :label="formatLat(item.p95_latency_ns)"
-            :tooltip="item.p95_latency_ns.toLocaleString() + ' ns'"
-          />
-        </template>
+            <template #cell-error_count="{ row }">
+              <span :data-test="`services-catalog-errors-${row.service_name}`">
+                {{ formatLargeNumber(row.error_count) }}
+                <OTooltip :content="row.error_count.toLocaleString()" />
+              </span>
+            </template>
 
-        <template #cell-p99_latency_ns="{ item }">
-          <ServiceCatalogBarCell
-            :value="item.p99_latency_ns"
-            :max="columnMaxes.p99_latency_ns"
-            :label="formatLat(item.p99_latency_ns)"
-            :tooltip="item.p99_latency_ns.toLocaleString() + ' ns'"
-            :variant="item.p99_latency_ns > P99_WARN_NS ? 'warning' : 'default'"
-          />
-        </template>
+            <!-- Latency / duration columns -->
+            <template #cell-p50_latency_ns="{ row }">
+              <ServiceCatalogBarCell
+                :value="row.p50_latency_ns"
+                :max="columnMaxes.p50_latency_ns"
+                :label="formatLat(row.p50_latency_ns)"
+                :tooltip="row.p50_latency_ns.toLocaleString() + ' ns'"
+              />
+            </template>
 
-        <template #cell-avg_duration_ns="{ item }">
-          <ServiceCatalogBarCell
-            :value="item.avg_duration_ns"
-            :max="columnMaxes.avg_duration_ns"
-            :label="formatLat(item.avg_duration_ns)"
-            :tooltip="item.avg_duration_ns.toLocaleString() + ' ns'"
-          />
-        </template>
+            <template #cell-p95_latency_ns="{ row }">
+              <ServiceCatalogBarCell
+                :value="row.p95_latency_ns"
+                :max="columnMaxes.p95_latency_ns"
+                :label="formatLat(row.p95_latency_ns)"
+                :tooltip="row.p95_latency_ns.toLocaleString() + ' ns'"
+              />
+            </template>
 
-        <template #cell-max_duration_ns="{ item }">
-          <ServiceCatalogBarCell
-            :value="item.max_duration_ns"
-            :max="columnMaxes.max_duration_ns"
-            :label="formatLat(item.max_duration_ns)"
-            :tooltip="item.max_duration_ns.toLocaleString() + ' ns'"
-          />
-        </template>
+            <template #cell-p99_latency_ns="{ row }">
+              <ServiceCatalogBarCell
+                :value="row.p99_latency_ns"
+                :max="columnMaxes.p99_latency_ns"
+                :label="formatLat(row.p99_latency_ns)"
+                :tooltip="row.p99_latency_ns.toLocaleString() + ' ns'"
+                :variant="row.p99_latency_ns > P99_WARN_NS ? 'warning' : 'default'"
+              />
+            </template>
 
-        <!-- Cell actions overlay -->
-        <template #cell-actions="{ row, column, active }">
-          <CellActions
-            v-if="active && !column.columnDef.meta?.disableCellAction"
-            :column="column"
-            :row="row"
-            :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
-            :hide-search-term-actions="false"
-            :hide-ai="true"
-            @copy="qCopyToClipboard(String(row[column.id]))"
-            @add-search-term="addSearchTerm"
-          />
-        </template>
+            <template #cell-avg_duration_ns="{ row }">
+              <ServiceCatalogBarCell
+                :value="row.avg_duration_ns"
+                :max="columnMaxes.avg_duration_ns"
+                :label="formatLat(row.avg_duration_ns)"
+                :tooltip="row.avg_duration_ns.toLocaleString() + ' ns'"
+              />
+            </template>
 
-        <template #empty />
-      </TenstackTable>
+            <template #cell-max_duration_ns="{ row }">
+              <ServiceCatalogBarCell
+                :value="row.max_duration_ns"
+                :max="columnMaxes.max_duration_ns"
+                :label="formatLat(row.max_duration_ns)"
+                :tooltip="row.max_duration_ns.toLocaleString() + ' ns'"
+              />
+            </template>
+          </OTable>
+        </div>
+      </div>
     </div>
 
     <!-- Service node side panel -->
@@ -398,9 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
-import TenstackTable from "@/components/TenstackTable.vue";
-import CellActions from "@/plugins/logs/data-table/CellActions.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import TraceServiceCell from "./components/TraceServiceCell.vue";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -420,12 +431,11 @@ import { getEffectiveTimeRange } from "@/utils/date";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 
 const { t } = useI18n();
@@ -522,28 +532,8 @@ const sortOrder = ref<"asc" | "desc">("desc");
  */
 const hasInferColumns = ref<boolean | null>(null);
 
-const totalPages = computed(() =>
-  filteredServices.value.length && rowsPerPage.value
-    ? Math.max(1, Math.ceil(filteredServices.value.length / rowsPerPage.value))
-    : 1,
-);
-
-const paginatedServices = computed(() => {
-  const all = sortedServices.value;
-  if (!all.length) return [];
-  const start = (currentPage.value - 1) * rowsPerPage.value;
-  return all.slice(start, start + rowsPerPage.value);
-});
-
-function changePage(page: number) {
-  currentPage.value = page;
-}
-
-function changeRowsPerPage(val: number) {
-  rowsPerPage.value = val;
-  currentPage.value = 1;
-}
-
+// OTable owns pagination internally; `currentPage` is retained only as the
+// "reset to page 1 on sort/filter change" signal the tests assert against.
 function handleSortChange(field: string, order: "asc" | "desc") {
   sortBy.value = field;
   sortOrder.value = order;
@@ -572,98 +562,101 @@ const timeRange = computed(() => ({
 
 let currentTraceId: string | null = null;
 
+// OTable column defs. Sorting is `server` mode on the table (it emits
+// sort-change; the catalog reorders `sortedServices` itself), so each sortable
+// column just sets `sortable: true`. The service-name column is the `flex`
+// filler so the table fills its container like the Dashboards name column.
 const tableColumns = computed(() => [
   {
     id: "service_name",
     header: t("traces.servicesCatalog.columns.serviceName"),
     accessorKey: "service_name",
-    enableSorting: true,
+    sortable: true,
+    resizable: true,
     size: 260,
-    meta: { slot: true, align: "left", sortable: true },
+    minSize: 180,
+    meta: { align: "left", flex: true },
   },
   {
     id: "status",
     header: t("traces.servicesCatalog.columns.status"),
     accessorKey: "status",
-    size: 90,
-    enableSorting: true,
-    sortingFn: (rowA: any, rowB: any) => {
-      const order = { healthy: 0, degraded: 1, warning: 2, critical: 3 };
-      return (
-        (order[rowA.original.status as keyof typeof order] ?? 0) -
-        (order[rowB.original.status as keyof typeof order] ?? 0)
-      );
-    },
-    meta: {
-      slot: true,
-      align: "left",
-      disableCellAction: true,
-      sortable: true,
-    },
+    sortable: true,
+    resizable: true,
+    size: 110,
+    meta: { align: "left" },
   },
   {
     id: "total_requests",
     header: t("traces.servicesCatalog.columns.requests"),
     accessorKey: "total_requests",
+    sortable: true,
+    resizable: true,
     size: 110,
-    enableSorting: true,
-    meta: { slot: true, align: "right", sortable: true },
+    meta: { align: "right" },
   },
   {
     id: "error_count",
     header: t("traces.servicesCatalog.columns.errors"),
     accessorKey: "error_count",
+    sortable: true,
+    resizable: true,
     size: 90,
-    enableSorting: true,
-    meta: { slot: true, align: "right", sortable: true },
+    meta: { align: "right" },
   },
   {
     id: "error_rate",
     header: t("traces.servicesCatalog.columns.errorRate"),
     accessorKey: "error_rate",
-    size: 110,
-    enableSorting: true,
-    meta: { slot: true, align: "right", sortable: true },
+    sortable: true,
+    resizable: true,
+    size: 130,
+    meta: { align: "right" },
   },
   {
     id: "p50_latency_ns",
     header: t("traces.servicesCatalog.columns.p50Latency"),
     accessorKey: "p50_latency_ns",
-    size: 100,
-    enableSorting: true,
-    meta: { slot: true, align: "right", sortable: true },
+    sortable: true,
+    resizable: true,
+    size: 120,
+    meta: { align: "right" },
   },
   {
     id: "p95_latency_ns",
     header: t("traces.servicesCatalog.columns.p95Latency"),
     accessorKey: "p95_latency_ns",
-    size: 100,
-    enableSorting: true,
-    meta: { slot: true, align: "right", sortable: true },
+    sortable: true,
+    resizable: true,
+    size: 120,
+    meta: { align: "right" },
   },
   {
     id: "p99_latency_ns",
     header: t("traces.servicesCatalog.columns.p99Latency"),
     accessorKey: "p99_latency_ns",
-    size: 100,
-    enableSorting: true,
-    meta: { slot: true, align: "right", sortable: true },
+    sortable: true,
+    resizable: true,
+    size: 120,
+    meta: { align: "right" },
   },
   {
     id: "avg_duration_ns",
     header: t("traces.servicesCatalog.columns.avgDuration"),
     accessorKey: "avg_duration_ns",
-    size: 120,
-    enableSorting: true,
-    meta: { slot: true, align: "right", sortable: true },
+    sortable: true,
+    resizable: true,
+    size: 130,
+    meta: { align: "right" },
   },
   {
     id: "max_duration_ns",
     header: t("traces.servicesCatalog.columns.maxDuration"),
     accessorKey: "max_duration_ns",
-    size: 120,
-    enableSorting: true,
-    meta: { slot: true, align: "right", sortable: true },
+    sortable: true,
+    resizable: true,
+    size: 130,
+    meta: { align: "right" },
   },
 ]);
 
@@ -784,19 +777,6 @@ const categoryUnhealthyCounts = computed<Record<TypeFilter, number>>(() => {
 });
 
 // Tailwind text-color class for a tab's worst status; empty when healthy.
-function tabStatusClass(filter: TypeFilter): string {
-  switch (categoryWorstStatus.value[filter]) {
-    case "critical":
-      return "text-[var(--o2-service-health-critical)]";
-    case "warning":
-      return "text-[var(--o2-service-health-warning)]";
-    case "degraded":
-      return "text-[var(--o2-service-health-degraded)]";
-    default:
-      return "";
-  }
-}
-
 // CSS color (var reference) for a tab's worst-status badge fill; empty when
 // healthy. Used as the filled-circle background for the unhealthy count.
 function tabStatusColorVar(filter: TypeFilter): string {
@@ -886,20 +866,6 @@ function formatPercent(value: number): string {
 
 function formatLat(us: number): string {
   return formatTimeWithSuffix(us);
-}
-
-function addSearchTerm(
-  field: string,
-  fieldValue: string | number | boolean,
-  action: string,
-) {
-  const operator = action === "include" ? "=" : "!=";
-  if (fieldValue === null || fieldValue === "" || fieldValue === "null") {
-    const isOp = action === "include" ? "is" : "is not";
-    searchObj.data.stream.addToFilter = `${field} ${isOp} null`;
-  } else {
-    searchObj.data.stream.addToFilter = `${field} ${operator} '${String(fieldValue).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
-  }
 }
 
 function handleRowClick(row: ServiceRow) {
@@ -1132,3 +1098,25 @@ onUnmounted(() => {
   }
 });
 </script>
+
+<style>
+/* Vertical entity-type rail — same treatment as the Dashboards folder list so
+   the active row shows the app's standard left-rail tint + primary text, and
+   rows read calm (left-aligned, rounded, weight 500). */
+.catalog-type-filter .o-tabs {
+  height: auto !important;
+  max-height: none !important;
+}
+
+.catalog-type-filter .o-tabs--vertical {
+  margin: 0;
+}
+
+.catalog-type-filter .o-tabs--vertical .o-tab {
+  justify-content: flex-start;
+  padding: 0 0.5rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  width: 100%;
+}
+</style>

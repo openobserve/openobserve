@@ -379,6 +379,78 @@ describe("convertTraceData", () => {
       expect(result.options.series[0].orient).toBe("LR");
     });
 
+    it("auto-shrinks node symbol + label font when there are many leaf rows", () => {
+      // ECharts fits the whole tree into the panel, so many leaf rows get
+      // compressed until they'd overlap. The converter scales symbol + font down
+      // to the compressed pitch. Compare a small tree (full size) against a tall
+      // one (shrunk) at the SAME panel height.
+      const root = { id: "root", label: "root" };
+      const small = {
+        nodes: [root, { id: "c0", label: "c0" }, { id: "c1", label: "c1" }],
+        edges: [
+          { from: "root", to: "c0", total_requests: 1 },
+          { from: "root", to: "c1", total_requests: 1 },
+        ],
+      };
+      const tallNodes = [root];
+      const tallEdges: any[] = [];
+      for (let i = 0; i < 60; i++) {
+        tallNodes.push({ id: `c${i}`, label: `child-${i}` });
+        tallEdges.push({ from: "root", to: `c${i}`, total_requests: 1 });
+      }
+      const tall = { nodes: tallNodes, edges: tallEdges };
+
+      const PANEL_H = 700;
+      const smallRes = convertServiceGraphToTree(small, "horizontal", true, PANEL_H);
+      const tallRes = convertServiceGraphToTree(tall, "horizontal", true, PANEL_H);
+
+      const smallFont = smallRes.options.series[0].label.fontSize;
+      const smallSym = smallRes.options.series[0].symbolSize;
+      const tallFont = tallRes.options.series[0].label.fontSize;
+      const tallSym = tallRes.options.series[0].symbolSize;
+
+      // Small tree keeps the comfortable full size.
+      expect(smallFont).toBe(12);
+      expect(smallSym).toBe(30);
+      // Tall tree is shrunk so rows don't overlap — smaller than the small one,
+      // and never below the readable floor.
+      expect(tallSym).toBeLessThan(smallSym);
+      expect(tallSym).toBeGreaterThanOrEqual(8);
+      expect(tallFont).toBeGreaterThanOrEqual(7);
+      expect(tallFont).toBeLessThanOrEqual(12);
+    });
+
+    it("drops the 'N req' second label line at extreme density, keeps the name", () => {
+      // The two-line label (name + "N req") is the real overlap driver. At a
+      // roomy panel both lines show; at extreme density the second line is
+      // dropped so the name alone stays readable instead of colliding.
+      const root = { id: "root", label: "root" };
+      const nodes = [root];
+      const edges: any[] = [];
+      for (let i = 0; i < 80; i++) {
+        nodes.push({ id: `c${i}`, label: `child-${i}`, requests: 10 });
+        edges.push({ from: "root", to: `c${i}`, total_requests: 10 });
+      }
+      const graphData = { nodes, edges };
+
+      // Roomy panel → both lines fit → formatter includes "req".
+      const roomy = convertServiceGraphToTree(graphData, "horizontal", true, 4000);
+      // Cramped panel → second line dropped.
+      const cramped = convertServiceGraphToTree(graphData, "horizontal", true, 400);
+
+      // Find a leaf node's formatter output (params.name = its label).
+      const leafLabel = (res: any) => {
+        const root = res.options.series[0].data[0];
+        const leaf = root.children[0];
+        return leaf.label.formatter({ name: leaf.name });
+      };
+
+      expect(leafLabel(roomy)).toContain("req");
+      expect(leafLabel(cramped)).not.toContain("req");
+      // The name is always present.
+      expect(leafLabel(cramped)).toContain("{name|");
+    });
+
     it("renders each shared node once (DAG → spanning tree, no duplication)", () => {
       // Diamond: A→B, A→C, B→shared, C→shared. 'shared' must appear ONCE.
       const graphData = {
@@ -440,7 +512,9 @@ describe("convertTraceData", () => {
 
       const result = convertServiceGraphToNetwork(graphData);
 
+      // Pan + wheel-zoom, bounded by scaleLimit so it can't run away.
       expect(result.options.series[0].roam).toBe(true);
+      expect(result.options.series[0].scaleLimit).toBeTruthy();
       expect(result.options.series[0].label.show).toBe(true);
       expect(result.options.series[0].draggable).toBe(false);
       expect(result.options.series[0].focusNodeAdjacency).toBe(true);
@@ -671,6 +745,28 @@ describe('convertServiceGraphToNetwork', () => {
     expect(result.options).toBeDefined();
     expect(result.options.series[0].type).toBe('graph');
     expect(result.options.series[0].layout).toBe('none');
+  });
+
+  it('does not throw on a force layout when an edge references a node not in the node list', () => {
+    // A dangling edge endpoint (e.g. from collapse/filtering leaving an edge to
+    // a removed node) must not crash computeForceLayout — the force loops read
+    // pos.get(endpoint) and a missing endpoint would throw on `.x`.
+    const graphData = {
+      nodes: [
+        { id: 'a', label: 'a', requests: 100, errors: 0, error_rate: 0 },
+        { id: 'b', label: 'b', requests: 50, errors: 0, error_rate: 0 },
+        { id: 'c', label: 'c', requests: 20, errors: 0, error_rate: 0 },
+      ],
+      edges: [
+        { from: 'a', to: 'b', total_requests: 50, failed_requests: 0 },
+        // 'ghost' is NOT in nodes — this edge's endpoint is missing from pos.
+        { from: 'a', to: 'ghost', total_requests: 10, failed_requests: 0 },
+      ],
+    };
+
+    expect(() =>
+      convertServiceGraphToNetwork(graphData, 'force', new Map()),
+    ).not.toThrow();
   });
 
   it('should handle circular layout', () => {

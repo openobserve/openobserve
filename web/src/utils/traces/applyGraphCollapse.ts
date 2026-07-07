@@ -27,6 +27,13 @@ export interface CollapseState {
   mode: CollapseMode;
   /** Kinds the user has drilled into (shown individually despite collapse). */
   expandedKinds: Set<string>;
+  /**
+   * Individual boundary groups the user has drilled into, by boundary id
+   * (`__group_<kind>__<caller>`). Expanding one group reveals ONLY that caller's
+   * members — clicking `payment`'s External group does not expand `product`'s.
+   * A group is a hub if its id is here OR its kind is in `expandedKinds`.
+   */
+  expandedGroups?: Set<string>;
   /** Kinds hidden from the graph entirely. */
   hiddenKinds: Set<string>;
   /** Total-node count above which `auto` mode collapses dependency kinds. */
@@ -100,28 +107,30 @@ export function applyGraphCollapse(
     );
   }
 
-  // 2. Decide, per kind, whether it collapses. A kind in `expandedKinds` becomes
-  //    a HUB (boundary + members both shown, so it can be folded back); otherwise
-  //    it fully collapses (members hidden behind the boundary).
+  // 2. Decide which KINDS are collapsible at all (auto over threshold, or
+  //    collapsed mode). Whether each individual GROUP is a hub (members shown,
+  //    foldable) or fully collapsed is decided per-group in step 3b — so
+  //    expanding one caller's group never expands another caller's.
   const shouldCollapseAll =
     state.mode === "collapsed" ||
     (state.mode === "auto" && nodes.length > state.threshold);
-  const collapseKinds = new Set<string>();
-  const hubKinds = new Set<string>();
+  const collapsibleKinds = new Set<string>();
   if (state.mode !== "expanded" && shouldCollapseAll) {
-    for (const k of DEP_KINDS) {
-      if (state.expandedKinds.has(k)) hubKinds.add(k);
-      else collapseKinds.add(k);
-    }
+    for (const k of DEP_KINDS) collapsibleKinds.add(k);
   }
-  if (!collapseKinds.size && !hubKinds.size) return { nodes, edges };
+  if (!collapsibleKinds.size) return { nodes, edges };
+
+  const expandedGroups = state.expandedGroups ?? new Set<string>();
+  // A group is a hub (expanded, members visible) when the user drilled into that
+  // specific group, OR into its whole kind via `expandedKinds`.
+  const isHubGroup = (gid: string, kind: string) =>
+    expandedGroups.has(gid) || state.expandedKinds.has(kind);
 
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
   const isDep = (id: string) => {
     const n = nodeById.get(id);
     return n ? DEP_KINDS.includes(kindOf(n)) : false;
   };
-  const collapsibleKinds = new Set([...collapseKinds, ...hubKinds]);
 
   // 3. Walk edges CALLER→dep. Each such edge assigns the dep to the caller's
   //    per-kind boundary group. (Deps are terminal leaves, so they only ever
@@ -201,18 +210,26 @@ export function applyGraphCollapse(
     }
     const kind = g.service_type!;
     const kindLabel = kind.charAt(0).toUpperCase() + kind.slice(1);
-    const isHub = hubKinds.has(kind);
+    const isHub = isHubGroup(gid, kind);
     (g as any).is_expanded = isHub;
     // ▾ = expanded (click to collapse), ▸ = collapsed (click to expand).
     g.label = `${kindLabel} (${g.member_count}) ${isHub ? "▾" : "▸"}`;
   }
 
-  // 4. Which dep member ids are collapsed away (fully-collapsed kinds only).
-  //    Hub members stay visible; collapsed members are hidden behind boundaries.
+  // 4. Which dep member ids are hidden behind a collapsed boundary. A member is
+  //    hidden only if it is NOT a visible member of ANY hub group — a dep shared
+  //    by two callers (collapsed under one, expanded under the other) stays
+  //    visible. So: gather hub members first, then collapse everything else.
+  const hubMemberIds = new Set<string>();
+  for (const g of groups.values()) {
+    if (isHubGroup(g.id, g.service_type!)) {
+      for (const mid of groupMembers.get(g.id)!) hubMemberIds.add(mid);
+    }
+  }
   const collapsedMemberIds = new Set<string>();
   for (const g of groups.values()) {
-    if (collapseKinds.has(g.service_type!)) {
-      for (const mid of groupMembers.get(g.id)!) collapsedMemberIds.add(mid);
+    for (const mid of groupMembers.get(g.id)!) {
+      if (!hubMemberIds.has(mid)) collapsedMemberIds.add(mid);
     }
   }
 
@@ -247,7 +264,11 @@ export function applyGraphCollapse(
   }
   for (const ce of callerEdge.values()) put(ce);
   for (const me of memberEdge.values()) {
-    if (hubKinds.has(me.connection_type as string)) put(me);
+    // Emit the boundary→member containment edge only for HUB groups (members
+    // visible). `me.from` is the boundary id; check that specific group.
+    const gid = me.from as string;
+    const g = groups.get(gid);
+    if (g && isHubGroup(gid, g.service_type!)) put(me);
   }
 
   return { nodes: outNodes, edges: Array.from(edgeMap.values()) };

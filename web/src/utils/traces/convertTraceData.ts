@@ -213,7 +213,7 @@ export const convertTraceServiceMapData = (
         data: treeData,
         symbolSize: 30,
         initialTreeDepth: treeDepth,
-        roam: true,
+        roam: "move",
         expandAndCollapse: false,
         ...layoutConfig, // Apply layout config for multiple roots
         label: {
@@ -239,6 +239,7 @@ export const convertServiceGraphToTree = (
   graphData: { nodes: any[]; edges: any[] },
   layoutType: string = "horizontal",
   isDarkMode: boolean = true,
+  canvasHeight: number = 700,
 ) => {
   // Build adjacency map for edges
   const edgesMap = new Map<string, any[]>();
@@ -272,6 +273,50 @@ export const convertServiceGraphToTree = (
     { nodes: graphData.nodes, edges: graphData.edges },
     layoutType,
   );
+
+  // ── Auto-shrink to fit ────────────────────────────────────────────────────
+  // ECharts `layout:'none'` fits the whole coordinate bounding box into the
+  // panel, so a tall tree (many leaf rows) gets compressed until labels collide.
+  // We can't stop the compression, so we scale the label font + node symbol
+  // DOWN to match it: the compressed vertical pitch is (panel height ÷ rows),
+  // and a label needs a bit less than that pitch to clear its neighbour.
+  // Number of leaf ROWS drives the height — count nodes with no children in the
+  // spanning tree (parents stack between their kids, so they don't add rows).
+  const parentIds = new Set(
+    graphData.edges.map((e: any) => e.from).filter((f: any) => f != null),
+  );
+  const leafRows = Math.max(
+    1,
+    graphData.nodes.filter((n: any) => !parentIds.has(n.id)).length,
+  );
+  // Usable vertical pixels: panel minus the top/bottom series insets (~4% each).
+  const usableH = Math.max(120, canvasHeight * 0.92);
+  // Pixels each leaf row gets after ECharts compresses the tree to fit the panel.
+  const pitch = usableH / leafRows;
+  // A row's visual height is the LARGER of its node symbol and its TWO-LINE label
+  // (a bold name line + a smaller "N req" line). Both must fit inside the pitch
+  // (with a breathing gap) or rows collide. The two-line label is the real
+  // driver here — budgeting a single line (as before) let the "req" line overlap
+  // the next node. So size everything against the pitch as a whole.
+  const ROW_GAP = 6; // min clear space between adjacent rows
+  const avail = Math.max(10, pitch - ROW_GAP);
+  // Two-line label total height ≈ nameFont*1.35 + reqFont*1.35, with req ≈ 0.83×
+  // name. So total ≈ nameFont * 1.35 * 1.83 ≈ nameFont * 2.47. Invert to get the
+  // name font that fits `avail`, capped at the comfortable 12px, floored at 7px.
+  const labelFontSize = Math.max(7, Math.min(12, Math.floor(avail / 2.47)));
+  const reqFontSize = Math.max(6, Math.round(labelFontSize * 0.83));
+  const nameLineHeight = Math.round(labelFontSize * 1.35);
+  const reqLineHeight = Math.round(reqFontSize * 1.35);
+  // When even the shrunk two-line label can't fit the pitch (extreme density),
+  // drop the secondary "N req" line and keep just the name — a single line still
+  // fits, so the essential label stays readable instead of overlapping. The
+  // dropped metric is still available on hover / in the side panel.
+  const showReqLine = nameLineHeight + reqLineHeight <= avail;
+  // Node symbol fits the pitch too (a 30px dot overlaps a 24px pitch regardless
+  // of font). Comfortable 30px, shrunk toward 8px as rows tighten.
+  const nodeSymbolSize = Math.max(8, Math.min(30, Math.round(avail)));
+  // Tighten the label offset from the node as things shrink.
+  const labelDistance = Math.max(3, Math.round(labelFontSize / 2));
 
   const green = isDarkMode ? "#10b981" : "#52c41a";
 
@@ -350,7 +395,7 @@ export const convertServiceGraphToTree = (
       name: node.label || node.id,
       value: totalRequests,
       symbol: iconDataUrl,
-      symbolSize: 30, // Fixed size so ECharts tree layout spaces nodes consistently
+      symbolSize: nodeSymbolSize, // Auto-shrunk to fit (see sizing block); uniform so ECharts spaces nodes consistently
       lineStyle: {
         color: edgeColor,
         width: 2,
@@ -396,22 +441,28 @@ export const convertServiceGraphToTree = (
       label: {
         show: true,
         position: layoutType === "vertical" ? "bottom" : "right",
-        distance: 6,
+        distance: labelDistance,
         formatter: (params: any) => {
-          return `{name|${params.name}}\n{requests|${formatNumber(totalRequests)} req}`;
+          // Drop the "N req" line at extreme density (see showReqLine) so the
+          // name line alone stays readable rather than the two lines colliding.
+          return showReqLine
+            ? `{name|${params.name}}\n{requests|${formatNumber(totalRequests)} req}`
+            : `{name|${params.name}}`;
         },
         rich: {
+          // Both lines auto-shrink with the row pitch so the two-line label
+          // never overruns into the next node (see the sizing block above).
           name: {
-            fontSize: 12,
+            fontSize: labelFontSize,
             fontWeight: "600",
             color: isDarkMode ? "#e4e7eb" : "#1f2937",
-            lineHeight: 16,
+            lineHeight: nameLineHeight,
           },
           requests: {
-            fontSize: 10,
+            fontSize: reqFontSize,
             fontWeight: "normal",
             color: isDarkMode ? "#9ca3af" : "#6b7280",
-            lineHeight: 14,
+            lineHeight: reqLineHeight,
           },
         },
       },
@@ -474,7 +525,8 @@ export const convertServiceGraphToTree = (
           orient: layoutType === "vertical" ? "TB" : "LR",
           initialTreeDepth: -1,
           symbolSize: 50,
-          roam: true, // Enable panning and zooming
+          roam: true, // Pan + bounded wheel-zoom
+          scaleLimit: { min: 0.4, max: 4 },
           selectedMode: "single", // Enable single node selection
           label: {
             position: "inside",
@@ -518,20 +570,26 @@ export const convertServiceGraphToTree = (
         top: layoutType === "vertical" ? "8%" : "2%",
         bottom: layoutType === "vertical" ? "8%" : "2%",
         initialTreeDepth: -1,
-        symbolSize: 30,
+        // Auto-shrunk to the fit-to-view compression so labels never overlap,
+        // however many leaf rows there are (see the sizing block above).
+        symbolSize: nodeSymbolSize,
+        // Pan + wheel-zoom, but bounded: scaleLimit keeps the wheel from zooming
+        // to extremes (the "erratic" feel), and wheel zoom centers on the cursor
+        // so you can focus an area. The +/- buttons drive the same zoom.
         roam: true,
+        scaleLimit: { min: 0.4, max: 4 },
         selectedMode: "single",
         label: {
           position: layoutType === "vertical" ? "bottom" : "right",
-          distance: 6,
-          fontSize: 12,
+          distance: labelDistance,
+          fontSize: labelFontSize,
           rotate: 0,
         },
         leaves: {
           label: {
             position: layoutType === "vertical" ? "bottom" : "right",
-            distance: 6,
-            fontSize: 12,
+            distance: labelDistance,
+            fontSize: labelFontSize,
             rotate: 0,
           },
         },
@@ -596,10 +654,15 @@ const computeForceLayout = (
     });
   });
 
-  // Deduplicate edges (undirected for layout purposes)
+  // Deduplicate edges (undirected for layout purposes). Only keep edges whose
+  // BOTH endpoints have a position — a dangling endpoint (e.g. an edge left
+  // pointing at a node removed by collapse/filtering) would otherwise crash the
+  // force loops below at `pos.get(endpoint).x`. Filtering here fixes it once for
+  // every loop (repulsion, edge-repulsion, attraction).
   const seen = new Set<string>();
   const layoutEdges: { u: string; v: string }[] = [];
   edges.forEach((e: any) => {
+    if (!pos.has(e.from) || !pos.has(e.to)) return;
     const key = [e.from, e.to].sort().join("→");
     if (!seen.has(key)) {
       seen.add(key);
@@ -1497,6 +1560,7 @@ export const convertServiceGraphToNetwork = (
         layout: layoutMode,
         data: nodes,
         links: edges,
+        // Pan + bounded wheel-zoom (scaleLimit below tames the extremes).
         roam: true,
         draggable: false,
         focusNodeAdjacency: true,

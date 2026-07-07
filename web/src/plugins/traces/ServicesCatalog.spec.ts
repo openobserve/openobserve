@@ -326,14 +326,18 @@ function mountServicesCatalog(
         store: mockStore,
       },
       stubs: {
-        TenstackTable: {
+        OTable: {
+          // Mirrors the OTable contract the catalog now uses: `:data` (not
+          // `:rows`), `row-click` (not `click:dataRow`), and `{ row }` cell
+          // slots. The catalog feeds OTable the FULL sorted list; OTable owns
+          // pagination + footer internally, so the stub just renders all rows.
           template: `
               <div data-test="services-catalog-table" :data-loading="loading">
-                <template v-if="rows.length > 0">
-                  <div v-for="(row, idx) in rows" :key="idx"
+                <template v-if="data.length > 0">
+                  <div v-for="(row, idx) in data" :key="idx"
                     :data-test="'services-catalog-status-' + row.service_name"
                     :data-status="row.status"
-                    @click="$emit('click:dataRow', row)">
+                    @click="$emit('row-click', row, {})">
                     <span :data-test="'services-catalog-row-name-' + row.service_name">
                       {{ row.service_name }}
                     </span>
@@ -354,19 +358,22 @@ function mountServicesCatalog(
               </div>
             `,
           props: [
-            "rows",
+            "data",
             "columns",
             "loading",
             "sortBy",
             "sortOrder",
-            "rowHeight",
-            "enableColumnReorder",
-            "enableRowExpand",
-            "enableTextHighlight",
-            "enableStatusBar",
+            "sorting",
+            "pagination",
+            "pageSize",
+            "pageSizeOptions",
+            "footerTitle",
+            "frame",
             "defaultColumns",
+            "rowKey",
+            "tableId",
           ],
-          emits: ["click:dataRow", "sort-change"],
+          emits: ["row-click", "sort-change"],
         },
         CellActions: {
           template: '<div data-test="services-catalog-cell-actions" />',
@@ -2233,11 +2240,14 @@ describe("ServicesCatalog", () => {
         expect(unhealthy.all).toBe(2); // svc-crit + db-degraded
       });
 
-      it("applies the critical color class to a critical category tab", async () => {
+      it("conveys a tab's worst status via the badge fill, not a row-text tint", async () => {
+        // The vertical rail (OTabs) owns the active-row tint, so worst-status is
+        // signalled only by the colored unhealthy badge — there is no separate
+        // whole-row text-color class (the old tabStatusClass helper was removed).
         wrapper = await mountWithRows(healthRows);
-        expect(wrapper.vm.tabStatusClass("service")).toContain("critical");
-        expect(wrapper.vm.tabStatusClass("datastore")).toContain("degraded");
-        expect(wrapper.vm.tabStatusClass("queue")).toBe(""); // healthy → no accent
+        expect(wrapper.vm.tabStatusClass).toBeUndefined();
+        expect(wrapper.vm.tabStatusColorVar("service")).toContain("critical");
+        expect(wrapper.vm.tabStatusColorVar("datastore")).toContain("degraded");
       });
 
       it("exposes a worst-status color var for the count badge fill", async () => {

@@ -17,6 +17,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { defineComponent, h, nextTick, reactive } from "vue";
 import ServiceGraph from "./ServiceGraph.vue";
+import i18n from "@/locales";
 
 // Stub for the in-house ODialog that mirrors its public surface
 // (v-model:open + click:primary/secondary emits). Renders default slot when
@@ -209,6 +210,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
     return mount(ServiceGraph, {
       global: {
+        plugins: [i18n],
         mocks: {
           $store: mockStore,
         },
@@ -578,6 +580,35 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       // Verify chartKey was incremented
       expect(wrapper.vm.chartKey).toBe(initialChartKey + 1);
+    });
+
+    it("does a full-replace render for graph view (so the tree→graph series swap takes)", async () => {
+      // Tree uses a `type:"tree"` series and Graph uses `type:"graph"`. ECharts
+      // can't swap series types via a merge, so graph must render notMerge:true
+      // or Graph View stays blank after a tree→graph switch. (chartKey is NOT
+      // bumped — that would replay the tree animation; the swap comes from the
+      // full replace instead.)
+      mockSearchObj.meta.serviceGraphVisualizationType = "graph";
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Freshly-mounted in graph mode → the render is a full replace.
+      expect(wrapper.vm.chartData.notMerge).toBe(true);
+    });
+
+    it("invalidates the cached chart options when the viz type changes", async () => {
+      // The viz-type watcher must clear lastChartOptions so the next render
+      // recomputes with the correct series type instead of reusing a stale
+      // (wrong-type) cached option set.
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const keyBefore = wrapper.vm.chartKey;
+      mockSearchObj.meta.serviceGraphVisualizationType = "graph";
+      await flushPromises();
+
+      // chartKey stays put (no ChartRenderer recreation → no tree animation replay).
+      expect(wrapper.vm.chartKey).toBe(keyBefore);
     });
 
     it("should call API to get fresh data", async () => {
@@ -1963,9 +1994,92 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         rpc: 0,
       });
     });
+
+    it("sums every kind into totalEntities for the header inventory chip", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.graphData = {
+        nodes: [
+          { id: "a", label: "a", requests: 1, errors: 0 },
+          { id: "b", label: "b", requests: 1, errors: 0, service_type: "database" },
+          { id: "c", label: "c", requests: 1, errors: 0, service_type: "external" },
+          { id: "d", label: "d", requests: 1, errors: 0, service_type: "queue" },
+          // group nodes are excluded (kindCounts skips them), so total = 4
+          {
+            id: "__group_external",
+            label: "External (5)",
+            requests: 5,
+            errors: 0,
+            service_type: "external",
+            is_group: true,
+            member_count: 5,
+          },
+        ],
+        edges: [],
+      };
+      await flushPromises();
+      expect(wrapper.vm.totalEntities).toBe(4);
+    });
+
+    it("exposes kindRows with counts; only dependency kinds are toggleable", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.graphData = {
+        nodes: [
+          { id: "a", label: "a", requests: 1, errors: 0 },
+          { id: "b", label: "b", requests: 1, errors: 0, service_type: "database" },
+        ],
+        edges: [],
+      };
+      await flushPromises();
+      const rows = wrapper.vm.kindRows;
+      const service = rows.find((r: any) => r.key === "service");
+      const database = rows.find((r: any) => r.key === "database");
+      // Services are the graph spine — always shown, never a toggle.
+      expect(service).toMatchObject({ label: "Services", count: 1, toggleable: false });
+      // Dependency kinds carry a live count and can be hidden.
+      expect(database).toMatchObject({ label: "Datastores", count: 1, toggleable: true });
+    });
   });
 
   describe("topology from traces", () => {
+    it("sorts nodes + edges deterministically at ingest (same topology → same graph)", async () => {
+      // The backend does not guarantee node/edge order, and the layouts are
+      // order-sensitive — so ingest must sort, or the same topology renders a
+      // different graph each fetch. Feed an UNSORTED topology and assert the
+      // stored graphData comes out in a stable, sorted order.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: {
+          nodes: [
+            { id: "gamma", label: "gamma", requests: 1, errors: 0 },
+            { id: "alpha", label: "alpha", requests: 1, errors: 0 },
+            { id: "beta", label: "beta", requests: 1, errors: 0 },
+          ],
+          edges: [
+            { from: "gamma", to: "alpha", total_requests: 1, failed_requests: 0 },
+            { from: "alpha", to: "beta", total_requests: 1, failed_requests: 0 },
+            { from: "alpha", to: "gamma", total_requests: 1, failed_requests: 0 },
+          ],
+        },
+      } as any);
+
+      const wrapper = createWrapper();
+      await flushPromises();
+      await wrapper.vm.loadServiceGraph();
+      await flushPromises();
+
+      // Nodes sorted by id.
+      expect(wrapper.vm.graphData.nodes.map((n: any) => n.id)).toEqual([
+        "alpha",
+        "beta",
+        "gamma",
+      ]);
+      // Edges sorted by (from, to).
+      expect(
+        wrapper.vm.graphData.edges.map((e: any) => `${e.from}->${e.to}`),
+      ).toEqual(["alpha->beta", "alpha->gamma", "gamma->alpha"]);
+    });
+
     it("builds a typed inferred node from the traces queries", async () => {
       // The backend now returns a fully classified topology; a database-typed
       // node arrives with service_type set and is used directly.
@@ -2045,47 +2159,51 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(ids).not.toContain("ext0");
     });
 
-    it("expands a group when toggleGroupExpansion is called", async () => {
+    it("expands ONLY the clicked group (by boundary id) via toggleGroupExpansion", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.toggleGroupExpansion("external");
+      // Per-group: the FULL boundary id is toggled, not the kind — so one
+      // caller's group expands without expanding every group of that kind.
+      wrapper.vm.toggleGroupExpansion("__group_external__payment");
       await flushPromises();
-      expect(wrapper.vm.expandedKinds.has("external")).toBe(true);
-      wrapper.vm.toggleGroupExpansion("external");
-      expect(wrapper.vm.expandedKinds.has("external")).toBe(false);
+      expect(wrapper.vm.expandedGroups.has("__group_external__payment")).toBe(true);
+      // A different caller's external group stays untouched.
+      expect(wrapper.vm.expandedGroups.has("__group_external__product")).toBe(false);
+      wrapper.vm.toggleGroupExpansion("__group_external__payment");
+      expect(wrapper.vm.expandedGroups.has("__group_external__payment")).toBe(false);
     });
 
-    it("clicking a collapsed boundary node toggles its kind (graph params)", async () => {
+    it("clicking a collapsed boundary node toggles that specific group (graph params)", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      // ECharts graph-view click: data has id + is_group + service_type.
+      // ECharts graph-view click: data has the full boundary id + is_group.
       wrapper.vm.handleNodeClick({
         dataType: "node",
         data: {
-          id: "__group_external",
+          id: "__group_external__payment",
           is_group: true,
           service_type: "external",
         },
       });
-      expect(wrapper.vm.expandedKinds.has("external")).toBe(true);
+      expect(wrapper.vm.expandedGroups.has("__group_external__payment")).toBe(true);
       // Side panel must NOT open for a group node.
       expect(wrapper.vm.showSidePanel).toBe(false);
     });
 
-    it("clicking a collapsed boundary node toggles its kind (tree params)", async () => {
+    it("clicking a collapsed boundary node toggles that specific group (tree params)", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       // ECharts tree-view click: data carries id (name is the label).
       wrapper.vm.handleNodeClick({
         componentType: "series",
         data: {
-          id: "__group_rpc",
+          id: "__group_rpc__api-gateway",
           name: "Rpc (3)",
           is_group: true,
           service_type: "rpc",
         },
       });
-      expect(wrapper.vm.expandedKinds.has("rpc")).toBe(true);
+      expect(wrapper.vm.expandedGroups.has("__group_rpc__api-gateway")).toBe(true);
     });
 
     it("switches collapse mode", async () => {
@@ -2095,11 +2213,75 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.vm.collapseMode).toBe("expanded");
     });
 
+    it("zoom in/out adjust the series zoom from the CURRENT level; fit recreates", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+
+      // Stub an ECharts instance whose live zoom is read via getOption and
+      // written via setOption. The buttons read the current zoom first so they
+      // stay in sync with wheel zoom.
+      let liveZoom = 1;
+      const setOptionCalls: any[] = [];
+      (wrapper.vm as any).chartRendererRef = {
+        chart: {
+          getOption: () => ({ series: [{ zoom: liveZoom }] }),
+          setOption: (opt: any) => {
+            setOptionCalls.push(opt);
+            liveZoom = opt.series[0].zoom; // reflect the write back
+          },
+        },
+      };
+
+      // Zoom in → series zoom increases above 1.
+      wrapper.vm.zoomIn();
+      expect(setOptionCalls.at(-1).series[0].zoom).toBeGreaterThan(1);
+      const afterIn = setOptionCalls.at(-1).series[0].zoom;
+
+      // Zoom out → adjusts from the (now zoomed-in) live level, so it decreases.
+      wrapper.vm.zoomOut();
+      expect(setOptionCalls.at(-1).series[0].zoom).toBeLessThan(afterIn);
+
+      // Zoom is clamped — many zoom-outs never go below the floor.
+      for (let i = 0; i < 30; i++) wrapper.vm.zoomOut();
+      expect(setOptionCalls.at(-1).series[0].zoom).toBeGreaterThanOrEqual(0.4);
+
+      // Fit-to-screen recreates the chart (bumps chartKey) to re-fit at zoom 1.
+      const keyBefore = wrapper.vm.chartKey;
+      wrapper.vm.fitToScreen();
+      expect(wrapper.vm.chartKey).toBeGreaterThan(keyBefore);
+    });
+
     it("hides a kind via the visibility toggle", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.toggleKindVisibility("external");
       expect(wrapper.vm.hiddenKinds.has("external")).toBe(true);
+    });
+
+    it("shows a filter-active dot on the Show types button when any type is hidden", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+
+      const dotSelector = '[data-test="service-graph-active-filter-indicator"]';
+
+      // No types hidden → no dot, count 0.
+      expect(wrapper.vm.activeFilterCount).toBe(0);
+      expect(wrapper.find(dotSelector).exists()).toBe(false);
+
+      // Hide a type → dot appears so the user knows the graph is filtered
+      // (entities withheld) rather than simply empty. A plain dot (not a count)
+      // avoids the "N shown vs N hidden" ambiguity.
+      wrapper.vm.toggleKindVisibility("external");
+      await flushPromises();
+
+      expect(wrapper.vm.activeFilterCount).toBe(1);
+      expect(wrapper.find(dotSelector).exists()).toBe(true);
+
+      // Un-hide → dot disappears.
+      wrapper.vm.toggleKindVisibility("external");
+      await flushPromises();
+      expect(wrapper.vm.activeFilterCount).toBe(0);
+      expect(wrapper.find(dotSelector).exists()).toBe(false);
     });
 
     it("renders the compact Density dropdown trigger", async () => {
