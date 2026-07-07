@@ -42,6 +42,12 @@ import Users from "@/views/User.vue";
 
 const IncidentList = () => import("@/components/alerts/IncidentList.vue");
 
+const WorkflowsList = () =>
+  import("@/components/workflows/WorkflowsList.vue");
+
+const WorkflowEditor = () =>
+  import("@/components/workflows/WorkflowEditor.vue");
+
 const useEnterpriseRoutes = () => {
   const routes: any = [
     {
@@ -147,6 +153,40 @@ const useEnterpriseRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
+    });
+
+    // Workflows — enterprise/cloud only (FD3). List is the parent; the editor
+    // renders in its <router-view> for add/edit.
+    routes.push({
+      path: "workflows",
+      name: "workflows",
+      component: WorkflowsList,
+      meta: {
+        title: "Workflows",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+      children: [
+        {
+          path: "add",
+          name: "createWorkflow",
+          component: WorkflowEditor,
+          meta: { title: "Add Workflow" },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "edit",
+          name: "workflowEditor",
+          component: WorkflowEditor,
+          meta: { title: "Edit Workflow" },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+      ],
     });
     routes[0].children.push(
       ...[

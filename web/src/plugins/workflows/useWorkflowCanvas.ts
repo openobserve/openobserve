@@ -1,0 +1,517 @@
+/* Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+// Workflow canvas composable — a fork of plugins/pipelines/useDnD.ts.
+//
+// Differences from the pipeline version (FD1/FD2):
+//   - NO node sidebar / drag-from-palette. Nodes are added programmatically via
+//     the hover-`+` StepMenu (addNodeAfter, wired in a later slice), so all the
+//     onDragStart/onDragOver/onDrop machinery is removed.
+//   - Restricted, colour-coded node taxonomy (trigger / logic / action).
+//   - Cycle + single-incoming validation use edge.source/target strings
+//     (always present) instead of VueFlow's runtime sourceNode/targetNode.
+//
+// State is a module-level reactive singleton (same pattern as pipelineObj) so
+// the editor, canvas, nodes and node-forms all share one object.
+
+import { reactive } from "vue";
+import { MarkerType, useVueFlow } from "@vue-flow/core";
+import { getUUID } from "@/utils/zincutils";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+
+export type WorkflowNodeCategory = "trigger" | "logic" | "action";
+
+export interface WorkflowNodeMeta {
+  /** Colour/behaviour family. */
+  category: WorkflowNodeCategory;
+  /** Small uppercase label above the title (i18n key). */
+  kindKey: string;
+  /** Node title (i18n key). */
+  titleKey: string;
+  /** Short description (i18n key), shown in the step picker. */
+  descKey: string;
+  /** OIcon registry name for the node's glyph. */
+  icon: IconName;
+  /**
+   * VueFlow render template + handle layout (UI only — NOT persisted).
+   *  - "input":  source handle only (the trigger; can't receive).
+   *  - "default": source + target handles (any continuable step).
+   *  - "output": target handle only (hard terminal; unused in workflows so
+   *    every action can chain onward).
+   * Node role for the backend is inferred from `node_type` + edges, so this
+   * never goes into the saved payload.
+   */
+  ioType: "input" | "output" | "default";
+}
+
+// v1 palette (D2 + FD4). node_type matches the backend serde tag
+// (NodeData, #[serde(tag = "node_type", rename_all = "snake_case")]).
+export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
+  workflow_trigger: {
+    category: "trigger",
+    kindKey: "workflow.node.kindTrigger",
+    titleKey: "workflow.node.alertTrigger",
+    descKey: "workflow.node.triggerBody",
+    icon: "notifications-active",
+    ioType: "input",
+  },
+  condition: {
+    category: "logic",
+    kindKey: "workflow.node.kindLogic",
+    titleKey: "workflow.node.condition",
+    descKey: "workflow.node.conditionDesc",
+    icon: "alt-route",
+    ioType: "default",
+  },
+  function: {
+    category: "logic",
+    kindKey: "workflow.node.kindLogic",
+    titleKey: "workflow.node.function",
+    descKey: "workflow.node.functionDesc",
+    icon: "code",
+    ioType: "default",
+  },
+  // Serialized node_type is `send_to_destination` — the planned backend
+  // NodeData::SendToDestination ({ destination_name }) that dispatches to an
+  // existing Alert Destination (webhook / email / action). Backend task B3 adds
+  // this variant + `is_workflow_node()` entry; until then saving a destination
+  // node is gated on that. The user-facing label stays "Send To Destination".
+  //
+  // `ioType: "default"` (not "output") so an action isn't a dead end — it has
+  // an output handle + hover-`+` and can chain onward (send to Slack, then
+  // PagerDuty, then run another condition, …).
+  send_to_destination: {
+    category: "action",
+    kindKey: "workflow.node.kindAction",
+    titleKey: "workflow.node.sendToDestination",
+    descKey: "workflow.node.destinationDesc",
+    icon: "share",
+    ioType: "default",
+  },
+};
+
+export const nodeMeta = (nodeType: string): WorkflowNodeMeta | undefined =>
+  WORKFLOW_NODE_TYPES[nodeType];
+
+// Node types offered by the hover-`+` StepMenu (everything but the trigger,
+// which is fixed and can only be the first node).
+export const ADDABLE_NODE_TYPES = [
+  "condition",
+  "function",
+  "send_to_destination",
+];
+
+// Trigger kinds the user chooses from when creating a workflow. `key` maps to
+// the future backend WorkflowTriggerKind (B1). Only Alert Fired is enabled in
+// v1; the rest are shown as "coming soon" so the picker is clearly extensible.
+export interface WorkflowTriggerType {
+  key: string;
+  labelKey: string;
+  descKey: string;
+  icon: IconName;
+  enabled: boolean;
+}
+
+export const WORKFLOW_TRIGGER_TYPES: WorkflowTriggerType[] = [
+  {
+    key: "alert_fired",
+    labelKey: "workflow.triggerType.alertFired",
+    descKey: "workflow.triggerType.alertFiredDesc",
+    icon: "notifications-active",
+    enabled: true,
+  },
+  {
+    key: "schedule",
+    labelKey: "workflow.triggerType.schedule",
+    descKey: "workflow.triggerType.scheduleDesc",
+    icon: "schedule",
+    enabled: false,
+  },
+  {
+    key: "webhook",
+    labelKey: "workflow.triggerType.webhook",
+    descKey: "workflow.triggerType.webhookDesc",
+    icon: "webhook",
+    enabled: false,
+  },
+];
+
+// Accent colour per category (hex mirrors the design tokens; used for handle /
+// edge colouring where a raw value is needed).
+export const categoryColor = (category?: WorkflowNodeCategory): string => {
+  switch (category) {
+    case "trigger":
+      return "#e0891d"; // amber
+    case "logic":
+      return "#4f6bed"; // blue / indigo
+    case "action":
+      return "#1f9d63"; // green
+    default:
+      return "#6b7280";
+  }
+};
+
+const defaultDialog = {
+  show: false,
+  name: "",
+  // When a node body needs the full-width drawer with its own footer (e.g. the
+  // Function form's inline "Create New Function" editor), it flips this on; the
+  // drawer widens and hides its Save/Cancel/Delete buttons.
+  expand: false,
+};
+
+const defaultWorkflow = {
+  id: "",
+  name: "",
+  description: "",
+  enabled: true,
+  nodes: <any>[],
+  edges: <any>[],
+  org: "",
+};
+
+const defaultObject = {
+  dirtyFlag: false,
+  isEditWorkflow: false,
+  isEditNode: false,
+  edgesChange: false,
+  nodesChange: false,
+  currentSelectedNodeID: "",
+  currentSelectedNodeData: <any>null,
+  // Edge to create when the staged node's drawer is saved (add flow).
+  pendingEdge: <any>null,
+  dialog: { ...defaultDialog },
+  // Step picker (the searchable "add next step" dialog). The hover-`+` opens it
+  // with the source node + handle; picking a type calls addNodeAfter.
+  stepPicker: { show: false, source: "", handle: "out" },
+  currentSelectedWorkflow: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
+  workflowWithoutChange: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
+  nameError: false,
+  nameErrorMessage: "",
+};
+
+const workflowObj = reactive(Object.assign({}, defaultObject));
+
+export { workflowObj };
+
+// Load a workflow (a list row or API result) into the shared editor state,
+// normalizing nodes/edges for VueFlow (type from node_type; edge styling). Mirrors
+// the pipeline pattern where editPipeline() sets pipelineObj from the row
+// synchronously — so the editor has the name + graph immediately, no re-fetch.
+export const hydrateWorkflow = (wf: any) => {
+  const nodes = (wf.nodes || []).map((n: any) => {
+    // VueFlow render template comes from node_type (not a stored io_type).
+    // Drop any legacy io_type from the node, falling back to it only for the
+    // render template if node_type is somehow unknown.
+    const { io_type: legacyIoType, ...rest } = n;
+    const node = {
+      ...rest,
+      type: nodeMeta(n.data?.node_type)?.ioType || legacyIoType || "default",
+    };
+    // The trigger's kind lives in `meta` (strings) since its NodeData is a unit
+    // variant. Rehydrate it into `data` so the form/UI can read it.
+    if (node.data?.node_type === "workflow_trigger" && node.meta) {
+      node.data = {
+        ...node.data,
+        trigger_kind:
+          node.meta.trigger_kind || node.data.trigger_kind || "alert_fired",
+      };
+    }
+    // The destination's display type (webhook/email/action) lives in `meta`
+    // since it isn't part of NodeData::SendToDestination. Rehydrate it so the
+    // node card / form can show it without re-fetching the destination.
+    if (node.data?.node_type === "send_to_destination" && node.meta) {
+      node.data = {
+        ...node.data,
+        destination_type:
+          node.meta.destination_type || node.data.destination_type || "",
+      };
+    }
+    return node;
+  });
+  const edges = (wf.edges || []).map((e: any) => ({
+    ...e,
+    type: "custom",
+    markerEnd: { type: MarkerType.ArrowClosed, width: 20, height: 20 },
+    style: { strokeWidth: 2 },
+    animated: true,
+  }));
+  workflowObj.currentSelectedWorkflow = { ...wf, nodes, edges };
+  workflowObj.workflowWithoutChange = JSON.parse(JSON.stringify(wf));
+  workflowObj.isEditWorkflow = true;
+};
+
+export default function useWorkflowCanvas() {
+  const { screenToFlowCoordinate, onNodesInitialized, updateNode } =
+    useVueFlow();
+
+  // --- edge helpers ----------------------------------------------------------
+  const newEdge = (source: string, target: string, sourceHandle?: string) => ({
+    id: `e${source}-${target}${sourceHandle ? `-${sourceHandle}` : ""}`,
+    source,
+    target,
+    ...(sourceHandle ? { sourceHandle } : {}),
+    markerEnd: { type: MarkerType.ArrowClosed, width: 20, height: 20 },
+    type: "custom",
+    style: { strokeWidth: 2 },
+    animated: true,
+  });
+
+  // Cycle detection on plain source/target strings (robust — does not rely on
+  // VueFlow's runtime-enriched sourceNode/targetNode).
+  const detectCycle = (edges: any[], connection: any): boolean => {
+    const graph: Record<string, string[]> = {};
+    edges.forEach((e: any) => {
+      (graph[e.source] ||= []).push(e.target);
+    });
+    (graph[connection.source] ||= []).push(connection.target);
+
+    const dfs = (node: string, visited: Set<string>, stack: Set<string>): boolean => {
+      if (!visited.has(node)) {
+        visited.add(node);
+        stack.add(node);
+        for (const next of graph[node] || []) {
+          if (!visited.has(next) && dfs(next, visited, stack)) return true;
+          if (stack.has(next)) return true;
+        }
+      }
+      stack.delete(node);
+      return false;
+    };
+    return dfs(connection.source, new Set(), new Set());
+  };
+
+  // --- VueFlow event handlers ------------------------------------------------
+  function onNodeChange() {}
+
+  function onNodesChange() {
+    if (workflowObj.isEditWorkflow) workflowObj.nodesChange = true;
+  }
+
+  function onEdgesChange(changes: any[]) {
+    if (workflowObj.isEditWorkflow) workflowObj.dirtyFlag = true;
+    if (changes.length > 0) workflowObj.edgesChange = true;
+  }
+
+  // Manual wiring (dragging between handles). Programmatic add uses addNodeAfter.
+  function onConnect(connection: any) {
+    const edges = workflowObj.currentSelectedWorkflow.edges;
+
+    // one incoming edge per node
+    if (edges.some((e: any) => e.target === connection.target)) {
+      toast({
+        message: "Only one incoming connection to a step is allowed",
+        variant: "warning",
+      });
+      return;
+    }
+
+    if (detectCycle(edges, connection)) {
+      toast({
+        message: "This connection would create a loop",
+        variant: "warning",
+      });
+      return;
+    }
+
+    workflowObj.currentSelectedWorkflow.edges = [
+      ...edges,
+      newEdge(connection.source, connection.target, connection.sourceHandle),
+    ];
+  }
+
+  // The trigger starts the workflow, so it can't be a connection target.
+  // Everything else is continuable (no hard terminals), so any node can be a
+  // source. Role is derived from node_type, not a stored io_type.
+  function validateConnection({ source, target }: any) {
+    const nodes = workflowObj.currentSelectedWorkflow.nodes;
+    const src = nodes.find((n: any) => n.id === source);
+    const tgt = nodes.find((n: any) => n.id === target);
+    if (!src || !tgt) return false;
+    if (tgt.data?.node_type === "workflow_trigger") return false; // can't receive
+    return true;
+  }
+
+  function deleteNode(nodeId: string) {
+    const wf = workflowObj.currentSelectedWorkflow;
+    const node = wf.nodes.find((n: any) => n.id === nodeId);
+    // The trigger anchors the workflow and can't be removed.
+    if (node?.data?.node_type === "workflow_trigger") {
+      toast({
+        message: "The trigger starts the workflow and can't be deleted",
+        variant: "warning",
+      });
+      return;
+    }
+    wf.nodes = wf.nodes.filter((n: any) => n.id !== nodeId);
+    wf.edges = wf.edges.filter(
+      (e: any) => e.source !== nodeId && e.target !== nodeId,
+    );
+    if (workflowObj.currentSelectedNodeData?.id === nodeId) {
+      workflowObj.currentSelectedNodeData = null;
+      workflowObj.dialog.show = false;
+    }
+    if (workflowObj.isEditWorkflow) workflowObj.dirtyFlag = true;
+  }
+
+  // Hover-`+` opens the step picker dialog anchored to this source + handle.
+  function openStepPicker(sourceId: string, handle: string) {
+    workflowObj.stepPicker = { show: true, source: sourceId, handle };
+  }
+  function closeStepPicker() {
+    workflowObj.stepPicker = { show: false, source: "", handle: "out" };
+  }
+
+  // Hover-`+` add: STAGE a node below `sourceId` and open its config drawer. The
+  // node is NOT added to the canvas here — it's committed (added + auto-wired)
+  // only when the drawer is saved (commitNode), or discarded on cancel
+  // (cancelNodeDrawer). Pipeline pattern. `handle` is always "out" (the single
+  // output; the Condition is a filter, not a true/false branch).
+  const NODE_W = 240;
+  function addNodeAfter(sourceId: string, handle: string, nodeType: string) {
+    const wf = workflowObj.currentSelectedWorkflow;
+    const src = wf.nodes.find((n: any) => n.id === sourceId);
+    const meta = nodeMeta(nodeType);
+    if (!src || !meta) return;
+
+    const id = getUUID();
+    const sourceHandle = handle === "out" ? undefined : handle;
+    // Offset siblings on the same output so they don't overlap (fan-out).
+    const siblings = wf.edges.filter(
+      (e: any) =>
+        e.source === sourceId && (e.sourceHandle || undefined) === sourceHandle,
+    ).length;
+    const position = {
+      x: (src.position?.x ?? 0) + siblings * (NODE_W + 40),
+      y: (src.position?.y ?? 0) + 160,
+    };
+
+    workflowObj.currentSelectedNodeData = {
+      id,
+      // VueFlow render template (UI only) — derived from node_type, not stored.
+      type: meta.ioType,
+      position,
+      data: { label: id, node_type: nodeType },
+    };
+    workflowObj.pendingEdge = { source: sourceId, sourceHandle };
+    workflowObj.currentSelectedNodeID = id;
+    workflowObj.isEditNode = false;
+    workflowObj.dialog.name = nodeType;
+    workflowObj.dialog.expand = false;
+    workflowObj.dialog.show = true;
+  }
+
+  // Drawer Save: merge the form payload, then either update the existing node
+  // (edit) or commit the staged node + its auto-wired edge (add).
+  function commitNode(payload: any = {}) {
+    const wf = workflowObj.currentSelectedWorkflow;
+    const node = workflowObj.currentSelectedNodeData;
+    if (!node) return;
+    node.data = { ...node.data, ...payload };
+
+    if (workflowObj.isEditNode) {
+      const idx = wf.nodes.findIndex((n: any) => n.id === node.id);
+      if (idx !== -1) wf.nodes[idx] = node;
+    } else {
+      wf.nodes = [...wf.nodes, node];
+      if (workflowObj.pendingEdge) {
+        wf.edges = [
+          ...wf.edges,
+          newEdge(
+            workflowObj.pendingEdge.source,
+            node.id,
+            workflowObj.pendingEdge.sourceHandle,
+          ),
+        ];
+      }
+    }
+    workflowObj.pendingEdge = null;
+    workflowObj.isEditNode = false;
+    workflowObj.dialog.expand = false;
+    workflowObj.dialog.show = false;
+    if (workflowObj.isEditWorkflow) workflowObj.dirtyFlag = true;
+  }
+
+  // Drawer Cancel: discard a staged (not-yet-added) node; leave existing nodes
+  // untouched.
+  function cancelNodeDrawer() {
+    workflowObj.pendingEdge = null;
+    workflowObj.currentSelectedNodeData = null;
+    workflowObj.currentSelectedNodeID = "";
+    workflowObj.isEditNode = false;
+    workflowObj.dialog.expand = false;
+    workflowObj.dialog.show = false;
+  }
+
+  // Open an existing node's config drawer.
+  function editNode(nodeId: string) {
+    const node = workflowObj.currentSelectedWorkflow.nodes.find(
+      (n: any) => n.id === nodeId,
+    );
+    if (!node) return;
+    workflowObj.isEditNode = true;
+    workflowObj.pendingEdge = null;
+    workflowObj.currentSelectedNodeData = node;
+    workflowObj.currentSelectedNodeID = nodeId;
+    workflowObj.dialog.name = node.data.node_type;
+    workflowObj.dialog.show = true;
+  }
+
+  function resetWorkflowData() {
+    workflowObj.currentSelectedWorkflow = JSON.parse(
+      JSON.stringify(defaultWorkflow),
+    );
+    workflowObj.workflowWithoutChange = JSON.parse(
+      JSON.stringify(defaultWorkflow),
+    );
+    workflowObj.currentSelectedNodeData = null;
+    workflowObj.currentSelectedNodeID = "";
+    workflowObj.dialog = { ...defaultDialog };
+    workflowObj.stepPicker = { show: false, source: "", handle: "out" };
+    workflowObj.isEditWorkflow = false;
+    workflowObj.isEditNode = false;
+    workflowObj.dirtyFlag = false;
+    workflowObj.nodesChange = false;
+    workflowObj.edgesChange = false;
+  }
+
+  return {
+    workflowObj,
+    // vue-flow events
+    onNodeChange,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    validateConnection,
+    // node ops
+    openStepPicker,
+    closeStepPicker,
+    addNodeAfter,
+    commitNode,
+    cancelNodeDrawer,
+    editNode,
+    deleteNode,
+    resetWorkflowData,
+    // helpers (exported for the StepMenu slice + tests)
+    detectCycle,
+    newEdge,
+    // vue-flow instance passthroughs
+    screenToFlowCoordinate,
+    onNodesInitialized,
+    updateNode,
+  };
+}

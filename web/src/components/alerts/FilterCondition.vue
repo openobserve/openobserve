@@ -52,6 +52,7 @@
             :error-message="columnError"
             data-test="alert-conditions-select-column"
             @search="filterColumns"
+            @create="onColumnCreate"
             @update:model-value="() => { columnError = ''; emits('input:update', 'conditions', condition) }"
             @blur="validateColumn"
           />
@@ -250,6 +251,24 @@ const filterColumns = (val: string) => {
       (column: any) => column.value.toLowerCase().indexOf(value) > -1
     );
   }
+};
+
+// Custom column: when `allowCustomColumns` is on, OSelect is `creatable` and
+// emits `create` with the typed term on Enter — but only emits, it doesn't set
+// the value. Add the typed column to the options so it renders, then select it.
+const onColumnCreate = (term: string) => {
+  const value = String(term ?? "").trim();
+  if (!value) return;
+  const exists = filteredFields.value.some((c: any) => c.value === value);
+  if (!exists) {
+    filteredFields.value = [
+      ...filteredFields.value,
+      { label: value, value, type: "custom" },
+    ];
+  }
+  props.condition.column = value;
+  columnError.value = "";
+  emits("input:update", "conditions", props.condition);
 };
 
   </script>

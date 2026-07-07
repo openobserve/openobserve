@@ -16,14 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md tw:p-0 o2-custom-bg"
-    style="
-      height: calc(100vh - 48px);
-      min-height: inherit;
-      display: flex;
-      flex-direction: column;
-    "
+    :style="embedded ? undefined : {
+      height: 'calc(100vh - 48px)',
+      minHeight: 'inherit',
+      display: 'flex',
+      flexDirection: 'column',
+    }"
   >
     <AppPageHeader
+      v-if="!embedded"
       :back="{
         label: t('alert_destinations.header'),
         onClick: () => emit('cancel:hideform'),
@@ -43,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
     <div
       class="card-container tw:py-2"
-      style="flex: 1; overflow-y: auto; overflow-x: hidden"
+      :style="embedded ? undefined : { flex: '1', overflowY: 'auto', overflowX: 'hidden' }"
     >
       <div>
         <div class="tw:flex tw:flex-col tw:gap-2 tw:px-3 tw:mt-2 tw:mb-1">
@@ -118,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:w-full"
           >
             <!-- Name Field for Create Mode -->
-            <div v-if="!destination" class="tw:w-1/2 tw:pb-3">
+            <div v-if="!destination" :class="[halfWidthClass, 'tw:pb-3']">
               <OInput
                 data-test="add-destination-name-input"
                 v-model="formData.name"
@@ -140,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="prebuiltCredentials"
               :destination-type="formData.destination_type"
               :hide-actions="true"
+              :embedded="embedded"
               data-test="prebuilt-form"
             />
             <div v-else-if="isUpdatingDestination" class="tw:p-3 tw:text-center">
@@ -153,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 formData.destination_type &&
                 formData.destination_type !== 'custom'
               "
-              class="tw:w-1/2 tw:py-1"
+              :class="[halfWidthClass, 'tw:py-1']"
             >
               <OSelect
                 data-test="add-destination-prebuilt-template-select"
@@ -280,9 +282,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Name + Template row for custom alert destinations -->
           <div
             v-if="isAlerts && formData.destination_type === 'custom'"
-            class="tw:flex tw:gap-3 tw:w-full"
+            :class="fieldRowClass"
           >
-            <div class="tw:w-1/2 tw:py-1">
+            <div :class="[halfWidthClass, 'tw:py-1']">
               <OInput
                 data-test="add-destination-name-input"
                 v-model="formData.name"
@@ -293,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="nameError = ''"
               />
             </div>
-            <div class="tw:w-1/2 tw:py-1">
+            <div :class="[halfWidthClass, 'tw:py-1']">
               <OSelect
                 data-test="add-destination-template-select"
                 v-model="formData.template"
@@ -330,8 +332,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (!isAlerts && formData.type === 'http')
             "
           >
-            <div class="tw:flex tw:gap-3 tw:w-full">
-              <div class="tw:w-1/2 tw:py-1">
+            <div :class="fieldRowClass">
+              <div :class="[halfWidthClass, 'tw:py-1']">
                 <OInput
                   data-test="add-destination-url-input"
                   v-model="formData.url"
@@ -344,7 +346,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 class="tw:py-1"
-                :class="{ 'tw:w-1/4': !isAlerts, 'tw:w-1/2': isAlerts }"
+                :class="
+                  embedded
+                    ? 'tw:w-full'
+                    : { 'tw:w-1/4': !isAlerts, 'tw:w-1/2': isAlerts }
+                "
               >
                 <OSelect
                   data-test="add-destination-method-select"
@@ -453,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (!isAlerts || formData.destination_type === 'custom')
             "
           >
-            <div class="tw:w-1/2 tw:py-1 action-select">
+            <div :class="[halfWidthClass, 'tw:py-1', 'action-select']">
               <OSelect
                 data-test="add-destination-action-select"
                 v-model="formData.action_id"
@@ -472,7 +478,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </div>
       </div>
-      <div class="tw:flex tw:justify-between tw:px-4 tw:py-4 tw:w-full tw:border-t tw:border-border-default">
+      <div
+        v-if="!embedded"
+        class="tw:flex tw:justify-between tw:px-4 tw:py-4 tw:w-full tw:border-t tw:border-border-default"
+      >
         <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
         <div
           v-if="
@@ -589,8 +598,26 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  // When true, render without the full-page AppPageHeader / fixed viewport
+  // height so the form can be embedded inline (e.g. inside a node drawer).
+  embedded: {
+    type: Boolean,
+    default: false,
+  },
 });
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
+
+// Embedded (narrow drawer) layout: fields that sit at half/quarter width on the
+// full-width alerts page span the full width and stack instead.
+const halfWidthClass = computed(() =>
+  props.embedded ? "tw:w-full" : "tw:w-1/2",
+);
+const fieldRowClass = computed(() =>
+  props.embedded
+    ? "tw:flex tw:flex-col tw:gap-3 tw:w-full"
+    : "tw:flex tw:gap-3 tw:w-full",
+);
+
 const apiMethods = ["get", "post", "put"];
 const outputFormats = ["json", "ndjson"];
 const store = useStore();
@@ -1363,4 +1390,8 @@ const filterColumns = (options: any[], val: String, update: Function) => {
 const filterActions = (val: string, update: any) => {
   filterColumns(actionOptions.value, val, update);
 };
+
+// Exposed so an embedding parent (e.g. a node drawer) can drive Save from its
+// own sticky footer while the form's footer is hidden (`embedded`).
+defineExpose({ saveDestination });
 </script>

@@ -161,6 +161,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-workflows": {
+    illustration: "pipeline",
+    variant: "create",
+    titleKey: "emptyState.noWorkflows.title",
+    descriptionKey: "emptyState.noWorkflows.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noWorkflows.action",
+        descriptionKey: "emptyState.noWorkflows.actionDesc",
+      },
+    ],
+  },
 
   // --- no ingestion / no data flowing in -----------------------------------
   "no-streams": {
