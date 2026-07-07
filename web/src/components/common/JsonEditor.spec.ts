@@ -492,7 +492,7 @@ describe("JsonEditor", () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
       await nextTick();
-      expect(wrapper.html()).toContain("tw:bg-(--o2-primary-background)");
+      expect(wrapper.html()).toContain("bg-(--o2-primary-background)");
     });
 
     it("does not apply dark background class on root when theme is light", async () => {
@@ -500,7 +500,7 @@ describe("JsonEditor", () => {
       wrapper = createWrapper();
       await nextTick();
       // Dark background class is only applied in dark theme
-      expect(wrapper.html()).not.toContain("tw:bg-(--o2-primary-background)");
+      expect(wrapper.html()).not.toContain("bg-(--o2-primary-background)");
     });
   });
 

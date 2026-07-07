@@ -16,47 +16,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:bg-surface-panel tw:relative tw:h-full tw:min-h-0 tw:flex tw:flex-col"
-    :class="isOpen ? 'tw:w-75' : 'tw:w-12.5'"
+    class="bg-surface-panel relative h-full min-h-0 flex flex-col"
+    :class="isOpen ? 'w-75' : 'w-12.5'"
     data-test="panel-sidebar-root"
   >
     <div
       v-if="!isOpen"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-start tw:w-12.5 tw:h-full tw:overflow-y-auto tw:cursor-pointer"
+      class="flex flex-col items-center justify-start w-12.5 h-full overflow-y-auto cursor-pointer"
       data-test="panel-sidebar-header-collapsed"
       @click="toggleSidebar"
     >
-      <!-- <div class="tw:mt-[10px] tw:text-[20px]">+</div> -->
+      <!-- <div class="mt-[10px] text-[20px]">+</div> -->
       <OIcon
         name="expand-all" size="sm"
-        class="tw:mt-[10px] tw:text-[20px] rotate-90"
+        class="mt-[10px] text-[20px] rotate-90"
         data-test="dashboard-sidebar"
       />
       <div
-        class="tw:[writing-mode:vertical-rl] tw:[text-orientation:mixed] tw:font-bold"
+        class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold"
         data-test="panel-sidebar-collapsed-title"
       >{{ title }}</div>
     </div>
     <div
       v-else
-      class="tw:flex tw:items-center tw:justify-between tw:h-[60px] tw:px-[10px] tw:shrink-0"
+      class="flex items-center justify-between h-[60px] px-[10px] shrink-0"
       data-test="panel-sidebar-header-expanded"
     >
       <div
-        class="tw:font-bold"
+        class="font-bold"
         data-test="panel-sidebar-expanded-title"
       >{{ title }}</div>
       <OButton
         variant="outline"
         size="icon-xs-sq"
-        class="tw:rotate-90"
+        class="rotate-90"
         @click="toggleSidebar"
         data-test="dashboard-sidebar-collapse-btn"
         icon-left="unfold-less"
       >
       </OButton>
     </div>
-    <OSeparator class="tw:-mt-px tw:shrink-0" data-test="panel-sidebar-separator" />
+    <OSeparator class="-mt-px shrink-0" data-test="panel-sidebar-separator" />
     <div
       class="scroll"
       style="height: calc(100vh - 176px); overflow-y: auto;"

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <nav
-    class="tw:flex tw:items-center tw:gap-0.5 tw:-ms-1.5 tw:min-w-0"
+    class="flex items-center gap-0.5 -ms-1.5 min-w-0"
     aria-label="Breadcrumb"
     data-test="app-breadcrumb"
   >
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="idx > 0"
         name="chevron-right"
         size="sm"
-        class="tw:text-text-disabled tw:shrink-0"
+        class="text-text-disabled shrink-0"
       />
 
       <!-- Collapsed middle crumbs → overflow dropdown -->
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <button
         v-else-if="node.item.to || node.item.onClick"
         type="button"
-        class="tw:text-text-secondary tw:max-w-48 tw:truncate tw:px-1.5 tw:py-0.5 tw:rounded-md tw:outline-none tw:transition-colors tw:hover:text-text-primary tw:hover:bg-surface-subtle tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset tw:shrink-0"
+        class="text-text-secondary max-w-48 truncate px-1.5 py-0.5 rounded-md outline-none transition-colors hover:text-text-primary hover:bg-surface-subtle focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset shrink-0"
         :title="node.item.title ?? node.item.label"
         :data-test="node.item.dataTest"
         @click="onCrumbClick(node.item)"
@@ -80,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Current (terminal) crumb — non-interactive -->
       <span
         v-else
-        class="tw:text-text-primary tw:font-medium tw:max-w-64 tw:truncate tw:px-1.5 tw:py-0.5 tw:shrink"
-        :class="{ 'tw:min-w-0': node.isCurrent }"
+        class="text-text-primary font-medium max-w-64 truncate px-1.5 py-0.5 shrink"
+        :class="{ 'min-w-0': node.isCurrent }"
         :aria-current="node.isCurrent ? 'page' : undefined"
         :title="node.item.title ?? node.item.label"
         :data-test="node.item.dataTest"

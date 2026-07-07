@@ -15,25 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="tag-input-container" class="tw:w-full tw:h-full">
+  <div data-test="tag-input-container" class="w-full h-full">
     <div
       data-test="tag-input-wrapper"
-      class="tag-input-wrapper tw:relative tw:flex tw:flex-col tw:px-[5px] tw:py-0 tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.12)) tw:rounded tw:bg-(--o2-card-bg) tw:min-h-14 tw:h-full tw:w-full tw:max-w-full tw:cursor-text tw:transition-colors tw:duration-300 tw:overflow-hidden"
+      class="tag-input-wrapper relative flex flex-col px-[5px] py-0 border border-(--o2-border-color,rgba(0,0,0,0.12)) rounded bg-(--o2-card-bg) min-h-14 h-full w-full max-w-full cursor-text transition-colors duration-300 overflow-hidden"
       :class="{ 'has-content': hasContent }"
     >
       <label
         v-if="label"
         data-test="tag-input-label"
-        class="tag-input-label tw:absolute tw:top-4 tw:left-3 tw:text-base tw:text-[rgba(0,0,0,0.6)] tw:pointer-events-none tw:transition-all tw:duration-300 tw:bg-transparent tw:px-1 tw:-ml-1"
+        class="tag-input-label absolute top-4 left-3 text-base text-[rgba(0,0,0,0.6)] pointer-events-none transition-all duration-300 bg-transparent px-1 -ml-1"
         style="transition-timing-function: cubic-bezier(0.25, 0.8, 0.5, 1); transform-origin: left top;"
       >{{ label }}</label>
-      <div data-test="tags-and-input" class="tw:flex tw:flex-wrap tw:items-start tw:gap-1 tw:mt-[5px] tw:w-full tw:overflow-hidden">
+      <div data-test="tags-and-input" class="flex flex-wrap items-start gap-1 mt-[5px] w-full overflow-hidden">
         <OTag
           v-for="(tag, index) in modelValue"
           :key="index"
           :data-test="`tag-chip-${index}`"
           type="selectionChip"
-          class="tag-chip tw:m-0! tw:shrink-0 tw:grow-0 tw:basis-auto"
+          class="tag-chip m-0! shrink-0 grow-0 basis-auto"
           style="background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%)"
         >
           {{ tag }}
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               :aria-label="`Remove ${tag}`"
-              class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+              class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
               @click="removeTag(index)"
             >
               <OIcon name="close" size="xs" />
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="inputValue"
           type="text"
           :placeholder="modelValue.length > 0 ? '' : placeholder"
-          class="tag-input tw:[flex:1_1_100px] tw:min-w-[100px] tw:border-0 tw:outline-none tw:bg-transparent tw:p-1 tw:text-sm tw:text-(--q-color-text-primary)"
+          class="tag-input [flex:1_1_100px] min-w-[100px] border-0 outline-none bg-transparent p-1 text-sm text-(--q-color-text-primary)"
           @keydown.enter.prevent="addTag"
           @input="handleInput"
           @keydown.delete="handleBackspace"

@@ -15,11 +15,11 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div data-test="dashboard-join-pop-up" class="tw:w-156 tw:flex tw:flex-col tw:max-h-[54vh] tw:overflow-hidden">
-    <div class="tw:flex tw:justify-between tw:items-center tw:mb-3.75" data-test="dashboard-join-pop-up-header">
-      <div class="tw:flex-1 tw:gap-2">
-        <div class="tw:flex tw:items-center tw:gap-2 tw:text-(--q-primary)">
-          <LeftJoinSvg class="tw:h-5.25" />
+  <div data-test="dashboard-join-pop-up" class="w-156 flex flex-col max-h-[54vh] overflow-hidden">
+    <div class="flex justify-between items-center mb-3.75" data-test="dashboard-join-pop-up-header">
+      <div class="flex-1 gap-2">
+        <div class="flex items-center gap-2 text-(--q-primary)">
+          <LeftJoinSvg class="h-5.25" />
           <label>Join</label>
         </div>
         <OSelect
@@ -31,15 +31,15 @@
         />
       </div>
 
-      <div class="tw:flex tw:items-center tw:gap-2 tw:pt-5.25 tw:px-2.5 tw:text-(--q-primary)">
-        <LeftJoinLineSvg class="tw:h-10 tw:w-14.5" />
+      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-(--q-primary)">
+        <LeftJoinLineSvg class="h-10 w-14.5" />
       </div>
 
-      <div class="tw:flex tw:flex-col tw:items-center">
+      <div class="flex flex-col items-center">
         <label for="joinType">Join type</label>
-        <div class="tw:flex tw:justify-center tw:items-center tw:gap-2">
+        <div class="flex justify-center items-center gap-2">
           <div
-            class="tw:flex tw:flex-col tw:items-center tw:cursor-pointer tw:transition-opacity tw:duration-200 tw:text-(--q-primary) tw:hover:opacity-80"
+            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--q-primary) hover:opacity-80"
             @click="handleJoinTypeChange('left')"
             :aria-label="t('panel.leftJoin')"
             data-test="dashboard-join-type-left"
@@ -48,7 +48,7 @@
             <div :class="getJoinTypeLabelClass('left')">Left</div>
           </div>
           <div
-            class="tw:flex tw:flex-col tw:items-center tw:cursor-pointer tw:transition-opacity tw:duration-200 tw:text-(--q-primary) tw:hover:opacity-80"
+            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--q-primary) hover:opacity-80"
             @click="handleJoinTypeChange('inner')"
             :aria-label="t('panel.innerJoin')"
             data-test="dashboard-join-type-inner"
@@ -57,7 +57,7 @@
             <div :class="getJoinTypeLabelClass('inner')">Inner</div>
           </div>
           <div
-            class="tw:flex tw:flex-col tw:items-center tw:cursor-pointer tw:transition-opacity tw:duration-200 tw:text-(--q-primary) tw:hover:opacity-80"
+            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--q-primary) hover:opacity-80"
             @click="handleJoinTypeChange('right')"
             :aria-label="t('panel.rightJoin')"
             data-test="dashboard-join-type-right"
@@ -68,13 +68,13 @@
         </div>
       </div>
 
-      <div class="tw:flex tw:items-center tw:gap-2 tw:pt-5.25 tw:px-2.5 tw:text-(--q-primary)">
-        <RightJoinLineSvg class="tw:h-10 tw:w-14.5" />
+      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-(--q-primary)">
+        <RightJoinLineSvg class="h-10 w-14.5" />
       </div>
 
-      <div class="tw:flex-1 tw:gap-2">
-        <div class="tw:flex tw:items-center tw:gap-2 tw:text-(--q-primary)">
-          <RightJoinSvg class="tw:h-5.25" />
+      <div class="flex-1 gap-2">
+        <div class="flex items-center gap-2 text-(--q-primary)">
+          <RightJoinSvg class="h-5.25" />
           <label>On</label>
         </div>
 
@@ -88,47 +88,47 @@
       </div>
     </div>
 
-    <div class="tw:flex tw:items-center tw:gap-4">
-      <div class="tw:border-t tw:border-gray-200 tw:flex-1"></div>
+    <div class="flex items-center gap-4">
+      <div class="border-t border-gray-200 flex-1"></div>
       <div
         :class="[
-          'tw:py-2 tw:text-center tw:text-xs',
-          store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-700',
+          'py-2 text-center text-xs',
+          store.state.theme === 'dark' ? 'text-white' : 'text-gray-700',
         ]"
         v-if="showJoinSummary"
       >
         Performing
         <span
-          class="tw:inline-flex tw:items-center tw:rounded tw:px-1.5 tw:py-0.5 tw:text-xs tw:font-semibold"
+          class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold"
           style="background-color: color-mix(in srgb, var(--o2-primary-color) 15%, transparent); color: var(--o2-primary-color);"
         >{{ joinTypeLabel }} Join</span> between
-        <span class="tw:font-semibold">{{ mainStream }}</span> and
-        <span class="tw:font-semibold">{{ modelValue.stream }}</span>
+        <span class="font-semibold">{{ mainStream }}</span> and
+        <span class="font-semibold">{{ modelValue.stream }}</span>
       </div>
-      <div class="tw:border-t tw:border-gray-200 tw:flex-1"></div>
+      <div class="border-t border-gray-200 flex-1"></div>
     </div>
 
-    <div class="tw:mb-2.5 tw:flex tw:flex-col tw:min-h-0 tw:flex-1">
-      <div class="tw:mb-2.5 tw:shrink-0">
-        <h3 class="tw:text-sm tw:not-italic tw:font-semibold tw:leading-normal tw:m-0">Joining Clause</h3>
-        <p class="tw:text-xs tw:not-italic tw:font-normal tw:leading-normal tw:mt-1 tw:mb-0 tw:mx-0">
+    <div class="mb-2.5 flex flex-col min-h-0 flex-1">
+      <div class="mb-2.5 shrink-0">
+        <h3 class="text-sm not-italic font-semibold leading-normal m-0">Joining Clause</h3>
+        <p class="text-xs not-italic font-normal leading-normal mt-1 mb-0 mx-0">
           Select the fields that need to be correlated within the joining
           streams
         </p>
       </div>
 
       <div
-        class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto"
+        class="flex-1 min-h-0 overflow-y-auto"
         data-test="dashboard-join-clause-list"
       >
       <div
         v-for="(arg, argIndex) in modelValue.conditions"
         :key="argIndex + JSON.stringify(arg)"
-        class="tw:mb-2.5 tw:p-2.5 tw:border tw:border-border-default tw:rounded"
+        class="mb-2.5 p-2.5 border border-border-default rounded"
       >
-        <div class="tw:mb-2 tw:font-medium">Clause {{ argIndex + 1 }}</div>
-        <div class="tw:flex tw:items-center tw:gap-2.5">
-          <div class="tw:flex-1 tw:min-w-0 tw:overflow-hidden">
+        <div class="mb-2 font-medium">Clause {{ argIndex + 1 }}</div>
+        <div class="flex items-center gap-2.5">
+          <div class="flex-1 min-w-0 overflow-hidden">
             <StreamFieldSelect
               :streams="getStreamsBasedJoinIndex()"
               v-model="modelValue.conditions[argIndex].leftField"
@@ -136,7 +136,7 @@
             />
           </div>
 
-          <div class="tw:flex-1 tw:min-w-0 tw:overflow-hidden">
+          <div class="flex-1 min-w-0 overflow-hidden">
             <OSelect
               :label-position="'inside'"
               v-model="modelValue.conditions[argIndex].operation"
@@ -146,7 +146,7 @@
             />
           </div>
 
-          <div class="tw:flex-1 tw:min-w-0 tw:overflow-hidden">
+          <div class="flex-1 min-w-0 overflow-hidden">
             <StreamFieldSelect
               :streams="rightFieldStreams"
               v-model="modelValue.conditions[argIndex].rightField"
@@ -408,7 +408,7 @@ export default defineComponent({
      */
     function getJoinTypeLabelClass(type: string): string {
       return props.modelValue.joinType === type
-        ? "text-primary tw:font-[600]"
+        ? "text-primary font-[600]"
         : "";
     }
 

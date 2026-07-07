@@ -18,17 +18,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OSplitter
     v-model="categorySplitterModel"
     unit="px"
-    class="tw:h-full"
+    class="h-full"
   >
     <template v-slot:before>
-      <div class="tw:w-full tw:h-full">
-        <div class="tw:h-full tw:bg-surface-panel tw:border-r tw:border-border-default">
-          <div class="tw:overflow-y-auto tw:h-full tw:pt-1.5">
+      <div class="w-full h-full">
+        <div class="h-full bg-surface-panel border-r border-border-default">
+          <div class="overflow-y-auto h-full pt-1.5">
             <OTabs
               v-model="selectedCategory"
               orientation="vertical"
               dense
-              class="tw:px-1"
+              class="px-1"
             >
               <OTab
                 v-for="cat in aiCategories"
@@ -47,27 +47,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSplitter
         v-model="integrationSplitterModel"
         unit="px"
-        class="tw:h-full"
+        class="h-full"
       >
         <template v-slot:before>
-          <div class="tw:w-full tw:h-full">
-            <div class="tw:h-full tw:bg-surface-panel tw:border-r tw:border-border-default">
-              <div class="tw:flex tw:flex-col tw:h-full">
-                <div class="tw:pt-2 tw:pl-2 tw:pr-4">
+          <div class="w-full h-full">
+            <div class="h-full bg-surface-panel border-r border-border-default">
+              <div class="flex flex-col h-full">
+                <div class="pt-2 pl-2 pr-4">
                   <OSearchInput
                     data-test="ai-integrations-search-input"
                     v-model="integrationFilter"
                     clearable
-                    class="tw:w-full indexlist-search-input"
+                    class="w-full indexlist-search-input"
                     :placeholder="t('common.search')"
                   />
                 </div>
-                <div class="tw:overflow-y-auto tw:flex-1 tw:min-h-0">
+                <div class="overflow-y-auto flex-1 min-h-0">
                   <OTabs
                     v-model="selectedIntegration"
                     orientation="vertical"
                     dense
-                    class="tw:px-1"
+                    class="px-1"
                     @update:model-value="navigateToIntegration"
                   >
                     <OTab
@@ -100,9 +100,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template v-slot:after>
-          <div class="tw:w-full tw:h-full">
-            <div class="card-container tw:h-full" data-test="ai-integrations-detail-pane">
-              <div class="tw:overflow-auto tw:h-full tw:pt-0.5">
+          <div class="w-full h-full">
+            <div class="card-container h-full" data-test="ai-integrations-detail-pane">
+              <div class="overflow-auto h-full pt-0.5">
                 <router-view />
               </div>
             </div>

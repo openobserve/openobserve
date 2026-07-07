@@ -8740,7 +8740,7 @@ export class LogsPage {
      */
     async inspectPatternCardDOM(index = 0) {
         const patternElements = await this.page.locator('tbody tr').nth(index).evaluate(el => {
-            const styledElements = el.querySelectorAll('[style*="background"], [class*="chip"], [class*="token"], [class*="highlight"], span[class*="tw:"], code');
+            const styledElements = el.querySelectorAll('[style*="background"], [class*="chip"], [class*="token"], [class*="highlight"], code');
             return {
                 totalElements: styledElements.length,
                 classes: Array.from(styledElements).slice(0, 5).map(e => e.className).filter(c => c),
@@ -9368,7 +9368,7 @@ export class LogsPage {
             if (isVisible) {
                 const parent = chartItem.locator('..');
                 // Prefer data-selected attribute (ChartSelection.vue exposes it on the <li>).
-                // Fall back to legacy bg-grey-3/5 (Quasar) and tw:bg-gray-200/400 (Tailwind).
+                // Fall back to legacy bg-grey-3/5 (Quasar) and bg-gray-200/400 (Tailwind).
                 const dataSelected = await parent.getAttribute('data-selected');
                 if (dataSelected === 'true') {
                     testLogger.info(`Current chart type detected: ${chartType}`);
@@ -9379,8 +9379,8 @@ export class LogsPage {
                     if (
                         parentClassList.includes('bg-grey-3') ||
                         parentClassList.includes('bg-grey-5') ||
-                        parentClassList.includes('tw:bg-gray-200') ||
-                        parentClassList.includes('tw:bg-gray-400')
+                        parentClassList.includes('bg-gray-200') ||
+                        parentClassList.includes('bg-gray-400')
                     ) {
                         testLogger.info(`Current chart type detected: ${chartType}`);
                         return chartType;
@@ -9413,8 +9413,8 @@ export class LogsPage {
                         (dataSelected === null && (
                             classes.includes('bg-grey-3') ||
                             classes.includes('bg-grey-5') ||
-                            classes.includes('tw:bg-gray-200') ||
-                            classes.includes('tw:bg-gray-400')
+                            classes.includes('bg-gray-200') ||
+                            classes.includes('bg-gray-400')
                         ));
                     if (matchesSelected) {
                         // Found selected item - extract chart type from child data-test attribute

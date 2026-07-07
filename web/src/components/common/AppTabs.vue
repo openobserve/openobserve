@@ -32,12 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-if="tab.icon" #icon-left>
         <OIcon v-if="typeof tab.icon === 'string'" :name="(tab.icon as any)" size="sm" />
-        <component v-else :is="tab.icon" class="tw:size-3.5 tw:shrink-0" />
+        <component v-else :is="tab.icon" class="size-3.5 shrink-0" />
       </template>
       {{ tab.label }}
       <span
         v-if="tab.dirty"
-        class="tw:ml-1.5 tw:w-2 tw:h-2 tw:rounded-full tw:bg-button-primary tw:shrink-0"
+        class="ml-1.5 w-2 h-2 rounded-full bg-button-primary shrink-0"
         :title="dirtyTitle"
         :data-test="`tab-${tab.value}-dirty-dot`"
         aria-hidden="true"

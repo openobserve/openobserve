@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     filter-mode="client"
     :default-columns="false"
     :show-global-filter="false"
-    class="tw:h-full tw:w-full"
+    class="h-full w-full"
   >
     <template #empty>
       <NoData />
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('billing.downloadInvoice')"
         variant="ghost"
         size="icon-sm"
-        class="tw:ml-1"
+        class="ml-1"
       >
         <OIcon name="download" size="sm" />
       </OButton>

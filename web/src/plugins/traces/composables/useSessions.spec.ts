@@ -44,6 +44,21 @@ import { useSessions } from "./useSessions";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // List state is a module-scoped singleton (it survives the component
+  // unmount/remount cycle in the app). Reset it between tests so each starts
+  // from a clean slate.
+  const s = useSessions();
+  s.sessions.value = [];
+  s.total.value = 0;
+  s.loading.value = false;
+  s.error.value = null;
+  s.hasLoadedOnce.value = false;
+  s.lastRunAt.value = null;
+  s.loadedOrg.value = null;
+  s.currentPage.value = 1;
+  s.rowsPerPage.value = 20;
+  s.agents.value = [];
+  s.agentsLoaded.value = false;
 });
 
 // ---------------------------------------------------------------------------

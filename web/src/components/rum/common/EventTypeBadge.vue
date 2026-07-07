@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OTag
     type="rumEventType"
     :value="type"
-    class="tw:mr-1.5"
+    class="mr-1.5"
     :data-test="dataTest"
   />
 </template>

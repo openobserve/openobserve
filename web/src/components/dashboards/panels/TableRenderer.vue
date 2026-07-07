@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="table-wrapper tw:h-full tw:w-full tw:relative" data-test="dashboard-table-renderer-wrapper">
+  <div class="table-wrapper h-full w-full relative" data-test="dashboard-table-renderer-wrapper">
     <TenstackTable
       ref="tableRef"
       :rows="sortedRows"
@@ -46,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #bottom="scope">
         <slot name="bottom" v-bind="scope">
           <!-- Default: dashboard pagination controls -->
-          <div class="tw:flex tw:items-center tw:w-full tw:pr-2" data-test="dashboard-table-pagination">
-            <div class="tw:flex-1" />
+          <div class="flex items-center w-full pr-2" data-test="dashboard-table-pagination">
+            <div class="flex-1" />
             <TablePaginationControls
               :show-pagination="showPagination"
               :pagination="scope.pagination"

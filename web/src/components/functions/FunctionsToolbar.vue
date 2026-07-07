@@ -8,13 +8,13 @@
     :back="{ label: t('function.header'), onClick: redirectToFunctions, dataTest: 'add-function-back-btn' }"
   >
     <template #tabs>
-      <div class="o2-input tw:flex tw:items-center tw:gap-6">
-        <div class="tw:flex tw:items-center">
+      <div class="o2-input flex items-center gap-6">
+        <div class="flex items-center">
           <OFormInput
             name="name"
             data-test="add-function-name-input"
             :placeholder="t('function.name')"
-            class="tw:p-0 tw:w-full"
+            class="p-0 w-full"
             :readonly="disableName"
             :disabled="disableName"
             required
@@ -23,27 +23,27 @@
           />
         </div>
         <!-- Transform Type Radio Buttons -->
-        <div class="tw:flex tw:items-center tw:gap-4 tw:h-9">
-          <OFormRadioGroup name="transType" orientation="horizontal" class="tw:items-center tw:gap-4">
-            <div class="tw:flex tw:items-center tw:gap-1">
+        <div class="flex items-center gap-4 h-9">
+          <OFormRadioGroup name="transType" orientation="horizontal" class="items-center gap-4">
+            <div class="flex items-center gap-1">
               <ORadio value="0" data-test="function-transform-type-vrl-radio" />
-              <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[0]?.label }}</span>
+              <span class="text-[13px] font-medium leading-none">{{ transformTypeOptions[0]?.label }}</span>
             </div>
             <!-- JavaScript option only shown in _meta organization -->
-            <div v-if="transformTypeOptions[1]" class="tw:flex tw:items-center tw:gap-1">
+            <div v-if="transformTypeOptions[1]" class="flex items-center gap-1">
               <ORadio value="1" data-test="function-transform-type-js-radio" />
-              <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[1]?.label }}</span>
+              <span class="text-[13px] font-medium leading-none">{{ transformTypeOptions[1]?.label }}</span>
             </div>
           </OFormRadioGroup>
           <!-- Info icon with tooltip -->
           <OIcon
             name="info-outline"
             size="sm"
-            class="tw:cursor-pointer tw:text-gray-500 tw:shrink-0"
+            class="cursor-pointer text-gray-500 shrink-0"
           >
             <OTooltip>
               <template #content>
-                <div class="tw:font-semibold tw:mb-1">{{ transTypeValue === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
+                <div class="font-semibold mb-1">{{ transTypeValue === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
                 <div>{{ transTypeValue === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
               </template>
             </OTooltip>
@@ -58,13 +58,13 @@
         size="icon-sm"
         @click="emit('open:chat',!store.state.isAiChatEnabled)"
         data-test="menu-link-ai-item"
-        class="tw:![background:linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)] tw:transition-[background,box-shadow] tw:duration-300 tw:ease-in-out tw:hover:![background:linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)] tw:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] tw:rounded-md"
+        class="![background:linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)] transition-[background,box-shadow] duration-300 ease-in-out hover:![background:linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)] hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] rounded-md"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
         :disabled="isSubmitting"
         @mouseenter="isHovered = true"
         @mouseleave="isHovered = false"
       >
-        <img :src="getBtnLogo" class="tw:opacity-70 tw:transition-transform tw:duration-600 tw:[.ai-btn-active_&]:!opacity-100 tw:[.ai-hover-btn:hover_&]:rotate-180 tw:[.ai-hover-btn:hover_&]:[filter:brightness(0)_invert(1)]" />
+        <img :src="getBtnLogo" class="opacity-70 transition-transform duration-600 [.ai-btn-active_&]:!opacity-100 [.ai-hover-btn:hover_&]:rotate-180 [.ai-hover-btn:hover_&]:[filter:brightness(0)_invert(1)]" />
       </OButton>
       <OButton
         data-test="add-function-fullscreen-btn"

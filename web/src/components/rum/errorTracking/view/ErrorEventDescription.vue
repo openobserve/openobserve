@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:wrap-break-word tw:overflow-hidden tw:whitespace-break-spaces">
+  <div class="wrap-break-word overflow-hidden whitespace-break-spaces">
     <template
       v-if="
         column.type === 'view' && column.view_loading_type === 'route_change'
@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <pre
         data-test="error-event-description-navigation"
-        class="tw:bg-[#ececec] tw:rounded tw:p-2"
+        class="bg-[#ececec] rounded p-2"
       >
 {
   <span class="text-primary">from</span> : {{ column.view_referrer }},
@@ -33,22 +33,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template
       v-else-if="column.type === 'resource' && column.resource_type === 'xhr'"
     >
-      <span class="tw:font-bold tw:pr-2 tw:text-[0.75rem]">{{
+      <span class="font-bold pr-2 text-[0.75rem]">{{
         column.resource_method
       }}</span>
       <a
         :href="column.resource_url"
         target="_blank"
         data-test="error-event-description-resource-url"
-        class="resource-url tw:no-underline tw:text-sm text-primary"
+        class="resource-url no-underline text-sm text-primary"
         >{{ column.resource_url }}</a
       >
-      <span class="tw:pl-2">[ {{ column.resource_status_code }} ]</span>
+      <span class="pl-2">[ {{ column.resource_status_code }} ]</span>
     </template>
     <template v-else>
       <span
         data-test="error-event-description-default"
-        class="tw:text-[0.875rem]"
+        class="text-[0.875rem]"
       >{{ getDescription }}</span>
     </template>
   </div>
