@@ -28,6 +28,7 @@ export function buildTooltip(
   panelSchema: any,
   triggerType: "axis" | "item" = "axis",
   store?: any,
+  hoveredSeriesState?: any,
 ): any {
   const config = panelSchema.config || {};
   const decimals = config.decimals ?? 2;
@@ -71,7 +72,20 @@ export function buildTooltip(
         tooltipItems.push(params[0].axisValue);
       }
 
-      // Add series data with unit formatting
+      // Sort by value and hoist the hovered series, matching SQL tooltips
+      const hoveredName = hoveredSeriesState?.value?.hoveredSeriesName;
+      params.sort(
+        (a: any, b: any) =>
+          ((b.value?.[1] ?? b.value) || 0) - ((a.value?.[1] ?? a.value) || 0),
+      );
+      const hoveredIndex = params.findIndex(
+        (it: any) => it.seriesName === hoveredName,
+      );
+      if (hoveredIndex > 0) {
+        params.unshift(params.splice(hoveredIndex, 1)[0]);
+      }
+
+      // Add series data with unit formatting; bold ONLY the hovered series
       params.forEach((param: any) => {
         if (param.seriesName) {
           const marker = param.marker || "";
@@ -82,8 +96,9 @@ export function buildTooltip(
             getUnitValue(value, unit, unitCustom, decimals),
           );
 
+          const row = `${marker} ${param.seriesName}: ${formattedValue}`;
           tooltipItems.push(
-            `${marker} ${param.seriesName}: <strong>${formattedValue}</strong>`,
+            param.seriesName === hoveredName ? `<strong>${row}</strong>` : row,
           );
         }
       });
