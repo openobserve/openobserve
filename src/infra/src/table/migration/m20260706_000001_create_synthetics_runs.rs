@@ -102,7 +102,7 @@ fn create_synthetics_runs_table() -> TableCreateStatement {
             ForeignKey::create()
                 .name("fk_synthetics_runs_synthetics_id")
                 .from(SyntheticsRuns::Table, SyntheticsRuns::SyntheticsId)
-                .to(SyntheticsMonitors::Table, SyntheticsMonitors::Id)
+                .to(Synthetics::Table, Synthetics::Id)
                 .on_delete(ForeignKeyAction::Cascade),
         )
         .to_owned()
@@ -135,7 +135,7 @@ enum SyntheticsRuns {
 }
 
 #[derive(DeriveIden)]
-enum SyntheticsMonitors {
+enum Synthetics {
     Table,
     Id,
 }
@@ -162,7 +162,7 @@ mod tests {
                 "run_result" integer,
                 "created_at" bigint NOT NULL,
                 "completed_at" bigint,
-                CONSTRAINT "fk_synthetics_runs_synthetics_id" FOREIGN KEY ("synthetics_id") REFERENCES "synthetics_monitors" ("id") ON DELETE CASCADE
+                CONSTRAINT "fk_synthetics_runs_synthetics_id" FOREIGN KEY ("synthetics_id") REFERENCES "synthetics" ("id") ON DELETE CASCADE
             )"#
         );
         assert_eq!(
@@ -187,7 +187,7 @@ mod tests {
                 "run_result" integer,
                 "created_at" bigint NOT NULL,
                 "completed_at" bigint,
-                CONSTRAINT "fk_synthetics_runs_synthetics_id" FOREIGN KEY ("synthetics_id") REFERENCES "synthetics_monitors" ("id") ON DELETE CASCADE
+                CONSTRAINT "fk_synthetics_runs_synthetics_id" FOREIGN KEY ("synthetics_id") REFERENCES "synthetics" ("id") ON DELETE CASCADE
             )"#
         );
     }
