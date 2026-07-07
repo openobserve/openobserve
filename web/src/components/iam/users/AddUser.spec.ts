@@ -562,6 +562,49 @@ describe("AddUser", () => {
     });
   });
 
+  // The `organization === 'other'` path: a root user assigning the new user to a
+  // brand-new org typed into `other_organization`. The submitted org identifier is
+  // encodeURIComponent(other_organization), and the value must pass otherOrgRegex
+  // (start with a letter). The old spec covered both cases; the migrated spec only
+  // referenced it in a comment — restored here.
+  describe("other_organization submit path (root → 'other' org)", () => {
+    const mountOtherOrg = () => {
+      const w = mountComp({ userRole: "root" });
+      w.vm.existingUser = false; // create-new mode → password shown + required
+      w.vm.organization = "other"; // root selected the "Other" org
+      return w;
+    };
+
+    it("blocks submit when other_organization fails the regex (must start with a letter)", async () => {
+      wrapper = mountOtherOrg();
+      await flushPromises();
+      setField(wrapper, "password", "Str0ng!Pass");
+      setField(wrapper, "other_organization", "123-invalid"); // starts with a digit
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
+      expect(userServiece.create).not.toHaveBeenCalled();
+    });
+
+    it("submits with the encoded other_organization as the target org identifier", async () => {
+      vi.mocked(userServiece.create).mockResolvedValue({ data: {} } as any);
+      wrapper = mountOtherOrg();
+      await flushPromises();
+      setField(wrapper, "password", "Str0ng!Pass");
+      setField(wrapper, "other_organization", "custom-org");
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(true);
+      expect(userServiece.create).toHaveBeenCalledTimes(1);
+      // organization === 'other' → encodeURIComponent(other_organization) is both
+      // the payload.organization and the org identifier passed to the service.
+      const payload = vi.mocked(userServiece.create).mock.calls[0][0];
+      const orgArg = vi.mocked(userServiece.create).mock.calls[0][1];
+      expect(orgArg).toBe("custom-org");
+      expect(payload.organization).toBe("custom-org");
+    });
+  });
+
   describe("dialog interactions", () => {
     it("emits update:open(false) when cancel is clicked", async () => {
       wrapper = mountComp();

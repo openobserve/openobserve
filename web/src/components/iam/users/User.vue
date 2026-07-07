@@ -660,12 +660,13 @@ export default defineComponent({
                 rawEmail: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
-                // Pre-migration behavior (restored): store the display-cased role
-                // (e.g. "Admin", "Admin (Invited)"). This keeps the edit/update
-                // payloads byte-identical to pre-migration, which sent the capitalized
-                // value. NOTE: it also restores the pre-migration edit-dropdown
-                // mismatch — the OSelect option value is "admin", so a seeded "Admin"
-                // shows blank until re-picked.
+                // Store the display-cased role (e.g. "Admin", "Admin (Invited)") so
+                // the edit/update payloads stay byte-identical to pre-migration, which
+                // sent the capitalized value. The role options from getRoles use the
+                // lowercase value ("admin"), so this seeded "Admin" doesn't match an
+                // option — but OSelect renders the raw value as a fallback, so the
+                // field still displays "Admin" correctly. The only cosmetic quirk is
+                // that the open dropdown won't highlight the lowercase option as active.
                 role:
                   data?.status == "pending"
                     ? toCamelCase(data.role) + " (Invited)"

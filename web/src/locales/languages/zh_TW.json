@@ -1136,11 +1136,13 @@
     },
     "group": {
       "name": {
+        "required": "群組名稱為必填。",
         "invalidChars": "僅可使用字母、數字與底線，且不可含空格。"
       }
     },
     "role": {
       "name": {
+        "required": "角色名稱為必填。",
         "invalidChars": "僅可使用字母、數字與底線，且不可含空格。"
       },
       "startFrom": {

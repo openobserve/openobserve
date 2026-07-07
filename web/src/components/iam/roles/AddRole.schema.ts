@@ -19,7 +19,7 @@ export const makeAddRoleSchema = (
     name: z
       .string()
       .trim()
-      .min(1, t("common.nameRequired"))
+      .min(1, t("iam.role.name.required"))
       .regex(roleNameRegex, t("iam.role.name.invalidChars"))
       .max(100, t("common.nameMaxLength", { max: 100 })),
     // "Start from" preset (from #12460): "custom" = empty role; "readonly" =

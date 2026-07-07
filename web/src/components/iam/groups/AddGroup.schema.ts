@@ -18,7 +18,7 @@ export const makeAddGroupSchema = (
     name: z
       .string()
       .trim()
-      .min(1, t("common.nameRequired"))
+      .min(1, t("iam.group.name.required"))
       .regex(groupNameRegex, t("iam.group.name.invalidChars"))
       // Mirrors the input's maxlength=100 (defense-in-depth for non-typed values).
       .max(100, t("common.nameMaxLength", { max: 100 })),

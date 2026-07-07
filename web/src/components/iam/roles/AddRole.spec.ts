@@ -192,7 +192,7 @@ describe("AddRole", () => {
 
       expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
       expect(createRole).not.toHaveBeenCalled();
-      expect(wrapper.text()).toContain("Name is required");
+      expect(wrapper.text()).toContain("Role name is required.");
     });
 
     it("blocks submit for a name with invalid characters (restored regex rule)", async () => {
