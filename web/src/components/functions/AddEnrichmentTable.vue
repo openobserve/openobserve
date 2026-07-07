@@ -355,6 +355,10 @@ export default defineComponent({
     // manual guard, gates the save. `value` is the validated, form-owned source
     // of truth. Awaited so OForm's isSubmitting drives the Save spinner.
     const onSubmit = async (value: AddEnrichmentTableForm) => {
+      // Clear any stale error from a previous failed submit so a subsequent
+      // successful (or retried) submit doesn't keep showing the old message.
+      compilationErr.value = "";
+
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",
