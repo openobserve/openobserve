@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-else
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
-                class="cursor-default select-none whitespace-nowrap"
+                class="cursor-pointer select-none whitespace-nowrap"
                 style="font-size: 12px"
                 :title="'Double-click to rename'"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
