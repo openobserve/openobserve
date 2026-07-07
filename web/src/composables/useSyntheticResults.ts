@@ -41,13 +41,9 @@ const EMPTY_KPI: SyntheticKpi = {
   lastRunAt: null,
 };
 
-const RUNS_LIMIT = 100;
-
 /**
- * Orchestration layer for the Monitor Results page. Builds SQL via the schema
- * module, runs the queries through the shared streaming-search runner, and maps
- * every raw response into typed models before exposing them. Components bind to
- * `kpi` / `buckets` / `runs` only — they never see raw hits or field names.
+ * Orchestration layer for KPI cards and Response Time chart.
+ * Runs data is fetched separately via the REST /runs endpoint in MonitorResultsDashboard.
  */
 export function useSyntheticResults() {
   const { executeQuery, cancelAll } = useLLMStreamQuery();
@@ -69,32 +65,22 @@ export function useSyntheticResults() {
     loading.value = true;
     error.value = null;
     try {
+      const safe = (p: Promise<any[]>) => p.catch(() => [] as any[]);
       const interval = bucketInterval(endTime - startTime);
-      const [kpiRows, lastRunRows, histogramRows, runRows] = await Promise.all([
-        executeQuery(buildKpiSql(monitorId), startTime, endTime, "logs"),
-        executeQuery(buildLastRunSql(monitorId), startTime, endTime, "logs"),
-        executeQuery(
-          buildHistogramSql(monitorId, interval),
-          startTime,
-          endTime,
-          "logs",
-        ),
-        executeQuery(
-          buildRunsSql(monitorId, RUNS_LIMIT),
-          startTime,
-          endTime,
-          "logs",
-        ),
+      const [kpiRows, lastRunRows, histogramRows, runsRows] = await Promise.all([
+        safe(executeQuery(buildKpiSql(monitorId), startTime, endTime, "logs")),
+        safe(executeQuery(buildLastRunSql(monitorId), startTime, endTime, "logs")),
+        safe(executeQuery(buildHistogramSql(monitorId, interval), startTime, endTime, "logs")),
+        safe(executeQuery(buildRunsSql(monitorId, 500), startTime, endTime, "logs")),
       ]);
 
       kpi.value = mapKpi(kpiRows[0] ?? null, lastRunRows[0] ?? null);
       buckets.value = mapHistogram(histogramRows, startTime, endTime);
-      runs.value = runRows.map(mapRun);
+      runs.value = runsRows.map(mapRun);
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : "Failed to load results";
       kpi.value = { ...EMPTY_KPI };
       buckets.value = [];
-      runs.value = [];
     } finally {
       loading.value = false;
       hasLoadedOnce.value = true;

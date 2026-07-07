@@ -431,9 +431,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ (row as VisibleRun).statusLabel }}
                   </OBadge>
                 </template>
-                <template #cell-age="{ row }">
-                  <span class="tw:text-xs tw:text-text-heading">
-                    {{ (row as VisibleRun).age }}
+                <template #cell-scheduled_at="{ row }">
+                  <span class="tw:text-xs tw:text-text-secondary tw:font-mono tw:tabular-nums">
+                    {{ (row as VisibleRun).scheduledAt }}
                   </span>
                 </template>
                 <template #cell-duration="{ row }">
@@ -476,17 +476,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OBadge>
                   </span>
                 </template>
-                <template #cell-artifacts="{ row }">
-                  <span class="tw:flex tw:gap-1">
-                    <span
-                      v-for="art in (row as VisibleRun).artifacts"
-                      :key="art.icon"
-                      class="tw:w-[22px] tw:h-[22px] tw:rounded tw:flex tw:items-center tw:justify-center"
-                      :style="{ background: art.bg, color: art.color }"
-                      :title="art.title"
-                    >
-                      <OIcon :name="art.icon" size="xs" />
-                    </span>
+                <template #cell-trigger_type="{ row }">
+                  <span class="tw:text-xs tw:text-text-secondary">
+                    {{ (row as VisibleRun).triggerType }}
                   </span>
                 </template>
               </OTable>
@@ -772,7 +764,6 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -902,11 +893,13 @@ function errorPatterns(): string[] {
 interface MockRun {
   id: number;
   ageMin: number;
+  scheduledTs: number;
   duration: number;
   status: "pass" | "fail";
   location: string;
   browser: string;
   device: string;
+  triggerType: string;
   failedStep: string | null;
   locator: string | null;
   action: string | null;
@@ -938,9 +931,12 @@ function generateRuns(): MockRun[] {
     const errIdx = Math.floor(r() * errs.length);
     const failedStep = isFail ? steps[8 + Math.floor(r() * 4)] : null;
     const locator = failedStep ? meta[failedStep].locator : null;
+    const ageMinVal = i * 17 + Math.floor(r() * 6);
     runs.push({
       id: idNum,
-      ageMin: i * 17 + Math.floor(r() * 6),
+      ageMin: ageMinVal,
+      scheduledTs: Date.now() - ageMinVal * 60 * 1000,
+      triggerType: "schedule",
       duration: dur,
       status: isFail ? ("fail" as const) : ("pass" as const),
       location: locations[Math.floor(r() * locations.length)],
@@ -974,6 +970,10 @@ function fmtAge(min: number): string {
   const h = Math.floor(min / 60);
   if (h < 24) return h + "h ago";
   return Math.floor(h / 24) + "d ago";
+}
+function fmtScheduledTs(ms: number): string {
+  if (!ms) return "—";
+  return new Date(ms).toLocaleString();
 }
 
 function sparkPts(seed: number, n: number, base: number, vol: number): string {
@@ -1035,12 +1035,13 @@ const actionOptions: SelectOption[] = [
 
 // ── Helper: map SyntheticRun to MockRun shape used by computed properties ─
 function toMockRun(r: SyntheticRun, idx: number): MockRun {
-  // Capitalize first letter for browser engine names (e.g. "chromium" → "Chromium")
   const eng = r.browserEngine;
   const browser = eng ? eng.charAt(0).toUpperCase() + eng.slice(1) : eng;
   return {
     id: idx + 1,
     ageMin: Math.round((Date.now() / 1000 - r.timestamp) / 60),
+    scheduledTs: r.scheduledTs,
+    triggerType: r.triggerType,
     duration: r.durationMs,
     status: r.status === "passed" ? ("pass" as const) : ("fail" as const),
     location: r.location,
@@ -1335,18 +1336,13 @@ const failedStepOptions = computed<SelectOption[]>(() => {
 });
 
 // ── OTable columns ───────────────────────────────────────────────────────
-interface ArtifactIcon {
-  icon: string;
-  title: string;
-  bg: string;
-  color: string;
-}
 interface VisibleRun {
   id: number;
   statusBadgeVariant: string;
   statusIcon: string;
   statusLabel: string;
-  age: string;
+  scheduledAt: string;
+  triggerType: string;
   duration: string;
   durColor: string;
   location: string;
@@ -1354,7 +1350,6 @@ interface VisibleRun {
   device: string;
   errorSnippet: string | null;
   errorPattern: string | null;
-  artifacts: ArtifactIcon[];
 }
 
 const visibleRuns = computed<VisibleRun[]>(() => {
@@ -1365,7 +1360,8 @@ const visibleRuns = computed<VisibleRun[]>(() => {
       statusBadgeVariant: isFail ? "error-outline" : "success-outline",
       statusIcon: isFail ? "cancel" : "check_circle",
       statusLabel: isFail ? "Failed" : "Passed",
-      age: fmtAge(run.ageMin),
+      scheduledAt: fmtScheduledTs(run.scheduledTs),
+      triggerType: run.triggerType === "manual" ? "Manual" : "Schedule",
       duration: fmtDur(run.duration),
       durColor: isFail ? "var(--o2-status-error-text)" : "var(--o2-text-body)",
       location: run.location,
@@ -1376,45 +1372,13 @@ const visibleRuns = computed<VisibleRun[]>(() => {
           (run.failedStep ? " · " + run.failedStep : "")
         : null,
       errorPattern: run.errorPattern,
-      artifacts: [
-        {
-          icon: "photo_camera",
-          title: "Screenshots",
-          bg: "var(--o2-primary-50)",
-          color: "var(--o2-primary-700)",
-        },
-        {
-          icon: "smart_display",
-          title: run.artifacts.replay ? "Session replay" : "No replay",
-          bg: run.artifacts.replay
-            ? "var(--o2-primary-50)"
-            : "var(--o2-grey-100)",
-          color: run.artifacts.replay
-            ? "var(--o2-primary-700)"
-            : "var(--o2-grey-300)",
-        },
-        {
-          icon: "description",
-          title: "Playwright trace",
-          bg: "var(--o2-primary-50)",
-          color: "var(--o2-primary-700)",
-        },
-        {
-          icon: "devices",
-          title: run.artifacts.rum ? "RUM session" : "No RUM",
-          bg: run.artifacts.rum ? "var(--o2-primary-50)" : "var(--o2-grey-100)",
-          color: run.artifacts.rum
-            ? "var(--o2-primary-700)"
-            : "var(--o2-grey-300)",
-        },
-      ],
     };
   });
 });
 
 const runColumns: OTableColumnDef[] = [
   { id: "status", header: "Status", accessorKey: "status", size: 110 },
-  { id: "age", header: "Age", accessorKey: "age", size: 90 },
+  { id: "scheduled_at", header: "Scheduled At", accessorKey: "scheduledAt", size: 160 },
   {
     id: "duration",
     header: "Duration",
@@ -1425,8 +1389,7 @@ const runColumns: OTableColumnDef[] = [
   { id: "location", header: "Location", accessorKey: "location", size: 110 },
   { id: "browser", header: "Browser", accessorKey: "browser", size: 100 },
   { id: "device", header: "Device", accessorKey: "device", size: 90 },
-  { id: "error", header: "Error", accessorKey: "error", size: 200 },
-  { id: "artifacts", header: "Artifacts", accessorKey: "artifacts", size: 110 },
+  { id: "trigger_type", header: "Trigger", accessorKey: "triggerType", size: 90 },
 ];
 
 // ── Step groups ──────────────────────────────────────────────────────────

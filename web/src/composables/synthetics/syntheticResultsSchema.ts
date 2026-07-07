@@ -29,48 +29,49 @@
 
 export const SYNTHETIC_RESULTS_STREAM = "synthetics_results";
 
-export const STATUS_PASSED = "passed";
-export const STATUS_FAILED = "failed";
+export const SYNTHETIC_FIELDS = {
+  monitorId: "synthetics_id",
+  status: "status",
+  timestamp: "_timestamp",
+  duration: "response_time_ms",
+  location: "location",
+  device: "device",
+  engine: "engine",
+  error: "error",
+} as const;
+
+export const STATUS_VALUES = { passed: "passed", warning: "warning", failed: "failed", error: "error" } as const;
 
 // ── Typed UI models (stable regardless of stream schema) ─────────────────
 
-export type RunStatus = "passed" | "failed";
+export type RunStatus = "passed" | "warning" | "failed" | "error";
 
 export interface SyntheticKpi {
-  /** Percentage of runs that passed in the window (0–100). */
   uptimePct: number;
-  /** 95th-percentile run duration, milliseconds. */
   p95Ms: number;
-  /** Count of failed runs in the window. */
   failedRuns: number;
-  /** Total runs in the window. */
   totalRuns: number;
-  /** Status of the most recent run, or null when there is no data. */
   lastRunStatus: RunStatus | null;
-  /** Timestamp of the most recent run (_timestamp value, ms epoch), or null. */
   lastRunAt: number | null;
 }
 
+// ── Run list / detail types (used by useSyntheticResults + dedicated pages) ─
+
 export interface SyntheticRun {
-  /** Run timestamp, milliseconds epoch. */
   timestamp: number;
+  scheduledTs: number;
   status: RunStatus;
   durationMs: number;
   location: string;
   device: string;
-  /** Engine/browser name (e.g. "chromium", "webkit"). */
   browserEngine: string;
-  /** Failure reason for failed runs (empty for passing runs). */
+  triggerType: string;
   error: string;
-  /** Job identifier — used to fetch artifacts. */
   jobId: string;
-  /** Run identifier — used for navigation to run detail. */
   runId: string;
 }
 
-/** Full run document including steps, used for RunDetail view. */
 export interface SyntheticRunDetail extends SyntheticRun {
-  runId: string;
   executionId: string;
   triggerType: string;
   monitorName: string;
@@ -127,43 +128,65 @@ export interface WebVitals {
   ttfbMs: number;
 }
 
+// ── RunRowExpansion types (per engine×device execution rows in a run) ──────
+
+/** One step result as reported by the probe in last_attempt_steps. */
+export interface StepResult {
+  stepId: string;
+  status: "ok" | "fail";
+  durationMs: number;
+  error: string;
+  screenshotKey: string | null;
+}
+
+/** One execution row from the stream — one per engine×device combo per run. */
+export interface RunLocationResult {
+  timestampMs: number;
+  status: RunStatus;
+  durationMs: number;
+  location: string;
+  device: string;
+  browserEngine: string;
+  error: string;
+  jobId: string;
+  executionId: string;
+  traceKey: string | null;
+  steps: StepResult[];
+  recordedSteps: RecordedStep[];
+  retryHistory: RetryAttempt[];
+}
+
 export interface SyntheticBucket {
-  /** Bucket start, milliseconds epoch. */
   tsMs: number;
-  /** Average run duration in the bucket, milliseconds. */
   avgMs: number;
-  /** p95 run duration in the bucket, milliseconds. */
   p95Ms: number;
-  /** Uptime percentage in the bucket (0–100); 100 for empty buckets. */
   uptimePct: number;
-  /** Failed run count in the bucket. */
   failedRuns: number;
 }
 
 // ── Internal helpers ───────────────────────────────────────────────────────
 
-/** Escape a string literal for safe inlining into SQL (single-quote doubling). */
 function escapeSqlLiteral(value: string): string {
   return value.replace(/'/g, "''");
 }
 
-/** Coerce a loosely-typed raw field value to a finite number (0 otherwise). */
 function num(value: unknown): number {
   const n = typeof value === "string" ? parseFloat(value) : (value as number);
   return Number.isFinite(n) ? n : 0;
 }
 
-/** Coerce a loosely-typed raw field value to a string ("" otherwise). */
 function str(value: unknown): string {
   return value == null ? "" : String(value);
 }
 
-/** Map a raw status field value onto the typed RunStatus. */
 function toRunStatus(raw: unknown): RunStatus {
-  return str(raw) === STATUS_PASSED ? "passed" : "failed";
+  const s = str(raw);
+  if (s === "passed") return "passed";
+  if (s === "warning") return "warning";
+  if (s === "error") return "error";
+  return "failed";
 }
 
-/** Safely parse a JSON string or return the value as-is. */
 function parseJson(raw: unknown): unknown {
   if (!raw) return null;
   if (typeof raw === "string") {
@@ -176,9 +199,24 @@ function parseJson(raw: unknown): unknown {
   return raw;
 }
 
-/**
- * Pick a histogram bucket width yielding ~30 buckets across the window.
- */
+function parseJsonArray(raw: unknown): any[] {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string") {
+    try { return JSON.parse(raw); } catch { return []; }
+  }
+  return [];
+}
+
+function parseSteps(raw: unknown): StepResult[] {
+  return parseJsonArray(raw).map((s: any) => ({
+    stepId: str(s.step_id ?? s.id),
+    status: s.status === "ok" || s.status === "passed" ? "ok" : "fail",
+    durationMs: num(s.duration_ms),
+    error: str(s.error),
+    screenshotKey: s.screenshot_key ? str(s.screenshot_key) : null,
+  }));
+}
+
 export function bucketInterval(durationMicros: number): string {
   const seconds = durationMicros / 1_000_000;
   const target = seconds / 30;
@@ -194,65 +232,54 @@ export function bucketInterval(durationMicros: number): string {
 
 function intervalSeconds(interval: string): number {
   switch (interval) {
-    case "10 seconds":
-      return 10;
-    case "1 minute":
-      return 60;
-    case "5 minutes":
-      return 300;
-    case "15 minutes":
-      return 900;
-    case "30 minutes":
-      return 1800;
-    case "1 hour":
-      return 3600;
-    case "6 hours":
-      return 21_600;
-    case "1 day":
-      return 86_400;
-    default:
-      return 60;
+    case "10 seconds": return 10;
+    case "1 minute": return 60;
+    case "5 minutes": return 300;
+    case "15 minutes": return 900;
+    case "30 minutes": return 1800;
+    case "1 hour": return 3600;
+    case "6 hours": return 21_600;
+    case "1 day": return 86_400;
+    default: return 60;
   }
 }
 
 // ── Query builders ────────────────────────────────────────────────────────
 
+const F = SYNTHETIC_FIELDS;
 const TABLE = `"${SYNTHETIC_RESULTS_STREAM}"`;
 
-/** Summary aggregates for the KPI cards (single row). */
 export function buildKpiSql(monitorId: string): string {
   const id = escapeSqlLiteral(monitorId);
   return `SELECT
   COUNT(*) as total_runs,
-  COUNT(*) FILTER (WHERE status = '${STATUS_PASSED}') as passed_runs,
-  COUNT(*) FILTER (WHERE status != '${STATUS_PASSED}') as failed_runs,
-  COALESCE(approx_percentile_cont(duration_ms, 0.95), 0) as p95_duration
+  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
+  COUNT(*) FILTER (WHERE ${F.status} != '${STATUS_VALUES.passed}') as failed_runs,
+  COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration
 FROM ${TABLE}
-WHERE synthetics_id = '${id}'`;
+WHERE ${F.monitorId} = '${id}'`;
 }
 
-/** Most-recent run, for the "Last Run" KPI card. */
 export function buildLastRunSql(monitorId: string): string {
   const id = escapeSqlLiteral(monitorId);
-  return `SELECT status, _timestamp as ts
+  return `SELECT ${F.status} as status, ${F.timestamp} as ts
 FROM ${TABLE}
-WHERE synthetics_id = '${id}'
-ORDER BY _timestamp DESC
+WHERE ${F.monitorId} = '${id}'
+ORDER BY ${F.timestamp} DESC
 LIMIT 1`;
 }
 
-/** Bucketed time-series powering the sparkline + Response Time chart. */
 export function buildHistogramSql(monitorId: string, interval: string): string {
   const id = escapeSqlLiteral(monitorId);
   return `SELECT
-  histogram(_timestamp, '${interval}') as ts,
-  COALESCE(AVG(duration_ms), 0) as avg_duration,
-  COALESCE(approx_percentile_cont(duration_ms, 0.95), 0) as p95_duration,
+  histogram(${F.timestamp}, '${interval}') as ts,
+  COALESCE(AVG(${F.duration}), 0) as avg_duration,
+  COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration,
   COUNT(*) as total_runs,
-  COUNT(*) FILTER (WHERE status = '${STATUS_PASSED}') as passed_runs,
-  COUNT(*) FILTER (WHERE status != '${STATUS_PASSED}') as failed_runs
+  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
+  COUNT(*) FILTER (WHERE ${F.status} != '${STATUS_VALUES.passed}') as failed_runs
 FROM ${TABLE}
-WHERE synthetics_id = '${id}'
+WHERE ${F.monitorId} = '${id}'
 GROUP BY ts
 ORDER BY ts`;
 }
@@ -260,26 +287,25 @@ ORDER BY ts`;
 /** Most-recent runs for the Runs table. */
 export function buildRunsSql(monitorId: string, limit: number): string {
   const id = escapeSqlLiteral(monitorId);
-  return `SELECT _timestamp as ts, status, duration_ms as duration, location, device, engine, error, job_id, run_id
-FROM "${SYNTHETIC_RESULTS_STREAM}"
-WHERE synthetics_id = '${id}'
-ORDER BY _timestamp DESC
+  return `SELECT ${F.timestamp} as ts, scheduled_ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, trigger_type, ${F.error} as error, job_id, run_id
+FROM ${TABLE}
+WHERE ${F.monitorId} = '${id}'
+ORDER BY ${F.timestamp} DESC
 LIMIT ${limit}`;
 }
 
-/** Single run document for RunDetail view — returns all fields including steps. */
+/** Per-execution results for a single run — one row per engine×device combo. */
 export function buildRunDetailSql(monitorId: string, runId: string): string {
-  const mid = escapeSqlLiteral(monitorId);
+  const id = escapeSqlLiteral(monitorId);
   const rid = escapeSqlLiteral(runId);
-  return `SELECT *
+  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, ${F.error} as error, job_id, execution_id, trace_key, last_attempt_steps, recorded_steps
 FROM ${TABLE}
-WHERE synthetics_id = '${mid}' AND run_id = '${rid}'
-LIMIT 1`;
+WHERE ${F.monitorId} = '${id}' AND run_id = '${rid}'
+ORDER BY ${F.location} ASC`;
 }
 
 // ── Adapters (raw hits → typed models) ────────────────────────────────────
 
-/** Map the KPI aggregate row (+ optional last-run row) to the typed model. */
 export function mapKpi(
   rawKpiRow: Record<string, unknown> | null | undefined,
   rawLastRun: Record<string, unknown> | null | undefined,
@@ -298,22 +324,22 @@ export function mapKpi(
   };
 }
 
-/** Map one runs-table hit to the typed model. */
 export function mapRun(rawHit: Record<string, unknown>): SyntheticRun {
   return {
     timestamp: num(rawHit.ts) / 1000,
+    scheduledTs: num(rawHit.scheduled_ts) / 1000,
     status: toRunStatus(rawHit.status),
     durationMs: num(rawHit.duration),
     location: str(rawHit.location),
     device: str(rawHit.device),
     browserEngine: str(rawHit.engine),
+    triggerType: str(rawHit.trigger_type) || "schedule",
     error: str(rawHit.error),
     jobId: str(rawHit.job_id),
     runId: str(rawHit.run_id),
   };
 }
 
-/** Map one raw document to a SyntheticRunDetail (all fields including steps). */
 export function mapRunDetail(
   rawHit: Record<string, unknown>,
 ): SyntheticRunDetail | null {
@@ -327,37 +353,56 @@ export function mapRunDetail(
     engine: rawHit.engine,
     error: rawHit.error,
     job_id: rawHit.job_id,
+    run_id: rawHit.run_id,
   });
 
-  // Parse nested JSON fields
   const rawSteps = parseJson(rawHit.last_attempt_steps);
   const rawRecordedSteps = parseJson(rawHit.recorded_steps);
 
   return {
     ...base,
-    runId: str(rawHit.run_id),
     executionId: str(rawHit.execution_id),
     triggerType: str(rawHit.trigger_type),
     monitorName: str(rawHit.synthetics_name),
     attempts: num(rawHit.attempts),
     failedStep: rawHit.failed_step ? str(rawHit.failed_step) : null,
-    recordedSteps: Array.isArray(rawRecordedSteps)
-      ? (rawRecordedSteps as RecordedStep[])
-      : [],
-    lastAttemptSteps: Array.isArray(rawSteps)
-      ? (rawSteps as StepExecution[])
-      : [],
+    recordedSteps: Array.isArray(rawRecordedSteps) ? (rawRecordedSteps as RecordedStep[]) : [],
+    lastAttemptSteps: Array.isArray(rawSteps) ? (rawSteps as StepExecution[]) : [],
     retryHistory: [],
     network: null,
     webVitals: null,
-    traceKey: null,
+    traceKey: rawHit.trace_key ? str(rawHit.trace_key) : null,
   };
 }
 
-/**
- * Map the histogram hits to a dense, time-ordered bucket series. Zero-fills
- * empty buckets so the sparkline is always properly shaped.
- */
+export function mapRunLocationResult(rawHit: Record<string, unknown>): RunLocationResult {
+  return {
+    timestampMs: num(rawHit.ts) / 1000,
+    status: toRunStatus(rawHit.status),
+    durationMs: num(rawHit.duration),
+    location: str(rawHit.location),
+    device: str(rawHit.device),
+    browserEngine: str(rawHit.engine),
+    error: str(rawHit.error),
+    jobId: str(rawHit.job_id),
+    executionId: str(rawHit.execution_id),
+    traceKey: rawHit.trace_key ? str(rawHit.trace_key) : null,
+    steps: parseSteps(rawHit.last_attempt_steps),
+    recordedSteps: parseJsonArray(rawHit.recorded_steps).map((s: any) => ({
+      id: str(s.id),
+      name: str(s.name),
+      action: str(s.action),
+      selector: null,
+      url: null,
+      timeout_ms: 0,
+      value: null,
+      key: null,
+      text: null,
+    })),
+    retryHistory: [],
+  };
+}
+
 export function mapHistogram(
   rawHits: Record<string, unknown>[],
   startMicros: number,
@@ -368,17 +413,10 @@ export function mapHistogram(
   const startMs = Math.floor(startMicros / 1000 / stepMs) * stepMs;
   const endMs = Math.ceil(endMicros / 1000 / stepMs) * stepMs;
 
-  // Pre-fill every bucket key with zeros so empty positions still render.
   const buckets = new Map<string, SyntheticBucket>();
   for (let t = startMs; t < endMs; t += stepMs) {
     const key = new Date(t).toISOString().slice(0, 19);
-    buckets.set(key, {
-      tsMs: t,
-      avgMs: 0,
-      p95Ms: 0,
-      uptimePct: 100,
-      failedRuns: 0,
-    });
+    buckets.set(key, { tsMs: t, avgMs: 0, p95Ms: 0, uptimePct: 100, failedRuns: 0 });
   }
 
   for (const hit of rawHits) {
