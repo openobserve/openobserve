@@ -250,6 +250,7 @@ function editMonitor() {
 }
 
 function openRunDetail(runId: string) {
+  if (!runId) return;
   router.push({
     name: "synthetic-run-detail",
     params: { id: monitorId.value, runId },

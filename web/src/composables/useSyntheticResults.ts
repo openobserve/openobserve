@@ -20,10 +20,16 @@ import {
   buildHistogramSql,
   buildKpiSql,
   buildLastRunSql,
+  buildRunsSql,
+  buildRunDetailSql,
   mapHistogram,
   mapKpi,
+  mapRun,
+  mapRunDetail,
   type SyntheticBucket,
   type SyntheticKpi,
+  type SyntheticRun,
+  type SyntheticRunDetail,
 } from "@/composables/synthetics/syntheticResultsSchema";
 
 const EMPTY_KPI: SyntheticKpi = {
@@ -35,15 +41,21 @@ const EMPTY_KPI: SyntheticKpi = {
   lastRunAt: null,
 };
 
+const RUNS_LIMIT = 100;
+
 /**
- * Orchestration layer for KPI cards and Response Time chart.
- * Runs data is fetched separately via the REST /runs endpoint in MonitorResultsDashboard.
+ * Orchestration layer for the Monitor Results page. Builds SQL via the schema
+ * module, runs the queries through the shared streaming-search runner, and maps
+ * every raw response into typed models before exposing them. Components bind to
+ * `kpi` / `buckets` / `runs` only — they never see raw hits or field names.
  */
 export function useSyntheticResults() {
   const { executeQuery, cancelAll } = useLLMStreamQuery();
 
   const kpi = ref<SyntheticKpi>({ ...EMPTY_KPI });
   const buckets = ref<SyntheticBucket[]>([]);
+  const runs = ref<SyntheticRun[]>([]);
+  const runDetail = ref<SyntheticRunDetail | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
   const hasLoadedOnce = ref(false);
@@ -57,20 +69,61 @@ export function useSyntheticResults() {
     loading.value = true;
     error.value = null;
     try {
-      const safe = (p: Promise<any[]>) => p.catch(() => [] as any[]);
       const interval = bucketInterval(endTime - startTime);
-      const [kpiRows, lastRunRows, histogramRows] = await Promise.all([
-        safe(executeQuery(buildKpiSql(monitorId), startTime, endTime, "logs")),
-        safe(executeQuery(buildLastRunSql(monitorId), startTime, endTime, "logs")),
-        safe(executeQuery(buildHistogramSql(monitorId, interval), startTime, endTime, "logs")),
+      const [kpiRows, lastRunRows, histogramRows, runRows] = await Promise.all([
+        executeQuery(buildKpiSql(monitorId), startTime, endTime, "logs"),
+        executeQuery(buildLastRunSql(monitorId), startTime, endTime, "logs"),
+        executeQuery(
+          buildHistogramSql(monitorId, interval),
+          startTime,
+          endTime,
+          "logs",
+        ),
+        executeQuery(
+          buildRunsSql(monitorId, RUNS_LIMIT),
+          startTime,
+          endTime,
+          "logs",
+        ),
       ]);
 
       kpi.value = mapKpi(kpiRows[0] ?? null, lastRunRows[0] ?? null);
       buckets.value = mapHistogram(histogramRows, startTime, endTime);
+      runs.value = runRows.map(mapRun);
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : "Failed to load results";
       kpi.value = { ...EMPTY_KPI };
       buckets.value = [];
+      runs.value = [];
+    } finally {
+      loading.value = false;
+      hasLoadedOnce.value = true;
+    }
+  }
+
+  async function fetchRun(
+    monitorId: string,
+    runId: string,
+    startTime: number,
+    endTime: number,
+  ): Promise<void> {
+    if (!monitorId || !runId) return;
+    loading.value = true;
+    error.value = null;
+    runDetail.value = null;
+    try {
+      const rows = await executeQuery(
+        buildRunDetailSql(monitorId, runId),
+        startTime,
+        endTime,
+        "logs",
+      );
+      if (rows.length > 0) {
+        runDetail.value = mapRunDetail(rows[0]);
+      }
+    } catch (e: unknown) {
+      error.value = e instanceof Error ? e.message : "Failed to load run";
+      runDetail.value = null;
     } finally {
       loading.value = false;
       hasLoadedOnce.value = true;
@@ -80,10 +133,13 @@ export function useSyntheticResults() {
   return {
     kpi,
     buckets,
+    runs,
+    runDetail,
     loading,
     error,
     hasLoadedOnce,
     fetchAll,
+    fetchRun,
     cancelAll,
   };
 }

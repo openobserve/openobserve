@@ -1,6 +1,28 @@
 // Copyright 2026 OpenObserve Inc.
 import http from './http'
 
+const STREAM_NAME = "synthetics_results";
+
+export interface ListRunsPayload {
+  query: {
+    sql: string;
+    start_time: number;
+    end_time: number;
+    from: number;
+    size: number;
+  };
+}
+
+export interface GetRunPayload {
+  query: {
+    sql: string;
+    start_time: number;
+    end_time: number;
+    from: number;
+    size: number;
+  };
+}
+
 const syntheticsService = {
   create: (orgIdentifier: string, payload: unknown, folderId?: string) => {
     const params = folderId ? `?folder=${folderId}` : ''
@@ -55,6 +77,41 @@ const syntheticsService = {
 
   getLocations: (orgIdentifier: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/locations`),
+
+  listRunsPayload(
+    monitorId: string,
+    startTime: number,
+    endTime: number,
+  ): ListRunsPayload {
+    const sql = `SELECT * FROM "${STREAM_NAME}" WHERE synthetics_id = '${monitorId}' ORDER BY _timestamp DESC LIMIT 500`;
+    return {
+      query: {
+        sql,
+        start_time: startTime,
+        end_time: endTime,
+        from: 0,
+        size: 500,
+      },
+    };
+  },
+
+  getRunPayload(
+    monitorId: string,
+    runId: string,
+    startTime: number,
+    endTime: number,
+  ): GetRunPayload {
+    const sql = `SELECT * FROM "${STREAM_NAME}" WHERE synthetics_id = '${monitorId}' AND run_id = '${runId}' LIMIT 1`;
+    return {
+      query: {
+        sql,
+        start_time: startTime,
+        end_time: endTime,
+        from: 0,
+        size: 1,
+      },
+    };
+  },
 }
 
 export default syntheticsService

@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary"
                 >
                   <span
-                    class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-[#16a34a]"
+                    class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-[var(--o2-status-success-text)]"
                   />
                   {{ timelinePassCount }} Passed
                 </span>
@@ -764,6 +764,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
+import useSyntheticResults from "@/composables/useSyntheticResults";
+import type { SyntheticRun } from "@/composables/synthetics/syntheticResultsSchema";
 
 defineOptions({ name: "SyntheticMonitorRuns" });
 
@@ -781,6 +783,10 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   monitorStatus: "healthy",
 });
+
+// ── Synthetic results composable ──────────────────────────────────────────
+const synthetics = useSyntheticResults();
+const loading = computed(() => synthetics.loading.value);
 
 // ── Seeded random (deterministic mock data) ──────────────────────────────
 function seedRand(seed: number) {
@@ -965,7 +971,6 @@ function sparkPts(seed: number, n: number, base: number, vol: number): string {
 
 // ── State ────────────────────────────────────────────────────────────────
 const activeTab = ref("overview");
-const loading = ref(false);
 const windowLabel = ref("Last 24 hours");
 const statusFilter = ref("all");
 const browserFilter = ref("all");
@@ -1009,8 +1014,34 @@ const actionOptions: SelectOption[] = [
   { label: "type", value: "type" },
 ];
 
-// ── Computed: derived data from mock runs ────────────────────────────────
-const allRuns = computed(() => generateRuns());
+// ── Helper: map SyntheticRun to MockRun shape used by computed properties ─
+function toMockRun(r: SyntheticRun, idx: number): MockRun {
+  // Capitalize first letter for browser engine names (e.g. "chromium" → "Chromium")
+  const eng = r.browserEngine;
+  const browser = eng ? eng.charAt(0).toUpperCase() + eng.slice(1) : eng;
+  return {
+    id: idx + 1,
+    ageMin: Math.round((Date.now() / 1000 - r.timestamp) / 60),
+    duration: r.durationMs,
+    status: r.status === "passed" ? ("pass" as const) : ("fail" as const),
+    location: r.location,
+    browser,
+    device: r.device,
+    failedStep: null,
+    locator: null,
+    action: null,
+    errorPattern: r.error || null,
+    artifacts: { screenshot: true, replay: false, trace: true, rum: false },
+  };
+}
+
+// ── Runs: use live data when available, fall back to mock data ──────────
+const allRuns = computed<MockRun[]>(() => {
+  if (synthetics.hasLoadedOnce.value) {
+    return synthetics.runs.value.map(toMockRun);
+  }
+  return generateRuns();
+});
 
 const filteredRuns = computed(() => {
   return allRuns.value.filter((run) => {
@@ -1058,21 +1089,13 @@ const totalPasses = computed(
   () => allRuns.value.filter((r) => r.status === "pass").length,
 );
 
-const uptimePct = computed(() => {
-  const total = allRuns.value.length;
-  return total > 0
-    ? (((total - totalFails.value) / total) * 100).toFixed(2) + "%"
-    : "100%";
-});
-
-const durations = computed(() =>
-  allRuns.value.map((r) => r.duration).sort((a, b) => a - b),
+const p95Label = computed(() =>
+  synthetics.hasLoadedOnce.value && synthetics.kpi.value.p95Ms > 0
+    ? fmtDur(synthetics.kpi.value.p95Ms)
+    : fmtDur(0),
 );
-const p95Ms = computed(
-  () => durations.value[Math.floor(durations.value.length * 0.95)] || 0,
-);
-const p95Label = computed(() => fmtDur(p95Ms.value));
-const failCount = computed(() => String(totalFails.value));
+const p95Ms = computed(() => synthetics.kpi.value.p95Ms);
+const failCount = computed(() => String(synthetics.kpi.value.failedRuns));
 
 interface KpiCard {
   key: string;
@@ -1082,23 +1105,53 @@ interface KpiCard {
   valueClass?: string;
 }
 const kpiCards = computed<KpiCard[]>(() => {
+  const k = synthetics.kpi.value;
+  if (synthetics.hasLoadedOnce.value) {
+    return [
+      {
+        key: "pass-rate",
+        label: "Pass Rate",
+        value: k.totalRuns > 0 ? k.uptimePct.toFixed(1) + "%" : "—",
+      },
+      {
+        key: "p95-duration",
+        label: "p95 Duration",
+        value: k.p95Ms > 0 ? fmtDur(k.p95Ms) : "—",
+      },
+      {
+        key: "failed-runs",
+        label: "Failed Runs",
+        value: String(k.failedRuns),
+        valueClass: k.failedRuns > 0 ? "tw:text-status-error-text!" : undefined,
+      },
+      {
+        key: "last-run",
+        label: "Last Run",
+        value: k.lastRunStatus
+          ? k.lastRunStatus === "failed"
+            ? "Failed"
+            : "Passed"
+          : "—",
+        unit: k.lastRunAt
+          ? fmtAge(Math.round((Date.now() - k.lastRunAt) / 60000)) +
+            " · Next in 3 min"
+          : undefined,
+        valueClass:
+          k.lastRunStatus === "failed"
+            ? "tw:text-status-error-text!"
+            : "tw:text-status-success-text!",
+      },
+    ];
+  }
+  // Fallback: derive from mock data
+  const fallbackPassPct = allRuns.value.length > 0
+    ? ((allRuns.value.filter((r) => r.status === "pass").length / allRuns.value.length) * 100).toFixed(1) + "%"
+    : "100%";
   const lastRun = allRuns.value[0];
   return [
-    {
-      key: "pass-rate",
-      label: "Pass Rate",
-      value: uptimePct.value,
-    },
-    {
-      key: "p95-duration",
-      label: "p95 Duration",
-      value: p95Label.value,
-    },
-    {
-      key: "failed-runs",
-      label: "Failed Runs",
-      value: failCount.value,
-    },
+    { key: "pass-rate", label: "Pass Rate", value: fallbackPassPct },
+    { key: "p95-duration", label: "p95 Duration", value: "—" },
+    { key: "failed-runs", label: "Failed Runs", value: String(totalFails.value) },
     {
       key: "last-run",
       label: "Last Run",
@@ -1107,7 +1160,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       valueClass:
         lastRun?.status === "fail"
           ? "tw:text-status-error-text!"
-          : "tw:text-[#16a34a]!",
+          : "tw:text-status-success-text!",
     },
   ];
 });
@@ -1129,7 +1182,7 @@ const timelineSegments = computed(() => {
   });
   return merged.map((seg) => ({
     pct: ((seg.width / totalSpan) * 100).toFixed(2) + "%",
-    color: seg.status === "fail" ? "var(--o2-status-error-text)" : "#16a34a",
+    color: seg.status === "fail" ? "var(--o2-status-error-text)" : "var(--o2-status-success-text)",
     title:
       (seg.status === "fail" ? "Failed" : "Passed") +
       " · ~" +
@@ -1166,7 +1219,7 @@ const browserBreakdown = computed<BreakdownItem[]>(() => {
       pct: pct + "%",
       barColor:
         pct >= 95
-          ? "#16a34a"
+          ? "var(--o2-status-success-text)"
           : pct >= 85
             ? "var(--o2-warning-500)"
             : "var(--o2-status-error-text)",
@@ -1189,14 +1242,14 @@ const locationBreakdown = computed<BreakdownItem[]>(() => {
       name,
       dot:
         pct >= 95
-          ? "#16a34a"
+          ? "var(--o2-status-success-text)"
           : pct >= 85
             ? "var(--o2-warning-500)"
             : "var(--o2-status-error-text)",
       pct: pct + "%",
       barColor:
         pct >= 95
-          ? "#16a34a"
+          ? "var(--o2-status-success-text)"
           : pct >= 85
             ? "var(--o2-warning-500)"
             : "var(--o2-status-error-text)",
@@ -1220,7 +1273,7 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
       pct: pct + "%",
       barColor:
         pct >= 95
-          ? "#16a34a"
+          ? "var(--o2-status-success-text)"
           : pct >= 85
             ? "var(--o2-warning-500)"
             : "var(--o2-status-error-text)",
@@ -1237,7 +1290,7 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
 // ── Status filter options ────────────────────────────────────────────────
 const statusOptions = [
   { key: "all", label: "All", dot: "var(--o2-text-secondary)" },
-  { key: "pass", label: "Passed", dot: "#16a34a" },
+  { key: "pass", label: "Passed", dot: "var(--o2-status-success-text)" },
   { key: "fail", label: "Failed", dot: "var(--o2-status-error-text)" },
 ];
 
@@ -1383,7 +1436,7 @@ const stepGroups = computed<StepGroupRow[]>(() => {
       ? "var(--o2-status-error-text)"
       : pct >= 5
         ? "var(--o2-warning-500)"
-        : "#16a34a";
+        : "var(--o2-status-success-text)";
   const chipStyleForRate = (pct: number) =>
     pct >= 15
       ? { bg: "var(--o2-error-50)", color: "var(--o2-status-error-text)" }
@@ -1647,6 +1700,15 @@ function resetFilters() {
 }
 
 function openRun(row: { id: number }) {
+  // When data comes from the composable, use the real run_id
+  const idx = allRuns.value.findIndex((r) => r.id === row.id);
+  if (idx >= 0 && synthetics.hasLoadedOnce.value) {
+    const realRun = synthetics.runs.value[idx];
+    if (realRun?.runId) {
+      emit("open-run", realRun.runId);
+      return;
+    }
+  }
   emit("open-run", String(row.id));
 }
 
@@ -1659,10 +1721,8 @@ function toggleStepGroup(key: string) {
 
 // ── Public API — parent drives all (re)loads ─────────────────────────────
 async function refresh(startTime?: number, endTime?: number) {
-  // Placeholder: will wire to useSyntheticResults.fetchAll() in follow-up
-  loading.value = true;
-  await new Promise((r) => setTimeout(r, 100));
-  loading.value = false;
+  if (!startTime || !endTime) return;
+  await synthetics.fetchAll(props.monitorId, startTime, endTime);
 }
 
 defineExpose({ refresh });
