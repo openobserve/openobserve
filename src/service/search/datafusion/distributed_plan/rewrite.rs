@@ -29,7 +29,7 @@ use datafusion::{
     },
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::metadata_count::MetadataCountExec;
+use o2_enterprise::enterprise::search::datafusion::distributed_plan::metadata_count_exec::MetadataCountExec;
 
 use crate::service::search::{
     datafusion::plan::tantivy_optimize_exec::TantivyOptimizeExec, grpc::QueryParams,
@@ -52,7 +52,7 @@ pub fn aggregate_optimize_rewrite(
         return Ok(physical_plan);
     }
 
-    let mut visitor = IndexOptimizeRewriter::new(
+    let mut visitor = AggregateOptimizeRewriter::new(
         query,
         tantivy_file_list,
         index_condition,
@@ -63,17 +63,18 @@ pub fn aggregate_optimize_rewrite(
     Ok(physical_plan.rewrite(&mut visitor)?.data)
 }
 
-pub struct IndexOptimizeRewriter {
+pub struct AggregateOptimizeRewriter {
     query: Arc<QueryParams>,
     file_list: Vec<FileKey>,
     index_condition: Option<IndexCondition>,
     index_optimize_mode: Option<IndexOptimizeMode>,
+    #[allow(unused)]
     metadata_records: i64,
     #[allow(unused)]
     metadata_files: usize,
 }
 
-impl IndexOptimizeRewriter {
+impl AggregateOptimizeRewriter {
     pub fn new(
         query: Arc<QueryParams>,
         file_list: Vec<FileKey>,
@@ -113,16 +114,10 @@ impl IndexOptimizeRewriter {
         )))
     }
 
-    #[cfg(not(feature = "enterprise"))]
-    fn metadata_count_exec(&self, _schema: SchemaRef) -> Result<Arc<dyn ExecutionPlan>> {
-        Err(datafusion::error::DataFusionError::Internal(
-            "metadata count rewrite requires enterprise feature".to_string(),
-        ))
-    }
-
     fn additional_inputs(&mut self, schema: SchemaRef) -> Result<Vec<Arc<dyn ExecutionPlan>>> {
         let mut inputs = Vec::new();
 
+        #[cfg(feature = "enterprise")]
         if self.metadata_records > 0 {
             inputs.push(self.metadata_count_exec(schema.clone())?);
         }
@@ -135,7 +130,7 @@ impl IndexOptimizeRewriter {
     }
 }
 
-impl TreeNodeRewriter for IndexOptimizeRewriter {
+impl TreeNodeRewriter for AggregateOptimizeRewriter {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
