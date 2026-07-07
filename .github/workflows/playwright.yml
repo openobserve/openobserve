@@ -68,12 +68,15 @@ jobs:
 
       - id: check
         run: |
-          # Skip when a PR touches only docs, images, or unrelated workflow files. Source,
-          # web/, and this workflow (playwright.yml) still run the suite.
+          # Skip when a PR touches only docs, images, or unrelated workflow files (e.g. a
+          # dependabot bump to another workflow) — none can affect the app. Source, web/, and
+          # this workflow (playwright.yml) still run the suite.
           IGNORE_RE='(\.md$|^docs/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'
           CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          # Files not matching IGNORE_RE; captured (not `grep -qv`) so the check doesn't depend
-          # on grep -qv exit semantics, which differ across grep builds.
+          # Files not matching IGNORE_RE. Captured (not `grep -qv`) so the check doesn't depend
+          # on grep -qv exit semantics, which differ across grep builds; the `|| true` keeps
+          # `set -e` from aborting when grep matches nothing (exit 1). The `grep -qE` below is a
+          # loop-safe `if`-condition term (`set -e` doesn't fire there), so it needs no `|| true`.
           RELEVANT=$(printf '%s' "$CHANGED" | grep -vE "$IGNORE_RE" || true)
           if [ -z "$CHANGED" ] || [ -n "$RELEVANT" ] || printf '%s' "$CHANGED" | grep -qE '^\.github/workflows/playwright\.yml$'; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
