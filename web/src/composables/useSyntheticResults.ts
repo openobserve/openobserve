@@ -37,6 +37,7 @@ const EMPTY_KPI: SyntheticKpi = {
   p95Ms: 0,
   failedRuns: 0,
   totalRuns: 0,
+  retriedRuns: 0,
   lastRunStatus: null,
   lastRunAt: null,
 };

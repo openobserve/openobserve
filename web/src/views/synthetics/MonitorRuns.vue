@@ -40,17 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         Overview
       </OTab>
       <OTab name="steps" data-test="monitor-runs-tab-steps"> Steps </OTab>
-      <OTab name="errors" data-test="monitor-runs-tab-errors">
-        Errors
-        <OBadge
-          v-if="errorGroupCount > 0"
-          variant="error"
-          size="sm"
-          class="tw:ml-1"
-        >
-          {{ errorGroupCount }}
-        </OBadge>
-      </OTab>
     </OTabs>
 
     <div class="tw:flex-1 tw:min-h-0">
@@ -66,88 +55,153 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:max-w-[85rem] tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
           >
             <!-- Status Timeline -->
-            <OCard>
-              <OCardSection role="header" class="tw:gap-2">
+            <div class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden">
+              <div class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]">
                 <span class="tw:font-bold tw:text-xs tw:text-text-heading">
                   Status Timeline
                 </span>
                 <span class="tw:flex-1" />
-                <span
-                  class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary"
-                >
-                  <span
-                    class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-status-error-text"
-                  />
+                <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary">
+                  <span class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-[var(--o2-status-warning-text)]" />
+                  {{ timelineMixedCount }} Mixed
+                </span>
+                <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary">
+                  <span class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-status-error-text" />
                   {{ timelineFailCount }} Failed
                 </span>
-                <span
-                  class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary"
-                >
-                  <span
-                    class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-[var(--o2-status-success-text)]"
-                  />
+                <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary">
+                  <span class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-[var(--o2-status-success-text)]" />
                   {{ timelinePassCount }} Passed
                 </span>
-              </OCardSection>
-              <OSeparator />
-              <OCardSection
-                role="body"
-                class="tw:flex tw:flex-col tw:gap-1 tw:py-2"
-              >
-                <div
-                  class="tw:flex tw:w-full tw:h-[26px] tw:rounded tw:overflow-hidden tw:gap-0.5"
-                >
+              </div>
+              <div class="tw:border-t tw:border-[var(--o2-border-color)]" />
+              <div class="tw:flex tw:flex-col tw:gap-1 tw:py-2 tw:px-[0.875rem]">
+                <div class="tw:flex tw:items-center tw:gap-1">
+                  <button
+                    class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded tw:bg-transparent tw:border-none tw:cursor-pointer tw:text-text-secondary tw:hover:bg-surface-subtle tw:disabled:opacity-30 tw:disabled:cursor-default tw:transition-colors"
+                    :disabled="!canScrollLeft"
+                    @click="scrollTimeline('left')"
+                    aria-label="Scroll timeline left"
+                  >
+                    <OIcon name="chevron-left" size="xs" />
+                  </button>
                   <div
-                    v-for="(seg, i) in timelineSegments"
-                    :key="i"
-                    class="tw:min-w-[3px] tw:h-full"
-                    :style="{ width: seg.pct, background: seg.color }"
-                    :title="seg.title"
-                  />
+                    ref="timelineScrollRef"
+                    class="tw:flex-1 tw:overflow-hidden tw:flex tw:rounded tw:h-[26px] tw:gap-0.5"
+                    @scroll="onTimelineScroll"
+                  >
+                    <div
+                      v-for="(seg, i) in timelineSegments"
+                      :key="seg.runId"
+                      class="tw:shrink-0 tw:h-full tw:min-w-[3px] tw:cursor-pointer tw:transition-all tw:duration-100 hover:tw:scale-y-[1.35]"
+                      :style="{ width: (100 / MAX_VISIBLE_SEGMENTS) + '%', background: seg.color }"
+                      :title="seg.title"
+                      @mouseenter="showTooltip($event, seg)"
+                      @mouseleave="hideTooltip"
+                    />
+                  </div>
+                  <button
+                    class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded tw:bg-transparent tw:border-none tw:cursor-pointer tw:text-text-secondary tw:hover:bg-surface-subtle tw:disabled:opacity-30 tw:disabled:cursor-default tw:transition-colors"
+                    :disabled="!canScrollRight"
+                    @click="scrollTimeline('right')"
+                    aria-label="Scroll timeline right"
+                  >
+                    <OIcon name="chevron-right" size="xs" />
+                  </button>
                 </div>
                 <div
                   class="tw:flex tw:justify-between tw:text-[10.5px] tw:font-mono tw:tabular-nums tw:text-text-secondary"
                 >
                   <span>{{ timelineStartLabel }}</span>
+                  <span>{{ timelineRangeLabel }}</span>
                   <span>{{ timelineEndLabel }}</span>
                 </div>
-              </OCardSection>
-            </OCard>
+              </div>
+            </div>
+
+            <!-- Timeline hover tooltip -->
+            <Teleport to="body">
+              <div
+                v-if="hoveredSegment"
+                class="tw:fixed tw:z-[10100] tw:rounded-md tw:shadow-lg tw:px-3 tw:py-2 tw:text-xs tw:min-w-[220px] tw:max-w-[360px]"
+                :style="{
+                  left: tooltipX + 'px',
+                  top: tooltipY + 'px',
+                  transform: 'translate(-50%, -100%)',
+                  background: 'var(--color-surface-overlay)',
+                }"
+              >
+                <div class="tw:font-semibold tw:text-text-heading tw:mb-1.5 tw:truncate">
+                  {{ hoveredSegment.title }}
+                </div>
+                <div
+                  v-for="(exec, eIdx) in hoveredSegment.executions"
+                  :key="eIdx"
+                  class="tw:flex tw:items-center tw:gap-1.5 tw:py-0.5 tw:border-b tw:border-border-default tw:last:border-b-0"
+                >
+                  <OIcon
+                    :name="exec.statusIcon"
+                    size="xs"
+                    class="tw:shrink-0"
+                    :class="exec.status === 'pass' ? 'tw:text-[var(--o2-status-success-text)]' : 'tw:text-[var(--o2-status-error-text)]'"
+                  />
+                  <span class="tw:text-text-secondary tw:truncate">
+                    <span class="tw:font-medium tw:text-text-body">{{ exec.location }}</span>
+                    <span class="tw:mx-1 tw:opacity-40">·</span>
+                    {{ exec.browserEngine }}
+                    <span class="tw:mx-1 tw:opacity-40">·</span>
+                    {{ exec.device }}
+                  </span>
+                  <span
+                    v-if="exec.errorSnippet"
+                    class="tw:text-[10px] tw:text-status-error-text tw:truncate tw:ml-auto tw:max-w-[100px]"
+                  >
+                    {{ exec.errorSnippet }}
+                  </span>
+                </div>
+                <div
+                  class="tw:absolute tw:left-1/2 tw:-bottom-[5px] tw:-translate-x-1/2"
+                  style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 6px solid var(--color-surface-overlay);"
+                />
+              </div>
+            </Teleport>
 
             <!-- KPI Cards — LLMInsightsDashboard style -->
-            <div class="tw:grid tw:grid-cols-4 tw:gap-[0.625rem]">
+            <div class="tw:grid tw:grid-cols-5 tw:gap-[0.625rem]">
               <div
                 v-for="card in kpiCards"
                 :key="card.key"
-                class="card-container tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem]"
+                class="card-container tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem] tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
                 :data-test="`monitor-runs-kpi-${card.key}`"
               >
-                <div
-                  class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]"
-                >
-                  {{ card.label }}
-                </div>
-                <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
-                  <span
-                    class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]"
-                    :class="card.valueClass"
+                <div class="tw:flex tw:flex-col tw:gap-[0.25rem]">
+                  <div
+                    class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]"
                   >
-                    {{ card.value }}
-                  </span>
-                  <span
-                    v-if="card.unit"
-                    class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
-                  >
-                    {{ card.unit }}
-                  </span>
+                    {{ card.label }}
+                  </div>
+                  <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
+                    <span
+                      class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]"
+                      :class="card.valueClass"
+                    >
+                      {{ card.value }}
+                    </span>
+                    <span
+                      v-if="card.unit"
+                      class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
+                    >
+                      {{ card.unit }}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
             <!-- Charts row -->
             <div class="tw:grid tw:grid-cols-2 tw:gap-[0.875rem]">
-              <OCard>
-                <OCardSection role="header" class="tw:gap-2">
+              <div class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden">
+                <div class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]">
                   <span class="tw:font-bold tw:text-sm tw:text-text-heading">
                     Response Time
                   </span>
@@ -155,17 +209,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OBadge variant="default" size="sm">
                     p95 {{ p95Label }}
                   </OBadge>
-                </OCardSection>
-                <OSeparator />
-                <OCardSection role="body" class="tw:p-0 tw:min-h-[180px]">
+                </div>
+                <div class="tw:border-t tw:border-[var(--o2-border-color)]" />
+                <div class="tw:min-h-[180px] tw:p-0">
                   <ChartRenderer
                     :data="{ options: responseChartOption }"
                     height="180px"
                   />
-                </OCardSection>
-              </OCard>
-              <OCard>
-                <OCardSection role="header" class="tw:gap-2">
+                </div>
+              </div>
+              <div class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden">
+                <div class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]">
                   <span class="tw:font-bold tw:text-sm tw:text-text-heading">
                     Errors Over Time
                   </span>
@@ -173,28 +227,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OBadge variant="error" size="sm">
                     {{ failCount }} failed
                   </OBadge>
-                </OCardSection>
-                <OSeparator />
-                <OCardSection role="body" class="tw:p-0 tw:min-h-[180px]">
+                </div>
+                <div class="tw:border-t tw:border-[var(--o2-border-color)]" />
+                <div class="tw:min-h-[180px] tw:p-0">
                   <ChartRenderer
                     :data="{ options: errorChartOption }"
                     height="180px"
                   />
-                </OCardSection>
-              </OCard>
+                </div>
+              </div>
             </div>
 
             <!-- Breakdown cards -->
             <div class="tw:grid tw:grid-cols-3 tw:gap-[0.875rem]">
-              <OCard>
-                <OCardSection role="header" class="tw:gap-2">
+              <div class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden">
+                <div class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]">
                   <OIcon name="public" size="sm" class="tw:text-primary-700" />
                   <span class="tw:font-bold tw:text-sm tw:text-text-heading">
                     Pass Rate by Browser
                   </span>
-                </OCardSection>
-                <OSeparator />
-                <OCardSection role="body">
+                </div>
+                <div class="tw:border-t tw:border-[var(--o2-border-color)]" />
+                <div class="tw:px-[0.875rem] tw:py-[0.5rem]">
                   <div
                     v-for="b in browserBreakdown"
                     :key="b.name"
@@ -225,10 +279,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ b.pct }}
                     </span>
                   </div>
-                </OCardSection>
-              </OCard>
-              <OCard>
-                <OCardSection role="header" class="tw:gap-2">
+                </div>
+              </div>
+              <div class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden">
+                <div class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]">
                   <OIcon
                     name="distance"
                     size="sm"
@@ -237,9 +291,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="tw:font-bold tw:text-sm tw:text-text-heading">
                     Pass Rate by Location
                   </span>
-                </OCardSection>
-                <OSeparator />
-                <OCardSection role="body">
+                </div>
+                <div class="tw:border-t tw:border-[var(--o2-border-color)]" />
+                <div class="tw:px-[0.875rem] tw:py-[0.5rem]">
                   <div
                     v-for="l in locationBreakdown"
                     :key="l.name"
@@ -269,17 +323,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ l.pct }}
                     </span>
                   </div>
-                </OCardSection>
-              </OCard>
-              <OCard>
-                <OCardSection role="header" class="tw:gap-2">
+                </div>
+              </div>
+              <div class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden">
+                <div class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]">
                   <OIcon name="devices" size="sm" class="tw:text-primary-700" />
                   <span class="tw:font-bold tw:text-sm tw:text-text-heading">
                     Pass Rate by Device
                   </span>
-                </OCardSection>
-                <OSeparator />
-                <OCardSection role="body">
+                </div>
+                <div class="tw:border-t tw:border-[var(--o2-border-color)]" />
+                <div class="tw:px-[0.875rem] tw:py-[0.5rem]">
                   <div
                     v-for="d in deviceBreakdown"
                     :key="d.name"
@@ -310,8 +364,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ d.pct }}
                     </span>
                   </div>
-                </OCardSection>
-              </OCard>
+                </div>
+              </div>
             </div>
 
             <!-- Filter bar -->
@@ -892,6 +946,7 @@ function errorPatterns(): string[] {
 
 interface MockRun {
   id: number;
+  runId: string;
   ageMin: number;
   scheduledTs: number;
   duration: number;
@@ -921,42 +976,51 @@ function generateRuns(): MockRun[] {
   const meta = stepMeta();
   const errs = errorPatterns();
   const runs: MockRun[] = [];
-  const N = 26;
-  for (let i = 0; i < N; i++) {
-    const idNum = 4821 - i;
-    const isFail = r() < 0.22;
-    const dur = isFail
-      ? Math.round(20000 + r() * 15000)
-      : Math.round(1800 + r() * 3200);
-    const errIdx = Math.floor(r() * errs.length);
-    const failedStep = isFail ? steps[8 + Math.floor(r() * 4)] : null;
-    const locator = failedStep ? meta[failedStep].locator : null;
-    const ageMinVal = i * 17 + Math.floor(r() * 6);
-    runs.push({
-      id: idNum,
-      ageMin: ageMinVal,
-      scheduledTs: Date.now() - ageMinVal * 60 * 1000,
-      triggerType: "schedule",
-      duration: dur,
-      status: isFail ? ("fail" as const) : ("pass" as const),
-      location: locations[Math.floor(r() * locations.length)],
-      browser: browsers[Math.floor(r() * browsers.length)],
-      device: devices[r() < 0.85 ? 0 : 1],
-      failedStep,
-      locator,
-      action: failedStep
-        ? ["Place order", "Go to checkout", "Add to cart"].includes(failedStep)
-          ? "click"
-          : "type"
-        : null,
-      errorPattern: isFail ? errs[errIdx] : null,
-      artifacts: {
-        screenshot: true,
-        replay: r() < 0.7,
-        trace: true,
-        rum: r() < 0.9,
-      },
-    });
+
+  const NUM_LOGICAL_RUNS = 26;
+  let idCounter = 1;
+  for (let logicalRunIdx = 0; logicalRunIdx < NUM_LOGICAL_RUNS; logicalRunIdx++) {
+    const runId = "run-" + String(5000 - logicalRunIdx);
+    const numExecutions = 3 + Math.floor(r() * 16); // 3–18 executions per run
+    const ageMinVal = logicalRunIdx * 17 + Math.floor(r() * 6);
+    const scheduledBase = Date.now() - ageMinVal * 60 * 1000;
+
+    for (let execIdx = 0; execIdx < numExecutions; execIdx++) {
+      const isFail = r() < 0.22;
+      const dur = isFail
+        ? Math.round(20000 + r() * 15000)
+        : Math.round(1800 + r() * 3200);
+      const errIdx = Math.floor(r() * errs.length);
+      const failedStep = isFail ? steps[8 + Math.floor(r() * 4)] : null;
+      const locator = failedStep ? meta[failedStep].locator : null;
+
+      runs.push({
+        id: idCounter++,
+        runId,
+        ageMin: ageMinVal,
+        scheduledTs: scheduledBase,
+        triggerType: "schedule",
+        duration: dur,
+        status: isFail ? ("fail" as const) : ("pass" as const),
+        location: locations[Math.floor(r() * locations.length)],
+        browser: browsers[Math.floor(r() * browsers.length)],
+        device: devices[r() < 0.85 ? 0 : 1],
+        failedStep,
+        locator,
+        action: failedStep
+          ? ["Place order", "Go to checkout", "Add to cart"].includes(failedStep)
+            ? "click"
+            : "type"
+          : null,
+        errorPattern: isFail ? errs[errIdx] : null,
+        artifacts: {
+          screenshot: true,
+          replay: r() < 0.7,
+          trace: true,
+          rum: r() < 0.9,
+        },
+      });
+    }
   }
   return runs;
 }
@@ -990,7 +1054,25 @@ function sparkPts(seed: number, n: number, base: number, vol: number): string {
 
 // ── State ────────────────────────────────────────────────────────────────
 const activeTab = ref("overview");
-const windowLabel = ref("Last 24 hours");
+/** Time range from the parent (microseconds). Updated on each refresh call. */
+const timeRangeMicros = ref<{ startTime: number; endTime: number } | null>(null);
+
+/** Human-readable window label derived from the time range duration. */
+function formatWindowLabel(startMicros: number, endMicros: number): string {
+  const diffMs = (endMicros - startMicros) / 1000;
+  const hours = Math.round(diffMs / 3600000);
+  if (hours >= 48) return `Last ${Math.round(hours / 24)} days`;
+  if (hours >= 24) return "Last 24 hours";
+  if (hours >= 2) return `Last ${hours} hours`;
+  const minutes = Math.round(diffMs / 60000);
+  if (minutes >= 60) return "Last 1 hour";
+  return `Last ${minutes} minutes`;
+}
+const windowLabel = computed(() =>
+  timeRangeMicros.value
+    ? formatWindowLabel(timeRangeMicros.value.startTime, timeRangeMicros.value.endTime)
+    : "Last 24 hours",
+);
 const statusFilter = ref("all");
 const browserFilter = ref("all");
 const deviceFilter = ref("all");
@@ -1003,24 +1085,23 @@ const errorFilter = ref<string | null>(null);
 const stepsGroupBy = ref<"step" | "locator">("step");
 const expandedRows = ref<Record<string, boolean>>({});
 
-// ── Select options ───────────────────────────────────────────────────────
-const browserOptions: SelectOption[] = [
+// ── Select options (dynamic from run data) ──────────────────────────────
+function uniqueValues(key: "browser" | "device" | "location"): string[] {
+  const vals = new Set(allRuns.value.map((r) => r[key]).filter(Boolean));
+  return Array.from(vals).sort();
+}
+const browserOptions = computed<SelectOption[]>(() => [
   { label: "All browsers", value: "all" },
-  { label: "Chromium", value: "Chromium" },
-  { label: "Firefox", value: "Firefox" },
-  { label: "WebKit", value: "WebKit" },
-];
-const deviceOptions: SelectOption[] = [
+  ...uniqueValues("browser").map((v) => ({ label: v, value: v })),
+]);
+const deviceOptions = computed<SelectOption[]>(() => [
   { label: "All devices", value: "all" },
-  { label: "Desktop", value: "Desktop" },
-  { label: "Mobile", value: "Mobile" },
-];
-const locationOptions: SelectOption[] = [
+  ...uniqueValues("device").map((v) => ({ label: v, value: v })),
+]);
+const locationOptions = computed<SelectOption[]>(() => [
   { label: "All locations", value: "all" },
-  { label: "us-east-1", value: "us-east-1" },
-  { label: "eu-west-1", value: "eu-west-1" },
-  { label: "ap-south-1", value: "ap-south-1" },
-];
+  ...uniqueValues("location").map((v) => ({ label: v, value: v })),
+]);
 const durationOptions: SelectOption[] = [
   { label: "Any duration", value: "all" },
   { label: "< 5s", value: "fast" },
@@ -1039,6 +1120,7 @@ function toMockRun(r: SyntheticRun, idx: number): MockRun {
   const browser = eng ? eng.charAt(0).toUpperCase() + eng.slice(1) : eng;
   return {
     id: idx + 1,
+    runId: r.runId || "unknown-" + idx,
     ageMin: Math.round((Date.now() / 1000 - r.timestamp) / 60),
     scheduledTs: r.scheduledTs,
     triggerType: r.triggerType,
@@ -1105,9 +1187,6 @@ const filteredRuns = computed(() => {
 const totalFails = computed(
   () => allRuns.value.filter((r) => r.status === "fail").length,
 );
-const totalPasses = computed(
-  () => allRuns.value.filter((r) => r.status === "pass").length,
-);
 
 const p95Label = computed(() =>
   synthetics.hasLoadedOnce.value && synthetics.kpi.value.p95Ms > 0
@@ -1137,6 +1216,16 @@ const kpiCards = computed<KpiCard[]>(() => {
         key: "p95-duration",
         label: "p95 Duration",
         value: k.p95Ms > 0 ? fmtDur(k.p95Ms) : "—",
+      },
+      {
+        key: "retry-rate",
+        label: "Retry Rate",
+        value:
+          k.totalRuns > 0
+            ? ((k.retriedRuns / k.totalRuns) * 100).toFixed(1) + "%"
+            : "—",
+        valueClass:
+          k.retriedRuns > 0 ? "tw:text-text-body!" : undefined,
       },
       {
         key: "failed-runs",
@@ -1176,6 +1265,7 @@ const kpiCards = computed<KpiCard[]>(() => {
   return [
     { key: "pass-rate", label: "Pass Rate", value: fallbackPassPct },
     { key: "p95-duration", label: "p95 Duration", value: "—" },
+    { key: "retry-rate", label: "Retry Rate", value: "—" },
     {
       key: "failed-runs",
       label: "Failed Runs",
@@ -1194,39 +1284,166 @@ const kpiCards = computed<KpiCard[]>(() => {
   ];
 });
 
+// ── Timeline view model types ────────────────────────────────────────────
+interface TimelineExecution {
+  location: string;
+  browserEngine: string;
+  device: string;
+  status: "pass" | "fail";
+  statusIcon: string;
+  errorSnippet: string | null;
+}
+
+interface TimelineSegment {
+  runId: string;
+  status: "all-pass" | "mixed" | "all-fail";
+  color: string;
+  title: string;
+  executions: TimelineExecution[];
+}
+
 // ── Status timeline ──────────────────────────────────────────────────────
-const timelineSegments = computed(() => {
-  const chronological = [...allRuns.value].sort((a, b) => b.ageMin - a.ageMin);
-  const totalSpan = chronological.length ? chronological[0].ageMin || 1 : 1;
-  const rawSegments = chronological.map((run, i) => {
-    const nextAge =
-      i < chronological.length - 1 ? chronological[i + 1].ageMin : 0;
-    return { status: run.status, width: Math.max(run.ageMin - nextAge, 0) };
+const timelineSegments = computed<TimelineSegment[]>(() => {
+  const runs = allRuns.value;
+  if (runs.length === 0) return [];
+
+  // Group by runId — preserves insertion order (most recent run first)
+  const groupMap = new Map<string, MockRun[]>();
+  const groupOrder: string[] = [];
+  for (const run of runs) {
+    if (!run.runId) continue;
+    const existing = groupMap.get(run.runId);
+    if (existing) {
+      existing.push(run);
+    } else {
+      groupMap.set(run.runId, [run]);
+      groupOrder.push(run.runId);
+    }
+  }
+
+  return groupOrder.map((runId) => {
+    const executions = groupMap.get(runId)!;
+    const allPass = executions.every((e) => e.status === "pass");
+    const allFail = executions.every((e) => e.status === "fail");
+    const status: TimelineSegment["status"] = allPass
+      ? "all-pass"
+      : allFail
+        ? "all-fail"
+        : "mixed";
+
+    const color =
+      status === "all-pass"
+        ? "var(--o2-status-success-text)"
+        : status === "all-fail"
+          ? "var(--o2-status-error-text)"
+          : "var(--o2-status-warning-text)";
+
+    const passCount = executions.filter((e) => e.status === "pass").length;
+    const failCount = executions.length - passCount;
+    const title =
+      status === "all-pass"
+        ? "All " + executions.length + " passed"
+        : status === "all-fail"
+          ? "All " + executions.length + " failed"
+          : passCount + " passed, " + failCount + " failed of " + executions.length;
+
+    const execDetails: TimelineExecution[] = executions.map((e) => ({
+      location: e.location,
+      browserEngine: e.browser,
+      device: e.device,
+      status: e.status === "pass" ? "pass" : "fail",
+      statusIcon: e.status === "pass" ? "check_circle" : "cancel",
+      errorSnippet: e.errorPattern
+        ? e.errorPattern.split(":")[0].substring(0, 50)
+        : null,
+    }));
+
+    return {
+      runId,
+      status,
+      color,
+      title,
+      executions: execDetails,
+    };
   });
-  const merged: { status: string; width: number }[] = [];
-  rawSegments.forEach((seg) => {
-    const last = merged[merged.length - 1];
-    if (last && last.status === seg.status) last.width += seg.width;
-    else merged.push({ ...seg });
-  });
-  return merged.map((seg) => ({
-    pct: ((seg.width / totalSpan) * 100).toFixed(2) + "%",
-    color:
-      seg.status === "fail"
-        ? "var(--o2-status-error-text)"
-        : "var(--o2-status-success-text)",
-    title:
-      (seg.status === "fail" ? "Failed" : "Passed") +
-      " · ~" +
-      Math.max(1, Math.round(seg.width)) +
-      " min",
-  }));
 });
-const timelineFailCount = computed(() => String(totalFails.value));
-const timelinePassCount = computed(() => String(totalPasses.value));
-const timelineStartLabel = computed(
-  () => windowLabel.value.replace("Last ", "") + " ago",
+
+const timelineFailCount = computed(() =>
+  String(timelineSegments.value.filter((s) => s.status === "all-fail").length),
 );
+const timelinePassCount = computed(() =>
+  String(timelineSegments.value.filter((s) => s.status === "all-pass").length),
+);
+const timelineMixedCount = computed(() =>
+  String(timelineSegments.value.filter((s) => s.status === "mixed").length),
+);
+
+// ── Timeline scroll state ────────────────────────────────────────────────
+const MAX_VISIBLE_SEGMENTS = 30;
+const timelineScrollRef = ref<HTMLElement | null>(null);
+const scrollLeft = ref(0);
+
+const timelinePage = computed(() => {
+  const el = timelineScrollRef.value;
+  if (!el) return 0;
+  return Math.round(el.scrollLeft / el.clientWidth);
+});
+
+const canScrollLeft = computed(() => scrollLeft.value > 1);
+const canScrollRight = computed(() => {
+  const el = timelineScrollRef.value;
+  if (!el) return false;
+  return el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+});
+
+const timelineRangeLabel = computed(() => {
+  const total = timelineSegments.value.length;
+  const page = timelinePage.value;
+  const start = page * MAX_VISIBLE_SEGMENTS + 1;
+  const end = Math.min((page + 1) * MAX_VISIBLE_SEGMENTS, total);
+  return "Showing " + start + "-" + end + " of " + total + " runs";
+});
+
+function scrollTimeline(direction: "left" | "right") {
+  const el = timelineScrollRef.value;
+  if (!el) return;
+  const pageWidth = el.clientWidth;
+  const target =
+    direction === "left"
+      ? Math.max(0, el.scrollLeft - pageWidth)
+      : Math.min(el.scrollWidth - el.clientWidth, el.scrollLeft + pageWidth);
+  el.scrollTo({ left: target, behavior: "smooth" });
+}
+
+function onTimelineScroll(event: Event) {
+  scrollLeft.value = (event.target as HTMLElement).scrollLeft;
+}
+
+// ── Timeline hover tooltip state ─────────────────────────────────────────
+const hoveredSegment = ref<TimelineSegment | null>(null);
+const tooltipX = ref(0);
+const tooltipY = ref(0);
+
+function showTooltip(event: MouseEvent, seg: TimelineSegment) {
+  hoveredSegment.value = seg;
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  tooltipX.value = rect.left + rect.width / 2;
+  tooltipY.value = rect.top - 8;
+}
+
+function hideTooltip() {
+  hoveredSegment.value = null;
+}
+
+const timelineStartLabel = computed(() => {
+  if (!timeRangeMicros.value) return windowLabel.value.replace("Last ", "") + " ago";
+  const startMs = timeRangeMicros.value.startTime / 1000;
+  const diffMin = Math.round((Date.now() - startMs) / 60000);
+  if (diffMin < 60) return diffMin + " min ago";
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return diffH + "h ago";
+  return Math.floor(diffH / 24) + "d ago";
+});
 const timelineEndLabel = "Now";
 
 // ── Breakdowns ───────────────────────────────────────────────────────────
@@ -1239,15 +1456,21 @@ interface BreakdownItem {
   textColor: string;
 }
 const browserBreakdown = computed<BreakdownItem[]>(() => {
-  const names = ["Chromium", "Firefox", "WebKit"];
+  const groups = new Map<string, { pass: number; total: number }>();
+  for (const run of allRuns.value) {
+    const key = run.browser || "Unknown";
+    const g = groups.get(key) ?? { pass: 0, total: 0 };
+    g.total++;
+    if (run.status === "pass") g.pass++;
+    groups.set(key, g);
+  }
   const icons = ["language", "travel_explore", "explore"];
-  return names.map((name, i) => {
-    const br = allRuns.value.filter((r) => r.browser === name);
-    const pass = br.filter((r) => r.status === "pass").length;
-    const pct = br.length ? Math.round((pass / br.length) * 100) : 100;
-    return {
+  let iconIdx = 0;
+  return Array.from(groups.entries()).map(([name, g]) => {
+    const pct = g.total > 0 ? Math.round((g.pass / g.total) * 100) : 100;
+    const entry: BreakdownItem = {
       name,
-      icon: icons[i],
+      icon: icons[iconIdx % icons.length],
       pct: pct + "%",
       barColor:
         pct >= 95
@@ -1262,22 +1485,32 @@ const browserBreakdown = computed<BreakdownItem[]>(() => {
             ? "var(--o2-warning-700)"
             : "var(--o2-status-error-text)",
     };
+    iconIdx++;
+    return entry;
   });
 });
 const locationBreakdown = computed<BreakdownItem[]>(() => {
-  const names = ["us-east-1", "eu-west-1", "ap-south-1"];
-  return names.map((name) => {
-    const lr = allRuns.value.filter((r) => r.location === name);
-    const pass = lr.filter((r) => r.status === "pass").length;
-    const pct = lr.length ? Math.round((pass / lr.length) * 100) : 100;
-    return {
+  const groups = new Map<string, { pass: number; total: number }>();
+  for (const run of allRuns.value) {
+    const key = run.location || "Unknown";
+    const g = groups.get(key) ?? { pass: 0, total: 0 };
+    g.total++;
+    if (run.status === "pass") g.pass++;
+    groups.set(key, g);
+  }
+  const dotColors = [
+    "var(--o2-status-success-text)",
+    "var(--o2-warning-500)",
+    "var(--o2-status-error-text)",
+    "var(--o2-primary-500)",
+    "var(--o2-text-secondary)",
+  ];
+  let dotIdx = 0;
+  return Array.from(groups.entries()).map(([name, g]) => {
+    const pct = g.total > 0 ? Math.round((g.pass / g.total) * 100) : 100;
+    const entry: BreakdownItem = {
       name,
-      dot:
-        pct >= 95
-          ? "var(--o2-status-success-text)"
-          : pct >= 85
-            ? "var(--o2-warning-500)"
-            : "var(--o2-status-error-text)",
+      dot: dotColors[dotIdx % dotColors.length],
       pct: pct + "%",
       barColor:
         pct >= 95
@@ -1292,16 +1525,28 @@ const locationBreakdown = computed<BreakdownItem[]>(() => {
             ? "var(--o2-warning-700)"
             : "var(--o2-status-error-text)",
     };
+    dotIdx++;
+    return entry;
   });
 });
 const deviceBreakdown = computed<BreakdownItem[]>(() => {
-  return ["Desktop", "Mobile"].map((name) => {
-    const dr = allRuns.value.filter((r) => r.device === name);
-    const pass = dr.filter((r) => r.status === "pass").length;
-    const pct = dr.length ? Math.round((pass / dr.length) * 100) : 100;
+  const groups = new Map<string, { pass: number; total: number }>();
+  for (const run of allRuns.value) {
+    const key = run.device || "Unknown";
+    const g = groups.get(key) ?? { pass: 0, total: 0 };
+    g.total++;
+    if (run.status === "pass") g.pass++;
+    groups.set(key, g);
+  }
+  const iconMap: Record<string, string> = {
+    Desktop: "computer",
+    Mobile: "smartphone",
+  };
+  return Array.from(groups.entries()).map(([name, g]) => {
+    const pct = g.total > 0 ? Math.round((g.pass / g.total) * 100) : 100;
     return {
       name,
-      icon: name === "Desktop" ? "computer" : "smartphone",
+      icon: iconMap[name] || "devices",
       pct: pct + "%",
       barColor:
         pct >= 95
@@ -1737,6 +1982,7 @@ function toggleStepGroup(key: string) {
 // ── Public API — parent drives all (re)loads ─────────────────────────────
 async function refresh(startTime?: number, endTime?: number) {
   if (!startTime || !endTime) return;
+  timeRangeMicros.value = { startTime, endTime };
   await synthetics.fetchAll(props.monitorId, startTime, endTime);
 }
 

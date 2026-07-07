@@ -51,6 +51,8 @@ export interface SyntheticKpi {
   p95Ms: number;
   failedRuns: number;
   totalRuns: number;
+  /** Count of runs that had at least one retry (attempts > 1). */
+  retriedRuns: number;
   lastRunStatus: RunStatus | null;
   lastRunAt: number | null;
 }
@@ -255,6 +257,7 @@ export function buildKpiSql(monitorId: string): string {
   COUNT(*) as total_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
   COUNT(*) FILTER (WHERE ${F.status} != '${STATUS_VALUES.passed}') as failed_runs,
+  COUNT(*) FILTER (WHERE attempts > 1) as retried_runs,
   COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'`;
@@ -313,14 +316,16 @@ export function mapKpi(
   const totalRuns = num(rawKpiRow?.total_runs);
   const passedRuns = num(rawKpiRow?.passed_runs);
   const failedRuns = num(rawKpiRow?.failed_runs);
+  const retriedRuns = num(rawKpiRow?.retried_runs);
   const lastRunTsRaw = rawLastRun ? num(rawLastRun.ts) : 0;
   return {
     uptimePct: totalRuns > 0 ? (passedRuns / totalRuns) * 100 : 0,
     p95Ms: num(rawKpiRow?.p95_duration),
     failedRuns,
     totalRuns,
+    retriedRuns,
     lastRunStatus: rawLastRun ? toRunStatus(rawLastRun.status) : null,
-    lastRunAt: lastRunTsRaw > 0 ? lastRunTsRaw : null,
+    lastRunAt: lastRunTsRaw > 0 ? lastRunTsRaw / 1000 : null,
   };
 }
 

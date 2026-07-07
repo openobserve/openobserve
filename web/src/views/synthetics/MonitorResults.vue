@@ -27,15 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <AppPageHeader
       :title="monitorName"
-      :back="{ label: t('synthetics.results.monitors'), to: { name: 'synthetic' } }"
+      :back="{
+        label: t('synthetics.results.monitors'),
+        to: { name: 'synthetic' },
+      }"
+      class="tw:px-4"
     >
       <template #title-trail>
-        <OBadge
-          v-if="statusBadge"
-          :variant="statusBadge.variant"
-          size="sm"
-          dot
-        >
+        <OBadge v-if="statusBadge" :variant="statusBadge.variant" size="sm" dot>
           {{ statusBadge.label }}
         </OBadge>
       </template>
@@ -221,10 +220,7 @@ async function onDateChange(value: any) {
   }
   writeToUrl();
   await nextTick();
-  runsRef.value?.refresh?.(
-    timeRange.value.startTime,
-    timeRange.value.endTime,
-  );
+  runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
 }
 
 async function refresh() {
