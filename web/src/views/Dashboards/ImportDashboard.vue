@@ -300,7 +300,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormFile from "@/lib/forms/File/OFormFile.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import {
-  importDashboardSchema,
+  makeImportDashboardSchema,
   importDashboardDefaults,
 } from "./ImportDashboard.schema";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -374,7 +374,7 @@ export default defineComponent({
     // form (documented no-OForm* exceptions).
     const form = useOForm({
       defaultValues: importDashboardDefaults(),
-      schema: importDashboardSchema,
+      schema: makeImportDashboardSchema(t),
       // forward to importDashboard defined below (avoids a TDZ ref at setup time)
       onSubmit: () => importDashboard(),
     });

@@ -33,7 +33,7 @@ export const drilldownVariableRowSchema = z.object({
 export const makeDrilldownPopUpSchema = (t: (_key: string) => string) =>
   z
     .object({
-      name: z.string().trim().min(1, t("common.required")),
+      name: z.string().trim().min(1, t("dashboard.nameRequired")),
       type: z.string().optional().default("byDashboard"),
       targetBlank: z.boolean().optional().default(false),
       findBy: z.string().optional().default("name"),
@@ -64,7 +64,7 @@ export const makeDrilldownPopUpSchema = (t: (_key: string) => string) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["data", "url"],
-            message: t("common.required"),
+            message: t("dashboard.urlRequired"),
           });
         } else if (!URL_PROTOCOL_REGEX.test(url)) {
           ctx.addIssue({
@@ -86,21 +86,21 @@ export const makeDrilldownPopUpSchema = (t: (_key: string) => string) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["data", "folder"],
-            message: t("common.required"),
+            message: t("dashboard.folderRequired"),
           });
         }
         if (!trimmed(data.dashboard)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["data", "dashboard"],
-            message: t("common.required"),
+            message: t("dashboard.dashboardRequired"),
           });
         }
         if (!trimmed(data.tab)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["data", "tab"],
-            message: t("common.required"),
+            message: t("dashboard.tabRequired"),
           });
         }
       }

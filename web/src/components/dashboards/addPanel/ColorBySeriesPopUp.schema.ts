@@ -19,27 +19,31 @@
 
 import { z } from "zod";
 
-export const seriesRowSchema = z
-  .object({
-    type: z.string().optional().default("value"),
-    value: z.string().trim().min(1, "Series value is required"),
-    // null until the user clicks "Set color"; enforced non-empty below.
-    color: z.union([z.string(), z.null()]).optional(),
-  })
-  .superRefine((row, ctx) => {
-    if (typeof row.color !== "string" || row.color.trim().length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["color"],
-        message: "Color is required",
-      });
-    }
+export const makeSeriesRowSchema = (t: (_key: string) => string) =>
+  z
+    .object({
+      type: z.string().optional().default("value"),
+      value: z.string().trim().min(1, t("dashboard.seriesValueRequired")),
+      // null until the user clicks "Set color"; enforced non-empty below.
+      color: z.union([z.string(), z.null()]).optional(),
+    })
+    .superRefine((row, ctx) => {
+      if (typeof row.color !== "string" || row.color.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["color"],
+          message: t("dashboard.colorRequired"),
+        });
+      }
+    });
+
+export const makeColorBySeriesPopUpSchema = (t: (_key: string) => string) =>
+  z.object({
+    // No `.min(1)`: an empty array is valid (saving with no rows clears all
+    // per-series colors, matching pre-revamp behavior).
+    series: z.array(makeSeriesRowSchema(t)),
   });
 
-export const colorBySeriesPopUpSchema = z.object({
-  // No `.min(1)`: an empty array is valid (saving with no rows clears all
-  // per-series colors, matching pre-revamp behavior).
-  series: z.array(seriesRowSchema),
-});
-
-export type ColorBySeriesPopUpForm = z.infer<typeof colorBySeriesPopUpSchema>;
+export type ColorBySeriesPopUpForm = z.infer<
+  ReturnType<typeof makeColorBySeriesPopUpSchema>
+>;

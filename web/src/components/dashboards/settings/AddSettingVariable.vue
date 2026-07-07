@@ -637,7 +637,8 @@ export default defineComponent({
       customMultiSelectValue: [],
       escapeSingleQuotes: false,
     });
-    const addSettingVariableSchema = makeAddSettingVariableSchema();
+    const { t } = useI18n();
+    const addSettingVariableSchema = makeAddSettingVariableSchema(t);
     const form = useOForm<AddSettingVariableForm>({
       defaultValues: addSettingVariableDefaults(),
       schema: addSettingVariableSchema,
@@ -767,7 +768,6 @@ export default defineComponent({
 
       return options;
     });
-    const { t } = useI18n();
     const store = useStore();
     const data: any = reactive({
       schemaResponse: [],

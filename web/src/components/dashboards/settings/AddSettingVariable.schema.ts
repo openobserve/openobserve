@@ -36,7 +36,7 @@ export const VARIABLE_NAME_REGEX = /^[a-zA-Z0-9_-]*$/;
 // Operators that do NOT need a value (the filter value field is hidden for them).
 export const FILTER_OPERATORS_WITHOUT_VALUE = ["Is Null", "Is Not Null"];
 
-export const makeAddSettingVariableSchema = () =>
+export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
   z
     .object({
       scope: z.string().optional().default("global"),
@@ -48,11 +48,8 @@ export const makeAddSettingVariableSchema = () =>
       name: z
         .string()
         .trim()
-        .min(1, "Variable name is required.")
-        .regex(
-          VARIABLE_NAME_REGEX,
-          "Only letters, numbers, hyphens (-), and underscores (_) are allowed.",
-        ),
+        .min(1, t("dashboard.variableNameRequired"))
+        .regex(VARIABLE_NAME_REGEX, t("dashboard.variableNameInvalid")),
       label: z.string().optional().default(""),
       query_data: z
         .object({
@@ -89,14 +86,14 @@ export const makeAddSettingVariableSchema = () =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["selectedTabs"],
-          message: "At least one tab is required.",
+          message: t("dashboard.atLeastOneTabRequired"),
         });
       }
       if (val.scope === "panels" && (val.selectedPanels ?? []).length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["selectedPanels"],
-          message: "At least one panel is required.",
+          message: t("dashboard.atLeastOnePanelRequired"),
         });
       }
       if (val.type === "query_values") {
@@ -104,21 +101,21 @@ export const makeAddSettingVariableSchema = () =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["query_data", "stream_type"],
-            message: "Stream type is required.",
+            message: t("dashboard.streamTypeRequired"),
           });
         }
         if (!val.query_data?.stream) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["query_data", "stream"],
-            message: "Stream / index is required.",
+            message: t("dashboard.streamIndexRequired"),
           });
         }
         if (!val.query_data?.field) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["query_data", "field"],
-            message: "Field is required.",
+            message: t("dashboard.fieldRequired"),
           });
         }
       }
@@ -126,7 +123,7 @@ export const makeAddSettingVariableSchema = () =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["value"],
-          message: "Constant value is required.",
+          message: t("dashboard.constantValueRequired"),
         });
       }
 
@@ -138,14 +135,14 @@ export const makeAddSettingVariableSchema = () =>
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               path: ["query_data", "filter", i, "name"],
-              message: "Field is required.",
+              message: t("dashboard.fieldRequired"),
             });
           }
           if (!String(row?.operator ?? "").trim()) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               path: ["query_data", "filter", i, "operator"],
-              message: "Operator is required.",
+              message: t("dashboard.operatorRequired"),
             });
           }
           const needsValue = !FILTER_OPERATORS_WITHOUT_VALUE.includes(
@@ -155,7 +152,7 @@ export const makeAddSettingVariableSchema = () =>
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               path: ["query_data", "filter", i, "value"],
-              message: "Required",
+              message: t("dashboard.filterValueRequired"),
             });
           }
         });
@@ -169,14 +166,14 @@ export const makeAddSettingVariableSchema = () =>
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               path: ["options", i, "label"],
-              message: "Label is required.",
+              message: t("dashboard.labelRequired"),
             });
           }
           if (!String(row?.value ?? "").trim()) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               path: ["options", i, "value"],
-              message: "Field is required!",
+              message: t("dashboard.optionValueRequired"),
             });
           }
         });

@@ -701,7 +701,7 @@ describe("AddSettingVariable", () => {
     // level (rendering the tabs <OFormSelect> needs dashboard tabs data that
     // this unit mock omits). This preserves the restored BEFORE cross-field rule.
     it("schema requires at least one tab when scope is tabs/panels", () => {
-      const schema = makeAddSettingVariableSchema();
+      const schema = makeAddSettingVariableSchema((k: string) => k);
       const base = {
         scope: "tabs",
         name: "myvar",
@@ -717,7 +717,7 @@ describe("AddSettingVariable", () => {
     });
 
     it("schema requires at least one panel when scope is panels", () => {
-      const schema = makeAddSettingVariableSchema();
+      const schema = makeAddSettingVariableSchema((k: string) => k);
       const base = {
         scope: "panels",
         name: "myvar",
@@ -735,7 +735,7 @@ describe("AddSettingVariable", () => {
 
   // §4 dropped row requireds, now restored on the FORM-OWNED field-arrays.
   describe("Restored dropped row rules (#6 filter[].value, #7 options[].value)", () => {
-    const schema = makeAddSettingVariableSchema();
+    const schema = makeAddSettingVariableSchema((k: string) => k);
     const validBase = {
       scope: "global",
       name: "myvar",

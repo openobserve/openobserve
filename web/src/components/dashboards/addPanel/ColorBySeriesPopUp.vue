@@ -131,7 +131,7 @@ import OFormColor from "@/lib/forms/Color/OFormColor.vue";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import {
-  colorBySeriesPopUpSchema,
+  makeColorBySeriesPopUpSchema,
   type ColorBySeriesPopUpForm,
 } from "./ColorBySeriesPopUp.schema";
 
@@ -178,7 +178,7 @@ export default defineComponent({
     // row order from the drag. Save submits via form-id (R4) → handleSubmit.
     const form = useOForm<ColorBySeriesPopUpForm>({
       defaultValues: { series: makeDefaultRows() },
-      schema: colorBySeriesPopUpSchema,
+      schema: makeColorBySeriesPopUpSchema(t),
       onSubmit: (value) => {
         emit("save", value.series);
       },

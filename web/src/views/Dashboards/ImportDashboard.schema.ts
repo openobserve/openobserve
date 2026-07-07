@@ -20,20 +20,23 @@
 
 import { z } from "zod";
 
-export const importDashboardSchema = z.object({
-  // Optional, but if provided it must be an http(s) URL.
-  url: z
-    .string()
-    .optional()
-    .refine((v) => !v || /^https?:\/\//i.test(String(v)), {
-      message: "Only HTTP(S) URLs are allowed",
-    }),
-  // The selected .json file(s). Optional (the same import can come from a URL or
-  // pasted JSON); content validity is checked imperatively after parse.
-  jsonFiles: z.any().optional(),
-});
+export const makeImportDashboardSchema = (t: (_key: string) => string) =>
+  z.object({
+    // Optional, but if provided it must be an http(s) URL.
+    url: z
+      .string()
+      .optional()
+      .refine((v) => !v || /^https?:\/\//i.test(String(v)), {
+        message: t("dashboard.onlyHttpsUrlsAllowed"),
+      }),
+    // The selected .json file(s). Optional (the same import can come from a URL
+    // or pasted JSON); content validity is checked imperatively after parse.
+    jsonFiles: z.any().optional(),
+  });
 
-export type ImportDashboardForm = z.infer<typeof importDashboardSchema>;
+export type ImportDashboardForm = z.infer<
+  ReturnType<typeof makeImportDashboardSchema>
+>;
 
 export const importDashboardDefaults = (): ImportDashboardForm => ({
   url: "",
