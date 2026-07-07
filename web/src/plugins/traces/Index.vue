@@ -146,6 +146,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="traces-no-streams-in-org-text"
                     @ask-ai="onAskAiSetupTracing"
                   />
+                  <!-- Stable loading state while streams load / auto-run fires,
+                       so the empties don't flash in between. -->
+                  <div
+                    v-else-if="searchObj.loadingStream"
+                    class="card-container h-full flex flex-col items-center justify-center gap-2 text-[var(--o2-text-secondary)]"
+                    data-test="traces-search-loading"
+                  >
+                    <OSpinner size="sm" />
+                    <span>{{ t("traces.fetchingTraces") }}</span>
+                  </div>
                   <div
                     v-else-if="
                       searchObj.data.errorMsg !== '' &&
@@ -363,6 +373,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
 import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
