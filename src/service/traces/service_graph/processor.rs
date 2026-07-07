@@ -107,10 +107,46 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
         usage_results.len()
     );
 
+    // Fallback: the usage stream is the primary discovery source, but if it is
+    // empty (self-reporting stalled/disabled, or a fresh instance) the service
+    // graph would silently go dark. When usage yields nothing, discover trace
+    // streams directly from the schema cache across all orgs so the graph keeps
+    // working regardless of the usage pipeline's health.
+    let discovered: Vec<RecentIngestedTraceStream> = if usage_results.is_empty() {
+        let mut fallback = Vec::new();
+        match crate::service::organization::list_all_orgs(None).await {
+            Ok(orgs) => {
+                for org in orgs {
+                    for stream_name in crate::service::db::schema::list_streams_from_cache(
+                        &org.identifier,
+                        StreamType::Traces,
+                    )
+                    .await
+                    {
+                        fallback.push(RecentIngestedTraceStream {
+                            org_id: org.identifier.clone(),
+                            stream_name,
+                        });
+                    }
+                }
+            }
+            Err(e) => log::warn!(
+                "[ServiceGraph] usage empty and org list failed, no fallback discovery: {e}"
+            ),
+        }
+        log::info!(
+            "[ServiceGraph] Usage empty; discovered {} trace streams via schema cache",
+            fallback.len()
+        );
+        fallback
+    } else {
+        usage_results
+    };
+
     for RecentIngestedTraceStream {
         org_id,
         stream_name,
-    } in usage_results
+    } in discovered
     {
         log::info!("[ServiceGraph] Processing stream {org_id}/{stream_name}");
 
