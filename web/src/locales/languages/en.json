@@ -157,7 +157,7 @@
     "noRegexPatterns": {
       "title": "No regex patterns yet",
       "description": "Create a reusable pattern to redact sensitive data, or import one from your library.",
-      "action": "Create pattern",
+      "action": "New pattern",
       "actionDesc": "Define a new regex pattern",
       "import": "Import pattern",
       "importDesc": "Reuse a pattern from your library"
@@ -219,7 +219,7 @@
     "noScorers": {
       "title": "No scorers yet",
       "description": "Scorers grade LLM responses against your score configs — start with an LLM judge or import one from the library.",
-      "action": "Create scorer",
+      "action": "New scorer",
       "actionDesc": "Define an LLM judge or remote scorer",
       "import": "Import scorer",
       "importDesc": "Import from a JSON file"
@@ -227,13 +227,13 @@
     "noEvalJobs": {
       "title": "No evaluation jobs yet",
       "description": "Jobs schedule scorers against an LLM stream. Create one to start grading conversations on a cadence.",
-      "action": "Create eval job",
+      "action": "New job",
       "actionDesc": "Pick a stream + scorers + cadence"
     },
     "noScoreConfigs": {
       "title": "No score configs yet",
       "description": "Score configs define the schema scorers produce — numeric, boolean, or categorical. Add one to start scoring.",
-      "action": "Create score config",
+      "action": "New score config",
       "actionDesc": "Define the score shape + healthy range",
       "import": "Import score config",
       "importDesc": "Import from a JSON file"
