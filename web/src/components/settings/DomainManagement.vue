@@ -723,30 +723,14 @@ const addEmail = (domain: Domain) => {
     return;
   }
 
+  // Stage the entry — persisted only on Save. No success toast (avoid implying it's saved).
   domain.allowedEmails.push(domain.newEmail.toLowerCase());
   domain.newEmail = "";
-
-  q.notify({
-    type: "positive",
-    message: t("settings.emailAdded"),
-    timeout: 3000,
-  });
 };
 
 const removeEmail = (domain: Domain, emailIndex: number) => {
-  q.dialog({
-    title: t("common.confirm"),
-    message: t("settings.confirmRemoveEmail", { email: domain.allowedEmails[emailIndex] }),
-    cancel: true,
-    persistent: true,
-  }).onOk(() => {
-    domain.allowedEmails.splice(emailIndex, 1);
-    q.notify({
-      type: "positive",
-      message: t("settings.emailRemoved"),
-      timeout: 3000,
-    });
-  });
+  // Staged removal — takes effect on Save. Remove instantly (no confirm dialog / success toast).
+  domain.allowedEmails.splice(emailIndex, 1);
 };
 
 const addBlockedEmail = (domain: Domain) => {
@@ -761,30 +745,15 @@ const addBlockedEmail = (domain: Domain) => {
     return;
   }
 
+  // Stage the entry — it is persisted only when the user clicks Save. No success toast here, so
+  // we don't imply it's already saved.
   domain.blockedEmails.push(domain.newBlockedEmail.toLowerCase());
   domain.newBlockedEmail = "";
-
-  q.notify({
-    type: "positive",
-    message: t("settings.blockedEmailAdded"),
-    timeout: 3000,
-  });
 };
 
 const removeBlockedEmail = (domain: Domain, emailIndex: number) => {
-  q.dialog({
-    title: t("common.confirm"),
-    message: t("settings.confirmRemoveBlockedEmail", { email: domain.blockedEmails[emailIndex] }),
-    cancel: true,
-    persistent: true,
-  }).onOk(() => {
-    domain.blockedEmails.splice(emailIndex, 1);
-    q.notify({
-      type: "positive",
-      message: t("settings.blockedEmailRemoved"),
-      timeout: 3000,
-    });
-  });
+  // Staged removal — takes effect on Save. Remove instantly (no confirm dialog / success toast).
+  domain.blockedEmails.splice(emailIndex, 1);
 };
 
 // Load VRL functions from _meta org
