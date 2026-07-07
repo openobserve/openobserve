@@ -747,7 +747,8 @@ describe("BarConverter", () => {
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.grid.left).toBe(8);
-      expect(result.grid.right).toBe("4%");
+      // measured half-width of the last category label, floored at 20
+      expect(result.grid.right).toBe(20);
       expect(result.grid.bottom).toBe(12);
     });
 

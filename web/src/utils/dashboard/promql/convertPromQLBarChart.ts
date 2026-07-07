@@ -19,6 +19,7 @@ import { buildCategoryXAxis, buildCategoryYAxis, buildValueAxis, buildTooltip } 
 import { buildLegendConfig } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
+import { calculateWidthText } from "../chartDimensionUtils";
 
 /**
  * Converter for bar chart variants (h-bar, stacked, h-stacked)
@@ -236,12 +237,18 @@ export class BarConverter implements PromQLChartConverter {
     // of percentage margins on wide panels and starvation on short ones.
     const legendAtBottom =
       config.show_legends && config.legends_position !== "right";
+    // the last category label centers under the final tick and spills half
+    // its width past the plot edge — reserve that much on the right
+    const lastCategory = String(categories[categories.length - 1] ?? "");
+    const rightInset = isHorizontal
+      ? "4%"
+      : Math.max(20, Math.ceil(calculateWidthText(lastCategory, "12px") / 2) + 6);
     return {
       series,
       ...axisConfig,
       grid: {
         left: 8,
-        right: "4%",
+        right: rightInset,
         top: 8,
         bottom: legendAtBottom ? 40 : 12,
         containLabel: true,

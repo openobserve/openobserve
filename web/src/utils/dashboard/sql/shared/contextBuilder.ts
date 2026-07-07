@@ -198,53 +198,6 @@ export function buildSQLContext(
     return result;
   };
 
-  /**
-   * Returns the largest label from the stacked chart data.
-   * Calculates the largest value for each unique breakdown and sums those values.
-   * @param axisKey - key of the yaxis
-   * @param breakDownkey - key of the breakdown
-   * @returns {number} - the largest value
-   */
-  const largestStackLabel = (axisKey: string, breakDownkey: string) => {
-    const data =
-      missingValueData?.filter((item: any) => {
-        return (
-          xAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
-          yAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
-          breakDownKeys.every((key: any) => getDataValue(item, key) != null)
-        );
-      }) || [];
-
-    const maxValues: any = {};
-
-    data.forEach((obj: any) => {
-      const breakDownValue = getDataValue(obj, breakDownkey);
-      const axisValue = getDataValue(obj, axisKey);
-
-      if (maxValues[breakDownValue]) {
-        if (axisValue > maxValues[breakDownValue]) {
-          maxValues[breakDownValue] = axisValue;
-        }
-      } else {
-        maxValues[breakDownValue] =
-          typeof axisValue === "number" ? axisValue : 0;
-      }
-    });
-
-    return Object.values(maxValues).reduce((a: any, b: any) => a + b, 0);
-  };
-
-  function getLargestLabel() {
-    if (
-      (panelSchema.type === "stacked" || panelSchema.type === "area-stacked") &&
-      breakDownKeys.length > 0
-    ) {
-      return largestStackLabel(yAxisKeys[0], breakDownKeys[0]);
-    } else {
-      return largestLabel(getAxisDataFromKey(yAxisKeys[0]));
-    }
-  }
-
   const convertedTimeStampToDataFormat = new Date(
     annotations?.value?.[0]?.start_time / 1000,
   ).toString();
@@ -314,11 +267,18 @@ export function buildSQLContext(
         (panelSchema?.type === "stacked" ||
           panelSchema?.type === "area-stacked") &&
         (breakDownKeys?.length ?? 0) > 0;
-      const hi = usesStackExtent
-        ? Number(getLargestLabel()) || 0
-        : Number.isFinite(max)
-          ? max
-          : 0;
+      // stacked extent = the largest per-bucket SUM (what ECharts stacks to),
+      // not the sum of per-series maxima that peak in different buckets
+      let hi = Number.isFinite(max) ? max : 0;
+      if (usesStackExtent) {
+        const sums: Record<string, number> = {};
+        for (const row of missingValueData ?? []) {
+          const bucket = String(getDataValue(row, xAxisKeys[0]));
+          const v = Number(getDataValue(row, yAxisKeys[0]));
+          if (Number.isFinite(v)) sums[bucket] = (sums[bucket] ?? 0) + v;
+        }
+        for (const k in sums) if (sums[k] > hi) hi = sums[k];
+      }
       const lo = Number.isFinite(min) ? Math.min(min, hi) : 0;
 
       const ticks = calculateNiceTickValues(lo, hi);
@@ -349,8 +309,13 @@ export function buildSQLContext(
         }
       }
 
+      // include one extra interval tick — if the extent estimate runs a
+      // hair short, ECharts' real top tick is still measured
+      const interval = ticks.length > 1 ? ticks[1] - ticks[0] : 0;
+      const candidates =
+        interval > 0 ? [...ticks, ticks[ticks.length - 1] + interval] : ticks;
       const widestLabelWidth = Math.max(
-        ...ticks.map((v: number) => calculateWidthText(format(v, decimals))),
+        ...candidates.map((v: number) => calculateWidthText(format(v, decimals))),
       );
       return { decimals, widestLabelWidth };
     } catch {
@@ -364,6 +329,7 @@ export function buildSQLContext(
   };
   const { decimals: yAxisTickDecimals, widestLabelWidth: widestYAxisTickLabel } =
     getYAxisTickInfo();
+
 
   const getFinalAxisValue = (
     configValue: number | null | undefined,
@@ -385,11 +351,12 @@ export function buildSQLContext(
   const hasXAxisName =
     xAxisNameFits && panelSchema?.queries?.[0]?.fields?.x?.[0]?.label;
 
-  // Drop the y-axis name on panels too narrow to fit name + labels + plot;
-  // ECharts would squeeze the name onto the labels regardless of nameGap.
+  // Drop the y-axis name on panels too narrow for name inset (36) + labels +
+  // right margin (20) + a usable plot (~84); below that ECharts squeezes the
+  // labels over the name regardless of nameGap.
   const panelWidthPx = chartPanelRef?.value?.offsetWidth ?? 0;
   const yAxisNameFits =
-    !panelWidthPx || panelWidthPx >= widestYAxisTickLabel + 110;
+    !panelWidthPx || panelWidthPx >= widestYAxisTickLabel + 140;
 
   const hasYAxisName =
     yAxisNameFits &&
@@ -775,7 +742,7 @@ export function buildSQLContext(
           ? calculateWidthText(
               largestLabel(getAxisDataFromKey(yAxisKeys?.[0])),
             )
-          : widestYAxisTickLabel) + 18,
+          : widestYAxisTickLabel) + 8,
       nameTextStyle: {
         fontWeight: "bold",
         fontSize: 14,
