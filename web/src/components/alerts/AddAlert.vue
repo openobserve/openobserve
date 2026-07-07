@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full">
+  <div class="w-full h-full">
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-      <div class="tw:flex tw:flex-col tw:h-full">
+      <div class="flex flex-col h-full">
       <AppPageHeader
-        class="alert-v3-topbar tw:[container-type:inline-size] tw:[container-name:topbar] tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="alert-v3-topbar [container-type:inline-size] [container-name:topbar] shrink-0 px-4 border-b border-border-default"
         :back="{
           label: activeFolderName || t('alerts.header'),
           onClick: goBackToAlertsList,
@@ -32,30 +32,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Inline title editing (name + folder), kept in the header per the
              AddPanel convention (#tabs slot renders inline beside the back tile). -->
         <template #tabs>
-          <div class="tw:flex tw:items-center tw:gap-1.5 tw:min-w-0">
+          <div class="flex items-center gap-1.5 min-w-0">
 
           <!-- EDIT MODE: (folder → chevron → name) -->
           <template v-if="beingUpdated || anomalyEditMode">
             <span
-              class="alert-folder-name tw:text-xl tw:tracking-[0.005em] tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:text-(--o2-menu-color)! tw:hover:rounded-[0.325rem] tw:hover:bg-(--o2-tab-bg)!"
+              class="alert-folder-name text-xl tracking-[0.005em] px-2 cursor-pointer transition-all rounded-sm text-(--o2-menu-color)! hover:rounded-[0.325rem] hover:bg-(--o2-tab-bg)!"
               @click="goBackToAlertsList"
             >{{ activeFolderName }}</span>
-            <OIcon name="chevron-right" size="sm" class="tw:text-gray-400 tw:mt-0.5 tw:shrink-0" />
+            <OIcon name="chevron-right" size="sm" class="text-gray-400 mt-0.5 shrink-0" />
             <template v-if="!isAnomalyMode">
-              <span class="tw:text-xl tw:tracking-[0.005em] tw:truncate tw:max-w-[200px]">
+              <span class="text-xl tracking-[0.005em] truncate max-w-[200px]">
                 {{ formData.name }}
                 <OTooltip v-if="formData.name?.length > 24" :content="formData.name" />
               </span>
             </template>
             <template v-else>
-              <span class="tw:text-xl tw:tracking-[0.005em] tw:truncate tw:max-w-[200px]">
+              <span class="text-xl tracking-[0.005em] truncate max-w-[200px]">
                 {{ anomalyConfig.name }}
                 <OTooltip v-if="anomalyConfig.name?.length > 24" :content="anomalyConfig.name" />
               </span>
               <OTag v-if="anomalyConfig.status" type="anomalyStatus" :value="anomalyConfig.status" />
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
-                class="tw:text-[11px] tw:whitespace-nowrap tw:text-text-secondary"
+                class="text-[11px] whitespace-nowrap text-text-secondary"
               >
                 Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
               </span>
@@ -67,15 +67,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- CREATE MODE: Alert Name + Folder -->
           <template v-else>
-            <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-              <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="tw:text-text-primary">*</span></div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="text-text-primary">*</span></div>
               <OInput
                 v-if="!isAnomalyMode"
                 ref="step1Ref"
                 v-model="formData.name"
                 data-test="add-alert-name-input"
                 :placeholder="t('alerts.alertNamePlaceholder')"
-                class="topbar-name-input tw:text-sm tw:h-[28px]! tw:min-h-[28px]! tw:min-w-[120px] tw:max-w-[150px]"
+                class="topbar-name-input text-sm h-[28px]! min-h-[28px]! min-w-[120px] max-w-[150px]"
                 :class="alertNameError ? 'field-error' : ''"
                 @update:model-value="alertNameError = false"
               />
@@ -84,13 +84,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="anomalyNameRef"
                 v-model="anomalyConfig.name"
                 :placeholder="t('alerts.anomalyNamePlaceholder')"
-                class="topbar-name-input tw:text-sm tw:h-[28px]! tw:min-h-[28px]! tw:min-w-[120px] tw:max-w-[150px]"
+                class="topbar-name-input text-sm h-[28px]! min-h-[28px]! min-w-[120px] max-w-[150px]"
               />
             </div>
 
             <!-- Folder -->
-            <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-              <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ t('alerts.folder') }}</div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t('alerts.folder') }}</div>
               <InlineSelectFolderDropdown
                 :model-value="activeFolderId"
                 type="alerts"
@@ -104,28 +104,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </AppPageHeader>
 
-      <div class="tw:flex tw:flex-1 tw:min-h-0">
+      <div class="flex flex-1 min-h-0">
 
       <!-- LEFT column wrapper (flex: 6.5) -->
       <div style="flex: 6.5; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px 0;">
 
       <!-- Stream Name & Stream Type -->
-      <div class="card-container tw:shrink-0 stream-config-card tw:[container-type:inline-size] tw:[container-name:stream-config]">
-        <div class="tw:flex tw:items-center tw:gap-0 tw:py-[10px] tw:px-3 tw:border-b tw:border-[#e6e6e6] tw:dark:border-[var(--color-border-default)]">
-          <div class="tw:w-[3px] tw:h-4 tw:rounded-sm tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
-          <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em]">{{ t('alerts.streamConfig') }} <span class="tw:text-text-primary">*</span></span>
+      <div class="card-container shrink-0 stream-config-card [container-type:inline-size] [container-name:stream-config]">
+        <div class="flex items-center gap-0 py-[10px] px-3 border-b border-[#e6e6e6] dark:border-[var(--color-border-default)]">
+          <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
+          <span class="text-[13px] font-semibold tracking-[0.01em]">{{ t('alerts.streamConfig') }} <span class="text-text-primary">*</span></span>
         </div>
-        <div class="tw:flex tw:items-center tw:gap-4 tw:px-3 tw:py-2">
+        <div class="flex items-center gap-4 px-3 py-2">
         <!-- Stream Type -->
-        <div class="tw:flex tw:items-center tw:gap-1.5">
-          <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ t("alerts.streamType") }} <span class="tw:text-text-primary">*</span></div>
+        <div class="flex items-center gap-1.5">
+          <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.streamType") }} <span class="text-text-primary">*</span></div>
           <OSelect
             ref="streamTypeRef"
             data-test="add-alert-stream-type-select-dropdown"
             v-model="formData.stream_type"
             :options="streamTypes"
             :searchable="false"
-            class="stream-type-select tw:h-[28px]! tw:min-h-[28px]!"
+            class="stream-type-select h-[28px]! min-h-[28px]!"
             :class="streamTypeError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode"
             @update:model-value="streamTypeError = false; updateStreams()"
@@ -133,15 +133,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Stream Name -->
-        <div class="tw:flex tw:items-center tw:gap-1.5">
-          <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ t("alerts.stream_name") }} <span class="tw:text-text-primary">*</span></div>
+        <div class="flex items-center gap-1.5">
+          <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.stream_name") }} <span class="text-text-primary">*</span></div>
           <OSelect
             ref="streamNameRef"
             data-test="add-alert-stream-name-select-dropdown"
             v-model="formData.stream_name"
             :options="indexOptions"
             :loading="isFetchingStreams"
-            class="stream-name-select tw:h-[28px]! tw:min-h-[28px]!"
+            class="stream-name-select h-[28px]! min-h-[28px]!"
             :class="streamNameError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
             @update:model-value="streamNameError = false; updateStreamFields($event)"
@@ -150,14 +150,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Alert Type -->
-        <div class="tw:flex tw:items-center tw:gap-1.5">
-          <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ t("alerts.alertType") || 'Alert Type' }}</div>
+        <div class="flex items-center gap-1.5">
+          <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.alertType") || 'Alert Type' }}</div>
           <OSelect
             data-test="add-alert-type-select-dropdown"
             v-model="formData.is_real_time"
             :options="alertTypeOptions"
             :disabled="beingUpdated || anomalyEditMode"
-            class="alert-type-select tw:h-[28px]! tw:min-h-[28px]!"
+            class="alert-type-select h-[28px]! min-h-[28px]!"
             :searchable="false"
           />
         </div>
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OToggleGroup
           :model-value="activeTab"
           @update:model-value="activeTab = ($event as string)"
-          class="tw:shrink-0"
+          class="shrink-0"
         >
           <OToggleGroupItem
             v-for="tab in alertTabs"
@@ -190,9 +190,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
 
         <!-- Tab Content -->
-        <div class="tw:flex-1 tw:overflow-auto">
+        <div class="flex-1 overflow-auto">
           <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
-          <div v-show="activeTab === 'condition'" class="tw:flex tw:flex-col tw:gap-4">
+          <div v-show="activeTab === 'condition'" class="flex flex-col gap-4">
             <div>
               <QueryConfig
               ref="step2Ref"
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div v-show="activeTab === 'advanced'" class="tw:flex tw:flex-col tw:gap-4">
+          <div v-show="activeTab === 'advanced'" class="flex flex-col gap-4">
 
             <!-- Additional Settings (first) -->
             <div>
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Footer: Cancel / Save (left column, separate card) -->
       <div
-        class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2 tw:border-t tw:border-border-default"
+        class="card-container flex items-center justify-end px-3 py-2.5 shrink-0 gap-2 border-t border-border-default"
       >
         <OButton
           data-test="add-alert-cancel-btn"
@@ -342,30 +342,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- TIER 2: Preview + Summary (RIGHT 30%) -->
       <!-- border-l: full-height vertical divider flush against the Preview/Summary pane -->
-      <div class="tw:flex tw:flex-col tw:gap-2 tw:border-l tw:border-border-default tw:pt-2 tw:pb-2" style="flex: 3.5; min-width: 0; min-height: 0; overflow: hidden;">
+      <div class="flex flex-col gap-2 border-l border-border-default pt-2 pb-2" style="flex: 3.5; min-width: 0; min-height: 0; overflow: hidden;">
         <!-- Preview Card -->
-        <div class="card-container tw:overflow-hidden tw:flex tw:flex-col" style="flex: 1; min-height: 0;">
+        <div class="card-container overflow-hidden flex flex-col" style="flex: 1; min-height: 0;">
           <div
-            class="tw:flex tw:items-center tw:px-3 tw:py-[0.625rem] tw:select-none tw:border-b tw:border-border-default tw:shrink-0 tw:gap-2"
+            class="flex items-center px-3 py-[0.625rem] select-none border-b border-border-default shrink-0 gap-2"
           >
-            <span class="tw:text-sm tw:font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
+            <span class="text-sm font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
             <template v-if="!isAnomalyMode && activeEvaluationStatus">
-              <div class="tw:w-px tw:h-4 tw:bg-border-default" />
-              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-[var(--o2-positive)]' : 'tw:text-[var(--o2-gray)]'" size="sm" />
-              <span class="tw:text-xs tw:font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-[var(--o2-positive)]' : 'tw:text-[var(--o2-gray)]'">
+              <div class="w-px h-4 bg-border-default" />
+              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :class="activeEvaluationStatus.wouldTrigger ? 'text-[var(--o2-positive)]' : 'text-[var(--o2-gray)]'" size="sm" />
+              <span class="text-xs font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'text-[var(--o2-positive)]' : 'text-[var(--o2-gray)]'">
                 {{ activeEvaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
               </span>
-              <span class="tw:text-xs tw:opacity-60">{{ activeEvaluationStatus.reason }}</span>
+              <span class="text-xs opacity-60">{{ activeEvaluationStatus.reason }}</span>
             </template>
           </div>
-          <div class="tw:flex-1 tw:min-h-0" style="overflow: hidden;">
+          <div class="flex-1 min-h-0" style="overflow: hidden;">
             <template v-if="isAnomalyMode">
               <QueryEditor editor-id="anomaly-sql-preview" language="sql" :read-only="true" :show-auto-complete="false" :hide-nl-toggle="true" :query="anomalyPreviewSql" style="height: 100%" />
             </template>
             <template v-else>
-              <div v-if="!formData.stream_name" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2">
-                <OIcon name="query-stats" size="lg" class="tw:opacity-20" />
-                <span class="tw:text-sm tw:font-medium tw:text-text-secondary">
+              <div v-if="!formData.stream_name" class="flex flex-col items-center justify-center h-full gap-2">
+                <OIcon name="query-stats" size="lg" class="opacity-20" />
+                <span class="text-sm font-medium text-text-secondary">
                   {{ t('alerts.previewEmptyState') }}
                 </span>
               </div>
@@ -386,13 +386,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Summary Card -->
-        <div class="card-container tw:overflow-hidden tw:flex tw:flex-col" style="flex: 1; min-height: 0;">
+        <div class="card-container overflow-hidden flex flex-col" style="flex: 1; min-height: 0;">
           <div
-            class="tw:flex tw:items-center tw:px-3 tw:py-[0.625rem] tw:select-none tw:border-b tw:border-border-default tw:shrink-0"
+            class="flex items-center px-3 py-[0.625rem] select-none border-b border-border-default shrink-0"
           >
-            <span class="tw:text-sm tw:font-medium">{{ t('alerts.summary.title') || 'Summary' }}</span>
+            <span class="text-sm font-medium">{{ t('alerts.summary.title') || 'Summary' }}</span>
           </div>
-          <div class="tw:flex-1 tw:min-h-0" style="overflow: auto;">
+          <div class="flex-1 min-h-0" style="overflow: auto;">
             <AnomalySummary
               v-if="isAnomalyMode"
               style="height: 100%; overflow: auto;"

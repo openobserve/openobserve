@@ -154,26 +154,26 @@ describe("AlertContextMenu Component", () => {
   });
 
   describe("Hover State", () => {
-    // Hover is now handled purely via CSS (tw:hover:bg-*) rather than a
+    // Hover is now handled purely via CSS (hover:bg-*) rather than a
     // JS-tracked hoveredItem state, so we assert the hover utility classes exist.
     it("should apply hover background utility class to above menu item", () => {
       wrapper = createWrapper();
       const aboveItem = wrapper.find('[data-test="alert-context-menu-above"]');
       expect(aboveItem.exists()).toBe(true);
-      expect(aboveItem.classes()).toContain("tw:hover:bg-[#f5f5f5]");
+      expect(aboveItem.classes()).toContain("hover:bg-[#f5f5f5]");
     });
 
     it("should apply hover background utility class to below menu item", () => {
       wrapper = createWrapper();
       const belowItem = wrapper.find('[data-test="alert-context-menu-below"]');
       expect(belowItem.exists()).toBe(true);
-      expect(belowItem.classes()).toContain("tw:hover:bg-[#f5f5f5]");
+      expect(belowItem.classes()).toContain("hover:bg-[#f5f5f5]");
     });
 
     it("should apply cursor-pointer class to menu items", () => {
       wrapper = createWrapper();
       const aboveItem = wrapper.find('[data-test="alert-context-menu-above"]');
-      expect(aboveItem.classes()).toContain("tw:cursor-pointer");
+      expect(aboveItem.classes()).toContain("cursor-pointer");
     });
   });
 

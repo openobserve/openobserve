@@ -27,15 +27,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onConfirm"
   >
 
-    <div class="tw:flex tw:flex-col tw:gap-1.75 tw:w-78">
+    <div class="flex flex-col gap-1.75 w-78">
       <ORadioGroup v-model="resumeFromStart">
         <ORadio
-          class="tw:items-center"
+          class="items-center"
           :value="false">
           <template #label>
             <div class="resume-radio-label">
-              <div class="resume-radio-main-text tw:text-[13px] tw:leading-4.5 tw:font-normal">Continue from where it paused</div>
-              <div v-if="lastPausedAt" class="resume-radio-sub-text tw:text-xs tw:leading-4.5 tw:font-normal tw:h-4.5">
+              <div class="resume-radio-main-text text-[13px] leading-4.5 font-normal">Continue from where it paused</div>
+              <div v-if="lastPausedAt" class="resume-radio-sub-text text-xs leading-4.5 font-normal h-4.5">
                 {{ convertUnixToQuasarFormat(lastPausedAt) }}.
               </div>
             </div>
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="height: 18px;"
         >
           <template #label>
-            <span class="tw:text-[13px] tw:leading-4.5 tw:font-normal">Start from now.</span>
+            <span class="text-[13px] leading-4.5 font-normal">Start from now.</span>
           </template>
         </ORadio>
       </ORadioGroup>

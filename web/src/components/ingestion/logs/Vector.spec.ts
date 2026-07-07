@@ -104,7 +104,7 @@ describe("Vector.vue Comprehensive Coverage", () => {
 
     it("should have correct component structure", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
+      expect(wrapper.find('.p-3').exists()).toBe(true);
     });
 
     it("should initialize with all required dependencies", () => {
@@ -453,7 +453,7 @@ describe("Vector.vue Comprehensive Coverage", () => {
   describe("Template Rendering Tests", () => {
     it("should render main container with correct classes", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('.tw\\:p-3');
+      const container = wrapper.find('.p-3');
       expect(container.exists()).toBe(true);
     });
 
@@ -467,7 +467,7 @@ describe("Vector.vue Comprehensive Coverage", () => {
     it("should render template structure correctly", () => {
       wrapper = createWrapper();
       const template = wrapper.html();
-      expect(template).toContain('tw:p-3');
+      expect(template).toContain('p-3');
       expect(template).toContain('copy-content-mock');
     });
   });

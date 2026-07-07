@@ -516,7 +516,7 @@ describe("AppAlerts", () => {
       const wrapper = createWrapper();
       const qPage = wrapper.find('[data-test="alerts-page"]');
       expect(qPage.exists()).toBe(true);
-      expect(qPage.classes()).toContain("tw:p-0");
+      expect(qPage.classes()).toContain("p-0");
     });
 
     it("should have correct styling classes on main container", () => {

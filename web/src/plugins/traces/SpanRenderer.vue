@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="span-renderer"
-    class="relative-position tw:pt-2"
+    class="relative-position pt-2"
     :style="{ height: '100%' }"
   >
     <template v-if="spans?.length">

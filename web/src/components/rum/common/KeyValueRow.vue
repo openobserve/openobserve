@@ -16,20 +16,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:py-1 tw:px-1.5 tw:text-xs"
+    class="flex py-1 px-1.5 text-xs"
     :class="[
       showBorder
-        ? 'tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]'
+        ? 'border-b border-solid border-[var(--o2-border-color)]'
         : '',
     ]"
     :data-test="dataTest"
   >
     <div
-      class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
+      class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
     >
       {{ label }}:
     </div>
-    <div class="tw:flex-1 tw:break-words" :class="valueClass">
+    <div class="flex-1 break-words" :class="valueClass">
       <slot>{{ value }}</slot>
     </div>
   </div>

@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flexWrap: 'nowrap',
             height: '100%',
           }"
-          class="tw:flex tw:relative tw:min-h-7.5 span-row"
+          class="flex relative min-h-7.5 span-row"
           :class="{
             'span-row-selected':
               (spans as any[])[virtualRow.index].spanId === highlightedSpanId,
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseleave="onUnhoverSpan"
           :data-test="`trace-tree-span-container-${(spans as any[])[virtualRow.index].spanId}`"
         >
-          <div :style="{ width: leftWidth + 'px' }" class="tw:pl-[0.375rem]">
+          <div :style="{ width: leftWidth + 'px' }" class="pl-[0.375rem]">
             <div
               :style="{
                 height: '100%',
@@ -115,11 +115,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'px'
                 }`,
               }"
-              class="tw:flex tw:flex-col tw:items-start tw:justify-start tw:truncate"
+              class="flex flex-col items-start justify-start truncate"
               :title="(spans as any[])[virtualRow.index].operationName"
             >
               <div
-                class="tw:flex tw:flex-nowrap tw:w-full tw:h-7.5 tw:overflow-visible relative-position operation-name-container tw:cursor-pointer tw:items-center"
+                class="flex flex-nowrap w-full h-7.5 overflow-visible relative-position operation-name-container cursor-pointer items-center"
                 :class="[
                   store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
                 ]"
@@ -130,10 +130,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <div
-                  class="tw:absolute tw:top-1 tw:right-0 tw:invisible view-logs-container"
+                  class="absolute top-1 right-0 invisible view-logs-container"
                   :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
                 >
-                  <div class="tw:mx-1 view-span-logs">
+                  <div class="mx-1 view-span-logs">
                     <OButton
                       variant="ghost"
                       size="icon"
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
-                  class="span-count-box tw:min-w-5 tw:h-5 tw:py-0 tw:px-1 tw:rounded-full tw:border tw:flex tw:items-center tw:justify-center tw:text-[0.7rem] tw:font-semibold tw:mr-1 tw:transition-colors tw:duration-200 tw:cursor-pointer tw:border-(--o2-border-color)! tw:relative"
+                  class="span-count-box min-w-5 h-5 py-0 px-1 rounded-full border flex items-center justify-center text-[0.7rem] font-semibold mr-1 transition-colors duration-200 cursor-pointer border-(--o2-border-color)! relative"
                   :style="{
                     color: (spans as any[])[virtualRow.index].style.color,
                   }"
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <div
                   v-else
-                  class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:mr-1 tw:shrink-0 tw:self-center"
+                  class="w-1.5 h-1.5 rounded-full mr-1 shrink-0 self-center"
                   :style="{
                     backgroundColor: (spans as any[])[virtualRow.index].style
                       .color,
@@ -189,24 +189,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></div>
 
                 <div
-                  class="tw:flex tw:justify-between"
+                  class="flex justify-between"
                   :class="
                     (spans as any[])[virtualRow.index].hasChildSpans
-                      ? 'tw:w-full'
-                      : 'tw:w-[calc(100%-0.6rem)]!'
+                      ? 'w-full'
+                      : 'w-[calc(100%-0.6rem)]!'
                   "
                 >
                   <div
-                    class="tw:truncate tw:pl-1 tw:cursor-pointer tw:w-[calc(100%-2rem)]!"
+                    class="truncate pl-1 cursor-pointer w-[calc(100%-2rem)]!"
                     :class="
                       isLLMTrace((spans as any[])[virtualRow.index])
-                        ? 'tw:flex-col tw:items-start'
-                        : ' tw:flex tw:items-center'
+                        ? 'flex-col items-start'
+                        : ' flex items-center'
                     "
                     :data-test="`trace-tree-span-select-btn-${(spans as any[])[virtualRow.index].spanId}`"
                   >
                     <div
-                      class="tw:truncate tw:flex tw:items-center span-name-section-content"
+                      class="truncate flex items-center span-name-section-content"
                     >
                       <OIcon
                         v-if="
@@ -214,22 +214,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'ERROR'
                         "
                         name="error" size="sm"
-                        class="tw:text-[var(--o2-status-error-text)]! tw:mr-1"
+                        class="text-[var(--o2-status-error-text)]! mr-1"
                         title="Error Span"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
                       <span
-                        class="tw:text-sm tw:font-medium tw:font-bold tw:mr-2"
+                        class="text-sm font-medium font-bold mr-2"
                         :class="{
-                          'tw:bg-yellow-300 tw:font-bold': isHighlighted(
+                          'bg-yellow-300 font-bold': isHighlighted(
                             (spans as any[])[virtualRow.index].spanId,
                           ),
-                          'tw:text-gray-900':
+                          'text-gray-900':
                             store.state.theme === 'dark' &&
                             isHighlighted(
                               (spans as any[])[virtualRow.index].spanId,
                             ),
-                          'tw:bg-yellow-300 tw:text-red-600 tw:font-bold':
+                          'bg-yellow-300 text-red-600 font-bold':
                             currentSelectedValue ===
                             (spans as any[])[virtualRow.index].spanId,
                         }"
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <SpanKindBadge
                         v-if="(spans as any[])[virtualRow.index]?.spanKind"
                         :kind="(spans as any[])[virtualRow.index]?.spanKind"
-                        class="tw:mr-1"
+                        class="mr-1"
                       />
 
                       <img
@@ -255,16 +255,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                         :title="getSpanTech((spans as any[])[virtualRow.index])"
-                        class="tw:mr-1 tw:shrink-0 tw:w-[0.875rem] tw:h-[0.875rem] tw:inline-block tw:opacity-60"
+                        class="mr-1 shrink-0 w-[0.875rem] h-[0.875rem] inline-block opacity-60"
                         aria-hidden="true"
                         alt=""
                         :data-test="`trace-tree-span-tech-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
                       <span
-                        class="tw:text-sm"
+                        class="text-sm"
                         :class="
                           store.state.theme === 'dark'
-                            ? 'tw:text-gray-400'
+                            ? 'text-gray-400'
                             : 'text-blue-grey-9'
                         "
                         :data-test="`trace-tree-span-operation-name-${(spans as any[])[virtualRow.index].spanId}`"
@@ -276,14 +276,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- LLM Metrics -->
                     <div
                       v-if="isLLMTrace((spans as any[])[virtualRow.index])"
-                      class="tw:flex tw:items-center tw:text-xs tw:text-[var(--o2-status-error-text)]! tw:mt-[-0.125rem] tw:mb-[0.125rem] tw:leading-none"
+                      class="flex items-center text-xs text-[var(--o2-status-error-text)]! mt-[-0.125rem] mb-[0.125rem] leading-none"
                     >
                       <span
                         v-if="
                           (spans as any[])[virtualRow.index].genAiUsage?.total >
                           0
                         "
-                        class="tw:mr-2"
+                        class="mr-2"
                       >
                         <OIcon name="functions" size="xs" />
                         {{
@@ -307,12 +307,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
 
-                  <div class="tw:flex tw:items-center tw:sticky tw:right-0">
+                  <div class="flex items-center sticky right-0">
                     <span
                       v-if="
                         getHttpStatusVars((spans as any[])[virtualRow.index])
                       "
-                      class="tw:text-xs tw:font-semibold tw:leading-none tw:py-[0.4rem] tw:px-1 tw:mr-[0.25rem] tw:rounded tw:whitespace-nowrap"
+                      class="text-xs font-semibold leading-none py-[0.4rem] px-1 mr-[0.25rem] rounded whitespace-nowrap"
                       :style="{
                         backgroundColor: getHttpStatusVars(
                           (spans as any[])[virtualRow.index],
@@ -331,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         getEventCount((spans as any[])[virtualRow.index]) > 0 &&
                         false
                       "
-                      class="tw:flex tw:items-center"
+                      class="flex items-center"
                       :style="{
                         fontSize: '0.625rem',
                         lineHeight: 1,
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="tw:grow tw:relative span-background-wrapper"
+                class="grow relative span-background-wrapper"
                 :style="{
                   backgroundColor: (spans as any[])[virtualRow.index].style
                     .backgroundColor,
