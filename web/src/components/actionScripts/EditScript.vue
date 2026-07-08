@@ -669,11 +669,22 @@ const getCronError = (cron: string): string => {
   return "";
 };
 
+// Sticky flag: has the user edited the cron field? Byte-exact main parity — main
+// only validated cron once its inline @update handler had run (i.e. after an edit),
+// so a never-touched blank cron on create still saved. Flipped below the first time
+// the cron form value changes from user input. Injected into the schema's cron gate.
+const cronEdited = ref(false);
+
 // Co-located Zod schema (factory keeps create-vs-edit + cron checks injectable).
 const editScriptSchema = makeEditScriptSchema({
   t,
   getIsEditing: () => isEditingActionScript.value,
   getCronError,
+  // Main validated cron via TWO paths (see EditScript.schema.ts):
+  //   (a) submit-path gate on execution_details === "repeat" (fires on EDIT), and
+  //   (b) the cron field's inline handler, which only ran after the user edited it.
+  getExecutionDetails: () => formData.value.execution_details ?? "",
+  getCronEdited: () => cronEdited.value,
 });
 
 // Dynamic (edit-prefill) defaults: projects the form-owned fields out of the
@@ -697,6 +708,17 @@ const form = useOForm<EditScriptForm>({
   defaultValues: editScriptDefaults.value,
   schema: editScriptSchema,
   onSubmit: (value) => saveActionScript(value),
+});
+
+// Reproduce main's "validate cron only after the field is edited" gate. On CREATE
+// the only cron-value changes come from user input — the field is disabled on edit
+// and create never calls form.reset — so a change here means the user edited it
+// (main's inline @update trigger). Guarded by !isEditing so the edit-load re-seed
+// (form.reset) doesn't count. Sticky, so a typed-then-cleared cron still validates
+// (matches main, which showed "Field is required!" on clear).
+const cronFieldValue = form.useStore((s: any) => s?.values?.cron ?? "");
+watch(cronFieldValue, () => {
+  if (!isEditingActionScript.value) cronEdited.value = true;
 });
 
 // Read the form-owned `type` reactively (form.useStore) — the stepper's
@@ -999,6 +1021,9 @@ const isRequiredValue = (value: any) => {
 
 const handleActionScript = async () => {
   isEditingActionScript.value = !!router.currentRoute.value.query?.id;
+  // Fresh load starts with an unedited cron field (edit-load re-seeds via
+  // form.reset, which re-baselines isDirty; this covers route re-navigation).
+  cronEdited.value = false;
 
   if (isEditingActionScript.value) {
     isEditingActionScript.value = true;

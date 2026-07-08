@@ -1,10 +1,10 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Unit tests for the EditScript Zod schema — the object-level rules
-// (name/type/service_account/timezone) and the superRefine conditionals
-// (codeZip required-on-create, cron required+valid when scheduled+repeat).
-// These restore the Quasar BEFORE baseline (6 rules) with the truthy→Zod
-// inversion (required + custom check, not check-only).
+// (name/type/service_account; timezone defaulted-not-enforced) and the
+// superRefine conditionals (codeZip required-on-create; cron validated byte-exact
+// to main's two paths — execution_details === "repeat" on EDIT, and only-once-the-
+// cron-field-is-edited on CREATE, preserving the never-touched-blank gap).
 
 import { describe, it, expect, vi } from "vitest";
 import { makeEditScriptSchema } from "./EditScript.schema";
@@ -19,13 +19,22 @@ const t = (key: string) =>
   key === "common.nameRequired" ? "Name is required" : key;
 
 // `getCronError` is injected by the component; here a tiny stub treats the
-// literal "bad" as an invalid cron and everything else as valid.
-const makeSchema = (isEditing = false) =>
+// literal "bad" as an invalid cron and everything else as valid. `execution_details`
+// (main's EDIT gate) and `cronEdited` (main's CREATE "field was touched" gate) are
+// also injected — both default to the cron-validating state so the general valid-
+// record tests still exercise the cron happy path.
+const makeSchema = (
+  isEditing = false,
+  executionDetails = "repeat",
+  cronEdited = true,
+) =>
   makeEditScriptSchema({
     t,
     getIsEditing: () => isEditing,
     getCronError: (cron: string) =>
       cron === "bad" ? "Invalid cron expression!" : "",
+    getExecutionDetails: () => executionDetails,
+    getCronEdited: () => cronEdited,
   });
 
 // A fully-valid CREATE record (scheduled + repeat, with a file + valid cron).
@@ -40,8 +49,15 @@ const base = () => ({
   frequencyType: "repeat",
 });
 
-const errorPaths = (input: any, isEditing = false): string[] => {
-  const res = makeSchema(isEditing).safeParse(input);
+const errorPaths = (
+  input: any,
+  isEditing = false,
+  executionDetails = "repeat",
+  cronEdited = true,
+): string[] => {
+  const res = makeSchema(isEditing, executionDetails, cronEdited).safeParse(
+    input,
+  );
   if (res.success) return [];
   return res.error.issues.map((i) => i.path.join("."));
 };
@@ -79,8 +95,8 @@ describe("EditScript.schema", () => {
       );
     });
 
-    it("requires timezone", () => {
-      expect(errorPaths({ ...base(), timezone: "" })).toContain("timezone");
+    it("does NOT enforce timezone (parity with pre-migration main)", () => {
+      expect(errorPaths({ ...base(), timezone: "" })).not.toContain("timezone");
     });
 
     it("defaults timezone to UTC when omitted", () => {
@@ -105,59 +121,60 @@ describe("EditScript.schema", () => {
     });
   });
 
-  describe("cron (required + valid only when scheduled + repeat)", () => {
-    it("is required when scheduled + repeat and empty", () => {
+  describe("cron (byte-exact main: execution_details on edit + edited-field on create)", () => {
+    // ── EDIT path — main validated via execution_details === "repeat", regardless
+    // of whether the (disabled) field was touched. cronEdited=false proves the
+    // edit gate stands on its own.
+    it("is required when execution_details is repeat and cron empty", () => {
       expect(
-        errorPaths({
-          ...base(),
-          type: "scheduled",
-          frequencyType: "repeat",
-          cron: "",
-        }),
+        errorPaths({ ...base(), cron: "" }, false, "repeat", false),
       ).toContain("cron");
     });
 
-    it("flags an invalid cron when scheduled + repeat", () => {
+    it("flags an invalid cron when execution_details is repeat", () => {
       expect(
-        errorPaths({
-          ...base(),
-          type: "scheduled",
-          frequencyType: "repeat",
-          cron: "bad",
-        }),
+        errorPaths({ ...base(), cron: "bad" }, false, "repeat", false),
       ).toContain("cron");
     });
 
-    it("accepts a valid cron when scheduled + repeat", () => {
+    it("accepts a valid cron when execution_details is repeat", () => {
       expect(
-        errorPaths({
-          ...base(),
-          type: "scheduled",
-          frequencyType: "repeat",
-          cron: "0 12 * * *",
-        }),
+        errorPaths({ ...base(), cron: "0 12 * * *" }, false, "repeat", false),
       ).not.toContain("cron");
     });
 
-    it("is NOT required for a 'once' schedule", () => {
-      expect(
-        errorPaths({
-          ...base(),
-          type: "scheduled",
-          frequencyType: "once",
-          cron: "",
-        }),
-      ).not.toContain("cron");
+    // ── CREATE path — execution_details is "" the whole time; cron is validated
+    // ONLY once the user has edited the field (main's inline @update handler).
+    it("validates a blank cron on create once the field is edited", () => {
+      expect(errorPaths({ ...base(), cron: "" }, false, "", true)).toContain(
+        "cron",
+      );
     });
 
-    it("is NOT required for a non-scheduled (service) action", () => {
+    it("flags an invalid cron on create once the field is edited", () => {
+      expect(errorPaths({ ...base(), cron: "bad" }, false, "", true)).toContain(
+        "cron",
+      );
+    });
+
+    // ── The preserved latent gap: repeat selected but cron field NEVER touched →
+    // a blank cron still saves on create (matches main exactly).
+    it("does NOT validate an untouched blank cron on create (main's gap, preserved)", () => {
+      expect(errorPaths({ ...base(), cron: "" }, false, "", false)).not.toContain(
+        "cron",
+      );
+    });
+
+    // A 'once' schedule never validates cron even if the field was edited (the
+    // create gate also requires the live repeat tab).
+    it("is NOT validated for a 'once' schedule even if the field was edited", () => {
       expect(
-        errorPaths({
-          ...base(),
-          type: "service",
-          frequencyType: "repeat",
-          cron: "",
-        }),
+        errorPaths(
+          { ...base(), frequencyType: "once", cron: "" },
+          false,
+          "",
+          true,
+        ),
       ).not.toContain("cron");
     });
   });

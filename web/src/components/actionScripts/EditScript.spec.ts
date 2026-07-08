@@ -263,15 +263,38 @@ describe("EditScript", () => {
       expect(actions.create).not.toHaveBeenCalled();
     });
 
-    it("requires cron when scheduled + repeat (restored conditional)", async () => {
-      // Toggle the frequency tabs to a repeat schedule (bridged into the form).
+    it("does NOT block a NEVER-TOUCHED blank cron on create (main's latent gap, preserved)", async () => {
+      vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+      (actions.create as any).mockResolvedValue({ data: { code: 200 } });
+
+      // Repeat schedule, but the user never touches the cron field. On main the
+      // inline @update handler never fired and the submit-path gate keys off
+      // execution_details, which stays "" on create — so a blank cron saved. We
+      // preserve that exactly: cron is left untouched here.
       wrapper.vm.frequency.type = "repeat";
       await nextTick();
 
       setField(wrapper, "name", "valid_action");
       setField(wrapper, "service_account", "service1@example.com");
       setField(wrapper, "codeZip", new File(["code"], "script.zip"));
-      setField(wrapper, "cron", ""); // empty cron → blocked
+      await nextTick();
+
+      await submit(wrapper);
+
+      expect(wrapper.vm.form.state.isValid).toBe(true);
+      expect(actions.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("blocks an invalid cron on create ONCE the field is edited (restored inline handler)", async () => {
+      wrapper.vm.frequency.type = "repeat";
+      await nextTick();
+
+      setField(wrapper, "name", "valid_action");
+      setField(wrapper, "service_account", "service1@example.com");
+      setField(wrapper, "codeZip", new File(["code"], "script.zip"));
+      // Editing the cron field flips the sticky "edited" flag → cron now validates,
+      // exactly like main's inline @update handler once the user typed.
+      setField(wrapper, "cron", "not a cron");
       await nextTick();
 
       await submit(wrapper);

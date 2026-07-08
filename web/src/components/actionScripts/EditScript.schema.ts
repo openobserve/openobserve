@@ -12,10 +12,16 @@
 //   • name             required + isValidResourceName (custom char rule)
 //   • type             required
 //   • service_account  required
-//   • timezone         required (disabled, value "UTC")
+//   • timezone         defaulted to "UTC" (disabled field) — NOT enforced, to
+//                      match pre-migration main, which had no timezone rule.
 //   • codeZip (q-file) required ONLY on create  → superRefine
-//   • frequency.cron   required + cron-format/interval ONLY when scheduled+repeat
-//                      → superRefine (cross-field on type + frequencyType)
+//   • frequency.cron   required + cron-format/interval, byte-exact to main's TWO
+//                      validation paths → superRefine:
+//                        · EDIT: execution_details === "repeat" (submit-path gate)
+//                        · CREATE: only once the user has EDITED the cron field
+//                          (main's inline @update handler) + repeat tab live. A
+//                          never-touched blank cron on create still saves — main's
+//                          latent gap, preserved.
 //
 // Built via a factory so the conditionals can branch on live create-vs-edit
 // state and the cron parse/interval check (which needs the store config) without
@@ -39,6 +45,19 @@ export interface EditScriptSchemaOptions {
    * from the component so the schema stays decoupled from the store / cron-parser.
    */
   getCronError: (_cron: string) => string;
+  /**
+   * Returns the component's `execution_details`. This is main's submit-path cron
+   * gate: cron is validated when it equals "repeat" (the case on EDIT of a saved
+   * repeat action). During CREATE it stays "" the whole time.
+   */
+  getExecutionDetails: () => string;
+  /**
+   * Returns whether the user has edited the cron field (its form dirty state).
+   * On CREATE, main only validated cron once its inline @update handler had run —
+   * i.e. after an edit — so an untouched blank cron still saves. This reproduces
+   * that gate; it stays false until the user changes the field.
+   */
+  getCronEdited: () => boolean;
 }
 
 export const makeEditScriptSchema = (opts: EditScriptSchemaOptions) =>
@@ -59,16 +78,18 @@ export const makeEditScriptSchema = (opts: EditScriptSchemaOptions) =>
       description: z.string().optional().default(""),
       type: z.string().min(1, "Field is required!"),
       service_account: z.string().min(1, "Field is required!"),
-      // Disabled field whose value is always "UTC" — still required per baseline.
-      timezone: z.string().min(1, "Field is required!").default("UTC"),
+      // Disabled field whose value is always "UTC". Pre-migration main had NO
+      // timezone rule, so it's defaulted but NOT enforced (parity).
+      timezone: z.string().default("UTC"),
 
       // ── Conditional fields (validated in superRefine) ────────────────────
       // codeZip is a File on create, null/absent on edit. Required-on-create is
       // enforced below.
       codeZip: z.any().nullable().optional(),
       // cron + frequencyType are bridged from the component (the frequency tabs
-      // are an OButton toggle, not an <input>). The cron requirement/format is
-      // enforced below only when scheduled + repeat.
+      // are an OButton toggle, not an <input>). frequencyType feeds the save
+      // payload AND the create-side cron gate (repeat tab live); the cron
+      // requirement/format is enforced below (see superRefine).
       cron: z.string().optional().default(""),
       frequencyType: z.string().optional().default("once"),
     })
@@ -82,8 +103,19 @@ export const makeEditScriptSchema = (opts: EditScriptSchemaOptions) =>
         });
       }
 
-      // cron — required + valid ONLY for a scheduled action on a repeat schedule.
-      if (val.type === "scheduled" && val.frequencyType === "repeat") {
+      // cron — byte-exact restoration of pre-migration main, which validated cron
+      // through TWO paths:
+      //   (a) the submit-path gate on execution_details === "repeat" (fires on
+      //       EDIT, where the record's execution_details is "repeat"), and
+      //   (b) the cron field's inline @update handler, which only ran once the
+      //       user had actually edited the field. So on CREATE a repeat schedule
+      //       whose cron field is never touched still saves with a blank cron —
+      //       main's latent gap, deliberately preserved here.
+      // (a) → getExecutionDetails(); (b) → getCronEdited() gated on the live tab.
+      const editRepeat = opts.getExecutionDetails() === "repeat";
+      const createEditedRepeat =
+        opts.getCronEdited() && val.frequencyType === "repeat";
+      if (editRepeat || createEditedRepeat) {
         const cron = String(val.cron ?? "").trim();
         if (!cron) {
           ctx.addIssue({
