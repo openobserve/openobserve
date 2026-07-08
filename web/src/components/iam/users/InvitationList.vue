@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title text-text-primary">
+            <span class="o2-table-footer-title">
               {{ resultTotal }} {{ t('invitation.pendingInvitations') }}
             </span>
           </template>

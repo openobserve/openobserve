@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center justify-between w-full py-2"
             >
               <div
-                class="flex items-center w-full font-bold text-[14px]"
+                class="flex items-center w-full o2-table-footer-title"
               >
                 {{ scope.totalRows }} Stream(s)
                 <OButton

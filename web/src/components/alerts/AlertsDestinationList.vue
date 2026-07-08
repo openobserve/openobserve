@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom="{ totalRows }">
-            <span class="o2-table-footer-title text-primary">
+            <span class="o2-table-footer-title">
               {{ totalRows.toLocaleString() }} {{ t('alert_destinations.header') }}
             </span>
             <OButton

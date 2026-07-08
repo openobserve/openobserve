@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title text-text-primary">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || 'Organization Members') : t('iam.basicUsers') }}</span>
+            <span class="o2-table-footer-title">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || 'Organization Members') : t('iam.basicUsers') }}</span>
             <OButton
               v-if="selectedUsers.length > 0"
               data-test="users-list-delete-users-btn"
