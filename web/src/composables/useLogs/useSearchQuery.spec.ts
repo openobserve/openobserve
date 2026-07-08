@@ -112,7 +112,6 @@ vi.mock("./logsUtils", () => ({
     addTransformToQuery: vi.fn(),
     updateUrlQueryParams: vi.fn(),
     fnUnparsedSQL: vi.fn((p: any) => JSON.stringify(p)),
-    checkTimestampAlias: vi.fn(() => true),
   })),
 }));
 
