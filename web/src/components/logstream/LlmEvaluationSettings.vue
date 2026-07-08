@@ -79,18 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           <template v-if="enabled">
             <!-- LLM Span Identifier -->
             <div class="pt-3 px-4 pb-1">
-              <label
-                class="block text-[0.8125rem] font-semibold mb-1"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'text-[#e5e7eb]'
-                    : 'text-[#374151]'
-                "
-              >
-                {{ t("pipeline.llmSpanIdentifier") }}
-              </label>
               <OFormSelect
                 name="spanIdentifier"
+                :label="t('pipeline.llmSpanIdentifier')"
+                required
                 :options="streamFields"
                 searchable
                 labelKey="label"
@@ -113,19 +105,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
             <!-- Evaluation Template Selection -->
             <div class="pt-3 px-4 pb-1">
-              <label
-                class="block text-[0.8125rem] font-semibold mb-1"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'text-[#e5e7eb]'
-                    : 'text-[#374151]'
-                "
-              >
-                {{ t("pipeline.evaluationTemplate") }}
-              </label>
-              <div class="flex items-center gap-2">
+              <div class="flex items-end gap-2">
                 <OFormSelect
                   name="selectedTemplate"
+                  :label="t('pipeline.evaluationTemplate')"
+                  required
                   :options="availableTemplates"
                   labelKey="name"
                   valueKey="id"
@@ -224,18 +208,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
             <!-- Output stream name -->
             <div class="pt-3 px-4 pb-1">
-              <label
-                class="block text-[0.8125rem] font-semibold mb-1"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'text-[#e5e7eb]'
-                    : 'text-[#374151]'
-                "
-              >
-                {{ t("pipeline.llmEvaluationOutputStreamName") }}
-              </label>
               <OFormInput
                 name="outputStream"
+                :label="t('pipeline.llmEvaluationOutputStreamName')"
+                required
                 class="w-full"
                 data-test="stream-llm-eval-output-stream"
                 @update:model-value="markDirty"

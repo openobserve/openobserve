@@ -17,6 +17,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 
@@ -183,6 +185,33 @@ describe("LlmEvaluationSettings", () => {
       await flushPromises();
 
       expect(values(wrapper).samplingRate).toBe(0.01);
+    });
+  });
+
+  describe("Required-field indicators", () => {
+    // The three fields that become required once evaluation is enabled render
+    // the * via the OForm* `required` prop (never a hardcoded asterisk). The
+    // whole config section is v-if="enabled", so the fields are always required
+    // when visible → a static * is accurate.
+    it.each([
+      ["spanIdentifier", OFormSelect],
+      ["selectedTemplate", OFormSelect],
+      ["outputStream", OFormInput],
+    ] as const)("shows a required * on %s when enabled", async (name, Comp) => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      getForm(wrapper).setFieldValue("enabled", true);
+      await flushPromises();
+
+      const field = wrapper
+        .findAllComponents(Comp as any)
+        .find((c: any) => c.props("name") === name);
+      expect(field?.exists()).toBe(true);
+
+      const label = field!.find("label");
+      expect(label.exists()).toBe(true);
+      expect(label.text()).toContain("*");
     });
   });
 
