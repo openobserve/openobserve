@@ -38,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{
         minWidth: '100%',
         ...columnSizeVars,
-        minHeight: isFirefox ? undefined : totalSize + 'px',
         width: !defaultColumns
           ? table.getCenterTotalSize() + 'px'
           : wrap
@@ -258,11 +257,17 @@ class="mr-1" />
         </tr>
       </tbody>
 
+      <!-- height reserves the full virtual-scroll height (rows are
+           position:absolute and add none of their own). The `.logs-table`
+           element/thead/tbody are forced to `display: block` in component.css
+           so `position: relative` (containing block for the absolute rows),
+           `height`, and the sticky header all behave identically in Firefox —
+           Firefox does not honor these on native table-row-group boxes. -->
       <tbody
         data-test="logs-search-result-table-body"
         ref="tableBodyRef"
         class="relative"
-        :style="isFirefox ? { minHeight: totalSize + 'px' } : {}"
+        :style="{ height: totalSize + 'px' }"
       >
         <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
           <tr

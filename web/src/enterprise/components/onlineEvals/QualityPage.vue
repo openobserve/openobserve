@@ -6,7 +6,7 @@
     <!-- Agent filter — right-aligned at the top of the content container so it
          sits with the KPIs + table it scopes (matches LLM Insights). -->
     <div class="flex items-center justify-end px-4">
-      <div class="w-[14rem] flex-shrink-0">
+      <div class="w-[17rem] flex-shrink-0">
         <!-- While the agent list is loading we swap the select for a skeleton
              of the same height so the control reads as "loading" (and can't be
              opened on an empty list) instead of showing an empty dropdown. -->
@@ -22,6 +22,7 @@
           v-model="agentModel"
           label="Agent"
           label-position="inside"
+          :placeholder="t('onlineEvals.quality.agentPlaceholder')"
           :options="agentOptions || []"
           labelKey="label"
           valueKey="value"

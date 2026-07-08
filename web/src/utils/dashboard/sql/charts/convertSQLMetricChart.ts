@@ -18,10 +18,43 @@ import { calculateOptimalFontSize } from "../../chartDimensionUtils";
 import { getContrastColor } from "../../chartColorUtils";
 import { type SQLContext } from "../shared/types";
 
-// Width reserved for the copy button when auto-fitting the value font size,
-// so the hover button has room beside the value without shrinking the text
-// more than necessary.
-export const METRIC_COPY_BTN_RESERVE_PX = 40;
+// Copy-button size (icon-xs-sq) and the slot it needs beside the value
+// (button + gaps). The value stays perfectly centered, so free width splits
+// evenly between both sides — reserving the slot on BOTH sides during font
+// fitting keeps the right-hand slot available on any reasonably wide panel.
+export const METRIC_COPY_BTN_PX = 28;
+export const METRIC_COPY_BTN_SLOT_PX = METRIC_COPY_BTN_PX + 4;
+
+// Below this the value stops being readable; the fit may use it even when
+// the button slot no longer fits, and the button then moves below the value
+// (or hides) instead of shrinking the text further.
+export const METRIC_MIN_FONT_PX = 12;
+
+/**
+ * Font size for a metric value: fits the width left over after reserving the
+ * copy-button slot on both sides, capped by the cell height, and floored at
+ * a readable minimum (never beyond what the height allows).
+ */
+export const calculateMetricFontSize = (
+  text: string,
+  width: number,
+  height: number,
+): number => {
+  const fit = calculateOptimalFontSize(
+    text,
+    width - 2 * METRIC_COPY_BTN_SLOT_PX,
+    height,
+  );
+  const heightCap = Math.max(1, Math.floor(height / 1.2));
+  const floorCap = Math.min(METRIC_MIN_FONT_PX, heightCap);
+  // common case: the fit already clears the readability floor, so the
+  // full-width fit (a second measurement binary search) is not needed
+  if (fit >= floorCap) return fit;
+  // the floor may ignore the button slots (the button wraps instead), but it
+  // must never exceed what the full cell width fits — that would clip digits
+  const fullWidthFit = calculateOptimalFontSize(text, width, height);
+  return Math.max(fit, Math.min(floorCap, fullWidthFit));
+};
 
 /**
  * Applies chart-specific options for: metric
@@ -39,16 +72,17 @@ export function applyMetricChart(ctx: SQLContext): void {
     chartPanelRef,
   } = ctx;
 
-  const key1 = yAxisKeys[0];
+  const key1 = yAxisKeys?.[0];
   const yAxisValue = getAxisDataFromKey(key1);
   const unitValue = getUnitValue(
-    yAxisValue.length > 0 ? yAxisValue[0] : 0,
-    panelSchema.config?.unit,
-    panelSchema.config?.unit_custom,
-    panelSchema.config?.decimals,
+    yAxisValue?.length > 0 ? yAxisValue[0] : 0,
+    panelSchema?.config?.unit,
+    panelSchema?.config?.unit_custom,
+    panelSchema?.config?.decimals,
   );
   const metricText = formatUnitValue(unitValue);
-  options.backgroundColor = panelSchema.config?.background?.value?.color ?? "";
+  options.backgroundColor =
+    panelSchema?.config?.background?.value?.color ?? "";
   options.dataset = { source: [[]] };
   options.tooltip = {
     show: false,
@@ -63,11 +97,11 @@ export function applyMetricChart(ctx: SQLContext): void {
   options.xAxis = [];
   options.yAxis = [];
   const metricFillColor = getContrastColor(
-    panelSchema.config?.background?.value?.color,
-    store.state.theme === "dark",
+    panelSchema?.config?.background?.value?.color,
+    store?.state?.theme === "dark",
   );
   const metricFieldLabel =
-    panelSchema.queries[0]?.fields?.y?.[0]?.label || key1;
+    panelSchema?.queries?.[0]?.fields?.y?.[0]?.label || key1;
   options.series = [
     {
       ...defaultSeriesProps,
@@ -76,16 +110,17 @@ export function applyMetricChart(ctx: SQLContext): void {
       _metricLabel: metricFieldLabel,
       renderItem: function (params: any) {
         try {
-          const backgroundColor = panelSchema.config?.background?.value?.color;
-          const isDarkTheme = store.state.theme === "dark";
-
+          const backgroundColor =
+            panelSchema?.config?.background?.value?.color;
+          const isDarkTheme = store?.state?.theme === "dark";
           return {
             type: "text",
             style: {
               text: metricText,
-              fontSize: calculateOptimalFontSize(
+              fontSize: calculateMetricFontSize(
                 metricText,
-                params?.coordSys?.cx * 2 - METRIC_COPY_BTN_RESERVE_PX,
+                params?.coordSys?.cx * 2,
+                params?.coordSys?.cy * 2,
               ), //coordSys is relative. so that we can use it to calculate the dynamic size
               fontWeight: 500,
               align: "center",
@@ -114,10 +149,7 @@ export function applyMetricChart(ctx: SQLContext): void {
       height: h,
       cx: w / 2,
       cy: h / 2,
-      fontSize: calculateOptimalFontSize(
-        metricText,
-        w - METRIC_COPY_BTN_RESERVE_PX,
-      ),
+      fontSize: calculateMetricFontSize(metricText, w, h),
     };
   }
 }

@@ -1,3 +1,10 @@
+// Cached 2D context for text measurement — canvas measureText is the same
+// browser API ECharts measures its labels with, and it avoids the
+// DOM-append + forced-reflow cost of measuring with a <span>, which adds up
+// because this runs for every axis label of every panel on every render.
+// `undefined` = not attempted yet, `null` = unavailable (headless).
+let measureTextCtx: CanvasRenderingContext2D | null | undefined;
+
 /**
  * Calculates the width of a given text.
  * Useful to calculate nameGap for the left axis
@@ -12,32 +19,86 @@ export const calculateWidthText = (
 ): number => {
   if (!text) return 0;
 
-  const span = document.createElement("span");
-  document.body.appendChild(span);
+  if (measureTextCtx === undefined) {
+    try {
+      const canvas = document.createElement("canvas");
+      measureTextCtx =
+        typeof canvas.getContext === "function"
+          ? canvas.getContext("2d")
+          : null;
+    } catch {
+      measureTextCtx = null;
+    }
+  }
+  if (measureTextCtx) {
+    // sans-serif matches the font ECharts renders axis labels with
+    measureTextCtx.font = `${fontSize || "12px"} sans-serif`;
+    return Math.ceil(measureTextCtx.measureText(String(text)).width);
+  }
 
-  span.style.font = "sans-serif";
-  span.style.fontSize = fontSize || "12px";
-  span.style.height = "auto";
-  span.style.width = "auto";
-  span.style.top = "0px";
-  span.style.position = "absolute";
-  span.style.whiteSpace = "no-wrap";
-  span.innerHTML = text;
-
-  const width = Math.ceil(span.clientWidth);
-  span.remove();
-  return width;
+  // no 2D context (e.g. jsdom) — deterministic estimate, avg glyph ≈ 0.6em
+  const px = parseFloat(fontSize) || 12;
+  return Math.ceil(String(text).length * px * 0.6);
 };
 
 /**
- * Calculates the optimal font size for a given text that fits the canvas width.
+ * Tick values a value axis will render for the given extent, mirroring
+ * ECharts' nice-interval algorithm (interval = "nice" of span/splitNumber,
+ * where nice rounds to 1/2/3/5×10^n, and the extent is widened to interval
+ * multiples). Kept local instead of importing ECharts' internal IntervalScale
+ * so upgrades cannot break us; verified to produce identical ticks.
+ *
+ * @param lo - axis extent minimum
+ * @param hi - axis extent maximum
+ * @param splitNumber - desired number of intervals (ECharts default: 5)
+ * @return {number[]} the tick values, lowest first
+ */
+export const calculateNiceTickValues = (
+  lo: number,
+  hi: number,
+  splitNumber: number = 5,
+): number[] => {
+  const span = hi - lo;
+  if (!(span > 0) || !Number.isFinite(span)) return [lo];
+
+  const step = span / splitNumber;
+  const exp10 = 10 ** Math.floor(Math.log10(step));
+  const f = step / exp10;
+  const nf = f < 1.5 ? 1 : f < 2.5 ? 2 : f < 4 ? 3 : f < 7 ? 5 : 10;
+  const interval = nf * exp10;
+
+  const ticks: number[] = [];
+  for (let k = Math.floor(lo / interval); k <= Math.ceil(hi / interval); k++) {
+    // toPrecision strips float noise like 0.30000000000000004
+    ticks.push(parseFloat((k * interval).toPrecision(12)));
+  }
+  return ticks;
+};
+
+/**
+ * Calculates the optimal font size for a given text that fits the canvas width
+ * and, when provided, the canvas height.
  * @param text - The text to calculate the font size for.
  * @param canvasWidth - canvas width in pixels
+ * @param canvasHeight - optional canvas height in pixels; caps the font size so
+ * the rendered line (~1.2em tall) also fits vertically
  * @returns {number} - The optimal font size in pixels.
  */
-export const calculateOptimalFontSize = (text: string, canvasWidth: number) => {
+export const calculateOptimalFontSize = (
+  text: string,
+  canvasWidth: number,
+  canvasHeight?: number,
+) => {
   let minFontSize = 1; // Start with the smallest font size
   let maxFontSize = 90; // Set a maximum possible font size
+
+  if (canvasHeight !== undefined && canvasHeight > 0) {
+    maxFontSize = Math.max(
+      minFontSize,
+      Math.min(maxFontSize, Math.floor(canvasHeight / 1.2)),
+    );
+  }
+
   let optimalFontSize = minFontSize;
 
   while (minFontSize <= maxFontSize) {

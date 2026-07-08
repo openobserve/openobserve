@@ -133,7 +133,9 @@
     "disable": "停用",
     "download": "下載",
     "enabled": "已啟用",
-    "disabled": "已停用"
+    "disabled": "已停用",
+    "invalidEmail": "請輸入有效的電子郵件地址。",
+    "nameMaxLength": "名稱長度不得超過 {max} 個字元。"
   },
   "validation": {
     "required": "此欄位為必填",
@@ -952,7 +954,15 @@
     "revokeInvitationTitle": "撤銷邀請",
     "revokeInvitationMsg": "您確定要撤銷對 {email} 的邀請嗎？",
     "deleteUsersTitle": "刪除使用者",
-    "deleteUsersMsg": "您確定要刪除 {count} 位使用者嗎？"
+    "deleteUsersMsg": "您確定要刪除 {count} 位使用者嗎？",
+    "fieldRequired": "此欄位為必填",
+    "roleRequired": "角色為必填",
+    "passwordRequired": "必須輸入密碼。",
+    "currentPasswordRequired": "必須輸入目前的密碼。",
+    "newPasswordRequired": "必須輸入新密碼。",
+    "passwordPolicyHint": "密碼長度必須為 8 至 128 個字元，且至少包含一個小寫字母、一個大寫字母、一個數字與一個特殊字元。",
+    "inviteEmailInvalid": "請輸入正確的電子郵件地址。",
+    "otherOrgInvalid": "組織名稱必須以字母開頭，且僅能包含英數字元、_ 或 -。"
   },
   "invitation": {
     "pendingInvitations": "待處理的邀請",
@@ -975,20 +985,74 @@
   },
   "serviceAccounts": {
     "header": "服務帳戶",
+    "emailInvalid": "請輸入有效的電子郵件地址",
+    "headerSubtitle": "API 的程式化存取權杖",
     "search": "搜尋服務帳戶",
     "refresh": "重新整理服務權杖",
+    "rotate": "輪換權杖",
     "showToken": "顯示服務權杖",
     "hideToken": "隱藏服務權杖",
-    "delete": "刪除服務帳戶",
+    "delete": "刪除",
+    "deleteServiceAccount": "刪除服務帳戶",
     "update": "更新服務帳戶",
     "copyToken": "複製權杖",
     "add": "新增服務帳戶",
-    "confirmDeleteMsg": "確定要刪除此服務帳戶嗎？",
+    "confirmDeleteMsg": "確定要刪除 {identifier} 嗎？",
     "confirmDeleteHead": "刪除服務帳戶",
-    "confirmRefreshMsg": "確定要重新整理此服務帳戶的權杖嗎？",
-    "confirmRefreshHead": "重新整理服務權杖",
+    "confirmDeleteBtn": "刪除帳戶",
+    "confirmRefreshMsg": "確定要輪換 {identifier} 的權杖嗎？",
+    "confirmRefreshHead": "輪換服務權杖",
+    "confirmRefreshBtn": "輪換權杖",
+    "confirmBulkDeleteHead": "刪除服務帳戶",
+    "confirmBulkDeleteMsg": "確定要刪除 {count} 個服務帳戶嗎？",
+    "confirmBulkDeleteBtn": "刪除 {count} 個帳戶",
     "downloadToken": "下載權杖",
-    "token": "權杖"
+    "token": "權杖",
+    "tokenDialogTitle": "服務帳戶權杖",
+    "tokenReveal": {
+      "curl": "cURL",
+      "header": "標頭",
+      "env": "環境變數",
+      "nextStep": "在您的 API 請求中使用此權杖。請妥善保存；它將不會再次顯示。",
+      "nextStepCloud": "在您的 API 請求中使用此權杖。請聯絡您的管理員以取得 API 端點。",
+      "nextStepGrant": "此服務帳戶尚無任何權限。請為其指派角色，或將其加入使用者群組以授予存取權限。",
+      "nextStepOss": "請從「角色與群組」頁面授予存取權限。",
+      "addToGroup": "加入使用者群組",
+      "addToRole": "指派角色",
+      "step1Title": "複製您的權杖",
+      "step2Title": "授予權限",
+      "copyHint": "請立即複製此權杖——您將無法再次看到它。",
+      "next": "下一步：授予權限",
+      "back": "返回",
+      "done": "完成"
+    },
+    "form": {
+      "identifier": {
+        "label": "識別碼",
+        "placeholder": "輸入電子郵件地址",
+        "help": "作為服務帳戶識別碼的電子郵件地址"
+      }
+    },
+    "list": {
+      "col": {
+        "identifier": "識別碼",
+        "description": "描述",
+        "token": "權杖",
+        "created": "建立時間"
+      }
+    },
+    "empty": {
+      "title": "尚無服務帳戶",
+      "description": "建立服務帳戶以產生用於程式化存取的 API 權杖。",
+      "cta": "新增服務帳戶"
+    },
+    "row": {
+      "managedBy": "系統管理",
+      "managedByTooltip": "這是由系統管理的服務帳戶，無法修改",
+      "checkboxTooltip": "系統管理的帳戶不列入批次操作"
+    },
+    "bulkDelete": "刪除",
+    "bulkDeleteNotice": "系統管理的帳戶不列入批次操作"
   },
   "iam": {
     "users": "使用者",
@@ -1033,7 +1097,60 @@
     "organizationsDesc": "您可存取的組織",
     "nameHelpText": "僅可使用英數字元與「_」字元，不可包含空格。",
     "ingestionTokens": "擷取權杖",
-    "organizationMembers": "組織成員"
+    "organizationMembers": "組織成員",
+    "editGroup": {
+      "unsavedDot": {
+        "title": "此分頁有未儲存的變更。"
+      },
+      "leaveConfirm": {
+        "title": "捨棄未儲存的變更？",
+        "message": "您有未儲存的角色或成員變更。離開此頁面將會捨棄這些變更。"
+      }
+    },
+    "editRole": {
+      "unsavedDot": {
+        "title": "此分頁有未儲存的變更。"
+      },
+      "leaveConfirm": {
+        "title": "捨棄未儲存的變更？",
+        "message": "您有未儲存的權限或成員變更。離開此頁面將會捨棄這些變更。"
+      }
+    },
+    "groupsPage": {
+      "subtitle": "使用者群組會綑綁多個角色——將成員加入群組，即可一次授予其所有角色。",
+      "delete": {
+        "impact": "{count} 位成員將失去此群組所授予的角色。"
+      },
+      "bulkDelete": {
+        "impact": "這些群組的成員將失去這些群組所授予的角色。"
+      }
+    },
+    "rolesPage": {
+      "subtitle": "角色會綑綁多個權限——將角色指派給使用者、服務帳戶或群組，即可授予存取權限。",
+      "delete": {
+        "impact": "{count} 位使用者以及繫結至此角色的任何服務帳戶將失去存取權限。"
+      },
+      "bulkDelete": {
+        "impact": "繫結至這些角色的任何使用者與服務帳戶將失去存取權限。"
+      }
+    },
+    "group": {
+      "name": {
+        "required": "群組名稱為必填。",
+        "invalidChars": "僅可使用字母、數字與底線，且不可含空格。"
+      }
+    },
+    "role": {
+      "name": {
+        "required": "角色名稱為必填。",
+        "invalidChars": "僅可使用字母、數字與底線，且不可含空格。"
+      },
+      "startFrom": {
+        "label": "起始範本",
+        "custom": "自訂（空白角色）",
+        "readonly": "唯讀（可檢視所有資源）"
+      }
+    }
   },
   "ticket": {
     "header": "支援工單",
@@ -1543,12 +1660,18 @@
     "defaultTokenBadge": "預設",
     "createTokenBtn": "建立新權杖",
     "createTokenTitle": "建立權杖",
+    "searchToken": "搜尋權杖",
     "tokenNameLabel": "名稱",
     "tokenDescriptionLabel": "描述",
     "rotateTokenBtn": "輪替",
     "deleteTokenBtn": "刪除",
     "copyTokenBtn": "複製",
     "copyTokenWarning": "請立即複製此權杖。它將不會再次顯示。",
+    "tokenAuthHeader": "授權",
+    "authHeaderLabel": "授權標頭（可直接使用）",
+    "authHeaderHelp": "將此內容貼到您擷取請求的授權標頭中——無需手動編碼。",
+    "copyAuthHeaderBtn": "複製授權標頭",
+    "copyRawTokenBtn": "複製原始權杖",
     "newTokenRevealed": "已產生新權杖",
     "deleteTokenConfirm": "要刪除權杖「{name}」嗎？使用此權杖的管線將停止運作。",
     "rotateTokenConfirm": "要輪替權杖「{name}」嗎？所有使用此權杖的管線都必須以新值更新。",
