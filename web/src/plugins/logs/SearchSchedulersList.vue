@@ -8,16 +8,22 @@
         class="shrink-0 px-4 border-b border-border-default"
       >
         <template #actions>
-          <div>
+          <div class="flex items-center gap-1">
+            <OTableColumnToggle
+              :columns="columnsToBeRendered"
+              :column-visibility="columnVisibility"
+              @update:column-visibility="setColumnVisibility"
+            />
             <OButton
-              variant="primary"
-              size="sm"
-              class="ml-3"
-              @click="fetchSearchHistory"
-              :disabled="isLoading"
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              class=""
+              :loading="isLoading"
               data-test="search-scheduler-get-jobs-btn"
+              @click="fetchSearchHistory"
             >
-              {{ t('search_scheduler_job.get_jobs') }}
+              <OTooltip side="bottom" :content="t('search_scheduler_job.get_jobs')" shortcut-id="searchSchedulersRefresh" />
             </OButton>
           </div>
         </template>
@@ -28,6 +34,7 @@
             data-test="search-scheduler-table"
             :data="dataToBeLoaded"
             :columns="columnsToBeRendered"
+            :column-visibility="columnVisibility"
             row-key="trace_id"
             :loading="isLoading"
             pagination="client"
@@ -261,6 +268,8 @@ import { useI18n } from "vue-i18n";
 import { formatDate } from "@/utils/date";
 import type { Ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -272,11 +281,14 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import JsonPreview from "./JsonPreview.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "SearchSchedulersList",
@@ -284,6 +296,7 @@ export default defineComponent({
     DateTime,
     OEmptyState,
     OTable,
+    OTableColumnToggle,
     OTimeCell,
     OUserCell,
     OTag,
@@ -292,6 +305,7 @@ export default defineComponent({
     AppTabs,
     JsonPreview,
     OButton,
+    OTooltip,
     OSpinner,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
@@ -329,6 +343,9 @@ export default defineComponent({
       endTime: 0,
     });
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
+    const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
+      "logs-search-schedulers-list",
+    );
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
     const isDateTimeChanged = ref(false);
@@ -363,11 +380,11 @@ export default defineComponent({
       if (data && data.length === 0) return [];
 
       return [
-        { id: "user_id", header: t('search_scheduler_job.user_id'), accessorKey: "user_id", sortable: true, size: COL.owner, meta: { align: "left", autoWidth: true } },
-        { id: "created_at", header: t('search_scheduler_job.created_at'), accessorKey: "created_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
-        { id: "start_time", header: t('search_scheduler_job.start_time'), accessorKey: "start_time", sortable: true, size: COL.date, meta: { align: "left" } },
-        { id: "duration", header: t('search_scheduler_job.duration'), accessorKey: "duration", sortable: false, size: COL.duration, meta: { align: "left" } },
-        { id: "status", header: t('search_scheduler_job.status'), accessorKey: "status", cell: " ", sortable: false, size: COL.status, meta: { align: "left" } },
+        { id: "user_id", header: t('search_scheduler_job.user_id'), accessorKey: "user_id", sortable: true, hideable: true, size: COL.owner, meta: { align: "left", autoWidth: true } },
+        { id: "created_at", header: t('search_scheduler_job.created_at'), accessorKey: "created_at", sortable: true, hideable: true, size: COL.createdAt, meta: { align: "left" } },
+        { id: "start_time", header: t('search_scheduler_job.start_time'), accessorKey: "start_time", sortable: true, hideable: true, size: COL.date, meta: { align: "left" } },
+        { id: "duration", header: t('search_scheduler_job.duration'), accessorKey: "duration", sortable: false, hideable: true, size: COL.duration, meta: { align: "left" } },
+        { id: "status", header: t('search_scheduler_job.status'), accessorKey: "status", cell: " ", sortable: false, hideable: true, size: COL.status, meta: { align: "left" } },
         { id: "actions", header: t('search_scheduler_job.actions'), isAction: true, size: 120, meta: { align: "center", cellClass: "actions-column", actionCount: 4 } },
       ];
     };
@@ -687,6 +704,8 @@ export default defineComponent({
     watch(
       () => props.isClicked,
       (value) => {
+        // v-show sub-view of the Logs page: own the keyboard scope only while visible.
+        getManager()?.setScope(value ? "search-schedulers" : "logs");
         if (value && !isLoading.value) {
           fetchSearchHistory();
         }
@@ -763,6 +782,14 @@ export default defineComponent({
       searchObj.meta.jobId = row.id;
       goToLogs(row);
     };
+    useShortcuts([
+      { id: "searchSchedulersRefresh", handler: () => { if (!isInputFocused()) fetchSearchHistory(); } },
+    ]);
+    // useShortcuts activates this sub-view's scope on mount, but it mounts while
+    // hidden inside the Logs page — restore the logs scope until it's shown.
+    onMounted(() => {
+      if (!props.isClicked) getManager()?.setScope("logs");
+    });
     return {
       searchObj,
       store,
@@ -770,6 +797,8 @@ export default defineComponent({
       fetchSearchHistory,
       dataToBeLoaded,
       columnsToBeRendered,
+      columnVisibility,
+      setColumnVisibility,
       config,
       t,
       route,
