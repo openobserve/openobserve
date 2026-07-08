@@ -128,7 +128,19 @@ describe('AddFunction.vue Branch Coverage', () => {
       await flushPromises();
 
       expect((wrapper.vm as any).beingUpdated).toBe(false);
-      expect(createSpy).toHaveBeenCalled();
+      // Payload parity (Rule ④): assert the EXACT object — keys AND value types —
+      // handed to the save service, not merely that it was called. `transType`
+      // MUST be a number (parseInt), guarding the string→number type-drift class
+      // that broke dashboards' max_record_size; `function`/`params` are the
+      // Monaco body + hidden constant merged in from `formData` at submit.
+      expect(createSpy).toHaveBeenCalledWith('test-org', {
+        name: 'testFunction',
+        function: '',
+        params: 'row',
+        transType: 0,
+      });
+      const createPayload = createSpy.mock.calls[0][1] as any;
+      expect(typeof createPayload.transType).toBe('number');
       expect(wrapper.emitted('update:list')).toBeTruthy();
     });
 
@@ -143,7 +155,15 @@ describe('AddFunction.vue Branch Coverage', () => {
       await flushPromises();
 
       expect((wrapper.vm as any).beingUpdated).toBe(true);
-      expect(updateSpy).toHaveBeenCalled();
+      // Same exact-payload + numeric-transType parity check for the update path.
+      expect(updateSpy).toHaveBeenCalledWith('test-org', {
+        name: 'testFunction',
+        function: '',
+        params: 'row',
+        transType: 0,
+      });
+      const updatePayload = updateSpy.mock.calls[0][1] as any;
+      expect(typeof updatePayload.transType).toBe('number');
     });
   });
 
